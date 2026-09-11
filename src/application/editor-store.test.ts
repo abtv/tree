@@ -130,4 +130,20 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'error', message: expect.stringContaining('missing') })
     expect(services.saves).toEqual([])
   })
+
+  it('returns to the parent level when a second image is pasted into the current parent', async () => {
+    const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+    services.load = async () => ({
+      version: 1,
+      document: { roots: [{ id: 'parent', text: '', attachment: { id: 'existing', mimeType: 'image/png' }, children: [] }] },
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    })
+    const store = new EditorStore(services, ids('new-image', 'sibling'))
+    await store.initialize()
+
+    await store.paste('parent', 0)
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'sibling' })
+  })
 })

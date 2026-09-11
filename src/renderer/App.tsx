@@ -78,7 +78,12 @@ export function App({ store }: AppProps): React.JSX.Element {
 
   return (
     <main className="editor-shell">
-      {currentParent === undefined ? null : <section className="current-parent" aria-label="Current parent">{input(currentParent, 'Current parent', true)}</section>}
+      {currentParent === undefined ? null : (
+        <section className="current-parent" aria-label="Current parent">
+          {input(currentParent, 'Current parent', true)}
+          {currentParent.attachment === undefined ? null : <AttachmentImage attachmentId={currentParent.attachment.id} />}
+        </section>
+      )}
       <section className="node-list" aria-label="Nodes">
         <DropZone index={0} onDrop={onDrop} />
         {nodes.map((node, index) => (

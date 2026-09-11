@@ -321,9 +321,10 @@ export class EditorStore {
           this.applyStructural(attachImage(this.snapshot.document, nodeId, attachment), this.snapshot.location, this.newFocus(nodeId, target.text.length))
         } else {
           const newId = this.createId()
+          const outerLocation = this.locationForSiblingOf(this.snapshot.document, nodeId, newId, this.snapshot.location)
           this.applyStructural(
             insertSiblingAfter(this.snapshot.document, nodeId, newId, '', attachment),
-            { ...this.snapshot.location, selectedNodeId: newId },
+            outerLocation,
             this.newFocus(newId, 0),
           )
         }
@@ -344,7 +345,7 @@ export class EditorStore {
     const finalLine = lines.at(-1) ?? ''
     this.applyStructural(
       pasteMultilineText(current.document, nodeId, cursor, lines, ids),
-      { ...current.location, selectedNodeId: finalNodeId ?? nodeId },
+      this.locationForSiblingOf(current.document, nodeId, finalNodeId ?? nodeId, current.location),
       this.newFocus(finalNodeId ?? nodeId, finalLine.length),
     )
   }
@@ -407,6 +408,13 @@ export class EditorStore {
       throw new Error('An undo state must contain a root node.')
     }
     return { currentParentId: null, selectedNodeId: root.id }
+  }
+
+  private locationForSiblingOf(document: Document, nodeId: NodeId, selectedNodeId: NodeId, location: Location): Location {
+    if (location.currentParentId !== nodeId) {
+      return { ...location, selectedNodeId }
+    }
+    return { currentParentId: requireNode(document, nodeId).parent?.id ?? null, selectedNodeId }
   }
 
   private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, persist: boolean): void {
