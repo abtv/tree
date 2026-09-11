@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -40,5 +40,28 @@ describe('file services', () => {
 
     expect(await services.readAttachment('keep')).toEqual(new Uint8Array([1]))
     expect(await services.readAttachment('remove')).toBeNull()
+  })
+
+  it('returns null when no document has been saved yet', async () => {
+    const { services } = await servicesForTest()
+    expect(await services.load()).toBeNull()
+  })
+
+  it('propagates malformed document data instead of hiding it', async () => {
+    const { directory, services } = await servicesForTest()
+    await writeFile(join(directory, 'document.json'), '{ not valid json', 'utf8')
+
+    await expect(services.load()).rejects.toThrow()
+  })
+
+  it('reports attachment presence and rejects unsafe attachment IDs', async () => {
+    const { services } = await servicesForTest()
+    await services.writeAttachment('present', new Uint8Array([1]))
+
+    expect(await services.hasAttachment('present')).toBe(true)
+    expect(await services.hasAttachment('missing')).toBe(false)
+
+    await expect(services.writeAttachment('bad/id', new Uint8Array([1]))).rejects.toThrow('Attachment IDs')
+    await expect(services.readAttachment('bad/id')).rejects.toThrow('Attachment IDs')
   })
 })

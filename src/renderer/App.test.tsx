@@ -253,4 +253,142 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('B')
   })
+
+  it('shows a loading state before the document is ready', () => {
+    render(<App store={createStore()} />)
+    expect(screen.getByText('Loading document…')).toBeInTheDocument()
+  })
+
+  it('shows an error state when the document cannot be loaded', async () => {
+    const services: EditorServices = {
+      load: async () => { throw new Error('boom') },
+      save: async () => undefined,
+      readClipboard: async () => ({ kind: 'text', text: '' }),
+      writeAttachment: async () => undefined,
+      hasAttachment: async () => true,
+      cleanupAttachments: async () => undefined,
+    }
+    const store = new EditorStore(services, () => 'root')
+    await act(async () => { await store.initialize() })
+
+    render(<App store={store} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('boom')
+  })
+
+  it('selects a node when its input receives focus', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'child' } })
+
+    fireEvent.focus(screen.getByRole('textbox', { name: 'Node 1' }))
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'root' } })
+  })
+
+  it('ignores keys during composition', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const node = screen.getByRole('textbox', { name: 'Node 1' })
+
+    fireEvent.compositionStart(node)
+    fireEvent.keyDown(node, { key: 'Enter' })
+    expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+
+    fireEvent.compositionEnd(node)
+    fireEvent.keyDown(node, { key: 'Enter' })
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
+  })
+
+  it('handles cut as a standalone text edit', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const node = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+
+    fireEvent.change(node, { target: { value: 'a' } })
+    fireEvent.cut(node)
+    fireEvent.change(node, { target: { value: 'ab' } })
+    fireEvent.keyDown(node, { key: 'z', metaKey: true })
+
+    expect(node).toHaveValue('a')
+  })
+
+  it('pastes at the cursor', async () => {
+    const store = createStore({ kind: 'text', text: 'XY' })
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+
+    fireEvent.change(first, { target: { value: 'ab' } })
+    first.setSelectionRange(1, 1)
+    await act(async () => { fireEvent.paste(first) })
+
+    expect(first).toHaveValue('aXYb')
+  })
+
+  it('dispatches navigation keys', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    const second = screen.getByRole('textbox', { name: 'Node 2' })
+
+    fireEvent.keyDown(second, { key: 'ArrowUp' })
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'root' } })
+    fireEvent.keyDown(first, { key: 'ArrowDown' })
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'child' } })
+    fireEvent.keyDown(first, { key: 'ArrowLeft' })
+  })
+
+  it('dispatches undo and redo keys', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'z', metaKey: true })
+    expect(first).toHaveValue('')
+    fireEvent.keyDown(first, { key: 'z', metaKey: true, shiftKey: true })
+    expect(first).toHaveValue('A')
+  })
+
+  it('deletes the selected node with Cmd+Backspace', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 2' }), { key: 'Backspace', metaKey: true })
+
+    expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
+  })
+
+  it('falls back to the dragged node when the drop carries no id', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const transfer = { dropEffect: '', effectAllowed: '', setData() {}, getData() { return '' } }
+
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
+    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
+    fireEvent.drop(screen.getByLabelText('Drop position 3'), { dataTransfer: transfer })
+
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
+  })
 })

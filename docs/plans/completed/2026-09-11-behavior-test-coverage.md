@@ -88,3 +88,7 @@ All eight planned fixes were implemented:
 `npm run check:full` passes: type checking, linting, 64 unit/component tests, build, and 36 end-to-end tests.
 
 `src/application/editor-store.ts` coverage is now 96.35% statements / 86.23% branches. The remaining uncovered lines are defensive throws, mid-await selection races, and cleanup-failure handling, which are not product logic.
+
+Follow-up (same coverage initiative): added tests for `clipboard.ts` (text/empty fallback) and `file-services.ts` (missing document, malformed data, attachment presence, unsafe IDs), bringing both to 100%, and for `App.tsx` (loading/error states, focus selection, composition guard, cut, paste, key dispatch, drag fallback), bringing it to 93.9% statements / 86.0% branches. Project totals: 86.29% statements / 83.98% branches / 78.33% functions / 87.23% lines, 79 unit/component tests and 36 end-to-end tests.
+
+The remaining low-coverage files are Electron entrypoints and the preload bridge (`main/index.ts`, `preload/index.ts`, `renderer/main.tsx`, `electron-services.ts`, `shared/ipc.ts`). They contain no business logic and are exercised by every end-to-end launch.
