@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent } from 'react'
+import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, SyntheticEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { nodePath, type TreeNode } from '../domain/document'
 import { readAttachment } from '../infrastructure/renderer/electron-services'
@@ -11,7 +11,6 @@ interface AppProps {
 export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const inputs = useRef(new Map<string, HTMLInputElement>())
-  const skipSelectionBoundary = useRef(false)
   const composing = useRef(false)
   const [draggedNodeId, setDraggedNodeId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
@@ -37,14 +36,14 @@ export function App({ store }: AppProps): React.JSX.Element {
     else inputs.current.set(id, input)
   }
   const onChange = (nodeId: string) => (event: ChangeEvent<HTMLInputElement>): void => {
-    skipSelectionBoundary.current = true
     store.editText(nodeId, event.currentTarget.value)
-    queueMicrotask(() => { skipSelectionBoundary.current = false })
   }
   const onFocus = (nodeId: string) => (event: FocusEvent<HTMLInputElement>): void => {
     if (state.location.selectedNodeId !== nodeId) store.selectNode(nodeId, event.currentTarget.selectionStart ?? 0)
   }
-  const onSelect = (): void => { if (!skipSelectionBoundary.current) store.endTextSession() }
+  const onSelect = (event: SyntheticEvent<HTMLInputElement>): void => {
+    if (event.currentTarget.selectionStart !== event.currentTarget.selectionEnd) store.endTextSession()
+  }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (composing.current) return
     const cursor = event.currentTarget.selectionStart ?? 0
@@ -56,6 +55,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     else if (event.key === 'Enter') { event.preventDefault(); store.createSiblingOrFirstChild(cursor) }
     else if (event.key === 'ArrowUp') { event.preventDefault(); store.moveSelection('up', cursor) }
     else if (event.key === 'ArrowDown') { event.preventDefault(); store.moveSelection('down', cursor) }
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End' || event.key === 'PageUp' || event.key === 'PageDown') store.endTextSession()
   }
   const onPaste = (nodeId: string) => (event: ClipboardEvent<HTMLInputElement>): void => {
     event.preventDefault()
@@ -84,7 +84,7 @@ export function App({ store }: AppProps): React.JSX.Element {
       ref={setInput(node.id)} aria-label={label} className={parent ? 'node-input current-parent-input' : 'node-input'} value={node.text}
       onBlur={() => store.endTextSession()} onChange={onChange(node.id)} onCompositionEnd={() => { composing.current = false }}
       onCompositionStart={() => { composing.current = true }} onCut={() => store.markNextTextEditStandalone()} onFocus={onFocus(node.id)}
-      onKeyDown={onKeyDown} onPaste={onPaste(node.id)} onSelect={onSelect} spellCheck
+      onKeyDown={onKeyDown} onMouseDown={() => store.endTextSession()} onPaste={onPaste(node.id)} onSelect={onSelect} spellCheck
     />
   )
 

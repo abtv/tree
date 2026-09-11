@@ -36,6 +36,40 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('rent')
   })
 
+  it('keeps consecutive text edits in one undo session when the caret advances', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+
+    fireEvent.change(root, { target: { value: 'F' } })
+    await act(async () => undefined)
+    fireEvent.select(root)
+    fireEvent.change(root, { target: { value: 'Fi' } })
+    fireEvent.change(root, { target: { value: 'Fir' } })
+
+    fireEvent.keyDown(root, { key: 'z', metaKey: true })
+
+    expect(root).toHaveValue('')
+  })
+
+  it('ends the text session when the user selects text within the node', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+
+    fireEvent.change(root, { target: { value: 'Fir' } })
+    await act(async () => undefined)
+    root.setSelectionRange(0, 3)
+    fireEvent.select(root)
+    fireEvent.change(root, { target: { value: 'First' } })
+
+    fireEvent.keyDown(root, { key: 'z', metaKey: true })
+
+    expect(root).toHaveValue('Fir')
+  })
+
   it('renders and edits the current parent after entering an empty node', async () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
