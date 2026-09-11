@@ -83,9 +83,11 @@ A thin toolbar at the top of the application displays the current location.
 
 At the root level, the toolbar displays only an outline-root glyph representing the implicit document container. The document container itself has no visible text label.
 
-Below the root level, the toolbar displays a read-only breadcrumb beginning with the outline-root glyph and continuing through every ancestor to the current parent. The current parent is the final breadcrumb segment.
+Below the root level, the toolbar displays a breadcrumb beginning with the outline-root glyph and continuing through every ancestor to the current parent. The current parent is the final breadcrumb segment.
 
-The location path represents the current parent/location, not the selected child. It is display-only and does not provide direct navigation.
+The location path represents the current parent/location, not the selected child. The outline-root glyph and each ancestor segment are clickable navigation controls. Clicking the outline-root glyph returns to the top-level root nodes. Clicking an ancestor segment displays that ancestor's immediate children.
+
+When navigation moves to an ancestor through the location path, the direct child on the path from the destination to the previous location becomes selected and its text cursor is placed at the beginning. Clicking the current-parent segment does nothing.
 
 ---
 
