@@ -25,10 +25,13 @@ button, input, textarea { font: inherit; }
   color: #778187;
   font-size: 14px;
   line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .location-root {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 18px;
@@ -49,17 +52,28 @@ button, input, textarea { font: inherit; }
   stroke-width: 1.4;
 }
 
-.location-segment { display: inline-flex; align-items: center; min-width: 0; }
+.location-segment { display: inline-flex; align-items: center; min-width: 0; flex: 0 1 auto; }
 
-.location-separator { margin: 0 9px; color: #b1b8bc; font-size: 20px; font-weight: 300; }
+.location-separator { flex: 0 0 auto; margin: 0 9px; color: #b1b8bc; font-size: 20px; font-weight: 300; }
 
 .location-link {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .location-root:hover, .location-link:hover { color: #596267; }

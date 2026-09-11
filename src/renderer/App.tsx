@@ -98,10 +98,10 @@ export function App({ store }: AppProps): React.JSX.Element {
       <header className="location-bar" aria-label="Current location">
         <button aria-label="Top level" className="location-root" onClick={() => store.navigateToAncestor(null)} type="button"><OutlineRootIcon /></button>
         {path.map((node) => (
-          <span className="location-segment" key={node.id}>
+          <span className="location-segment" key={node.id} style={{ flexShrink: node.text.length + 1 }}>
             <span className="location-separator">›</span>
-            {node.id === state.location.currentParentId ? <span>{node.text}</span> : (
-              <button className="location-link" onClick={() => store.navigateToAncestor(node.id)} type="button">{node.text}</button>
+            {node.id === state.location.currentParentId ? <span className="location-current" title={node.text}>{node.text}</span> : (
+              <button className="location-link" onClick={() => store.navigateToAncestor(node.id)} title={node.text} type="button">{node.text}</button>
             )}
           </span>
         ))}
