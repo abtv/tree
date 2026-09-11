@@ -98,19 +98,21 @@ Product rules that determine how the tree behaves belong in the domain or applic
 
 ## 5. Domain Model
 
-The core document is a tree.
+The core document is an ordered collection of trees.
 
 Conceptually:
 
 ```text id="9j1g2m"
 Document
+├── Root Node
+│   ├── Node
+│   │   ├── Child
+│   │   └── Child
+│   └── Node
 └── Root Node
-    ├── Node
-    │   ├── Child
-    │   └── Child
-    ├── Node
-    └── Node
 ```
+
+The document is the implicit container for top-level root nodes. It is not itself a node and is not persisted as a synthetic node. Top-level root nodes have no parent node.
 
 A node contains:
 
@@ -241,15 +243,15 @@ Exact cursor position, focus state, navigation stack, and undo/redo history are 
 
 ## 10. Navigation
 
-Navigation is separate from the tree itself.
+Navigation is separate from the document's trees.
 
-The tree represents the document structure.
+The root collection and its trees represent the document structure.
 
-Navigation represents where the user currently is in that tree.
+Navigation represents where the user currently is in the document structure.
 
 The application maintains:
 
-* current parent;
+* current parent, which is absent at the top-level document container;
 * selected node;
 * runtime navigation history.
 
@@ -542,8 +544,8 @@ The following rules should remain true unless the architecture is explicitly cha
 4. Electron-specific APIs do not leak into the domain.
 5. Attachments are not embedded as base64 data in the document JSON.
 6. Node IDs remain stable.
-7. Parent relationships are derived from the tree unless explicitly changed.
-8. Navigation history is separate from the persistent tree.
+7. Parent relationships are derived from each tree; top-level root nodes have no parent node.
+8. Navigation history is separate from the persistent document structure.
 9. Undo/redo is separate from persistent document state.
 10. Major architectural changes require explicit approval.
 

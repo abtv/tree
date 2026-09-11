@@ -4,7 +4,7 @@
 
 Desktop application for macOS that combines the hierarchical text editing model of Workflowy with the navigation model of Windows Explorer.
 
-The application stores a tree of text nodes.
+The application stores an ordered collection of top-level root nodes. Each root node is the root of a tree of text nodes.
 
 Each node:
 
@@ -14,7 +14,7 @@ Each node:
 * may contain at most one image attachment;
 * can be edited inline.
 
-The user is always viewing one level of the tree: the immediate children of the current parent.
+The user is always viewing one level: either the top-level root nodes or the immediate children of the current parent.
 
 The application is keyboard-first. Mouse interaction is primarily used for drag-and-drop reordering.
 
@@ -39,13 +39,23 @@ Projects
 
 A node may contain child nodes.
 
+The document is an implicit container for the top-level root nodes.
+
+The implicit document container:
+
+* is not a tree node;
+* is not displayed or edited;
+* may contain multiple top-level root nodes.
+
+At the root level, the user views and edits the top-level root nodes. Below the root level, the user views the immediate children of a real current-parent node.
+
 The UI does not display the entire expanded tree.
 
 The user enters a node to view and edit its children.
 
-The node representing the current parent is displayed as contextual information and is visually highlighted.
+The node representing the current parent is displayed as contextual information, is visually highlighted, and can be edited inline.
 
-The current parent is a real tree node, not a fake UI-only title.
+Below the root level, the current parent is a real tree node, not a fake UI-only title.
 
 If the current parent's text changes, the displayed context must update immediately.
 
@@ -57,7 +67,7 @@ The current parent is not part of `↑` / `↓` sibling navigation.
 
 On first launch, when no document exists:
 
-* create one empty root node;
+* create one empty top-level root node;
 * display it;
 * place the text cursor into it.
 
@@ -99,9 +109,9 @@ Cursor-position behavior is the same as for `↑`.
 
 ### 5.1 Enter
 
-`Enter` always creates a new sibling on the same level.
+When focus is on a node in the currently displayed level, `Enter` always creates a new sibling on the same level.
 
-It never creates a child.
+In that context, it never creates a child.
 
 The new node is inserted immediately after the current node.
 
@@ -117,8 +127,10 @@ Press `Enter`:
 
 ```text
 Current
-New node|
+|
 ```
+
+The new node has empty text. The UI does not display a `New node` placeholder.
 
 ### Cursor at the beginning
 
@@ -183,7 +195,11 @@ It does not create or modify nodes.
 
 If the selected node has no children:
 
-* display an empty list for that level.
+* display an empty list for that level;
+* do not create a child automatically;
+* keep the text cursor in the editable current-parent field.
+
+When the child list is empty, pressing `Enter` while the current parent is focused creates the first empty child and moves the text cursor to that child.
 
 Example:
 
@@ -339,6 +355,10 @@ Undo/redo must support:
 
 Stable node IDs must survive undo and redo.
 
+Consecutive text edits are grouped into a continuous editing session for undo purposes.
+
+Undo and redo do not restore the previous selection, text cursor position, or navigation state. The application must still keep those runtime states valid after the document changes.
+
 Undo/redo history does not need to survive application restart.
 
 ---
@@ -347,7 +367,7 @@ Undo/redo history does not need to survive application restart.
 
 Mouse drag-and-drop is supported for sibling reordering.
 
-Drag-and-drop is allowed only between immediate children of the current parent.
+Drag-and-drop is allowed only between nodes on the displayed level: either top-level root nodes or immediate children of the current parent.
 
 A drag operation:
 
@@ -395,6 +415,8 @@ D
 ## 12. Clipboard
 
 `Cmd+V` is the normal system paste operation.
+
+Paste uses the current clipboard item created by the most recent copy operation. It does not use older clipboard history.
 
 The application must support:
 
@@ -509,9 +531,9 @@ The document must persist between application restarts.
 
 The following state must be persisted:
 
-* the tree;
+* the ordered top-level root nodes and their trees;
 * stable node IDs;
-* the current parent;
+* the current parent, or the root-level location when there is no current parent;
 * the selected node.
 
 The exact text cursor position does not need to be persisted.
@@ -592,3 +614,13 @@ The user normally interacts with the application through:
 * mouse drag-and-drop for sibling reordering.
 
 The tree hierarchy is primarily navigated by entering and leaving nodes rather than by expanding and collapsing a full tree view.
+
+---
+
+## 21. Open Product Decisions
+
+The following product behavior requires Product Owner clarification before implementation:
+
+* focus and keyboard behavior for the editable current parent when it already has children, including `Enter`, `↑`, `↓`, `Cmd+.`, and `Cmd+Backspace`;
+* the events and any idle interval that end a continuous text-editing session for undo grouping;
+* paste precedence when the current clipboard item exposes both image and text representations.
