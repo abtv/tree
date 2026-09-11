@@ -64,9 +64,9 @@ export function nodeCount(window: Page): Promise<number> {
 }
 
 export function nodeTexts(window: Page): Promise<string[]> {
-  return window.locator('[aria-label^="Node "]').evaluateAll((inputs) =>
-    inputs.map((input) => (input as HTMLTextAreaElement).value),
-  )
+  return window
+    .locator('[aria-label^="Node "]')
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLTextAreaElement).value))
 }
 
 export async function setCursor(input: ReturnType<Page['locator']>, position: number): Promise<void> {
@@ -119,19 +119,22 @@ export async function writeClipboardImageAndText(app: ElectronApplication): Prom
 }
 
 export async function writeClipboardImageSized(app: ElectronApplication, width: number, height: number): Promise<void> {
-  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }, size) => {
-    const pixels = Buffer.alloc(size.width * size.height * 4)
-    for (let offset = 0; offset < pixels.length; offset += 4) {
-      pixels[offset] = 40
-      pixels[offset + 1] = 90
-      pixels[offset + 2] = 200
-      pixels[offset + 3] = 255
-    }
-    const png = nativeImage.createFromBitmap(pixels, { width: size.width, height: size.height }).toPNG()
-    const item = new ClipboardItem({ 'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })
-    clipboard.clear()
-    await clipboard.write([item])
-  }, { width, height })
+  await app.evaluate(
+    async ({ clipboard, ClipboardItem, nativeImage }, size) => {
+      const pixels = Buffer.alloc(size.width * size.height * 4)
+      for (let offset = 0; offset < pixels.length; offset += 4) {
+        pixels[offset] = 40
+        pixels[offset + 1] = 90
+        pixels[offset + 2] = 200
+        pixels[offset + 3] = 255
+      }
+      const png = nativeImage.createFromBitmap(pixels, { width: size.width, height: size.height }).toPNG()
+      const item = new ClipboardItem({ 'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })
+      clipboard.clear()
+      await clipboard.write([item])
+    },
+    { width, height },
+  )
 }
 
 export async function firePaste(input: ReturnType<Page['locator']>): Promise<void> {

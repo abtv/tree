@@ -87,12 +87,17 @@ function firstLocation(document: Document): Location {
   return { currentParentId: null, selectedNodeId: root.id }
 }
 
-function createServices(loadValue: unknown | null, clipboard: () => { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array }): EditorServices & { saves: unknown[] } {
+function createServices(
+  loadValue: unknown | null,
+  clipboard: () => { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array },
+): EditorServices & { saves: unknown[] } {
   const saves: unknown[] = []
   return {
     saves,
     load: async () => loadValue,
-    save: async (state) => { saves.push(state) },
+    save: async (state) => {
+      saves.push(state)
+    },
     readClipboard: async () => clipboard(),
     writeAttachment: async () => undefined,
     hasAttachment: async () => true,
@@ -118,92 +123,100 @@ function assertInvariants(store: EditorStore): void {
 
 describe('EditorStore invariants under command sequences', () => {
   it('keeps the document and location valid after any command sequence', async () => {
-    await fc.assert(fc.asyncProperty(forest, fc.array(command, { minLength: 1, maxLength: 30 }), async (rawForest, commands) => {
-      const document = materialize(rawForest)
-      const clipboard: { current: { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array } } = { current: { kind: 'text', text: '' } }
-      const store = new EditorStore(createServices(
-        { version: 1, document, location: firstLocation(document) },
-        () => clipboard.current,
-      ), (() => {
-        let counter = 0
-        return () => `x${counter++}`
-      })())
-      await store.initialize()
-
-      for (const action of commands) {
-        const state = store.getSnapshot()
-        if (state.status !== 'ready') {
-          break
+    await fc.assert(
+      fc.asyncProperty(forest, fc.array(command, { minLength: 1, maxLength: 30 }), async (rawForest, commands) => {
+        const document = materialize(rawForest)
+        const clipboard: { current: { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array } } = {
+          current: { kind: 'text', text: '' },
         }
+        const store = new EditorStore(
+          createServices({ version: 1, document, location: firstLocation(document) }, () => clipboard.current),
+          (() => {
+            let counter = 0
+            return () => `x${counter++}`
+          })(),
+        )
+        await store.initialize()
 
-        const nodes = allNodes(state.document)
-        const displayed = displayedNodes(state.document, state.location.currentParentId)
+        for (const action of commands) {
+          const state = store.getSnapshot()
+          if (state.status !== 'ready') {
+            break
+          }
 
-        switch (action.kind) {
-          case 'edit':
-            if (nodes.length > 0) {
-              store.editText(nodes[action.a % nodes.length]!.id, action.text)
-            }
-            break
-          case 'split':
-            store.createSiblingOrFirstChild(action.a % 30)
-            break
-          case 'delete':
-            store.deleteSelected()
-            break
-          case 'deleteEmpty':
-            store.deleteEmptySelected()
-            break
-          case 'move':
-            if (displayed.length > 0) {
-              store.moveNodeTo(displayed[action.a % displayed.length]!.id, action.b % (displayed.length + 2))
-            }
-            break
-          case 'enter':
-            store.enter()
-            break
-          case 'leave':
-            store.leave()
-            break
-          case 'up':
-            store.moveSelection('up', action.a % 10)
-            break
-          case 'down':
-            store.moveSelection('down', action.a % 10)
-            break
-          case 'navigate':
-            store.navigateToAncestor(action.a % 2 === 0 ? null : state.location.currentParentId)
-            break
-          case 'undo':
-            store.undo()
-            break
-          case 'redo':
-            store.redo()
-            break
-          case 'paste':
-            clipboard.current = action.a % 2 === 0
-              ? { kind: 'text', text: action.text }
-              : { kind: 'text', text: `${action.text}\n${action.text}` }
-            await store.paste(state.location.selectedNodeId, action.b % 30)
-            break
-          case 'pasteImage':
-            clipboard.current = { kind: 'image', png: new Uint8Array([action.a % 256]) }
-            await store.paste(state.location.selectedNodeId, action.b % 30)
-            break
+          const nodes = allNodes(state.document)
+          const displayed = displayedNodes(state.document, state.location.currentParentId)
+
+          switch (action.kind) {
+            case 'edit':
+              if (nodes.length > 0) {
+                store.editText(nodes[action.a % nodes.length]!.id, action.text)
+              }
+              break
+            case 'split':
+              store.createSiblingOrFirstChild(action.a % 30)
+              break
+            case 'delete':
+              store.deleteSelected()
+              break
+            case 'deleteEmpty':
+              store.deleteEmptySelected()
+              break
+            case 'move':
+              if (displayed.length > 0) {
+                store.moveNodeTo(displayed[action.a % displayed.length]!.id, action.b % (displayed.length + 2))
+              }
+              break
+            case 'enter':
+              store.enter()
+              break
+            case 'leave':
+              store.leave()
+              break
+            case 'up':
+              store.moveSelection('up', action.a % 10)
+              break
+            case 'down':
+              store.moveSelection('down', action.a % 10)
+              break
+            case 'navigate':
+              store.navigateToAncestor(action.a % 2 === 0 ? null : state.location.currentParentId)
+              break
+            case 'undo':
+              store.undo()
+              break
+            case 'redo':
+              store.redo()
+              break
+            case 'paste':
+              clipboard.current =
+                action.a % 2 === 0
+                  ? { kind: 'text', text: action.text }
+                  : { kind: 'text', text: `${action.text}\n${action.text}` }
+              await store.paste(state.location.selectedNodeId, action.b % 30)
+              break
+            case 'pasteImage':
+              clipboard.current = { kind: 'image', png: new Uint8Array([action.a % 256]) }
+              await store.paste(state.location.selectedNodeId, action.b % 30)
+              break
+          }
+
+          assertInvariants(store)
         }
-
-        assertInvariants(store)
-      }
-    }), { numRuns: 500 })
+      }),
+      { numRuns: 500 },
+    )
   })
 
   it('preserves node ids that survive an operation', () => {
-    fc.assert(fc.property(forest, (rawForest) => {
-      const document = materialize(rawForest)
-      const ids = allIds(document)
-      const clone = { roots: document.roots.map(cloneNode) }
+    fc.assert(
+      fc.property(forest, (rawForest) => {
+        const document = materialize(rawForest)
+        const ids = allIds(document)
+        const clone = { roots: document.roots.map(cloneNode) }
 
-      expect(allIds(clone)).toEqual(ids)
-    }))
+        expect(allIds(clone)).toEqual(ids)
+      }),
+    )
   })
 })

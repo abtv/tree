@@ -73,7 +73,15 @@ export default tseslint.config(
           ...platformImportRestrictions,
           patterns: [
             {
-              group: ['react', 'react/*', '../application/**', '../infrastructure/**', '../main/**', '../preload/**', '../renderer/**'],
+              group: [
+                'react',
+                'react/*',
+                '../application/**',
+                '../infrastructure/**',
+                '../main/**',
+                '../preload/**',
+                '../renderer/**',
+              ],
               message: 'The domain must not depend on UI, application orchestration, or infrastructure.',
             },
           ],

@@ -132,7 +132,10 @@ export class EditorStore {
       return
     }
     this.endTextSession()
-    this.replaceReady({ ...state, location: { ...state.location, selectedNodeId: nodeId }, focus: this.newFocus(nodeId, cursor) }, true)
+    this.replaceReady(
+      { ...state, location: { ...state.location, selectedNodeId: nodeId }, focus: this.newFocus(nodeId, cursor) },
+      true,
+    )
   }
 
   public editText(nodeId: NodeId, text: string): void {
@@ -318,7 +321,11 @@ export class EditorStore {
     const next = selected.siblings[selected.index + 1]
     const document = deleteNode(state.document, selected.node.id)
     if (previous !== undefined) {
-      this.applyStructural(document, { ...state.location, selectedNodeId: previous.id }, this.newFocus(previous.id, previous.text.length))
+      this.applyStructural(
+        document,
+        { ...state.location, selectedNodeId: previous.id },
+        this.newFocus(previous.id, previous.text.length),
+      )
       return
     }
     if (selected.parent !== null) {
@@ -376,7 +383,11 @@ export class EditorStore {
         }
         const target = requireNode(this.snapshot.document, nodeId).node
         if (target.attachment === undefined) {
-          this.applyStructural(attachImage(this.snapshot.document, nodeId, attachment), this.snapshot.location, this.newFocus(nodeId, target.text.length))
+          this.applyStructural(
+            attachImage(this.snapshot.document, nodeId, attachment),
+            this.snapshot.location,
+            this.newFocus(nodeId, target.text.length),
+          )
         } else {
           const newId = this.createId()
           const outerLocation = this.locationForSiblingOf(this.snapshot.document, nodeId, newId, this.snapshot.location)
@@ -394,7 +405,11 @@ export class EditorStore {
     }
 
     if (!clipboard.text.includes('\n') && !clipboard.text.includes('\r')) {
-      this.applyStructural(pasteText(current.document, nodeId, cursor, clipboard.text), current.location, this.newFocus(nodeId, cursor + clipboard.text.length))
+      this.applyStructural(
+        pasteText(current.document, nodeId, cursor, clipboard.text),
+        current.location,
+        this.newFocus(nodeId, cursor + clipboard.text.length),
+      )
       return
     }
     const lines = clipboard.text.replace(/\r\n?/g, '\n').split('\n')
@@ -417,7 +432,10 @@ export class EditorStore {
     const state = this.ready()
     this.future.push(cloneDocument(state.document))
     const location = this.reconcileLocation(previous, state.document, state.location)
-    this.replaceReady({ ...state, document: previous, location, focus: this.newFocus(location.selectedNodeId, 0) }, true)
+    this.replaceReady(
+      { ...state, document: previous, location, focus: this.newFocus(location.selectedNodeId, 0) },
+      true,
+    )
   }
 
   public redo(): void {
@@ -454,8 +472,12 @@ export class EditorStore {
     if (isValidLocation(document, previousLocation)) {
       return previousLocation
     }
-    const current = previousLocation.currentParentId === null ? undefined : locateNode(previousDocument, previousLocation.currentParentId)
-    const candidates = current === undefined ? [] : [...current.ancestors.map((node) => node.id), current.node.id].reverse()
+    const current =
+      previousLocation.currentParentId === null
+        ? undefined
+        : locateNode(previousDocument, previousLocation.currentParentId)
+    const candidates =
+      current === undefined ? [] : [...current.ancestors.map((node) => node.id), current.node.id].reverse()
     for (const candidate of candidates) {
       if (locateNode(document, candidate) !== undefined) {
         return { currentParentId: candidate, selectedNodeId: candidate }
@@ -468,7 +490,12 @@ export class EditorStore {
     return { currentParentId: null, selectedNodeId: root.id }
   }
 
-  private locationForSiblingOf(document: Document, nodeId: NodeId, selectedNodeId: NodeId, location: Location): Location {
+  private locationForSiblingOf(
+    document: Document,
+    nodeId: NodeId,
+    selectedNodeId: NodeId,
+    location: Location,
+  ): Location {
     if (location.currentParentId !== nodeId) {
       return { ...location, selectedNodeId }
     }

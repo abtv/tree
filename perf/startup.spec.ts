@@ -11,7 +11,9 @@ async function measureStartup(userDataDir: string, scenario: string, seed?: Seed
   const launchMs = nodePerformance.now() - start
   const rendererMs = await window.evaluate(() => performance.now())
 
-  console.log(`PERF ${JSON.stringify({ kind: 'startup', scenario, launchMs: round(launchMs), rendererMs: round(rendererMs) })}`)
+  console.log(
+    `PERF ${JSON.stringify({ kind: 'startup', scenario, launchMs: round(launchMs), rendererMs: round(rendererMs) })}`,
+  )
 
   expect(launchMs).toBeLessThan(15_000)
   expect(rendererMs).toBeLessThan(15_000)

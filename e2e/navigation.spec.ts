@@ -30,7 +30,9 @@ test.describe('navigation', () => {
     expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
   })
 
-  test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({ userDataDir }) => {
+  test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({
+    userDataDir,
+  }) => {
     const { window } = await launchTree(userDataDir)
 
     await typeInto(node(window, 1), 'Projects')

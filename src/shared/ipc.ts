@@ -10,9 +10,7 @@ export const ipcChannels = {
   cleanupAttachments: 'tree:cleanup-attachments',
 } as const
 
-export type ClipboardPayload =
-  | { kind: 'text'; text: string }
-  | { kind: 'image'; png: Uint8Array }
+export type ClipboardPayload = { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array }
 
 export interface TreeApi {
   load(): Promise<unknown | null>

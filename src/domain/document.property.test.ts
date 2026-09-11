@@ -105,155 +105,191 @@ function positionOf(text: string, cursor: number): number {
 
 describe('document invariants', () => {
   it('round-trips any valid document and location through serialization', () => {
-    fc.assert(fc.property(forest, fc.nat(), (rawForest, seed) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
-      const state = serializeState(document, locationFor(document, node))
+    fc.assert(
+      fc.property(forest, fc.nat(), (rawForest, seed) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const state = serializeState(document, locationFor(document, node))
 
-      expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
-    }))
+        expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
+      }),
+    )
   })
 
   it('splitNode reconstructs the text and keeps the image and children on the original', () => {
-    fc.assert(fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), (rawForest, seed, cursor) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
-      const before = locateNode(document, node.id)!.node
-
-      const result = splitNode(document, node.id, cursor, 'split-node')
-      const located = locateNode(result, node.id)!
-      const created = located.siblings[located.index + 1]!
-      const position = positionOf(before.text, cursor)
-
-      expect(located.node.text + created.text).toBe(before.text)
-      expect(located.node.text).toBe(before.text.slice(0, position))
-      expect(created.text).toBe(before.text.slice(position))
-      expect(created.attachment).toBeUndefined()
-      expect(located.node.attachment).toEqual(before.attachment)
-      expect(located.node.children).toEqual(before.children)
-    }))
-  })
-
-  it('pasteText inserts at the clamped cursor and leaves every other node intact', () => {
-    fc.assert(fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, insert) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
-      const before = locateNode(document, node.id)!.node
-
-      const result = pasteText(document, node.id, cursor, insert)
-      const after = locateNode(result, node.id)!.node
-      const position = positionOf(before.text, cursor)
-
-      expect(after.text).toBe(before.text.slice(0, position) + insert + before.text.slice(position))
-      expect(allIds(result)).toEqual(allIds(document))
-    }))
-  })
-
-  it('pasteMultilineText inserts the lines and moves the image to the final node', () => {
-    fc.assert(fc.property(
-      forest,
-      fc.nat(),
-      fc.integer({ min: -2, max: 40 }),
-      fc.array(fc.string(), { minLength: 2, maxLength: 4 }),
-      (rawForest, seed, cursor, lines) => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), (rawForest, seed, cursor) => {
         const document = materialize(rawForest)
         const node = pick(document, seed)
         const before = locateNode(document, node.id)!.node
-        const position = positionOf(before.text, cursor)
-        const suffix = before.text.slice(position)
-        const ids = lines.slice(1).map((_, index) => `pasted-${index}`)
 
-        const result = pasteMultilineText(document, node.id, cursor, lines, ids)
+        const result = splitNode(document, node.id, cursor, 'split-node')
         const located = locateNode(result, node.id)!
-        const created = located.siblings.slice(located.index + 1, located.index + 1 + ids.length)
+        const created = located.siblings[located.index + 1]!
+        const position = positionOf(before.text, cursor)
 
-        expect(located.node.text).toBe(before.text.slice(0, position) + lines[0])
-        expect(located.node.attachment).toBeUndefined()
-        expect(created.map((entry) => entry.id)).toEqual(ids)
-        expect(created.map((entry) => entry.text)).toEqual(
-          lines.slice(1).map((line, index) => (index === lines.length - 2 ? line + suffix : line)),
-        )
-        expect(created.at(-1)!.attachment).toEqual(before.attachment)
-      },
-    ))
+        expect(located.node.text + created.text).toBe(before.text)
+        expect(located.node.text).toBe(before.text.slice(0, position))
+        expect(created.text).toBe(before.text.slice(position))
+        expect(created.attachment).toBeUndefined()
+        expect(located.node.attachment).toEqual(before.attachment)
+        expect(located.node.children).toEqual(before.children)
+      }),
+    )
+  })
+
+  it('pasteText inserts at the clamped cursor and leaves every other node intact', () => {
+    fc.assert(
+      fc.property(
+        forest,
+        fc.nat(),
+        fc.integer({ min: -2, max: 40 }),
+        fc.string(),
+        (rawForest, seed, cursor, insert) => {
+          const document = materialize(rawForest)
+          const node = pick(document, seed)
+          const before = locateNode(document, node.id)!.node
+
+          const result = pasteText(document, node.id, cursor, insert)
+          const after = locateNode(result, node.id)!.node
+          const position = positionOf(before.text, cursor)
+
+          expect(after.text).toBe(before.text.slice(0, position) + insert + before.text.slice(position))
+          expect(allIds(result)).toEqual(allIds(document))
+        },
+      ),
+    )
+  })
+
+  it('pasteMultilineText inserts the lines and moves the image to the final node', () => {
+    fc.assert(
+      fc.property(
+        forest,
+        fc.nat(),
+        fc.integer({ min: -2, max: 40 }),
+        fc.array(fc.string(), { minLength: 2, maxLength: 4 }),
+        (rawForest, seed, cursor, lines) => {
+          const document = materialize(rawForest)
+          const node = pick(document, seed)
+          const before = locateNode(document, node.id)!.node
+          const position = positionOf(before.text, cursor)
+          const suffix = before.text.slice(position)
+          const ids = lines.slice(1).map((_, index) => `pasted-${index}`)
+
+          const result = pasteMultilineText(document, node.id, cursor, lines, ids)
+          const located = locateNode(result, node.id)!
+          const created = located.siblings.slice(located.index + 1, located.index + 1 + ids.length)
+
+          expect(located.node.text).toBe(before.text.slice(0, position) + lines[0])
+          expect(located.node.attachment).toBeUndefined()
+          expect(created.map((entry) => entry.id)).toEqual(ids)
+          expect(created.map((entry) => entry.text)).toEqual(
+            lines.slice(1).map((line, index) => (index === lines.length - 2 ? line + suffix : line)),
+          )
+          expect(created.at(-1)!.attachment).toEqual(before.attachment)
+        },
+      ),
+    )
   })
 
   it('moveSibling permutes siblings and preserves subtrees and ids', () => {
-    fc.assert(fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 20 }), (rawForest, seed, destination) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
-      const located = locateNode(document, node.id)!
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 20 }), (rawForest, seed, destination) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const located = locateNode(document, node.id)!
 
-      const result = moveSibling(document, node.id, destination)
-      const moved = locateNode(result, node.id)!
+        const result = moveSibling(document, node.id, destination)
+        const moved = locateNode(result, node.id)!
 
-      expect(moved.siblings.map((entry) => entry.id).slice().sort()).toEqual(located.siblings.map((entry) => entry.id).slice().sort())
-      expect(moved.node.children).toEqual(located.node.children)
-      expect(allIds(result).slice().sort()).toEqual(allIds(document).slice().sort())
-    }))
+        expect(
+          moved.siblings
+            .map((entry) => entry.id)
+            .slice()
+            .sort(),
+        ).toEqual(
+          located.siblings
+            .map((entry) => entry.id)
+            .slice()
+            .sort(),
+        )
+        expect(moved.node.children).toEqual(located.node.children)
+        expect(allIds(result).slice().sort()).toEqual(allIds(document).slice().sort())
+      }),
+    )
   })
 
   it('moveSibling to the current index is a no-op', () => {
-    fc.assert(fc.property(forest, fc.nat(), (rawForest, seed) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
-      const index = locateNode(document, node.id)!.index
+    fc.assert(
+      fc.property(forest, fc.nat(), (rawForest, seed) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const index = locateNode(document, node.id)!.index
 
-      const result = moveSibling(document, node.id, index)
+        const result = moveSibling(document, node.id, index)
 
-      expect(allIds(result)).toEqual(allIds(document))
-    }))
+        expect(allIds(result)).toEqual(allIds(document))
+      }),
+    )
   })
 
   it('deleteNode removes exactly the selected subtree', () => {
-    fc.assert(fc.property(forest, fc.nat(), (rawForest, seed) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
-      const removed = subtreeIds(node)
+    fc.assert(
+      fc.property(forest, fc.nat(), (rawForest, seed) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const removed = subtreeIds(node)
 
-      const result = deleteNode(document, node.id)
-      const remaining = allIds(result)
+        const result = deleteNode(document, node.id)
+        const remaining = allIds(result)
 
-      expect(remaining.length).toBe(allIds(document).length - removed.length)
-      for (const id of removed) {
-        expect(remaining).not.toContain(id)
-      }
-    }))
+        expect(remaining.length).toBe(allIds(document).length - removed.length)
+        for (const id of removed) {
+          expect(remaining).not.toContain(id)
+        }
+      }),
+    )
   })
 
   it('locates every node with a path ending at it and a valid location', () => {
-    fc.assert(fc.property(forest, (rawForest) => {
-      const document = materialize(rawForest)
-      const nodes = allNodes(document)
+    fc.assert(
+      fc.property(forest, (rawForest) => {
+        const document = materialize(rawForest)
+        const nodes = allNodes(document)
 
-      for (const node of nodes) {
-        const located = locateNode(document, node.id)!
-        expect(located.node.id).toBe(node.id)
-        expect(nodePath(document, node.id).at(-1)!.id).toBe(node.id)
-        expect(nodePath(document, node.id).length).toBe(located.ancestors.length + 1)
-        expect(isValidLocation(document, locationFor(document, node))).toBe(true)
-      }
+        for (const node of nodes) {
+          const located = locateNode(document, node.id)!
+          expect(located.node.id).toBe(node.id)
+          expect(nodePath(document, node.id).at(-1)!.id).toBe(node.id)
+          expect(nodePath(document, node.id).length).toBe(located.ancestors.length + 1)
+          expect(isValidLocation(document, locationFor(document, node))).toBe(true)
+        }
 
-      expect(collectAttachmentIds(document).size).toBe(nodes.filter((node) => node.attachment !== undefined).length)
-    }))
+        expect(collectAttachmentIds(document).size).toBe(nodes.filter((node) => node.attachment !== undefined).length)
+      }),
+    )
   })
 
   it('rejects duplicate node ids', () => {
-    fc.assert(fc.property(forest, (rawForest) => {
-      const document = materialize(rawForest)
-      const duplicate = cloneDocument(document)
-      duplicate.roots.push({ ...cloneNode(document.roots[0]!), children: [] })
+    fc.assert(
+      fc.property(forest, (rawForest) => {
+        const document = materialize(rawForest)
+        const duplicate = cloneDocument(document)
+        duplicate.roots.push({ ...cloneNode(document.roots[0]!), children: [] })
 
-      expect(() => assertDocument(duplicate)).toThrow('unique')
-    }))
+        expect(() => assertDocument(duplicate)).toThrow('unique')
+      }),
+    )
   })
 
   it('rejects a location that does not match the tree', () => {
-    fc.assert(fc.property(forest, fc.nat(), (rawForest, seed) => {
-      const document = materialize(rawForest)
-      const node = pick(document, seed)
+    fc.assert(
+      fc.property(forest, fc.nat(), (rawForest, seed) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
 
-      expect(() => serializeState(document, { currentParentId: 'missing', selectedNodeId: node.id })).toThrow()
-    }))
+        expect(() => serializeState(document, { currentParentId: 'missing', selectedNodeId: node.id })).toThrow()
+      }),
+    )
   })
 })

@@ -1,0 +1,9 @@
+node_modules/
+out/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+package-lock.json
+docs/
+*.md

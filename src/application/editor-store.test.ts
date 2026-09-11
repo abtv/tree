@@ -6,7 +6,9 @@ function createServices(clipboard: ClipboardValue = { kind: 'text', text: '' }):
   return {
     saves,
     load: async () => null,
-    save: async (state) => { saves.push(state) },
+    save: async (state) => {
+      saves.push(state)
+    },
     readClipboard: async () => clipboard,
     writeAttachment: async () => undefined,
     hasAttachment: async () => true,
@@ -35,7 +37,10 @@ describe('EditorStore', () => {
     const state = store.getSnapshot()
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
-      expect(state.document.roots.map((node) => [node.id, node.text])).toEqual([['root', 'Cur'], ['next', 'rent']])
+      expect(state.document.roots.map((node) => [node.id, node.text])).toEqual([
+        ['root', 'Cur'],
+        ['next', 'rent'],
+      ])
       expect(state.location.selectedNodeId).toBe('next')
     }
   })
@@ -70,7 +75,18 @@ describe('EditorStore', () => {
 
   it('deletes an empty node on Backspace and selects the previous sibling at the end', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'Alpha', children: [] }, { id: 'b', text: '', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'Alpha', children: [] },
+              { id: 'b', text: '', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -89,7 +105,18 @@ describe('EditorStore', () => {
 
   it('focuses the current parent when Backspace deletes the first child with no previous sibling', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: '', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: '', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -126,7 +153,15 @@ describe('EditorStore', () => {
 
   it('deletes an empty subtree on Backspace', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: '', children: [{ id: 'a1', text: 'A1', children: [] }] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [{ id: 'a', text: '', children: [{ id: 'a1', text: 'A1', children: [] }] }],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -158,7 +193,12 @@ describe('EditorStore', () => {
 
   it('selects the next root at the beginning when Backspace deletes an empty first root', async () => {
     const services = loadedState(
-      { roots: [{ id: 'r1', text: '', children: [] }, { id: 'r2', text: 'Second', children: [] }] },
+      {
+        roots: [
+          { id: 'r1', text: '', children: [] },
+          { id: 'r2', text: 'Second', children: [] },
+        ],
+      },
       { currentParentId: null, selectedNodeId: 'r1' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -192,12 +232,27 @@ describe('EditorStore', () => {
     const parentStore = new EditorStore(emptyParent, ids('unused'))
     await parentStore.initialize()
     parentStore.deleteEmptySelected()
-    expect(parentStore.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ id: 'root' }] }, location: { currentParentId: 'root' } })
+    expect(parentStore.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ id: 'root' }] },
+      location: { currentParentId: 'root' },
+    })
   })
 
   it('moves selection to the current parent at the end of its text on ArrowUp from the first child', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'A', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -215,7 +270,12 @@ describe('EditorStore', () => {
 
   it('does nothing on ArrowUp from the first root', async () => {
     const services = loadedState(
-      { roots: [{ id: 'r1', text: 'A', children: [] }, { id: 'r2', text: 'B', children: [] }] },
+      {
+        roots: [
+          { id: 'r1', text: 'A', children: [] },
+          { id: 'r2', text: 'B', children: [] },
+        ],
+      },
       { currentParentId: null, selectedNodeId: 'r1' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -223,7 +283,10 @@ describe('EditorStore', () => {
 
     store.moveSelection('up', 0)
 
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { currentParentId: null, selectedNodeId: 'r1' } })
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: null, selectedNodeId: 'r1' },
+    })
   })
 
   it('groups direct text edits until a structural boundary', async () => {
@@ -255,7 +318,10 @@ describe('EditorStore', () => {
   })
 
   it('creates a following sibling when image paste targets a node with an image', async () => {
-    const store = new EditorStore(createServices({ kind: 'image', png: new Uint8Array([1]) }), ids('root', 'first-image', 'second-image', 'image-node'))
+    const store = new EditorStore(
+      createServices({ kind: 'image', png: new Uint8Array([1]) }),
+      ids('root', 'first-image', 'second-image', 'image-node'),
+    )
     await store.initialize()
     await store.paste('root', 0)
     await store.paste('root', 0)
@@ -283,7 +349,9 @@ describe('EditorStore', () => {
     const services = createServices()
     services.load = async () => ({
       version: 1,
-      document: { roots: [{ id: 'root', text: '', attachment: { id: 'missing', mimeType: 'image/png' }, children: [] }] },
+      document: {
+        roots: [{ id: 'root', text: '', attachment: { id: 'missing', mimeType: 'image/png' }, children: [] }],
+      },
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
     services.hasAttachment = async () => false
@@ -299,7 +367,9 @@ describe('EditorStore', () => {
     const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
     services.load = async () => ({
       version: 1,
-      document: { roots: [{ id: 'parent', text: '', attachment: { id: 'existing', mimeType: 'image/png' }, children: [] }] },
+      document: {
+        roots: [{ id: 'parent', text: '', attachment: { id: 'existing', mimeType: 'image/png' }, children: [] }],
+      },
       location: { currentParentId: 'parent', selectedNodeId: 'parent' },
     })
     const store = new EditorStore(services, ids('new-image', 'sibling'))
@@ -316,7 +386,13 @@ describe('EditorStore', () => {
     services.load = async () => ({
       version: 1,
       document: {
-        roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'current', text: 'Current', children: [] }] }] }],
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [{ id: 'parent', text: 'Parent', children: [{ id: 'current', text: 'Current', children: [] }] }],
+          },
+        ],
       },
       location: { currentParentId: 'current', selectedNodeId: 'current' },
     })
@@ -359,13 +435,25 @@ describe('EditorStore', () => {
     await store.paste('root', 3)
 
     const state = store.getSnapshot()
-    expect(state.status === 'ready' && state.document.roots.map((node) => node.text)).toEqual(['abcone', 'two', 'threedef'])
+    expect(state.status === 'ready' && state.document.roots.map((node) => node.text)).toEqual([
+      'abcone',
+      'two',
+      'threedef',
+    ])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('three')
   })
 
   it('navigates to the parent when deleting a non-root current parent', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }],
+          },
+        ],
+      },
       { currentParentId: 'parent', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -380,7 +468,12 @@ describe('EditorStore', () => {
 
   it('selects the next root when deleting a root current parent', async () => {
     const services = loadedState(
-      { roots: [{ id: 'r1', text: 'First', children: [] }, { id: 'r2', text: 'Second', children: [] }] },
+      {
+        roots: [
+          { id: 'r1', text: 'First', children: [] },
+          { id: 'r2', text: 'Second', children: [] },
+        ],
+      },
       { currentParentId: 'r1', selectedNodeId: 'r1' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -395,7 +488,18 @@ describe('EditorStore', () => {
 
   it('selects the next sibling when deleting a middle sibling', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'A', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -410,7 +514,18 @@ describe('EditorStore', () => {
 
   it('selects the previous sibling when deleting the last sibling', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'A', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -456,7 +571,9 @@ describe('EditorStore', () => {
 
   it('surfaces a persistence error in the snapshot', async () => {
     const services = createServices()
-    services.save = async () => { throw new Error('disk full') }
+    services.save = async () => {
+      throw new Error('disk full')
+    }
     const store = new EditorStore(services, ids('root'))
     await store.initialize()
 
@@ -492,7 +609,18 @@ describe('EditorStore', () => {
 
   it('moves the selected node by index', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'A', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -507,7 +635,18 @@ describe('EditorStore', () => {
 
   it('moves from the current parent down to the first child and clamps the cursor', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: 'Alpha', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'Alpha', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -536,7 +675,10 @@ describe('EditorStore', () => {
     store.leave()
     store.navigateToAncestor('missing')
 
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { currentParentId: null, selectedNodeId: 'root' } })
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
 
     const blank = new EditorStore(createServices(), ids('root'))
     expect(() => blank.deleteSelected()).toThrow('not ready')
@@ -544,7 +686,15 @@ describe('EditorStore', () => {
 
   it('enters a node and selects its first child at the beginning', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('unused'))
@@ -567,22 +717,42 @@ describe('EditorStore', () => {
 
     store.enter()
 
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { currentParentId: 'root', selectedNodeId: 'root' } })
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: 'root', selectedNodeId: 'root' },
+    })
   })
 
   it('undoes a sibling reorder', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'A', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
     await store.initialize()
     store.moveNodeTo('b', 0)
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [{ id: 'b' }, { id: 'a' }] }] } })
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ children: [{ id: 'b' }, { id: 'a' }] }] },
+    })
 
     store.undo()
 
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [{ id: 'a' }, { id: 'b' }] }] } })
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ children: [{ id: 'a' }, { id: 'b' }] }] },
+    })
   })
 
   it('undoes a multiline paste', async () => {
@@ -594,7 +764,10 @@ describe('EditorStore', () => {
     const store = new EditorStore(services, ids('two'))
     await store.initialize()
     await store.paste('root', 3)
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'abcone' }, { text: 'twodef' }] } })
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ text: 'abcone' }, { text: 'twodef' }] },
+    })
 
     store.undo()
 
@@ -603,7 +776,15 @@ describe('EditorStore', () => {
 
   it('undoes a subtree deletion', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] }] },
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }],
+          },
+        ],
+      },
       { currentParentId: 'root', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('unused'))

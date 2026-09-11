@@ -76,7 +76,12 @@ describe('document operations', () => {
     const state = serializeState(document, { currentParentId: null, selectedNodeId: 'root' })
 
     expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
-    expect(() => parsePersistedState({ ...state, document: { roots: [{ ...document.roots[0]!, children: [{ id: 'root', text: '', children: [] }] }] } })).toThrow('unique')
+    expect(() =>
+      parsePersistedState({
+        ...state,
+        document: { roots: [{ ...document.roots[0]!, children: [{ id: 'root', text: '', children: [] }] }] },
+      }),
+    ).toThrow('unique')
   })
 
   it('deletes a subtree as one operation', () => {
@@ -102,7 +107,9 @@ describe('document operations', () => {
     expect(locateNode(document, `n${depth - 1}`)?.ancestors).toHaveLength(depth - 1)
     expect(nodePath(document, `n${depth - 1}`)).toHaveLength(depth)
     expect(collectAttachmentIds(document).size).toBe(0)
-    expect(() => parsePersistedState({ version: 1, document, location: { currentParentId: null, selectedNodeId: 'n0' } })).not.toThrow()
+    expect(() =>
+      parsePersistedState({ version: 1, document, location: { currentParentId: null, selectedNodeId: 'n0' } }),
+    ).not.toThrow()
   })
 
   it('does not split a surrogate pair when the cursor is inside it', () => {

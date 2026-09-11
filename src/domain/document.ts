@@ -153,7 +153,12 @@ export function insertSiblingAfter(
 ): Document {
   const next = cloneDocument(document)
   const located = requireNode(next, nodeId)
-  located.siblings.splice(located.index + 1, 0, { id: newNodeId, text, ...(attachment === undefined ? {} : { attachment }), children: [] })
+  located.siblings.splice(located.index + 1, 0, {
+    id: newNodeId,
+    text,
+    ...(attachment === undefined ? {} : { attachment }),
+    children: [],
+  })
   return next
 }
 
@@ -296,9 +301,7 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
   }
 
   const output: TreeNode[] = []
-  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[] }> = [
-    { input: value, index: 0, output },
-  ]
+  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[] }> = [{ input: value, index: 0, output }]
 
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
@@ -308,7 +311,12 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
     }
     const candidate = frame.input[frame.index]
     frame.index += 1
-    if (!isRecord(candidate) || typeof candidate.id !== 'string' || candidate.id.length === 0 || typeof candidate.text !== 'string') {
+    if (
+      !isRecord(candidate) ||
+      typeof candidate.id !== 'string' ||
+      candidate.id.length === 0 ||
+      typeof candidate.text !== 'string'
+    ) {
       throw new Error('A saved node is invalid.')
     }
     if (nodeIds.has(candidate.id)) {

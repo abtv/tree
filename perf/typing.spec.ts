@@ -40,15 +40,17 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
   const commit = summarize(measured.commits)
   const paint = summarize(measured.paints)
 
-  console.log(`PERF ${JSON.stringify({
-    kind: 'typing',
-    scenario,
-    commitMedianMs: round(commit.median),
-    commitP95Ms: round(commit.p95),
-    paintMedianMs: round(paint.median),
-    paintP95Ms: round(paint.p95),
-    paintMaxMs: round(paint.max),
-  })}`)
+  console.log(
+    `PERF ${JSON.stringify({
+      kind: 'typing',
+      scenario,
+      commitMedianMs: round(commit.median),
+      commitP95Ms: round(commit.p95),
+      paintMedianMs: round(paint.median),
+      paintP95Ms: round(paint.p95),
+      paintMaxMs: round(paint.max),
+    })}`,
+  )
 
   expect(measured.paints.length).toBeGreaterThan(0)
   expect(paint.p95).toBeLessThan(2_000)

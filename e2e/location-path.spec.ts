@@ -39,7 +39,9 @@ test.describe('location path overflow', () => {
     const barOverflow = await bar.evaluate((element) => element.scrollWidth - element.clientWidth)
     expect(barOverflow).toBeLessThanOrEqual(1)
 
-    const pageOverflow = await window.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    const pageOverflow = await window.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
     expect(pageOverflow).toBeLessThanOrEqual(1)
 
     await expect(parent(window)).toHaveValue(longCurrent)

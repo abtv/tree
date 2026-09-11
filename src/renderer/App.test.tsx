@@ -40,7 +40,9 @@ function createStore(clipboard: ClipboardValue = { kind: 'text', text: '' }): Ed
 describe('App', () => {
   it('renders the initial editable root and splits it with Enter', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
@@ -54,7 +56,9 @@ describe('App', () => {
 
   it('deletes an empty node and focuses the previous node on Backspace', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
@@ -69,7 +73,9 @@ describe('App', () => {
 
   it('keeps consecutive text edits in one undo session when the caret advances', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
@@ -86,7 +92,9 @@ describe('App', () => {
 
   it('ends the text session when the user selects text within the node', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
@@ -103,8 +111,12 @@ describe('App', () => {
 
   it('opens the image preview with Cmd+Enter and closes it on Escape, restoring focus', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
-    await act(async () => { await store.initialize() })
-    await act(async () => { await store.paste('root', 0) })
+    await act(async () => {
+      await store.initialize()
+    })
+    await act(async () => {
+      await store.paste('root', 0)
+    })
     render(<App store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
     await screen.findByRole('button', { name: 'Open image preview' })
@@ -119,8 +131,12 @@ describe('App', () => {
 
   it('opens the image preview by clicking the image and closes it with the close button', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
-    await act(async () => { await store.initialize() })
-    await act(async () => { await store.paste('root', 0) })
+    await act(async () => {
+      await store.initialize()
+    })
+    await act(async () => {
+      await store.paste('root', 0)
+    })
     render(<App store={store} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open image preview' }))
@@ -132,8 +148,12 @@ describe('App', () => {
 
   it('opens the image preview from the current parent with Cmd+Enter', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
-    await act(async () => { await store.initialize() })
-    await act(async () => { await store.paste('root', 0) })
+    await act(async () => {
+      await store.initialize()
+    })
+    await act(async () => {
+      await store.paste('root', 0)
+    })
     render(<App store={store} />)
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
@@ -147,7 +167,9 @@ describe('App', () => {
 
   it('does nothing on Cmd+Enter when the node has no image', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'Enter', metaKey: true })
@@ -157,7 +179,9 @@ describe('App', () => {
 
   it('renders and edits the current parent after entering an empty node', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
 
@@ -170,7 +194,9 @@ describe('App', () => {
 
   it('shows a disclosure control only for nodes with children and enters the node when clicked', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
 
     expect(screen.queryByRole('button', { name: 'Enter node 1' })).not.toBeInTheDocument()
@@ -186,7 +212,9 @@ describe('App', () => {
 
   it('navigates through the location path and selects the child on the previous path', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' })
 
@@ -210,12 +238,24 @@ describe('App', () => {
 
   it('moves a node to the boundary above a row and prevents the node ID from being dropped into its text', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
-    const transfer = { dropEffect: '', effectAllowed: '', value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
+    const transfer = {
+      dropEffect: '',
+      effectAllowed: '',
+      value: '',
+      setData(_type: string, value: string) {
+        this.value = value
+      },
+      getData() {
+        return this.value
+      },
+    }
     const secondRow = screen.getByRole('textbox', { name: 'Node 2' }).parentElement
     const firstRow = first.parentElement
     vi.spyOn(firstRow!, 'getBoundingClientRect').mockReturnValue({ height: 20, top: 10 } as DOMRect)
@@ -232,10 +272,22 @@ describe('App', () => {
 
   it('moves nodes through the drop zones before the first and after the last node', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
-    const transfer = { dropEffect: '', effectAllowed: '', value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
+    const transfer = {
+      dropEffect: '',
+      effectAllowed: '',
+      value: '',
+      setData(_type: string, value: string) {
+        this.value = value
+      },
+      getData() {
+        return this.value
+      },
+    }
 
     fireEvent.change(first, { target: { value: 'A' } })
     first.setSelectionRange(1, 1)
@@ -261,7 +313,9 @@ describe('App', () => {
 
   it('shows an error state when the document cannot be loaded', async () => {
     const services: EditorServices = {
-      load: async () => { throw new Error('boom') },
+      load: async () => {
+        throw new Error('boom')
+      },
       save: async () => undefined,
       readClipboard: async () => ({ kind: 'text', text: '' }),
       writeAttachment: async () => undefined,
@@ -269,7 +323,9 @@ describe('App', () => {
       cleanupAttachments: async () => undefined,
     }
     const store = new EditorStore(services, () => 'root')
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
 
     render(<App store={store} />)
 
@@ -278,7 +334,9 @@ describe('App', () => {
 
   it('selects a node when its input receives focus', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
@@ -292,7 +350,9 @@ describe('App', () => {
 
   it('ignores keys during composition', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
 
@@ -307,7 +367,9 @@ describe('App', () => {
 
   it('handles cut as a standalone text edit', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
@@ -321,20 +383,26 @@ describe('App', () => {
 
   it('pastes at the cursor', async () => {
     const store = createStore({ kind: 'text', text: 'XY' })
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'ab' } })
     first.setSelectionRange(1, 1)
-    await act(async () => { fireEvent.paste(first) })
+    await act(async () => {
+      fireEvent.paste(first)
+    })
 
     expect(first).toHaveValue('aXYb')
   })
 
   it('dispatches navigation keys', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
@@ -350,7 +418,9 @@ describe('App', () => {
 
   it('dispatches undo and redo keys', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
@@ -363,7 +433,9 @@ describe('App', () => {
 
   it('deletes the selected node with Cmd+Backspace', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
@@ -377,10 +449,19 @@ describe('App', () => {
 
   it('falls back to the dragged node when the drop carries no id', async () => {
     const store = createStore()
-    await act(async () => { await store.initialize() })
+    await act(async () => {
+      await store.initialize()
+    })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
-    const transfer = { dropEffect: '', effectAllowed: '', setData() {}, getData() { return '' } }
+    const transfer = {
+      dropEffect: '',
+      effectAllowed: '',
+      setData() {},
+      getData() {
+        return ''
+      },
+    }
 
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })

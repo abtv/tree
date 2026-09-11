@@ -21,7 +21,9 @@ describe('file services', () => {
     const { directory, services } = await servicesForTest()
     const state = {
       version: 1 as const,
-      document: { roots: [{ id: 'root', text: '', attachment: { id: 'image', mimeType: 'image/png' as const }, children: [] }] },
+      document: {
+        roots: [{ id: 'root', text: '', attachment: { id: 'image', mimeType: 'image/png' as const }, children: [] }],
+      },
       location: { currentParentId: null, selectedNodeId: 'root' },
     }
 
