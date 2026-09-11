@@ -63,6 +63,18 @@ If the current parent's text changes, the displayed context must update immediat
 
 The current parent is not part of `↑` / `↓` sibling navigation.
 
+### 2.1 Node Presentation
+
+Nodes are presented as plain, single-line outline rows with a bullet to the left of their text.
+
+Node text is always edited inline. A node must not have a persistent input border or card-like container.
+
+The focused node may have a subtle background to show its active editing state. It must not display an additional more-options or selection-dot ornament.
+
+The current parent is presented above its children as a larger, bold, editable heading without a bullet.
+
+An attached image is displayed beneath its node's text and aligned with that node's text column.
+
 ---
 
 ## 3. Initial State
