@@ -166,6 +166,7 @@ UI handlers will translate keyboard, input, focus, selection, composition, clipb
 - Phase 1 completed on 2026-09-11.
 - Phase 2 completed on 2026-09-11.
 - Phase 3 completed on 2026-09-11.
+- Phase 4 completed on 2026-09-11.
 
 ### Phase 1: Domain foundation and persistence contract
 

@@ -22,21 +22,91 @@ textarea {
   font: inherit;
 }
 
+.app-shell,
+.editor-shell {
+  min-height: 100vh;
+}
+
 .app-shell {
   display: grid;
-  min-height: 100vh;
   place-items: center;
 }
 
-.app-shell h1 {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 600;
+.editor-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 44px 32px;
+}
+
+.current-parent {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #e7edf5;
+}
+
+.node-list {
+  display: grid;
+  gap: 5px;
+}
+
+.node-row {
+  padding: 2px 0;
+}
+
+.node-input {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 7px 9px;
+  color: inherit;
+  background: transparent;
+  outline: none;
+}
+
+.node-input:hover {
+  background: #edf0f3;
+}
+
+.node-input:focus {
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 18%);
+}
+
+.current-parent-input {
+  padding: 3px 1px;
+  font-weight: 650;
+}
+
+.error-state {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 48px;
+  text-align: center;
+}
+
+.save-error {
+  margin-top: 24px;
+  color: #b42318;
+  font-size: 0.875rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f3f4f6;
     background: #17191d;
+  }
+
+  .current-parent {
+    background: #252b34;
+  }
+
+  .node-input:hover {
+    background: #24282e;
+  }
+
+  .node-input:focus {
+    background: #202329;
   }
 }
