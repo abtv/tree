@@ -355,7 +355,18 @@ Undo/redo must support:
 
 Stable node IDs must survive undo and redo.
 
-Consecutive text edits are grouped into a continuous editing session for undo purposes.
+Consecutive direct text edits are grouped into a continuous editing session for undo purposes. Direct text edits include typing, `Backspace`, and `Delete` within the same node.
+
+A continuous text-editing session ends when any of the following occurs:
+
+* five seconds pass without a text change;
+* focus switches to another node or leaves the text field;
+* the user explicitly moves the text cursor or changes the text selection within the node;
+* the user cuts or pastes content;
+* the user performs a structural command, including node creation, splitting, deletion, or reordering;
+* the user invokes undo or redo.
+
+Normal cursor advancement caused by typing or deletion does not end the session. Cut, paste, structural commands, undo, and redo are recorded separately from the preceding text-editing session.
 
 Undo and redo do not restore the previous selection, text cursor position, or navigation state. The application must still keep those runtime states valid after the document changes.
 
@@ -623,5 +634,4 @@ The tree hierarchy is primarily navigated by entering and leaving nodes rather t
 
 The following product behavior requires Product Owner clarification before implementation:
 
-* focus and keyboard behavior for the editable current parent when it already has children, including `Enter`, `↑`, `↓`, `Cmd+.`, and `Cmd+Backspace`;
-* the events and any idle interval that end a continuous text-editing session for undo grouping.
+* focus and keyboard behavior for the editable current parent when it already has children, including `Enter`, `↑`, `↓`, `Cmd+.`, and `Cmd+Backspace`.
