@@ -193,6 +193,12 @@ It changes the current parent.
 
 It does not create or modify nodes.
 
+If the selected node has children:
+
+* display its children;
+* select the first child;
+* place the text cursor at the beginning of the first child's text.
+
 If the selected node has no children:
 
 * display an empty list for that level;
@@ -200,6 +206,11 @@ If the selected node has no children:
 * keep the text cursor in the editable current-parent field.
 
 When the child list is empty, pressing `Enter` while the current parent is focused creates the first empty child and moves the text cursor to that child.
+
+When the editable current parent is focused:
+
+* `↑` does nothing;
+* `Cmd+.` does nothing.
 
 Example:
 
@@ -286,7 +297,7 @@ At the root level:
 
 This is different from normal `Backspace`, which remains ordinary text editing.
 
-After deletion:
+After deleting a node from the currently displayed level:
 
 1. If a next sibling exists, select it.
 2. Otherwise select the previous sibling.
@@ -295,13 +306,11 @@ After deletion:
 
 When inside a parent, `Cmd+Backspace` deletes the currently selected child.
 
-It never implicitly deletes the current parent.
+When the editable current parent is focused, `Cmd+Backspace` deletes that parent and its entire subtree, then navigates one level outward to the deleted node's parent.
 
-To delete a parent:
+If the deleted current parent was not a top-level root node, its parent becomes the new current parent and receives the text cursor.
 
-1. use `Cmd+,` to return to its parent level;
-2. select the node;
-3. press `Cmd+Backspace`.
+If the deleted current parent was a top-level root node, navigate to the root level and apply the root-node selection and replacement rules above.
 
 ---
 
@@ -634,4 +643,5 @@ The tree hierarchy is primarily navigated by entering and leaving nodes rather t
 
 The following product behavior requires Product Owner clarification before implementation:
 
-* focus and keyboard behavior for the editable current parent when it already has children, including `Enter`, `↑`, `↓`, `Cmd+.`, and `Cmd+Backspace`.
+* `Enter` and `↓` behavior while the editable current parent is focused and already has children, including where a new child would be inserted and what receives focus afterward;
+* whether a child remains selected while the editable current parent has focus, including which text field `Cmd+0` restores and what selected-node state is persisted.
