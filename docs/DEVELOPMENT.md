@@ -379,6 +379,10 @@ Do not rewrite or remove unrelated user changes.
 
 Do not use destructive git commands unless explicitly requested.
 
+### Immediate follow-up fixes
+
+When the Product Owner requests a fix directly related to the most recently committed change, do not create a new plan or a new commit. Update the existing plan and amend the last commit with `git commit --amend`. If the fix changes the plan's scope, update the plan content and rename the plan file to match. This applies only to direct follow-ups to the most recent commit; unrelated changes get their own plan and commit.
+
 ---
 
 ## 18. Handling Existing Changes
