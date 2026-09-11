@@ -332,4 +332,309 @@ describe('EditorStore', () => {
     state = store.getSnapshot()
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
   })
+
+  it('pastes plain text at the cursor', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abcdef', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'XYZ' })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    await store.paste('root', 3)
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'abcXYZdef' }] } })
+  })
+
+  it('pastes multiline text as separate nodes', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abcdef', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'one\ntwo\nthree' })
+    const store = new EditorStore(services, ids('two', 'three'))
+    await store.initialize()
+
+    await store.paste('root', 3)
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots.map((node) => node.text)).toEqual(['abcone', 'two', 'threedef'])
+    expect(state.status === 'ready' && state.location.selectedNodeId).toBe('three')
+  })
+
+  it('navigates to the parent when deleting a non-root current parent', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] }] },
+      { currentParentId: 'parent', selectedNodeId: 'parent' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteSelected()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.children).toEqual([])
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+  })
+
+  it('selects the next root when deleting a root current parent', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'r1', text: 'First', children: [] }, { id: 'r2', text: 'Second', children: [] }] },
+      { currentParentId: 'r1', selectedNodeId: 'r1' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteSelected()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['r2'])
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'r2' })
+  })
+
+  it('selects the next sibling when deleting a middle sibling', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteSelected()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.children.map((node) => node.id)).toEqual(['b'])
+    expect(state.status === 'ready' && state.location.selectedNodeId).toBe('b')
+  })
+
+  it('selects the previous sibling when deleting the last sibling', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteSelected()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.children.map((node) => node.id)).toEqual(['a'])
+    expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
+  })
+
+  it('replaces the only root when it is deleted as the current parent', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [] }] },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('replacement'))
+    await store.initialize()
+
+    store.deleteSelected()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['replacement'])
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'replacement' })
+  })
+
+  it('reconciles the location on undo when the current location no longer exists', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [] }] }] },
+      { currentParentId: 'parent', selectedNodeId: 'parent' },
+    )
+    const store = new EditorStore(services, ids('child'))
+    await store.initialize()
+    store.createSiblingOrFirstChild(0)
+
+    store.undo()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.children[0]!.children).toEqual([])
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
+  })
+
+  it('surfaces a persistence error in the snapshot', async () => {
+    const services = createServices()
+    services.save = async () => { throw new Error('disk full') }
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+
+    await vi.waitFor(() => {
+      const state = store.getSnapshot()
+      expect(state.status === 'ready' && state.saveError).toContain('disk full')
+    })
+  })
+
+  it('ignores repeated text and empty undo or redo', async () => {
+    const store = new EditorStore(createServices(), ids('root'))
+    await store.initialize()
+
+    store.editText('root', '')
+    store.undo()
+    store.redo()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('')
+  })
+
+  it('ends the editing session after a standalone text edit', async () => {
+    const store = new EditorStore(createServices(), ids('root'))
+    await store.initialize()
+
+    store.editText('root', 'a')
+    store.markNextTextEditStandalone()
+    store.editText('root', 'ab')
+    store.undo()
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'a' }] } })
+  })
+
+  it('moves the selected node by index', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelectedTo(2)
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.children.map((node) => node.id)).toEqual(['b', 'a'])
+    expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
+  })
+
+  it('moves from the current parent down to the first child and clamps the cursor', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: 'Alpha', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelection('down', 0)
+    let state = store.getSnapshot()
+    expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
+
+    store.selectNode('b', 10)
+    store.moveSelection('up', 10)
+    state = store.getSnapshot()
+    expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
+  })
+
+  it('ignores invalid selection and commands before initialization', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.selectNode('missing', 0)
+    store.enter()
+    store.leave()
+    store.navigateToAncestor('missing')
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { currentParentId: null, selectedNodeId: 'root' } })
+
+    const blank = new EditorStore(createServices(), ids('root'))
+    expect(() => blank.deleteSelected()).toThrow('not ready')
+  })
+
+  it('enters a node and selects its first child at the beginning', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'parent' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.enter()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'child' })
+    expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'child', cursor: 0 })
+  })
+
+  it('does nothing when entering the already-selected current parent', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [] }] },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.enter()
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { currentParentId: 'root', selectedNodeId: 'root' } })
+  })
+
+  it('undoes a sibling reorder', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    store.moveNodeTo('b', 0)
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [{ id: 'b' }, { id: 'a' }] }] } })
+
+    store.undo()
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [{ id: 'a' }, { id: 'b' }] }] } })
+  })
+
+  it('undoes a multiline paste', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abcdef', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'one\ntwo' })
+    const store = new EditorStore(services, ids('two'))
+    await store.initialize()
+    await store.paste('root', 3)
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'abcone' }, { text: 'twodef' }] } })
+
+    store.undo()
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'abcdef' }] } })
+  })
+
+  it('undoes a subtree deletion', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'parent' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    store.deleteSelected()
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [] }] } })
+
+    store.undo()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots[0]!.children[0]!.id).toBe('parent')
+      expect(state.document.roots[0]!.children[0]!.children[0]!.id).toBe('child')
+    }
+  })
+
+  it('undoes deletion of a node with an image', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('replacement'))
+    await store.initialize()
+    store.deleteSelected()
+    const deleted = store.getSnapshot()
+    expect(deleted.status === 'ready' && deleted.document.roots[0]!.attachment).toBeUndefined()
+
+    store.undo()
+
+    const restored = store.getSnapshot()
+    expect(restored.status === 'ready' && restored.document.roots[0]!.attachment?.id).toBe('image')
+  })
 })

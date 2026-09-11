@@ -171,9 +171,13 @@ Tests are part of the implementation contract.
 
 When behavior changes, add or update appropriate tests.
 
+Every user-visible behavior described in `docs/PRODUCT.md` must be covered by at least one automated test. Behaviors that cross a process, persistence, or platform boundary — the Electron shell, preload/IPC, persistence, attachments, clipboard, drag-and-drop, and global shortcuts — must also have an end-to-end test, in addition to any unit test for the underlying rule.
+
 Domain behavior should be covered by unit tests wherever practical.
 
 Tests must verify important edge cases, not only the happy path.
+
+Coverage percentages are a gap-finding tool, not a target. Do not add tests solely to raise coverage. When product behavior changes, review the affected `docs/PRODUCT.md` requirements and confirm each one still has coverage at the appropriate level.
 
 Do not remove or weaken tests merely to make an implementation pass.
 
@@ -232,9 +236,10 @@ Before modifying files with existing uncommitted changes, inspect those changes 
 A task is complete only when:
 
 * the requested behavior is implemented;
+* every affected `docs/PRODUCT.md` behavior has coverage at the appropriate level (a unit test for the rule, and an end-to-end test for boundary wiring);
 * relevant tests are added or updated;
 * documentation is updated when necessary;
-* `npm run check` passes;
+* `npm run check` passes, or `npm run check:full` when the change affects the Electron shell, preload/IPC, persistence, attachments, or clipboard;
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 

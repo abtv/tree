@@ -1,0 +1,21 @@
+import { expect, launchTree, node, test, typeInto } from './fixtures'
+
+test.describe('Cmd+0', () => {
+  test('is registered globally and preserves the document and selection', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Alpha')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 2), 'Beta')
+
+    const registered = await app.evaluate(({ globalShortcut }) => globalShortcut.isRegistered('CommandOrControl+0'))
+    expect(registered).toBe(true)
+
+    await window.keyboard.press('Meta+0')
+
+    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(2)
+    await expect(node(window, 1)).toHaveValue('Alpha')
+    await expect(node(window, 2)).toHaveValue('Beta')
+    await expect(node(window, 2)).toBeFocused()
+  })
+})
