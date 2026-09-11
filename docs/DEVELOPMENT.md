@@ -231,6 +231,8 @@ Completed plans:
 docs/plans/completed/
 ```
 
+Plan filenames are numbered sequentially, for example `0001-bootstrap-application.md`. See `AGENTS.md` §8 for the naming rules and required metadata.
+
 ---
 
 ## 12. Testing Strategy

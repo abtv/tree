@@ -125,13 +125,13 @@ docs/plans/completed/
 Plan filenames must use:
 
 ```text
-YYYY-MM-DD-short-description.md
+NNNN-short-description.md
 ```
 
-The date is the plan's creation date. The short description must use lowercase words separated by hyphens, for example:
+The number is a zero-padded sequential number assigned in order of plan creation, using the next available number across active and completed plans. The short description must use lowercase words separated by hyphens, for example:
 
 ```text
-2026-09-11-bootstrap-application.md
+0001-bootstrap-application.md
 ```
 
 Every plan must include the following metadata near the beginning of the document:
