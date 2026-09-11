@@ -42,7 +42,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(root, { target: { value: 'Current' } })
     root.setSelectionRange(3, 3)
@@ -56,7 +56,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -71,7 +71,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(root, { target: { value: 'F' } })
     await act(async () => undefined)
@@ -88,7 +88,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(root, { target: { value: 'Fir' } })
     await act(async () => undefined)
@@ -212,7 +212,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     const transfer = { dropEffect: '', effectAllowed: '', value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
@@ -234,7 +234,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     const transfer = { dropEffect: '', effectAllowed: '', value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
 
     fireEvent.change(first, { target: { value: 'A' } })
@@ -280,7 +280,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'child' } })
@@ -309,7 +309,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const node = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const node = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(node, { target: { value: 'a' } })
     fireEvent.cut(node)
@@ -323,7 +323,7 @@ describe('App', () => {
     const store = createStore({ kind: 'text', text: 'XY' })
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'ab' } })
     first.setSelectionRange(1, 1)
@@ -336,7 +336,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     const second = screen.getByRole('textbox', { name: 'Node 2' })
@@ -352,7 +352,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'z', metaKey: true })
@@ -365,7 +365,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
 
@@ -379,7 +379,7 @@ describe('App', () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     const transfer = { dropEffect: '', effectAllowed: '', setData() {}, getData() { return '' } }
 
     fireEvent.change(first, { target: { value: 'A' } })

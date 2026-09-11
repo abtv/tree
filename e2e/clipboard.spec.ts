@@ -33,7 +33,7 @@ test.describe('clipboard', () => {
     await writeClipboardText(app, 'one\ntwo\nthree')
     await firePaste(node(window, 1))
 
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(3)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(3)
     expect(await nodeTexts(window)).toEqual(['abcone', 'two', 'threedef'])
   })
 
@@ -66,7 +66,7 @@ test.describe('clipboard', () => {
     await expect(window.getByAltText('Attached image')).toHaveCount(1)
 
     await firePaste(node(window, 1))
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(2)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
     await expect(window.getByAltText('Attached image')).toHaveCount(2)
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(2)
   })

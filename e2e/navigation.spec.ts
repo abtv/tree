@@ -27,7 +27,7 @@ test.describe('navigation', () => {
 
     await expect(parent(window)).toHaveValue('Projects')
     await expect(parent(window)).toBeFocused()
-    expect(await parent(window).evaluate((element) => (element as HTMLInputElement).selectionStart)).toBe(8)
+    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
   })
 
   test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({ userDataDir }) => {
@@ -38,7 +38,7 @@ test.describe('navigation', () => {
 
     await expect(parent(window)).toHaveValue('Projects')
     await expect(parent(window)).toBeFocused()
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(0)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
 
     await window.keyboard.press('Enter')
     await typeInto(node(window, 1), 'Work')
@@ -78,7 +78,7 @@ test.describe('navigation', () => {
     await expect(node(window, 1)).toBeFocused()
 
     await window.getByRole('button', { name: 'Top level' }).click()
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(1)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('Projects')
     await expect(node(window, 1)).toBeFocused()
   })

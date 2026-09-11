@@ -65,7 +65,7 @@ test.describe('persistence', () => {
     await first.app.close()
     const second = await launchTree(userDataDir)
 
-    await expect(second.window.locator('input[aria-label^="Node "]')).toHaveCount(1)
+    await expect(second.window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(0)
   })
 })

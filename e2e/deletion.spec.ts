@@ -14,7 +14,7 @@ test.describe('deleting nodes', () => {
     await expect(node(window, 2)).toHaveValue('B')
     await window.keyboard.press('Meta+Backspace')
 
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(2)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
     await expect(node(window, 2)).toHaveValue('C')
     await expect(node(window, 2)).toBeFocused()
   })
@@ -25,7 +25,7 @@ test.describe('deleting nodes', () => {
     await typeInto(node(window, 1), 'Only')
     await window.keyboard.press('Meta+Backspace')
 
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(1)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('')
     await expect(node(window, 1)).toBeFocused()
   })
@@ -41,7 +41,7 @@ test.describe('deleting nodes', () => {
     await parent(window).focus()
     await window.keyboard.press('Meta+Backspace')
 
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(1)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('')
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveCount(0)
   })

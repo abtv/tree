@@ -10,7 +10,7 @@ interface AppProps {
 
 export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
-  const inputs = useRef(new Map<string, HTMLInputElement>())
+  const inputs = useRef(new Map<string, HTMLTextAreaElement>())
   const composing = useRef(false)
   const [draggedNodeId, setDraggedNodeId] = useState<string>()
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
@@ -32,20 +32,20 @@ export function App({ store }: AppProps): React.JSX.Element {
 
   const currentParent = state.location.currentParentId === null ? undefined : findNode(state.document.roots, state.location.currentParentId)
   const nodes = currentParent?.children ?? state.document.roots
-  const setInput = (id: string) => (input: HTMLInputElement | null): void => {
+  const setInput = (id: string) => (input: HTMLTextAreaElement | null): void => {
     if (input === null) inputs.current.delete(id)
     else inputs.current.set(id, input)
   }
-  const onChange = (nodeId: string) => (event: ChangeEvent<HTMLInputElement>): void => {
+  const onChange = (nodeId: string) => (event: ChangeEvent<HTMLTextAreaElement>): void => {
     store.editText(nodeId, event.currentTarget.value)
   }
-  const onFocus = (nodeId: string) => (event: FocusEvent<HTMLInputElement>): void => {
+  const onFocus = (nodeId: string) => (event: FocusEvent<HTMLTextAreaElement>): void => {
     if (state.location.selectedNodeId !== nodeId) store.selectNode(nodeId, event.currentTarget.selectionStart ?? 0)
   }
-  const onSelect = (event: SyntheticEvent<HTMLInputElement>): void => {
+  const onSelect = (event: SyntheticEvent<HTMLTextAreaElement>): void => {
     if (event.currentTarget.selectionStart !== event.currentTarget.selectionEnd) store.endTextSession()
   }
-  const onKeyDown = (node: TreeNode) => (event: KeyboardEvent<HTMLInputElement>): void => {
+  const onKeyDown = (node: TreeNode) => (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (composing.current) return
     const cursor = event.currentTarget.selectionStart ?? 0
     if (event.metaKey && event.key === '.') { event.preventDefault(); store.enter() }
@@ -60,7 +60,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     else if (event.key === 'ArrowDown') { event.preventDefault(); store.moveSelection('down', cursor) }
     else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End' || event.key === 'PageUp' || event.key === 'PageDown') store.endTextSession()
   }
-  const onPaste = (nodeId: string) => (event: ClipboardEvent<HTMLInputElement>): void => {
+  const onPaste = (nodeId: string) => (event: ClipboardEvent<HTMLTextAreaElement>): void => {
     event.preventDefault()
     void store.paste(nodeId, event.currentTarget.selectionStart ?? 0).catch(() => undefined)
   }
@@ -83,8 +83,8 @@ export function App({ store }: AppProps): React.JSX.Element {
     onDrop(rowInsertionIndex(index, event))(event)
   }
   const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => (
-    <input
-      ref={setInput(node.id)} aria-label={label} className={parent ? 'node-input current-parent-input' : 'node-input'} value={node.text}
+    <textarea
+      ref={setInput(node.id)} aria-label={label} className={parent ? 'node-input current-parent-input' : 'node-input'} rows={1} value={node.text}
       onBlur={() => store.endTextSession()} onChange={onChange(node.id)} onCompositionEnd={() => { composing.current = false }}
       onCompositionStart={() => { composing.current = true }} onCut={() => store.markNextTextEditStandalone()} onFocus={onFocus(node.id)}
       onKeyDown={onKeyDown(node)} onMouseDown={() => store.endTextSession()} onPaste={onPaste(node.id)} onSelect={onSelect} spellCheck

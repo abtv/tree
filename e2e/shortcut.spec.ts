@@ -13,7 +13,7 @@ test.describe('Cmd+0', () => {
 
     await window.keyboard.press('Meta+0')
 
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(2)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
     await expect(node(window, 1)).toHaveValue('Alpha')
     await expect(node(window, 2)).toHaveValue('Beta')
     await expect(node(window, 2)).toBeFocused()

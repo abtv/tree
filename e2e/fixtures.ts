@@ -30,7 +30,7 @@ export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
     const directory = mkdtempSync(join(tmpdir(), 'tree-e2e-'))
     await use(directory)
-    rmSync(directory, { recursive: true, force: true })
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   },
 })
 
@@ -60,18 +60,18 @@ export function parent(window: Page) {
 }
 
 export function nodeCount(window: Page): Promise<number> {
-  return window.locator('input[aria-label^="Node "]').count()
+  return window.locator('[aria-label^="Node "]').count()
 }
 
 export function nodeTexts(window: Page): Promise<string[]> {
-  return window.locator('input[aria-label^="Node "]').evaluateAll((inputs) =>
-    inputs.map((input) => (input as HTMLInputElement).value),
+  return window.locator('[aria-label^="Node "]').evaluateAll((inputs) =>
+    inputs.map((input) => (input as HTMLTextAreaElement).value),
   )
 }
 
 export async function setCursor(input: ReturnType<Page['locator']>, position: number): Promise<void> {
   await input.evaluate((element, cursor) => {
-    const field = element as HTMLInputElement
+    const field = element as HTMLTextAreaElement
     field.focus()
     field.setSelectionRange(cursor, cursor)
   }, position)

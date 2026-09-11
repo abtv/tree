@@ -4,7 +4,7 @@ test.describe('initial state', () => {
   test('first launch creates one empty focused root that is persisted', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(1)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('')
     await expect(node(window, 1)).toBeFocused()
 

@@ -19,10 +19,10 @@ test.describe('undo and redo', () => {
 
     await typeInto(node(window, 1), 'A')
     await window.keyboard.press('Enter')
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(2)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
 
     await window.keyboard.press('Meta+z')
-    await expect(window.locator('input[aria-label^="Node "]')).toHaveCount(1)
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('A')
   })
 
