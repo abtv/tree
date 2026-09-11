@@ -265,6 +265,8 @@ Coverage reporting (`npm run test:coverage`) is a gap-finder, not a target. Do n
 
 Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files.
 
+When a change affects domain invariants — tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency — add or update a property test for the affected invariants. They are not a coverage target. Boundary wiring and presentation changes do not require property tests.
+
 ---
 
 ## 13. Persistence Testing

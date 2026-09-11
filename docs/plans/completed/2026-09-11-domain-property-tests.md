@@ -43,7 +43,8 @@ Property tests run with the unit suite via `npm test`. They are excluded from co
 
 ## Documentation Changes
 
-- `docs/DEVELOPMENT.md` §12 notes that property-based tests use `fast-check`.
+- `docs/DEVELOPMENT.md` §12 notes that property-based tests use `fast-check`, and requires adding or updating property tests when a change affects domain invariants (tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency).
+- `AGENTS.md` §9 carries the same requirement for coding agents.
 
 ## Risks and Open Questions
 
