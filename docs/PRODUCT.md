@@ -65,7 +65,7 @@ The current parent is not part of `↑` / `↓` sibling navigation.
 
 ### 2.1 Node Presentation
 
-Nodes are presented as plain, single-line outline rows with a bullet to the left of their text.
+Nodes are presented as plain, single-line outline rows with a solid 7px circular bullet to the left of their text. The bullet and text are aligned to consistent outline columns.
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
