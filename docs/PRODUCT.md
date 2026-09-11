@@ -71,7 +71,7 @@ Nodes with one or more direct children display a muted outer circle surrounding 
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
-The focused node may have a subtle background to show its active editing state. It must not display an additional more-options or selection-dot ornament.
+Node rows retain the document-surface background when focused or hovered (white in the light appearance); focus and hover must not tint the editing row. A focused node must not display an additional more-options or selection-dot ornament.
 
 The current parent is presented above its children as a larger, bold, editable heading without a bullet.
 
