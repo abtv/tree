@@ -263,6 +263,8 @@ Every user-visible behavior described in `docs/PRODUCT.md` must have at least on
 
 Coverage reporting (`npm run test:coverage`) is a gap-finder, not a target. Do not add tests solely to raise the number. When behavior changes, review the affected product requirements and confirm each one still has coverage at the appropriate level.
 
+Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files.
+
 ---
 
 ## 13. Persistence Testing

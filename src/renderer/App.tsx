@@ -244,10 +244,11 @@ function ImagePreview({ attachmentId, onClose }: { attachmentId: string; onClose
 }
 
 function findNode(nodes: TreeNode[], id: string): TreeNode | undefined {
-  for (const node of nodes) {
+  const stack = [...nodes]
+  while (stack.length > 0) {
+    const node = stack.pop()!
     if (node.id === id) return node
-    const nested = findNode(node.children, id)
-    if (nested !== undefined) return nested
+    for (const child of node.children) stack.push(child)
   }
   return undefined
 }

@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assertDocument,
   attachImage,
+  cloneDocument,
+  collectAttachmentIds,
   createInitialDocument,
   createFirstChild,
   deleteNode,
   isValidLocation,
+  locateNode,
   moveSibling,
   nodePath,
   parsePersistedState,
   pasteMultilineText,
+  pasteText,
   serializeState,
   splitNode,
+  type TreeNode,
 } from './document'
 
 describe('document operations', () => {
@@ -77,5 +83,33 @@ describe('document operations', () => {
     const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
     const result = deleteNode(document, 'a')
     expect(result.roots).toEqual([])
+  })
+
+  it('supports deeply nested documents without recursive traversal failures', () => {
+    const depth = 5_000
+    const root: TreeNode = { id: 'n0', text: 'root', children: [] }
+    let current = root
+    for (let index = 1; index < depth; index += 1) {
+      const child: TreeNode = { id: `n${index}`, text: `t${index}`, children: [] }
+      current.children.push(child)
+      current = child
+    }
+    const document = { roots: [root] }
+
+    expect(() => assertDocument(document)).not.toThrow()
+    expect(() => cloneDocument(document)).not.toThrow()
+    expect(() => serializeState(document, { currentParentId: null, selectedNodeId: 'n0' })).not.toThrow()
+    expect(locateNode(document, `n${depth - 1}`)?.ancestors).toHaveLength(depth - 1)
+    expect(nodePath(document, `n${depth - 1}`)).toHaveLength(depth)
+    expect(collectAttachmentIds(document).size).toBe(0)
+    expect(() => parsePersistedState({ version: 1, document, location: { currentParentId: null, selectedNodeId: 'n0' } })).not.toThrow()
+  })
+
+  it('does not split a surrogate pair when the cursor is inside it', () => {
+    const document = createInitialDocument('a')
+    document.roots[0]!.text = '😀b'
+
+    expect(splitNode(document, 'a', 1, 'b').roots.map((node) => node.text)).toEqual(['', '😀b'])
+    expect(pasteText(document, 'a', 1, 'X').roots[0]!.text).toBe('X😀b')
   })
 })
