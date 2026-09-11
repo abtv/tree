@@ -418,6 +418,8 @@ D
 
 Paste uses the current clipboard item created by the most recent copy operation. It does not use older clipboard history.
 
+If the current clipboard item exposes both image and text representations, the image takes precedence. Paste the image and do not also paste the text representation.
+
 The application must support:
 
 * plain text;
@@ -622,5 +624,4 @@ The tree hierarchy is primarily navigated by entering and leaving nodes rather t
 The following product behavior requires Product Owner clarification before implementation:
 
 * focus and keyboard behavior for the editable current parent when it already has children, including `Enter`, `↑`, `↓`, `Cmd+.`, and `Cmd+Backspace`;
-* the events and any idle interval that end a continuous text-editing session for undo grouping;
-* paste precedence when the current clipboard item exposes both image and text representations.
+* the events and any idle interval that end a continuous text-editing session for undo grouping.
