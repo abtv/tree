@@ -21,12 +21,13 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "audit": "npm audit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && playwright test",
     "test:perf": "npm run build && playwright test -c perf.config.ts",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run audit",
     "check:full": "npm run check && playwright test && playwright test -c perf.config.ts"
   },
   "dependencies": {

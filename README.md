@@ -60,6 +60,8 @@ npm run build
 npm run start
 npm run typecheck
 npm run lint
+npm run format
+npm run audit
 npm test
 npm run test:watch
 npm run test:coverage

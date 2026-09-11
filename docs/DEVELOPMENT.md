@@ -157,8 +157,10 @@ It should run:
 
 1. type checking;
 2. linting;
-3. tests;
-4. production build.
+3. formatting check (`prettier --check`);
+4. tests;
+5. production build;
+6. dependency audit (`npm audit`).
 
 The repository must also provide the complete validation command:
 
@@ -334,6 +336,12 @@ Before adding a new dependency:
 5. Avoid adding a dependency for a trivial utility.
 
 Major dependency changes should be documented and, when appropriate, recorded as an architectural decision.
+
+`npm audit` runs as the final step of `npm run check`, so known vulnerabilities are reported before a commit. It requires registry access and fails when offline.
+
+## Formatting
+
+Code is formatted with Prettier using `semi: false`, `singleQuote: true`, and `printWidth: 120`, and indentation is declared in `.editorconfig`. `prettier --check` runs as part of `npm run check`; use `npm run format` to apply formatting.
 
 ---
 
