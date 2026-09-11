@@ -46,6 +46,7 @@ describe('App', () => {
     fireEvent.change(parent, { target: { value: 'Projects' } })
 
     expect(parent).toHaveValue('Projects')
+    expect(screen.getByLabelText('Current location')).toHaveTextContent('›Projects')
   })
 
   it('moves a node through a between-node drop zone', async () => {

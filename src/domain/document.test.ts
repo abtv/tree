@@ -6,6 +6,7 @@ import {
   deleteNode,
   isValidLocation,
   moveSibling,
+  nodePath,
   parsePersistedState,
   pasteMultilineText,
   serializeState,
@@ -54,6 +55,14 @@ describe('document operations', () => {
     expect(isValidLocation(document, { currentParentId: 'parent', selectedNodeId: 'child' })).toBe(true)
     expect(isValidLocation(document, { currentParentId: 'parent', selectedNodeId: 'parent' })).toBe(true)
     expect(isValidLocation(document, { currentParentId: 'parent', selectedNodeId: 'missing' })).toBe(false)
+  })
+
+  it('derives the complete node path without storing parent IDs', () => {
+    const document = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
+    document.roots[0]!.text = 'Parent'
+    document.roots[0]!.children[0]!.text = 'Child'
+
+    expect(nodePath(document, 'child').map((node) => node.text)).toEqual(['Parent', 'Child'])
   })
 
   it('round-trips a valid persisted state and rejects duplicate IDs', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
-import type { TreeNode } from '../domain/document'
+import { nodePath, type TreeNode } from '../domain/document'
 import { readAttachment } from '../infrastructure/renderer/electron-services'
 
 interface AppProps {
@@ -76,8 +76,15 @@ export function App({ store }: AppProps): React.JSX.Element {
     />
   )
 
+  const path = state.location.currentParentId === null ? [] : nodePath(state.document, state.location.currentParentId)
+
   return (
-    <main className="editor-shell">
+    <main className="tree-app">
+      <header className="location-bar" aria-label="Current location">
+        <span className="location-root" aria-label="Document root"><OutlineRootIcon /></span>
+        {path.map((node) => <span className="location-segment" key={node.id}><span className="location-separator">›</span><span>{node.text}</span></span>)}
+      </header>
+      <section className="editor-shell">
       {currentParent === undefined ? null : (
         <section className="current-parent" aria-label="Current parent">
           {input(currentParent, 'Current parent', true)}
@@ -95,7 +102,19 @@ export function App({ store }: AppProps): React.JSX.Element {
         ))}
       </section>
       {state.saveError === undefined ? null : <p className="save-error" role="status">Changes could not be saved: {state.saveError}</p>}
+      </section>
     </main>
+  )
+}
+
+function OutlineRootIcon(): React.JSX.Element {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 6v5m0 0-5 5m5-5 5 5" />
+      <circle cx="12" cy="5" r="2" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
+    </svg>
   )
 }
 

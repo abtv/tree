@@ -75,6 +75,16 @@ The current parent is presented above its children as a larger, bold, editable h
 
 An attached image is displayed beneath its node's text and aligned with that node's text column.
 
+### 2.2 Location Path
+
+A thin toolbar at the top of the application displays the current location.
+
+At the root level, the toolbar displays only an outline-root glyph representing the implicit document container. The document container itself has no visible text label.
+
+Below the root level, the toolbar displays a read-only breadcrumb beginning with the outline-root glyph and continuing through every ancestor to the current parent. The current parent is the final breadcrumb segment.
+
+The location path represents the current parent/location, not the selected child. It is display-only and does not provide direct navigation.
+
 ---
 
 ## 3. Initial State

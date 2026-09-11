@@ -12,9 +12,41 @@ body { min-width: 320px; min-height: 100vh; margin: 0; }
 
 button, input, textarea { font: inherit; }
 
-.app-shell, .editor-shell { min-height: 100vh; }
+.app-shell, .tree-app { min-height: 100vh; }
 
 .app-shell { display: grid; place-items: center; color: #737b80; }
+
+.location-bar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 18px;
+  border-bottom: 1px solid #e9edef;
+  color: #778187;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.location-root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.location-root svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.location-segment { display: inline-flex; align-items: center; min-width: 0; }
+
+.location-separator { margin: 0 9px; color: #b1b8bc; font-size: 20px; font-weight: 300; }
 
 .editor-shell {
   width: min(100%, 760px);
@@ -96,6 +128,8 @@ button, input, textarea { font: inherit; }
 @media (prefers-color-scheme: dark) {
   :root { color: #e5e7e8; background: #1e2022; }
   .app-shell { color: #a5adb2; }
+  .location-bar { border-color: #303438; color: #a5adb2; }
+  .location-separator { color: #687177; }
   .node-row::before { color: #c3c8cb; }
   .node-row:hover .node-input, .node-input:focus { background: #292c2f; }
   .current-parent-input:focus { background: transparent; }

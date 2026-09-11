@@ -96,6 +96,11 @@ export function displayedNodes(document: Document, currentParentId: NodeId | nul
   return currentParentId === null ? document.roots : requireNode(document, currentParentId).node.children
 }
 
+export function nodePath(document: Document, nodeId: NodeId): TreeNode[] {
+  const located = requireNode(document, nodeId)
+  return [...located.ancestors, located.node]
+}
+
 export function isValidLocation(document: Document, location: Location): boolean {
   const selected = locateNode(document, location.selectedNodeId)
   if (selected === undefined) {
