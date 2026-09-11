@@ -187,9 +187,9 @@ Do not remove or weaken tests merely to make an implementation pass.
 
 ## 10. Validation
 
-`npm run check` is the standard validation command. It runs type checking, linting, unit and component tests, and the production build. Run it before considering a task complete.
+`npm run check` is the fast local pipeline: type checking, linting, unit and component tests, and the production build.
 
-`npm run check:full` is the complete validation pipeline. It runs `npm run check` and then the end-to-end test suite. Run it when a change affects the Electron shell, preload/IPC, persistence, attachments, or clipboard behavior.
+`npm run check:full` is the complete validation pipeline. It runs `npm run check`, the end-to-end test suite, and the performance suite. Run it before every commit.
 
 If validation fails, fix the problem before considering the task complete.
 
@@ -241,7 +241,7 @@ A task is complete only when:
 * every affected `docs/PRODUCT.md` behavior has coverage at the appropriate level (a unit test for the rule, and an end-to-end test for boundary wiring);
 * relevant tests are added or updated;
 * documentation is updated when necessary;
-* `npm run check` passes, or `npm run check:full` when the change affects the Electron shell, preload/IPC, persistence, attachments, or clipboard;
+* `npm run check:full` passes;
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 

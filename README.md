@@ -41,13 +41,13 @@ Run the application in development mode:
 npm run dev
 ```
 
-Run the standard validation pipeline:
+Run the fast local validation pipeline:
 
 ```bash
 npm run check
 ```
 
-Run the complete validation pipeline, including end-to-end tests:
+Run the complete validation pipeline, including end-to-end and performance tests. Run this before every commit:
 
 ```bash
 npm run check:full

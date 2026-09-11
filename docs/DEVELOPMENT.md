@@ -166,7 +166,7 @@ The repository must also provide the complete validation command:
 npm run check:full
 ```
 
-This runs `npm run check` and then the end-to-end suite. Changes that touch the Electron shell, preload/IPC, persistence, attachments, or clipboard behavior must be validated with `npm run check:full`.
+This runs `npm run check`, the end-to-end suite, and the performance suite. Run `npm run check:full` before every commit. `npm run check` remains available as the fast local loop when a full run is not practical.
 
 A task is not considered complete until the appropriate validation command passes successfully.
 
@@ -183,7 +183,7 @@ For a small, well-defined task:
 5. Implement the change.
 6. Add or update tests.
 7. Update documentation if necessary.
-8. Run the appropriate validation (`npm run check`, or `npm run check:full` for integration-sensitive changes).
+8. Run `npm run check:full`.
 9. Review the git diff.
 10. Commit the completed logical change.
 
@@ -196,7 +196,7 @@ For a larger or potentially architectural task:
 5. Get Product Owner approval when the plan requires a product or architectural decision.
 6. Implement the plan.
 7. Update tests and documentation.
-8. Run the appropriate validation (`npm run check`, or `npm run check:full` for integration-sensitive changes).
+8. Run `npm run check:full`.
 9. Move the completed plan to `docs/plans/completed/`.
 10. Commit the completed change.
 
@@ -267,13 +267,13 @@ Property-based tests using `fast-check` cover domain invariants and `EditorStore
 
 When a change affects domain invariants — tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency — add or update a property test for the affected invariants. They are not a coverage target. Boundary wiring and presentation changes do not require property tests.
 
-Performance tests live in `perf/` and run with:
+Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
 
 ```bash
 npm run test:perf
 ```
 
-They measure startup and typing latency at several document scales and print one JSON line per scenario. They are separate from `check` and `check:full`; thresholds are intentionally loose and exist to catch catastrophic regressions, with baselines recorded in the associated plan.
+They measure startup and typing latency at several document scales and print one JSON line per scenario. Thresholds are intentionally loose and exist to catch catastrophic regressions, with baselines recorded in the associated plan.
 
 ---
 
@@ -421,7 +421,7 @@ A development task is complete when:
 * type checking passes;
 * linting passes;
 * the production build passes;
-* `npm run check` passes;
+* `npm run check:full` passes;
 * relevant documentation is updated;
 * no temporary or debugging code remains;
 * the git diff contains only intentional changes.

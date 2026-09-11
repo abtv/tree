@@ -40,7 +40,7 @@ Out of scope:
 Constraints:
 
 - No test hooks in production code. Measurement is done from Playwright and in-page `performance` APIs.
-- Performance tests are not part of `npm run check` or `check:full`; they run via `npm run test:perf`.
+- Performance tests run via `npm run test:perf` and as part of `npm run check:full`.
 
 ## Proposed Approach
 
@@ -83,7 +83,7 @@ None.
 
 ## Testing Strategy
 
-Performance scenarios run separately from correctness tests. Correctness is unchanged and remains covered by the unit, component, and `e2e/` suites.
+Performance scenarios run after the correctness suites as part of `check:full`. Correctness is unchanged and remains covered by the unit, component, and `e2e/` suites.
 
 ## Baselines
 
