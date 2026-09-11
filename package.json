@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && playwright test",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "check:full": "npm run check && playwright test"
@@ -38,6 +39,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^5.0.0",
     "electron": "^44.3.0",
     "electron-vite": "^5.0.0",
     "eslint": "^10.10.0",

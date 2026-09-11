@@ -117,6 +117,14 @@ Run tests in watch mode during development with:
 npm run test:watch
 ```
 
+Run the unit and component tests with a coverage report with:
+
+```bash
+npm run test:coverage
+```
+
+Coverage uses the V8 provider and reports statements, branches, functions, and lines for sources under `src/`. It covers the unit and component tests only; end-to-end coverage is not collected. Coverage output is written to `coverage/`, which is not committed.
+
 Tests should primarily cover domain and application behavior.
 
 Domain tests must not require Electron or a browser environment.
