@@ -111,7 +111,7 @@ export function App({ store }: AppProps): React.JSX.Element {
         </section>
       )}
       <section className="node-list" aria-label="Nodes">
-        <DropZone index={0} onDrop={onDrop} />
+        <DropZone index={0} onDrop={onDrop} start />
         {nodes.map((node, index) => (
           <div
             className="node-row"
@@ -142,7 +142,7 @@ export function App({ store }: AppProps): React.JSX.Element {
             {node.attachment === undefined ? null : <AttachmentImage attachmentId={node.attachment.id} />}
           </div>
         ))}
-        <DropZone index={nodes.length} onDrop={onDrop} />
+        <DropZone end index={nodes.length} onDrop={onDrop} />
       </section>
       {state.saveError === undefined ? null : <p className="save-error" role="status">Changes could not be saved: {state.saveError}</p>}
       </section>
@@ -161,8 +161,8 @@ function OutlineRootIcon(): React.JSX.Element {
   )
 }
 
-function DropZone({ index, onDrop }: { index: number; onDrop: (index: number) => (event: DragEvent<HTMLDivElement>) => void }): React.JSX.Element {
-  return <div className="drop-zone" aria-label={`Drop position ${index + 1}`} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }} onDrop={onDrop(index)} />
+function DropZone({ end = false, index, onDrop, start = false }: { end?: boolean; index: number; onDrop: (index: number) => (event: DragEvent<HTMLDivElement>) => void; start?: boolean }): React.JSX.Element {
+  return <div className={`drop-zone${start ? ' drop-zone-start' : ''}${end ? ' drop-zone-end' : ''}`} aria-label={`Drop position ${index + 1}`} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }} onDrop={onDrop(index)} />
 }
 
 function AttachmentImage({ attachmentId }: { attachmentId: string }): React.JSX.Element | null {
