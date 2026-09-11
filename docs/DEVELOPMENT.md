@@ -39,6 +39,12 @@ npm install
 
 The install runs the project's `postinstall` script to download the Electron runtime for the current platform. Do not disable lifecycle scripts when preparing a development environment.
 
+The end-to-end suite drives Electron, not browser binaries, so the Playwright browser download is not needed. To skip it and reduce install size and time:
+
+```bash
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install
+```
+
 ---
 
 ## 4. Running the Application
@@ -117,6 +123,16 @@ Domain tests must not require Electron or a browser environment.
 
 Vitest uses the Node.js environment by default. Renderer tests opt into jsdom when behavior requires a DOM.
 
+End-to-end tests live in `e2e/` and run with:
+
+```bash
+npm run test:e2e
+```
+
+This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. The suite runs serially with a single worker because of the single-instance application and the global `Cmd+0` shortcut. The suite is macOS-only and requires a display.
+
+Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**`, and Playwright only reads `e2e/`.
+
 ---
 
 ## 9. Full Validation
@@ -127,7 +143,7 @@ The repository must provide:
 npm run check
 ```
 
-This is the standard validation command.
+This is the standard validation command for day-to-day work.
 
 It should run:
 
@@ -136,13 +152,15 @@ It should run:
 3. tests;
 4. production build.
 
-A task is not considered complete until:
+The repository must also provide the complete validation command:
 
 ```bash
-npm run check
+npm run check:full
 ```
 
-passes successfully.
+This runs `npm run check` and then the end-to-end suite. Changes that touch the Electron shell, preload/IPC, persistence, attachments, or clipboard behavior must be validated with `npm run check:full`.
+
+A task is not considered complete until the appropriate validation command passes successfully.
 
 ---
 
@@ -157,7 +175,7 @@ For a small, well-defined task:
 5. Implement the change.
 6. Add or update tests.
 7. Update documentation if necessary.
-8. Run `npm run check`.
+8. Run the appropriate validation (`npm run check`, or `npm run check:full` for integration-sensitive changes).
 9. Review the git diff.
 10. Commit the completed logical change.
 
@@ -170,7 +188,7 @@ For a larger or potentially architectural task:
 5. Get Product Owner approval when the plan requires a product or architectural decision.
 6. Implement the plan.
 7. Update tests and documentation.
-8. Run `npm run check`.
+8. Run the appropriate validation (`npm run check`, or `npm run check:full` for integration-sensitive changes).
 9. Move the completed plan to `docs/plans/completed/`.
 10. Commit the completed change.
 
@@ -231,6 +249,8 @@ Tests should verify behavior rather than implementation details.
 
 A refactoring that preserves behavior should not require unnecessary test changes.
 
+End-to-end tests complement unit tests by exercising the real Electron application through the UI. They should target integration points that unit tests cannot cover: preload/IPC wiring, autosave and restart behavior, attachment files, the system clipboard, and the application startup path. See `docs/decisions/0002-e2e-testing-with-playwright.md`.
+
 ---
 
 ## 13. Persistence Testing
@@ -250,6 +270,8 @@ Tests should cover:
 * attachment cleanup where applicable.
 
 The application must not silently lose user data.
+
+Real persistence across an Electron restart is additionally covered by the end-to-end suite in `e2e/persistence.spec.ts`.
 
 ---
 

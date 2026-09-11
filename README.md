@@ -41,10 +41,16 @@ Run the application in development mode:
 npm run dev
 ```
 
-Run the complete validation pipeline:
+Run the standard validation pipeline:
 
 ```bash
 npm run check
+```
+
+Run the complete validation pipeline, including end-to-end tests:
+
+```bash
+npm run check:full
 ```
 
 Other available commands:
@@ -56,7 +62,10 @@ npm run typecheck
 npm run lint
 npm test
 npm run test:watch
+npm run test:e2e
 ```
+
+The end-to-end suite launches the real Electron application and verifies persistence, clipboard, and attachment behavior. It is macOS-only and builds the application before running Playwright.
 
 The application opens an inline, keyboard-first tree editor. It supports multiple root nodes, entering and leaving levels, sibling creation and reordering, undo/redo, text and image paste, local image attachments, and automatic persistence between restarts.
 

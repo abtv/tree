@@ -31,12 +31,20 @@ export default tseslint.config(
       'electron.vite.config.ts',
       'eslint.config.mjs',
       'vitest.config.ts',
+      'playwright.config.ts',
+      'e2e/**/*.ts',
       'src/main/**/*.ts',
       'src/preload/**/*.ts',
       'src/infrastructure/main/**/*.ts',
     ],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    files: ['playwright.config.ts', 'e2e/**/*.ts'],
+    rules: {
+      'no-empty-pattern': 'off',
     },
   },
   {

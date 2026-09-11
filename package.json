@@ -16,11 +16,14 @@
     "build": "electron-vite build",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:renderer": "tsc --noEmit -p tsconfig.web.json",
-    "typecheck": "npm run typecheck:node && npm run typecheck:renderer",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:renderer && npm run typecheck:e2e",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build"
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "check:full": "npm run check && playwright test"
   },
   "dependencies": {
     "react": "^19.3.0",
@@ -28,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.4",
