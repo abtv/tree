@@ -128,9 +128,19 @@ button, input, textarea { font: inherit; }
 
 .node-row[draggable='true']:active { cursor: grabbing; }
 
-.drop-zone { height: 2px; border-radius: 2px; }
+.drop-zone { position: relative; height: 16px; }
 
-.drop-zone:hover { background: #d9e9f7; }
+.drop-zone::after {
+  position: absolute;
+  top: 7px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  content: '';
+}
+
+.drop-zone:hover::after { background: #d9e9f7; }
 
 .node-input {
   width: 100%;
@@ -187,5 +197,5 @@ button, input, textarea { font: inherit; }
   .node-row:hover .node-input, .node-input:focus { background: #292c2f; }
   .current-parent-input:focus { background: transparent; }
   .node-input { caret-color: #fff; }
-  .drop-zone:hover { background: #31455a; }
+  .drop-zone:hover::after { background: #31455a; }
 }

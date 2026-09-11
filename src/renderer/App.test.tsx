@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from '../application/editor-store'
 import './test/setup'
 import { App } from './App'
@@ -89,20 +89,49 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
   })
 
-  it('moves a node through a between-node drop zone', async () => {
+  it('moves a node to the boundary above a row and prevents the node ID from being dropped into its text', async () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
     render(<App store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
-    const transfer = { value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
+    const transfer = { dropEffect: '', effectAllowed: '', value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
     const secondRow = screen.getByRole('textbox', { name: 'Node 2' }).parentElement
+    const firstRow = first.parentElement
+    vi.spyOn(firstRow!, 'getBoundingClientRect').mockReturnValue({ height: 20, top: 10 } as DOMRect)
 
     fireEvent.dragStart(secondRow!, { dataTransfer: transfer })
+    fireEvent.dragOver(first, { dataTransfer: transfer, clientY: 11 })
+    fireEvent.drop(first, { dataTransfer: transfer, clientY: 11 })
+
+    expect(transfer.effectAllowed).toBe('move')
+    expect(transfer.dropEffect).toBe('move')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('')
+  })
+
+  it('moves nodes through the drop zones before the first and after the last node', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    const transfer = { dropEffect: '', effectAllowed: '', value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
+
+    fireEvent.change(first, { target: { value: 'A' } })
+    first.setSelectionRange(1, 1)
+    fireEvent.keyDown(first, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
+    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
+    fireEvent.drop(screen.getByLabelText('Drop position 3'), { dataTransfer: transfer })
+
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
+
+    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 2' }).parentElement!, { dataTransfer: transfer })
     fireEvent.drop(screen.getByLabelText('Drop position 1'), { dataTransfer: transfer })
 
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('')
-    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('B')
   })
 })

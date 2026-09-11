@@ -61,11 +61,23 @@ export function App({ store }: AppProps): React.JSX.Element {
     event.preventDefault()
     void store.paste(nodeId, event.currentTarget.selectionStart ?? 0).catch(() => undefined)
   }
+  const onDragOver = (event: DragEvent<HTMLElement>): void => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
   const onDrop = (insertionIndex: number) => (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault()
     const nodeId = event.dataTransfer.getData('text/plain') || draggedNodeId
     if (nodeId !== undefined) store.moveNodeTo(nodeId, insertionIndex)
     setDraggedNodeId(undefined)
+  }
+  const rowInsertionIndex = (index: number, event: DragEvent<HTMLDivElement>): number => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    return event.clientY < bounds.top + bounds.height / 2 ? index : index + 1
+  }
+  const onRowDragOver = (event: DragEvent<HTMLDivElement>): void => onDragOver(event)
+  const onRowDrop = (index: number) => (event: DragEvent<HTMLDivElement>): void => {
+    onDrop(rowInsertionIndex(index, event))(event)
   }
   const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => (
     <input
@@ -101,7 +113,19 @@ export function App({ store }: AppProps): React.JSX.Element {
       <section className="node-list" aria-label="Nodes">
         <DropZone index={0} onDrop={onDrop} />
         {nodes.map((node, index) => (
-          <div className="node-row" draggable key={node.id} onDragEnd={() => setDraggedNodeId(undefined)} onDragStart={(event) => { event.dataTransfer.setData('text/plain', node.id); setDraggedNodeId(node.id) }}>
+          <div
+            className="node-row"
+            draggable
+            key={node.id}
+            onDragEnd={() => setDraggedNodeId(undefined)}
+            onDragOver={onRowDragOver}
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', node.id)
+              setDraggedNodeId(node.id)
+            }}
+            onDrop={onRowDrop(index)}
+          >
             {node.children.length === 0 ? null : (
               <button
                 aria-label={`Enter node ${index + 1}`}
@@ -116,9 +140,9 @@ export function App({ store }: AppProps): React.JSX.Element {
             )}
             {input(node, `Node ${index + 1}`)}
             {node.attachment === undefined ? null : <AttachmentImage attachmentId={node.attachment.id} />}
-            <DropZone index={index + 1} onDrop={onDrop} />
           </div>
         ))}
+        <DropZone index={nodes.length} onDrop={onDrop} />
       </section>
       {state.saveError === undefined ? null : <p className="save-error" role="status">Changes could not be saved: {state.saveError}</p>}
       </section>
@@ -138,7 +162,7 @@ function OutlineRootIcon(): React.JSX.Element {
 }
 
 function DropZone({ index, onDrop }: { index: number; onDrop: (index: number) => (event: DragEvent<HTMLDivElement>) => void }): React.JSX.Element {
-  return <div className="drop-zone" aria-label={`Drop position ${index + 1}`} onDragOver={(event) => event.preventDefault()} onDrop={onDrop(index)} />
+  return <div className="drop-zone" aria-label={`Drop position ${index + 1}`} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }} onDrop={onDrop(index)} />
 }
 
 function AttachmentImage({ attachmentId }: { attachmentId: string }): React.JSX.Element | null {
