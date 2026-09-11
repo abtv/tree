@@ -170,13 +170,67 @@ button, input, textarea { font: inherit; }
 
 .current-parent-input:focus { background: transparent; }
 
+.attachment-button {
+  display: block;
+  width: fit-content;
+  margin: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.attachment-button:focus-visible { outline: 1px solid #778187; outline-offset: 2px; }
+
 .attachment-image {
   display: block;
-  max-width: min(100%, 640px);
-  max-height: 480px;
-  margin: 6px;
+  max-width: 200px;
+  max-height: 200px;
   border-radius: 3px;
 }
+
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(18, 20, 22, 0.72);
+}
+
+.image-preview { display: grid; place-items: center; }
+
+.image-preview-image {
+  display: block;
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 64px);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.image-preview-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #373f43;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.image-preview-close:hover { background: #fff; }
+
+.image-preview-close:focus-visible { outline: 2px solid #d9e9f7; outline-offset: 2px; }
 
 .error-state { max-width: 560px; margin: 0 auto; padding: 48px; text-align: center; }
 
@@ -197,5 +251,6 @@ button, input, textarea { font: inherit; }
   .node-input:focus { background: #1e2022; }
   .current-parent-input:focus { background: transparent; }
   .node-input { caret-color: #fff; }
+  .attachment-button:focus-visible { outline-color: #a5adb2; }
   .drop-zone:hover::after { background: #31455a; }
 }

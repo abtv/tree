@@ -118,6 +118,22 @@ export async function writeClipboardImageAndText(app: ElectronApplication): Prom
   }, PNG_1X1_BASE64)
 }
 
+export async function writeClipboardImageSized(app: ElectronApplication, width: number, height: number): Promise<void> {
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }, size) => {
+    const pixels = Buffer.alloc(size.width * size.height * 4)
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      pixels[offset] = 40
+      pixels[offset + 1] = 90
+      pixels[offset + 2] = 200
+      pixels[offset + 3] = 255
+    }
+    const png = nativeImage.createFromBitmap(pixels, { width: size.width, height: size.height }).toPNG()
+    const item = new ClipboardItem({ 'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })
+    clipboard.clear()
+    await clipboard.write([item])
+  }, { width, height })
+}
+
 export async function firePaste(input: ReturnType<Page['locator']>): Promise<void> {
   await input.evaluate((element) => {
     element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true }))

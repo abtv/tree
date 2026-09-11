@@ -618,6 +618,20 @@ Deleting a subtree must clean up attachments belonging to deleted nodes when the
 
 Image attachments must survive application restart.
 
+### 17.1 Inline Presentation and Preview
+
+An attached image is displayed inline beneath its node's text.
+
+Inline images are constrained to a 200×200 CSS-pixel bounding box while preserving their aspect ratio. An image whose natural size exceeds the box is scaled down to fit. An image whose natural size is smaller than the box is displayed at its natural size; it is not enlarged.
+
+Clicking an attached image opens an image preview.
+
+`Cmd+Enter` opens the image preview for the selected node or the editable current parent when that node has an attached image. When neither the selected node nor the current parent has an image, `Cmd+Enter` does nothing.
+
+The image preview is a modal overlay within the application window. It displays the image fitted within the available window area while preserving its aspect ratio, and it does not enlarge the image beyond its natural size.
+
+Only one preview is open at a time. The preview has a visible close button and also closes on `Esc`. Closing the preview returns focus to the element that was focused before the preview opened.
+
 ---
 
 ## 18. Node Identity

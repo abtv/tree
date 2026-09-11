@@ -1,18 +1,34 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EditorStore, type EditorServices } from '../application/editor-store'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
 import './test/setup'
 import { App } from './App'
 
 afterEach(cleanup)
 
-function createStore(): EditorStore {
-  const services: EditorServices = {
+const attachmentBytes = new Uint8Array([137, 80, 78, 71])
+
+beforeEach(() => {
+  window.treeApi = {
     load: async () => null,
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),
+    writeAttachment: async () => undefined,
+    hasAttachment: async () => true,
+    readAttachment: async () => attachmentBytes,
+    cleanupAttachments: async () => undefined,
+  }
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:test' })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined })
+})
+
+function createStore(clipboard: ClipboardValue = { kind: 'text', text: '' }): EditorStore {
+  const services: EditorServices = {
+    load: async () => null,
+    save: async () => undefined,
+    readClipboard: async () => clipboard,
     writeAttachment: async () => undefined,
     hasAttachment: async () => true,
     cleanupAttachments: async () => undefined,
@@ -68,6 +84,60 @@ describe('App', () => {
     fireEvent.keyDown(root, { key: 'z', metaKey: true })
 
     expect(root).toHaveValue('Fir')
+  })
+
+  it('opens the image preview with Cmd+Enter and closes it on Escape, restoring focus', async () => {
+    const store = createStore({ kind: 'image', png: attachmentBytes })
+    await act(async () => { await store.initialize() })
+    await act(async () => { await store.paste('root', 0) })
+    render(<App store={store} />)
+    const node = screen.getByRole('textbox', { name: 'Node 1' })
+    await screen.findByRole('button', { name: 'Open image preview' })
+
+    fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
+    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
+    expect(node).toHaveFocus()
+  })
+
+  it('opens the image preview by clicking the image and closes it with the close button', async () => {
+    const store = createStore({ kind: 'image', png: attachmentBytes })
+    await act(async () => { await store.initialize() })
+    await act(async () => { await store.paste('root', 0) })
+    render(<App store={store} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open image preview' }))
+    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close image preview' }))
+    expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
+  })
+
+  it('opens the image preview from the current parent with Cmd+Enter', async () => {
+    const store = createStore({ kind: 'image', png: attachmentBytes })
+    await act(async () => { await store.initialize() })
+    await act(async () => { await store.paste('root', 0) })
+    render(<App store={store} />)
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
+    const parent = screen.getByRole('textbox', { name: 'Current parent' })
+    await screen.findByRole('button', { name: 'Open image preview' })
+
+    fireEvent.keyDown(parent, { key: 'Enter', metaKey: true })
+
+    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+  })
+
+  it('does nothing on Cmd+Enter when the node has no image', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'Enter', metaKey: true })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('renders and edits the current parent after entering an empty node', async () => {
