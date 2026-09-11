@@ -15,6 +15,21 @@ test.describe('navigation', () => {
     await expect(node(window, 2)).toBeFocused()
   })
 
+  test('moves from the first child up to the current parent', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Projects')
+    await window.keyboard.press('Meta+.')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 1), 'Work')
+
+    await window.keyboard.press('ArrowUp')
+
+    await expect(parent(window)).toHaveValue('Projects')
+    await expect(parent(window)).toBeFocused()
+    expect(await parent(window).evaluate((element) => (element as HTMLInputElement).selectionStart)).toBe(8)
+  })
+
   test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

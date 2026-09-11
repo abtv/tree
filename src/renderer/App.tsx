@@ -54,6 +54,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     else if (event.metaKey && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) store.redo(); else store.undo() }
     else if (event.metaKey && event.key === '0') event.preventDefault()
     else if (event.metaKey && event.key === 'Enter') { event.preventDefault(); if (node.attachment !== undefined) setPreviewAttachmentId(node.attachment.id) }
+    else if (event.key === 'Backspace' && node.text === '') { event.preventDefault(); store.deleteEmptySelected() }
     else if (event.key === 'Enter') { event.preventDefault(); store.createSiblingOrFirstChild(cursor) }
     else if (event.key === 'ArrowUp') { event.preventDefault(); store.moveSelection('up', cursor) }
     else if (event.key === 'ArrowDown') { event.preventDefault(); store.moveSelection('down', cursor) }

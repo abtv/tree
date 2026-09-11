@@ -181,6 +181,11 @@ export class EditorStore {
     }
     const nodes = displayedNodes(state.document, state.location.currentParentId)
     const index = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
+    if (direction === 'up' && index === 0 && state.location.currentParentId !== null) {
+      const parent = requireNode(state.document, state.location.currentParentId).node
+      this.selectNode(parent.id, parent.text.length)
+      return
+    }
     const target = nodes[index + (direction === 'up' ? -1 : 1)]
     if (target !== undefined) {
       this.selectNode(target.id, Math.min(cursor, target.text.length))
@@ -300,6 +305,33 @@ export class EditorStore {
     }
 
     this.applyStructural(document, location, this.newFocus(location.selectedNodeId, 0))
+  }
+
+  public deleteEmptySelected(): void {
+    const state = this.ready()
+    const selected = requireNode(state.document, state.location.selectedNodeId)
+    if (selected.node.id === state.location.currentParentId || selected.node.text !== '') {
+      return
+    }
+    this.endTextSession()
+    const previous = selected.siblings[selected.index - 1]
+    const next = selected.siblings[selected.index + 1]
+    const document = deleteNode(state.document, selected.node.id)
+    if (previous !== undefined) {
+      this.applyStructural(document, { ...state.location, selectedNodeId: previous.id }, this.newFocus(previous.id, previous.text.length))
+      return
+    }
+    if (selected.parent !== null) {
+      this.applyStructural(
+        document,
+        { currentParentId: selected.parent.id, selectedNodeId: selected.parent.id },
+        this.newFocus(selected.parent.id, selected.parent.text.length),
+      )
+      return
+    }
+    if (next !== undefined) {
+      this.applyStructural(document, { ...state.location, selectedNodeId: next.id }, this.newFocus(next.id, 0))
+    }
   }
 
   public moveSelectedTo(insertionIndex: number): void {

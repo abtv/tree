@@ -19,6 +19,12 @@ function ids(...values: string[]): () => string {
   return () => values[index++] ?? `id-${index}`
 }
 
+function loadedState(document: unknown, location: unknown): EditorServices & { saves: unknown[] } {
+  const services = createServices()
+  services.load = async () => ({ version: 1, document, location })
+  return services
+}
+
 describe('EditorStore', () => {
   it('creates an initial root and a sibling split', async () => {
     const store = new EditorStore(createServices(), ids('root', 'next'))
@@ -60,6 +66,164 @@ describe('EditorStore', () => {
     if (state.status === 'ready') {
       expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
     }
+  })
+
+  it('deletes an empty node on Backspace and selects the previous sibling at the end', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'Alpha', children: [] }, { id: 'b', text: '', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteEmptySelected()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual(['a'])
+      expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'a' })
+      expect(state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
+    }
+  })
+
+  it('focuses the current parent when Backspace deletes the first child with no previous sibling', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: '', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteEmptySelected()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual(['b'])
+      expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+      expect(state.focus).toMatchObject({ nodeId: 'root', cursor: 6 })
+    }
+  })
+
+  it('focuses the current parent when Backspace deletes the only child', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: '', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteEmptySelected()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots[0]!.children).toEqual([])
+      expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+    }
+  })
+
+  it('deletes an empty subtree on Backspace', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: '', children: [{ id: 'a1', text: 'A1', children: [] }] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteEmptySelected()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.children).toEqual([])
+  })
+
+  it('keeps the only empty root when Backspace is pressed', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteEmptySelected()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots.map((node) => node.id)).toEqual(['root'])
+      expect(state.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
+    }
+  })
+
+  it('selects the next root at the beginning when Backspace deletes an empty first root', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'r1', text: '', children: [] }, { id: 'r2', text: 'Second', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'r1' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.deleteEmptySelected()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots.map((node) => node.id)).toEqual(['r2'])
+      expect(state.location).toEqual({ currentParentId: null, selectedNodeId: 'r2' })
+      expect(state.focus).toMatchObject({ nodeId: 'r2', cursor: 0 })
+    }
+  })
+
+  it('does nothing when Backspace is pressed on a non-empty node or the current parent', async () => {
+    const nonEmpty = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'a', text: 'A', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(nonEmpty, ids('unused'))
+    await store.initialize()
+    store.deleteEmptySelected()
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [{ id: 'a' }] }] } })
+
+    const emptyParent = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const parentStore = new EditorStore(emptyParent, ids('unused'))
+    await parentStore.initialize()
+    parentStore.deleteEmptySelected()
+    expect(parentStore.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ id: 'root' }] }, location: { currentParentId: 'root' } })
+  })
+
+  it('moves selection to the current parent at the end of its text on ArrowUp from the first child', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'a', text: 'A', children: [] }, { id: 'b', text: 'B', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelection('up', 0)
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+      expect(state.focus).toMatchObject({ nodeId: 'root', cursor: 6 })
+    }
+  })
+
+  it('does nothing on ArrowUp from the first root', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'r1', text: 'A', children: [] }, { id: 'r2', text: 'B', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'r1' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelection('up', 0)
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { currentParentId: null, selectedNodeId: 'r1' } })
   })
 
   it('groups direct text edits until a structural boundary', async () => {

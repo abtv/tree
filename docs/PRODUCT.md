@@ -61,7 +61,7 @@ Below the root level, the current parent is a real tree node, not a fake UI-only
 
 If the current parent's text changes, the displayed context must update immediately.
 
-The current parent is not part of `↑` / `↓` sibling navigation.
+The current parent is not part of `↑` / `↓` sibling navigation, except that `↑` on the first child moves selection to the current parent (see 4.1).
 
 ### 2.1 Node Presentation
 
@@ -113,7 +113,12 @@ Empty nodes are valid and must never be automatically deleted.
 
 Move selection to the previous node on the current level.
 
-If the current node is the first node on the level:
+If the current node is the first node on the level, and the current parent exists:
+
+* move selection to the editable current parent;
+* place the text cursor at the end of the current parent's text.
+
+If the current node is the first node on the level, and the current parent does not exist (the root level):
 
 * do nothing.
 
@@ -328,7 +333,7 @@ At the root level:
 
 `Cmd+Backspace` deletes the current node and its entire subtree.
 
-This is different from normal `Backspace`, which remains ordinary text editing.
+This is different from normal `Backspace`, which remains ordinary text editing except when the node is empty (see 8.2).
 
 After deleting a node from the currently displayed level:
 
@@ -344,6 +349,23 @@ When the editable current parent is focused, `Cmd+Backspace` deletes that parent
 If the deleted current parent was not a top-level root node, its parent becomes the new current parent and receives the text cursor.
 
 If the deleted current parent was a top-level root node, navigate to the root level and apply the root-node selection and replacement rules above.
+
+### 8.2 Backspace on an Empty Node
+
+Pressing `Backspace` on a node whose text is empty deletes that node and its entire subtree.
+
+This applies to nodes on the displayed level. It does not apply to the editable current-parent heading, where `Backspace` remains ordinary text editing.
+
+An empty node that has an attachment or children is still deleted this way, including its subtree and its attachment.
+
+After the deletion:
+
+1. If a previous sibling exists, select it and place the text cursor at the end of its text.
+2. Otherwise, if the current parent exists, select the editable current parent and place the text cursor at the end of its text.
+3. Otherwise, at the root level, select the next root node and place the text cursor at the beginning of its text.
+4. If the deleted node was the only root node, do nothing; the empty root is kept.
+
+This is an explicit user action. Empty nodes are never deleted automatically.
 
 ---
 
@@ -665,7 +687,8 @@ An empty node can:
 * receive text;
 * receive an image;
 * receive children;
-* be deleted explicitly by the user.
+* be deleted explicitly by the user;
+* be deleted by pressing `Backspace` when its text is empty (see 8.2).
 
 ---
 

@@ -52,6 +52,21 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('rent')
   })
 
+  it('deletes an empty node and focuses the previous node on Backspace', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 2' }), { key: 'Backspace' })
+
+    expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
+  })
+
   it('keeps consecutive text edits in one undo session when the caret advances', async () => {
     const store = createStore()
     await act(async () => { await store.initialize() })
