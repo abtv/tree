@@ -161,6 +161,10 @@ UI handlers will translate keyboard, input, focus, selection, composition, clipb
 
 ## Implementation Phases
 
+### Progress
+
+- Phase 1 completed on 2026-09-11.
+
 ### Phase 1: Domain foundation and persistence contract
 
 - Add document, node, attachment-reference, persistent-location, and IPC types.
