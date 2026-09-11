@@ -75,6 +75,8 @@ Node rows retain the document-surface background when focused or hovered (white 
 
 The current parent is presented above its children as a larger, bold, editable heading without a bullet.
 
+The first child is separated from the current-parent heading by the same compact vertical spacing used between node rows. A drag-and-drop target must not introduce an additional blank gap there.
+
 An attached image is displayed beneath its node's text and aligned with that node's text column.
 
 ### 2.2 Location Path
