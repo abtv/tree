@@ -267,6 +267,14 @@ Property-based tests using `fast-check` cover domain invariants and `EditorStore
 
 When a change affects domain invariants — tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency — add or update a property test for the affected invariants. They are not a coverage target. Boundary wiring and presentation changes do not require property tests.
 
+Performance tests live in `perf/` and run with:
+
+```bash
+npm run test:perf
+```
+
+They measure startup and typing latency at several document scales and print one JSON line per scenario. They are separate from `check` and `check:full`; thresholds are intentionally loose and exist to catch catastrophic regressions, with baselines recorded in the associated plan.
+
 ---
 
 ## 13. Persistence Testing

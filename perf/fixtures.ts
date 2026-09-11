@@ -1,0 +1,86 @@
+import { _electron as electron, expect, test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+export interface Launched {
+  app: ElectronApplication
+  window: Page
+}
+
+export interface Seed {
+  document: unknown
+  location: unknown
+}
+
+const launchedApps: ElectronApplication[] = []
+
+export const test = base.extend<{ userDataDir: string }>({
+  userDataDir: async ({}, use) => {
+    const directory = mkdtempSync(join(tmpdir(), 'tree-perf-'))
+    await use(directory)
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  },
+})
+
+test.afterEach(async () => {
+  await Promise.all(launchedApps.splice(0).map((app) => app.close().catch(() => undefined)))
+})
+
+export { expect }
+
+export async function launchTree(userDataDir: string): Promise<Launched> {
+  const app = await electron.launch({
+    args: [`--user-data-dir=${userDataDir}`, '.'],
+    cwd: process.cwd(),
+  })
+  launchedApps.push(app)
+  const window = await app.firstWindow()
+  await expect(window.locator('main.tree-app')).toBeVisible()
+  await expect(window.getByRole('textbox').first()).toBeVisible()
+  return { app, window }
+}
+
+export function seedDocument(userDataDir: string, seed: Seed): void {
+  const directory = join(userDataDir, 'data')
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, 'document.json'), JSON.stringify({ version: 1, ...seed }))
+}
+
+interface BuiltNode {
+  id: string
+  text: string
+  children: BuiltNode[]
+}
+
+export function wideSeed(count: number): Seed {
+  const children: BuiltNode[] = Array.from({ length: count }, (_, index) => ({
+    id: `c${index}`,
+    text: `Child ${index}`,
+    children: [],
+  }))
+  return {
+    document: { roots: [{ id: 'root', text: 'Root', children }] },
+    location: { currentParentId: 'root', selectedNodeId: 'c0' },
+  }
+}
+
+export function largeSeed(roots: number, perRoot: number): Seed {
+  const rootNodes: BuiltNode[] = Array.from({ length: roots }, (_, rootIndex) => ({
+    id: `r${rootIndex}`,
+    text: `Root ${rootIndex}`,
+    children: Array.from({ length: perRoot }, (_, childIndex) => ({
+      id: `r${rootIndex}c${childIndex}`,
+      text: `Node ${rootIndex}.${childIndex}`,
+      children: [],
+    })),
+  }))
+  return {
+    document: { roots: rootNodes },
+    location: { currentParentId: null, selectedNodeId: 'r0' },
+  }
+}
+
+export function round(value: number): number {
+  return Math.round(value * 100) / 100
+}

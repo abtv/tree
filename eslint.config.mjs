@@ -32,7 +32,9 @@ export default tseslint.config(
       'eslint.config.mjs',
       'vitest.config.ts',
       'playwright.config.ts',
+      'perf.config.ts',
       'e2e/**/*.ts',
+      'perf/**/*.ts',
       'src/main/**/*.ts',
       'src/preload/**/*.ts',
       'src/infrastructure/main/**/*.ts',
@@ -42,7 +44,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['playwright.config.ts', 'e2e/**/*.ts'],
+    files: ['playwright.config.ts', 'perf.config.ts', 'e2e/**/*.ts', 'perf/**/*.ts'],
     rules: {
       'no-empty-pattern': 'off',
     },

@@ -23,6 +23,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run build && playwright test",
+    "test:perf": "npm run build && playwright test -c perf.config.ts",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "check:full": "npm run check && playwright test"
   },
