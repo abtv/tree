@@ -33,6 +33,7 @@ export interface EditorServices {
   save(state: ReturnType<typeof serializeState>): Promise<void>
   readClipboard(): Promise<ClipboardValue>
   writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
+  hasAttachment(id: AttachmentId): Promise<boolean>
   cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
 }
 
@@ -67,6 +68,7 @@ export class EditorStore {
   private readonly listeners = new Set<() => void>()
   private readonly past: Document[] = []
   private readonly future: Document[] = []
+  private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private snapshot: EditorSnapshot = { status: 'loading' }
   private activeTextNodeId: NodeId | undefined
   private textTimer: unknown
@@ -104,6 +106,11 @@ export class EditorStore {
       }
 
       const parsed = parsePersistedState(loaded)
+      for (const attachmentId of collectAttachmentIds(parsed.document)) {
+        if (!(await this.services.hasAttachment(attachmentId))) {
+          throw new Error(`Attachment ${attachmentId} is missing from local storage.`)
+        }
+      }
       this.snapshot = {
         status: 'ready',
         document: parsed.document,
@@ -271,11 +278,13 @@ export class EditorStore {
 
   public moveSelectedTo(insertionIndex: number): void {
     const state = this.ready()
-    if (state.location.currentParentId === state.location.selectedNodeId) {
-      return
-    }
+    this.moveNodeTo(state.location.selectedNodeId, insertionIndex)
+  }
+
+  public moveNodeTo(nodeId: NodeId, insertionIndex: number): void {
+    const state = this.ready()
     const nodes = displayedNodes(state.document, state.location.currentParentId)
-    const sourceIndex = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
+    const sourceIndex = nodes.findIndex((node) => node.id === nodeId)
     if (sourceIndex < 0) {
       return
     }
@@ -284,7 +293,11 @@ export class EditorStore {
       return
     }
     this.endTextSession()
-    this.applyStructural(moveSibling(state.document, state.location.selectedNodeId, destination), state.location, state.focus)
+    this.applyStructural(
+      moveSibling(state.document, nodeId, destination),
+      { ...state.location, selectedNodeId: nodeId },
+      this.newFocus(nodeId, 0),
+    )
   }
 
   public async paste(nodeId: NodeId, cursor: number): Promise<void> {
@@ -297,17 +310,26 @@ export class EditorStore {
     const current = this.ready()
     if (clipboard.kind === 'image') {
       const attachment: AttachmentReference = { id: this.createId(), mimeType: 'image/png' }
-      await this.services.writeAttachment(attachment.id, clipboard.png)
-      const target = requireNode(current.document, nodeId).node
-      if (target.attachment === undefined) {
-        this.applyStructural(attachImage(current.document, nodeId, attachment), current.location, this.newFocus(nodeId, target.text.length))
-      } else {
-        const newId = this.createId()
-        this.applyStructural(
-          insertSiblingAfter(current.document, nodeId, newId, '', attachment),
-          { ...current.location, selectedNodeId: newId },
-          this.newFocus(newId, 0),
-        )
+      this.pendingAttachmentIds.add(attachment.id)
+      try {
+        await this.services.writeAttachment(attachment.id, clipboard.png)
+        if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) {
+          return
+        }
+        const target = requireNode(this.snapshot.document, nodeId).node
+        if (target.attachment === undefined) {
+          this.applyStructural(attachImage(this.snapshot.document, nodeId, attachment), this.snapshot.location, this.newFocus(nodeId, target.text.length))
+        } else {
+          const newId = this.createId()
+          this.applyStructural(
+            insertSiblingAfter(this.snapshot.document, nodeId, newId, '', attachment),
+            { ...this.snapshot.location, selectedNodeId: newId },
+            this.newFocus(newId, 0),
+          )
+        }
+      } finally {
+        this.pendingAttachmentIds.delete(attachment.id)
+        this.queueAttachmentCleanup()
       }
       return
     }
@@ -424,6 +446,7 @@ export class EditorStore {
     }
     this.past.forEach(add)
     this.future.forEach(add)
+    this.pendingAttachmentIds.forEach((id) => ids.add(id))
     return ids
   }
 

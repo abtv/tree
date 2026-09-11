@@ -6,6 +6,7 @@ export interface FileServices {
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
+  hasAttachment(id: string): Promise<boolean>
   readAttachment(id: string): Promise<Uint8Array | null>
   cleanupAttachments(referencedIds: string[]): Promise<void>
 }
@@ -48,6 +49,9 @@ export function createFileServices(dataDirectory: string): FileServices {
         }
         throw error
       }
+    },
+    async hasAttachment(id): Promise<boolean> {
+      return (await this.readAttachment(id)) !== null
     },
     async cleanupAttachments(referencedIds): Promise<void> {
       await prepare()

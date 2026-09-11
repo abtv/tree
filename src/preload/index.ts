@@ -6,6 +6,7 @@ const treeApi: TreeApi = {
   save: (state) => ipcRenderer.invoke(ipcChannels.save, state),
   readClipboard: () => ipcRenderer.invoke(ipcChannels.readClipboard),
   writeAttachment: (id, png) => ipcRenderer.invoke(ipcChannels.writeAttachment, id, png),
+  hasAttachment: (id) => ipcRenderer.invoke(ipcChannels.hasAttachment, id),
   readAttachment: (id) => ipcRenderer.invoke(ipcChannels.readAttachment, id),
   cleanupAttachments: (referencedIds) => ipcRenderer.invoke(ipcChannels.cleanupAttachments, referencedIds),
 }

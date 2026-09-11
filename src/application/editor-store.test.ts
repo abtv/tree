@@ -9,6 +9,7 @@ function createServices(clipboard: ClipboardValue = { kind: 'text', text: '' }):
     save: async (state) => { saves.push(state) },
     readClipboard: async () => clipboard,
     writeAttachment: async () => undefined,
+    hasAttachment: async () => true,
     cleanupAttachments: async () => undefined,
   }
 }
@@ -87,5 +88,30 @@ describe('EditorStore', () => {
     store.undo()
     state = store.getSnapshot()
     expect(state.status === 'ready' && state.document.roots[0]!.attachment).toBeUndefined()
+  })
+
+  it('creates a following sibling when image paste targets a node with an image', async () => {
+    const store = new EditorStore(createServices({ kind: 'image', png: new Uint8Array([1]) }), ids('root', 'first-image', 'second-image', 'image-node'))
+    await store.initialize()
+    await store.paste('root', 0)
+    await store.paste('root', 0)
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots.map((node) => node.attachment?.id)).toEqual(['first-image', 'second-image'])
+      expect(state.location.selectedNodeId).toBe('image-node')
+    }
+  })
+
+  it('moves a dragged displayed sibling and keeps it selected', async () => {
+    const store = new EditorStore(createServices(), ids('root', 'second'))
+    await store.initialize()
+    store.createSiblingOrFirstChild(0)
+    store.moveNodeTo('second', 0)
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['second', 'root'])
+    expect(state.status === 'ready' && state.location.selectedNodeId).toBe('second')
   })
 })

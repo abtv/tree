@@ -46,6 +46,7 @@ void app.whenReady().then(() => {
   ipcMain.handle(ipcChannels.save, (_event, state) => fileServices.save(state))
   ipcMain.handle(ipcChannels.readClipboard, () => readClipboard(clipboard))
   ipcMain.handle(ipcChannels.writeAttachment, (_event, id, png) => fileServices.writeAttachment(id, png))
+  ipcMain.handle(ipcChannels.hasAttachment, (_event, id) => fileServices.hasAttachment(id))
   ipcMain.handle(ipcChannels.readAttachment, (_event, id) => fileServices.readAttachment(id))
   ipcMain.handle(ipcChannels.cleanupAttachments, (_event, referencedIds) => fileServices.cleanupAttachments(referencedIds))
   globalShortcut.register('CommandOrControl+0', () => surfaceWindow(mainWindow))

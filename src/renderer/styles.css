@@ -54,6 +54,19 @@ textarea {
   padding: 2px 0;
 }
 
+.node-row[draggable='true'] {
+  cursor: grab;
+}
+
+.drop-zone {
+  height: 6px;
+  border-radius: 3px;
+}
+
+.drop-zone:hover {
+  background: #93c5fd;
+}
+
 .node-input {
   width: 100%;
   border: 1px solid transparent;
@@ -77,6 +90,14 @@ textarea {
 .current-parent-input {
   padding: 3px 1px;
   font-weight: 650;
+}
+
+.attachment-image {
+  display: block;
+  max-width: min(100%, 640px);
+  max-height: 480px;
+  margin: 8px 9px 4px;
+  border-radius: 5px;
 }
 
 .error-state {

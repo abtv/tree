@@ -14,6 +14,7 @@ function createStore(): EditorStore {
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),
     writeAttachment: async () => undefined,
+    hasAttachment: async () => true,
     cleanupAttachments: async () => undefined,
   }
   let id = 0

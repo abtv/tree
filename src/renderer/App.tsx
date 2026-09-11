@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
-import type { ChangeEvent, ClipboardEvent, FocusEvent, KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
+import { readAttachment } from '../infrastructure/renderer/electron-services'
 
 interface AppProps {
   store: EditorStore
@@ -12,6 +13,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const inputs = useRef(new Map<string, HTMLInputElement>())
   const skipSelectionBoundary = useRef(false)
   const composing = useRef(false)
+  const [draggedNodeId, setDraggedNodeId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
 
   useLayoutEffect(() => {
@@ -59,6 +61,12 @@ export function App({ store }: AppProps): React.JSX.Element {
     event.preventDefault()
     void store.paste(nodeId, event.currentTarget.selectionStart ?? 0).catch(() => undefined)
   }
+  const onDrop = (insertionIndex: number) => (event: DragEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    const nodeId = event.dataTransfer.getData('text/plain') || draggedNodeId
+    if (nodeId !== undefined) store.moveNodeTo(nodeId, insertionIndex)
+    setDraggedNodeId(undefined)
+  }
   const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => (
     <input
       ref={setInput(node.id)} aria-label={label} className={parent ? 'node-input current-parent-input' : 'node-input'} value={node.text}
@@ -72,11 +80,40 @@ export function App({ store }: AppProps): React.JSX.Element {
     <main className="editor-shell">
       {currentParent === undefined ? null : <section className="current-parent" aria-label="Current parent">{input(currentParent, 'Current parent', true)}</section>}
       <section className="node-list" aria-label="Nodes">
-        {nodes.map((node, index) => <div className="node-row" key={node.id}>{input(node, `Node ${index + 1}`)}</div>)}
+        <DropZone index={0} onDrop={onDrop} />
+        {nodes.map((node, index) => (
+          <div className="node-row" draggable key={node.id} onDragEnd={() => setDraggedNodeId(undefined)} onDragStart={(event) => { event.dataTransfer.setData('text/plain', node.id); setDraggedNodeId(node.id) }}>
+            {input(node, `Node ${index + 1}`)}
+            {node.attachment === undefined ? null : <AttachmentImage attachmentId={node.attachment.id} />}
+            <DropZone index={index + 1} onDrop={onDrop} />
+          </div>
+        ))}
       </section>
       {state.saveError === undefined ? null : <p className="save-error" role="status">Changes could not be saved: {state.saveError}</p>}
     </main>
   )
+}
+
+function DropZone({ index, onDrop }: { index: number; onDrop: (index: number) => (event: DragEvent<HTMLDivElement>) => void }): React.JSX.Element {
+  return <div className="drop-zone" aria-label={`Drop position ${index + 1}`} onDragOver={(event) => event.preventDefault()} onDrop={onDrop(index)} />
+}
+
+function AttachmentImage({ attachmentId }: { attachmentId: string }): React.JSX.Element | null {
+  const [url, setUrl] = useState<string>()
+  useEffect(() => {
+    let disposed = false
+    let objectUrl: string | undefined
+    void readAttachment(attachmentId).then((bytes) => {
+      if (disposed || bytes === null) return
+      objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
+      setUrl(objectUrl)
+    }).catch(() => undefined)
+    return () => {
+      disposed = true
+      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
+    }
+  }, [attachmentId])
+  return url === undefined ? null : <img className="attachment-image" src={url} alt="Attached image" />
 }
 
 function findNode(nodes: TreeNode[], id: string): TreeNode | undefined {
