@@ -55,6 +55,8 @@ The user enters a node to view and edit its children.
 
 The node representing the current parent is displayed as contextual information, is visually highlighted, and can be edited inline.
 
+The node whose text field contains the caret is the selected node. When the current parent contains the caret, the current parent is selected and no child is selected.
+
 Below the root level, the current parent is a real tree node, not a fake UI-only title.
 
 If the current parent's text changes, the displayed context must update immediately.
@@ -205,10 +207,13 @@ If the selected node has no children:
 * do not create a child automatically;
 * keep the text cursor in the editable current-parent field.
 
-When the child list is empty, pressing `Enter` while the current parent is focused creates the first empty child and moves the text cursor to that child.
+When the editable current parent is selected:
 
-When the editable current parent is focused:
-
+* no child remains selected;
+* `Enter` creates a new empty first child immediately below the parent, before any existing children;
+* after `Enter`, the new child is selected and the text cursor moves to the beginning of its empty text;
+* `↓` selects the first child and places the text cursor at the beginning of its text;
+* if the parent has no children, `↓` does nothing;
 * `↑` does nothing;
 * `Cmd+.` does nothing.
 
@@ -316,7 +321,7 @@ If the deleted current parent was a top-level root node, navigate to the root le
 
 ## 9. Cmd+0
 
-`Cmd+0` focuses and activates the application.
+`Cmd+0` surfaces and activates the application.
 
 It must work even when the application is not currently focused.
 
@@ -324,12 +329,15 @@ Behavior:
 
 * if the application is minimized, restore the main window;
 * if the application is inactive, bring it to the front and activate it;
-* if already active, focus the current selected node/text field.
+* if the application is already active, do nothing.
+
+`Cmd+0` changes only application/window focus. It preserves the selected node, the text field that contains the caret, and the caret position.
 
 `Cmd+0` must not change:
 
 * current node;
 * current parent;
+* selected node;
 * cursor position;
 * undo history;
 * redo history;
@@ -636,12 +644,3 @@ The user normally interacts with the application through:
 * mouse drag-and-drop for sibling reordering.
 
 The tree hierarchy is primarily navigated by entering and leaving nodes rather than by expanding and collapsing a full tree view.
-
----
-
-## 21. Open Product Decisions
-
-The following product behavior requires Product Owner clarification before implementation:
-
-* `Enter` and `↓` behavior while the editable current parent is focused and already has children, including where a new child would be inserted and what receives focus afterward;
-* whether a child remains selected while the editable current parent has focus, including which text field `Cmd+0` restores and what selected-node state is persisted.
