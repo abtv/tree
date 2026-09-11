@@ -40,6 +40,13 @@ export function createInitialDocument(id: NodeId): Document {
   return { roots: [{ id, text: '', children: [] }] }
 }
 
+export function ensureRoot(document: Document, id: NodeId): Document {
+  if (document.roots.length > 0) {
+    return cloneDocument(document)
+  }
+  return createInitialDocument(id)
+}
+
 export function cloneDocument(document: Document): Document {
   return { roots: document.roots.map(cloneNode) }
 }

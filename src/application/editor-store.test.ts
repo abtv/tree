@@ -1,0 +1,91 @@
+import { describe, expect, it, vi } from 'vitest'
+import { EditorStore, type ClipboardValue, type EditorServices } from './editor-store'
+
+function createServices(clipboard: ClipboardValue = { kind: 'text', text: '' }): EditorServices & { saves: unknown[] } {
+  const saves: unknown[] = []
+  return {
+    saves,
+    load: async () => null,
+    save: async (state) => { saves.push(state) },
+    readClipboard: async () => clipboard,
+    writeAttachment: async () => undefined,
+    cleanupAttachments: async () => undefined,
+  }
+}
+
+function ids(...values: string[]): () => string {
+  let index = 0
+  return () => values[index++] ?? `id-${index}`
+}
+
+describe('EditorStore', () => {
+  it('creates an initial root and a sibling split', async () => {
+    const store = new EditorStore(createServices(), ids('root', 'next'))
+    await store.initialize()
+    store.editText('root', 'Current')
+    store.createSiblingOrFirstChild(3)
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots.map((node) => [node.id, node.text])).toEqual([['root', 'Cur'], ['next', 'rent']])
+      expect(state.location.selectedNodeId).toBe('next')
+    }
+  })
+
+  it('creates a first child from the focused current parent', async () => {
+    const store = new EditorStore(createServices(), ids('root', 'child'))
+    await store.initialize()
+    store.enter()
+    store.createSiblingOrFirstChild(0)
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots[0]!.children[0]!.id).toBe('child')
+      expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
+    }
+  })
+
+  it('returns to the current parent after deleting its only child', async () => {
+    const store = new EditorStore(createServices(), ids('root', 'child'))
+    await store.initialize()
+    store.enter()
+    store.createSiblingOrFirstChild(0)
+    store.deleteSelected()
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+    }
+  })
+
+  it('groups direct text edits until a structural boundary', async () => {
+    vi.useFakeTimers()
+    const store = new EditorStore(createServices(), ids('root', 'sibling'))
+    await store.initialize()
+    store.editText('root', 'a')
+    store.editText('root', 'ab')
+    vi.advanceTimersByTime(5_000)
+    store.undo()
+    let state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('')
+    store.redo()
+    state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('ab')
+    vi.useRealTimers()
+  })
+
+  it('uses image clipboard data in preference to text and keeps it undoable', async () => {
+    const services = createServices({ kind: 'image', png: new Uint8Array([1, 2]) })
+    const store = new EditorStore(services, ids('root', 'image'))
+    await store.initialize()
+    await store.paste('root', 0)
+    let state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.attachment?.id).toBe('image')
+    store.undo()
+    state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.attachment).toBeUndefined()
+  })
+})
