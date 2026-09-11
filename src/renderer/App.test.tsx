@@ -47,4 +47,21 @@ describe('App', () => {
 
     expect(parent).toHaveValue('Projects')
   })
+
+  it('moves a node through a between-node drop zone', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLInputElement
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    const transfer = { value: '', setData(_type: string, value: string) { this.value = value }, getData() { return this.value } }
+    const secondRow = screen.getByRole('textbox', { name: 'Node 2' }).parentElement
+
+    fireEvent.dragStart(secondRow!, { dataTransfer: transfer })
+    fireEvent.drop(screen.getByLabelText('Drop position 1'), { dataTransfer: transfer })
+
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
+  })
 })

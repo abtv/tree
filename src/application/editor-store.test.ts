@@ -114,4 +114,20 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['second', 'root'])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('second')
   })
+
+  it('leaves invalid persisted data untouched when an attachment is missing', async () => {
+    const services = createServices()
+    services.load = async () => ({
+      version: 1,
+      document: { roots: [{ id: 'root', text: '', attachment: { id: 'missing', mimeType: 'image/png' }, children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    services.hasAttachment = async () => false
+    const store = new EditorStore(services, ids('unused'))
+
+    await store.initialize()
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'error', message: expect.stringContaining('missing') })
+    expect(services.saves).toEqual([])
+  })
 })

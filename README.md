@@ -58,7 +58,7 @@ npm test
 npm run test:watch
 ```
 
-The current bootstrap opens a minimal application shell. Tree editing and the other documented product behavior will be implemented in subsequent product changes.
+The application opens an inline, keyboard-first tree editor. It supports multiple root nodes, entering and leaving levels, sibling creation and reordering, undo/redo, text and image paste, local image attachments, and automatic persistence between restarts.
 
 ## Documentation
 
@@ -72,6 +72,8 @@ The current bootstrap opens a minimal application shell. Tree editing and the ot
 The repository is organized around a clear separation between product requirements, architecture, development practices, and implementation.
 
 Implementation code lives under `src/`.
+
+The implementation separates pure tree behavior in `src/domain/`, editor commands and runtime history in `src/application/`, Electron and filesystem adapters in `src/infrastructure/` and `src/main/`, and the React UI in `src/renderer/`.
 
 Additional documentation may be added under `docs/` as the project evolves, including:
 
