@@ -67,6 +67,8 @@ The current parent is not part of `↑` / `↓` sibling navigation.
 
 Nodes are presented as plain, single-line outline rows with a solid 7px circular bullet to the left of their text. The bullet and text are aligned to consistent outline columns.
 
+Nodes with one or more direct children display a muted outer circle surrounding their solid bullet, producing two concentric circles. Nodes without children display only the solid bullet. Clicking the circular indicator enters that node and displays its children; it does not place the text cursor or edit the node.
+
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
 The focused node may have a subtle background to show its active editing state. It must not display an additional more-options or selection-dot ornament.
