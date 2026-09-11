@@ -81,8 +81,15 @@ export function App({ store }: AppProps): React.JSX.Element {
   return (
     <main className="tree-app">
       <header className="location-bar" aria-label="Current location">
-        <span className="location-root" aria-label="Document root"><OutlineRootIcon /></span>
-        {path.map((node) => <span className="location-segment" key={node.id}><span className="location-separator">›</span><span>{node.text}</span></span>)}
+        <button aria-label="Top level" className="location-root" onClick={() => store.navigateToAncestor(null)} type="button"><OutlineRootIcon /></button>
+        {path.map((node) => (
+          <span className="location-segment" key={node.id}>
+            <span className="location-separator">›</span>
+            {node.id === state.location.currentParentId ? <span>{node.text}</span> : (
+              <button className="location-link" onClick={() => store.navigateToAncestor(node.id)} type="button">{node.text}</button>
+            )}
+          </span>
+        ))}
       </header>
       <section className="editor-shell">
       {currentParent === undefined ? null : (

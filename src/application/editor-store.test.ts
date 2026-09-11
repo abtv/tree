@@ -146,4 +146,26 @@ describe('EditorStore', () => {
     const state = store.getSnapshot()
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'sibling' })
   })
+
+  it('navigates to an ancestor and selects the direct child on the previous path', async () => {
+    const services = createServices()
+    services.load = async () => ({
+      version: 1,
+      document: {
+        roots: [{ id: 'root', text: 'Root', children: [{ id: 'parent', text: 'Parent', children: [{ id: 'current', text: 'Current', children: [] }] }] }],
+      },
+      location: { currentParentId: 'current', selectedNodeId: 'current' },
+    })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.navigateToAncestor('parent')
+    let state = store.getSnapshot()
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'current' })
+    expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'current', cursor: 0 })
+
+    store.navigateToAncestor(null)
+    state = store.getSnapshot()
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
+  })
 })

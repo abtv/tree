@@ -65,6 +65,30 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
   })
 
+  it('navigates through the location path and selects the child on the previous path', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' })
+
+    fireEvent.change(root, { target: { value: 'Root' } })
+    fireEvent.keyDown(root, { key: '.', metaKey: true })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+    const child = screen.getByRole('textbox', { name: 'Node 1' })
+    fireEvent.change(child, { target: { value: 'Child' } })
+    fireEvent.keyDown(child, { key: '.', metaKey: true })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Root' }))
+    expect(screen.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Root')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('Child')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Top level' }))
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('Root')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
+  })
+
   it('moves a node through a between-node drop zone', async () => {
     const store = createStore()
     await act(async () => { await store.initialize() })

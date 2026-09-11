@@ -33,6 +33,11 @@ button, input, textarea { font: inherit; }
   justify-content: center;
   width: 18px;
   height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
 .location-root svg {
@@ -47,6 +52,19 @@ button, input, textarea { font: inherit; }
 .location-segment { display: inline-flex; align-items: center; min-width: 0; }
 
 .location-separator { margin: 0 9px; color: #b1b8bc; font-size: 20px; font-weight: 300; }
+
+.location-link {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.location-root:hover, .location-link:hover { color: #596267; }
+
+.location-root:focus-visible, .location-link:focus-visible { outline: 1px solid #778187; outline-offset: 3px; }
 
 .editor-shell {
   width: min(100%, 760px);
@@ -159,6 +177,8 @@ button, input, textarea { font: inherit; }
   .app-shell { color: #a5adb2; }
   .location-bar { border-color: #303438; color: #a5adb2; }
   .location-separator { color: #687177; }
+  .location-root:hover, .location-link:hover { color: #e5e7e8; }
+  .location-root:focus-visible, .location-link:focus-visible { outline-color: #a5adb2; }
   .node-row::before { color: #c3c8cb; }
   .node-disclosure { background: #4b5155; }
   .node-disclosure::before { background: #c3c8cb; }

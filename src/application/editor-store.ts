@@ -12,6 +12,7 @@ import {
   isValidLocation,
   locateNode,
   moveSibling,
+  nodePath,
   parsePersistedState,
   pasteMultilineText,
   pasteText,
@@ -218,6 +219,31 @@ export class EditorStore {
         ...state,
         location: { currentParentId: currentParent.parent?.id ?? null, selectedNodeId: currentParentId },
         focus: this.newFocus(currentParentId, 0),
+      },
+      true,
+    )
+  }
+
+  public navigateToAncestor(parentId: NodeId | null): void {
+    const state = this.ready()
+    const currentParentId = state.location.currentParentId
+    if (parentId === currentParentId || currentParentId === null) {
+      return
+    }
+
+    const path = nodePath(state.document, currentParentId)
+    const parentIndex = parentId === null ? -1 : path.findIndex((node) => node.id === parentId)
+    const selected = path[parentIndex + 1]
+    if ((parentIndex === -1 && parentId !== null) || selected === undefined) {
+      return
+    }
+
+    this.endTextSession()
+    this.replaceReady(
+      {
+        ...state,
+        location: { currentParentId: parentId, selectedNodeId: selected.id },
+        focus: this.newFocus(selected.id, 0),
       },
       true,
     )
