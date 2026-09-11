@@ -192,7 +192,7 @@ export function pasteMultilineText(
   located.node.text = `${prefix}${lines[0] ?? ''}`
   delete located.node.attachment
 
-  const created = newNodeIds.map((id, index) => ({
+  const created: TreeNode[] = newNodeIds.map((id, index) => ({
     id,
     text: index === newNodeIds.length - 1 ? `${lines[index + 1] ?? ''}${suffix}` : (lines[index + 1] ?? ''),
     children: [],
