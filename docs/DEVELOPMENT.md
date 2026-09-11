@@ -19,11 +19,11 @@ The repository is the source of truth for the current implementation, documentat
 
 The development environment requires:
 
-* Node.js
-* npm
+* Node.js 24.13.1;
+* npm 11.8.0;
 * Git
 
-The project should use the Node.js version specified by the repository configuration.
+The Node.js version is pinned in `.nvmrc`. The supported Node.js and npm ranges are also declared in `package.json`.
 
 Do not assume a different Node.js version without checking the project configuration first.
 
@@ -37,6 +37,8 @@ After cloning the repository or when dependencies need to be installed:
 npm install
 ```
 
+The install runs the project's `postinstall` script to download the Electron runtime for the current platform. Do not disable lifecycle scripts when preparing a development environment.
+
 ---
 
 ## 4. Running the Application
@@ -49,7 +51,11 @@ npm run dev
 
 This command should start the Electron application in development mode with the Vite development environment.
 
-The exact implementation of the development command belongs to the project configuration.
+To run an existing production build locally:
+
+```bash
+npm run start
+```
 
 ---
 
@@ -99,11 +105,17 @@ Run the test suite with:
 npm test
 ```
 
+Run tests in watch mode during development with:
+
+```bash
+npm run test:watch
+```
+
 Tests should primarily cover domain and application behavior.
 
 Domain tests must not require Electron or a browser environment.
 
-UI tests may be added where behavior cannot reasonably be tested at the domain/application level.
+Vitest uses the Node.js environment by default. Renderer tests opt into jsdom when behavior requires a DOM.
 
 ---
 
@@ -289,6 +301,8 @@ Do not commit:
 * generated artifacts that are not part of the source repository.
 
 Follow the repository's `.gitignore`.
+
+Electron Vite writes production build output to `out/`. This directory is generated and must not be committed.
 
 ---
 

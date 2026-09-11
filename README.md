@@ -27,6 +27,8 @@ The application is designed to be keyboard-first, with mouse drag-and-drop avail
 
 ## Getting Started
 
+Use Node.js `24.13.1` and npm `11.8.0`. The Node.js version is recorded in `.nvmrc`.
+
 Install dependencies:
 
 ```bash
@@ -44,6 +46,19 @@ Run the complete validation pipeline:
 ```bash
 npm run check
 ```
+
+Other available commands:
+
+```bash
+npm run build
+npm run start
+npm run typecheck
+npm run lint
+npm test
+npm run test:watch
+```
+
+The current bootstrap opens a minimal application shell. Tree editing and the other documented product behavior will be implemented in subsequent product changes.
 
 ## Documentation
 

@@ -1,0 +1,67 @@
+import js from '@eslint/js'
+import { builtinModules } from 'node:module'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+
+const nodeImports = [...builtinModules, ...builtinModules.map((name) => `node:${name}`)]
+
+const platformImportRestrictions = {
+  paths: [
+    ...nodeImports.map((name) => ({
+      name,
+      message: 'Platform APIs belong outside the domain and renderer layers.',
+    })),
+    {
+      name: 'electron',
+      message: 'Electron APIs must remain behind the main/preload process boundary.',
+    },
+  ],
+}
+
+export default tseslint.config(
+  {
+    ignores: ['coverage/**', 'node_modules/**', 'out/**'],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['electron.vite.config.ts', 'eslint.config.mjs', 'vitest.config.ts', 'src/main/**/*.ts', 'src/preload/**/*.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: globals.browser,
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.flat.recommended.rules,
+      ...reactRefresh.configs.vite.rules,
+      'no-restricted-imports': ['error', platformImportRestrictions],
+    },
+  },
+  {
+    files: ['src/domain/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...platformImportRestrictions,
+          patterns: [
+            {
+              group: ['react', 'react/*', '../application/**', '../infrastructure/**', '../main/**', '../preload/**', '../renderer/**'],
+              message: 'The domain must not depend on UI, application orchestration, or infrastructure.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+)
