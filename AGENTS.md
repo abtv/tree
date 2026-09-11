@@ -122,7 +122,32 @@ docs/plans/active/
 docs/plans/completed/
 ```
 
-When a plan is completed, move it from `active` to `completed`.
+Plan filenames must use:
+
+```text
+YYYY-MM-DD-short-description.md
+```
+
+The date is the plan's creation date. The short description must use lowercase words separated by hyphens, for example:
+
+```text
+2026-09-11-bootstrap-application.md
+```
+
+Every plan must include the following metadata near the beginning of the document:
+
+```text
+Status: Active
+Created: YYYY-MM-DD
+```
+
+When a plan is completed:
+
+1. Change its status to `Completed`.
+2. Add `Completed: YYYY-MM-DD` to its metadata.
+3. Move the same file from `docs/plans/active/` to `docs/plans/completed/` without changing its filename.
+
+Do not create a second copy of a plan when completing it.
 
 Use Architecture Decision Records (ADRs) for important technical or architectural decisions that are worth preserving for future development.
 

@@ -1,5 +1,11 @@
 # Bootstrap Application
 
+```text
+Status: Completed
+Created: 2026-09-11
+Completed: 2026-09-11
+```
+
 ## Goal
 
 Bootstrap the documented Electron, React, TypeScript, and Vite application so that it can be run, tested, linted, type-checked, and built from the empty repository.
