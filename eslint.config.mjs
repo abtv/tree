@@ -27,13 +27,20 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['electron.vite.config.ts', 'eslint.config.mjs', 'vitest.config.ts', 'src/main/**/*.ts', 'src/preload/**/*.ts'],
+    files: [
+      'electron.vite.config.ts',
+      'eslint.config.mjs',
+      'vitest.config.ts',
+      'src/main/**/*.ts',
+      'src/preload/**/*.ts',
+      'src/infrastructure/main/**/*.ts',
+    ],
     languageOptions: {
       globals: globals.node,
     },
   },
   {
-    files: ['src/renderer/**/*.{ts,tsx}'],
+    files: ['src/renderer/**/*.{ts,tsx}', 'src/infrastructure/renderer/**/*.ts'],
     languageOptions: {
       globals: globals.browser,
     },

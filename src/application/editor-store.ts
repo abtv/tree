@@ -24,10 +24,9 @@ import {
   type Location,
   type NodeId,
 } from '../domain/document'
+import type { ClipboardPayload } from '../shared/ipc'
 
-export type ClipboardValue =
-  | { kind: 'text'; text: string }
-  | { kind: 'image'; png: Uint8Array }
+export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
   load(): Promise<unknown | null>

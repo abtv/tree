@@ -18,6 +18,9 @@
     "eslint.config.mjs",
     "vitest.config.ts",
     "src/main/**/*.ts",
-    "src/preload/**/*.ts"
+    "src/preload/**/*.ts",
+    "src/domain/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/infrastructure/main/**/*.ts"
   ]
 }
