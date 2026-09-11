@@ -49,6 +49,22 @@ describe('App', () => {
     expect(screen.getByLabelText('Current location')).toHaveTextContent('›Projects')
   })
 
+  it('shows a disclosure control only for nodes with children and enters the node when clicked', async () => {
+    const store = createStore()
+    await act(async () => { await store.initialize() })
+    render(<App store={store} />)
+
+    expect(screen.queryByRole('button', { name: 'Enter node 1' })).not.toBeInTheDocument()
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Enter node 1' }))
+
+    expect(screen.getByRole('textbox', { name: 'Current parent' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
+  })
+
   it('moves a node through a between-node drop zone', async () => {
     const store = createStore()
     await act(async () => { await store.initialize() })

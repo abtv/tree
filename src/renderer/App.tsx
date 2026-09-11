@@ -95,6 +95,18 @@ export function App({ store }: AppProps): React.JSX.Element {
         <DropZone index={0} onDrop={onDrop} />
         {nodes.map((node, index) => (
           <div className="node-row" draggable key={node.id} onDragEnd={() => setDraggedNodeId(undefined)} onDragStart={(event) => { event.dataTransfer.setData('text/plain', node.id); setDraggedNodeId(node.id) }}>
+            {node.children.length === 0 ? null : (
+              <button
+                aria-label={`Enter node ${index + 1}`}
+                className="node-disclosure"
+                onClick={() => {
+                  store.selectNode(node.id, 0)
+                  store.enter()
+                }}
+                onMouseDown={(event) => event.preventDefault()}
+                type="button"
+              />
+            )}
             {input(node, `Node ${index + 1}`)}
             {node.attachment === undefined ? null : <AttachmentImage attachmentId={node.attachment.id} />}
             <DropZone index={index + 1} onDrop={onDrop} />
