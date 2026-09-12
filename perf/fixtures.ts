@@ -24,21 +24,44 @@ export const test = base.extend<{ userDataDir: string }>({
 })
 
 test.afterEach(async () => {
-  await Promise.all(launchedApps.splice(0).map((app) => app.close().catch(() => undefined)))
+  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
 })
 
 export { expect }
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
+  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   const app = await electron.launch({
     args: [`--user-data-dir=${userDataDir}`, '.'],
     cwd: process.cwd(),
   })
   launchedApps.push(app)
-  const window = await app.firstWindow()
-  await expect(window.locator('main.tree-app')).toBeVisible()
-  await expect(window.getByRole('textbox').first()).toBeVisible()
-  return { app, window }
+  try {
+    const window = await app.firstWindow()
+    await expect(window.locator('main.tree-app')).toBeVisible()
+    await expect(window.getByRole('textbox').first()).toBeVisible()
+    return { app, window }
+  } catch (error) {
+    await closeApp(app)
+    throw error
+  }
+}
+
+async function closeApp(app: ElectronApplication): Promise<void> {
+  let electronProcess: ReturnType<ElectronApplication['process']>
+  try {
+    electronProcess = app.process()
+  } catch {
+    await app.close().catch(() => undefined)
+    return
+  }
+  await app.close().catch(() => undefined)
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
+    electronProcess.kill('SIGTERM')
+  }
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
+    electronProcess.kill('SIGKILL')
+  }
 }
 
 export function seedDocument(userDataDir: string, seed: Seed): void {

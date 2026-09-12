@@ -3,9 +3,6 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const PNG_1X1_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-
 export interface PersistedNode {
   id: string
   text: string
@@ -35,17 +32,30 @@ export const test = base.extend<{ userDataDir: string }>({
 })
 
 test.afterEach(async () => {
-  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
+  await closeTrackedApps()
 })
 
 export { expect }
 
+async function closeTrackedApps(): Promise<void> {
+  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
+}
+
 export async function closeApp(app: ElectronApplication): Promise<void> {
-  const electronProcess = app.process()
+  const trackedIndex = launchedApps.indexOf(app)
+  if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+
+  let electronProcess: ReturnType<ElectronApplication['process']>
+  try {
+    electronProcess = app.process()
+  } catch {
+    await app.close().catch(() => undefined)
+    return
+  }
   const exited =
     electronProcess.exitCode !== null || electronProcess.signalCode !== null
       ? Promise.resolve()
-      : new Promise<void>((resolve) => app.once('close', resolve))
+      : new Promise<void>((resolve) => electronProcess.once('close', () => resolve()))
   let timeout: ReturnType<typeof setTimeout> | undefined
 
   await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
@@ -59,18 +69,36 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
   } finally {
     if (timeout !== undefined) clearTimeout(timeout)
   }
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
+    electronProcess.kill('SIGTERM')
+    await Promise.race([
+      exited,
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, 5_000)
+      }),
+    ])
+  }
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
+    electronProcess.kill('SIGKILL')
+  }
   await app.close().catch(() => undefined)
 }
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
+  await closeTrackedApps()
   const app = await electron.launch({
     args: [`--user-data-dir=${userDataDir}`, '.'],
     cwd: process.cwd(),
   })
   launchedApps.push(app)
-  const window = await app.firstWindow()
-  await expect(window.locator('main.tree-app')).toBeVisible()
-  return { app, window }
+  try {
+    const window = await app.firstWindow()
+    await expect(window.locator('main.tree-app')).toBeVisible()
+    return { app, window }
+  } catch (error) {
+    await closeApp(app)
+    throw error
+  }
 }
 
 export function node(window: Page, index: number) {
@@ -120,24 +148,24 @@ export async function writeClipboardText(app: ElectronApplication, text: string)
 }
 
 export async function writeClipboardImage(app: ElectronApplication): Promise<void> {
-  await app.evaluate(async ({ clipboard, ClipboardItem }, base64) => {
-    const bytes = Uint8Array.from(Buffer.from(base64, 'base64'))
-    const item = new ClipboardItem({ 'public.png': new Blob([bytes], { type: 'image/png' }) })
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const png = nativeImage.createFromBitmap(Buffer.from([40, 90, 200, 255]), { width: 1, height: 1 }).toPNG()
+    const item = new ClipboardItem({ 'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })
     clipboard.clear()
     await clipboard.write([item])
-  }, PNG_1X1_BASE64)
+  })
 }
 
 export async function writeClipboardImageAndText(app: ElectronApplication): Promise<void> {
-  await app.evaluate(async ({ clipboard, ClipboardItem }, base64) => {
-    const bytes = Uint8Array.from(Buffer.from(base64, 'base64'))
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const png = nativeImage.createFromBitmap(Buffer.from([40, 90, 200, 255]), { width: 1, height: 1 }).toPNG()
     const item = new ClipboardItem({
-      'public.png': new Blob([bytes], { type: 'image/png' }),
+      'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }),
       'text/plain': 'text representation',
     })
     clipboard.clear()
     await clipboard.write([item])
-  }, PNG_1X1_BASE64)
+  })
 }
 
 export async function writeClipboardImageSized(app: ElectronApplication, width: number, height: number): Promise<void> {

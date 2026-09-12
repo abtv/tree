@@ -210,6 +210,8 @@ TypeScript types do not prove that runtime values are forwarded correctly across
 
 Shutdown, startup, persistence, or quit changes must cover the success path and relevant failure paths, including pending-save flushing, save failure, timeout, retry, duplicate requests, application-menu quit, window close, and renderer unavailability.
 
+E2E and performance fixtures must treat launched Electron applications as owned child processes. Register each process immediately after launch, clean it up when launch or readiness fails, and wait for the process to exit before the next test starts. Teardown must be idempotent for explicit restarts and must include a bounded termination fallback so a failed test cannot leave application windows or processes running into later tests.
+
 ---
 
 ## 10. Validation
