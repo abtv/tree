@@ -120,7 +120,7 @@ Move selection to the previous node on the current level.
 If the current node is the first node on the level, and the current parent exists:
 
 * move selection to the editable current parent;
-* place the text cursor at the end of the current parent's text.
+* preserve the horizontal cursor position as much as possible, clamping it to the current parent's text length.
 
 If the current node is the first node on the level, and the current parent does not exist (the root level):
 
@@ -270,7 +270,7 @@ When the editable current parent is selected:
 * no child remains selected;
 * `Enter` creates a new empty first child immediately below the parent, before any existing children;
 * after `Enter`, the new child is selected and the text cursor moves to the beginning of its empty text;
-* `↓` selects the first child and places the text cursor at the beginning of its text;
+* `↓` selects the first child and preserves the horizontal cursor position as much as possible, clamping it to the child's text length;
 * if the parent has no children, `↓` does nothing;
 * `↑` moves the caret to the beginning when the caret is at the end of the parent's text; otherwise it does nothing;
 * `Cmd+.` does nothing.

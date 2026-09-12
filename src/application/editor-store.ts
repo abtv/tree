@@ -253,7 +253,7 @@ export class EditorStore {
       if (direction === 'down') {
         const child = displayedNodes(state.document, state.location.currentParentId)[0]
         if (child !== undefined) {
-          this.selectNode(child.id, 0)
+          this.selectNode(child.id, Math.min(cursor, child.text.length))
         }
       }
       return
@@ -262,7 +262,7 @@ export class EditorStore {
     const index = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
     if (direction === 'up' && index === 0 && state.location.currentParentId !== null) {
       const parent = requireNode(state.document, state.location.currentParentId).node
-      this.selectNode(parent.id, parent.text.length)
+      this.selectNode(parent.id, Math.min(cursor, parent.text.length))
       return
     }
     const target = nodes[index + (direction === 'up' ? -1 : 1)]

@@ -262,7 +262,7 @@ describe('EditorStore', () => {
     })
   })
 
-  it('moves selection to the current parent at the end of its text on ArrowUp from the first child', async () => {
+  it('preserves the caret position when ArrowUp moves from the first child to the current parent', async () => {
     const services = loadedState(
       {
         roots: [
@@ -281,13 +281,13 @@ describe('EditorStore', () => {
     const store = new EditorStore(services, ids('unused'))
     await store.initialize()
 
-    store.moveSelection('up', 0)
+    store.moveSelection('up', 1)
 
     const state = store.getSnapshot()
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
-      expect(state.focus).toMatchObject({ nodeId: 'root', cursor: 6 })
+      expect(state.focus).toMatchObject({ nodeId: 'root', cursor: 1 })
     }
   })
 
@@ -746,9 +746,10 @@ describe('EditorStore', () => {
     const store = new EditorStore(services, ids('unused'))
     await store.initialize()
 
-    store.moveSelection('down', 0)
+    store.moveSelection('down', 10)
     let state = store.getSnapshot()
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
+    expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
 
     store.selectNode('b', 10)
     store.moveSelection('up', 10)

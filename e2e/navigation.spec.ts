@@ -27,7 +27,11 @@ test.describe('navigation', () => {
 
     await expect(parent(window)).toHaveValue('Projects')
     await expect(parent(window)).toBeFocused()
-    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
+    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
+
+    await window.keyboard.press('ArrowDown')
+    await expect(node(window, 1)).toBeFocused()
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
   })
 
   test('moves left and right across sibling and parent boundaries', async ({ userDataDir }) => {
@@ -59,7 +63,7 @@ test.describe('navigation', () => {
     await window.keyboard.press('Home')
     await window.keyboard.press('ArrowUp')
     await expect(parent(window)).toBeFocused()
-    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
+    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
 
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowUp')
