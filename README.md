@@ -78,6 +78,7 @@ The application opens an inline, keyboard-first tree editor. It supports multipl
 * [Architecture](docs/ARCHITECTURE.md) — technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development workflow, testing, validation, and repository conventions.
 * [Agent Instructions](AGENTS.md) — instructions for AI coding agents working on the repository.
+* [License](LICENSE) — MIT License.
 
 ## Project Structure
 

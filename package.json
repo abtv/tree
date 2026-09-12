@@ -2,6 +2,7 @@
   "name": "tree",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A macOS desktop application for working with hierarchical text nodes and image attachments.",
   "main": "out/main/index.js",
   "packageManager": "npm@11.8.0",
