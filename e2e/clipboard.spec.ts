@@ -80,9 +80,9 @@ test.describe('clipboard', () => {
 
     await node(window, 1).focus()
     await window.keyboard.press('Enter')
-    await firePaste(node(window, 1))
+    await firePaste(node(window, 2))
 
-    await expect(node(window, 1)).toContainText('See https://example.com now')
+    await expect(node(window, 2)).toContainText('See https://example.com now')
     await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
   })
 

@@ -70,7 +70,12 @@ describe('EditorStore', () => {
 
   it('creates the next sibling after an empty node when Enter is pressed', async () => {
     const services = loadedState(
-      { roots: [{ id: 'root', text: 'Current', children: [] }, { id: 'empty', text: '', children: [] }] },
+      {
+        roots: [
+          { id: 'root', text: 'Current', children: [] },
+          { id: 'empty', text: '', children: [] },
+        ],
+      },
       { currentParentId: null, selectedNodeId: 'empty' },
     )
     const store = new EditorStore(services, ids('next'))
