@@ -142,6 +142,24 @@ If the current node is the last node on the level:
 
 Cursor-position behavior is the same as for `↑`.
 
+### 4.3 Left and right
+
+`←` and `→` move between adjacent nodes when the caret is at the corresponding text boundary.
+
+When the caret is at the beginning of a node and the user presses `←`:
+
+* if a previous sibling exists, select it and place the caret at the end of its text;
+* otherwise, if the node is a child, select its parent and place the caret at the end of the parent's text;
+* otherwise, do nothing.
+
+When the caret is at the end of a node and the user presses `→`:
+
+* if a next sibling exists, select it and place the caret at the beginning of its text;
+* otherwise, if the node is a child, select its parent and place the caret at the beginning of the parent's text;
+* otherwise, do nothing.
+
+At any other caret position, `←` and `→` retain their ordinary text-editing behavior.
+
 ---
 
 ## 5. Creating Nodes

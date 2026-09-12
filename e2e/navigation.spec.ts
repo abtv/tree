@@ -30,6 +30,32 @@ test.describe('navigation', () => {
     expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
   })
 
+  test('moves left and right across sibling and parent boundaries', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Projects')
+    await window.keyboard.press('Meta+.')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 1), 'Work')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 2), 'Personal')
+
+    await window.keyboard.press('Home')
+    await window.keyboard.press('ArrowLeft')
+    await expect(node(window, 1)).toBeFocused()
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
+
+    await window.keyboard.press('End')
+    await window.keyboard.press('ArrowRight')
+    await expect(node(window, 2)).toBeFocused()
+    expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
+    await window.keyboard.press('End')
+    await window.keyboard.press('ArrowRight')
+    await expect(parent(window)).toBeFocused()
+    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+  })
+
   test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({
     userDataDir,
   }) => {

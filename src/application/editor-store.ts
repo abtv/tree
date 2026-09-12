@@ -265,6 +265,30 @@ export class EditorStore {
     }
   }
 
+  public moveHorizontal(direction: 'left' | 'right', cursor: number): boolean {
+    const state = this.ready()
+    if (state.location.currentParentId === state.location.selectedNodeId) {
+      return false
+    }
+
+    const selected = requireNode(state.document, state.location.selectedNodeId)
+    const atBoundary = direction === 'left' ? cursor === 0 : cursor === selected.node.text.length
+    if (!atBoundary) return false
+
+    const target = selected.siblings[selected.index + (direction === 'left' ? -1 : 1)]
+    if (target !== undefined) {
+      this.selectNode(target.id, direction === 'left' ? target.text.length : 0)
+      return true
+    }
+
+    if (selected.parent !== null) {
+      this.selectNode(selected.parent.id, direction === 'left' ? selected.parent.text.length : 0)
+      return true
+    }
+
+    return false
+  }
+
   public enter(): void {
     const state = this.ready()
     if (state.location.currentParentId === state.location.selectedNodeId) {

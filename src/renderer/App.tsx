@@ -173,8 +173,15 @@ export function App({ store }: AppProps): React.JSX.Element {
         event.key === 'End' ||
         event.key === 'PageUp' ||
         event.key === 'PageDown'
-      )
-        store.endTextSession()
+      ) {
+        const selection = getSelectionRange(event.currentTarget)
+        const moved =
+          selection.start === selection.end &&
+          ((event.key === 'ArrowLeft' && store.moveHorizontal('left', cursor)) ||
+            (event.key === 'ArrowRight' && store.moveHorizontal('right', cursor)))
+        if (moved) event.preventDefault()
+        else store.endTextSession()
+      }
     }
   const onPaste =
     (nodeId: string) =>

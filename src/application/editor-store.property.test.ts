@@ -43,6 +43,7 @@ const command = fc.record({
     'leave',
     'up',
     'down',
+    'horizontal',
     'navigate',
     'undo',
     'redo',
@@ -178,6 +179,9 @@ describe('EditorStore invariants under command sequences', () => {
               break
             case 'down':
               store.moveSelection('down', action.a % 10)
+              break
+            case 'horizontal':
+              store.moveHorizontal(action.a % 2 === 0 ? 'left' : 'right', action.b % 30)
               break
             case 'navigate':
               store.navigateToAncestor(action.a % 2 === 0 ? null : state.location.currentParentId)

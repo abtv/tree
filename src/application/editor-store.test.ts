@@ -756,6 +756,48 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
   })
 
+  it('moves horizontally between siblings and from child boundaries to the parent', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'Alpha', children: [] },
+              { id: 'b', text: 'Beta', children: [] },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    expect(store.moveHorizontal('left', 0)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { cursor: 6 } })
+
+    store.selectNode('a', 0)
+    expect(store.moveHorizontal('right', 5)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { cursor: 0 } })
+
+    expect(store.moveHorizontal('right', 4)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { cursor: 0 } })
+  })
+
+  it('does not move horizontally away from a root boundary or from the current parent', async () => {
+    const store = new EditorStore(createServices(), ids('root'))
+    await store.initialize()
+
+    expect(store.moveHorizontal('left', 0)).toBe(false)
+    expect(store.moveHorizontal('right', 0)).toBe(false)
+
+    store.enter()
+    expect(store.moveHorizontal('left', 0)).toBe(false)
+    expect(store.moveHorizontal('right', 0)).toBe(false)
+  })
+
   it('ignores invalid selection and commands before initialization', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'Root', children: [] }] },
