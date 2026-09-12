@@ -23,4 +23,16 @@ test.describe('content security policy', () => {
 
     expect(violations).toEqual([])
   })
+
+  test('blocks navigation away from the application renderer', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const initialUrl = window.url()
+
+    await window.evaluate(() => {
+      document.location.href = 'https://example.com/'
+    })
+    await window.waitForTimeout(250)
+
+    expect(window.url()).toBe(initialUrl)
+  })
 })

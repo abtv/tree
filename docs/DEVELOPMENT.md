@@ -172,6 +172,8 @@ This runs `npm run check`, the end-to-end suite, and the performance suite. Run 
 
 A task is not considered complete until the appropriate validation command passes successfully.
 
+Security-sensitive changes must also verify the Electron boundary tests, including IPC validation, renderer navigation restrictions, attachment validation, and the production content security policy. Run `npm audit` when the network is available; a registry connectivity failure must be reported rather than treated as a clean audit result.
+
 ---
 
 ## 10. Development Workflow

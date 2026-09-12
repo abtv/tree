@@ -184,6 +184,10 @@ The application layer may use infrastructure interfaces.
 
 External hyperlink opening is handled by the Electron shell. The renderer renders link anchors, while the main process validates HTTP(S) URLs and delegates approved URLs to the operating system's default hyperlink application.
 
+The main process treats the preload API as an untrusted boundary: every IPC call must originate from the configured application renderer, and IPC arguments are validated at runtime before filesystem, clipboard, or application operations run. Renderer navigation is restricted to the packaged renderer document (or the configured development renderer URL), while external links open only through the validated shell path.
+
+Attachment writes are limited to validated IDs, PNG data, and a bounded payload size.
+
 The application layer must not contain React components or JSX.
 
 ---

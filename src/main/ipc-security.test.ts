@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import {
+  MAX_ATTACHMENT_BYTES,
+  isTrustedRendererUrl,
+  validateAttachmentBytes,
+  validateAttachmentId,
+  validateAttachmentIds,
+  validateClipboardWritePayload,
+  validatePersistedEditorState,
+} from './ipc-security'
+
+const state = {
+  version: 1,
+  document: { roots: [{ id: 'root', text: '', children: [] }] },
+  location: { currentParentId: null, selectedNodeId: 'root' },
+}
+
+describe('IPC security validation', () => {
+  it('accepts only the expected renderer URL', () => {
+    expect(isTrustedRendererUrl('file:///app/out/renderer/index.html', 'file:///app/out/renderer/index.html')).toBe(
+      true,
+    )
+    expect(isTrustedRendererUrl('https://evil.example/index.html', 'file:///app/out/renderer/index.html')).toBe(false)
+    expect(isTrustedRendererUrl(undefined, 'file:///app/out/renderer/index.html')).toBe(false)
+  })
+
+  it('validates persisted state through the domain parser', () => {
+    expect(validatePersistedEditorState(state).version).toBe(2)
+    expect(() => validatePersistedEditorState({ version: 1 })).toThrow('unsupported format')
+  })
+
+  it('rejects malformed clipboard payloads', () => {
+    expect(validateClipboardWritePayload({ text: 'text', html: '<p>text</p>' })).toEqual({
+      text: 'text',
+      html: '<p>text</p>',
+    })
+    expect(() => validateClipboardWritePayload({ text: 'text' })).toThrow('Clipboard payload')
+  })
+
+  it('validates attachment IDs and lists', () => {
+    expect(validateAttachmentId('image_01-test')).toBe('image_01-test')
+    expect(validateAttachmentIds(['one', 'two'])).toEqual(['one', 'two'])
+    expect(() => validateAttachmentId('../document')).toThrow('Attachment IDs')
+    expect(() => validateAttachmentIds('one')).toThrow('Attachment IDs')
+  })
+
+  it('requires non-empty binary data within the size limit', () => {
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+    expect(validateAttachmentBytes(png)).toBe(png)
+    expect(validateAttachmentBytes([...png])).toEqual(png)
+    expect(validateAttachmentBytes({ type: 'Buffer', data: [...png] })).toEqual(png)
+    expect(() => validateAttachmentBytes(new Uint8Array())).toThrow('empty')
+    expect(() => validateAttachmentBytes(new Uint8Array(MAX_ATTACHMENT_BYTES + 1))).toThrow('too large')
+  })
+})

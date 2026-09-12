@@ -5,7 +5,7 @@ import type { Plugin } from 'vite'
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self'",
   "img-src 'self' blob: data:",
   "font-src 'self'",
   "connect-src 'self'",

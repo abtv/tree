@@ -16,6 +16,20 @@ export function isAllowedExternalUrl(value: string): boolean {
   }
 }
 
+export function isAllowedRendererUrl(value: string, expected: string): boolean {
+  try {
+    const actualUrl = new URL(value)
+    const expectedUrl = new URL(expected)
+    return (
+      actualUrl.protocol === expectedUrl.protocol &&
+      actualUrl.host === expectedUrl.host &&
+      actualUrl.pathname === expectedUrl.pathname
+    )
+  } catch {
+    return false
+  }
+}
+
 export function surfaceWindow(window: WindowSurface | null): void {
   if (window === null || window.isDestroyed() || window.isFocused()) {
     return

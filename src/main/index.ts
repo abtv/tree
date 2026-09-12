@@ -1,10 +1,19 @@
 import { app, BrowserWindow, ClipboardItem, clipboard, globalShortcut, ipcMain, Menu, shell } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { readClipboard, writeClipboard } from '../infrastructure/main/clipboard'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
 import { ipcChannels } from '../shared/ipc'
-import { isAllowedExternalUrl, surfaceWindow } from './window'
+import {
+  validateAttachmentBytes,
+  validateAttachmentId,
+  validateAttachmentIds,
+  validateClipboardWritePayload,
+  validatePersistedEditorState,
+  isTrustedRendererUrl,
+} from './ipc-security'
+import { isAllowedExternalUrl, isAllowedRendererUrl, surfaceWindow } from './window'
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
@@ -49,6 +58,13 @@ function createMainWindow(): void {
 
   mainWindow = window
 
+  const rendererUrl =
+    process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+
+  window.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedRendererUrl(url, rendererUrl)) event.preventDefault()
+  })
+
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) void shell.openExternal(url)
     return { action: 'deny' }
@@ -62,9 +78,7 @@ function createMainWindow(): void {
     if (mainWindow === window) mainWindow = null
   })
 
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
-
-  if (rendererUrl) {
+  if (process.env['ELECTRON_RENDERER_URL']) {
     void window.loadURL(rendererUrl)
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'))
@@ -73,17 +87,47 @@ function createMainWindow(): void {
 
 void app.whenReady().then(() => {
   const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
-  ipcMain.handle(ipcChannels.quit, () => app.quit())
-  ipcMain.handle(ipcChannels.load, () => fileServices.load())
-  ipcMain.handle(ipcChannels.save, (_event, state) => fileServices.save(state))
-  ipcMain.handle(ipcChannels.readClipboard, () => readClipboard(nativeClipboard))
-  ipcMain.handle(ipcChannels.writeClipboard, (_event, payload) => writeClipboard(nativeClipboard, payload))
-  ipcMain.handle(ipcChannels.writeAttachment, (_event, id, png) => fileServices.writeAttachment(id, png))
-  ipcMain.handle(ipcChannels.hasAttachment, (_event, id) => fileServices.hasAttachment(id))
-  ipcMain.handle(ipcChannels.readAttachment, (_event, id) => fileServices.readAttachment(id))
-  ipcMain.handle(ipcChannels.cleanupAttachments, (_event, referencedIds) =>
-    fileServices.cleanupAttachments(referencedIds),
-  )
+  const rendererUrl =
+    process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+  const requireTrustedRenderer = (event: Electron.IpcMainInvokeEvent): void => {
+    if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
+  }
+  ipcMain.handle(ipcChannels.quit, (event) => {
+    requireTrustedRenderer(event)
+    return app.quit()
+  })
+  ipcMain.handle(ipcChannels.load, (event) => {
+    requireTrustedRenderer(event)
+    return fileServices.load()
+  })
+  ipcMain.handle(ipcChannels.save, (event, state) => {
+    requireTrustedRenderer(event)
+    return fileServices.save(validatePersistedEditorState(state))
+  })
+  ipcMain.handle(ipcChannels.readClipboard, (event) => {
+    requireTrustedRenderer(event)
+    return readClipboard(nativeClipboard)
+  })
+  ipcMain.handle(ipcChannels.writeClipboard, (event, payload) => {
+    requireTrustedRenderer(event)
+    return writeClipboard(nativeClipboard, validateClipboardWritePayload(payload))
+  })
+  ipcMain.handle(ipcChannels.writeAttachment, (event, id, png) => {
+    requireTrustedRenderer(event)
+    return fileServices.writeAttachment(validateAttachmentId(id), validateAttachmentBytes(png))
+  })
+  ipcMain.handle(ipcChannels.hasAttachment, (event, id) => {
+    requireTrustedRenderer(event)
+    return fileServices.hasAttachment(validateAttachmentId(id))
+  })
+  ipcMain.handle(ipcChannels.readAttachment, (event, id) => {
+    requireTrustedRenderer(event)
+    return fileServices.readAttachment(validateAttachmentId(id))
+  })
+  ipcMain.handle(ipcChannels.cleanupAttachments, (event, referencedIds) => {
+    requireTrustedRenderer(event)
+    return fileServices.cleanupAttachments(validateAttachmentIds(referencedIds))
+  })
   globalShortcut.register('CommandOrControl+0', () => surfaceWindow(mainWindow))
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

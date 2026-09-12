@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isAllowedExternalUrl, surfaceWindow } from './window'
+import { isAllowedExternalUrl, isAllowedRendererUrl, surfaceWindow } from './window'
 
 describe('surfaceWindow', () => {
   it('does nothing for a destroyed window', () => {
@@ -51,5 +51,13 @@ describe('isAllowedExternalUrl', () => {
     expect(isAllowedExternalUrl('https://example.com/path')).toBe(true)
     expect(isAllowedExternalUrl('javascript:alert(1)')).toBe(false)
     expect(isAllowedExternalUrl('file:///tmp/example')).toBe(false)
+  })
+})
+
+describe('isAllowedRendererUrl', () => {
+  it('allows only the configured renderer document', () => {
+    expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'file:///app/renderer/index.html')).toBe(true)
+    expect(isAllowedRendererUrl('file:///app/renderer/other.html', 'file:///app/renderer/index.html')).toBe(false)
+    expect(isAllowedRendererUrl('https://evil.example/', 'file:///app/renderer/index.html')).toBe(false)
   })
 })
