@@ -191,6 +191,8 @@ Security-sensitive changes must also verify the Electron boundary tests, includi
 
 Shutdown and attachment changes should also verify that queued renderer saves are flushed before quit and that non-PNG or malformed image bytes are rejected at the main-process boundary.
 
+The E2E and performance fixtures continuously observe the renderer's save-status message. Any occurrence of `Changes could not be saved:` fails the test, including transient messages that disappear before the test completes. New persistence or autosave work must retain this guard and include a regression scenario for rapid edits or overlapping saves.
+
 ---
 
 ## 10. Development Workflow

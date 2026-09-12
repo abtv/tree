@@ -1,18 +1,13 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { ClipboardEvent, DragEvent, FocusEvent, FormEvent, KeyboardEvent, SyntheticEvent } from 'react'
+import type { ClipboardEvent, FocusEvent, FormEvent, SyntheticEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { nodePath, type TreeNode } from '../domain/document'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
-import {
-  getCaret,
-  getSelectionRange,
-  isCollapsedSelection,
-  readEditableContent,
-  selectAll,
-  setCaret,
-} from './editor-dom'
+import { getCaret, isCollapsedSelection, readEditableContent, setCaret } from './editor-dom'
+import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
+import { NodeList } from './NodeList'
 
 interface AppProps {
   store: EditorStore
@@ -22,8 +17,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const inputs = useRef(new Map<string, HTMLElement>())
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
-  const composing = useRef(false)
-  const [draggedNodeId, setDraggedNodeId] = useState<string>()
+  const [composing, setComposing] = useState(false)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
@@ -71,9 +65,6 @@ export function App({ store }: AppProps): React.JSX.Element {
     )
   }
 
-  const currentParent =
-    state.location.currentParentId === null ? undefined : findNode(state.document.roots, state.location.currentParentId)
-  const nodes = currentParent?.children ?? state.document.roots
   const setInput =
     (id: string) =>
     (input: HTMLElement | null): void => {
@@ -100,6 +91,14 @@ export function App({ store }: AppProps): React.JSX.Element {
         inputs.current.set(id, input)
       }
     }
+  const clearSelectedInput = (id: string): void => {
+    inputs.current.get(id)?.classList.remove('select-all')
+  }
+  const isComposing = (): boolean => composing
+
+  const currentParent =
+    state.location.currentParentId === null ? undefined : findNode(state.document.roots, state.location.currentParentId)
+  const nodes = currentParent?.children ?? state.document.roots
   const onInput =
     (node: TreeNode) =>
     (event: FormEvent<HTMLElement>): void => {
@@ -124,117 +123,11 @@ export function App({ store }: AppProps): React.JSX.Element {
       if (target.selectionStart !== target.selectionEnd) store.endTextSession()
     } else if (!isCollapsedSelection()) store.endTextSession()
   }
-  const onKeyDown =
-    (node: TreeNode) =>
-    (event: KeyboardEvent<HTMLElement>): void => {
-      if (composing.current) return
-      const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
-      const copying = event.metaKey && event.key.toLowerCase() === 'c'
-      if (!selectingAll && !copying) {
-        setSelectAllNodeId(undefined)
-        event.currentTarget.classList.remove('select-all')
-      }
-      const cursor = getCaret(event.currentTarget)
-      if (selectingAll) {
-        if (!(event.currentTarget instanceof HTMLTextAreaElement)) {
-          event.preventDefault()
-          const input = event.currentTarget
-          selectAll(input)
-          globalThis.queueMicrotask(() => {
-            setSelectAllNodeId(node.id)
-            input.classList.add('select-all')
-          })
-        }
-      } else if (event.metaKey && event.key.toLowerCase() === 'c') {
-        const selection = getSelectionRange(event.currentTarget)
-        if (selection.start !== selection.end) {
-          event.preventDefault()
-          void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
-        }
-      } else if (event.metaKey && event.key.toLowerCase() === 'x') {
-        const selection = getSelectionRange(event.currentTarget)
-        if (selection.start !== selection.end) {
-          event.preventDefault()
-          void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
-        }
-      } else if (event.metaKey && event.key === '.') {
-        event.preventDefault()
-        store.enter()
-      } else if (event.metaKey && event.key === ',') {
-        event.preventDefault()
-        store.leave()
-      } else if (event.metaKey && event.key === 'Backspace') {
-        event.preventDefault()
-        store.deleteSelected()
-      } else if (event.metaKey && event.key.toLowerCase() === 'z') {
-        event.preventDefault()
-        if (event.shiftKey) store.redo()
-        else store.undo()
-      } else if (event.metaKey && event.key.toLowerCase() === 'q') {
-        event.preventDefault()
-        void window.treeApi.quit().catch((error: unknown) => store.reportError(error))
-      } else if (event.metaKey && event.key === '0') event.preventDefault()
-      else if (event.metaKey && event.key === 'Enter') {
-        event.preventDefault()
-        if (node.attachment !== undefined) setPreviewAttachmentId(node.attachment.id)
-      } else if (event.key === 'Backspace' && store.deleteLink(node.id, cursor)) {
-        event.preventDefault()
-      } else if (event.key === 'Backspace' && node.text === '') {
-        event.preventDefault()
-        store.deleteEmptySelected()
-      } else if (event.key === 'Enter') {
-        event.preventDefault()
-        store.createSiblingOrFirstChild(cursor)
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        store.moveSelection('up', cursor)
-      } else if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        store.moveSelection('down', cursor)
-      } else if (
-        event.key === 'ArrowLeft' ||
-        event.key === 'ArrowRight' ||
-        event.key === 'Home' ||
-        event.key === 'End' ||
-        event.key === 'PageUp' ||
-        event.key === 'PageDown'
-      ) {
-        const selection = getSelectionRange(event.currentTarget)
-        const moved =
-          selection.start === selection.end &&
-          ((event.key === 'ArrowLeft' && store.moveHorizontal('left', cursor)) ||
-            (event.key === 'ArrowRight' && store.moveHorizontal('right', cursor)))
-        if (moved) event.preventDefault()
-        else store.endTextSession()
-      }
-    }
   const onPaste =
     (nodeId: string) =>
     (event: ClipboardEvent<HTMLElement>): void => {
       event.preventDefault()
       void store.paste(nodeId, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
-    }
-  const onDragOver = (event: DragEvent<HTMLElement>): void => {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-  }
-  const onDrop =
-    (insertionIndex: number) =>
-    (event: DragEvent<HTMLDivElement>): void => {
-      event.preventDefault()
-      const nodeId = event.dataTransfer.getData('text/plain') || draggedNodeId
-      if (nodeId !== undefined) store.moveNodeTo(nodeId, insertionIndex)
-      setDraggedNodeId(undefined)
-    }
-  const rowInsertionIndex = (index: number, event: DragEvent<HTMLDivElement>): number => {
-    const bounds = event.currentTarget.getBoundingClientRect()
-    return event.clientY < bounds.top + bounds.height / 2 ? index : index + 1
-  }
-  const onRowDragOver = (event: DragEvent<HTMLDivElement>): void => onDragOver(event)
-  const onRowDrop =
-    (index: number) =>
-    (event: DragEvent<HTMLDivElement>): void => {
-      onDrop(rowInsertionIndex(index, event))(event)
     }
   const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => (
     <NodeInput
@@ -251,17 +144,23 @@ export function App({ store }: AppProps): React.JSX.Element {
       onContentInput={onInput(node)}
       onContentChange={onChange(node)}
       onCompositionEnd={() => {
-        composing.current = false
+        setComposing(false)
       }}
       onCompositionStart={() => {
-        composing.current = true
+        setComposing(true)
       }}
       onCut={() => store.markNextTextEditStandalone()}
       onFocus={onFocus(node.id)}
-      onKeyDown={onKeyDown(node)}
+      onKeyDown={createEditorKeyDownHandler({
+        store,
+        node,
+        isComposing,
+        setSelectAllNodeId,
+        onPreviewAttachment: setPreviewAttachmentId,
+      })}
       onMouseDown={() => {
         setSelectAllNodeId(undefined)
-        inputs.current.get(node.id)?.classList.remove('select-all')
+        clearSelectedInput(node.id)
         store.endTextSession()
       }}
       onPaste={(event) => {
@@ -290,42 +189,22 @@ export function App({ store }: AppProps): React.JSX.Element {
             )}
           </section>
         )}
-        <section className="node-list" aria-label="Nodes">
-          <DropZone index={0} onDrop={onDrop} start />
-          {nodes.map((node, index) => (
-            <div
-              className="node-row"
-              draggable
-              key={node.id}
-              onDragEnd={() => setDraggedNodeId(undefined)}
-              onDragOver={onRowDragOver}
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = 'move'
-                event.dataTransfer.setData('text/plain', node.id)
-                setDraggedNodeId(node.id)
-              }}
-              onDrop={onRowDrop(index)}
-            >
-              {node.children.length === 0 ? null : (
-                <button
-                  aria-label={`Enter node ${index + 1}`}
-                  className="node-disclosure"
-                  onClick={() => {
-                    store.selectNode(node.id, 0)
-                    store.enter()
-                  }}
-                  onMouseDown={(event) => event.preventDefault()}
-                  type="button"
-                />
-              )}
-              {input(node, `Node ${index + 1}`)}
+        <NodeList
+          nodes={nodes}
+          onEnter={(node) => {
+            store.selectNode(node.id, 0)
+            store.enter()
+          }}
+          onMove={(nodeId, insertionIndex) => store.moveNodeTo(nodeId, insertionIndex)}
+          renderInput={(node, label) => (
+            <>
+              {input(node, label)}
               {node.attachment === undefined ? null : (
                 <AttachmentImage attachmentId={node.attachment.id} onOpen={setPreviewAttachmentId} />
               )}
-            </div>
-          ))}
-          <DropZone end index={nodes.length} onDrop={onDrop} />
-        </section>
+            </>
+          )}
+        />
         {state.saveError === undefined ? null : (
           <p className="save-error" role="status">
             Changes could not be saved: {state.saveError}
@@ -341,30 +220,6 @@ export function App({ store }: AppProps): React.JSX.Element {
         <ImagePreview attachmentId={previewAttachmentId} onClose={() => setPreviewAttachmentId(undefined)} />
       )}
     </main>
-  )
-}
-
-function DropZone({
-  end = false,
-  index,
-  onDrop,
-  start = false,
-}: {
-  end?: boolean
-  index: number
-  onDrop: (index: number) => (event: DragEvent<HTMLDivElement>) => void
-  start?: boolean
-}): React.JSX.Element {
-  return (
-    <div
-      className={`drop-zone${start ? ' drop-zone-start' : ''}${end ? ' drop-zone-end' : ''}`}
-      aria-label={`Drop position ${index + 1}`}
-      onDragOver={(event) => {
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-      }}
-      onDrop={onDrop(index)}
-    />
   )
 }
 

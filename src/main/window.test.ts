@@ -1,5 +1,46 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isAllowedExternalUrl, isAllowedRendererUrl, surfaceWindow } from './window'
+import {
+  configureSingleInstance,
+  isAllowedExternalUrl,
+  isAllowedRendererUrl,
+  reportMainProcessError,
+  surfaceWindow,
+} from './window'
+
+describe('configureSingleInstance', () => {
+  it('registers second-instance handling when the lock is acquired', () => {
+    const app = { requestSingleInstanceLock: vi.fn(() => true), on: vi.fn() }
+    const onSecondInstance = vi.fn()
+
+    expect(configureSingleInstance(app, onSecondInstance)).toBe(true)
+    expect(app.on).toHaveBeenCalledWith('second-instance', onSecondInstance)
+  })
+
+  it('does not register second-instance handling when another process owns the lock', () => {
+    const app = { requestSingleInstanceLock: vi.fn(() => false), on: vi.fn() }
+
+    expect(configureSingleInstance(app, vi.fn())).toBe(false)
+    expect(app.on).not.toHaveBeenCalled()
+  })
+})
+
+describe('reportMainProcessError', () => {
+  it('reports Error messages with context', () => {
+    const report = vi.fn()
+
+    reportMainProcessError('Could not start', new Error('startup failed'), report)
+
+    expect(report).toHaveBeenCalledWith('[Tree] Could not start: startup failed')
+  })
+
+  it('reports a safe message for non-Error failures', () => {
+    const report = vi.fn()
+
+    reportMainProcessError('Could not start', 'bad failure', report)
+
+    expect(report).toHaveBeenCalledWith('[Tree] Could not start: Unknown error.')
+  })
+})
 
 describe('surfaceWindow', () => {
   it('does nothing for a destroyed window', () => {

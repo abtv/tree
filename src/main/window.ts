@@ -7,6 +7,22 @@ export interface WindowSurface {
   focus(): void
 }
 
+export interface SingleInstanceApp {
+  requestSingleInstanceLock(): boolean
+  on(event: 'second-instance', listener: () => void): void
+}
+
+export function configureSingleInstance(app: SingleInstanceApp, onSecondInstance: () => void): boolean {
+  if (!app.requestSingleInstanceLock()) return false
+  app.on('second-instance', onSecondInstance)
+  return true
+}
+
+export function reportMainProcessError(context: string, error: unknown, report = console.error): void {
+  const message = error instanceof Error ? error.message : 'Unknown error.'
+  report(`[Tree] ${context}: ${message}`)
+}
+
 export function isAllowedExternalUrl(value: string): boolean {
   try {
     const url = new URL(value)

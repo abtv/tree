@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, open, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { PersistedEditorState } from '../../domain/document'
 
@@ -14,7 +14,9 @@ export interface FileServices {
 export function createFileServices(dataDirectory: string): FileServices {
   const documentPath = join(dataDirectory, 'document.json')
   const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
+  const backupDocumentPath = join(dataDirectory, 'document.json.bak')
   const attachmentsDirectory = join(dataDirectory, 'attachments')
+  let saveQueue: Promise<void> = Promise.resolve()
 
   const prepare = async (): Promise<void> => {
     await mkdir(attachmentsDirectory, { recursive: true })
@@ -22,19 +24,27 @@ export function createFileServices(dataDirectory: string): FileServices {
 
   return {
     async load(): Promise<unknown | null> {
-      try {
-        return JSON.parse(await readFile(documentPath, 'utf8'))
-      } catch (error) {
-        if (isNotFound(error)) {
-          return null
+      let firstError: unknown
+      for (const candidate of [documentPath, temporaryDocumentPath, backupDocumentPath]) {
+        try {
+          const value = JSON.parse(await readFile(candidate, 'utf8'))
+          if (candidate !== documentPath) {
+            await rename(candidate, documentPath)
+          }
+          return value
+        } catch (error) {
+          if (!isNotFound(error) && firstError === undefined) {
+            firstError = error
+          }
         }
-        throw error
       }
+      if (firstError !== undefined) throw firstError
+      return null
     },
-    async save(state): Promise<void> {
-      await prepare()
-      await writeFile(temporaryDocumentPath, JSON.stringify(state, null, 2), 'utf8')
-      await rename(temporaryDocumentPath, documentPath)
+    save(state): Promise<void> {
+      const operation = saveQueue.then(() => saveDocument(state))
+      saveQueue = operation.catch(() => undefined)
+      return operation
     },
     async writeAttachment(id, png): Promise<void> {
       await prepare()
@@ -64,6 +74,18 @@ export function createFileServices(dataDirectory: string): FileServices {
       )
     },
   }
+
+  async function saveDocument(state: PersistedEditorState): Promise<void> {
+    await prepare()
+    await writeDurableFile(temporaryDocumentPath, JSON.stringify(state, null, 2))
+    try {
+      await copyFile(documentPath, backupDocumentPath)
+      await syncFile(backupDocumentPath)
+    } catch (error) {
+      if (!isNotFound(error)) throw error
+    }
+    await rename(temporaryDocumentPath, documentPath)
+  }
 }
 
 function attachmentPath(attachmentsDirectory: string, id: string): string {
@@ -75,4 +97,23 @@ function attachmentPath(attachmentsDirectory: string, id: string): string {
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+}
+
+async function writeDurableFile(path: string, contents: string): Promise<void> {
+  const file = await open(path, 'w')
+  try {
+    await file.writeFile(contents, 'utf8')
+    await file.sync()
+  } finally {
+    await file.close()
+  }
+}
+
+async function syncFile(path: string): Promise<void> {
+  const file = await open(path, 'r')
+  try {
+    await file.sync()
+  } finally {
+    await file.close()
+  }
 }

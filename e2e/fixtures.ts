@@ -22,6 +22,8 @@ export interface Launched {
 }
 
 const launchedApps: ElectronApplication[] = []
+const observedSaveErrors = new Map<Page, { errors: string[]; timer: ReturnType<typeof setInterval> }>()
+const closedApps = new WeakSet<ElectronApplication>()
 
 export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
@@ -33,6 +35,13 @@ export const test = base.extend<{ userDataDir: string }>({
 
 test.afterEach(async () => {
   await closeTrackedApps()
+  const observations = [...observedSaveErrors.values()]
+  observations.forEach(({ timer }) => clearInterval(timer))
+  observedSaveErrors.clear()
+  const errors = observations.flatMap(({ errors: values }) => values)
+  if (errors.length > 0) {
+    throw new Error(`Renderer reported save errors:\n${errors.join('\n')}`)
+  }
 })
 
 export { expect }
@@ -52,10 +61,8 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
     await app.close().catch(() => undefined)
     return
   }
-  const exited =
-    electronProcess.exitCode !== null || electronProcess.signalCode !== null
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => app.once('close', resolve))
+  if (closedApps.has(app) || electronProcess.exitCode !== null || electronProcess.signalCode !== null) return
+  const exited = new Promise<void>((resolve) => app.once('close', resolve))
   let timeout: ReturnType<typeof setTimeout> | undefined
 
   await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
@@ -85,14 +92,32 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
     cwd: process.cwd(),
   })
   launchedApps.push(app)
+  app.once('close', () => closedApps.add(app))
   try {
     const window = await app.firstWindow()
+    observeSaveErrors(window)
     await expect(window.locator('main.tree-app')).toBeVisible()
     return { app, window }
   } catch (error) {
     await closeApp(app)
     throw error
   }
+}
+
+function observeSaveErrors(window: Page): void {
+  const errors: string[] = []
+  const timer = setInterval(() => {
+    void window
+      .locator('.save-error[role="status"]')
+      .allTextContents()
+      .then((messages) => {
+        messages.forEach((message) => {
+          if (!errors.includes(message)) errors.push(message)
+        })
+      })
+      .catch(() => undefined)
+  }, 25)
+  observedSaveErrors.set(window, { errors, timer })
 }
 
 export function node(window: Page, index: number) {

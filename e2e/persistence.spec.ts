@@ -14,6 +14,14 @@ import {
 } from './fixtures'
 
 test.describe('persistence', () => {
+  test('does not surface a save error during rapid edits', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const text = 'rapid '.repeat(100)
+
+    await typeInto(node(window, 1), text)
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
+  })
+
   test('restores the document, current parent, and selected node after restart', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
 
@@ -43,6 +51,7 @@ test.describe('persistence', () => {
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await closeApp(first.app)
