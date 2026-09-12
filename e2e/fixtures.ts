@@ -41,7 +41,24 @@ test.afterEach(async () => {
 export { expect }
 
 export async function closeApp(app: ElectronApplication): Promise<void> {
+  const electronProcess = app.process()
+  const exited =
+    electronProcess.exitCode !== null || electronProcess.signalCode !== null
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => app.once('close', resolve))
+  let timeout: ReturnType<typeof setTimeout> | undefined
+
   await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
+  try {
+    await Promise.race([
+      exited,
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, 5_000)
+      }),
+    ])
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout)
+  }
   await app.close().catch(() => undefined)
 }
 
