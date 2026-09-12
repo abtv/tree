@@ -235,6 +235,16 @@ Before modifying files with existing uncommitted changes, inspect those changes 
 
 When the Product Owner requests a fix directly related to the most recently committed change, do not create a new plan or a new commit. Update the existing plan and amend the last commit with `git commit --amend` instead. If the fix changes the plan's scope, update the plan content and rename the plan file to match. This applies only to direct follow-ups to the most recent commit; unrelated changes get their own plan and commit.
 
+### Session boundaries
+
+A session should cover a single logical task.
+
+After a commit completes a logical task, stop working and tell the Product Owner to start a new session before beginning the next task. Do not continue with a new, unrelated task in the same session.
+
+The only exception is a direct follow-up fix to the most recently committed change, which stays in the current session as described above.
+
+Context grows with every message and tool call, increasing cost and latency. A new session per task keeps the context small and focused.
+
 ---
 
 ## 13. Completion Criteria
