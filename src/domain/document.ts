@@ -6,9 +6,16 @@ export interface AttachmentReference {
   mimeType: 'image/png'
 }
 
+export interface LinkRange {
+  start: number
+  end: number
+  url: string
+}
+
 export interface TreeNode {
   id: NodeId
   text: string
+  links?: LinkRange[]
   attachment?: AttachmentReference
   children: TreeNode[]
 }
@@ -23,7 +30,7 @@ export interface Location {
 }
 
 export interface PersistedEditorState {
-  version: 1
+  version: 1 | 2
   document: Document
   location: Location
 }
@@ -69,6 +76,7 @@ function cloneNodeShallow(node: TreeNode): TreeNode {
   return {
     id: node.id,
     text: node.text,
+    ...(node.links === undefined ? {} : { links: node.links.map((link) => ({ ...link })) }),
     ...(node.attachment === undefined ? {} : { attachment: { ...node.attachment } }),
     children: [],
   }
@@ -139,8 +147,61 @@ export function isValidLocation(document: Document, location: Location): boolean
 }
 
 export function editNodeText(document: Document, nodeId: NodeId, text: string): Document {
+  return editNodeContent(document, nodeId, text, [])
+}
+
+export function editNodeContent(document: Document, nodeId: NodeId, text: string, links: LinkRange[]): Document {
   const next = cloneDocument(document)
-  requireNode(next, nodeId).node.text = text
+  const node = requireNode(next, nodeId).node
+  node.text = text
+  const normalized = normalizeLinks(links, text)
+  if (normalized.length === 0) delete node.links
+  else node.links = normalized
+  return next
+}
+
+export function deleteLink(document: Document, nodeId: NodeId, cursor: number): Document | undefined {
+  const next = cloneDocument(document)
+  const node = requireNode(next, nodeId).node
+  const link = node.links?.find((candidate) => candidate.end === cursor)
+  if (link === undefined) return undefined
+  node.text = `${node.text.slice(0, link.start)}${node.text.slice(link.end)}`
+  setLinks(
+    node,
+    normalizeLinks(
+      (node.links ?? [])
+        .filter((candidate) => candidate !== link)
+        .map((candidate) => ({
+          ...candidate,
+          start: candidate.start >= link.end ? candidate.start - (link.end - link.start) : candidate.start,
+          end: candidate.end >= link.end ? candidate.end - (link.end - link.start) : candidate.end,
+        })),
+      node.text,
+    ),
+  )
+  return next
+}
+
+export function removeTextRange(document: Document, nodeId: NodeId, start: number, end: number): Document {
+  const next = cloneDocument(document)
+  const node = requireNode(next, nodeId).node
+  const from = snapToCodePoint(node.text, Math.min(start, end))
+  const to = snapToCodePoint(node.text, Math.max(start, end))
+  if (from === to) return next
+  node.text = `${node.text.slice(0, from)}${node.text.slice(to)}`
+  setLinks(
+    node,
+    normalizeLinks(
+      (node.links ?? [])
+        .filter((link) => link.end <= from || link.start >= to)
+        .map((link) => ({
+          ...link,
+          start: link.start >= to ? link.start - (to - from) : link.start,
+          end: link.end >= to ? link.end - (to - from) : link.end,
+        })),
+      node.text,
+    ),
+  )
   return next
 }
 
@@ -156,6 +217,7 @@ export function insertSiblingAfter(
   located.siblings.splice(located.index + 1, 0, {
     id: newNodeId,
     text,
+    ...(text.length > 0 && isHttpUrl(text) ? { links: [{ start: 0, end: text.length, url: text }] } : {}),
     ...(attachment === undefined ? {} : { attachment }),
     children: [],
   })
@@ -173,8 +235,15 @@ export function splitNode(document: Document, nodeId: NodeId, cursor: number, ne
   const located = requireNode(next, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)
   const suffix = located.node.text.slice(position)
+  const links = splitLinks(located.node.links ?? [], position)
   located.node.text = located.node.text.slice(0, position)
-  located.siblings.splice(located.index + 1, 0, { id: newNodeId, text: suffix, children: [] })
+  setLinks(located.node, links.before)
+  located.siblings.splice(located.index + 1, 0, {
+    id: newNodeId,
+    text: suffix,
+    ...(links.after.length === 0 ? {} : { links: links.after }),
+    children: [],
+  })
   return next
 }
 
@@ -196,11 +265,18 @@ export function moveSibling(document: Document, nodeId: NodeId, destinationIndex
   return next
 }
 
-export function pasteText(document: Document, nodeId: NodeId, cursor: number, text: string): Document {
+export function pasteText(
+  document: Document,
+  nodeId: NodeId,
+  cursor: number,
+  text: string,
+  richLinks?: LinkRange[],
+): Document {
   const next = cloneDocument(document)
   const node = requireNode(next, nodeId).node
   const position = snapToCodePoint(node.text, cursor)
   node.text = `${node.text.slice(0, position)}${text}${node.text.slice(position)}`
+  setLinks(node, insertLinks(node.links ?? [], position, text, richLinks))
   return next
 }
 
@@ -210,6 +286,7 @@ export function pasteMultilineText(
   cursor: number,
   lines: string[],
   newNodeIds: NodeId[],
+  richLinks?: LinkRange[],
 ): Document {
   if (lines.length < 2 || newNodeIds.length !== lines.length - 1) {
     throw new Error('Multiline paste requires one new node ID for every line after the first.')
@@ -221,13 +298,36 @@ export function pasteMultilineText(
   const prefix = located.node.text.slice(0, position)
   const suffix = located.node.text.slice(position)
   const attachment = located.node.attachment
+  const links = splitLinks(located.node.links ?? [], position)
 
   located.node.text = `${prefix}${lines[0] ?? ''}`
+  setLinks(
+    located.node,
+    insertLinks(
+      links.before,
+      position,
+      lines[0] ?? '',
+      richLinks === undefined ? undefined : linksForLine(richLinks, lines, 0),
+    ),
+  )
   delete located.node.attachment
 
   const created: TreeNode[] = newNodeIds.map((id, index) => ({
     id,
     text: index === newNodeIds.length - 1 ? `${lines[index + 1] ?? ''}${suffix}` : (lines[index + 1] ?? ''),
+    ...(() => {
+      const line = lines[index + 1] ?? ''
+      const lineLinks = linksForLine(richLinks, lines, index + 1)
+      if (richLinks === undefined && isHttpUrl(line)) lineLinks.push({ start: 0, end: line.length, url: line })
+      const finalLinks =
+        index === newNodeIds.length - 1
+          ? [
+              ...lineLinks,
+              ...links.after.map((link) => ({ ...link, start: link.start + line.length, end: link.end + line.length })),
+            ]
+          : lineLinks
+      return finalLinks.length === 0 ? {} : { links: finalLinks }
+    })(),
     children: [],
   }))
   const finalNode = created.at(-1)
@@ -264,11 +364,16 @@ export function serializeState(document: Document, location: Location): Persiste
   if (!isValidLocation(document, location)) {
     throw new Error('The selected node is not valid for the persisted location.')
   }
-  return { version: 1, document: cloneDocument(document), location: { ...location } }
+  return { version: 2, document: cloneDocument(document), location: { ...location } }
 }
 
 export function parsePersistedState(value: unknown): PersistedEditorState {
-  if (!isRecord(value) || value.version !== 1 || !isRecord(value.document) || !isRecord(value.location)) {
+  if (
+    !isRecord(value) ||
+    (value.version !== 1 && value.version !== 2) ||
+    !isRecord(value.document) ||
+    !isRecord(value.location)
+  ) {
     throw new Error('The saved document has an unsupported format.')
   }
 
@@ -285,7 +390,7 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
   if (!isValidLocation(document, location)) {
     throw new Error('The saved document location does not match its tree.')
   }
-  return { version: 1, document, location }
+  return { version: 2, document, location }
 }
 
 export function assertDocument(document: Document): void {
@@ -324,6 +429,7 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
     }
     nodeIds.add(candidate.id)
     const attachment = parseAttachment(candidate.attachment)
+    const links = parseLinks(candidate.links, candidate.text)
     const children = candidate.children
     if (!Array.isArray(children)) {
       throw new Error('Node children must be an array.')
@@ -331,6 +437,7 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
     const node: TreeNode = {
       id: candidate.id,
       text: candidate.text,
+      ...(links.length === 0 ? {} : { links }),
       ...(attachment === undefined ? {} : { attachment }),
       children: [],
     }
@@ -339,6 +446,25 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
   }
 
   return output
+}
+
+function parseLinks(value: unknown, text: string): LinkRange[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) throw new Error('Saved links are invalid.')
+  return normalizeLinks(
+    value.map((candidate) => {
+      if (
+        !isRecord(candidate) ||
+        !Number.isInteger(candidate.start) ||
+        !Number.isInteger(candidate.end) ||
+        typeof candidate.url !== 'string'
+      ) {
+        throw new Error('Saved links are invalid.')
+      }
+      return { start: candidate.start as number, end: candidate.end as number, url: candidate.url }
+    }),
+    text,
+  )
 }
 
 function parseAttachment(value: unknown): AttachmentReference | undefined {
@@ -369,4 +495,85 @@ function snapToCodePoint(text: string, cursor: number): number {
     }
   }
   return position
+}
+
+export function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.length > 0
+  } catch {
+    return false
+  }
+}
+
+export function normalizeLinks(links: LinkRange[], text: string, requireMatchingText = true): LinkRange[] {
+  const sorted = links
+    .filter(
+      (link) =>
+        link.start >= 0 &&
+        link.end > link.start &&
+        link.end <= text.length &&
+        (!requireMatchingText || text.slice(link.start, link.end) === link.url) &&
+        isHttpUrl(link.url),
+    )
+    .sort((a, b) => a.start - b.start)
+  const result: LinkRange[] = []
+  for (const link of sorted) {
+    if ((result.at(-1)?.end ?? 0) > link.start) continue
+    result.push({ ...link })
+  }
+  return result
+}
+
+function insertLinks(
+  links: LinkRange[],
+  position: number,
+  insertedText: string,
+  insertedLinks?: LinkRange[],
+): LinkRange[] {
+  const delta = insertedText.length
+  const inserted =
+    insertedLinks === undefined
+      ? isHttpUrl(insertedText)
+        ? [{ start: position, end: position + delta, url: insertedText }]
+        : []
+      : insertedLinks
+          .filter((link) => insertedText.slice(link.start, link.end) === link.url)
+          .map((link) => ({ ...link, start: link.start + position, end: link.end + position }))
+  return normalizeLinks(
+    [
+      ...links.map((link) => ({
+        ...link,
+        start: link.start >= position ? link.start + delta : link.start,
+        end: link.end > position ? link.end + delta : link.end,
+      })),
+      ...inserted,
+    ],
+    ' '.repeat(Math.max(position + delta, ...links.map((link) => link.end + delta), 0)),
+    false,
+  )
+}
+
+function linksForLine(links: LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {
+  if (links === undefined) return []
+  let lineStart = 0
+  for (let index = 0; index < lineIndex; index += 1) lineStart += (lines[index] ?? '').length + 1
+  const lineEnd = lineStart + (lines[lineIndex] ?? '').length
+  return links
+    .filter((link) => link.start >= lineStart && link.end <= lineEnd)
+    .map((link) => ({ ...link, start: link.start - lineStart, end: link.end - lineStart }))
+}
+
+function splitLinks(links: LinkRange[], position: number): { before: LinkRange[]; after: LinkRange[] } {
+  return {
+    before: links.filter((link) => link.end <= position).map((link) => ({ ...link })),
+    after: links
+      .filter((link) => link.start >= position)
+      .map((link) => ({ ...link, start: link.start - position, end: link.end - position })),
+  }
+}
+
+function setLinks(node: TreeNode, links: LinkRange[]): void {
+  if (links.length === 0) delete node.links
+  else node.links = links
 }

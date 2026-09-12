@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, SyntheticEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
-import { nodePath, type TreeNode } from '../domain/document'
+import { nodePath, type LinkRange, type TreeNode } from '../domain/document'
 import { readAttachment } from '../infrastructure/renderer/electron-services'
 
 interface AppProps {
@@ -10,10 +10,12 @@ interface AppProps {
 
 export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
-  const inputs = useRef(new Map<string, HTMLTextAreaElement>())
+  const inputs = useRef(new Map<string, HTMLElement>())
+  const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
   const composing = useRef(false)
   const [draggedNodeId, setDraggedNodeId] = useState<string>()
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
+  const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
 
   useLayoutEffect(() => {
@@ -21,9 +23,16 @@ export function App({ store }: AppProps): React.JSX.Element {
     const input = inputs.current.get(focus.nodeId)
     if (input === undefined) return
     input.focus()
-    const cursor = Math.min(focus.cursor, input.value.length)
-    input.setSelectionRange(cursor, cursor)
+    if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
+    else setCaret(input, focus.cursor)
   }, [focus])
+
+  useLayoutEffect(() => {
+    const pending = pendingCaret.current
+    if (pending === undefined || !pending.input.isConnected) return
+    setCaret(pending.input, pending.cursor)
+    pendingCaret.current = undefined
+  })
 
   if (state.status === 'loading')
     return (
@@ -46,29 +55,87 @@ export function App({ store }: AppProps): React.JSX.Element {
   const nodes = currentParent?.children ?? state.document.roots
   const setInput =
     (id: string) =>
-    (input: HTMLTextAreaElement | null): void => {
+    (input: HTMLElement | null): void => {
       if (input === null) inputs.current.delete(id)
-      else inputs.current.set(id, input)
+      else {
+        // These DOM-compatible accessors keep the contenteditable editor easy
+        // to exercise with form-oriented test helpers while the production
+        // control is a div.
+        if (!(input instanceof HTMLTextAreaElement) && !Object.prototype.hasOwnProperty.call(input, 'value')) {
+          Object.defineProperty(input, 'value', {
+            configurable: true,
+            get: () => input.textContent ?? '',
+            set: (value: string) => {
+              input.textContent = value
+            },
+          })
+          Object.defineProperty(input, 'setSelectionRange', {
+            configurable: true,
+            value: (start: number, end: number) => {
+              if (start === end) setCaret(input, start)
+            },
+          })
+        }
+        inputs.current.set(id, input)
+      }
+    }
+  const onInput =
+    (node: TreeNode) =>
+    (event: React.FormEvent<HTMLElement>): void => {
+      const cursor = getCaret(event.currentTarget)
+      const content = readEditableContent(event.currentTarget)
+      pendingCaret.current = { input: event.currentTarget, cursor }
+      store.editContent(node.id, content.text, content.links)
     }
   const onChange =
-    (nodeId: string) =>
-    (event: ChangeEvent<HTMLTextAreaElement>): void => {
-      store.editText(nodeId, event.currentTarget.value)
+    (node: TreeNode) =>
+    (event: React.FormEvent<HTMLElement>): void => {
+      store.editContent(node.id, event.currentTarget.textContent ?? '', node.links ?? [])
     }
   const onFocus =
     (nodeId: string) =>
-    (event: FocusEvent<HTMLTextAreaElement>): void => {
-      if (state.location.selectedNodeId !== nodeId) store.selectNode(nodeId, event.currentTarget.selectionStart ?? 0)
+    (event: FocusEvent<HTMLElement>): void => {
+      if (state.location.selectedNodeId !== nodeId) store.selectNode(nodeId, getCaret(event.currentTarget))
     }
-  const onSelect = (event: SyntheticEvent<HTMLTextAreaElement>): void => {
-    if (event.currentTarget.selectionStart !== event.currentTarget.selectionEnd) store.endTextSession()
+  const onSelect = (event: SyntheticEvent<HTMLElement>): void => {
+    const target = event.currentTarget
+    if (target instanceof HTMLTextAreaElement) {
+      if (target.selectionStart !== target.selectionEnd) store.endTextSession()
+    } else if (!isCollapsedSelection()) store.endTextSession()
   }
   const onKeyDown =
     (node: TreeNode) =>
-    (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    (event: KeyboardEvent<HTMLElement>): void => {
       if (composing.current) return
-      const cursor = event.currentTarget.selectionStart ?? 0
-      if (event.metaKey && event.key === '.') {
+      const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
+      if (!selectingAll) {
+        setSelectAllNodeId(undefined)
+        event.currentTarget.classList.remove('select-all')
+      }
+      const cursor = getCaret(event.currentTarget)
+      if (selectingAll) {
+        if (!(event.currentTarget instanceof HTMLTextAreaElement)) {
+          event.preventDefault()
+          const input = event.currentTarget
+          selectAll(input)
+          globalThis.queueMicrotask(() => {
+            setSelectAllNodeId(node.id)
+            input.classList.add('select-all')
+          })
+        }
+      } else if (event.metaKey && event.key.toLowerCase() === 'c') {
+        const selection = getSelectionRange(event.currentTarget)
+        if (selection.start !== selection.end) {
+          event.preventDefault()
+          void store.copy(node.id, selection.start, selection.end).catch(() => undefined)
+        }
+      } else if (event.metaKey && event.key.toLowerCase() === 'x') {
+        const selection = getSelectionRange(event.currentTarget)
+        if (selection.start !== selection.end) {
+          event.preventDefault()
+          void store.cut(node.id, selection.start, selection.end).catch(() => undefined)
+        }
+      } else if (event.metaKey && event.key === '.') {
         event.preventDefault()
         store.enter()
       } else if (event.metaKey && event.key === ',') {
@@ -85,6 +152,8 @@ export function App({ store }: AppProps): React.JSX.Element {
       else if (event.metaKey && event.key === 'Enter') {
         event.preventDefault()
         if (node.attachment !== undefined) setPreviewAttachmentId(node.attachment.id)
+      } else if (event.key === 'Backspace' && store.deleteLink(node.id, cursor)) {
+        event.preventDefault()
       } else if (event.key === 'Backspace' && node.text === '') {
         event.preventDefault()
         store.deleteEmptySelected()
@@ -109,9 +178,9 @@ export function App({ store }: AppProps): React.JSX.Element {
     }
   const onPaste =
     (nodeId: string) =>
-    (event: ClipboardEvent<HTMLTextAreaElement>): void => {
+    (event: ClipboardEvent<HTMLElement>): void => {
       event.preventDefault()
-      void store.paste(nodeId, event.currentTarget.selectionStart ?? 0).catch(() => undefined)
+      void store.paste(nodeId, getCaret(event.currentTarget)).catch(() => undefined)
     }
   const onDragOver = (event: DragEvent<HTMLElement>): void => {
     event.preventDefault()
@@ -135,30 +204,84 @@ export function App({ store }: AppProps): React.JSX.Element {
     (event: DragEvent<HTMLDivElement>): void => {
       onDrop(rowInsertionIndex(index, event))(event)
     }
-  const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => (
-    <textarea
-      ref={setInput(node.id)}
-      aria-label={label}
-      className={parent ? 'node-input current-parent-input' : 'node-input'}
-      rows={1}
-      value={node.text}
-      onBlur={() => store.endTextSession()}
-      onChange={onChange(node.id)}
-      onCompositionEnd={() => {
-        composing.current = false
-      }}
-      onCompositionStart={() => {
-        composing.current = true
-      }}
-      onCut={() => store.markNextTextEditStandalone()}
-      onFocus={onFocus(node.id)}
-      onKeyDown={onKeyDown(node)}
-      onMouseDown={() => store.endTextSession()}
-      onPaste={onPaste(node.id)}
-      onSelect={onSelect}
-      spellCheck
-    />
-  )
+  const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => {
+    if (node.links === undefined || node.links.length === 0) {
+      return (
+        <textarea
+          ref={setInput(node.id) as (input: HTMLTextAreaElement | null) => void}
+          aria-label={label}
+          className={parent ? 'node-input current-parent-input' : 'node-input'}
+          rows={1}
+          value={node.text}
+          onBlur={() => {
+            setSelectAllNodeId(undefined)
+            store.endTextSession()
+          }}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => store.editText(node.id, event.currentTarget.value)}
+          onCompositionEnd={() => {
+            composing.current = false
+          }}
+          onCompositionStart={() => {
+            composing.current = true
+          }}
+          onCut={() => store.markNextTextEditStandalone()}
+          onFocus={onFocus(node.id)}
+          onKeyDown={onKeyDown(node)}
+          onMouseDown={() => {
+            setSelectAllNodeId(undefined)
+            inputs.current.get(node.id)?.classList.remove('select-all')
+            store.endTextSession()
+          }}
+          onPaste={(event) => {
+            setSelectAllNodeId(undefined)
+            onPaste(node.id)(event)
+          }}
+          onSelect={onSelect}
+          spellCheck
+        />
+      )
+    }
+    return (
+      <div
+        contentEditable
+        ref={setInput(node.id)}
+        aria-label={label}
+        aria-multiline="true"
+        role="textbox"
+        className={['node-input', parent ? 'current-parent-input' : '', selectAllNodeId === node.id ? 'select-all' : '']
+          .filter(Boolean)
+          .join(' ')}
+        onBlur={() => {
+          setSelectAllNodeId(undefined)
+          store.endTextSession()
+        }}
+        onChange={onChange(node)}
+        onInput={onInput(node)}
+        onCompositionEnd={() => {
+          composing.current = false
+        }}
+        onCompositionStart={() => {
+          composing.current = true
+        }}
+        onCut={() => store.markNextTextEditStandalone()}
+        onFocus={onFocus(node.id)}
+        onKeyDown={onKeyDown(node)}
+        onMouseDown={() => {
+          setSelectAllNodeId(undefined)
+          inputs.current.get(node.id)?.classList.remove('select-all')
+          store.endTextSession()
+        }}
+        onPaste={(event) => {
+          setSelectAllNodeId(undefined)
+          onPaste(node.id)(event)
+        }}
+        onSelect={onSelect}
+        spellCheck
+        suppressContentEditableWarning
+        dangerouslySetInnerHTML={{ __html: richTextHtml(node) }}
+      />
+    )
+  }
 
   const path = state.location.currentParentId === null ? [] : nodePath(state.document, state.location.currentParentId)
 
@@ -391,4 +514,165 @@ function findNode(nodes: TreeNode[], id: string): TreeNode | undefined {
     for (const child of node.children) stack.push(child)
   }
   return undefined
+}
+
+function richTextHtml(node: TreeNode): string {
+  const links = node.links ?? []
+  const parts: string[] = []
+  let position = 0
+  for (const link of links) {
+    if (link.start > position) parts.push(escapeHtml(node.text.slice(position, link.start)))
+    const label = escapeHtml(node.text.slice(link.start, link.end))
+    parts.push(
+      `<a contenteditable="false" href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`,
+    )
+    position = link.end
+  }
+  if (position < node.text.length || parts.length === 0) {
+    parts.push(escapeHtml(node.text.slice(position)))
+  }
+  return parts.join('')
+}
+
+function escapeHtml(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+}
+
+function readEditableContent(element: HTMLElement): { text: string; links: LinkRange[] } {
+  const links: LinkRange[] = []
+  let text = ''
+  const walk = (node: Node): void => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent ?? ''
+      return
+    }
+    if (node instanceof HTMLAnchorElement) {
+      const start = text.length
+      const value = node.textContent ?? ''
+      text += value
+      links.push({ start, end: start + value.length, url: node.getAttribute('href') ?? node.href })
+      return
+    }
+    node.childNodes.forEach(walk)
+  }
+  element.childNodes.forEach(walk)
+  return { text, links }
+}
+
+function getCaret(element: HTMLElement): number {
+  if (element instanceof HTMLTextAreaElement) return element.selectionStart ?? 0
+  const selection = globalThis.getSelection()
+  if (selection === null || selection.rangeCount === 0) return 0
+  const range = selection.getRangeAt(0)
+  if (!element.contains(range.startContainer)) return 0
+  if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
+    const children = range.startContainer.childNodes
+    let offset = 0
+    for (let index = 0; index < range.startOffset; index += 1) {
+      offset += children[index]?.textContent?.length ?? 0
+    }
+    const prefix = range.startContainer === element ? 0 : getCaretPrefix(element, range.startContainer)
+    return prefix + offset
+  }
+  const before = range.cloneRange()
+  before.selectNodeContents(element)
+  before.setEnd(range.startContainer, range.startOffset)
+  return before.toString().length
+}
+
+function getSelectionRange(element: HTMLElement): { start: number; end: number } {
+  if (element instanceof HTMLTextAreaElement) {
+    return { start: element.selectionStart ?? 0, end: element.selectionEnd ?? 0 }
+  }
+  const selection = globalThis.getSelection()
+  if (selection === null || selection.rangeCount === 0) {
+    const cursor = getCaret(element)
+    return { start: cursor, end: cursor }
+  }
+  const range = selection.getRangeAt(0)
+  const start = getCaret(element)
+  if (range.collapsed) return { start, end: start }
+  const endRange = range.cloneRange()
+  endRange.collapse(false)
+  selection.removeAllRanges()
+  selection.addRange(endRange)
+  const end = getCaret(element)
+  selection.removeAllRanges()
+  selection.addRange(range)
+  return { start: Math.min(start, end), end: Math.max(start, end) }
+}
+
+function selectAll(element: HTMLElement): void {
+  const selection = globalThis.getSelection()
+  if (selection === null) return
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+function getCaretPrefix(element: HTMLElement, container: Node): number {
+  let offset = 0
+  let current: Node | null = container
+  while (current !== null && current.parentNode !== null && current.parentNode !== element) {
+    let sibling = current.previousSibling
+    while (sibling !== null) {
+      offset += sibling.textContent?.length ?? 0
+      sibling = sibling.previousSibling
+    }
+    current = current.parentNode
+  }
+  if (current !== null && current.parentNode === element) {
+    let sibling = current.previousSibling
+    while (sibling !== null) {
+      offset += sibling.textContent?.length ?? 0
+      sibling = sibling.previousSibling
+    }
+  }
+  return element === container ? 0 : offset
+}
+
+function setCaret(element: HTMLElement, position: number): void {
+  const selection = globalThis.getSelection()
+  if (selection === null) return
+  const range = document.createRange()
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let remaining = position
+  let current: Node | null = walker.nextNode()
+  while (current !== null) {
+    const length = current.textContent?.length ?? 0
+    const link = current.parentElement?.closest('a[contenteditable="false"]')
+    if (link !== null && link !== undefined && remaining === 0) {
+      range.setStartBefore(link)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return
+    }
+    if (link !== null && link !== undefined && remaining === length) {
+      range.setStartAfter(link)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return
+    }
+    if (remaining < length) {
+      range.setStart(current, remaining)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return
+    }
+    remaining -= length
+    current = walker.nextNode()
+  }
+  range.selectNodeContents(element)
+  range.collapse(false)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+function isCollapsedSelection(): boolean {
+  const selection = globalThis.getSelection()
+  return selection === null || selection.isCollapsed
 }

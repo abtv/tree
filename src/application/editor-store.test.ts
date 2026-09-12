@@ -423,6 +423,77 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'abcXYZdef' }] } })
   })
 
+  it('stores a valid pasted URL as a link and leaves an invalid URL as text', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.paste('root', 0)
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ links: [{ url: 'https://example.com' }] }] } })
+
+    services.readClipboard = async () => ({ kind: 'text', text: 'example.com' })
+    await store.paste('root', 19)
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('https://example.comexample.com')
+  })
+
+  it('removes a complete pasted link with Backspace at its end', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.paste('root', 0)
+    expect(store.deleteLink('root', 19)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+  })
+
+  it('places the caret where a removed link was when text follows it', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Ahttps://example.comB',
+            links: [{ start: 1, end: 20, url: 'https://example.com' }],
+            children: [],
+          },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    expect(store.deleteLink('root', 20)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ text: 'AB' }] },
+      focus: { nodeId: 'root', cursor: 1 },
+    })
+  })
+
+  it('undoes and redoes link removal', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.paste('root', 0)
+    store.deleteLink('root', 19)
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ links: [{ url: 'https://example.com' }] }] } })
+    store.redo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+  })
+
   it('pastes multiline text as separate nodes', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'abcdef', children: [] }] },

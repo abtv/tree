@@ -120,11 +120,14 @@ A node contains:
 Node
 ├── id
 ├── text
+├── links?
 ├── attachment?
 └── children
 ```
 
 The parent relationship is derived from the tree structure.
+
+`links` is a list of non-overlapping ranges into `text`. Each range stores its HTTP(S) URL, which must equal the text covered by the range. Version-one persisted documents without links are migrated in memory and are saved using the version-two format.
 
 Do not store redundant `parentId` fields unless there is a demonstrated technical need and the data model is explicitly changed.
 
@@ -178,6 +181,8 @@ It is responsible for use cases such as:
 The application layer may depend on the domain.
 
 The application layer may use infrastructure interfaces.
+
+External hyperlink opening is handled by the Electron shell. The renderer renders link anchors, while the main process validates HTTP(S) URLs and delegates approved URLs to the operating system's default hyperlink application.
 
 The application layer must not contain React components or JSX.
 

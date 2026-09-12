@@ -5,6 +5,7 @@ export function createElectronEditorServices(): EditorServices {
     load: () => window.treeApi.load(),
     save: (state) => window.treeApi.save(state),
     readClipboard: () => window.treeApi.readClipboard(),
+    writeClipboard: (payload) => window.treeApi.writeClipboard?.(payload) ?? Promise.resolve(),
     writeAttachment: (id, png) => window.treeApi.writeAttachment(id, png),
     hasAttachment: (id) => window.treeApi.hasAttachment(id),
     cleanupAttachments: (referencedIds) => window.treeApi.cleanupAttachments(referencedIds),

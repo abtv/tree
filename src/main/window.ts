@@ -1,4 +1,5 @@
 export interface WindowSurface {
+  isDestroyed(): boolean
   isFocused(): boolean
   isMinimized(): boolean
   restore(): void
@@ -6,8 +7,17 @@ export interface WindowSurface {
   focus(): void
 }
 
+export function isAllowedExternalUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.length > 0
+  } catch {
+    return false
+  }
+}
+
 export function surfaceWindow(window: WindowSurface | null): void {
-  if (window === null || window.isFocused()) {
+  if (window === null || window.isDestroyed() || window.isFocused()) {
     return
   }
   if (window.isMinimized()) {

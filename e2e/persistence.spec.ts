@@ -1,5 +1,6 @@
 import {
   attachmentFiles,
+  closeApp,
   expect,
   firePaste,
   launchTree,
@@ -9,6 +10,7 @@ import {
   test,
   typeInto,
   writeClipboardImage,
+  writeClipboardText,
 } from './fixtures'
 
 test.describe('persistence', () => {
@@ -26,7 +28,7 @@ test.describe('persistence', () => {
     const childId = persisted.document.roots[0]!.children[0]!.id
     expect(persisted.location).toEqual({ currentParentId: parentId, selectedNodeId: childId })
 
-    await first.app.close()
+    await closeApp(first.app)
     const second = await launchTree(userDataDir)
 
     await expect(parent(second.window)).toHaveValue('Projects')
@@ -43,11 +45,24 @@ test.describe('persistence', () => {
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
-    await first.app.close()
+    await closeApp(first.app)
     const second = await launchTree(userDataDir)
 
     await expect(second.window.getByAltText('Attached image')).toBeVisible()
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
+  })
+
+  test('restores a pasted hyperlink after restart', async ({ userDataDir }) => {
+    const first = await launchTree(userDataDir)
+
+    await writeClipboardText(first.app, 'https://example.com')
+    await firePaste(node(first.window, 1))
+    await expect(first.window.getByRole('link', { name: 'https://example.com' })).toBeVisible()
+
+    await closeApp(first.app)
+    const second = await launchTree(userDataDir)
+
+    await expect(second.window.getByRole('link', { name: 'https://example.com' })).toBeVisible()
   })
 
   test('removes an attachment file after its node is deleted and the app restarts', async ({ userDataDir }) => {
@@ -62,7 +77,7 @@ test.describe('persistence', () => {
     await first.window.keyboard.press('Meta+Backspace')
     await expect(first.window.getByAltText('Attached image')).toHaveCount(0)
 
-    await first.app.close()
+    await closeApp(first.app)
     const second = await launchTree(userDataDir)
 
     await expect(second.window.locator('[aria-label^="Node "]')).toHaveCount(1)

@@ -228,14 +228,38 @@ textarea {
   padding: 3px 6px;
   color: inherit;
   background: transparent;
+  cursor: text;
   caret-color: #373f43;
   outline: none;
   resize: none;
   overflow: hidden;
   field-sizing: content;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
   font-size: 16px;
   line-height: 21px;
+}
+
+.node-input a {
+  color: #1769aa;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.node-input.select-all a {
+  color: HighlightText;
+  background: Highlight;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #e5e7e9;
+    background: #202326;
+  }
+
+  .node-input a {
+    color: #73b7ff;
+  }
 }
 
 .node-input:focus {

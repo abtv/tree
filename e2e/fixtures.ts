@@ -35,10 +35,15 @@ export const test = base.extend<{ userDataDir: string }>({
 })
 
 test.afterEach(async () => {
-  await Promise.all(launchedApps.splice(0).map((app) => app.close().catch(() => undefined)))
+  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
 })
 
 export { expect }
+
+export async function closeApp(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
+  await app.close().catch(() => undefined)
+}
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
   const app = await electron.launch({

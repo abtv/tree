@@ -161,6 +161,19 @@ describe('document invariants', () => {
     )
   })
 
+  it('keeps a pasted HTTP link range aligned with its URL text', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -10, max: 10 }), (cursor) => {
+        const document = { roots: [{ id: 'root', text: 'prefix', children: [] }] }
+        const result = pasteText(document, 'root', cursor, 'https://example.com')
+        const node = result.roots[0]!
+        const link = node.links?.[0]
+        expect(link).toBeDefined()
+        expect(node.text.slice(link!.start, link!.end)).toBe(link!.url)
+      }),
+    )
+  })
+
   it('pasteMultilineText inserts the lines and moves the image to the final node', () => {
     fc.assert(
       fc.property(

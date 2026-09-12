@@ -6,6 +6,7 @@ import {
   collectAttachmentIds,
   createInitialDocument,
   createFirstChild,
+  deleteLink,
   deleteNode,
   isValidLocation,
   locateNode,
@@ -16,6 +17,7 @@ import {
   pasteText,
   serializeState,
   splitNode,
+  isHttpUrl,
   type TreeNode,
 } from './document'
 
@@ -118,5 +120,50 @@ describe('document operations', () => {
 
     expect(splitNode(document, 'a', 1, 'b').roots.map((node) => node.text)).toEqual(['', '😀b'])
     expect(pasteText(document, 'a', 1, 'X').roots[0]!.text).toBe('X😀b')
+  })
+
+  it('recognizes only valid HTTP and HTTPS URLs', () => {
+    expect(isHttpUrl('https://example.com')).toBe(true)
+    expect(isHttpUrl('http://localhost:8080/path')).toBe(true)
+    expect(isHttpUrl('example.com')).toBe(false)
+    expect(isHttpUrl('javascript:alert(1)')).toBe(false)
+  })
+
+  it('creates a link when a valid URL is pasted and leaves invalid text unlinked', () => {
+    const document = createInitialDocument('a')
+    const linked = pasteText(document, 'a', 0, 'https://example.com')
+    expect(linked.roots[0]!.links).toEqual([{ start: 0, end: 19, url: 'https://example.com' }])
+
+    const plain = pasteText(document, 'a', 0, 'example.com')
+    expect(plain.roots[0]!.links).toBeUndefined()
+  })
+
+  it('preserves link ranges supplied by rich clipboard paste', () => {
+    const document = createInitialDocument('a')
+    const result = pasteText(document, 'a', 0, 'See https://example.com', [
+      { start: 4, end: 23, url: 'https://example.com' },
+    ])
+    expect(result.roots[0]!.links).toEqual([{ start: 4, end: 23, url: 'https://example.com' }])
+
+    const partial = pasteText(document, 'a', 0, 'example.com', [{ start: 0, end: 11, url: 'https://example.com' }])
+    expect(partial.roots[0]!.links).toBeUndefined()
+  })
+
+  it('removes the complete link when Backspace is at its end', () => {
+    const document = pasteText(createInitialDocument('a'), 'a', 0, 'https://example.com')
+    const result = deleteLink(document, 'a', 19)
+    expect(result?.roots[0]).toMatchObject({ text: '' })
+    expect(result?.roots[0]!.links).toBeUndefined()
+  })
+
+  it('migrates version one documents and persists links as version two', () => {
+    const parsed = parsePersistedState({
+      version: 1,
+      document: { roots: [{ id: 'a', text: 'https://example.com', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    expect(parsed.version).toBe(2)
+    const document = pasteText(parsed.document, 'a', 0, 'https://example.com')
+    expect(serializeState(document, parsed.location).version).toBe(2)
   })
 })

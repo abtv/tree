@@ -177,6 +177,45 @@ describe('App', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('renders a pasted HTTP URL as a clickable styled link', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+
+    const link = screen.getByRole('link', { name: 'https://example.com' })
+    expect(link).toHaveAttribute('href', 'https://example.com')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveStyle({ textDecoration: 'underline' })
+  })
+
+  it('preserves the caret after typing in a linked node', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+
+    const editor = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLDivElement
+    const addedText = document.createTextNode('x')
+    editor.append(addedText)
+    const selection = window.getSelection()!
+    const range = document.createRange()
+    range.setStart(addedText, 1)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    fireEvent.input(editor)
+
+    await act(async () => undefined)
+    const caret = window.getSelection()!.getRangeAt(0)
+    expect(caret.startContainer.textContent).toBe('https://example.comx')
+    expect(caret.startOffset).toBeGreaterThan(0)
+  })
+
   it('renders and edits the current parent after entering an empty node', async () => {
     const store = createStore()
     await act(async () => {

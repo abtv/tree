@@ -508,6 +508,10 @@ The application must support:
 * multiline text;
 * images.
 
+When a valid HTTP or HTTPS URL is pasted, the URL is stored as a clickable hyperlink. The displayed link text is the URL itself. Clicking the link opens it in the system's default hyperlink application. Links are underlined and use a distinct color that adapts to the light or dark appearance.
+
+Only `http` and `https` URLs are hyperlinks. Invalid URLs and other schemes are pasted as ordinary text.
+
 ---
 
 ## 13. Plain Text Paste
@@ -515,6 +519,18 @@ The application must support:
 Plain text is inserted at the current cursor position.
 
 It does not replace the entire node.
+
+Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range. Existing links cannot be edited. Pressing `Backspace` immediately after a link removes the complete link rather than one character at a time.
+
+### 13.1 Selecting, copying, cutting, and pasting linked text
+
+`Cmd+A` visibly selects all text in the currently focused node, including its hyperlinks.
+
+`Cmd+C` copies the selected text. When the selection contains hyperlinks, the clipboard content preserves both the text and the clickable hyperlink ranges.
+
+`Cmd+X` cuts the selected text. When the selection contains hyperlinks, the cut clipboard content preserves both the text and the clickable hyperlink ranges.
+
+Pasting that content into another node inserts the text and preserves its clickable hyperlinks. If only part of a hyperlink is selected, only the selected portion is pasted as a hyperlink when the selected text remains the complete URL; otherwise it is pasted as ordinary text.
 
 Example:
 

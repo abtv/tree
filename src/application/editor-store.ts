@@ -5,8 +5,9 @@ import {
   createFirstChild,
   createInitialDocument,
   deleteNode,
+  deleteLink,
   displayedNodes,
-  editNodeText,
+  editNodeContent,
   ensureRoot,
   insertSiblingAfter,
   isValidLocation,
@@ -16,6 +17,7 @@ import {
   parsePersistedState,
   pasteMultilineText,
   pasteText,
+  removeTextRange,
   requireNode,
   serializeState,
   splitNode,
@@ -23,9 +25,11 @@ import {
   type AttachmentReference,
   type Document,
   type Location,
+  type LinkRange,
   type NodeId,
 } from '../domain/document'
 import type { ClipboardPayload } from '../shared/ipc'
+import type { ClipboardWritePayload } from '../shared/ipc'
 
 export type ClipboardValue = ClipboardPayload
 
@@ -33,6 +37,7 @@ export interface EditorServices {
   load(): Promise<unknown | null>
   save(state: ReturnType<typeof serializeState>): Promise<void>
   readClipboard(): Promise<ClipboardValue>
+  writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
   writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
   hasAttachment(id: AttachmentId): Promise<boolean>
   cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
@@ -74,6 +79,7 @@ export class EditorStore {
   private activeTextNodeId: NodeId | undefined
   private textTimer: unknown
   private standaloneNextTextEdit = false
+  private pendingClipboardOperation: Promise<void> | undefined
   private focusToken = 0
   private saveQueue: Promise<void> = Promise.resolve()
 
@@ -139,6 +145,10 @@ export class EditorStore {
   }
 
   public editText(nodeId: NodeId, text: string): void {
+    this.editContent(nodeId, text, [])
+  }
+
+  public editContent(nodeId: NodeId, text: string, links: LinkRange[]): void {
     const state = this.ready()
     const node = requireNode(state.document, nodeId).node
     if (node.text === text) {
@@ -149,12 +159,71 @@ export class EditorStore {
       this.beginHistoryEntry(state.document)
       this.activeTextNodeId = nodeId
     }
-    const next = editNodeText(state.document, nodeId, text)
+    const next = editNodeContent(state.document, nodeId, text, links)
     this.replaceReady({ ...state, document: next }, true)
     this.scheduleTextBoundary()
     if (this.standaloneNextTextEdit) {
       this.standaloneNextTextEdit = false
       this.endTextSession()
+    }
+  }
+
+  public deleteLink(nodeId: NodeId, cursor: number): boolean {
+    const state = this.ready()
+    const linkStart = requireNode(state.document, nodeId).node.links?.find((link) => link.end === cursor)?.start
+    if (linkStart === undefined) return false
+    const next = deleteLink(state.document, nodeId, cursor)
+    if (next === undefined) return false
+    this.endTextSession()
+    this.applyStructural(next, state.location, this.newFocus(nodeId, linkStart))
+    return true
+  }
+
+  public async copy(nodeId: NodeId, start: number, end: number): Promise<boolean> {
+    const state = this.ready()
+    const node = requireNode(state.document, nodeId).node
+    const from = Math.max(0, Math.min(start, end))
+    const to = Math.min(node.text.length, Math.max(start, end))
+    if (from === to || this.services.writeClipboard === undefined) return false
+    const text = node.text.slice(from, to)
+    const links = (node.links ?? [])
+      .filter((link) => link.start >= from && link.end <= to)
+      .map((link) => ({ ...link, start: link.start - from, end: link.end - from }))
+    const operation = this.services.writeClipboard({ text, html: clipboardHtml(text, links) })
+    this.pendingClipboardOperation = operation
+    try {
+      await operation
+      return true
+    } finally {
+      if (this.pendingClipboardOperation === operation) this.pendingClipboardOperation = undefined
+    }
+  }
+
+  public async cut(nodeId: NodeId, start: number, end: number): Promise<boolean> {
+    const state = this.ready()
+    const node = requireNode(state.document, nodeId).node
+    const from = Math.max(0, Math.min(start, end))
+    const to = Math.min(node.text.length, Math.max(start, end))
+    if (from === to || this.services.writeClipboard === undefined) return false
+    const text = node.text.slice(from, to)
+    const links = (node.links ?? [])
+      .filter((link) => link.start >= from && link.end <= to)
+      .map((link) => ({ ...link, start: link.start - from, end: link.end - from }))
+    const operation = (async (): Promise<void> => {
+      await this.services.writeClipboard!({ text, html: clipboardHtml(text, links) })
+      if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) return
+      this.applyStructural(
+        removeTextRange(this.snapshot.document, nodeId, from, to),
+        this.snapshot.location,
+        this.newFocus(nodeId, from),
+      )
+    })()
+    this.pendingClipboardOperation = operation
+    try {
+      await operation
+      return true
+    } finally {
+      if (this.pendingClipboardOperation === operation) this.pendingClipboardOperation = undefined
     }
   }
 
@@ -368,6 +437,7 @@ export class EditorStore {
   public async paste(nodeId: NodeId, cursor: number): Promise<void> {
     this.ready()
     this.endTextSession()
+    await this.pendingClipboardOperation
     const clipboard = await this.services.readClipboard()
     if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) {
       return
@@ -406,7 +476,7 @@ export class EditorStore {
 
     if (!clipboard.text.includes('\n') && !clipboard.text.includes('\r')) {
       this.applyStructural(
-        pasteText(current.document, nodeId, cursor, clipboard.text),
+        pasteText(current.document, nodeId, cursor, clipboard.text, clipboard.links),
         current.location,
         this.newFocus(nodeId, cursor + clipboard.text.length),
       )
@@ -417,7 +487,7 @@ export class EditorStore {
     const finalNodeId = ids.at(-1)
     const finalLine = lines.at(-1) ?? ''
     this.applyStructural(
-      pasteMultilineText(current.document, nodeId, cursor, lines, ids),
+      pasteMultilineText(current.document, nodeId, cursor, lines, ids, clipboard.links),
       this.locationForSiblingOf(current.document, nodeId, finalNodeId ?? nodeId, current.location),
       this.newFocus(finalNodeId ?? nodeId, finalLine.length),
     )
@@ -562,4 +632,21 @@ export class EditorStore {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'The editor could not complete the requested operation.'
+}
+
+function clipboardHtml(text: string, links: Array<{ start: number; end: number; url: string }>): string {
+  const parts: string[] = []
+  let position = 0
+  for (const link of links) {
+    parts.push(escapeClipboardHtml(text.slice(position, link.start)))
+    const label = escapeClipboardHtml(text.slice(link.start, link.end))
+    parts.push(`<a href="${escapeClipboardHtml(link.url)}">${label}</a>`)
+    position = link.end
+  }
+  parts.push(escapeClipboardHtml(text.slice(position)))
+  return parts.join('').replaceAll('\n', '<br>')
+}
+
+function escapeClipboardHtml(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 }
