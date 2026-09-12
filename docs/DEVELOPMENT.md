@@ -141,6 +141,19 @@ This command builds the application and runs Playwright against the production b
 
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**`, and Playwright only reads `e2e/`.
 
+### Defect regression workflow
+
+When fixing a reported defect:
+
+1. Reproduce the failure before changing the implementation.
+2. Add a regression test that fails for the reported behavior.
+3. Implement the fix and verify that the regression test passes.
+4. Run the relevant broader test suites.
+
+For changes crossing process, IPC, filesystem, persistence, clipboard, attachment, shortcut, or platform boundaries, add both a focused contract test and an end-to-end test. Type checking alone does not verify runtime argument forwarding or error propagation.
+
+Shutdown and quit changes should cover successful quit with and without pending changes, save failure, timeout, retry after failure, duplicate requests, application-menu quit, window close, and renderer unavailability. Use unit tests for deterministic state-machine branches and E2E tests for the real Electron wiring.
+
 ---
 
 ## 9. Full Validation
@@ -172,6 +185,8 @@ This runs `npm run check`, the end-to-end suite, and the performance suite. Run 
 
 A task is not considered complete until the appropriate validation command passes successfully.
 
+An E2E suite that cannot launch Electron or execute the relevant boundary is not a passing validation result. Report the exact environment failure and rerun the suite on supported macOS hardware with an available display before claiming full validation.
+
 Security-sensitive changes must also verify the Electron boundary tests, including IPC validation, renderer navigation restrictions, attachment validation, and the production content security policy. Run `npm audit` when the network is available; a registry connectivity failure must be reported rather than treated as a clean audit result.
 
 Shutdown and attachment changes should also verify that queued renderer saves are flushed before quit and that non-PNG or malformed image bytes are rejected at the main-process boundary.
@@ -185,13 +200,14 @@ For a small, well-defined task:
 1. Read `AGENTS.md`.
 2. Read the relevant sections of `docs/PRODUCT.md`.
 3. Read the relevant sections of `docs/ARCHITECTURE.md`.
-4. Inspect the existing implementation.
-5. Implement the change.
-6. Add or update tests.
-7. Update documentation if necessary.
-8. Run `npm run check:full`.
-9. Review the git diff.
-10. Commit the completed logical change.
+4. Reproduce the existing behavior or reported defect.
+5. Inspect the existing implementation.
+6. Implement the change.
+7. Add or update tests, including boundary tests where applicable.
+8. Update documentation if necessary.
+9. Run `npm run check:full`.
+10. Review the git diff and confirm no required test was blocked or skipped.
+11. Commit the completed logical change.
 
 For a larger or potentially architectural task:
 
@@ -205,6 +221,8 @@ For a larger or potentially architectural task:
 8. Run `npm run check:full`.
 9. Move the completed plan to `docs/plans/completed/`.
 10. Commit the completed change.
+
+When a task ends at a commit or session boundary, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt for resuming the work. An incomplete validation result must never be presented without a follow-up action.
 
 ---
 

@@ -48,6 +48,7 @@ The Product Owner may communicate with the agent in any language.
 * Do not introduce unnecessary abstractions or complexity.
 * Prefer simple, maintainable solutions.
 * Preserve existing behavior unless the task explicitly changes it.
+* Do not chain shell commands with `&&`, `||`, or `;`. Run commands in separate tool calls so approvals remain predictable and the Product Owner is not prompted repeatedly for a chained command.
 * Do not silently change product behavior.
 * Keep application shortcuts scoped to the application. Use Electron's `globalShortcut` only when the product requirement explicitly says the shortcut must work while the application is inactive; ordinary application commands, including quit, must use an application-scoped menu or window input handler.
 * Do not silently change the data model, persistence model, technology stack, or major architectural boundaries.
@@ -184,6 +185,31 @@ Property-based tests using `fast-check` guard domain invariants. When a change a
 
 Do not remove or weaken tests merely to make an implementation pass.
 
+### Defect-first workflow
+
+When fixing a reported defect:
+
+1. Reproduce the defect before changing the implementation.
+2. Add a regression test that fails because of the defect.
+3. Implement the fix.
+4. Confirm that the regression test passes.
+5. When practical, verify that the test fails again when the fix is reverted or bypassed.
+6. Run the relevant broader test suites.
+
+Do not consider a defect fixed based only on code inspection, type checking, or a newly added test that does not reproduce the reported failure.
+
+### Boundary testing
+
+Any change crossing a process, IPC, filesystem, persistence, clipboard, attachment, native shortcut, or platform boundary must include:
+
+* a focused unit test for the underlying rule;
+* a contract test for channel names, arguments, return values, and error propagation;
+* an end-to-end test exercising the real boundary.
+
+TypeScript types do not prove that runtime values are forwarded correctly across a boundary. Do not substitute broad UI coverage for a focused contract test when a boundary is changed.
+
+Shutdown, startup, persistence, or quit changes must cover the success path and relevant failure paths, including pending-save flushing, save failure, timeout, retry, duplicate requests, application-menu quit, window close, and renderer unavailability.
+
 ---
 
 ## 10. Validation
@@ -195,6 +221,8 @@ Do not remove or weaken tests merely to make an implementation pass.
 If validation fails, fix the problem before considering the task complete.
 
 If a failure is unrelated to the current task, report it explicitly rather than hiding or ignoring it.
+
+A test suite that cannot launch the application or execute the relevant boundary is not considered passed. If validation is blocked by the environment, report the exact blocked suite, identify the supported environment required to run it, and do not claim full validation.
 
 ---
 
@@ -242,6 +270,17 @@ A session should cover a single logical task.
 
 After a commit completes a logical task, stop working and tell the Product Owner to start a new session before beginning the next task. Do not continue with a new, unrelated task in the same session.
 
+Before stopping after a commit, provide an explicit handoff that states:
+
+* what was completed;
+* which validation passed;
+* which validation failed or was blocked;
+* whether unresolved failures remain;
+* the exact next task to start;
+* a suggested prompt the Product Owner can use to resume the work.
+
+Never leave unresolved validation failures without identifying the next action needed to investigate them.
+
 The only exception is a direct follow-up fix to the most recently committed change, which stays in the current session as described above.
 
 Context grows with every message and tool call, increasing cost and latency. A new session per task keeps the context small and focused.
@@ -257,6 +296,7 @@ A task is complete only when:
 * relevant tests are added or updated;
 * documentation is updated when necessary;
 * `npm run check:full` passes;
+* no required end-to-end test is skipped because of the environment;
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 
