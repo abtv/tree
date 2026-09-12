@@ -650,15 +650,10 @@ function setCaret(element: HTMLElement, position: number): void {
   while (current !== null) {
     const length = current.textContent?.length ?? 0
     const link = current.parentElement?.closest('a[contenteditable="false"]')
-    if (link !== null && link !== undefined && remaining === 0) {
-      range.setStartBefore(link)
-      range.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(range)
-      return
-    }
-    if (link !== null && link !== undefined && remaining === length) {
-      range.setStartAfter(link)
+    if (link !== null && link !== undefined && remaining <= length) {
+      const parent = link.parentNode ?? element
+      const linkIndex = Array.from(parent.childNodes).indexOf(link)
+      range.setStart(parent, remaining === length || remaining > length / 2 ? linkIndex + 1 : linkIndex)
       range.collapse(true)
       selection.removeAllRanges()
       selection.addRange(range)

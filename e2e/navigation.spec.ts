@@ -1,4 +1,4 @@
-import { expect, launchTree, node, parent, test, typeInto } from './fixtures'
+import { expect, firePaste, launchTree, node, parent, test, typeInto, writeClipboardText } from './fixtures'
 
 test.describe('navigation', () => {
   test('arrow keys move selection between siblings', async ({ userDataDir }) => {
@@ -32,6 +32,34 @@ test.describe('navigation', () => {
     await window.keyboard.press('ArrowDown')
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
+  })
+
+  test('focuses a linked first child with a visible caret after moving down from the parent', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Another parent')
+    await window.keyboard.press('Meta+.')
+    await window.keyboard.press('Enter')
+    await writeClipboardText(app, 'https://example.com/long-link')
+    await firePaste(node(window, 1))
+
+    await window.keyboard.press('ArrowUp')
+    await window.keyboard.press('ArrowDown')
+
+    const child = node(window, 1)
+    await expect(child).toBeFocused()
+    expect(
+      await child.evaluate((element) => {
+        const selection = element.ownerDocument.defaultView?.getSelection()
+        return {
+          anchorNodeIsEditor: selection?.anchorNode === element,
+          anchorOffset: selection?.anchorOffset,
+          collapsed: selection?.isCollapsed,
+        }
+      }),
+    ).toEqual({ anchorNodeIsEditor: true, anchorOffset: 0, collapsed: true })
   })
 
   test('moves left and right across sibling and parent boundaries', async ({ userDataDir }) => {
