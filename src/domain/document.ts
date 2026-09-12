@@ -224,6 +224,13 @@ export function insertSiblingAfter(
   return next
 }
 
+export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeId: NodeId): Document {
+  const next = cloneDocument(document)
+  const located = requireNode(next, nodeId)
+  located.siblings.splice(located.index, 0, { id: newNodeId, text: '', children: [] })
+  return next
+}
+
 export function createFirstChild(document: Document, parentId: NodeId, childId: NodeId): Document {
   const next = cloneDocument(document)
   requireNode(next, parentId).node.children.unshift({ id: childId, text: '', children: [] })

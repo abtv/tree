@@ -10,6 +10,7 @@ import {
   editNodeContent,
   ensureRoot,
   insertSiblingAfter,
+  insertSiblingBefore,
   isValidLocation,
   locateNode,
   moveSibling,
@@ -337,7 +338,10 @@ export class EditorStore {
     }
 
     const id = this.createId()
-    const document = splitNode(state.document, state.location.selectedNodeId, cursor, id)
+    const document =
+      cursor === 0
+        ? insertSiblingBefore(state.document, state.location.selectedNodeId, id)
+        : splitNode(state.document, state.location.selectedNodeId, cursor, id)
     this.applyStructural(document, { ...state.location, selectedNodeId: id }, this.newFocus(id, 0))
   }
 

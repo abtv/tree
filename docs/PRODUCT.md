@@ -152,7 +152,7 @@ When focus is on a node in the currently displayed level, `Enter` always creates
 
 In that context, it never creates a child.
 
-The new node is inserted immediately after the current node.
+The new node is inserted immediately before the current node when the caret is at the beginning; otherwise it is inserted immediately after the current node.
 
 ### Cursor at the end
 
@@ -188,7 +188,7 @@ Result:
 Current
 ```
 
-The original text moves to the newly created sibling.
+The new sibling is empty, and the original node keeps its text, image, and children.
 
 ### Cursor in the middle
 
@@ -215,7 +215,7 @@ The cursor moves to the beginning of the new node.
 
 ### Image behavior during split
 
-If the current node has an image:
+If Enter splits the current node and it has an image:
 
 * the image remains attached to the original node;
 * the newly created sibling has no image.

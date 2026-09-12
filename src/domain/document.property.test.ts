@@ -7,6 +7,7 @@ import {
   collectAttachmentIds,
   deleteNode,
   isValidLocation,
+  insertSiblingBefore,
   locateNode,
   moveSibling,
   nodePath,
@@ -134,6 +135,25 @@ describe('document invariants', () => {
         expect(created.attachment).toBeUndefined()
         expect(located.node.attachment).toEqual(before.attachment)
         expect(located.node.children).toEqual(before.children)
+      }),
+    )
+  })
+
+  it('insertSiblingBefore preserves the selected node and places one empty sibling before it', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), (rawForest, seed) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const before = locateNode(document, node.id)!
+
+        const result = insertSiblingBefore(document, node.id, 'inserted')
+        const located = locateNode(result, node.id)!
+        const created = located.siblings[located.index - 1]
+
+        expect(created).toEqual({ id: 'inserted', text: '', children: [] })
+        expect(located.node).toEqual(before.node)
+        expect(allIds(result)).toContain('inserted')
+        expect(subtreeIds(located.node)).toEqual(subtreeIds(before.node))
       }),
     )
   })

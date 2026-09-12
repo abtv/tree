@@ -6,6 +6,7 @@ import {
   collectAttachmentIds,
   createInitialDocument,
   createFirstChild,
+  insertSiblingBefore,
   deleteLink,
   deleteNode,
   isValidLocation,
@@ -22,6 +23,18 @@ import {
 } from './document'
 
 describe('document operations', () => {
+  it('inserts an empty sibling before a node without changing its subtree', () => {
+    const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
+    document.roots[0]!.text = 'Current'
+
+    const result = insertSiblingBefore(document, 'a', 'before')
+
+    expect(result.roots.map((node) => [node.id, node.text, node.children.map((child) => child.id)])).toEqual([
+      ['before', '', []],
+      ['a', 'Current', ['child']],
+    ])
+  })
+
   it('keeps an image on the first part when splitting a node', () => {
     const document = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
     document.roots[0]!.text = 'Current'

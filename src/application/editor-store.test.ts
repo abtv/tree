@@ -45,6 +45,29 @@ describe('EditorStore', () => {
     }
   })
 
+  it('creates an empty sibling before a node when Enter is pressed at the beginning', async () => {
+    const services = loadedState(
+      {
+        roots: [{ id: 'root', text: 'Current', children: [{ id: 'child', text: 'Child', children: [] }] }],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('before'))
+    await store.initialize()
+
+    store.createSiblingOrFirstChild(0)
+
+    const state = store.getSnapshot()
+    expect(state.status).toBe('ready')
+    if (state.status === 'ready') {
+      expect(state.document.roots.map((node) => [node.id, node.text, node.children.map((child) => child.id)])).toEqual([
+        ['before', '', []],
+        ['root', 'Current', ['child']],
+      ])
+      expect(state.location.selectedNodeId).toBe('before')
+    }
+  })
+
   it('creates a first child from the focused current parent', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
     await store.initialize()
