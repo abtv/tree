@@ -546,6 +546,8 @@ Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range. Exis
 
 `Cmd+C` copies the selected text. When the selection contains hyperlinks, the clipboard content preserves both the text and the clickable hyperlink ranges.
 
+Copying does not clear or otherwise change the visible text selection.
+
 `Cmd+X` cuts the selected text. When the selection contains hyperlinks, the cut clipboard content preserves both the text and the clickable hyperlink ranges.
 
 Pasting that content into another node inserts the text and preserves its clickable hyperlinks. If only part of a hyperlink is selected, only the selected portion is pasted as a hyperlink when the selected text remains the complete URL; otherwise it is pasted as ordinary text.

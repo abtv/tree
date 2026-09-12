@@ -108,7 +108,8 @@ export function App({ store }: AppProps): React.JSX.Element {
     (event: KeyboardEvent<HTMLElement>): void => {
       if (composing.current) return
       const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
-      if (!selectingAll) {
+      const copying = event.metaKey && event.key.toLowerCase() === 'c'
+      if (!selectingAll && !copying) {
         setSelectAllNodeId(undefined)
         event.currentTarget.classList.remove('select-all')
       }

@@ -191,6 +191,26 @@ describe('App', () => {
     expect(link).toHaveStyle({ textDecoration: 'underline' })
   })
 
+  it('keeps linked text visibly selected after copying all text', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+
+    const editor = screen.getByRole('textbox', { name: 'Node 1' })
+    await act(async () => {
+      fireEvent.keyDown(editor, { key: 'a', metaKey: true })
+      await Promise.resolve()
+    })
+    expect(editor).toHaveClass('select-all')
+
+    fireEvent.keyDown(editor, { key: 'c', metaKey: true })
+
+    expect(editor).toHaveClass('select-all')
+  })
+
   it('preserves the caret after typing in a linked node', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
     await act(async () => {
