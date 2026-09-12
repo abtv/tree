@@ -19,3 +19,15 @@ test.describe('Cmd+0', () => {
     await expect(node(window, 2)).toBeFocused()
   })
 })
+
+test.describe('Cmd+Q', () => {
+  test('quits the application from an editable node', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
+    await node(window, 1).press('Meta+q')
+
+    await closed
+    expect(app.process().exitCode).toBe(0)
+  })
+})

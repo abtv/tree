@@ -7,6 +7,10 @@ export interface WindowSurface {
   focus(): void
 }
 
+export function isQuitShortcut(key: string, modifiers: readonly string[]): boolean {
+  return key.toLowerCase() === 'q' && (modifiers.includes('meta') || modifiers.includes('control'))
+}
+
 export function isAllowedExternalUrl(value: string): boolean {
   try {
     const url = new URL(value)

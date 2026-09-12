@@ -418,6 +418,10 @@ Behavior:
 * redo history;
 * navigation state.
 
+### 9.1 Cmd+Q
+
+`Cmd+Q` quits the application, including when focus is in an editable node.
+
 ---
 
 ## 10. Undo and Redo

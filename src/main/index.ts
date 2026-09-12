@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ClipboardItem, clipboard, globalShortcut, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ClipboardItem, clipboard, globalShortcut, ipcMain, Menu, shell } from 'electron'
 import { join } from 'node:path'
 import { readClipboard, writeClipboard } from '../infrastructure/main/clipboard'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
@@ -84,6 +84,14 @@ void app.whenReady().then(() => {
     fileServices.cleanupAttachments(referencedIds),
   )
   globalShortcut.register('CommandOrControl+0', () => surfaceWindow(mainWindow))
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'Tree',
+        submenu: [{ role: 'quit' }],
+      },
+    ]),
+  )
   createMainWindow()
 
   app.on('activate', () => {
