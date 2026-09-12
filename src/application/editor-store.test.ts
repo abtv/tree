@@ -758,6 +758,18 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: undefined })
   })
 
+  it('surfaces attachment cleanup failures and waits for cleanup during flush', async () => {
+    const services = createServices()
+    services.cleanupAttachments = async () => {
+      throw new Error('cleanup failed')
+    }
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+
+    await expect(store.flushPersistence()).rejects.toThrow('cleanup failed')
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'cleanup failed' })
+  })
+
   it('waits for queued persistence when flushing', async () => {
     let release: (() => void) | undefined
     const services = createServices()

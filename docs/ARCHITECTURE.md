@@ -342,6 +342,8 @@ Persistence must support future schema evolution.
 
 The application must flush queued saves before a normal quit completes. A persistence failure must not silently discard the in-memory document; it is surfaced to the user and a later successful save clears the error state.
 
+Document saves and attachment filesystem operations are serialized by the file-service operation queue. The application also queues attachment cleanup with persistence work, so cleanup cannot race a save or another cleanup, and cleanup failures follow the same visible error and shutdown-flush path as save failures. File-service operations emit structured operation names, phases, and filesystem paths for diagnosing boundary failures.
+
 Loading invalid or unsupported data must fail safely rather than silently corrupting the document.
 
 Absolute filesystem paths must not be stored in the document.
@@ -369,6 +371,8 @@ Attachment storage is responsible for:
 * reading attachment files;
 * deleting unused attachment files;
 * ensuring attachment references remain valid.
+
+Reads, writes, and cleanup operations are ordered through the same infrastructure queue. Cleanup is therefore idempotent with respect to overlapping application requests rather than relying on concurrent unlink calls to succeed.
 
 Moving a node must not require copying its attachment file.
 

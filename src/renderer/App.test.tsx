@@ -437,6 +437,18 @@ describe('App', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('boom')
   })
 
+  it('shows operation failures in the visible red error message', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+
+    store.reportError(new Error('attachment cleanup failed'))
+    render(<App store={store} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Operation failed: attachment cleanup failed')
+  })
+
   it('selects a node when its input receives focus', async () => {
     const store = createStore()
     await act(async () => {

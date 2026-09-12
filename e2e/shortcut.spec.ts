@@ -31,4 +31,16 @@ test.describe('Cmd+Q', () => {
 
     await closed
   })
+
+  test('quits after an edit has queued persistence', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
+    await typeInto(node(window, 1), 'pending persistence '.repeat(100))
+    await node(window, 1)
+      .press('Meta+q')
+      .catch(() => undefined)
+
+    await closed
+  })
 })

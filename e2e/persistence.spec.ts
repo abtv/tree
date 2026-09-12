@@ -30,7 +30,7 @@ test.describe('persistence', () => {
     await first.window.keyboard.press('Enter')
     await typeInto(node(first.window, 1), 'Work')
 
-    await expect.poll(() => readPersisted(userDataDir).location.currentParentId).not.toBeNull()
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.children[0]?.text).toBe('Work')
     const persisted = readPersisted(userDataDir)
     const parentId = persisted.document.roots[0]!.id
     const childId = persisted.document.roots[0]!.children[0]!.id

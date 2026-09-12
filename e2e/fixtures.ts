@@ -22,23 +22,30 @@ export interface Launched {
 }
 
 const launchedApps: ElectronApplication[] = []
-const observedSaveErrors = new Map<Page, { errors: string[]; timer: ReturnType<typeof setInterval> }>()
+const observedSaveErrors = new Map<
+  Page,
+  { app: ElectronApplication; errors: string[]; timer: ReturnType<typeof setInterval>; collect: () => Promise<void> }
+>()
+const retainedSaveErrors: string[] = []
 const closedApps = new WeakSet<ElectronApplication>()
 
 export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
     const directory = mkdtempSync(join(tmpdir(), 'tree-e2e-'))
     await use(directory)
+    await closeTrackedApps()
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   },
 })
 
 test.afterEach(async () => {
-  await closeTrackedApps()
   const observations = [...observedSaveErrors.values()]
+  await Promise.all(observations.map(({ collect }) => collect()))
+  await closeTrackedApps()
   observations.forEach(({ timer }) => clearInterval(timer))
   observedSaveErrors.clear()
-  const errors = observations.flatMap(({ errors: values }) => values)
+  const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
+  retainedSaveErrors.length = 0
   if (errors.length > 0) {
     throw new Error(`Renderer reported save errors:\n${errors.join('\n')}`)
   }
@@ -51,6 +58,7 @@ async function closeTrackedApps(): Promise<void> {
 }
 
 export async function closeApp(app: ElectronApplication): Promise<void> {
+  forgetObservations(app)
   const trackedIndex = launchedApps.indexOf(app)
   if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
 
@@ -61,28 +69,39 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
     await app.close().catch(() => undefined)
     return
   }
-  if (closedApps.has(app) || electronProcess.exitCode !== null || electronProcess.signalCode !== null) return
-  const exited = new Promise<void>((resolve) => app.once('close', resolve))
-  let timeout: ReturnType<typeof setTimeout> | undefined
+  if (closedApps.has(app) || electronProcess.exitCode !== null || electronProcess.signalCode !== null) {
+    await terminateProcess(electronProcess)
+    return
+  }
+  const closePromise = app.close().catch(() => undefined)
+  await Promise.race([closePromise, waitForProcessExit(electronProcess, 7_000)])
+  await terminateProcess(electronProcess)
+  await closePromise
+}
 
-  await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
-  try {
-    await Promise.race([
-      exited,
-      new Promise<void>((resolve) => {
-        timeout = setTimeout(resolve, 5_000)
-      }),
-    ])
-  } finally {
-    if (timeout !== undefined) clearTimeout(timeout)
-  }
+async function terminateProcess(electronProcess: ReturnType<ElectronApplication['process']>): Promise<void> {
+  await waitForProcessExit(electronProcess, 1_000)
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) electronProcess.kill('SIGTERM')
+  await waitForProcessExit(electronProcess, 1_000)
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) electronProcess.kill('SIGKILL')
+  await waitForProcessExit(electronProcess, 1_000)
   if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
-    electronProcess.kill('SIGTERM')
+    throw new Error('The Electron worker process did not exit during bounded teardown.')
   }
-  if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
-    electronProcess.kill('SIGKILL')
-  }
-  await app.close().catch(() => undefined)
+}
+
+async function waitForProcessExit(
+  electronProcess: ReturnType<ElectronApplication['process']>,
+  timeoutMilliseconds: number,
+): Promise<void> {
+  if (electronProcess.exitCode !== null || electronProcess.signalCode !== null) return
+  await new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, timeoutMilliseconds)
+    electronProcess.once('exit', () => {
+      clearTimeout(timeout)
+      resolve()
+    })
+  })
 }
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
@@ -92,10 +111,15 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
     cwd: process.cwd(),
   })
   launchedApps.push(app)
-  app.once('close', () => closedApps.add(app))
+  app.once('close', () => {
+    closedApps.add(app)
+    const trackedIndex = launchedApps.indexOf(app)
+    if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+    forgetObservations(app)
+  })
   try {
     const window = await app.firstWindow()
-    observeSaveErrors(window)
+    await observeSaveErrors(window)
     await expect(window.locator('main.tree-app')).toBeVisible()
     return { app, window }
   } catch (error) {
@@ -104,11 +128,25 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
   }
 }
 
-function observeSaveErrors(window: Page): void {
+async function observeSaveErrors(window: Page): Promise<void> {
   const errors: string[] = []
+  await window.evaluate(() => {
+    const browserWindow = globalThis as unknown as Window & {
+      __treeObservedSaveErrors?: string[]
+    }
+    const observed = (browserWindow.__treeObservedSaveErrors ??= [])
+    const scan = (): void => {
+      document.querySelectorAll('.save-error').forEach((element) => {
+        const message = element.textContent ?? ''
+        if (!observed.includes(message)) observed.push(message)
+      })
+    }
+    scan()
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, characterData: true })
+  })
   const timer = setInterval(() => {
     void window
-      .locator('.save-error[role="status"]')
+      .locator('.save-error')
       .allTextContents()
       .then((messages) => {
         messages.forEach((message) => {
@@ -117,7 +155,33 @@ function observeSaveErrors(window: Page): void {
       })
       .catch(() => undefined)
   }, 25)
-  observedSaveErrors.set(window, { errors, timer })
+  const collect = async (): Promise<void> => {
+    if (window.isClosed()) return
+    await window
+      .evaluate(() => {
+        const browserWindow = globalThis as unknown as Window & { __treeObservedSaveErrors?: string[] }
+        return browserWindow.__treeObservedSaveErrors ?? []
+      })
+      .then((messages) => messages.forEach((message) => !errors.includes(message) && errors.push(message)))
+      .catch(() => undefined)
+    await window
+      .locator('.save-error')
+      .allTextContents()
+      .then((messages) => messages.forEach((message) => !errors.includes(message) && errors.push(message)))
+      .catch(() => undefined)
+  }
+  const app = [...launchedApps].find((candidate) => candidate.windows().includes(window))
+  if (app === undefined) throw new Error('The Electron app was not registered before error observation.')
+  observedSaveErrors.set(window, { app, errors, timer, collect })
+}
+
+function forgetObservations(app: ElectronApplication): void {
+  for (const [page, observation] of observedSaveErrors) {
+    if (observation.app !== app) continue
+    clearInterval(observation.timer)
+    retainedSaveErrors.push(...observation.errors)
+    observedSaveErrors.delete(page)
+  }
 }
 
 export function node(window: Page, index: number) {

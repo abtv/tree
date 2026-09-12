@@ -14,29 +14,40 @@ export interface Seed {
 }
 
 const launchedApps: ElectronApplication[] = []
-const observedSaveErrors = new Map<Page, { errors: string[]; timer: ReturnType<typeof setInterval> }>()
+const observedSaveErrors = new Map<
+  Page,
+  { app: ElectronApplication; errors: string[]; timer: ReturnType<typeof setInterval>; collect: () => Promise<void> }
+>()
+const retainedSaveErrors: string[] = []
 const closedApps = new WeakSet<ElectronApplication>()
 
 export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
     const directory = mkdtempSync(join(tmpdir(), 'tree-perf-'))
     await use(directory)
+    await closeTrackedApps()
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   },
 })
 
 test.afterEach(async () => {
-  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   const observations = [...observedSaveErrors.values()]
+  await Promise.all(observations.map(({ collect }) => collect()))
+  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   observations.forEach(({ timer }) => clearInterval(timer))
   observedSaveErrors.clear()
-  const errors = observations.flatMap(({ errors: values }) => values)
+  const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
+  retainedSaveErrors.length = 0
   if (errors.length > 0) {
     throw new Error(`Renderer reported save errors:\n${errors.join('\n')}`)
   }
 })
 
 export { expect }
+
+async function closeTrackedApps(): Promise<void> {
+  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
+}
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
@@ -45,10 +56,15 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
     cwd: process.cwd(),
   })
   launchedApps.push(app)
-  app.once('close', () => closedApps.add(app))
+  app.once('close', () => {
+    closedApps.add(app)
+    const trackedIndex = launchedApps.indexOf(app)
+    if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+    forgetObservations(app)
+  })
   try {
     const window = await app.firstWindow()
-    observeSaveErrors(window)
+    await observeSaveErrors(app, window)
     await expect(window.locator('main.tree-app')).toBeVisible()
     await expect(window.getByRole('textbox').first()).toBeVisible()
     return { app, window }
@@ -58,11 +74,25 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
   }
 }
 
-function observeSaveErrors(window: Page): void {
+async function observeSaveErrors(app: ElectronApplication, window: Page): Promise<void> {
   const errors: string[] = []
+  await window.evaluate(() => {
+    const browserWindow = globalThis as unknown as Window & {
+      __treeObservedSaveErrors?: string[]
+    }
+    const observed = (browserWindow.__treeObservedSaveErrors ??= [])
+    const scan = (): void => {
+      document.querySelectorAll('.save-error').forEach((element) => {
+        const message = element.textContent ?? ''
+        if (!observed.includes(message)) observed.push(message)
+      })
+    }
+    scan()
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, characterData: true })
+  })
   const timer = setInterval(() => {
     void window
-      .locator('.save-error[role="status"]')
+      .locator('.save-error')
       .allTextContents()
       .then((messages) => {
         messages.forEach((message) => {
@@ -71,10 +101,26 @@ function observeSaveErrors(window: Page): void {
       })
       .catch(() => undefined)
   }, 25)
-  observedSaveErrors.set(window, { errors, timer })
+  const collect = async (): Promise<void> => {
+    if (window.isClosed()) return
+    await window
+      .evaluate(() => {
+        const browserWindow = globalThis as unknown as Window & { __treeObservedSaveErrors?: string[] }
+        return browserWindow.__treeObservedSaveErrors ?? []
+      })
+      .then((messages) => messages.forEach((message) => !errors.includes(message) && errors.push(message)))
+      .catch(() => undefined)
+    await window
+      .locator('.save-error')
+      .allTextContents()
+      .then((messages) => messages.forEach((message) => !errors.includes(message) && errors.push(message)))
+      .catch(() => undefined)
+  }
+  observedSaveErrors.set(window, { app, errors, timer, collect })
 }
 
 async function closeApp(app: ElectronApplication): Promise<void> {
+  forgetObservations(app)
   let electronProcess: ReturnType<ElectronApplication['process']>
   try {
     electronProcess = app.process()
@@ -82,28 +128,48 @@ async function closeApp(app: ElectronApplication): Promise<void> {
     await app.close().catch(() => undefined)
     return
   }
-  if (closedApps.has(app) || electronProcess.exitCode !== null || electronProcess.signalCode !== null) return
-  const exited = new Promise<void>((resolve) => app.once('close', resolve))
-  let timeout: ReturnType<typeof setTimeout> | undefined
+  if (closedApps.has(app) || electronProcess.exitCode !== null || electronProcess.signalCode !== null) {
+    await terminateProcess(electronProcess)
+    return
+  }
+  const closePromise = app.close().catch(() => undefined)
+  await Promise.race([closePromise, waitForProcessExit(electronProcess, 7_000)])
+  await terminateProcess(electronProcess)
+  await closePromise
+}
 
-  await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
-  try {
-    await Promise.race([
-      exited,
-      new Promise<void>((resolve) => {
-        timeout = setTimeout(resolve, 5_000)
-      }),
-    ])
-  } finally {
-    if (timeout !== undefined) clearTimeout(timeout)
+function forgetObservations(app: ElectronApplication): void {
+  for (const [page, observation] of observedSaveErrors) {
+    if (observation.app !== app) continue
+    clearInterval(observation.timer)
+    retainedSaveErrors.push(...observation.errors)
+    observedSaveErrors.delete(page)
   }
+}
+
+async function terminateProcess(electronProcess: ReturnType<ElectronApplication['process']>): Promise<void> {
+  await waitForProcessExit(electronProcess, 1_000)
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) electronProcess.kill('SIGTERM')
+  await waitForProcessExit(electronProcess, 1_000)
+  if (electronProcess.exitCode === null && electronProcess.signalCode === null) electronProcess.kill('SIGKILL')
+  await waitForProcessExit(electronProcess, 1_000)
   if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
-    electronProcess.kill('SIGTERM')
+    throw new Error('The Electron worker process did not exit during bounded teardown.')
   }
-  if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
-    electronProcess.kill('SIGKILL')
-  }
-  await app.close().catch(() => undefined)
+}
+
+async function waitForProcessExit(
+  electronProcess: ReturnType<ElectronApplication['process']>,
+  timeoutMilliseconds: number,
+): Promise<void> {
+  if (electronProcess.exitCode !== null || electronProcess.signalCode !== null) return
+  await new Promise<void>((resolve) => {
+    const timeout = setTimeout(resolve, timeoutMilliseconds)
+    electronProcess.once('exit', () => {
+      clearTimeout(timeout)
+      resolve()
+    })
+  })
 }
 
 export function seedDocument(userDataDir: string, seed: Seed): void {

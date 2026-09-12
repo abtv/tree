@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFileServices } from './file-services'
 
 const temporaryDirectories: string[] = []
@@ -95,6 +95,62 @@ describe('file services', () => {
 
     await expect(Promise.all(states.map((state) => services.save(state)))).resolves.toHaveLength(states.length)
     await expect(services.load()).resolves.toEqual(expect.objectContaining({ version: 1 }))
+  })
+
+  it('serializes attachment writes and cleanup so overlapping cleanup cannot report ENOENT', async () => {
+    const { services } = await servicesForTest()
+    await services.writeAttachment('remove', new Uint8Array([1]))
+
+    await expect(Promise.all([services.cleanupAttachments([]), services.cleanupAttachments([])])).resolves.toEqual([
+      undefined,
+      undefined,
+    ])
+  })
+
+  it('logs operation names, paths, and failures', async () => {
+    const events: Array<{ operation: string; paths: string[]; phase: string; error?: string }> = []
+    const directory = await mkdtemp(join(tmpdir(), 'tree-file-services-'))
+    temporaryDirectories.push(directory)
+    const services = createFileServices(directory, (event) => events.push(event))
+
+    await services.save({
+      version: 1,
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    await expect(services.readAttachment('missing')).resolves.toBeNull()
+    await expect(services.writeAttachment('bad/id', new Uint8Array())).rejects.toThrow('Attachment IDs')
+
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operation: 'save', phase: 'start', paths: expect.arrayContaining([directory]) }),
+        expect.objectContaining({ operation: 'save', phase: 'success' }),
+        expect.objectContaining({ operation: 'readAttachment', phase: 'success' }),
+        expect.objectContaining({ operation: 'writeAttachment', phase: 'failure', error: expect.any(String) }),
+      ]),
+    )
+  })
+
+  it('keeps successful persistence logs quiet unless debugging is enabled', async () => {
+    const { services } = await servicesForTest()
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const previousDebug = process.env['TREE_PERSISTENCE_DEBUG']
+    delete process.env['TREE_PERSISTENCE_DEBUG']
+
+    await services.save({
+      version: 1,
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    expect(info).not.toHaveBeenCalled()
+
+    process.env['TREE_PERSISTENCE_DEBUG'] = '1'
+    await services.cleanupAttachments([])
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('[persistence] cleanupAttachments start'))
+
+    if (previousDebug === undefined) delete process.env['TREE_PERSISTENCE_DEBUG']
+    else process.env['TREE_PERSISTENCE_DEBUG'] = previousDebug
+    info.mockRestore()
   })
 
   it('reports attachment presence and rejects unsafe attachment IDs', async () => {

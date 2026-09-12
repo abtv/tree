@@ -55,6 +55,14 @@ The application should provide a development command:
 npm run dev
 ```
 
+Successful persistence operations are quiet during normal development. To enable detailed persistence operation and path logging while investigating a failure, run:
+
+```text
+TREE_PERSISTENCE_DEBUG=1 npm run dev
+```
+
+Persistence failures remain logged regardless of this flag.
+
 This command should start the Electron application in development mode with the Vite development environment.
 
 To run an existing production build locally:
@@ -191,7 +199,11 @@ Security-sensitive changes must also verify the Electron boundary tests, includi
 
 Shutdown and attachment changes should also verify that queued renderer saves are flushed before quit and that non-PNG or malformed image bytes are rejected at the main-process boundary.
 
-The E2E and performance fixtures continuously observe the renderer's save-status message. Any occurrence of `Changes could not be saved:` fails the test, including transient messages that disappear before the test completes. New persistence or autosave work must retain this guard and include a regression scenario for rapid edits or overlapping saves.
+The E2E and performance fixtures continuously observe the renderer's persistence and operation error messages. Any visible `.save-error` occurrence fails the test, including transient `Changes could not be saved:` and `Operation failed:` messages that disappear before the test completes. New persistence or autosave work must retain this guard and include a regression scenario for rapid edits or overlapping saves.
+
+The fixtures register each launched Electron child process before waiting for readiness. Teardown requests the application shutdown handshake, waits on the child process exit event, then uses bounded SIGTERM/SIGKILL escalation and fails if the owned process remains alive. Save-status observation uses both a DOM mutation observer and a final collection, so transient document-save and attachment-cleanup errors are retained even if the status disappears before test teardown. Observations are released with their owning app, so restart tests never query stale Playwright pages during worker teardown.
+
+File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttachment`, `hasAttachment`, and `cleanupAttachments` operations, their phase, and the paths involved. Failures are logged with the original error message.
 
 ---
 

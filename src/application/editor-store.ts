@@ -84,6 +84,9 @@ export class EditorStore {
   private pendingClipboardOperation: Promise<void> | undefined
   private focusToken = 0
   private saveQueue: Promise<void> = Promise.resolve()
+  private persistenceWorkQueued = false
+  private persistenceRequested = false
+  private persistenceSaveRequested = false
   private persistenceError: unknown
 
   public constructor(
@@ -645,29 +648,46 @@ export class EditorStore {
     }
   }
 
-  private queuePersistence(): void {
+  private queuePersistence(save = true): void {
+    this.persistenceRequested = true
+    this.persistenceSaveRequested ||= save
+    if (this.persistenceWorkQueued) return
+
+    this.persistenceWorkQueued = true
     this.saveQueue = this.saveQueue
       .then(async () => {
-        const state = this.ready()
-        await this.services.save(serializeState(state.document, state.location))
-        await this.services.cleanupAttachments([...this.referencedAttachmentIds()])
-        this.persistenceError = undefined
-        if (this.snapshot.status === 'ready' && this.snapshot.saveError !== undefined) {
-          this.snapshot = { ...this.snapshot, saveError: undefined }
-          this.emit()
+        while (this.persistenceRequested) {
+          this.persistenceRequested = false
+          const saveRequested = this.persistenceSaveRequested
+          this.persistenceSaveRequested = false
+          try {
+            const state = this.ready()
+            if (saveRequested) {
+              await this.services.save(serializeState(state.document, state.location))
+            }
+            await this.services.cleanupAttachments([...this.referencedAttachmentIds()])
+            this.persistenceError = undefined
+            if (this.snapshot.status === 'ready' && this.snapshot.saveError !== undefined) {
+              this.snapshot = { ...this.snapshot, saveError: undefined }
+              this.emit()
+            }
+          } catch (error) {
+            this.persistenceError = error
+            if (this.snapshot.status === 'ready') {
+              this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
+              this.emit()
+            }
+          }
         }
       })
-      .catch((error) => {
-        this.persistenceError = error
-        if (this.snapshot.status === 'ready') {
-          this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
-          this.emit()
-        }
+      .finally(() => {
+        this.persistenceWorkQueued = false
+        if (this.persistenceRequested) this.queuePersistence()
       })
   }
 
   private queueAttachmentCleanup(): void {
-    void this.services.cleanupAttachments([...this.referencedAttachmentIds()]).catch(() => undefined)
+    this.queuePersistence(false)
   }
 
   private referencedAttachmentIds(): Set<AttachmentId> {
