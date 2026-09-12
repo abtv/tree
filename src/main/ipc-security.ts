@@ -44,7 +44,43 @@ export function validateAttachmentBytes(value: unknown): Uint8Array {
   if (bytes === undefined) throw new Error('Attachment data is invalid.')
   if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Attachment is too large.')
   if (bytes.byteLength === 0) throw new Error('Attachment data is empty.')
+  if (!isPng(bytes)) throw new Error('Attachment data is not a valid PNG image.')
   return bytes
+}
+
+export function isPng(bytes: Uint8Array): boolean {
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10]
+  if (bytes.length < signature.length || !signature.every((byte, index) => bytes[index] === byte)) return false
+
+  let offset = signature.length
+  let sawHeader = false
+  while (offset + 12 <= bytes.length) {
+    const length = readUint32(bytes, offset)
+    const typeStart = offset + 4
+    const dataStart = offset + 8
+    const dataEnd = dataStart + length
+    const chunkEnd = dataEnd + 4
+    if (dataEnd > bytes.length || chunkEnd > bytes.length) return false
+    const type = String.fromCharCode(...bytes.slice(typeStart, dataStart))
+    if (!sawHeader) {
+      if (
+        type !== 'IHDR' ||
+        length !== 13 ||
+        readUint32(bytes, dataStart) === 0 ||
+        readUint32(bytes, dataStart + 4) === 0
+      ) {
+        return false
+      }
+      sawHeader = true
+    }
+    offset = chunkEnd
+    if (type === 'IEND') return sawHeader && length === 0 && offset === bytes.length
+  }
+  return false
+}
+
+function readUint32(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! * 2 ** 24 + bytes[offset + 1]! * 2 ** 16 + bytes[offset + 2]! * 2 ** 8 + bytes[offset + 3]!
 }
 
 export function validateAttachmentIds(value: unknown): string[] {

@@ -28,6 +28,15 @@ describe('readClipboard', () => {
     ).resolves.toEqual({ kind: 'text', text: 'hello' })
   })
 
+  it('does not treat non-PNG image clipboard data as a PNG attachment', async () => {
+    await expect(
+      readClipboard({
+        read: async () => [{ types: ['image/jpeg'], getType: async () => new Blob([new Uint8Array([1])]) }],
+        readText: async () => 'fallback',
+      }),
+    ).resolves.toEqual({ kind: 'text', text: 'fallback' })
+  })
+
   it('returns empty text for an empty clipboard', async () => {
     await expect(
       readClipboard({

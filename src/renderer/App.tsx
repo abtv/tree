@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, SyntheticEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { nodePath, type LinkRange, type TreeNode } from '../domain/document'
-import { readAttachment } from '../infrastructure/renderer/electron-services'
+import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 
 interface AppProps {
   store: EditorStore
@@ -139,13 +139,13 @@ export function App({ store }: AppProps): React.JSX.Element {
         const selection = getSelectionRange(event.currentTarget)
         if (selection.start !== selection.end) {
           event.preventDefault()
-          void store.copy(node.id, selection.start, selection.end).catch(() => undefined)
+          void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
         }
       } else if (event.metaKey && event.key.toLowerCase() === 'x') {
         const selection = getSelectionRange(event.currentTarget)
         if (selection.start !== selection.end) {
           event.preventDefault()
-          void store.cut(node.id, selection.start, selection.end).catch(() => undefined)
+          void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
         }
       } else if (event.metaKey && event.key === '.') {
         event.preventDefault()
@@ -162,7 +162,10 @@ export function App({ store }: AppProps): React.JSX.Element {
         else store.undo()
       } else if (event.metaKey && event.key.toLowerCase() === 'q') {
         event.preventDefault()
-        void window.treeApi.quit()
+        void store
+          .flushPersistence()
+          .then(() => window.treeApi.quit())
+          .catch((error: unknown) => store.reportError(error))
       } else if (event.metaKey && event.key === '0') event.preventDefault()
       else if (event.metaKey && event.key === 'Enter') {
         event.preventDefault()
@@ -202,7 +205,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     (nodeId: string) =>
     (event: ClipboardEvent<HTMLElement>): void => {
       event.preventDefault()
-      void store.paste(nodeId, getCaret(event.currentTarget)).catch(() => undefined)
+      void store.paste(nodeId, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
     }
   const onDragOver = (event: DragEvent<HTMLElement>): void => {
     event.preventDefault()
@@ -388,6 +391,11 @@ export function App({ store }: AppProps): React.JSX.Element {
             Changes could not be saved: {state.saveError}
           </p>
         )}
+        {state.operationError === undefined ? null : (
+          <p className="save-error" role="alert">
+            Operation failed: {state.operationError}
+          </p>
+        )}
       </section>
       {previewAttachmentId === undefined ? null : (
         <ImagePreview attachmentId={previewAttachmentId} onClose={() => setPreviewAttachmentId(undefined)} />
@@ -428,103 +436,6 @@ function DropZone({
       }}
       onDrop={onDrop(index)}
     />
-  )
-}
-
-function AttachmentImage({
-  attachmentId,
-  onOpen,
-}: {
-  attachmentId: string
-  onOpen: (attachmentId: string) => void
-}): React.JSX.Element | null {
-  const [url, setUrl] = useState<string>()
-  useEffect(() => {
-    let disposed = false
-    let objectUrl: string | undefined
-    void readAttachment(attachmentId)
-      .then((bytes) => {
-        if (disposed || bytes === null) return
-        objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
-        setUrl(objectUrl)
-      })
-      .catch(() => undefined)
-    return () => {
-      disposed = true
-      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
-    }
-  }, [attachmentId])
-  if (url === undefined) return null
-  return (
-    <button
-      aria-label="Open image preview"
-      className="attachment-button"
-      onClick={() => onOpen(attachmentId)}
-      type="button"
-    >
-      <img className="attachment-image" src={url} alt="Attached image" />
-    </button>
-  )
-}
-
-function ImagePreview({ attachmentId, onClose }: { attachmentId: string; onClose: () => void }): React.JSX.Element {
-  const [url, setUrl] = useState<string>()
-  const closeButton = useRef<HTMLButtonElement>(null)
-  const previouslyFocused = useRef<Element | null>(null)
-  const onCloseRef = useRef(onClose)
-
-  useEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-
-  useEffect(() => {
-    let disposed = false
-    let objectUrl: string | undefined
-    void readAttachment(attachmentId)
-      .then((bytes) => {
-        if (disposed || bytes === null) return
-        objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
-        setUrl(objectUrl)
-      })
-      .catch(() => undefined)
-    return () => {
-      disposed = true
-      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
-    }
-  }, [attachmentId])
-
-  useEffect(() => {
-    previouslyFocused.current = document.activeElement
-    closeButton.current?.focus()
-    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCloseRef.current()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      const previous = previouslyFocused.current
-      if (previous instanceof HTMLElement) previous.focus()
-    }
-  }, [])
-
-  return (
-    <div className="image-preview-overlay">
-      <div aria-label="Image preview" aria-modal="true" className="image-preview" role="dialog">
-        <button
-          ref={closeButton}
-          aria-label="Close image preview"
-          className="image-preview-close"
-          onClick={onClose}
-          type="button"
-        >
-          ×
-        </button>
-        {url === undefined ? null : <img className="image-preview-image" src={url} alt="Attached image preview" />}
-      </div>
-    </div>
   )
 }
 

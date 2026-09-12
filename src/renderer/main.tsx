@@ -14,6 +14,13 @@ if (!rootElement) {
 const store = new EditorStore(createElectronEditorServices(), () => crypto.randomUUID())
 void store.initialize()
 
+window.treeApi.onQuitRequested(() => {
+  void store
+    .flushPersistence()
+    .then(() => window.treeApi.quit())
+    .catch((error: unknown) => store.reportError(error))
+})
+
 createRoot(rootElement).render(
   <StrictMode>
     <App store={store} />

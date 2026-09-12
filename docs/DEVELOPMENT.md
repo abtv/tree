@@ -174,6 +174,8 @@ A task is not considered complete until the appropriate validation command passe
 
 Security-sensitive changes must also verify the Electron boundary tests, including IPC validation, renderer navigation restrictions, attachment validation, and the production content security policy. Run `npm audit` when the network is available; a registry connectivity failure must be reported rather than treated as a clean audit result.
 
+Shutdown and attachment changes should also verify that queued renderer saves are flushed before quit and that non-PNG or malformed image bytes are rejected at the main-process boundary.
+
 ---
 
 ## 10. Development Workflow

@@ -22,7 +22,7 @@ export async function writeClipboard(clipboard: NativeClipboard, payload: Clipbo
 export async function readClipboard(clipboard: NativeClipboard): Promise<ClipboardPayload> {
   const items = await clipboard.read()
   for (const item of items) {
-    const imageType = item.types.find((type) => type.startsWith('image/'))
+    const imageType = item.types.find((type) => type.toLowerCase() === 'image/png')
     if (imageType !== undefined) {
       const blob = (await item.getType(imageType)) as Blob
       return { kind: 'image', png: new Uint8Array(await blob.arrayBuffer()) }

@@ -3,6 +3,11 @@ import { ipcChannels, type TreeApi } from '../shared/ipc'
 
 const treeApi: TreeApi = {
   quit: () => ipcRenderer.invoke(ipcChannels.quit),
+  onQuitRequested: (listener) => {
+    const handler = (): void => listener()
+    ipcRenderer.on('tree:quit-requested', handler)
+    return () => ipcRenderer.removeListener('tree:quit-requested', handler)
+  },
   load: () => ipcRenderer.invoke(ipcChannels.load),
   save: (state) => ipcRenderer.invoke(ipcChannels.save, state),
   readClipboard: () => ipcRenderer.invoke(ipcChannels.readClipboard),

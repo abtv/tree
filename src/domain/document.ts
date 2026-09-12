@@ -151,13 +151,37 @@ export function editNodeText(document: Document, nodeId: NodeId, text: string): 
 }
 
 export function editNodeContent(document: Document, nodeId: NodeId, text: string, links: LinkRange[]): Document {
-  const next = cloneDocument(document)
-  const node = requireNode(next, nodeId).node
-  node.text = text
   const normalized = normalizeLinks(links, text)
-  if (normalized.length === 0) delete node.links
-  else node.links = normalized
-  return next
+  let changed = false
+  const update = (node: TreeNode): TreeNode => {
+    if (node.id === nodeId) {
+      changed = true
+      return {
+        ...node,
+        text,
+        ...(normalized.length === 0 ? { links: undefined } : { links: normalized }),
+      }
+    }
+    for (const child of node.children) {
+      if (containsNode(child, nodeId)) {
+        return { ...node, children: node.children.map(update) }
+      }
+    }
+    return node
+  }
+  const roots = document.roots.map(update)
+  if (!changed) throw new Error(`Node ${nodeId} does not exist.`)
+  return { roots }
+}
+
+function containsNode(node: TreeNode, nodeId: NodeId): boolean {
+  const stack = [node]
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    if (current.id === nodeId) return true
+    stack.push(...current.children)
+  }
+  return false
 }
 
 export function deleteLink(document: Document, nodeId: NodeId, cursor: number): Document | undefined {

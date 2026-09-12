@@ -13,6 +13,7 @@ const attachmentBytes = new Uint8Array([137, 80, 78, 71])
 beforeEach(() => {
   window.treeApi = {
     quit: async () => undefined,
+    onQuitRequested: () => () => undefined,
     load: async () => null,
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),
@@ -544,6 +545,7 @@ describe('App', () => {
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'q', metaKey: true })
 
+    await act(async () => undefined)
     expect(quit).toHaveBeenCalledOnce()
   })
 

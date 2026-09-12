@@ -188,6 +188,8 @@ The main process treats the preload API as an untrusted boundary: every IPC call
 
 Attachment writes are limited to validated IDs, PNG data, and a bounded payload size.
 
+Before application shutdown is allowed to complete, the main process asks the renderer to flush its queued persistence work. The renderer then acknowledges shutdown through the trusted IPC path. PNG attachment writes validate the PNG signature and required image header before bytes are stored.
+
 The application layer must not contain React components or JSX.
 
 ---
@@ -335,6 +337,8 @@ Conceptually:
 The exact schema is defined by the implementation and product requirements.
 
 Persistence must support future schema evolution.
+
+The application must flush queued saves before a normal quit completes. A persistence failure must not silently discard the in-memory document; it is surfaced to the user and a later successful save clears the error state.
 
 Loading invalid or unsupported data must fail safely rather than silently corrupting the document.
 

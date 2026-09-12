@@ -45,11 +45,15 @@ describe('IPC security validation', () => {
   })
 
   it('requires non-empty binary data within the size limit', () => {
-    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+    const png = new Uint8Array([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0,
+    ])
     expect(validateAttachmentBytes(png)).toBe(png)
     expect(validateAttachmentBytes([...png])).toEqual(png)
     expect(validateAttachmentBytes({ type: 'Buffer', data: [...png] })).toEqual(png)
     expect(() => validateAttachmentBytes(new Uint8Array())).toThrow('empty')
+    expect(() => validateAttachmentBytes(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]))).toThrow('PNG')
     expect(() => validateAttachmentBytes(new Uint8Array(MAX_ATTACHMENT_BYTES + 1))).toThrow('too large')
   })
 })

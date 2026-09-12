@@ -18,7 +18,12 @@ import { isAllowedExternalUrl, isAllowedRendererUrl, surfaceWindow } from './win
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (!appQuitting && mainWindow !== null && !mainWindow.isDestroyed()) {
+    event.preventDefault()
+    mainWindow.webContents.send('tree:quit-requested')
+    return
+  }
   appQuitting = true
   mainWindow = null
   globalShortcut.unregister('CommandOrControl+0')
@@ -94,6 +99,7 @@ void app.whenReady().then(() => {
   }
   ipcMain.handle(ipcChannels.quit, (event) => {
     requireTrustedRenderer(event)
+    appQuitting = true
     return app.quit()
   })
   ipcMain.handle(ipcChannels.load, (event) => {

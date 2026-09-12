@@ -749,6 +749,45 @@ describe('EditorStore', () => {
       const state = store.getSnapshot()
       expect(state.status === 'ready' && state.saveError).toContain('disk full')
     })
+
+    services.save = async (state) => {
+      services.saves.push(state)
+    }
+    store.editText('root', 'recovered')
+    await store.flushPersistence()
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: undefined })
+  })
+
+  it('waits for queued persistence when flushing', async () => {
+    let release: (() => void) | undefined
+    const services = createServices()
+    services.save = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+
+    let flushed = false
+    const pending = store.flushPersistence().then(() => {
+      flushed = true
+    })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    expect(flushed).toBe(false)
+    release!()
+    await pending
+    expect(flushed).toBe(true)
+  })
+
+  it('surfaces operation errors until the next successful command', async () => {
+    const store = new EditorStore(createServices(), ids('root'))
+    await store.initialize()
+
+    store.reportError(new Error('clipboard unavailable'))
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: 'clipboard unavailable' })
+
+    store.editText('root', 'ok')
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: undefined })
   })
 
   it('ignores repeated text and empty undo or redo', async () => {

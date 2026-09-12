@@ -64,6 +64,7 @@ export type EditorSnapshot =
       location: Location
       focus: FocusIntent
       saveError?: string
+      operationError?: string
     }
 
 const systemClock: Clock = {
@@ -83,6 +84,7 @@ export class EditorStore {
   private pendingClipboardOperation: Promise<void> | undefined
   private focusToken = 0
   private saveQueue: Promise<void> = Promise.resolve()
+  private persistenceError: unknown
 
   public constructor(
     private readonly services: EditorServices,
@@ -95,6 +97,17 @@ export class EditorStore {
   public subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
+  }
+
+  public async flushPersistence(): Promise<void> {
+    await this.saveQueue
+    if (this.persistenceError !== undefined) throw this.persistenceError
+  }
+
+  public reportError(error: unknown): void {
+    if (this.snapshot.status !== 'ready') return
+    this.snapshot = { ...this.snapshot, operationError: messageOf(error) }
+    this.emit()
   }
 
   public async initialize(): Promise<void> {
@@ -625,7 +638,7 @@ export class EditorStore {
   }
 
   private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, persist: boolean): void {
-    this.snapshot = state
+    this.snapshot = state.operationError === undefined ? state : { ...state, operationError: undefined }
     this.emit()
     if (persist) {
       this.queuePersistence()
@@ -638,8 +651,14 @@ export class EditorStore {
         const state = this.ready()
         await this.services.save(serializeState(state.document, state.location))
         await this.services.cleanupAttachments([...this.referencedAttachmentIds()])
+        this.persistenceError = undefined
+        if (this.snapshot.status === 'ready' && this.snapshot.saveError !== undefined) {
+          this.snapshot = { ...this.snapshot, saveError: undefined }
+          this.emit()
+        }
       })
       .catch((error) => {
+        this.persistenceError = error
         if (this.snapshot.status === 'ready') {
           this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
           this.emit()
