@@ -52,8 +52,23 @@ test.describe('navigation', () => {
 
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowRight')
+    await expect(node(window, 2)).toBeFocused()
+    expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
+
+    await window.keyboard.press('ArrowUp')
+    await window.keyboard.press('Home')
+    await window.keyboard.press('ArrowUp')
     await expect(parent(window)).toBeFocused()
+    expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
+
+    await window.keyboard.press('End')
+    await window.keyboard.press('ArrowUp')
     expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
+    await window.keyboard.press('End')
+    await window.keyboard.press('ArrowRight')
+    await expect(node(window, 1)).toBeFocused()
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
 
   test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({

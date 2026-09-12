@@ -782,8 +782,16 @@ describe('EditorStore', () => {
     expect(store.moveHorizontal('right', 5)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { cursor: 0 } })
 
-    expect(store.moveHorizontal('right', 4)).toBe(true)
+    expect(store.moveHorizontal('right', 4)).toBe(false)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { cursor: 0 } })
+
+    store.selectNode('root', 6)
+    store.moveSelection('up', 6)
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { cursor: 0 } })
+
+    store.selectNode('root', 6)
+    expect(store.moveHorizontal('right', 6)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'a' }, focus: { cursor: 0 } })
   })
 
   it('does not move horizontally away from a root boundary or from the current parent', async () => {

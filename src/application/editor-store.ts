@@ -244,6 +244,12 @@ export class EditorStore {
   public moveSelection(direction: 'up' | 'down', cursor: number): void {
     const state = this.ready()
     if (state.location.currentParentId === state.location.selectedNodeId) {
+      if (direction === 'up') {
+        const parent = requireNode(state.document, state.location.currentParentId).node
+        if (cursor === parent.text.length) {
+          this.selectNode(parent.id, 0)
+        }
+      }
       if (direction === 'down') {
         const child = displayedNodes(state.document, state.location.currentParentId)[0]
         if (child !== undefined) {
@@ -268,6 +274,14 @@ export class EditorStore {
   public moveHorizontal(direction: 'left' | 'right', cursor: number): boolean {
     const state = this.ready()
     if (state.location.currentParentId === state.location.selectedNodeId) {
+      if (direction === 'right') {
+        const parent = requireNode(state.document, state.location.currentParentId).node
+        const child = parent.children[0]
+        if (cursor === parent.text.length && child !== undefined) {
+          this.selectNode(child.id, 0)
+          return true
+        }
+      }
       return false
     }
 
@@ -281,7 +295,7 @@ export class EditorStore {
       return true
     }
 
-    if (selected.parent !== null) {
+    if (direction === 'left' && selected.parent !== null) {
       this.selectNode(selected.parent.id, direction === 'left' ? selected.parent.text.length : 0)
       return true
     }

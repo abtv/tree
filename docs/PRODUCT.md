@@ -126,6 +126,8 @@ If the current node is the first node on the level, and the current parent does 
 
 * do nothing.
 
+When the editable current parent is selected and the caret is at the end of its text, pressing `↑` places the caret at the beginning of the current parent.
+
 When moving between nodes, preserve the horizontal cursor position as much as possible.
 
 If the target node's text is shorter than the previous cursor position, place the cursor at the end of the target text.
@@ -155,8 +157,9 @@ When the caret is at the beginning of a node and the user presses `←`:
 When the caret is at the end of a node and the user presses `→`:
 
 * if a next sibling exists, select it and place the caret at the beginning of its text;
-* otherwise, if the node is a child, select its parent and place the caret at the beginning of the parent's text;
 * otherwise, do nothing.
+
+When the editable current parent is selected and the caret is at the end of its text, pressing `→` selects its first child and places the caret at the beginning of that child's text. If the current parent has no children, do nothing.
 
 At any other caret position, `←` and `→` retain their ordinary text-editing behavior.
 
@@ -269,7 +272,7 @@ When the editable current parent is selected:
 * after `Enter`, the new child is selected and the text cursor moves to the beginning of its empty text;
 * `↓` selects the first child and places the text cursor at the beginning of its text;
 * if the parent has no children, `↓` does nothing;
-* `↑` does nothing;
+* `↑` moves the caret to the beginning when the caret is at the end of the parent's text; otherwise it does nothing;
 * `Cmd+.` does nothing.
 
 Example:
