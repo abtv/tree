@@ -223,4 +223,37 @@ describe('EditorStore invariants under command sequences', () => {
       }),
     )
   })
+
+  it('places a sibling created from an empty node immediately after that node', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.array(fc.string(), { minLength: 1, maxLength: 5 }), async (texts) => {
+        const roots = texts.map((text, index) => ({ id: `root-${index}`, text, children: [] as TreeNode[] }))
+        roots.splice(1, 0, { id: 'empty', text: '', children: [] })
+        const store = new EditorStore(
+          createServices(
+            {
+              version: 1,
+              document: { roots },
+              location: { currentParentId: null, selectedNodeId: 'empty' },
+            },
+            () => ({ kind: 'text', text: '' }),
+          ),
+          () => 'created',
+        )
+        await store.initialize()
+
+        store.createSiblingOrFirstChild(0)
+
+        const state = store.getSnapshot()
+        expect(state.status).toBe('ready')
+        if (state.status === 'ready') {
+          const emptyIndex = state.document.roots.findIndex((node) => node.id === 'empty')
+          expect(state.document.roots[emptyIndex + 1]?.id).toBe('created')
+          expect(state.location.selectedNodeId).toBe('created')
+          expect(state.focus).toMatchObject({ nodeId: 'created', cursor: 0 })
+        }
+      }),
+      { numRuns: 100 },
+    )
+  })
 })

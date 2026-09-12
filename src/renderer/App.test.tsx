@@ -236,6 +236,49 @@ describe('App', () => {
     expect(caret.startOffset).toBeGreaterThan(0)
   })
 
+  it('places a linked caret at the nearest editable boundary', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+    const editor = screen.getByRole('textbox', { name: 'Node 1' })
+
+    await act(async () => {
+      store.selectNode('root', 9)
+    })
+    expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor)
+    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(0)
+
+    await act(async () => {
+      store.selectNode('root', 10)
+    })
+    expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor)
+    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(1)
+  })
+
+  it('moves the caret to a new sibling after Enter at the end of linked text', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+    const editor = screen.getByRole('textbox', { name: 'Node 1' })
+
+    await act(async () => {
+      store.selectNode('root', 19)
+    })
+    fireEvent.keyDown(editor, { key: 'Enter' })
+
+    expect(screen.getByRole('link', { name: 'https://example.com' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('')
+    const newEditor = screen.getByRole('textbox', { name: 'Node 2' })
+    expect(newEditor).toHaveFocus()
+    expect((newEditor as HTMLTextAreaElement).selectionStart).toBe(0)
+  })
+
   it('renders and edits the current parent after entering an empty node', async () => {
     const store = createStore()
     await act(async () => {

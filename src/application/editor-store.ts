@@ -246,23 +246,32 @@ export class EditorStore {
     if (state.location.currentParentId === state.location.selectedNodeId) {
       if (direction === 'up') {
         const parent = requireNode(state.document, state.location.currentParentId).node
-        if (cursor === parent.text.length) {
-          this.selectNode(parent.id, 0)
-        }
+        this.selectNode(parent.id, 0)
       }
       if (direction === 'down') {
         const child = displayedNodes(state.document, state.location.currentParentId)[0]
         if (child !== undefined) {
           this.selectNode(child.id, Math.min(cursor, child.text.length))
+        } else {
+          const parent = requireNode(state.document, state.location.currentParentId).node
+          this.selectNode(parent.id, parent.text.length)
         }
       }
       return
     }
     const nodes = displayedNodes(state.document, state.location.currentParentId)
     const index = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
+    if (direction === 'up' && index === 0 && state.location.currentParentId === null) {
+      this.selectNode(nodes[0]!.id, 0)
+      return
+    }
     if (direction === 'up' && index === 0 && state.location.currentParentId !== null) {
       const parent = requireNode(state.document, state.location.currentParentId).node
       this.selectNode(parent.id, Math.min(cursor, parent.text.length))
+      return
+    }
+    if (direction === 'down' && index === nodes.length - 1) {
+      this.selectNode(nodes[index]!.id, nodes[index]!.text.length)
       return
     }
     const target = nodes[index + (direction === 'up' ? -1 : 1)]
@@ -376,8 +385,9 @@ export class EditorStore {
     }
 
     const id = this.createId()
+    const selected = requireNode(state.document, state.location.selectedNodeId).node
     const document =
-      cursor === 0
+      cursor === 0 && selected.text !== ''
         ? insertSiblingBefore(state.document, state.location.selectedNodeId, id)
         : splitNode(state.document, state.location.selectedNodeId, cursor, id)
     this.applyStructural(document, { ...state.location, selectedNodeId: id }, this.newFocus(id, 0))

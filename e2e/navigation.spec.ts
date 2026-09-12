@@ -15,6 +15,64 @@ test.describe('navigation', () => {
     await expect(node(window, 2)).toBeFocused()
   })
 
+  test('moves the first root caret to the beginning on ArrowUp', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Root')
+    await window.keyboard.press('End')
+    await window.keyboard.press('ArrowUp')
+
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+  })
+
+  test('moves the last root caret to the end on ArrowDown', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'First')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 2), 'Last')
+    await window.keyboard.press('Home')
+    await window.keyboard.press('ArrowDown')
+
+    expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
+  })
+
+  test('moves the last linked root caret to the end on ArrowDown', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await writeClipboardText(app, 'https://example.com')
+    await firePaste(node(window, 1))
+    await window.keyboard.press('Home')
+    await window.keyboard.press('ArrowDown')
+
+    const editor = node(window, 1)
+    await expect(editor).toBeFocused()
+    expect(
+      await editor.evaluate((element) => {
+        const selection = element.ownerDocument.defaultView?.getSelection()
+        return { anchorNodeIsEditor: selection?.anchorNode === element, anchorOffset: selection?.anchorOffset }
+      }),
+    ).toEqual({ anchorNodeIsEditor: true, anchorOffset: 1 })
+  })
+
+  test('moves a childless linked parent caret to the end on ArrowDown', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await writeClipboardText(app, 'https://example.com')
+    await firePaste(node(window, 1))
+    await window.keyboard.press('Meta+.')
+    await window.keyboard.press('ArrowDown')
+
+    const editor = parent(window)
+    await expect(editor).toBeFocused()
+    expect(
+      await editor.evaluate((element) => {
+        const selection = element.ownerDocument.defaultView?.getSelection()
+        return { anchorNodeIsEditor: selection?.anchorNode === element, anchorOffset: selection?.anchorOffset }
+      }),
+    ).toEqual({ anchorNodeIsEditor: true, anchorOffset: 1 })
+  })
+
   test('moves from the first child up to the current parent', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -116,6 +174,8 @@ test.describe('navigation', () => {
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
 
     await window.keyboard.press('Enter')
+    await expect(node(window, 1)).toBeFocused()
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
     await typeInto(node(window, 1), 'Work')
     await expect(node(window, 1)).toHaveValue('Work')
   })

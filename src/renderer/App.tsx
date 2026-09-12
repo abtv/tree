@@ -17,14 +17,22 @@ export function App({ store }: AppProps): React.JSX.Element {
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
+  const latestFocus = useRef<typeof focus>(undefined)
+  latestFocus.current = focus
 
   useLayoutEffect(() => {
     if (focus === undefined) return
-    const input = inputs.current.get(focus.nodeId)
-    if (input === undefined) return
-    input.focus()
-    if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
-    else setCaret(input, focus.cursor)
+    const applyFocus = (): void => {
+      const input = inputs.current.get(focus.nodeId)
+      if (input === undefined) return
+      input.focus()
+      if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
+      else setCaret(input, focus.cursor)
+    }
+    applyFocus()
+    queueMicrotask(() => {
+      if (latestFocus.current?.token === focus.token) applyFocus()
+    })
   }, [focus])
 
   useLayoutEffect(() => {
@@ -653,7 +661,10 @@ function setCaret(element: HTMLElement, position: number): void {
     if (link !== null && link !== undefined && remaining <= length) {
       const parent = link.parentNode ?? element
       const linkIndex = Array.from(parent.childNodes).indexOf(link)
-      range.setStart(parent, remaining === length || remaining > length / 2 ? linkIndex + 1 : linkIndex)
+      // Links are non-editable, so an offset inside one must resolve to the
+      // nearest editable boundary. Ties stay before the link.
+      const beforeLink = remaining <= length / 2
+      range.setStart(parent, beforeLink ? linkIndex : linkIndex + 1)
       range.collapse(true)
       selection.removeAllRanges()
       selection.addRange(range)

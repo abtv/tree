@@ -122,11 +122,12 @@ If the current node is the first node on the level, and the current parent exist
 * move selection to the editable current parent;
 * preserve the horizontal cursor position as much as possible, clamping it to the current parent's text length.
 
-If the current node is the first node on the level, and the current parent does not exist (the root level):
+If the current node is the first top-level root node:
 
-* do nothing.
+* keep the first root node selected;
+* place the caret at the beginning of its text.
 
-When the editable current parent is selected and the caret is at the end of its text, pressing `↑` places the caret at the beginning of the current parent.
+When the editable current parent is selected, pressing `↑` places the caret at the beginning of the current parent.
 
 When moving between nodes, preserve the horizontal cursor position as much as possible.
 
@@ -138,11 +139,12 @@ If the target node's text is shorter than the previous cursor position, place th
 
 Move selection to the next node on the current level.
 
-If the current node is the last node on the level:
+If the current node is the last node on the displayed level:
 
-* do nothing.
+* keep the last node selected;
+* place the caret at the end of its text.
 
-Cursor-position behavior is the same as for `↑`.
+For sibling movements, cursor-position behavior is the same as for `↑`.
 
 ### 4.3 Left and right
 
@@ -173,7 +175,7 @@ When focus is on a node in the currently displayed level, `Enter` always creates
 
 In that context, it never creates a child.
 
-The new node is inserted immediately before the current node when the caret is at the beginning; otherwise it is inserted immediately after the current node.
+The new node is inserted immediately before the current non-empty node when the caret is at the beginning; otherwise it is inserted immediately after the current node. An empty node is treated as being at the end for this rule, so pressing `Enter` on an empty node creates the next sibling after it.
 
 ### Cursor at the end
 
@@ -190,7 +192,7 @@ Current
 |
 ```
 
-The new node has empty text. The UI does not display a `New node` placeholder.
+The new node has empty text, is selected, and receives the text cursor at the beginning of its text. The UI does not display a `New node` placeholder.
 
 ### Cursor at the beginning
 
@@ -271,8 +273,8 @@ When the editable current parent is selected:
 * `Enter` creates a new empty first child immediately below the parent, before any existing children;
 * after `Enter`, the new child is selected and the text cursor moves to the beginning of its empty text;
 * `↓` selects the first child and preserves the horizontal cursor position as much as possible, clamping it to the child's text length;
-* if the parent has no children, `↓` does nothing;
-* `↑` moves the caret to the beginning when the caret is at the end of the parent's text; otherwise it does nothing;
+* if the parent has no children, `↓` keeps the parent selected and places the caret at the end of the parent's text;
+* `↑` moves the caret to the beginning of the parent's text;
 * `Cmd+.` does nothing.
 
 Example:
@@ -546,6 +548,8 @@ Plain text is inserted at the current cursor position.
 It does not replace the entire node.
 
 Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range. Existing links cannot be edited. Pressing `Backspace` immediately after a link removes the complete link rather than one character at a time.
+
+When a caret position falls inside a non-editable hyperlink, the visible caret is placed at the nearer editable boundary of that hyperlink. If the position is exactly halfway between the boundaries, it is placed before the hyperlink.
 
 ### 13.1 Selecting, copying, cutting, and pasting linked text
 

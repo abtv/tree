@@ -68,6 +68,24 @@ describe('EditorStore', () => {
     }
   })
 
+  it('creates the next sibling after an empty node when Enter is pressed', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Current', children: [] }, { id: 'empty', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'empty' },
+    )
+    const store = new EditorStore(services, ids('next'))
+    await store.initialize()
+
+    store.createSiblingOrFirstChild(0)
+
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ id: 'root' }, { id: 'empty' }, { id: 'next' }] },
+      location: { selectedNodeId: 'next' },
+      focus: { nodeId: 'next', cursor: 0 },
+    })
+  })
+
   it('creates a first child from the focused current parent', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
     await store.initialize()
@@ -291,7 +309,7 @@ describe('EditorStore', () => {
     }
   })
 
-  it('does nothing on ArrowUp from the first root', async () => {
+  it('moves the caret to the beginning on ArrowUp from the first root', async () => {
     const services = loadedState(
       {
         roots: [
@@ -304,12 +322,63 @@ describe('EditorStore', () => {
     const store = new EditorStore(services, ids('unused'))
     await store.initialize()
 
-    store.moveSelection('up', 0)
+    store.moveSelection('up', 1)
 
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
       location: { currentParentId: null, selectedNodeId: 'r1' },
+      focus: { nodeId: 'r1', cursor: 0 },
     })
+  })
+
+  it('moves the current parent caret to the beginning on ArrowUp', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelection('up', 3)
+
+    expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'root', cursor: 0 } })
+  })
+
+  it('moves the last displayed node caret to the end on ArrowDown', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'First', children: [] },
+              { id: 'b', text: 'Last', children: [] },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelection('down', 0)
+
+    expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'b', cursor: 4 } })
+  })
+
+  it('moves a childless current parent caret to the end on ArrowDown', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Parent', children: [] }] },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.moveSelection('down', 0)
+
+    expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'root', cursor: 6 } })
   })
 
   it('groups direct text edits until a structural boundary', async () => {
