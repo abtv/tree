@@ -55,7 +55,7 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
   const exited =
     electronProcess.exitCode !== null || electronProcess.signalCode !== null
       ? Promise.resolve()
-      : new Promise<void>((resolve) => electronProcess.once('close', () => resolve()))
+      : new Promise<void>((resolve) => app.once('close', resolve))
   let timeout: ReturnType<typeof setTimeout> | undefined
 
   await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
@@ -71,12 +71,6 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
   }
   if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
     electronProcess.kill('SIGTERM')
-    await Promise.race([
-      exited,
-      new Promise<void>((resolve) => {
-        timeout = setTimeout(resolve, 5_000)
-      }),
-    ])
   }
   if (electronProcess.exitCode === null && electronProcess.signalCode === null) {
     electronProcess.kill('SIGKILL')

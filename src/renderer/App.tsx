@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, SyntheticEvent } from 'react'
+import type { ClipboardEvent, DragEvent, FocusEvent, FormEvent, KeyboardEvent, SyntheticEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { nodePath, type TreeNode } from '../domain/document'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
@@ -8,11 +8,11 @@ import {
   getSelectionRange,
   isCollapsedSelection,
   readEditableContent,
-  richTextHtml,
   selectAll,
   setCaret,
 } from './editor-dom'
 import { LocationBar } from './LocationBar'
+import { NodeInput } from './NodeInput'
 
 interface AppProps {
   store: EditorStore
@@ -102,7 +102,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     }
   const onInput =
     (node: TreeNode) =>
-    (event: React.FormEvent<HTMLElement>): void => {
+    (event: FormEvent<HTMLElement>): void => {
       const cursor = getCaret(event.currentTarget)
       const content = readEditableContent(event.currentTarget)
       pendingCaret.current = { input: event.currentTarget, cursor }
@@ -110,7 +110,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     }
   const onChange =
     (node: TreeNode) =>
-    (event: React.FormEvent<HTMLElement>): void => {
+    (event: FormEvent<HTMLElement>): void => {
       store.editContent(node.id, event.currentTarget.textContent ?? '', node.links ?? [])
     }
   const onFocus =
@@ -236,84 +236,41 @@ export function App({ store }: AppProps): React.JSX.Element {
     (event: DragEvent<HTMLDivElement>): void => {
       onDrop(rowInsertionIndex(index, event))(event)
     }
-  const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => {
-    if (node.links === undefined || node.links.length === 0) {
-      return (
-        <textarea
-          ref={setInput(node.id) as (input: HTMLTextAreaElement | null) => void}
-          aria-label={label}
-          className={parent ? 'node-input current-parent-input' : 'node-input'}
-          rows={1}
-          value={node.text}
-          onBlur={() => {
-            setSelectAllNodeId(undefined)
-            store.endTextSession()
-          }}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => store.editText(node.id, event.currentTarget.value)}
-          onCompositionEnd={() => {
-            composing.current = false
-          }}
-          onCompositionStart={() => {
-            composing.current = true
-          }}
-          onCut={() => store.markNextTextEditStandalone()}
-          onFocus={onFocus(node.id)}
-          onKeyDown={onKeyDown(node)}
-          onMouseDown={() => {
-            setSelectAllNodeId(undefined)
-            inputs.current.get(node.id)?.classList.remove('select-all')
-            store.endTextSession()
-          }}
-          onPaste={(event) => {
-            setSelectAllNodeId(undefined)
-            onPaste(node.id)(event)
-          }}
-          onSelect={onSelect}
-          spellCheck
-        />
-      )
-    }
-    return (
-      <div
-        contentEditable
-        ref={setInput(node.id)}
-        aria-label={label}
-        aria-multiline="true"
-        role="textbox"
-        className={['node-input', parent ? 'current-parent-input' : '', selectAllNodeId === node.id ? 'select-all' : '']
-          .filter(Boolean)
-          .join(' ')}
-        onBlur={() => {
-          setSelectAllNodeId(undefined)
-          store.endTextSession()
-        }}
-        onChange={onChange(node)}
-        onInput={onInput(node)}
-        onCompositionEnd={() => {
-          composing.current = false
-        }}
-        onCompositionStart={() => {
-          composing.current = true
-        }}
-        onCut={() => store.markNextTextEditStandalone()}
-        onFocus={onFocus(node.id)}
-        onKeyDown={onKeyDown(node)}
-        onMouseDown={() => {
-          setSelectAllNodeId(undefined)
-          inputs.current.get(node.id)?.classList.remove('select-all')
-          store.endTextSession()
-        }}
-        onPaste={(event) => {
-          setSelectAllNodeId(undefined)
-          onPaste(node.id)(event)
-        }}
-        onSelect={onSelect}
-        spellCheck
-        suppressContentEditableWarning
-        dangerouslySetInnerHTML={{ __html: richTextHtml(node) }}
-      />
-    )
-  }
+  const input = (node: TreeNode, label: string, parent = false): React.JSX.Element => (
+    <NodeInput
+      node={node}
+      label={label}
+      parent={parent}
+      selectedAll={selectAllNodeId === node.id}
+      inputRef={setInput(node.id)}
+      onBlur={() => {
+        setSelectAllNodeId(undefined)
+        store.endTextSession()
+      }}
+      onTextChange={(event) => store.editText(node.id, event.currentTarget.value)}
+      onContentInput={onInput(node)}
+      onContentChange={onChange(node)}
+      onCompositionEnd={() => {
+        composing.current = false
+      }}
+      onCompositionStart={() => {
+        composing.current = true
+      }}
+      onCut={() => store.markNextTextEditStandalone()}
+      onFocus={onFocus(node.id)}
+      onKeyDown={onKeyDown(node)}
+      onMouseDown={() => {
+        setSelectAllNodeId(undefined)
+        inputs.current.get(node.id)?.classList.remove('select-all')
+        store.endTextSession()
+      }}
+      onPaste={(event) => {
+        setSelectAllNodeId(undefined)
+        onPaste(node.id)(event)
+      }}
+      onSelect={onSelect}
+    />
+  )
 
   const path = state.location.currentParentId === null ? [] : nodePath(state.document, state.location.currentParentId)
 
