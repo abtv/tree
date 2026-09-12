@@ -190,6 +190,8 @@ Attachment writes are limited to validated IDs, PNG data, and a bounded payload 
 
 Before application shutdown is allowed to complete, the main process asks the renderer to flush its queued persistence work. The renderer then acknowledges shutdown through the trusted IPC path. PNG attachment writes validate the PNG signature and required image header before bytes are stored.
 
+The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit.
+
 The application layer must not contain React components or JSX.
 
 ---
@@ -542,6 +544,8 @@ src/
 This is a guideline, not a requirement to create every directory immediately.
 
 The actual structure should reflect the codebase as it evolves.
+
+The renderer currently isolates DOM/caret behavior in `editor-dom.ts`, location rendering in `LocationBar.tsx`, and attachment rendering/preview in `AttachmentPreview.tsx`. These modules remain UI adapters and dispatch document changes through the application layer.
 
 Do not create empty architectural layers solely to match this diagram.
 

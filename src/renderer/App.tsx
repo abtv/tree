@@ -1,8 +1,18 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, ClipboardEvent, DragEvent, FocusEvent, KeyboardEvent, SyntheticEvent } from 'react'
 import { EditorStore } from '../application/editor-store'
-import { nodePath, type LinkRange, type TreeNode } from '../domain/document'
+import { nodePath, type TreeNode } from '../domain/document'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
+import {
+  getCaret,
+  getSelectionRange,
+  isCollapsedSelection,
+  readEditableContent,
+  richTextHtml,
+  selectAll,
+  setCaret,
+} from './editor-dom'
+import { LocationBar } from './LocationBar'
 
 interface AppProps {
   store: EditorStore
@@ -162,10 +172,7 @@ export function App({ store }: AppProps): React.JSX.Element {
         else store.undo()
       } else if (event.metaKey && event.key.toLowerCase() === 'q') {
         event.preventDefault()
-        void store
-          .flushPersistence()
-          .then(() => window.treeApi.quit())
-          .catch((error: unknown) => store.reportError(error))
+        void window.treeApi.quit().catch((error: unknown) => store.reportError(error))
       } else if (event.metaKey && event.key === '0') event.preventDefault()
       else if (event.metaKey && event.key === 'Enter') {
         event.preventDefault()
@@ -312,35 +319,11 @@ export function App({ store }: AppProps): React.JSX.Element {
 
   return (
     <main className="tree-app">
-      <header className="location-bar" aria-label="Current location">
-        <button
-          aria-label="Top level"
-          className="location-root"
-          onClick={() => store.navigateToAncestor(null)}
-          type="button"
-        >
-          <OutlineRootIcon />
-        </button>
-        {path.map((node) => (
-          <span className="location-segment" key={node.id} style={{ flexShrink: node.text.length + 1 }}>
-            <span className="location-separator">›</span>
-            {node.id === state.location.currentParentId ? (
-              <span className="location-current" title={node.text}>
-                {node.text}
-              </span>
-            ) : (
-              <button
-                className="location-link"
-                onClick={() => store.navigateToAncestor(node.id)}
-                title={node.text}
-                type="button"
-              >
-                {node.text}
-              </button>
-            )}
-          </span>
-        ))}
-      </header>
+      <LocationBar
+        path={path}
+        currentParentId={state.location.currentParentId}
+        onNavigate={(parentId) => store.navigateToAncestor(parentId)}
+      />
       <section className="editor-shell">
         {currentParent === undefined ? null : (
           <section className="current-parent" aria-label="Current parent">
@@ -404,17 +387,6 @@ export function App({ store }: AppProps): React.JSX.Element {
   )
 }
 
-function OutlineRootIcon(): React.JSX.Element {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M12 6v5m0 0-5 5m5-5 5 5" />
-      <circle cx="12" cy="5" r="2" />
-      <circle cx="7" cy="18" r="2" />
-      <circle cx="17" cy="18" r="2" />
-    </svg>
-  )
-}
-
 function DropZone({
   end = false,
   index,
@@ -447,163 +419,4 @@ function findNode(nodes: TreeNode[], id: string): TreeNode | undefined {
     for (const child of node.children) stack.push(child)
   }
   return undefined
-}
-
-function richTextHtml(node: TreeNode): string {
-  const links = node.links ?? []
-  const parts: string[] = []
-  let position = 0
-  for (const link of links) {
-    if (link.start > position) parts.push(escapeHtml(node.text.slice(position, link.start)))
-    const label = escapeHtml(node.text.slice(link.start, link.end))
-    parts.push(
-      `<a contenteditable="false" href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`,
-    )
-    position = link.end
-  }
-  if (position < node.text.length || parts.length === 0) {
-    parts.push(escapeHtml(node.text.slice(position)))
-  }
-  return parts.join('')
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
-}
-
-function readEditableContent(element: HTMLElement): { text: string; links: LinkRange[] } {
-  const links: LinkRange[] = []
-  let text = ''
-  const walk = (node: Node): void => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      text += node.textContent ?? ''
-      return
-    }
-    if (node instanceof HTMLAnchorElement) {
-      const start = text.length
-      const value = node.textContent ?? ''
-      text += value
-      links.push({ start, end: start + value.length, url: node.getAttribute('href') ?? node.href })
-      return
-    }
-    node.childNodes.forEach(walk)
-  }
-  element.childNodes.forEach(walk)
-  return { text, links }
-}
-
-function getCaret(element: HTMLElement): number {
-  if (element instanceof HTMLTextAreaElement) return element.selectionStart ?? 0
-  const selection = globalThis.getSelection()
-  if (selection === null || selection.rangeCount === 0) return 0
-  const range = selection.getRangeAt(0)
-  if (!element.contains(range.startContainer)) return 0
-  if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
-    const children = range.startContainer.childNodes
-    let offset = 0
-    for (let index = 0; index < range.startOffset; index += 1) {
-      offset += children[index]?.textContent?.length ?? 0
-    }
-    const prefix = range.startContainer === element ? 0 : getCaretPrefix(element, range.startContainer)
-    return prefix + offset
-  }
-  const before = range.cloneRange()
-  before.selectNodeContents(element)
-  before.setEnd(range.startContainer, range.startOffset)
-  return before.toString().length
-}
-
-function getSelectionRange(element: HTMLElement): { start: number; end: number } {
-  if (element instanceof HTMLTextAreaElement) {
-    return { start: element.selectionStart ?? 0, end: element.selectionEnd ?? 0 }
-  }
-  const selection = globalThis.getSelection()
-  if (selection === null || selection.rangeCount === 0) {
-    const cursor = getCaret(element)
-    return { start: cursor, end: cursor }
-  }
-  const range = selection.getRangeAt(0)
-  const start = getCaret(element)
-  if (range.collapsed) return { start, end: start }
-  const endRange = range.cloneRange()
-  endRange.collapse(false)
-  selection.removeAllRanges()
-  selection.addRange(endRange)
-  const end = getCaret(element)
-  selection.removeAllRanges()
-  selection.addRange(range)
-  return { start: Math.min(start, end), end: Math.max(start, end) }
-}
-
-function selectAll(element: HTMLElement): void {
-  const selection = globalThis.getSelection()
-  if (selection === null) return
-  const range = document.createRange()
-  range.selectNodeContents(element)
-  selection.removeAllRanges()
-  selection.addRange(range)
-}
-
-function getCaretPrefix(element: HTMLElement, container: Node): number {
-  let offset = 0
-  let current: Node | null = container
-  while (current !== null && current.parentNode !== null && current.parentNode !== element) {
-    let sibling = current.previousSibling
-    while (sibling !== null) {
-      offset += sibling.textContent?.length ?? 0
-      sibling = sibling.previousSibling
-    }
-    current = current.parentNode
-  }
-  if (current !== null && current.parentNode === element) {
-    let sibling = current.previousSibling
-    while (sibling !== null) {
-      offset += sibling.textContent?.length ?? 0
-      sibling = sibling.previousSibling
-    }
-  }
-  return element === container ? 0 : offset
-}
-
-function setCaret(element: HTMLElement, position: number): void {
-  const selection = globalThis.getSelection()
-  if (selection === null) return
-  const range = document.createRange()
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let remaining = position
-  let current: Node | null = walker.nextNode()
-  while (current !== null) {
-    const length = current.textContent?.length ?? 0
-    const link = current.parentElement?.closest('a[contenteditable="false"]')
-    if (link !== null && link !== undefined && remaining <= length) {
-      const parent = link.parentNode ?? element
-      const linkIndex = Array.from(parent.childNodes).indexOf(link)
-      // Links are non-editable, so an offset inside one must resolve to the
-      // nearest editable boundary. Ties stay before the link.
-      const beforeLink = remaining <= length / 2
-      range.setStart(parent, beforeLink ? linkIndex : linkIndex + 1)
-      range.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(range)
-      return
-    }
-    if (remaining < length) {
-      range.setStart(current, remaining)
-      range.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(range)
-      return
-    }
-    remaining -= length
-    current = walker.nextNode()
-  }
-  range.selectNodeContents(element)
-  range.collapse(false)
-  selection.removeAllRanges()
-  selection.addRange(range)
-}
-
-function isCollapsedSelection(): boolean {
-  const selection = globalThis.getSelection()
-  return selection === null || selection.isCollapsed
 }

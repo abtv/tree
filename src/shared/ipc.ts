@@ -21,8 +21,9 @@ export interface ClipboardWritePayload {
 }
 
 export interface TreeApi {
-  quit(): Promise<void>
-  onQuitRequested(listener: () => void): () => void
+  quit(requestId?: string): Promise<void>
+  onQuitRequested(listener: (requestId: string) => void): () => void
+  onQuitFailed(listener: (message: string) => void): () => void
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   readClipboard(): Promise<ClipboardPayload>

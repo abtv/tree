@@ -14,14 +14,20 @@ import {
   isTrustedRendererUrl,
 } from './ipc-security'
 import { isAllowedExternalUrl, isAllowedRendererUrl, surfaceWindow } from './window'
+import { QuitHandshake } from './quit-handshake'
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
+const quitHandshake = new QuitHandshake(
+  (requestId) => mainWindow?.webContents.send('tree:quit-requested', requestId),
+  () => mainWindow?.webContents.send('tree:quit-failed', 'The application could not finish saving before quit.'),
+  () => app.quit(),
+)
 
 app.on('before-quit', (event) => {
   if (!appQuitting && mainWindow !== null && !mainWindow.isDestroyed()) {
     event.preventDefault()
-    mainWindow.webContents.send('tree:quit-requested')
+    quitHandshake.request()
     return
   }
   appQuitting = true
@@ -97,10 +103,14 @@ void app.whenReady().then(() => {
   const requireTrustedRenderer = (event: Electron.IpcMainInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
-  ipcMain.handle(ipcChannels.quit, (event) => {
+  ipcMain.handle(ipcChannels.quit, (event, requestId?: unknown) => {
     requireTrustedRenderer(event)
-    appQuitting = true
-    return app.quit()
+    if (typeof requestId === 'string' && quitHandshake.confirm(requestId)) {
+      appQuitting = true
+      return
+    }
+    if (requestId !== undefined) throw new Error('Invalid quit request.')
+    quitHandshake.request()
   })
   ipcMain.handle(ipcChannels.load, (event) => {
     requireTrustedRenderer(event)
@@ -143,7 +153,7 @@ void app.whenReady().then(() => {
           {
             label: 'Quit Tree',
             accelerator: 'CommandOrControl+Q',
-            click: () => app.quit(),
+            click: () => quitHandshake.request(),
           },
         ],
       },

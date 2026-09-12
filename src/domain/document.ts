@@ -152,36 +152,28 @@ export function editNodeText(document: Document, nodeId: NodeId, text: string): 
 
 export function editNodeContent(document: Document, nodeId: NodeId, text: string, links: LinkRange[]): Document {
   const normalized = normalizeLinks(links, text)
-  let changed = false
-  const update = (node: TreeNode): TreeNode => {
-    if (node.id === nodeId) {
-      changed = true
-      return {
-        ...node,
-        text,
-        ...(normalized.length === 0 ? { links: undefined } : { links: normalized }),
-      }
-    }
-    for (const child of node.children) {
-      if (containsNode(child, nodeId)) {
-        return { ...node, children: node.children.map(update) }
-      }
-    }
-    return node
+  const located = requireNode(document, nodeId)
+  let replacement: TreeNode = {
+    ...located.node,
+    text,
+    ...(normalized.length === 0 ? { links: undefined } : { links: normalized }),
   }
-  const roots = document.roots.map(update)
-  if (!changed) throw new Error(`Node ${nodeId} does not exist.`)
-  return { roots }
-}
 
-function containsNode(node: TreeNode, nodeId: NodeId): boolean {
-  const stack = [node]
-  while (stack.length > 0) {
-    const current = stack.pop()!
-    if (current.id === nodeId) return true
-    stack.push(...current.children)
+  for (let index = located.ancestors.length - 1; index >= 0; index -= 1) {
+    const ancestor = located.ancestors[index]!
+    const childId = index === located.ancestors.length - 1 ? nodeId : located.ancestors[index + 1]!.id
+    const childIndex = ancestor.children.findIndex((child) => child.id === childId)
+    if (childIndex < 0) throw new Error(`Node ${nodeId} does not exist.`)
+    const children = ancestor.children.slice()
+    children[childIndex] = replacement
+    replacement = { ...ancestor, children }
   }
-  return false
+
+  const rootIndex = document.roots.findIndex((root) => root.id === (located.ancestors[0]?.id ?? nodeId))
+  if (rootIndex < 0) throw new Error(`Node ${nodeId} does not exist.`)
+  const roots = document.roots.slice()
+  roots[rootIndex] = replacement
+  return { roots }
 }
 
 export function deleteLink(document: Document, nodeId: NodeId, cursor: number): Document | undefined {

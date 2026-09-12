@@ -660,6 +660,8 @@ There is no Save button.
 
 The document must persist between application restarts.
 
+When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes.
+
 The following state must be persisted:
 
 * the ordered top-level root nodes and their trees;

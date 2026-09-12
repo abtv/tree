@@ -14,6 +14,7 @@ beforeEach(() => {
   window.treeApi = {
     quit: async () => undefined,
     onQuitRequested: () => () => undefined,
+    onQuitFailed: () => () => undefined,
     load: async () => null,
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),

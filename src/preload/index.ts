@@ -1,12 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { ipcChannels, type TreeApi } from '../shared/ipc'
 
-const treeApi: TreeApi = {
-  quit: () => ipcRenderer.invoke(ipcChannels.quit),
+export const treeApi: TreeApi = {
+  quit: (requestId) => ipcRenderer.invoke(ipcChannels.quit, requestId),
   onQuitRequested: (listener) => {
-    const handler = (): void => listener()
+    const handler = (_event: Electron.IpcRendererEvent, requestId: string): void => listener(requestId)
     ipcRenderer.on('tree:quit-requested', handler)
     return () => ipcRenderer.removeListener('tree:quit-requested', handler)
+  },
+  onQuitFailed: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, message: string): void => listener(message)
+    ipcRenderer.on('tree:quit-failed', handler)
+    return () => ipcRenderer.removeListener('tree:quit-failed', handler)
   },
   load: () => ipcRenderer.invoke(ipcChannels.load),
   save: (state) => ipcRenderer.invoke(ipcChannels.save, state),

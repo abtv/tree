@@ -9,6 +9,7 @@ import {
   insertSiblingBefore,
   deleteLink,
   deleteNode,
+  editNodeContent,
   isValidLocation,
   locateNode,
   moveSibling,
@@ -23,6 +24,17 @@ import {
 } from './document'
 
 describe('document operations', () => {
+  it('updates text by cloning only the path to the edited node', () => {
+    const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
+    document.roots.push({ id: 'other', text: 'Other', children: [{ id: 'other-child', text: 'Child', children: [] }] })
+    const result = editNodeContent(document, 'child', 'Updated', [])
+
+    expect(result.roots[0]).not.toBe(document.roots[0])
+    expect(result.roots[0]!.children[0]!.text).toBe('Updated')
+    expect(result.roots[1]).toBe(document.roots[1])
+    expect(result.roots[1]!.children[0]).toBe(document.roots[1]!.children[0])
+  })
+
   it('inserts an empty sibling before a node without changing its subtree', () => {
     const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
     document.roots[0]!.text = 'Current'
