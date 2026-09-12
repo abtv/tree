@@ -73,6 +73,7 @@ function createMainWindow(): void {
 
 void app.whenReady().then(() => {
   const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
+  ipcMain.handle(ipcChannels.quit, () => app.quit())
   ipcMain.handle(ipcChannels.load, () => fileServices.load())
   ipcMain.handle(ipcChannels.save, (_event, state) => fileServices.save(state))
   ipcMain.handle(ipcChannels.readClipboard, () => readClipboard(nativeClipboard))
@@ -88,7 +89,13 @@ void app.whenReady().then(() => {
     Menu.buildFromTemplate([
       {
         label: 'Tree',
-        submenu: [{ role: 'quit' }],
+        submenu: [
+          {
+            label: 'Quit Tree',
+            accelerator: 'CommandOrControl+Q',
+            click: () => app.quit(),
+          },
+        ],
       },
     ]),
   )

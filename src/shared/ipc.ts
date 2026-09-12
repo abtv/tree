@@ -2,6 +2,7 @@ import type { PersistedEditorState } from '../domain/document'
 import type { LinkRange } from '../domain/document'
 
 export const ipcChannels = {
+  quit: 'tree:quit',
   load: 'tree:load',
   save: 'tree:save',
   readClipboard: 'tree:read-clipboard',
@@ -20,6 +21,7 @@ export interface ClipboardWritePayload {
 }
 
 export interface TreeApi {
+  quit(): Promise<void>
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   readClipboard(): Promise<ClipboardPayload>

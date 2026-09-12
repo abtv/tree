@@ -18,7 +18,10 @@ export function App({ store }: AppProps): React.JSX.Element {
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
   const latestFocus = useRef<typeof focus>(undefined)
-  latestFocus.current = focus
+
+  useLayoutEffect(() => {
+    latestFocus.current = focus
+  }, [focus])
 
   useLayoutEffect(() => {
     if (focus === undefined) return
@@ -157,6 +160,9 @@ export function App({ store }: AppProps): React.JSX.Element {
         event.preventDefault()
         if (event.shiftKey) store.redo()
         else store.undo()
+      } else if (event.metaKey && event.key.toLowerCase() === 'q') {
+        event.preventDefault()
+        void window.treeApi.quit()
       } else if (event.metaKey && event.key === '0') event.preventDefault()
       else if (event.metaKey && event.key === 'Enter') {
         event.preventDefault()

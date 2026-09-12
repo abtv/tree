@@ -12,6 +12,7 @@ const attachmentBytes = new Uint8Array([137, 80, 78, 71])
 
 beforeEach(() => {
   window.treeApi = {
+    quit: async () => undefined,
     load: async () => null,
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),
@@ -531,6 +532,19 @@ describe('App', () => {
     expect(first).toHaveValue('')
     fireEvent.keyDown(first, { key: 'z', metaKey: true, shiftKey: true })
     expect(first).toHaveValue('A')
+  })
+
+  it('quits the application when Cmd+Q is pressed in an editable node', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const quit = vi.spyOn(window.treeApi, 'quit')
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'q', metaKey: true })
+
+    expect(quit).toHaveBeenCalledOnce()
   })
 
   it('deletes the selected node with Cmd+Backspace', async () => {
