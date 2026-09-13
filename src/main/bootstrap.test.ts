@@ -66,6 +66,16 @@ describe('bootstrapApplication', () => {
     expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
   })
 
+  it('routes application-menu quit through the application lifecycle', async () => {
+    const { app, dependencies } = createHarness()
+
+    await Promise.resolve()
+    const requestQuit = dependencies.setApplicationMenu.mock.calls[0]![0]
+    requestQuit()
+
+    expect(app.quit).toHaveBeenCalledOnce()
+  })
+
   it('surfaces a new window on activation when no windows remain', async () => {
     const { listeners, dependencies } = createHarness()
     dependencies.getWindowCount.mockReturnValue(0)

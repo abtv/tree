@@ -181,7 +181,7 @@ It should run:
 1. type checking;
 2. linting;
 3. formatting check (`prettier --check`);
-4. tests;
+4. tests with coverage enforcement;
 5. production build;
 6. dependency audit (`npm audit`).
 
@@ -306,6 +306,8 @@ End-to-end tests complement unit tests by exercising the real Electron applicati
 Every user-visible behavior described in `docs/PRODUCT.md` must have at least one automated test. Behaviors that cross a process, persistence, or platform boundary — the Electron shell, preload/IPC, persistence, attachments, clipboard, drag-and-drop, and global shortcuts — must also have an end-to-end test, in addition to any unit test for the underlying rule.
 
 Coverage reporting (`npm run test:coverage`) is a gap-finder, not a target. Do not add tests solely to raise the number. When behavior changes, review the affected product requirements and confirm each one still has coverage at the appropriate level.
+
+The coverage-enabled unit suite enforces global floors of 89% statements, 80% branches, 89% functions, and 91% lines. These floors preserve the established repository baseline and must not be weakened to make validation pass. `npm run check` runs this coverage-enabled suite.
 
 Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files.
 

@@ -29,6 +29,7 @@ const observedSaveErrors = new Map<
 >()
 const retainedSaveErrors: string[] = []
 const closedApps = new WeakSet<ElectronApplication>()
+const allowedRendererErrors: RegExp[] = []
 
 export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
@@ -47,12 +48,33 @@ test.afterEach(async () => {
   observedSaveErrors.clear()
   const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
   retainedSaveErrors.length = 0
-  if (errors.length > 0) {
-    throw new Error(`Renderer reported save errors:\n${errors.join('\n')}`)
+  const unexpectedErrors = errors.filter((message) => !allowedRendererErrors.some((pattern) => pattern.test(message)))
+  allowedRendererErrors.length = 0
+  if (unexpectedErrors.length > 0) {
+    throw new Error(`Renderer reported save errors:\n${unexpectedErrors.join('\n')}`)
   }
 })
 
 export { expect }
+
+export function allowRendererError(pattern: RegExp): void {
+  allowedRendererErrors.push(pattern)
+}
+
+export async function clickApplicationMenuQuit(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ BrowserWindow, Menu }) => {
+    const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items[0]
+    if (item?.click === undefined) throw new Error('The application menu quit item is unavailable.')
+    item.click(item, BrowserWindow.getFocusedWindow() ?? undefined, {} as Electron.KeyboardEvent)
+  })
+}
+
+export async function delaySaveIpc(app: ElectronApplication, milliseconds: number): Promise<void> {
+  await app.evaluate(({ ipcMain }, delay) => {
+    ipcMain.removeHandler('tree:save')
+    ipcMain.handle('tree:save', () => new Promise<void>((resolve) => globalThis.setTimeout(resolve, delay)))
+  }, milliseconds)
+}
 
 async function closeTrackedApps(): Promise<void> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))

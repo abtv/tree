@@ -84,7 +84,7 @@ export function bootstrapApplication({
       if (!registerShortcut(surfaceWindow)) {
         onStartupError(new Error('The accelerator is unavailable.'))
       }
-      setApplicationMenu(() => quitHandshake.request())
+      setApplicationMenu(() => app.quit())
       createMainWindow()
       app.on('activate', () => {
         if (!appQuitting && getWindowCount() === 0) createMainWindow()
