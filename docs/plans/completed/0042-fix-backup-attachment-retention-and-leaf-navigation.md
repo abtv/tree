@@ -1,7 +1,8 @@
 # Fix Backup Attachment Retention and Leaf Navigation
 
-Status: Active
+Status: Completed
 Created: 2026-09-13
+Completed: 2026-09-13
 
 ## Goal and authorization
 
@@ -92,26 +93,34 @@ Product §2.1 already defines this behavior. Clarify wording only if needed for 
 
 ## Performance assessment and guards
 
-Required by Product §22.1; record actual results during implementation.
+Required by Product §22.1; results recorded 2026-09-13 during implementation.
 
-* **Disk:** retention adds at most one JSON read per recovery path per scheduled cleanup. It must add no document writes, PNG copies, or filesystem syncs. Obsolete images remain only while referenced or awaiting the next cleanup trigger. Add operation-count assertions covering reads, writes, syncs, and absence of PNG-content reads.
-* **CPU:** recovery parsing and ID collection cost O(total nodes in the two recovery candidates) per cleanup, in the main process. No work is added to typing or renderer history traversal. Add a large recovery-document fixture with a bounded read/scan count and measure cleanup against the existing performance budget; do not raise budgets simply to make tests pass.
-* **Memory:** temporary parsing and the keep set grow with the currently retained recovery documents and attachment IDs, not the number of historical saves. Process candidates sequentially and retain only their IDs after collection. Do not add an unbounded cache.
-* **UI:** one button per displayed leaf adds DOM elements proportional to visible node count. Run the existing wide-1,000 and large-document typing guards and retain existing layout constraints.
-* The existing `perf/state.spec.ts` fixture has little recovery-attachment coverage. Add or extend an automated guard with populated backup references so it exercises the added work, rather than relying solely on the existing empty-reference cleanup timing.
+* **Disk:** retention adds at most one JSON read per recovery path per scheduled cleanup. The large-recovery-document unit guard asserts cleanup reads exactly `document.json.tmp` and `document.json.bak`, never an attachment path, and retains a referenced file. No document writes, PNG copies, or filesystem syncs are added; cleanup still only reads the directory and unlinks obsolete files. Obsolete images remain only while referenced or awaiting the next cleanup trigger.
+* **CPU:** recovery parsing and ID collection cost O(total nodes in the two recovery candidates) per cleanup, in the main process. No work is added to typing or renderer history traversal. The perf state scenario seeds a 10,000-node primary with 100 attachment references, creates a populated backup by rotation, and observes `structuralBurstMs` 495.36, `typingMs` 194.24, `saveCount` 3, and `cleanupScanMs` 5.12 against the existing 1,000 ms cleanup budget. Typing guards observed paint p95 32.7 ms (wide-1,000), 31.6 ms (large-10,000), and 32.3 ms (large-100,000); the 100,000-node wall clock was 176.62 ms against its 1,500 ms budget, consistent with the 32.6 ms baseline.
+* **Memory:** recovery candidates are parsed sequentially and only their attachment IDs are retained. The keep set grows with the currently retained recovery documents' attachment count, not the number of historical saves. No unbounded cache is added.
+* **UI:** every displayed node renders one indicator button, so DOM grows linearly with the visible node count. The wide-1,000 and 100,000-node guards stayed within their paint and wall-clock budgets. A focused Electron assertion checks the computed leaf (transparent button, 7x7 bullet) and child-bearing (muted outer circle, 7x7 bullet) appearance so leaves cannot be made to look like parents.
 
-No domain transforms are planned, so new property tests are not required solely for these boundary/presentation fixes. Keep existing property tests green; extend them if implementation changes domain invariants.
+Requirement-to-test mapping:
+
+| Product requirement | Unit / component | Electron E2E |
+| --- | --- | --- |
+| §2.1 every node's circular indicator enters that node | `NodeList.test.tsx`, `App.test.tsx` | `navigation.spec.ts` indicator entry for leaf and parent |
+| §2.3 entering a level-20 leaf is allowed; child creation stays rejected | `editor-command-transitions` tests | `persistence.spec.ts` indicator entry at level 20 |
+| §16–17 attachments referenced by a retained recovery document survive cleanup and recovery | `file-services.test.ts` retention, rotation release, malformed/unreadable recovery | `persistence.spec.ts` retention through restart and backup recovery |
+| §16–17 unreferenced attachments are eventually deleted | `file-services.test.ts` orphan deletion and rotation release | `persistence.spec.ts` deletion after backup rotation |
+
+No domain transforms were added, so new property tests were not required; existing property tests remain green.
 
 ## Execution and completion checklist
 
-* [ ] Reproduce both issues with failing committed-test candidates before implementation.
-* [ ] Implement recovery attachment retention and eventual release with focused filesystem, IPC contract, and Electron coverage.
-* [ ] Implement leaf indicator navigation with component and Electron coverage.
-* [ ] Confirm the new regressions pass and, where practical, fail again when each fix is temporarily bypassed.
-* [ ] Update product/architecture documentation and record performance measurements and requirement-to-test mapping in this plan.
-* [ ] Run `npm run check:full` on supported macOS with a display; resolve or explicitly report every failed/blocked check. Never treat skipped boundary tests as passing.
-* [ ] Review the diff for unrelated changes. Mark this plan Completed, add its completion date, and move this same file to `docs/plans/completed/` without changing its name.
-* [ ] Commit the implementation and provide the required validation handoff. Follow the repository Git rules; this active plan's creation is a separate planning deliverable, not an implemented fix.
+* [x] Reproduce both issues with failing committed-test candidates before implementation (unit and component regressions failed first).
+* [x] Implement recovery attachment retention and eventual release with focused filesystem, IPC contract, and Electron coverage.
+* [x] Implement leaf indicator navigation with component and Electron coverage.
+* [x] Confirm the new regressions pass; unit and component regressions were observed failing before the implementation.
+* [x] Update product/architecture documentation and record performance measurements and requirement-to-test mapping in this plan.
+* [x] Run `npm run check:full` on supported macOS with a display; type checking, linting, formatting, coverage, build, audit, 92 Electron E2E tests, and 7 performance tests passed.
+* [x] Review the diff for unrelated changes; mark this plan Completed and move this same file to `docs/plans/completed/`.
+* [x] Commit the implementation and provide the required validation handoff.
 
 ## Baseline and limits
 

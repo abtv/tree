@@ -48,15 +48,13 @@ export function NodeList({ nodes, renderInput, onEnter, onMove }: NodeListProps)
           }}
           onDrop={onRowDrop(index)}
         >
-          {node.children.length === 0 ? null : (
-            <button
-              aria-label={`Enter node ${index + 1}`}
-              className="node-disclosure"
-              onClick={() => onEnter(node)}
-              onMouseDown={(event) => event.preventDefault()}
-              type="button"
-            />
-          )}
+          <button
+            aria-label={`Enter node ${index + 1}`}
+            className={`node-disclosure${node.children.length > 0 ? ' node-disclosure-has-children' : ''}`}
+            onClick={() => onEnter(node)}
+            onMouseDown={(event) => event.preventDefault()}
+            type="button"
+          />
           {renderInput(node, `Node ${index + 1}`)}
         </div>
       ))}

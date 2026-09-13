@@ -708,7 +708,7 @@ When the user quits, the application waits for queued automatic saves to finish.
 
 Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
 
-When recovering from a missing or malformed document file, a temporary or backup document must be validated, including the availability of its referenced attachments, before it replaces the primary file. If stored document files exist but no valid document can be loaded, loading fails without changing those files. If no document files exist, the normal first-launch behavior applies.
+When recovering from a missing or malformed document file, a temporary or backup document must be validated, including the availability of its referenced attachments, before it replaces the primary file. A valid retained temporary or backup document's referenced attachments continue to count as references during cleanup, so recovery remains possible after the primary file is damaged. If stored document files exist but no valid document can be loaded, loading fails without changing those files. If no document files exist, the normal first-launch behavior applies.
 
 A primary file containing JSON `null` is invalid stored data, not a first launch. Loading shows an error and preserves the primary and any temporary or backup documents.
 
@@ -740,6 +740,8 @@ Moving a node moves the attachment with the node logically; the attachment does 
 Deleting a node must also delete its attachment when that attachment is no longer referenced.
 
 Deleting a subtree must clean up attachments belonging to deleted nodes when they are no longer referenced.
+
+An attachment is no longer referenced only after every live document reference, every retained runtime (undo/redo) reference, and every valid retained recovery document reference is gone. A temporary or backup document that still references an attachment keeps that file available for recovery until a later save rotation removes the reference and a subsequent cleanup runs. Cleanup must not remove an attachment that a valid recovery document still references.
 
 Image attachments must survive application restart.
 

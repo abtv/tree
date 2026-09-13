@@ -1,4 +1,4 @@
-import { expect, largeSeed, launchTree, round, seedDocument, test } from './fixtures'
+import { expect, largeAttachmentSeed, launchTree, round, seedAttachmentFiles, seedDocument, test } from './fixtures'
 
 interface SaveControl {
   saves: number
@@ -46,7 +46,11 @@ async function readProbe(app: Awaited<ReturnType<typeof launchTree>>['app']): Pr
 
 test.describe('state and persistence work', () => {
   test('large-10000 structural burst, save policy, and cleanup scan', async ({ userDataDir }) => {
-    seedDocument(userDataDir, largeSeed(100, 100))
+    seedDocument(userDataDir, largeAttachmentSeed(100, 100))
+    seedAttachmentFiles(
+      userDataDir,
+      Array.from({ length: 100 }, (_, index) => `child-image-${index}`),
+    )
     const { app, window } = await launchTree(userDataDir)
     const input = window.getByRole('textbox').first()
     await input.focus()

@@ -105,6 +105,18 @@ describe('main IPC handlers', () => {
     expect(fileServices.cleanupAttachments).toHaveBeenCalledWith(['image-1'])
   })
 
+  it('forwards cleanup ids, returns successfully, and propagates cleanup failures', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const cleanup = handlers.get(ipcChannels.cleanupAttachments)!
+
+    await expect(cleanup(event, ['image-1', 'image-2'])).resolves.toBeUndefined()
+    expect(fileServices.cleanupAttachments).toHaveBeenLastCalledWith(['image-1', 'image-2'])
+
+    vi.mocked(fileServices.cleanupAttachments).mockRejectedValueOnce(new Error('cleanup failed'))
+    await expect(Promise.resolve().then(() => cleanup(event, []))).rejects.toThrow('cleanup failed')
+  })
+
   it('propagates handler and validation failures', async () => {
     const { handlers, fileServices } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }

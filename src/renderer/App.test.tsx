@@ -366,19 +366,40 @@ describe('App', () => {
     expect(screen.getByLabelText('Current location')).toHaveTextContent('›Projects')
   })
 
-  it('shows a disclosure control only for nodes with children and enters the node when clicked', async () => {
+  it('renders an enter control for a childless node and enters it without changing the document', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('The editor is not ready.')
+    const button = screen.getByRole('button', { name: 'Enter node 1' })
+    expect(button.className).not.toContain('node-disclosure-has-children')
+
+    fireEvent.mouseDown(button)
+    fireEvent.click(button)
+
+    const after = store.getSnapshot()
+    if (after.status !== 'ready') throw new Error('The editor is not ready.')
+    expect(screen.getByRole('textbox', { name: 'Current parent' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Node 1' })).not.toBeInTheDocument()
+    expect(after.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+    expect(after.document).toBe(before.document)
+  })
+
+  it('shows a child-bearing indicator and enters the node when clicked', async () => {
     const store = createStore()
     await act(async () => {
       await store.initialize()
     })
     render(<App store={store} />)
 
-    expect(screen.queryByRole('button', { name: 'Enter node 1' })).not.toBeInTheDocument()
-
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
     const disclosure = screen.getByRole('button', { name: 'Enter node 1' })
+    expect(disclosure.className).toContain('node-disclosure-has-children')
     fireEvent.mouseDown(disclosure)
     fireEvent.click(disclosure)
 

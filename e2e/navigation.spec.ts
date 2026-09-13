@@ -217,4 +217,44 @@ test.describe('navigation', () => {
     await expect(node(window, 1)).toHaveValue('Projects')
     await expect(node(window, 1)).toBeFocused()
   })
+
+  test('clicks the circular indicator to enter a node with children and a childless node', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Parent')
+    await window.keyboard.press('Meta+.')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 1), 'Child')
+    await window.keyboard.press('Meta+,')
+
+    const parentIndicator = window.getByRole('button', { name: 'Enter node 1' })
+    const indicatorAppearance = await parentIndicator.evaluate((element) => {
+      const button = getComputedStyle(element)
+      const bullet = getComputedStyle(element, '::before')
+      return { background: button.backgroundColor, bulletWidth: bullet.width, bulletHeight: bullet.height }
+    })
+    expect(indicatorAppearance.background).not.toBe('rgba(0, 0, 0, 0)')
+    expect(indicatorAppearance.bulletWidth).toBe('7px')
+    expect(indicatorAppearance.bulletHeight).toBe('7px')
+
+    await parentIndicator.click()
+    await expect(parent(window)).toHaveValue('Parent')
+    await expect(node(window, 1)).toHaveValue('Child')
+    await expect(node(window, 1)).toBeFocused()
+
+    const leafIndicator = window.getByRole('button', { name: 'Enter node 1' })
+    const leafAppearance = await leafIndicator.evaluate((element) => {
+      const button = getComputedStyle(element)
+      const bullet = getComputedStyle(element, '::before')
+      return { background: button.backgroundColor, bulletWidth: bullet.width, bulletHeight: bullet.height }
+    })
+    expect(leafAppearance.background).toBe('rgba(0, 0, 0, 0)')
+    expect(leafAppearance.bulletWidth).toBe('7px')
+    expect(leafAppearance.bulletHeight).toBe('7px')
+
+    await leafIndicator.click()
+    await expect(parent(window)).toHaveValue('Child')
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
+    await expect(parent(window)).toBeFocused()
+  })
 })

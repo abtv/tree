@@ -224,6 +224,30 @@ export function largeSeed(roots: number, perRoot: number): Seed {
   }
 }
 
+export function largeAttachmentSeed(roots: number, perRoot: number): Seed {
+  const rootNodes = Array.from({ length: roots }, (_, rootIndex) => ({
+    id: `r${rootIndex}`,
+    text: `Root ${rootIndex}`,
+    children: Array.from({ length: perRoot }, (_, childIndex) => ({
+      id: `r${rootIndex}c${childIndex}`,
+      text: `Node ${rootIndex}.${childIndex}`,
+      ...(childIndex === 0 ? { attachment: { id: `child-image-${rootIndex}`, mimeType: 'image/png' } } : {}),
+      children: [],
+    })),
+  }))
+  return {
+    document: { roots: rootNodes },
+    location: { currentParentId: null, selectedNodeId: 'r0' },
+  }
+}
+
+export function seedAttachmentFiles(userDataDir: string, ids: string[]): void {
+  const directory = join(userDataDir, 'data', 'attachments')
+  mkdirSync(directory, { recursive: true })
+  const png = Buffer.from([137, 80, 78, 71])
+  for (const id of ids) writeFileSync(join(directory, `${id}.png`), png)
+}
+
 export function round(value: number): number {
   return Math.round(value * 100) / 100
 }

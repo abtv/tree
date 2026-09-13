@@ -370,6 +370,8 @@ Persisted state is serialized without cloning the in-memory document, which the 
 
 Attachment cleanup is no longer part of every save cycle. The store marks cleanup dirty only where attachment reachability can change: structural deletes, undo, redo, history eviction, and initialization. The coordinator runs cleanup after the save that persists the new referenced set, never before it, so a crash cannot leave the persisted document referencing a file that was already deleted. When document changes are pending, a requested cleanup waits for the next save; startup cleanup with no pending changes may run without a save. Attachment cleanup retains files referenced by the live document, every retained history snapshot, and pending attachment writes. The referenced set is computed from the live document's derived attachment count plus the history's incrementally maintained attachment reference counts, so cleanup rescans neither the live document nor retained snapshots.
 
+The main-process file service extends the renderer-supplied keep set with attachment ids collected from schema-valid recovery documents at `document.json.tmp` and `document.json.bak`. It reads and parses those candidates inside the same serialized filesystem operation, before unlinking anything, so a save rotation cannot race the retention decision. Recovery candidates are parsed with the domain parser and their attachment ids collected without reading attachment contents or adding a filesystem check per reference. A missing recovery file contributes no ids; malformed or unsupported recovery JSON contributes no ids and is left byte-for-byte unchanged; an unexpected recovery-file read failure aborts cleanup instead of deleting with an incomplete keep set. Retention lasts only while a recovery document references the attachment: once a later save rotation removes that reference and a subsequent scheduled cleanup runs, the file is deleted, so old ids are not retained as an accumulating archive.
+
 Loading invalid or unsupported data must fail safely rather than silently corrupting the document.
 
 File recovery checks temporary and backup candidates with the domain parser and verifies their referenced attachment files before promoting a candidate to the primary path. Invalid candidates are left untouched while the next fallback is considered. A syntactically readable primary document continues through ordinary application validation; recovery does not silently replace an unsupported primary document.
@@ -403,6 +405,8 @@ Attachment storage is responsible for:
 * ensuring attachment references remain valid.
 
 Reads, writes, and cleanup operations are ordered through the same infrastructure queue. Cleanup is therefore idempotent with respect to overlapping application requests rather than relying on concurrent unlink calls to succeed.
+
+Attachment files referenced by a schema-valid recovery document are retained even when the live document and runtime history no longer reference them. The file service unions the renderer's keep set with the attachment ids parsed from the current temporary and backup documents before it deletes anything, so recovery candidates remain loadable until save rotation removes the last reference and cleanup runs again.
 
 Attachment existence checks use filesystem metadata (`stat`) rather than reading file contents, so validating referenced attachments at load time does not scale with attachment size.
 

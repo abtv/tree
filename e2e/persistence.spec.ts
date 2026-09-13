@@ -1,6 +1,8 @@
 import {
+  allowRendererError,
   attachmentFiles,
   closeApp,
+  documentPath,
   expect,
   firePaste,
   launchTree,
@@ -14,7 +16,7 @@ import {
   writeClipboardImage,
   writeClipboardText,
 } from './fixtures'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 
 function depthSeed(depth: number) {
   const root = { id: 'n0', text: 'Level 1', children: [] as Array<{ id: string; text: string; children: never[] }> }
@@ -27,6 +29,23 @@ function depthSeed(depth: number) {
   return {
     document: { roots: [root] },
     location: { currentParentId: depth === 1 ? null : current.id, selectedNodeId: current.id },
+  }
+}
+
+function depthSeedWithLeaf(parentDepth: number) {
+  type BuiltNode = { id: string; text: string; children: BuiltNode[] }
+  const root: BuiltNode = { id: 'n0', text: 'Level 1', children: [] }
+  let current = root
+  for (let index = 1; index < parentDepth; index += 1) {
+    const child: BuiltNode = { id: `n${index}`, text: `Level ${index + 1}`, children: [] }
+    current.children.push(child)
+    current = child
+  }
+  const leaf: BuiltNode = { id: `n${parentDepth}`, text: `Level ${parentDepth + 1}`, children: [] }
+  current.children.push(leaf)
+  return {
+    document: { roots: [root] },
+    location: { currentParentId: current.id, selectedNodeId: leaf.id },
   }
 }
 
@@ -132,22 +151,93 @@ test.describe('persistence', () => {
     await expect(second.window.getByRole('link', { name: 'https://example.com' })).toBeVisible()
   })
 
-  test('removes an attachment file after its node is deleted and the app restarts', async ({ userDataDir }) => {
+  test('retains an attachment referenced by the recovery backup and deletes it after backup rotation', async ({
+    userDataDir,
+  }) => {
     const first = await launchTree(userDataDir)
 
+    await typeInto(node(first.window, 1), 'Recover me')
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
+    const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()
     await first.window.keyboard.press('Meta+Backspace')
     await expect(first.window.getByAltText('Attached image')).toHaveCount(0)
 
     await closeApp(first.app)
-    const second = await launchTree(userDataDir)
+    expect(readPersisted(userDataDir).document.roots[0]?.attachment).toBeUndefined()
+    const backup = JSON.parse(readFileSync(`${documentPath(userDataDir)}.bak`, 'utf8')) as {
+      document: { roots: { attachment?: { id: string } }[] }
+    }
+    expect(backup.document.roots[0]?.attachment?.id).toBe(attachmentId)
+    expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
 
-    await expect(second.window.locator('[aria-label^="Node "]')).toHaveCount(1)
+    const second = await launchTree(userDataDir)
+    await expect(second.window.getByAltText('Attached image')).toHaveCount(0)
+    await expect.poll(() => attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
+    await closeApp(second.app)
+    expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
+
+    const third = await launchTree(userDataDir)
+    await typeInto(node(third.window, 1), 'Rotated')
+    await closeApp(third.app)
+
+    const fourth = await launchTree(userDataDir)
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(0)
+    await closeApp(fourth.app)
+  })
+
+  test('recovers the backup document including its image after the primary is damaged', async ({ userDataDir }) => {
+    const first = await launchTree(userDataDir)
+
+    await typeInto(node(first.window, 1), 'Recover me')
+    await writeClipboardImage(first.app)
+    await firePaste(node(first.window, 1))
+    await expect(first.window.getByAltText('Attached image')).toBeVisible()
+    await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
+    const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
+
+    await node(first.window, 1).focus()
+    await first.window.keyboard.press('Meta+Backspace')
+    await expect(first.window.getByAltText('Attached image')).toHaveCount(0)
+    await closeApp(first.app)
+
+    const backup = JSON.parse(readFileSync(`${documentPath(userDataDir)}.bak`, 'utf8')) as {
+      document: { roots: { attachment?: { id: string } }[] }
+    }
+    expect(backup.document.roots[0]?.attachment?.id).toBe(attachmentId)
+
+    const second = await launchTree(userDataDir)
+    await expect(second.window.locator('[aria-label^="Node "]')).toHaveCount(1)
+    await expect(second.window.getByAltText('Attached image')).toHaveCount(0)
+    await closeApp(second.app)
+
+    writeFileSync(documentPath(userDataDir), '{ damaged')
+    const third = await launchTree(userDataDir)
+
+    await expect(node(third.window, 1)).toHaveValue('Recover me')
+    await expect(third.window.getByAltText('Attached image')).toBeVisible()
+    expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
+    await closeApp(third.app)
+  })
+
+  test('enters a level-20 leaf through its indicator and still rejects creating a child', async ({ userDataDir }) => {
+    seedDocument(userDataDir, depthSeedWithLeaf(19))
+    const before = readFileSync(documentPath(userDataDir))
+    const { window } = await launchTree(userDataDir)
+    allowRendererError(/^Operation failed: Nodes cannot be nested deeper than 20 levels\.$/)
+
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+    await expect(parent(window)).toHaveValue('Level 20')
+    await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
+
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('alert')).toHaveText(
+      'Operation failed: Nodes cannot be nested deeper than 20 levels.',
+    )
+    expect(readFileSync(documentPath(userDataDir))).toEqual(before)
   })
 })

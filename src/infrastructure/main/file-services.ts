@@ -1,6 +1,11 @@
 import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { collectAttachmentIds, parsePersistedState, type PersistedEditorState } from '../../domain/document'
+import {
+  collectAttachmentIds,
+  parsePersistedState,
+  type AttachmentId,
+  type PersistedEditorState,
+} from '../../domain/document'
 
 export interface FileServices {
   load(): Promise<unknown | null>
@@ -104,7 +109,10 @@ export function createFileServices(
     cleanupAttachments(referencedIds) {
       return enqueue('cleanupAttachments', [attachmentsDirectory], async () => {
         await prepare()
-        const keep = new Set(referencedIds)
+        const keep = new Set<AttachmentId>(referencedIds)
+        for (const path of [temporaryDocumentPath, backupDocumentPath]) {
+          for (const id of await readRecoveryAttachmentIds(path)) keep.add(id)
+        }
         const names = await readdir(attachmentsDirectory)
         await Promise.all(
           names
@@ -186,6 +194,21 @@ async function attachmentExists(attachmentsDirectory: string, id: string): Promi
   } catch (error) {
     if (isNotFound(error)) return false
     throw error
+  }
+}
+
+async function readRecoveryAttachmentIds(path: string): Promise<ReadonlySet<AttachmentId>> {
+  let contents: string
+  try {
+    contents = await readFile(path, 'utf8')
+  } catch (error) {
+    if (isNotFound(error)) return new Set()
+    throw error
+  }
+  try {
+    return collectAttachmentIds(parsePersistedState(JSON.parse(contents)).document)
+  } catch {
+    return new Set()
   }
 }
 

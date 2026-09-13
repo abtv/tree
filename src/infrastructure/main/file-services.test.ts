@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +23,24 @@ async function servicesForTest() {
   const directory = await mkdtemp(join(tmpdir(), 'tree-file-services-'))
   temporaryDirectories.push(directory)
   return { directory, services: createFileServices(directory) }
+}
+
+function stateWithImage(id: string) {
+  return {
+    version: 2 as const,
+    document: {
+      roots: [{ id: 'root', text: '', attachment: { id, mimeType: 'image/png' as const }, children: [] }],
+    },
+    location: { currentParentId: null, selectedNodeId: 'root' },
+  }
+}
+
+function stateWithoutImage(text = 'Plain') {
+  return {
+    version: 2 as const,
+    document: { roots: [{ id: 'root', text, children: [] }] },
+    location: { currentParentId: null, selectedNodeId: 'root' },
+  }
 }
 
 describe('file services', () => {
@@ -51,6 +69,130 @@ describe('file services', () => {
 
     expect(await services.readAttachment('keep')).toEqual(new Uint8Array([1]))
     expect(await services.readAttachment('remove')).toBeNull()
+  })
+
+  it('retains an attachment referenced only by the recovery backup', async () => {
+    const { directory, services } = await servicesForTest()
+    const bytes = new Uint8Array([9, 9, 9])
+    await services.writeAttachment('backup-image', bytes)
+    await services.save(stateWithImage('backup-image'))
+    await services.save(stateWithoutImage())
+
+    const backup = JSON.parse(await readFile(join(directory, 'document.json.bak'), 'utf8')) as {
+      document: { roots: { attachment?: { id: string } }[] }
+    }
+    expect(backup.document.roots[0]?.attachment?.id).toBe('backup-image')
+
+    await services.cleanupAttachments([])
+
+    expect(await services.readAttachment('backup-image')).toEqual(bytes)
+  })
+
+  it('retains an attachment referenced only by the temporary recovery document', async () => {
+    const { directory, services } = await servicesForTest()
+    const bytes = new Uint8Array([7, 7])
+    await services.writeAttachment('temporary-image', bytes)
+    await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(stateWithImage('temporary-image')), 'utf8')
+
+    await services.cleanupAttachments([])
+
+    expect(await services.readAttachment('temporary-image')).toEqual(bytes)
+  })
+
+  it('retains an attachment referenced by both the caller and a recovery document', async () => {
+    const { directory, services } = await servicesForTest()
+    const bytes = new Uint8Array([5])
+    await services.writeAttachment('shared', bytes)
+    await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(stateWithImage('shared')), 'utf8')
+    await writeFile(join(directory, 'document.json.bak'), JSON.stringify(stateWithImage('shared')), 'utf8')
+
+    await services.cleanupAttachments(['shared'])
+
+    expect(await services.readAttachment('shared')).toEqual(bytes)
+  })
+
+  it('deletes an attachment referenced by neither the caller nor a recovery document', async () => {
+    const { services } = await servicesForTest()
+    await services.writeAttachment('orphan', new Uint8Array([1]))
+
+    await services.cleanupAttachments([])
+
+    expect(await services.readAttachment('orphan')).toBeNull()
+  })
+
+  it('releases an attachment after save rotation removes the backup reference', async () => {
+    const { services } = await servicesForTest()
+    await services.writeAttachment('rotated', new Uint8Array([3]))
+    await services.save(stateWithImage('rotated'))
+    await services.save(stateWithoutImage())
+
+    await services.cleanupAttachments([])
+    expect(await services.readAttachment('rotated')).not.toBeNull()
+
+    await services.save(stateWithoutImage('Second'))
+    await services.cleanupAttachments([])
+    expect(await services.readAttachment('rotated')).toBeNull()
+  })
+
+  it('ignores absent, malformed, and unsupported recovery documents without rewriting them', async () => {
+    const { directory, services } = await servicesForTest()
+    await services.writeAttachment('ignored', new Uint8Array([4]))
+    const malformed = '{ not valid json'
+    const unsupported = '{"version":999}'
+    await writeFile(join(directory, 'document.json.tmp'), malformed, 'utf8')
+    await writeFile(join(directory, 'document.json.bak'), unsupported, 'utf8')
+
+    await services.cleanupAttachments([])
+
+    expect(await services.readAttachment('ignored')).toBeNull()
+    expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe(malformed)
+    expect(await readFile(join(directory, 'document.json.bak'), 'utf8')).toBe(unsupported)
+  })
+
+  it('aborts cleanup before deleting anything when a recovery document cannot be read', async () => {
+    const { directory, services } = await servicesForTest()
+    const bytes = new Uint8Array([6])
+    await services.writeAttachment('untouched', bytes)
+    await mkdir(join(directory, 'document.json.bak'))
+
+    await expect(services.cleanupAttachments([])).rejects.toThrow()
+
+    expect(await services.readAttachment('untouched')).toEqual(bytes)
+  })
+
+  it('reads one JSON recovery candidate per path and never reads attachment contents during cleanup', async () => {
+    const { directory, services } = await servicesForTest()
+    await services.writeAttachment('backup-image', new Uint8Array([1]))
+    const roots = Array.from({ length: 200 }, (_, rootIndex) => ({
+      id: `r${rootIndex}`,
+      text: `Root ${rootIndex}`,
+      children: Array.from({ length: 50 }, (_, childIndex) => ({
+        id: `r${rootIndex}c${childIndex}`,
+        text: 'Node',
+        attachment: {
+          id: rootIndex === 0 && childIndex === 0 ? 'backup-image' : `image-${rootIndex}-${childIndex}`,
+          mimeType: 'image/png' as const,
+        },
+        children: [],
+      })),
+    }))
+    await writeFile(
+      join(directory, 'document.json.bak'),
+      JSON.stringify({
+        version: 2,
+        document: { roots },
+        location: { currentParentId: null, selectedNodeId: 'r0' },
+      }),
+      'utf8',
+    )
+    vi.mocked(readFile).mockClear()
+
+    await services.cleanupAttachments([])
+
+    const paths = vi.mocked(readFile).mock.calls.map(([path]) => String(path))
+    expect(paths).toEqual([join(directory, 'document.json.tmp'), join(directory, 'document.json.bak')])
+    expect(paths.some((path) => path.includes('attachments'))).toBe(false)
+    expect(await services.readAttachment('backup-image')).toEqual(new Uint8Array([1]))
   })
 
   it('returns null when no document has been saved yet', async () => {

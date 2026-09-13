@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import { NodeList } from './NodeList'
@@ -52,5 +52,46 @@ describe('NodeList', () => {
 
     dropAt(target, 'b', 29)
     expect(onMove).toHaveBeenLastCalledWith('b', 1)
+  })
+
+  it('enters a childless node when its circular indicator is clicked', () => {
+    const onEnter = vi.fn()
+    const { getByRole } = render(
+      <NodeList
+        nodes={nodes}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+        onEnter={onEnter}
+        onMove={() => undefined}
+      />,
+    )
+
+    fireEvent.click(getByRole('button', { name: 'Enter node 1' }))
+
+    expect(onEnter).toHaveBeenCalledWith(nodes[0])
+  })
+
+  it('distinguishes leaf and child-bearing indicators while entering both', () => {
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    const onEnter = vi.fn()
+    const { getByRole } = render(
+      <NodeList
+        nodes={[parentNode, ...nodes]}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+        onEnter={onEnter}
+        onMove={() => undefined}
+      />,
+    )
+
+    const parentButton = getByRole('button', { name: 'Enter node 1' })
+    const leafButton = getByRole('button', { name: 'Enter node 2' })
+    expect(parentButton.className).toContain('node-disclosure-has-children')
+    expect(leafButton.className).not.toContain('node-disclosure-has-children')
+
+    fireEvent.mouseDown(parentButton)
+    fireEvent.click(parentButton)
+    expect(onEnter).toHaveBeenLastCalledWith(parentNode)
+
+    fireEvent.click(leafButton)
+    expect(onEnter).toHaveBeenLastCalledWith(nodes[0])
   })
 })
