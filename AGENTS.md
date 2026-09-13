@@ -1,5 +1,17 @@
 # AGENTS.md
 
+## Session Bootstrap
+
+At the start of a session:
+
+1. Read this file and the active plan in `docs/plans/active/`, if one exists.
+2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references.
+3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
+
+Prefer the narrowest referenced section over reading an entire document.
+
+---
+
 ## 1. Project Role
 
 The user is the Product Owner.
@@ -213,9 +225,7 @@ TypeScript types do not prove that runtime values are forwarded correctly across
 
 Shutdown, startup, persistence, or quit changes must cover the success path and relevant failure paths, including pending-save flushing, save failure, timeout, retry, duplicate requests, application-menu quit, window close, and renderer unavailability.
 
-E2E and performance fixtures must treat launched Electron applications as owned child processes. Register each process immediately after launch, clean it up when launch or readiness fails, and wait for the process to exit before the next test starts. Teardown must be idempotent for explicit restarts and must include a bounded termination fallback so a failed test cannot leave application windows or processes running into later tests.
-
-When an Electron E2E or performance launch fails, also check for a macOS crash dialog and stale suite-owned Electron processes before diagnosing product behavior. Cleanup must be scoped to the suite's temporary user-data marker; never kill arbitrary Electron processes. Rerun the isolated failure after cleanup, then rerun the complete suite.
+End-to-end and performance fixtures must own the Electron processes they launch. The concrete registration, cleanup, crash-dialog, and bounded-teardown mechanics are in `docs/DEVELOPMENT.md` §9.
 
 ---
 
