@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import type { Document } from '../domain/document'
+import { describe, expect, it, vi } from 'vitest'
+import type { Document, TreeNode } from '../domain/document'
+import { MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import {
   ancestorNavigationTransition,
   createSiblingOrFirstChildTransition,
@@ -27,6 +28,31 @@ const document: Document = {
 }
 
 describe('editor command transitions', () => {
+  it('rejects a child at maximum depth before requesting an ID', () => {
+    const root: TreeNode = {
+      id: 'n0',
+      text: '',
+      children: [],
+    }
+    let current = root
+    for (let index = 1; index < 20; index += 1) {
+      const child: TreeNode = { id: `n${index}`, text: '', children: [] }
+      current.children.push(child)
+      current = child
+    }
+    const deepDocument = { roots: [root] }
+    const createId = vi.fn(() => 'unused')
+    const result = createSiblingOrFirstChildTransition(
+      deepDocument,
+      { currentParentId: current.id, selectedNodeId: current.id },
+      0,
+      createId,
+    )
+
+    expect(result).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(createId).not.toHaveBeenCalled()
+  })
+
   it('resolves vertical and horizontal navigation targets without changing the document', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
 
@@ -120,6 +146,7 @@ describe('editor command transitions', () => {
       0,
       () => 'before',
     )
+    if (!('document' in before)) throw new Error('Expected an accepted transition.')
     expect(before.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
       ['before', ''],
       ['first', 'First'],
@@ -134,6 +161,7 @@ describe('editor command transitions', () => {
       2,
       () => 'split',
     )
+    if (!('document' in split)) throw new Error('Expected an accepted transition.')
     expect(split.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
       ['first', 'Fi'],
       ['split', 'rst'],
@@ -147,6 +175,7 @@ describe('editor command transitions', () => {
       0,
       () => 'child',
     )
+    if (!('document' in child)) throw new Error('Expected an accepted transition.')
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'first', 'second'])
     expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
   })

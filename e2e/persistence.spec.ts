@@ -7,13 +7,51 @@ import {
   node,
   parent,
   readPersisted,
+  seedDocument,
   test,
   typeInto,
   writeClipboardImage,
   writeClipboardText,
 } from './fixtures'
+import { readFileSync } from 'node:fs'
+
+function depthSeed(depth: number) {
+  const root = { id: 'n0', text: 'Level 1', children: [] as Array<{ id: string; text: string; children: never[] }> }
+  let current = root
+  for (let index = 1; index < depth; index += 1) {
+    const child = { id: `n${index}`, text: `Level ${index + 1}`, children: [] as never[] }
+    current.children.push(child)
+    current = child
+  }
+  return {
+    document: { roots: [root] },
+    location: { currentParentId: depth === 1 ? null : current.id, selectedNodeId: current.id },
+  }
+}
 
 test.describe('persistence', () => {
+  test('rejects a child below level 20 without changing the editor or persisted bytes', async ({ userDataDir }) => {
+    seedDocument(userDataDir, depthSeed(20))
+    const before = readFileSync(`${userDataDir}/data/document.json`)
+    const { app, window } = await launchTree(userDataDir)
+
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('alert')).toHaveText(
+      'Operation failed: Nodes cannot be nested deeper than 20 levels.',
+    )
+    expect(readFileSync(`${userDataDir}/data/document.json`)).toEqual(before)
+    await closeApp(app)
+  })
+
+  test('shows the document error and leaves an over-depth file byte-for-byte unchanged', async ({ userDataDir }) => {
+    seedDocument(userDataDir, depthSeed(21))
+    const before = readFileSync(`${userDataDir}/data/document.json`)
+    const { window } = await launchTree(userDataDir, { expectReady: false })
+
+    await expect(window.getByRole('alert')).toContainText('Nodes cannot be nested deeper than 20 levels.')
+    expect(readFileSync(`${userDataDir}/data/document.json`)).toEqual(before)
+  })
+
   test('does not surface a save error during rapid edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const text = 'rapid '.repeat(100)

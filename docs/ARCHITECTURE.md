@@ -129,6 +129,8 @@ The parent relationship is derived from the tree structure.
 
 `links` is a list of non-overlapping ranges into `text`. Each range stores its HTTP(S) URL, which must equal the text covered by the range. Version-one persisted documents without links are migrated in memory and are saved using the version-two format.
 
+The domain invariant `MAX_DOCUMENT_DEPTH = 20` counts top-level roots as level 1. Nodes at level 20 may be edited and entered but cannot receive children. Domain creation, document assertions, and persisted-state parsing reject any node below level 20 with `Nodes cannot be nested deeper than 20 levels.`; the schema version remains 2.
+
 Do not store redundant `parentId` fields unless there is a demonstrated technical need and the data model is explicitly changed.
 
 Node IDs are stable identifiers.
@@ -158,6 +160,8 @@ leaveNode
 undo
 redo
 ```
+
+Sibling creation, splitting, pasting, editing, and reordering do not increase node depth and remain available at level 20. A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
 
 The exact API and naming may evolve.
 

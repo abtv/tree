@@ -1,6 +1,6 @@
 import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, type Seed } from './fixtures'
 
-const TYPED = 'abcdefghijklmnopqrst'
+const TYPED = 'abcdefghijklmnopqrstuvwxyz'.repeat(4)
 
 function summarize(samples: number[]): { median: number; p95: number; max: number } {
   const sorted = [...samples].sort((left, right) => left - right)
@@ -23,7 +23,7 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
     target.addEventListener('input', (event) => {
       const start = event.timeStamp
       queueMicrotask(() => commits.push(performance.now() - start))
-      requestAnimationFrame(() => paints.push(performance.now() - start))
+      requestAnimationFrame(() => requestAnimationFrame(() => paints.push(performance.now() - start)))
     })
   })
 
@@ -49,11 +49,14 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
       paintMedianMs: round(paint.median),
       paintP95Ms: round(paint.p95),
       paintMaxMs: round(paint.max),
+      samples: measured.paints.length,
     })}`,
   )
 
   expect(measured.paints.length).toBeGreaterThan(0)
-  expect(paint.p95).toBeLessThan(2_000)
+  expect(measured.paints.length).toBeGreaterThanOrEqual(100)
+  expect(paint.p95).toBeLessThan(100)
+  expect(paint.max).toBeLessThan(250)
 }
 
 test.describe('typing latency', () => {

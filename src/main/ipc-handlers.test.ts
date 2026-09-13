@@ -35,6 +35,28 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('validates the maximum persisted depth before filesystem persistence', async () => {
+    const { handlers, fileServices } = createHarness()
+    const root = { id: 'n0', text: '', children: [] as { id: string; text: string; children: never[] }[] }
+    let current = root
+    for (let index = 1; index < 20; index += 1) {
+      const child = { id: `n${index}`, text: '', children: [] as never[] }
+      current.children.push(child)
+      current = child
+    }
+    const state = { version: 2, document: { roots: [root] }, location: { currentParentId: null, selectedNodeId: 'n0' } }
+    const event = { senderFrame: { url: rendererUrl } }
+
+    await handlers.get(ipcChannels.save)!(event, state)
+    expect(fileServices.save).toHaveBeenCalledOnce()
+
+    current.children.push({ id: 'n20', text: '', children: [] })
+    await expect(Promise.resolve().then(() => handlers.get(ipcChannels.save)!(event, state))).rejects.toThrow(
+      'Nodes cannot be nested deeper than 20 levels.',
+    )
+    expect(fileServices.save).toHaveBeenCalledOnce()
+  })
+
   it('registers every exposed IPC channel', () => {
     const { handlers } = createHarness()
 

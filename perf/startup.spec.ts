@@ -2,21 +2,28 @@ import { performance as nodePerformance } from 'node:perf_hooks'
 import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, type Seed } from './fixtures'
 
 async function measureStartup(userDataDir: string, scenario: string, seed?: Seed): Promise<void> {
-  if (seed !== undefined) {
-    seedDocument(userDataDir, seed)
+  const launchSamples: number[] = []
+  const rendererSamples: number[] = []
+  for (let repetition = 0; repetition < 3; repetition += 1) {
+    if (seed !== undefined) seedDocument(userDataDir, seed)
+    const start = nodePerformance.now()
+    const { window } = await launchTree(userDataDir)
+    launchSamples.push(nodePerformance.now() - start)
+    rendererSamples.push(await window.evaluate(() => performance.now()))
   }
-
-  const start = nodePerformance.now()
-  const { window } = await launchTree(userDataDir)
-  const launchMs = nodePerformance.now() - start
-  const rendererMs = await window.evaluate(() => performance.now())
+  const range = (samples: number[]): { min: number; max: number } => ({
+    min: round(Math.min(...samples)),
+    max: round(Math.max(...samples)),
+  })
+  const launch = range(launchSamples)
+  const renderer = range(rendererSamples)
 
   console.log(
-    `PERF ${JSON.stringify({ kind: 'startup', scenario, launchMs: round(launchMs), rendererMs: round(rendererMs) })}`,
+    `PERF ${JSON.stringify({ kind: 'startup', scenario, samples: launchSamples.length, launchMs: launch, rendererMs: renderer })}`,
   )
 
-  expect(launchMs).toBeLessThan(15_000)
-  expect(rendererMs).toBeLessThan(15_000)
+  expect(launch.max).toBeLessThan(2_000)
+  expect(renderer.max).toBeLessThan(1_000)
 }
 
 test.describe('startup', () => {

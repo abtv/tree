@@ -16,6 +16,7 @@ import {
   pasteText,
   serializeState,
   splitNode,
+  MAX_DOCUMENT_DEPTH,
   type Document,
   type Location,
   type TreeNode,
@@ -68,6 +69,17 @@ function allIds(document: Document): string[] {
   return allNodes(document).map((node) => node.id)
 }
 
+function maxDepth(document: Document): number {
+  let maximum = 0
+  const stack = document.roots.map((node) => ({ node, depth: 1 }))
+  while (stack.length > 0) {
+    const entry = stack.pop()!
+    maximum = Math.max(maximum, entry.depth)
+    entry.node.children.forEach((child) => stack.push({ node: child, depth: entry.depth + 1 }))
+  }
+  return maximum
+}
+
 function subtreeIds(node: TreeNode): string[] {
   const ids: string[] = []
   const visit = (current: TreeNode): void => {
@@ -109,6 +121,7 @@ describe('document invariants', () => {
     fc.assert(
       fc.property(forest, fc.nat(), (rawForest, seed) => {
         const document = materialize(rawForest)
+        expect(maxDepth(document)).toBeLessThanOrEqual(MAX_DOCUMENT_DEPTH)
         const node = pick(document, seed)
         const state = serializeState(document, locationFor(document, node))
 

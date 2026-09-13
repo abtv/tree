@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test as base, type ElectronApplication, type Page } from '@playwright/test'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { cleanupStaleElectronProcesses } from './electron-process'
@@ -127,7 +127,7 @@ async function waitForProcessExit(
   })
 }
 
-export async function launchTree(userDataDir: string): Promise<Launched> {
+export async function launchTree(userDataDir: string, options: { expectReady?: boolean } = {}): Promise<Launched> {
   await closeTrackedApps()
   await cleanupStaleElectronProcesses('tree-e2e-')
   let app: ElectronApplication
@@ -150,7 +150,7 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
   try {
     const window = await app.firstWindow()
     await observeSaveErrors(window)
-    await expect(window.locator('main.tree-app')).toBeVisible()
+    if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
     return { app, window }
   } catch (error) {
     await closeApp(app)
@@ -246,6 +246,12 @@ export async function setCursor(input: ReturnType<Page['locator']>, position: nu
 
 export function documentPath(userDataDir: string): string {
   return join(userDataDir, 'data', 'document.json')
+}
+
+export function seedDocument(userDataDir: string, seed: { document: unknown; location: unknown }): void {
+  const directory = join(userDataDir, 'data')
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(documentPath(userDataDir), JSON.stringify({ version: 1, ...seed }))
 }
 
 export function readPersisted(userDataDir: string): PersistedState {

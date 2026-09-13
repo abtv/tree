@@ -12,6 +12,7 @@ import {
   type Location,
   type NodeId,
 } from '../domain/document'
+import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 
 export interface FocusTarget {
   nodeId: NodeId
@@ -25,6 +26,12 @@ export interface LocationTransition {
 
 export interface StructuralTransition extends LocationTransition {
   document: Document
+  kind?: never
+}
+
+export interface RejectedTransition {
+  kind: 'rejected'
+  message: string
 }
 
 export function createSiblingOrFirstChildTransition(
@@ -32,9 +39,13 @@ export function createSiblingOrFirstChildTransition(
   location: Location,
   cursor: number,
   createId: () => NodeId,
-): StructuralTransition {
-  const id = createId()
+): StructuralTransition | RejectedTransition {
   if (location.currentParentId === location.selectedNodeId) {
+    const parent = requireNode(document, location.selectedNodeId)
+    if (parent.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) {
+      return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+    }
+    const id = createId()
     return {
       document: createFirstChild(document, location.selectedNodeId, id),
       location: { ...location, selectedNodeId: id },
@@ -42,6 +53,7 @@ export function createSiblingOrFirstChildTransition(
     }
   }
 
+  const id = createId()
   const selected = requireNode(document, location.selectedNodeId).node
   const nextDocument =
     cursor === 0 && selected.text !== ''

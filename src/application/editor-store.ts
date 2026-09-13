@@ -305,8 +305,12 @@ export class EditorStore {
 
   public createSiblingOrFirstChild(cursor: number): void {
     const state = this.ready()
-    this.endTextSession()
     const transition = createSiblingOrFirstChildTransition(state.document, state.location, cursor, this.createId)
+    if (transition.kind === 'rejected') {
+      this.reportError(new Error(transition.message))
+      return
+    }
+    this.endTextSession()
     this.applyStructural(
       transition.document,
       transition.location,

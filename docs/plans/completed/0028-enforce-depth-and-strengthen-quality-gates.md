@@ -1,7 +1,8 @@
 # Enforce Document Depth and Strengthen Quality Gates
 
-Status: Active
+Status: Completed
 Created: 2026-09-13
+Completed: 2026-09-13
 
 ## Goal
 
@@ -181,3 +182,23 @@ During implementation:
 * Stable global coverage floors are updated without weakening any existing floor.
 * Documentation metadata is coherent.
 * `npm run check:full` passes without skipped boundary coverage.
+
+## Final Validation Outcome
+
+Implemented the 20-level invariant across domain creation, document assertion, persisted-state parsing, application transitions, IPC save validation, and the real Electron UI. Level-20 nodes remain enterable, selectable, and editable. Rejected child creation returns an explicit transition rejection before ID generation, leaves the document, location, focus, history, and persistence queue unchanged, and presents the approved error. Version 1 and version 2 over-depth persisted documents fail safely without modifying their files.
+
+Added focused unit and property coverage, IPC contract coverage, and real Electron persistence tests for depths 19, 20, and 21, asynchronous clipboard and attachment races, clipboard failures, malformed persistence, and hyperlink edge cases. The focused branch results are `src/domain/document.ts` 83.73% and `src/application/editor-store.ts` 85.05%.
+
+The measured global coverage baseline is 92.84% statements, 84.64% branches, 92.94% functions, and 94.57% lines. Enforced floors are 91%, 83%, 92%, and 93%, respectively; each is above the previous floor and leaves a small variance margin.
+
+Performance used three startup repetitions per scenario and 104 typing samples per scenario. Typing latency was measured from the input event through two consecutive animation frames. Final observations on the supported development machine were:
+
+| Scenario | Launch range | Renderer range | Typing paint p95 | Typing paint maximum |
+| --- | ---: | ---: | ---: | ---: |
+| fresh | 289.41–387.87 ms | 80.2–90.8 ms | — | — |
+| wide-1000 | 300.83–392.1 ms | 103.5–106.4 ms | 33.1 ms | 34.1 ms |
+| large-10000 | 285.67–347.41 ms | 92.2–99.9 ms | 36 ms | 40.4 ms |
+
+The approved budgets remain 2,000 ms launch, 1,000 ms renderer, 100 ms typing p95, and 250 ms typing maximum. All five performance scenarios passed.
+
+`npm run check:full` passed: type checking, linting, formatting, 210 unit/component tests with coverage, production build, audit with zero vulnerabilities, all 69 real Electron E2E tests, and all five performance tests. No relevant boundary test was skipped.

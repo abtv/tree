@@ -1,6 +1,9 @@
 export type NodeId = string
 export type AttachmentId = string
 
+export const MAX_DOCUMENT_DEPTH = 20
+export const MAX_DOCUMENT_DEPTH_ERROR = 'Nodes cannot be nested deeper than 20 levels.'
+
 export interface AttachmentReference {
   id: AttachmentId
   mimeType: 'image/png'
@@ -248,8 +251,13 @@ export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeI
 }
 
 export function createFirstChild(document: Document, parentId: NodeId, childId: NodeId): Document {
+  const parentDepth = requireNode(document, parentId).ancestors.length + 1
+  if (parentDepth >= MAX_DOCUMENT_DEPTH) {
+    throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
+  }
   const next = cloneDocument(document)
-  requireNode(next, parentId).node.children.unshift({ id: childId, text: '', children: [] })
+  const parent = requireNode(next, parentId)
+  parent.node.children.unshift({ id: childId, text: '', children: [] })
   return next
 }
 
@@ -429,7 +437,9 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
   }
 
   const output: TreeNode[] = []
-  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[] }> = [{ input: value, index: 0, output }]
+  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[]; depth: number }> = [
+    { input: value, index: 0, output, depth: 1 },
+  ]
 
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
@@ -439,6 +449,9 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
     }
     const candidate = frame.input[frame.index]
     frame.index += 1
+    if (frame.depth > MAX_DOCUMENT_DEPTH) {
+      throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
+    }
     if (
       !isRecord(candidate) ||
       typeof candidate.id !== 'string' ||
@@ -465,7 +478,7 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
       children: [],
     }
     frame.output.push(node)
-    stack.push({ input: children, index: 0, output: node.children })
+    stack.push({ input: children, index: 0, output: node.children, depth: frame.depth + 1 })
   }
 
   return output

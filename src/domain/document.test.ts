@@ -17,9 +17,13 @@ import {
   parsePersistedState,
   pasteMultilineText,
   pasteText,
+  removeTextRange,
   serializeState,
   splitNode,
   isHttpUrl,
+  normalizeLinks,
+  MAX_DOCUMENT_DEPTH,
+  MAX_DOCUMENT_DEPTH_ERROR,
   type TreeNode,
 } from './document'
 
@@ -117,8 +121,8 @@ describe('document operations', () => {
     expect(result.roots).toEqual([])
   })
 
-  it('supports deeply nested documents without recursive traversal failures', () => {
-    const depth = 5_000
+  it('accepts exactly the maximum depth and rejects the next level', () => {
+    const depth = MAX_DOCUMENT_DEPTH
     const root: TreeNode = { id: 'n0', text: 'root', children: [] }
     let current = root
     for (let index = 1; index < depth; index += 1) {
@@ -134,9 +138,30 @@ describe('document operations', () => {
     expect(locateNode(document, `n${depth - 1}`)?.ancestors).toHaveLength(depth - 1)
     expect(nodePath(document, `n${depth - 1}`)).toHaveLength(depth)
     expect(collectAttachmentIds(document).size).toBe(0)
+    expect(() => createFirstChild(document, 'n18', 'another-level-20')).not.toThrow()
     expect(() =>
       parsePersistedState({ version: 1, document, location: { currentParentId: null, selectedNodeId: 'n0' } }),
     ).not.toThrow()
+
+    current.children.push({ id: 'too-deep', text: '', children: [] })
+    expect(() => assertDocument(document)).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+    expect(() =>
+      parsePersistedState({ version: 2, document, location: { currentParentId: null, selectedNodeId: 'n0' } }),
+    ).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+  })
+
+  it('rejects creating a child below the maximum depth without cloning or changing the source', () => {
+    const root: TreeNode = { id: 'n0', text: '', children: [] }
+    let current = root
+    for (let index = 1; index < MAX_DOCUMENT_DEPTH; index += 1) {
+      const child: TreeNode = { id: `n${index}`, text: '', children: [] }
+      current.children.push(child)
+      current = child
+    }
+    const document = { roots: [root] }
+
+    expect(() => createFirstChild(document, current.id, 'new')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+    expect(current.children).toEqual([])
   })
 
   it('does not split a surrogate pair when the cursor is inside it', () => {
@@ -161,6 +186,88 @@ describe('document operations', () => {
 
     const plain = pasteText(document, 'a', 0, 'example.com')
     expect(plain.roots[0]!.links).toBeUndefined()
+  })
+
+  it('normalizes malformed, overlapping, and non-HTTP link ranges', () => {
+    expect(
+      normalizeLinks(
+        [
+          { start: -1, end: 2, url: 'https://example.com' },
+          { start: 0, end: 4, url: 'https://example.com' },
+          { start: 3, end: 8, url: 'https://example.com' },
+          { start: 0, end: 3, url: 'javascript:bad' },
+          { start: 0, end: 2, url: 'https://example.com' },
+        ],
+        'https://example.com',
+      ),
+    ).toEqual([])
+    expect(
+      normalizeLinks(
+        [
+          { start: 0, end: 19, url: 'https://example.com' },
+          { start: 20, end: 39, url: 'https://example.com' },
+        ],
+        'https://example.com https://example.com',
+      ),
+    ).toEqual([
+      { start: 0, end: 19, url: 'https://example.com' },
+      { start: 20, end: 39, url: 'https://example.com' },
+    ])
+  })
+
+  it('rejects malformed persisted nodes and links', () => {
+    const base = {
+      version: 1,
+      document: { roots: [{ id: 'a', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    }
+    expect(() => parsePersistedState({ ...base, document: { roots: 'not an array' } })).toThrow('children')
+    expect(() =>
+      parsePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', links: {}, children: [] }] } }),
+    ).toThrow('links')
+    expect(() => parsePersistedState({ ...base, document: { roots: [{ id: '', text: '', children: [] }] } })).toThrow(
+      'node is invalid',
+    )
+    expect(() => parsePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', children: {} }] } })).toThrow(
+      'children',
+    )
+    expect(() =>
+      parsePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', attachment: {}, children: [] }] } }),
+    ).toThrow('attachment')
+    expect(() =>
+      parsePersistedState({
+        ...base,
+        document: {
+          roots: [
+            {
+              id: 'a',
+              text: 'hello',
+              links: [{ start: '0', end: 2, url: 'https://example.com' }],
+              children: [],
+            },
+          ],
+        },
+      }),
+    ).toThrow('links')
+  })
+
+  it('handles link removal, insertion, and range edge cases', () => {
+    const linked = pasteText(createInitialDocument('a'), 'a', 0, 'https://example.com')
+    expect(deleteLink(linked, 'a', 0)).toBeUndefined()
+    expect(deleteLink(linked, 'a', 19)).toBeDefined()
+    expect(removeTextRange(linked, 'a', 4, 4).roots[0]!.text).toBe('https://example.com')
+    expect(removeTextRange(linked, 'a', 0, 4).roots[0]!.links).toBeUndefined()
+    expect(
+      pasteMultilineText(
+        linked,
+        'a',
+        0,
+        ['https://example.com', 'next'],
+        ['b'],
+        [{ start: 0, end: 19, url: 'https://example.com' }],
+      ).roots[1]!.links,
+    ).toEqual([{ start: 4, end: 23, url: 'https://example.com' }])
+    expect(() => pasteMultilineText(linked, 'a', 0, ['one'], [])).toThrow('one new node ID')
   })
 
   it('preserves link ranges supplied by rich clipboard paste', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from './editor-store'
+import { MAX_DOCUMENT_DEPTH, type TreeNode } from '../domain/document'
 
 function createServices(clipboard: ClipboardValue = { kind: 'text', text: '' }): EditorServices & { saves: unknown[] } {
   const saves: unknown[] = []
@@ -28,6 +29,39 @@ function loadedState(document: unknown, location: unknown): EditorServices & { s
 }
 
 describe('EditorStore', () => {
+  it('reports maximum depth without changing editor state, history, IDs, or persistence', async () => {
+    const root: TreeNode = { id: 'n0', text: 'root', children: [] }
+    let current = root
+    for (let index = 1; index < MAX_DOCUMENT_DEPTH; index += 1) {
+      const child: TreeNode = { id: `n${index}`, text: `node-${index}`, children: [] }
+      current.children.push(child)
+      current = child
+    }
+    const services = loadedState({ roots: [root] }, { currentParentId: current.id, selectedNodeId: current.id })
+    const createId = vi.fn(() => 'must-not-be-consumed')
+    const store = new EditorStore(services, createId)
+    await store.initialize()
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    store.createSiblingOrFirstChild(0)
+
+    const after = store.getSnapshot()
+    expect(after).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: current.id, selectedNodeId: current.id },
+      operationError: 'Nodes cannot be nested deeper than 20 levels.',
+    })
+    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(after.document).toEqual(before.document)
+    expect(after.focus).toEqual(before.focus)
+    expect(createId).not.toHaveBeenCalled()
+    expect(services.saves).toEqual([])
+
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: current.id } })
+  })
+
   it('creates an initial root and a sibling split', async () => {
     const store = new EditorStore(createServices(), ids('root', 'next'))
     await store.initialize()
@@ -412,6 +446,106 @@ describe('EditorStore', () => {
     store.undo()
     state = store.getSnapshot()
     expect(state.status === 'ready' && state.document.roots[0]!.attachment).toBeUndefined()
+  })
+
+  it('rejects empty copy and cut selections and propagates clipboard failures', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'copy me', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    expect(await store.copy('root', 2, 2)).toBe(false)
+    expect(await store.cut('root', 2, 2)).toBe(false)
+    expect(await store.copy('root', 0, 4)).toBe(false)
+
+    services.writeClipboard = async () => {
+      throw new Error('clipboard unavailable')
+    }
+    await expect(store.cut('root', 0, 4)).rejects.toThrow('clipboard unavailable')
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'copy me' }] } })
+  })
+
+  it('does not cut after the asynchronous selection changes', async () => {
+    let release: (() => void) | undefined
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'root', text: 'copy me', children: [] },
+          { id: 'other', text: 'other', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.writeClipboard = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.cut('root', 0, 4)
+    store.selectNode('other', 0)
+    release!()
+    await expect(pending).resolves.toBe(true)
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(state.document.roots[0]!.text).toBe('copy me')
+  })
+
+  it('does not apply a paste after the asynchronous clipboard read changes selection', async () => {
+    let release: ((value: ClipboardValue) => void) | undefined
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'root', text: '', children: [] },
+          { id: 'other', text: '', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = () =>
+      new Promise<ClipboardValue>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.paste('root', 0)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    store.selectNode('other', 0)
+    release!({ kind: 'text', text: 'ignored' })
+    await pending
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(state.document.roots[0]!.text).toBe('')
+  })
+
+  it('does not apply an image paste after attachment writing changes selection', async () => {
+    let release: (() => void) | undefined
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'root', text: '', children: [] },
+          { id: 'other', text: '', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'image', png: new Uint8Array([1]) })
+    services.writeAttachment = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('attachment'))
+    await store.initialize()
+    const pending = store.paste('root', 0)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    store.selectNode('other', 0)
+    release!()
+    await pending
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(state.document.roots[0]!.attachment).toBeUndefined()
   })
 
   it('creates a following sibling when image paste targets a node with an image', async () => {

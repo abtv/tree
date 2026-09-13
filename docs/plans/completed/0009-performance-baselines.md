@@ -103,7 +103,7 @@ Observations:
 
 ## Findings
 
-- **Electron `contextBridge` depth limit.** Documents nested deeper than roughly 250 tree levels cannot be loaded, because each level crosses an object and an array and Electron rejects nested objects beyond a depth of 1,000 (`contextBridge recursion depth exceeded`). The app fails safely into its error state and leaves the file unchanged. This is below the domain's own traversal capability (now iterative to 5,000+) and is a process-boundary constraint, not a performance one. Addressing it would mean changing the IPC payload to a serialized string; that is an architectural change requiring Product Owner approval and is not part of this plan. Accepted as out of scope, since expected nesting is well under 20 levels.
+- **Electron `contextBridge` depth limit.** Documents nested deeper than roughly 250 tree levels cannot be loaded, because each level crosses an object and an array and Electron rejects nested objects beyond a depth of 1,000 (`contextBridge recursion depth exceeded`). The app fails safely into its error state and leaves the file unchanged. This is below the domain's own traversal capability and is a process-boundary constraint, not a performance one. The approved 20-level product invariant in plan 0028 supersedes this plan's earlier assumption that expected nesting was merely well under the bridge limit; changing the IPC payload remains out of scope.
 
 ## Risks and Open Questions
 

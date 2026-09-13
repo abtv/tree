@@ -1,7 +1,8 @@
 # Improve Test Coverage
 
-Status: Active
+Status: Completed
 Created: 2026-09-12
+Completed: 2026-09-12
 
 ## Goal
 
