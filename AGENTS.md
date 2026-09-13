@@ -212,6 +212,8 @@ Shutdown, startup, persistence, or quit changes must cover the success path and 
 
 E2E and performance fixtures must treat launched Electron applications as owned child processes. Register each process immediately after launch, clean it up when launch or readiness fails, and wait for the process to exit before the next test starts. Teardown must be idempotent for explicit restarts and must include a bounded termination fallback so a failed test cannot leave application windows or processes running into later tests.
 
+When an Electron E2E or performance launch fails, also check for a macOS crash dialog and stale suite-owned Electron processes before diagnosing product behavior. Cleanup must be scoped to the suite's temporary user-data marker; never kill arbitrary Electron processes. Rerun the isolated failure after cleanup, then rerun the complete suite.
+
 ---
 
 ## 10. Validation

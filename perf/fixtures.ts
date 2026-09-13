@@ -2,6 +2,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { cleanupStaleElectronProcesses } from '../e2e/electron-process'
 
 export interface Launched {
   app: ElectronApplication
@@ -51,10 +52,17 @@ async function closeTrackedApps(): Promise<void> {
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
-  const app = await electron.launch({
-    args: [`--user-data-dir=${userDataDir}`, '.'],
-    cwd: process.cwd(),
-  })
+  await cleanupStaleElectronProcesses('tree-perf-')
+  let app: ElectronApplication
+  try {
+    app = await electron.launch({
+      args: [`--user-data-dir=${userDataDir}`, '.'],
+      cwd: process.cwd(),
+    })
+  } catch (error) {
+    await cleanupStaleElectronProcesses('tree-perf-')
+    throw new Error(`Electron failed to launch for performance test: ${formatLaunchError(error)}`, { cause: error })
+  }
   launchedApps.push(app)
   app.once('close', () => {
     closedApps.add(app)
@@ -72,6 +80,10 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
     await closeApp(app)
     throw error
   }
+}
+
+function formatLaunchError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function observeSaveErrors(app: ElectronApplication, window: Page): Promise<void> {

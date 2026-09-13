@@ -205,6 +205,8 @@ The E2E and performance fixtures continuously observe the renderer's persistence
 
 The fixtures register each launched Electron child process before waiting for readiness. Teardown requests the application shutdown handshake, waits on the child process exit event, then uses bounded SIGTERM/SIGKILL escalation and fails if the owned process remains alive. Save-status observation uses both a DOM mutation observer and a final collection, so transient document-save and attachment-cleanup errors are retained even if the status disappears before test teardown. Observations are released with their owning app, so restart tests never query stale Playwright pages during worker teardown.
 
+If Electron shows a macOS crash dialog or a full suite fails during application launch, first treat it as a process-lifecycle failure. The E2E and performance fixtures clean up only stale Electron processes carrying their own temporary `tree-e2e-*` or `tree-perf-*` user-data marker, retry cleanup after launch failure, and include the launch error in the test failure. Do not use an unrestricted Electron process kill because it may terminate unrelated applications. After cleanup, rerun the isolated failing test and then the complete suite.
+
 File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttachment`, `hasAttachment`, and `cleanupAttachments` operations, their phase, and the paths involved. Failures are logged with the original error message.
 
 ---

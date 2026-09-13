@@ -2,6 +2,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { cleanupStaleElectronProcesses } from './electron-process'
 
 export interface PersistedNode {
   id: string
@@ -106,10 +107,17 @@ async function waitForProcessExit(
 
 export async function launchTree(userDataDir: string): Promise<Launched> {
   await closeTrackedApps()
-  const app = await electron.launch({
-    args: [`--user-data-dir=${userDataDir}`, '.'],
-    cwd: process.cwd(),
-  })
+  await cleanupStaleElectronProcesses('tree-e2e-')
+  let app: ElectronApplication
+  try {
+    app = await electron.launch({
+      args: [`--user-data-dir=${userDataDir}`, '.'],
+      cwd: process.cwd(),
+    })
+  } catch (error) {
+    await cleanupStaleElectronProcesses('tree-e2e-')
+    throw new Error(`Electron failed to launch for E2E test: ${formatLaunchError(error)}`, { cause: error })
+  }
   launchedApps.push(app)
   app.once('close', () => {
     closedApps.add(app)
@@ -126,6 +134,10 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
     await closeApp(app)
     throw error
   }
+}
+
+function formatLaunchError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function observeSaveErrors(window: Page): Promise<void> {
