@@ -93,6 +93,11 @@ describe('isAllowedExternalUrl', () => {
     expect(isAllowedExternalUrl('javascript:alert(1)')).toBe(false)
     expect(isAllowedExternalUrl('file:///tmp/example')).toBe(false)
   })
+
+  it('rejects values that are not valid URLs', () => {
+    expect(isAllowedExternalUrl('not a url')).toBe(false)
+    expect(isAllowedExternalUrl('')).toBe(false)
+  })
 })
 
 describe('isAllowedRendererUrl', () => {
@@ -100,5 +105,10 @@ describe('isAllowedRendererUrl', () => {
     expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'file:///app/renderer/index.html')).toBe(true)
     expect(isAllowedRendererUrl('file:///app/renderer/other.html', 'file:///app/renderer/index.html')).toBe(false)
     expect(isAllowedRendererUrl('https://evil.example/', 'file:///app/renderer/index.html')).toBe(false)
+  })
+
+  it('rejects values that are not valid URLs', () => {
+    expect(isAllowedRendererUrl('not a url', 'file:///app/renderer/index.html')).toBe(false)
+    expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'not a url')).toBe(false)
   })
 })

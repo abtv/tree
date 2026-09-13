@@ -66,6 +66,11 @@ describe('readClipboard', () => {
     ])
   })
 
+  it('ignores anchors with empty text or text absent from the clipboard strings', () => {
+    expect(extractClipboardLinks('<a href="https://example.com"></a>', 'plain text')).toEqual([])
+    expect(extractClipboardLinks('<a href="https://example.com">missing</a>', 'plain text')).toEqual([])
+  })
+
   it('writes both plain text and HTML clipboard representations atomically', async () => {
     const calls: Array<{ text: string; html: string }> = []
     await writeClipboard(

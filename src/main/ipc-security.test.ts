@@ -22,6 +22,7 @@ describe('IPC security validation', () => {
     )
     expect(isTrustedRendererUrl('https://evil.example/index.html', 'file:///app/out/renderer/index.html')).toBe(false)
     expect(isTrustedRendererUrl(undefined, 'file:///app/out/renderer/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('not a url', 'file:///app/out/renderer/index.html')).toBe(false)
   })
 
   it('validates persisted state without rebuilding it', () => {
