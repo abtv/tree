@@ -138,6 +138,23 @@ describe('editor keyboard handler', () => {
     expect(deleteEvent.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('selects all plain text content explicitly', async () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'plain text'
+    input.setSelectionRange(2, 2)
+    const { handle, setSelectAllNodeId } = handler(store, { id: 'node', text: 'plain text', children: [] })
+
+    const event = keyEvent(input, 'a', { metaKey: true })
+    handle(event)
+    await Promise.resolve()
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
+    expect(setSelectAllNodeId).toHaveBeenCalledWith('node')
+  })
+
   it('leaves collapsed copy and cut selections to the browser', () => {
     const store = createStore()
     const input = document.createElement('textarea')
@@ -154,6 +171,20 @@ describe('editor keyboard handler', () => {
     expect(cutEvent.preventDefault).not.toHaveBeenCalled()
     expect(store.copy).not.toHaveBeenCalled()
     expect(store.cut).not.toHaveBeenCalled()
+  })
+
+  it('leaves non-empty plain-text copy to the browser', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 4)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const event = keyEvent(input, 'c', { metaKey: true })
+    handle(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(store.copy).not.toHaveBeenCalled()
   })
 
   it('does not open a preview for an image command when the node has no attachment', () => {

@@ -28,16 +28,15 @@ export function createEditorKeyDownHandler({
     }
     const cursor = getCaret(event.currentTarget)
     if (selectingAll) {
-      if (!(event.currentTarget instanceof HTMLTextAreaElement)) {
-        event.preventDefault()
-        const input = event.currentTarget
-        selectAll(input)
-        globalThis.queueMicrotask(() => {
-          setSelectAllNodeId(node.id)
-          input.classList.add('select-all')
-        })
-      }
+      event.preventDefault()
+      const input = event.currentTarget
+      selectAll(input)
+      globalThis.queueMicrotask(() => {
+        setSelectAllNodeId(node.id)
+        input.classList.add('select-all')
+      })
     } else if (event.metaKey && event.key.toLowerCase() === 'c') {
+      if (event.currentTarget instanceof HTMLTextAreaElement) return
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {
         event.preventDefault()

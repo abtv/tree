@@ -79,6 +79,10 @@ export function getSelectionRange(element: HTMLElement): { start: number; end: n
 }
 
 export function selectAll(element: HTMLElement): void {
+  if (element instanceof HTMLTextAreaElement) {
+    element.select()
+    return
+  }
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()

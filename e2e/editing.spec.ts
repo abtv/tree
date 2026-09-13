@@ -1,6 +1,84 @@
 import { expect, firePaste, launchTree, node, parent, setCursor, test, typeInto, writeClipboardText } from './fixtures'
 
 test.describe('creating nodes with Enter', () => {
+  test('Cmd+A selects all text in a link-free node', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'Plain text')
+    await window.keyboard.press('Meta+a')
+
+    await expect
+      .poll(() =>
+        editor.evaluate((element) => [
+          (element as HTMLTextAreaElement).selectionStart,
+          (element as HTMLTextAreaElement).selectionEnd,
+        ]),
+      )
+      .toEqual([0, 10])
+  })
+
+  test('Cmd+A and Cmd+C copy all text from a link-free node', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const source = node(window, 1)
+
+    await typeInto(source, 'Plain text')
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Meta+c')
+    await window.keyboard.press('End')
+    await window.keyboard.press('Enter')
+    await firePaste(node(window, 2))
+
+    await expect(node(window, 2)).toHaveValue('Plain text')
+    await app.close()
+  })
+
+  test('keeps plain text selected after Cmd+C', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'aaa')
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Meta+c')
+
+    await expect
+      .poll(() =>
+        editor.evaluate((element) => [
+          (element as HTMLTextAreaElement).selectionStart,
+          (element as HTMLTextAreaElement).selectionEnd,
+        ]),
+      )
+      .toEqual([0, 3])
+  })
+
+  test('pastes copied plain text with Cmd+V after typing in the target node', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const source = node(window, 1)
+
+    await typeInto(source, 'Plain text')
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Meta+c')
+    await window.keyboard.press('End')
+    await window.keyboard.press('Enter')
+    await window.keyboard.type(' ')
+    await window.keyboard.press('Meta+v')
+
+    await expect(node(window, 2)).toHaveValue(' Plain text')
+  })
+
+  test('pastes copied plain text after typing a space in the copied node', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'Plain text')
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Meta+c')
+    await window.keyboard.type(' ')
+    await window.keyboard.press('Meta+v')
+
+    await expect(editor).toHaveValue(' Plain text')
+  })
+
   test('Enter at the end creates an empty sibling after the node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
