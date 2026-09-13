@@ -306,6 +306,8 @@ The history is bounded to 200 entries. One entry is one text-editing session or 
 
 The choice of snapshots keeps undo/redo correct and simple. A future history bound change or a move to command/inverse-operation history must preserve the same user-visible undo depth and attachment reachability.
 
+The history also maintains an incremental reference count of the attachment IDs present in its retained snapshots. Reading the retained attachment set returns those counts instead of re-traversing every snapshot, so attachment cleanup does not scale with history depth.
+
 ---
 
 ## 12. Infrastructure Layer
@@ -360,7 +362,7 @@ The editor tracks pending asynchronous cut and paste operations. Shutdown flushi
 
 Document saves and attachment filesystem operations are serialized by the file-service operation queue. The application also queues attachment cleanup with persistence work, so cleanup cannot race a save or another cleanup, and cleanup failures follow the same visible error and shutdown-flush path as save failures. File-service operations emit structured operation names, phases, and filesystem paths for diagnosing boundary failures.
 
-Attachment cleanup is no longer part of every save cycle. The store marks cleanup dirty only where attachment reachability can change: structural deletes, undo, redo, history eviction, and initialization. The coordinator runs cleanup after the save that persists the new referenced set, never before it, so a crash cannot leave the persisted document referencing a file that was already deleted. When document changes are pending, a requested cleanup waits for the next save; startup cleanup with no pending changes may run without a save. Attachment cleanup retains files referenced by the live document, every retained history snapshot, and pending attachment writes.
+Attachment cleanup is no longer part of every save cycle. The store marks cleanup dirty only where attachment reachability can change: structural deletes, undo, redo, history eviction, and initialization. The coordinator runs cleanup after the save that persists the new referenced set, never before it, so a crash cannot leave the persisted document referencing a file that was already deleted. When document changes are pending, a requested cleanup waits for the next save; startup cleanup with no pending changes may run without a save. Attachment cleanup retains files referenced by the live document, every retained history snapshot, and pending attachment writes. The referenced set is computed from the live document plus the history's incrementally maintained attachment reference counts, so cleanup no longer rescans retained snapshots.
 
 Loading invalid or unsupported data must fail safely rather than silently corrupting the document.
 

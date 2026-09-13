@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { editNodeText, type Document, type Location } from '../domain/document'
+import { collectAttachmentIds, editNodeText, type Document, type Location } from '../domain/document'
 import { EditorHistory, HISTORY_LIMIT } from './editor-history'
 
 const root = (text: string): Document => ({ roots: [{ id: 'root', text, children: [] }] })
+const attached = (id: string): Document => ({
+  roots: [{ id: 'root', text: '', attachment: { id, mimeType: 'image/png' }, children: [] }],
+})
 const location: Location = { currentParentId: null, selectedNodeId: 'root' }
 
 describe('EditorHistory', () => {
@@ -44,6 +47,50 @@ describe('EditorHistory', () => {
     }
 
     expect(count).toBe(HISTORY_LIMIT)
+  })
+
+  it('tracks attachment references across undo and redo', () => {
+    const history = new EditorHistory()
+    history.begin(attached('image'))
+    expect([...history.attachmentIds()]).toEqual(['image'])
+
+    history.undo(root('live'), location)
+    expect([...history.attachmentIds()]).toEqual([])
+
+    history.redo(root('live'), location)
+    expect([...history.attachmentIds()]).toEqual([])
+  })
+
+  it('keeps an attachment referenced until every retained snapshot releases it', () => {
+    const history = new EditorHistory()
+    for (let index = 0; index < HISTORY_LIMIT; index += 1) {
+      history.begin(root(`v${index}`))
+    }
+    history.begin(attached('image'))
+    history.begin(attached('image'))
+    expect([...history.attachmentIds()]).toEqual(['image'])
+
+    history.undo(root('live'), location)
+    expect([...history.attachmentIds()]).toEqual(['image'])
+
+    history.undo(root('live'), location)
+    expect([...history.attachmentIds()]).toEqual([])
+  })
+
+  it('reads retained attachment ids without re-traversing snapshots', () => {
+    let traversals = 0
+    const history = new EditorHistory((document) => {
+      traversals += 1
+      return collectAttachmentIds(document)
+    })
+    for (let index = 0; index < HISTORY_LIMIT + 25; index += 1) {
+      history.begin(attached(`image-${index}`))
+    }
+
+    const before = traversals
+    history.attachmentIds()
+    history.attachmentIds()
+    expect(traversals).toBe(before)
   })
 
   it('reconciles an invalid location to the nearest surviving ancestor', () => {

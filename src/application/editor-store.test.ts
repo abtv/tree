@@ -1492,6 +1492,24 @@ describe('EditorStore', () => {
     expect(restored.status === 'ready' && restored.document.roots[0]!.attachment?.id).toBe('image')
   })
 
+  it('retains attachments reachable only through undo history during cleanup', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const cleanups: string[][] = []
+    services.cleanupAttachments = async (referencedIds) => {
+      cleanups.push(referencedIds)
+    }
+    const store = new EditorStore(services, ids('replacement'))
+    await store.initialize()
+
+    store.deleteSelected()
+    await store.flushPersistence()
+
+    expect(cleanups.at(-1)).toContain('image')
+  })
+
   it('does not save on every keystroke and saves when ten words have been inserted', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))

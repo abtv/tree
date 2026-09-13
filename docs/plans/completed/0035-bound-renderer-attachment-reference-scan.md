@@ -1,5 +1,6 @@
-Status: Active
+Status: Completed
 Created: 2026-09-13
+Completed: 2026-09-13
 
 # Bound the renderer-side attachment reference scan against history size
 
@@ -31,7 +32,7 @@ attachmentCounts: Map<AttachmentId, number>
 
 - On retention (`begin`, `undo`, `redo` pushing a snapshot), compute the snapshot's IDs once with `collectAttachmentIds` and increment each ID's count.
 - On release (past eviction, future eviction, and clearing the redo stack in `begin`), decrement using the stored set and delete entries that reach zero. Using the stored set keeps release proportional to the snapshot's attachments, not to document size.
-- Replace `documents()` with `attachmentIds(): Iterable<AttachmentId>` returning IDs whose count is greater than zero. The store no longer needs the retained documents themselves, so this also removes the 400-element array allocation per cleanup.
+- Add `attachmentIds(): Iterable<AttachmentId>` returning IDs whose count is greater than zero, and stop calling `documents()` from the store. The store no longer needs the retained documents themselves, so the 400-element array allocation no longer happens on the cleanup path. `documents()` remains a read accessor used by the property test's reference model.
 - Preserve the existing `begin` return value (`evicted`) so cleanup is still queued on exactly the same transitions as today. Clearing the redo stack continues not to queue cleanup by itself, preserving current timing behavior.
 
 ### 2. Use the maintained set in the store
@@ -87,7 +88,7 @@ Required by `PRODUCT.md` §22.1.
 - Recording attachment IDs when a snapshot is retained adds a per-snapshot `Set`. Retained snapshots share subtrees, so this is small in practice but is new retained memory; it stays bounded by the history limit.
 - Moving the snapshot traversal to history mutation adds an O(N) scan when a text-editing session starts. It is offset by the removal of the repeated full-history scan at cleanup, but it should be confirmed by the typing and state performance scenarios.
 - A counting mistake could under-retain a reachable attachment and delete a file still needed by undo. The model-based property test and the duplicate-ID unit cases specifically guard against this.
-- Removing `documents()` changes an application-internal method; the store is its only production caller, so no other behavior is affected.
+- `documents()` remains available as an application-internal read accessor; only the store stopped calling it, so no production behavior depends on it.
 
 ## Out of scope
 

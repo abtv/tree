@@ -327,6 +327,8 @@ The state/persistence scenario in `perf/state.spec.ts` seeds a 10,000-node docum
 
 Two unit guards cover disk-write and attachment-read work that the perf suite does not sample. `window-state.test.ts` uses fake timers to assert that rapid window-geometry changes coalesce into one write, that the latest bounds win, and that closing flushes the pending geometry. `file-services.test.ts` asserts that attachment existence checks use filesystem metadata and do not read attachment contents.
 
+The renderer's retention of attachment references is guarded separately. `editor-history.test.ts` asserts that reading the retained attachment IDs does not re-traverse history snapshots, and the `EditorHistory` property test checks that the maintained reference counts always equal the union of attachment IDs over the retained snapshots.
+
 ---
 
 ## 13. Persistence Testing

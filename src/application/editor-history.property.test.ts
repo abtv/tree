@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import type { Document, Location } from '../domain/document'
+import { collectAttachmentIds, type Document, type Location } from '../domain/document'
 import { EditorHistory, HISTORY_LIMIT } from './editor-history'
 
 const location: Location = { currentParentId: null, selectedNodeId: 'root' }
@@ -34,6 +34,53 @@ describe('EditorHistory invariants under the history cap', () => {
         }
         expect(history.redo(current, location)).toBeUndefined()
       }),
+    )
+  })
+
+  it('keeps tracked attachment ids equal to the retained snapshots', () => {
+    const documentWith = (attachmentId: string): Document => ({
+      roots: [
+        {
+          id: 'root',
+          text: 'live',
+          ...(attachmentId === '' ? {} : { attachment: { id: attachmentId, mimeType: 'image/png' as const } }),
+          children: [],
+        },
+      ],
+    })
+
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            action: fc.constantFrom('begin' as const, 'undo' as const, 'redo' as const),
+            attachment: fc.constantFrom('', 'a', 'b', 'c'),
+          }),
+          { minLength: 1, maxLength: 120 },
+        ),
+        (steps) => {
+          const history = new EditorHistory()
+          let current = documentWith('')
+          for (const step of steps) {
+            if (step.action === 'begin') {
+              history.begin(current)
+              current = documentWith(step.attachment)
+            } else if (step.action === 'undo') {
+              const result = history.undo(current, location)
+              if (result !== undefined) current = result.document
+            } else {
+              const result = history.redo(current, location)
+              if (result !== undefined) current = result.document
+            }
+
+            const expected = new Set<string>()
+            for (const document of history.documents()) {
+              collectAttachmentIds(document).forEach((id) => expected.add(id))
+            }
+            expect(new Set(history.attachmentIds())).toEqual(expected)
+          }
+        },
+      ),
     )
   })
 })

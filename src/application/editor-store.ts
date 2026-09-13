@@ -541,13 +541,10 @@ export class EditorStore {
 
   private referencedAttachmentIds(): Set<AttachmentId> {
     const ids = new Set<AttachmentId>()
-    const add = (document: Document): void => {
-      collectAttachmentIds(document).forEach((id) => ids.add(id))
-    }
     if (this.snapshot.status === 'ready') {
-      add(this.snapshot.document)
+      collectAttachmentIds(this.snapshot.document).forEach((id) => ids.add(id))
     }
-    for (const document of this.history.documents()) add(document)
+    for (const id of this.history.attachmentIds()) ids.add(id)
     this.pendingAttachmentIds.forEach((id) => ids.add(id))
     return ids
   }
