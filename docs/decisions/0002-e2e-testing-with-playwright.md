@@ -19,12 +19,12 @@ We need end-to-end coverage that launches the real application, drives it throug
 
 Add `@playwright/test` as a development dependency and use its Electron support for end-to-end tests, located in `e2e/`. The suite launches the production build in `out/` and isolates each run with Electron's `--user-data-dir` switch, so tests exercise real persistence without touching developer data and without adding test hooks to the application.
 
-Because e2e is slower and more timing-sensitive than unit tests, `npm run test:e2e` is a separate command. `npm run check` remains the standard fast pipeline, and `npm run check:full` adds e2e as the complete validation pipeline for changes that touch the Electron shell, IPC/preload, persistence, attachments, or clipboard.
+Because e2e is slower and more timing-sensitive than unit tests, `npm run test:e2e` is a separate command from the fast unit pipeline, and end-to-end tests are part of the complete validation pipeline defined in `docs/DEVELOPMENT.md` §9.
 
 ## Consequences
 
-- `package.json` gains a development dependency and two scripts; `vitest.config.ts` must exclude `e2e/**` so the two runners stay separate.
-- Browser binary downloads are not required for Electron testing and should be skipped during install.
-- E2E tests are macOS-only and headful for now, so they cannot run in a headless CI without a virtual display. This constrains future automation.
+- `package.json` gains a development dependency and two scripts; `vitest.config.ts` must exclude `e2e/**` so the two runners stay separate (`docs/DEVELOPMENT.md` §8).
+- Browser binary downloads are not required for Electron testing and should be skipped during install (`docs/DEVELOPMENT.md` §3).
+- E2E tests are macOS-only and headful, so they cannot run in a headless CI without a virtual display. This constrains future automation; the suite's platform and runtime constraints are owned by `docs/DEVELOPMENT.md` §8.
 - The suite runs serially with a single worker because of the single-instance application and the global `Cmd+0` shortcut.
-- `check:full` becomes the meaningful definition of done for integration-sensitive changes, which requires updating `AGENTS.md` and `docs/DEVELOPMENT.md`.
+- End-to-end coverage becomes part of the validation requirement for integration-sensitive changes, defined in `AGENTS.md` §10.

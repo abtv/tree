@@ -153,16 +153,7 @@ Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**`,
 
 ### Defect regression workflow
 
-When fixing a reported defect:
-
-1. Reproduce the failure before changing the implementation.
-2. Add a regression test that fails for the reported behavior.
-3. Implement the fix and verify that the regression test passes.
-4. Run the relevant broader test suites.
-
-For changes crossing process, IPC, filesystem, persistence, clipboard, attachment, shortcut, or platform boundaries, add both a focused contract test and an end-to-end test. Type checking alone does not verify runtime argument forwarding or error propagation.
-
-Shutdown and quit changes should cover successful quit with and without pending changes, save failure, timeout, retry after failure, duplicate requests, application-menu quit, window close, and renderer unavailability. Use unit tests for deterministic state-machine branches and E2E tests for the real Electron wiring.
+The defect-first and boundary-testing rules are defined in `AGENTS.md` §9. Boundary contract tests live next to the implementation; end-to-end tests live in `e2e/`. Use unit tests for deterministic state-machine branches and E2E tests for the real Electron wiring.
 
 ---
 
@@ -191,9 +182,7 @@ The repository must also provide the complete validation command:
 npm run check:full
 ```
 
-This runs `npm run check`, the end-to-end suite, and the performance suite. Run `npm run check:full` before every commit. `npm run check` remains available as the fast local loop when a full run is not practical.
-
-A task is not considered complete until the appropriate validation command passes successfully.
+This runs `npm run check`, the end-to-end suite, and the performance suite. The requirement to run validation before every commit is defined in `AGENTS.md` §10.
 
 An E2E suite that cannot launch Electron or execute the relevant boundary is not a passing validation result. Report the exact environment failure and rerun the suite on supported macOS hardware with an available display before claiming full validation.
 
@@ -303,17 +292,11 @@ A refactoring that preserves behavior should not require unnecessary test change
 
 End-to-end tests complement unit tests by exercising the real Electron application through the UI. They should target integration points that unit tests cannot cover: preload/IPC wiring, autosave and restart behavior, attachment files, the system clipboard, and the application startup path. See `docs/decisions/0002-e2e-testing-with-playwright.md`.
 
-Every user-visible behavior described in `docs/PRODUCT.md` must have at least one automated test. Behaviors that cross a process, persistence, or platform boundary — the Electron shell, preload/IPC, persistence, attachments, clipboard, drag-and-drop, and global shortcuts — must also have an end-to-end test, in addition to any unit test for the underlying rule.
-
 Platform-routed shortcuts need boundary-faithful end-to-end tests. Playwright injects key events through the DevTools protocol, which triggers Chromium's native editing behavior even though macOS does not route those commands in the running application. An end-to-end test for an editing command (Undo, Redo, Cut, Copy, Paste, Select All) must therefore suppress or disable the native browser behavior, such as the `copy`, `cut`, or `paste` event, and assert that the application still performs the action. A test that relies on the native default can pass while the product is broken. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
 
-Coverage reporting (`npm run test:coverage`) is a gap-finder, not a target. Do not add tests solely to raise the number. When behavior changes, review the affected product requirements and confirm each one still has coverage at the appropriate level.
+Coverage policy is defined in `AGENTS.md` §9. The enforced global and per-file floors are configured in `vitest.config.ts`, and `npm run check` runs the coverage-enabled unit suite that fails when a floor is not met.
 
-The coverage-enabled unit suite enforces global floors of 91% statements, 83% branches, 92% functions, and 93% lines. These floors are derived from the measured post-change baseline of 96.31%, 90.12%, 95.78%, and 97.97%, respectively, with a small margin for ordinary test-run variance. They are higher than the previous floors and must not be weakened to make validation pass. The focused floors for `src/domain/document.ts` and `src/application/editor-store.ts` are 80% branches. They are configured as per-file glob thresholds in `vitest.config.ts` alongside the global floors, so the coverage command fails when either file's branch coverage drops below 80%. `npm run check` runs this coverage-enabled suite.
-
-Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files.
-
-When a change affects domain invariants — tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency — add or update a property test for the affected invariants. They are not a coverage target. Boundary wiring and presentation changes do not require property tests.
+Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files. The rules for when to add one are in `AGENTS.md` §9.
 
 Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
 
@@ -321,33 +304,13 @@ Performance tests live in `perf/`. They run as part of `npm run check:full`, and
 npm run test:perf
 ```
 
-They measure startup, typing, and state/persistence work at several document scales and print one JSON line per scenario. Startup runs three repetitions per scenario and enforces an Electron launch-to-interactive ceiling of 2,000 ms and a renderer-start-to-interactive ceiling of 1,000 ms.
+They measure startup, typing, and state/persistence work at several document scales and print one JSON line per scenario. The recorded budgets, measured baselines, and scenario parameters are owned by the `perf/` suite and the completed performance-and-coverage plan; they are not restated here.
 
-Each typing scenario declares the accessible name of its intended input and the text it starts with. The helper focuses that exact field, asserts it is focused and contains the seeded text, types, then asserts the field received the typed text and that the current-parent heading was not edited. This matters inside a parent, where the first textbox is the current-parent heading rather than the selected child. Typing samples 104 keystrokes per scenario, measures wall-clock typing time end to end, and measures paint latency from the input event through two consecutive animation frames; it enforces a paint p95 below 100 ms and a maximum below 250 ms. The `inputTurnaround` metric records how long the input event's microtask takes to run and is an observation only: it is not React commit latency, because the microtask is queued before React's handler runs and does not capture the commit or paint work. The typing scenarios cover 1,000, 10,000, and 100,000 nodes; 100,000 is the supported document-scale target and types into the last child of the last root, as seeded. Its wall-clock budget (below 1,500 ms) is a coarse end-to-end guard for the node index against a return to per-keystroke full-document traversal, not a tight latency target. The approved budgets and final observations are recorded in the completed performance-and-coverage plan.
+Each typing scenario focuses a specific input, asserts the seeded text is present and focused, types, and asserts the field received the typed text while the current-parent heading was not edited. This matters inside a parent, where the first textbox is the current-parent heading rather than the selected child. The scenario measures wall-clock typing time and paint latency; the `inputTurnaround` metric is an observation only, not React commit latency. The supported document-scale target is 100,000 nodes.
 
-The state/persistence scenario in `perf/state.spec.ts` seeds a 10,000-node document with 100 attachments and performs a fixed 200-command structural burst, a typed-word burst, and a reference-changing delete. It prints the structural burst wall clock, typing wall clock, save count, and attachment cleanup scan duration, and enforces ceilings on each. The structural and typing budgets were tightened to 2,000 ms and 1,000 ms from repeated measured baselines. The save count confirms the automatic save policy triggers on inserted-word volume rather than per keystroke. The cleanup scan duration guards the reference-changing path against unbounded history or document scanning. A second scenario exercises attachment-bearing history through 100 structural commands, 100 undos, and 100 redos, then forces a save and cleanup; it prints the history wall clock, save count, and cleanup scan duration, and enforces ceilings on the history and cleanup work.
+The state/persistence scenario in `perf/state.spec.ts` seeds a large attachment-bearing document and runs a structural burst, a typed-word burst, and a reference-changing delete; a second scenario exercises attachment-bearing history through structural commands, undos, and redos. Both print their measurements and enforce ceilings on each. The save count confirms the automatic save policy triggers on inserted-word volume rather than per keystroke, and the cleanup scan duration guards the reference-changing path against unbounded history or document scanning. The budgets and their measured baselines are recorded in the completed performance-and-coverage plan.
 
-The automatic-save triggers are guarded by deterministic save-count tests in `editor-store.test.ts`. Typing before an existing hyperlink shifts the link's range but does not request a save, while an edit that genuinely inserts a hyperlink still does. The inserted-word volume trigger counts words since the last acknowledged snapshot, so a failed save does not discard pending words and the restored count keeps the volume trigger active until a save succeeds. Deferred-save regressions drive overlapping saves with deferred service promises: an earlier successful save must not acknowledge words captured by a later failed snapshot, a coalesced save still runs after the first save fails, consecutive failures retain the pending words, and a cleanup-only success does not acknowledge words while a successful save followed by a failed cleanup still does. `editor-store.property.test.ts` checks the same accounting over random edit and deferred-outcome sequences against an independent watermark reference model.
-
-Attachment validation is guarded before any filesystem write. `ipc-security.test.ts` rejects the signature-and-IEND payload that carries no image data, truncated chunks, missing `IDAT`, bad CRCs, zero dimensions, and structurally valid PNGs whose data cannot be decoded, while accepting real one-pixel and transparent PNGs through a zlib-based test decoder. `ipc-handlers.test.ts` proves invalid bytes reject before `writeAttachment` is called, valid bytes forward the same reference, and filesystem failures propagate. `png-decoder.test.ts` covers the `nativeImage` adapter, and the Electron suite writes invalid bytes through the preload boundary and decodes a real pasted image in the browser.
-
-Image-display failures are guarded by `AttachmentPreview.test.tsx`. Missing bytes, rejected reads, and browser decode errors all render the accessible `Image could not be loaded.` message; a late response for a switched attachment is ignored; a decode error releases the object URL; and the existing byte-cache reuse, focus-trap, Escape, close-button, and focus-restoration tests remain. `e2e/attachment-validation.spec.ts` covers a real read failure and corrupt stored bytes after restart while confirming the editor stays usable.
-
-Two unit guards cover disk-write and attachment-read work that the perf suite does not sample. `window-state.test.ts` uses fake timers to assert that rapid window-geometry changes coalesce into one write, that the latest bounds win, and that closing flushes the pending geometry. `file-services.test.ts` asserts that attachment existence checks use filesystem metadata and do not read attachment contents.
-
-The renderer's retention of attachment references is guarded separately. `editor-history.test.ts` asserts that reading the retained attachment IDs does not re-traverse history snapshots, that many retained entries sharing one immutable attachment summary enumerate its IDs only once on retention and once on final release, that path-copied documents from real text edits share their summary, and that a 10,000-ID summary is not enumerated per retained entry, and that `begin` reports a reachability change when it discards a non-empty redo branch. `editor-store.test.ts` asserts end to end that an attachment referenced only by the discarded redo branch is dropped from the next cleanup's keep set. The `EditorHistory` property test checks that the maintained reference counts always equal the union of attachment IDs over the retained snapshots. `document.test.ts` asserts that path-copied text edits share one summary by reference, that membership changes replace it, and that `collectAttachmentIds` returns a defensive copy without exposing the cached summary; `document.property.test.ts` compares the reported attachment multiplicity against a full traversal after every operation, including duplicate references.
-
-Renderer attachment-byte reuse is guarded by `attachment-bytes-cache.test.ts`: a second read of the same id is served from the cache, concurrent reads are deduplicated, entries are evicted least-recently-used under a byte budget, a single oversized entry is retained, and missing or failed reads are not cached. `AttachmentPreview.test.tsx` and `App.test.tsx` assert that remounting an image, and opening the preview after the inline image, call `readAttachment` only once.
-
-Save serialization is guarded by reference identity rather than timing. `document.test.ts` asserts that `serializeState` returns the input document without cloning and that `validatePersistedState` returns its input without rebuilding, and `ipc-handlers.test.ts` asserts that the `save` handler forwards the validated reference to `fileServices.save`. The `document.property.test.ts` round-trip property checks the same identity and validation for arbitrary documents.
-
-Node lookups are guarded against full-document traversal rather than by timing at the unit level. `document.test.ts` confirms that a warm lookup does not read an unrelated subtree, and the `document.property.test.ts` properties compare the indexed lookup against a full-traversal reference for every node, both directly and after every domain operation. Those properties also guard that sharing the index across a text edit and rebuilding it after a topology change never returns a stale location. The end-to-end guard is the ceiling on wall-clock typing for the worst-case `large-100000` scenario, which fails if a keystroke's lookup traverses the document again.
-
-Domain commands are guarded against falling back to full-document copies. `document.test.ts` asserts that a structural command leaves untouched roots and sibling subtrees reference-identical to the input, and the `document.property.test.ts` property "shares every node outside the edited path by reference" checks every operation against that rule. The existing input-immutability and indexed-lookup properties continue to prove the shared nodes are never mutated and the shared index stays valid. The `perf/state.spec.ts` structural burst is the end-to-end observation; path-copying keeps the 200-command burst well under its 2,000 ms ceiling (roughly 490–500 ms at 10,000 nodes on the measurement hardware recorded in the completed performance-and-coverage plan).
-
-Attachment-id collection is guarded against rescanning the live document. `document.test.ts` asserts that collecting a path-copied result does not read an unrelated subtree and that an attachment id is removed only when its last referencing node is deleted, including duplicate references. The `document.property.test.ts` property "reports exactly the referenced attachment ids after any operation" compares the propagated per-document counts against a full traversal after every operation, which catches an incorrect increment or decrement.
-
-External hyperlink opening is guarded end-to-end. `e2e/hyperlink.spec.ts` pastes a URL, replaces the main-process `shell.openExternal` with a spy, clicks the rendered link, and asserts that the URL reaches the shell while the application window does not navigate. This covers the click-to-shell boundary that the unit-level URL validation test cannot.
+Behavioral guards live next to the code they protect and are named after the behavior they assert. The main guard families are automatic-save accounting (`editor-store.test.ts`, `editor-store.property.test.ts`), attachment and PNG validation (`ipc-security.test.ts`, `ipc-handlers.test.ts`, `png-decoder.test.ts`, `e2e/attachment-validation.spec.ts`), image-display failures (`AttachmentPreview.test.tsx`, `e2e/attachment-validation.spec.ts`), window-geometry coalescing and attachment-existence I/O (`window-state.test.ts`, `file-services.test.ts`), retention and byte reuse of attachment references (`editor-history.test.ts`, `attachment-bytes-cache.test.ts`), save serialization, node lookup, path copying, and attachment-id collection (`document.test.ts`, `document.property.test.ts`), and external hyperlink opening (`e2e/hyperlink.spec.ts`). The completed performance-and-coverage plan records the guard-to-requirement mapping and the original rationale for each guard.
 
 ---
 
@@ -375,21 +338,7 @@ Real persistence across an Electron restart is additionally covered by the end-t
 
 ## 14. Code Organization
 
-The project should preserve the architectural boundaries described in:
-
-```text
-docs/ARCHITECTURE.md
-```
-
-In particular:
-
-* React components should contain presentation and UI interaction logic;
-* product and business rules belong outside React components;
-* Electron-specific behavior belongs in the appropriate Electron/infrastructure layer;
-* persistence belongs in infrastructure;
-* clipboard access belongs in infrastructure;
-* attachment filesystem access belongs in infrastructure;
-* domain logic must remain independently testable.
+The project must preserve the architectural boundaries described in `docs/ARCHITECTURE.md`, which owns the layer responsibilities and dependency direction.
 
 Do not move logic across architectural boundaries simply to reduce the amount of code in a single task.
 
@@ -434,80 +383,31 @@ Electron Vite writes production build output to `out/`. This directory is genera
 
 ## 17. Git Workflow
 
-Keep commits focused on one logical change.
+Git discipline — one logical commit per task, commit messages, preserving user changes, immediate follow-up fixes, and session boundaries — is defined in `AGENTS.md` §12.
 
-Prefer:
-
-```text
-one task → one logical commit
-```
-
-Do not mix unrelated refactoring with a feature unless the refactoring is required for that feature.
-
-Before committing:
+Before committing, review the change with:
 
 ```bash
 git status
 git diff
 ```
 
-Review the changes and verify that only intentional files are modified.
-
-Do not rewrite or remove unrelated user changes.
-
-Do not use destructive git commands unless explicitly requested.
-
-### Immediate follow-up fixes
-
-When the Product Owner requests a fix directly related to the most recently committed change, do not create a new plan or a new commit. Update the existing plan and amend the last commit with `git commit --amend`. If the fix changes the plan's scope, update the plan content and rename the plan file to match. This applies only to direct follow-ups to the most recent commit; unrelated changes get their own plan and commit.
+Confirm that only intentional files are modified. Do not use destructive git commands unless explicitly requested.
 
 ---
 
 ## 18. Handling Existing Changes
 
-Before modifying files, inspect the current git state.
-
-If the working tree contains changes that were not created by the current task:
-
-* do not overwrite them;
-* do not reset them;
-* do not discard them.
-
-Work around existing changes when possible.
-
-If existing changes make the task ambiguous or unsafe, ask the Product Owner.
+The rule for handling existing uncommitted changes is in `AGENTS.md` §12: inspect and preserve them, and do not overwrite, reset, or discard them. If existing changes make the task ambiguous or unsafe, ask the Product Owner.
 
 ---
 
 ## 19. Documentation Updates
 
-Update documentation when implementation changes affect:
-
-* product behavior → `docs/PRODUCT.md`;
-* architecture → `docs/ARCHITECTURE.md`;
-* development workflow → `docs/DEVELOPMENT.md`;
-* a significant architectural decision → `docs/decisions/`;
-* an active implementation plan → the relevant plan in `docs/plans/active/`.
-
-Avoid duplicating the same information across documents.
-
-Each fact should have one primary source of truth.
+Documentation responsibilities and the mapping from a change to the document that owns it are defined in `AGENTS.md` §11. Each fact must have one primary source of truth.
 
 ---
 
 ## 20. Definition of Done
 
-A development task is complete when:
-
-* the requested implementation is complete;
-* relevant tests are present or updated;
-* existing tests pass;
-* type checking passes;
-* linting passes;
-* the production build passes;
-* `npm run check:full` passes;
-* relevant documentation is updated;
-* no temporary or debugging code remains;
-* the git diff contains only intentional changes.
-
-The task should then be committed as a focused logical change.
+The completion criteria for a task are defined in `AGENTS.md` §13. When the task is complete, commit it as a focused logical change.

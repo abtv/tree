@@ -219,9 +219,7 @@ When an Electron E2E or performance launch fails, also check for a macOS crash d
 
 ## 10. Validation
 
-`npm run check` is the fast local pipeline: type checking, linting, unit and component tests, and the production build.
-
-`npm run check:full` is the complete validation pipeline. It runs `npm run check`, the end-to-end test suite, and the performance suite. Run it before every commit.
+`npm run check:full` is the required validation before every commit; `npm run check` is the fast local loop when a full run is not practical. The pipeline definition and steps are in `docs/DEVELOPMENT.md` §9.
 
 If validation fails, fix the problem before considering the task complete.
 
@@ -246,6 +244,7 @@ Do not duplicate the same information across multiple documents unless there is 
 
 Keep each document focused on its responsibility:
 
+* `README.md` — the project identity and documentation index.
 * `PRODUCT.md` — what the product does.
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
@@ -261,9 +260,11 @@ Prefer one logical task per commit.
 
 Commit messages should clearly describe the implemented change.
 
+Do not mix unrelated refactoring with a feature unless the refactoring is required for that feature.
+
 Do not rewrite or discard existing user changes unless explicitly instructed.
 
-Before modifying files with existing uncommitted changes, inspect those changes and preserve them.
+Before modifying files with existing uncommitted changes, inspect those changes and preserve them, working around them when possible.
 
 ### Immediate follow-up fixes
 
