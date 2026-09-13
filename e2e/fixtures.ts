@@ -78,8 +78,27 @@ export async function clickApplicationMenuQuit(app: ElectronApplication): Promis
 
 export async function delaySaveIpc(app: ElectronApplication, milliseconds: number): Promise<void> {
   await app.evaluate(({}, delay) => {
-    globalThis.__treeIpc.wrap('tree:save', () => new Promise<void>((resolve) => globalThis.setTimeout(resolve, delay)))
+    const control = globalThis as typeof globalThis & { __delayedSaveResolved?: boolean }
+    control.__delayedSaveResolved = false
+    globalThis.__treeIpc.wrap(
+      'tree:save',
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(() => {
+            control.__delayedSaveResolved = true
+            resolve()
+          }, delay)
+        }),
+    )
   }, milliseconds)
+}
+
+export async function waitForDelayedSave(app: ElectronApplication): Promise<void> {
+  await expect
+    .poll(() =>
+      app.evaluate(() => (globalThis as typeof globalThis & { __delayedSaveResolved?: boolean }).__delayedSaveResolved),
+    )
+    .toBe(true)
 }
 
 async function closeTrackedApps(): Promise<void> {

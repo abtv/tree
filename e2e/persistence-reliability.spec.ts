@@ -147,8 +147,7 @@ test.describe('persistence reliability regressions', () => {
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
-    await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
-    await window.waitForTimeout(250)
+    await expect(window.getByText(/Operation failed:.*image blocked/)).toBeVisible()
     expect(
       await app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0),
     ).toBe(0)
@@ -194,7 +193,6 @@ test.describe('persistence reliability regressions', () => {
     await expect
       .poll(() => window.evaluate(() => (globalThis as typeof globalThis & { quitRequested?: boolean }).quitRequested))
       .toBe(true)
-    await window.waitForTimeout(100)
     expect(app.process().exitCode).toBeNull()
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await app.evaluate(() =>
@@ -225,8 +223,19 @@ test.describe('persistence reliability regressions', () => {
         app.evaluate(() => (globalThis as typeof globalThis & { attachmentStarted?: boolean }).attachmentStarted),
       )
       .toBe(true)
+    await window.evaluate(() => {
+      const control = globalThis as typeof globalThis & {
+        quitRequested?: boolean
+        treeApi: { onQuitRequested(listener: () => void): () => void }
+      }
+      control.treeApi.onQuitRequested(() => {
+        control.quitRequested = true
+      })
+    })
     await clickApplicationMenuQuit(app)
-    await window.waitForTimeout(100)
+    await expect
+      .poll(() => window.evaluate(() => (globalThis as typeof globalThis & { quitRequested?: boolean }).quitRequested))
+      .toBe(true)
     await app.evaluate(() =>
       (globalThis as typeof globalThis & { releaseAttachment?: () => void }).releaseAttachment?.(),
     )

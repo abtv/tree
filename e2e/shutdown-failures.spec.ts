@@ -11,6 +11,7 @@ import {
   readPersisted,
   test,
   typeInto,
+  waitForDelayedSave,
 } from './fixtures'
 
 test.describe('shutdown failure handling', () => {
@@ -85,7 +86,7 @@ test.describe('shutdown failure handling', () => {
     ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
 
-    await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 750))
+    await waitForDelayedSave(app)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await clickApplicationMenuQuit(app)
     await closed

@@ -25,13 +25,28 @@ test.describe('content security policy', () => {
   })
 
   test('blocks navigation away from the application renderer', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir)
     const initialUrl = window.url()
+
+    await app.evaluate(({ BrowserWindow }) => {
+      const webContents = BrowserWindow.getAllWindows()[0]?.webContents
+      if (webContents === undefined) throw new Error('The main window is unavailable.')
+      const control = globalThis as typeof globalThis & { __navigationPrevented?: boolean }
+      webContents.once('will-navigate', (event) => {
+        control.__navigationPrevented = event.defaultPrevented
+      })
+    })
 
     await window.evaluate(() => {
       document.location.href = 'https://example.com/'
     })
-    await window.waitForTimeout(250)
+    await expect
+      .poll(() =>
+        app.evaluate(
+          () => (globalThis as typeof globalThis & { __navigationPrevented?: boolean }).__navigationPrevented,
+        ),
+      )
+      .toBe(true)
 
     expect(window.url()).toBe(initialUrl)
   })
