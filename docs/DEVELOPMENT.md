@@ -27,6 +27,8 @@ The Node.js version is pinned in `.nvmrc`. The supported Node.js and npm ranges 
 
 Do not assume a different Node.js version without checking the project configuration first.
 
+Run `npm run doctor` to check the toolchain, installed Electron and Playwright packages, display availability for the Electron suites, registry reachability for `npm audit`, and build output. It reports `PASS`, `WARN`, `FAIL`, or `INFO` per check and exits nonzero on a blocking problem.
+
 ---
 
 ## 3. Installing Dependencies
