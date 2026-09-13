@@ -9,6 +9,7 @@ import {
   test,
   writeClipboardImageSized,
 } from './fixtures'
+import { recordPerfResult } from './results'
 
 interface SaveControl {
   saves: number
@@ -88,16 +89,16 @@ test.describe('state and persistence work', () => {
     const saveCount = probe.saves - baseline.saves
     const wordCount = typed.split(/\s+/).filter((word) => word.length > 0).length
 
-    console.log(
-      `PERF ${JSON.stringify({
-        kind: 'state',
-        scenario: 'large-10000',
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'large-10000',
+      metrics: {
         structuralBurstMs: round(structuralBurstMs),
         typingMs: round(typingMs),
         saveCount,
         cleanupScanMs: round(cleanupScanMs),
-      })}`,
-    )
+      },
+    })
 
     expect(structuralBurstMs).toBeLessThan(2_000)
     expect(typingMs).toBeLessThan(1_000)
@@ -146,15 +147,15 @@ test.describe('state and persistence work', () => {
     const probe = await readProbe(app)
     const saveCount = probe.saves - baseline.saves
 
-    console.log(
-      `PERF ${JSON.stringify({
-        kind: 'state',
-        scenario: 'large-10000-attachment-history',
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'large-10000-attachment-history',
+      metrics: {
         historyMs: round(historyMs),
         saveCount,
         cleanupScanMs: round(cleanupScanMs),
-      })}`,
-    )
+      },
+    })
 
     expect(saveCount).toBeGreaterThan(0)
     expect(historyMs).toBeLessThan(5_000)
@@ -191,14 +192,14 @@ test.describe('state and persistence work', () => {
       measurements[name] = round(durations.at(-1) ?? 0)
     }
 
-    console.log(
-      `PERF ${JSON.stringify({
-        kind: 'attachment',
-        scenario: 'image-insertion-decode',
-        smallMs: measurements['small'],
-        largeMs: measurements['large'],
-      })}`,
-    )
+    recordPerfResult({
+      kind: 'attachment',
+      scenario: 'image-insertion-decode',
+      metrics: {
+        smallMs: measurements['small'] ?? 0,
+        largeMs: measurements['large'] ?? 0,
+      },
+    })
 
     expect(measurements['small']).toBeGreaterThan(0)
     expect(measurements['small']).toBeLessThan(1_000)

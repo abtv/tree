@@ -1,4 +1,5 @@
 import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, type Seed } from './fixtures'
+import { recordPerfResult } from './results'
 
 const TYPED = 'abcdefghijklmnopqrstuvwxyz'.repeat(4)
 
@@ -60,19 +61,19 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed, 
   const turnaround = summarize(measured.inputTurnaround)
   const paint = summarize(measured.paints)
 
-  console.log(
-    `PERF ${JSON.stringify({
-      kind: 'typing',
-      scenario,
+  recordPerfResult({
+    kind: 'typing',
+    scenario,
+    samples: measured.paints.length,
+    metrics: {
       typingMs: round(typingMs),
       inputTurnaroundMedianMs: round(turnaround.median),
       inputTurnaroundP95Ms: round(turnaround.p95),
       paintMedianMs: round(paint.median),
       paintP95Ms: round(paint.p95),
       paintMaxMs: round(paint.max),
-      samples: measured.paints.length,
-    })}`,
-  )
+    },
+  })
 
   expect(measured.paints.length).toBeGreaterThan(0)
   expect(measured.paints.length).toBeGreaterThanOrEqual(100)

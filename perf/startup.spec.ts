@@ -1,5 +1,6 @@
 import { performance as nodePerformance } from 'node:perf_hooks'
 import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, type Seed } from './fixtures'
+import { recordPerfResult } from './results'
 
 async function measureStartup(userDataDir: string, scenario: string, seed?: Seed): Promise<void> {
   const launchSamples: number[] = []
@@ -18,9 +19,12 @@ async function measureStartup(userDataDir: string, scenario: string, seed?: Seed
   const launch = range(launchSamples)
   const renderer = range(rendererSamples)
 
-  console.log(
-    `PERF ${JSON.stringify({ kind: 'startup', scenario, samples: launchSamples.length, launchMs: launch, rendererMs: renderer })}`,
-  )
+  recordPerfResult({
+    kind: 'startup',
+    scenario,
+    samples: launchSamples.length,
+    metrics: { launchMs: launch, rendererMs: renderer },
+  })
 
   expect(launch.max).toBeLessThan(2_000)
   expect(renderer.max).toBeLessThan(1_000)
