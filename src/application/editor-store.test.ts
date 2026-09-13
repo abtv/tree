@@ -1113,7 +1113,9 @@ describe('EditorStore', () => {
     }
     store.editText('root', 'recovered')
     await store.flushPersistence()
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: undefined })
+    const recovered = store.getSnapshot()
+    expect(recovered).toMatchObject({ status: 'ready' })
+    if (recovered.status === 'ready') expect(recovered.saveError).toBeUndefined()
   })
 
   it('surfaces attachment cleanup failures and waits for cleanup during flush', async () => {
@@ -1224,7 +1226,9 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: 'clipboard unavailable' })
 
     store.editText('root', 'ok')
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: undefined })
+    const recovered = store.getSnapshot()
+    expect(recovered).toMatchObject({ status: 'ready' })
+    if (recovered.status === 'ready') expect(recovered.operationError).toBeUndefined()
   })
 
   it('ignores repeated text and empty undo or redo', async () => {
@@ -1913,7 +1917,9 @@ describe('EditorStore', () => {
     fail = false
     clock.runAll()
     await store.flushPersistence()
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: undefined })
+    const recovered = store.getSnapshot()
+    expect(recovered).toMatchObject({ status: 'ready' })
+    if (recovered.status === 'ready') expect(recovered.saveError).toBeUndefined()
     expect(services.saves).toHaveLength(1)
   })
 })

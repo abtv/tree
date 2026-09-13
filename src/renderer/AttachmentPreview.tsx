@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { IMAGE_LOAD_ERROR } from '../domain/product-messages'
 import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
-
-const IMAGE_ERROR_MESSAGE = 'Image could not be loaded.'
 
 type AttachmentState =
   | { attachmentId: string; status: 'loading' }
@@ -58,7 +57,7 @@ function useAttachmentImage(attachmentId: string): {
 function ImageErrorMessage(): React.JSX.Element {
   return (
     <p className="attachment-error" role="status">
-      {IMAGE_ERROR_MESSAGE}
+      {IMAGE_LOAD_ERROR}
     </p>
   )
 }

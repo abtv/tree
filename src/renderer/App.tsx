@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode } from '../domain/document'
+import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
@@ -83,12 +84,12 @@ export function App({ store }: AppProps): React.JSX.Element {
         />
         {state.saveError === undefined ? null : (
           <p className="save-error" role="status">
-            Changes could not be saved: {state.saveError}
+            {SAVE_ERROR_PREFIX} {state.saveError}
           </p>
         )}
         {state.operationError === undefined ? null : (
           <p className="save-error" role="alert">
-            Operation failed: {state.operationError}
+            {OPERATION_ERROR_PREFIX} {state.operationError}
           </p>
         )}
       </section>

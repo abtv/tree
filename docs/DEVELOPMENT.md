@@ -95,6 +95,8 @@ Run TypeScript type checking with:
 npm run typecheck
 ```
 
+The node, renderer, and end-to-end projects compile with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `noUnusedLocals`, `noUnusedParameters`, and `noFallthroughCasesInSwitch`.
+
 Type errors must be fixed before a task is considered complete.
 
 ---

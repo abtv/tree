@@ -8,8 +8,8 @@ import type { NodeInputBindings } from './NodeInput'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
-  selectedNodeId?: string
-  focus?: FocusIntent
+  selectedNodeId?: string | undefined
+  focus?: FocusIntent | undefined
   onPreviewAttachment: (attachmentId: string) => void
 }
 

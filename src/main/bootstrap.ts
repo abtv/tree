@@ -1,3 +1,4 @@
+import { QUIT_SAVE_ERROR } from '../domain/product-messages'
 import { QuitHandshake } from './quit-handshake'
 
 export interface BeforeQuitEvent {
@@ -55,7 +56,7 @@ export function bootstrapApplication({
       getMainWindow()?.webContents.send('tree:quit-requested', requestId)
     },
     () => {
-      getMainWindow()?.webContents.send('tree:quit-failed', 'The application could not finish saving before quit.')
+      getMainWindow()?.webContents.send('tree:quit-failed', QUIT_SAVE_ERROR)
     },
     () => app.quit(),
   )

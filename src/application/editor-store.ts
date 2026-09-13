@@ -17,6 +17,7 @@ import {
   type NodeId,
   type PersistedEditorState,
 } from '../domain/document'
+import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
 import type { ClipboardPayload } from '../shared/ipc'
 import type { ClipboardWritePayload } from '../shared/ipc'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
@@ -248,7 +249,7 @@ export class EditorStore {
       const current = locateNode(this.snapshot.document, nodeId)?.node
       if (current === undefined) return
       if (!sameNodeContent(current, expectedContent)) {
-        this.reportError(new Error(CUT_CONFLICT_MESSAGE))
+        this.reportError(new Error(CUT_CONFLICT_ERROR))
         return
       }
       this.applyStructural(
@@ -498,7 +499,13 @@ export class EditorStore {
   }
 
   private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>): void {
-    this.snapshot = state.operationError === undefined ? state : { ...state, operationError: undefined }
+    if (state.operationError === undefined) {
+      this.snapshot = state
+    } else {
+      const next = { ...state }
+      delete next.operationError
+      this.snapshot = next
+    }
     this.emit()
   }
 
@@ -566,7 +573,9 @@ export class EditorStore {
     if (this.snapshot.status !== 'ready') return
     if (error === undefined) {
       if (this.snapshot.saveError === undefined) return
-      this.snapshot = { ...this.snapshot, saveError: undefined }
+      const next = { ...this.snapshot }
+      delete next.saveError
+      this.snapshot = next
     } else {
       this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
       this.changesPending = true
@@ -592,10 +601,8 @@ export class EditorStore {
   }
 }
 
-const CUT_CONFLICT_MESSAGE = 'The cut could not finish because the text changed.'
-
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'The editor could not complete the requested operation.'
+  return error instanceof Error ? error.message : GENERIC_OPERATION_ERROR
 }
 
 interface NodeContent {

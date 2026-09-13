@@ -1,9 +1,11 @@
+import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
+
 export type NodeId = string
 export type AttachmentId = string
 export type AttachmentSummary = ReadonlyMap<AttachmentId, number>
 
 export const MAX_DOCUMENT_DEPTH = 20
-export const MAX_DOCUMENT_DEPTH_ERROR = 'Nodes cannot be nested deeper than 20 levels.'
+export { MAX_DOCUMENT_DEPTH_ERROR }
 
 export interface AttachmentReference {
   id: AttachmentId
@@ -235,11 +237,9 @@ export function editNodeText(document: Document, nodeId: NodeId, text: string): 
 export function editNodeContent(document: Document, nodeId: NodeId, text: string, links: LinkRange[]): Document {
   const normalized = normalizeLinks(links, text)
   const located = requireNode(document, nodeId)
-  const replacement: TreeNode = {
-    ...located.node,
-    text,
-    ...(normalized.length === 0 ? { links: undefined } : { links: normalized }),
-  }
+  const replacement: TreeNode = { ...located.node, text }
+  if (normalized.length === 0) delete replacement.links
+  else replacement.links = normalized
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
   inheritAttachmentIds(document, next)

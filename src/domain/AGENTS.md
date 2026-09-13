@@ -7,7 +7,7 @@ Layer-specific rules for `src/domain/`. The repository-wide rules in the root `A
 * The domain is framework-free. Do not import React, the DOM, Electron, filesystem or browser APIs, or any application, infrastructure, main, preload, or renderer module (`docs/ARCHITECTURE.md` §4, §22).
 * Never mutate an input `Document`. Operations return a new document and path-copy only the changed path, sharing every unchanged subtree by reference (`docs/ARCHITECTURE.md` §5, §11).
 * Parent relationships are derived, never stored. Use the derived node index; do not add a persisted `parentId`.
-* User-visible product errors are product behavior and keep their exact approved text; the owner is `docs/PRODUCT.md`.
+* User-visible product errors are product behavior. Define them in `product-messages.ts` and keep their exact approved text; the owner is `docs/PRODUCT.md`.
 * Enforce the maximum document depth on creation, assertion, and parsing.
 
 ## Tests
