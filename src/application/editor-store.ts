@@ -85,8 +85,9 @@ export class EditorStore {
   private textTimer: unknown
   private saveTimer: unknown
   private changesPending = false
-  private insertedWordsSinceSave = 0
-  private insertedWordsAtSaveRequest = 0
+  private insertedWordsWatermark = 0
+  private savedWordsWatermark = 0
+  private pendingSaveWatermark: number | undefined
   private standaloneNextTextEdit = false
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
@@ -100,6 +101,8 @@ export class EditorStore {
       currentState: () => (this.snapshot.status === 'ready' ? this.snapshot : undefined),
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
       hasPendingDocumentChanges: () => this.changesPending,
+      onSaveCaptured: () => this.handleSaveCaptured(),
+      onDocumentSaved: () => this.handleDocumentSaved(),
       onResult: (error) => this.handlePersistenceResult(error),
     })
   }
@@ -506,8 +509,8 @@ export class EditorStore {
 
   private noteChange(insertedWords: number, saveImmediately: boolean): void {
     if (insertedWords > 0) {
-      this.insertedWordsSinceSave += insertedWords
-      if (this.insertedWordsSinceSave >= SAVE_WORD_THRESHOLD) saveImmediately = true
+      this.insertedWordsWatermark += insertedWords
+      if (this.insertedWordsWatermark - this.savedWordsWatermark >= SAVE_WORD_THRESHOLD) saveImmediately = true
     }
     this.markPersistedChange()
     if (saveImmediately) this.requestPolicySave()
@@ -524,8 +527,6 @@ export class EditorStore {
       this.saveTimer = undefined
     }
     this.changesPending = false
-    this.insertedWordsAtSaveRequest += this.insertedWordsSinceSave
-    this.insertedWordsSinceSave = 0
     this.persistence.requestSave()
   }
 
@@ -551,15 +552,22 @@ export class EditorStore {
     return ids
   }
 
+  private handleSaveCaptured(): void {
+    this.pendingSaveWatermark = this.insertedWordsWatermark
+  }
+
+  private handleDocumentSaved(): void {
+    if (this.pendingSaveWatermark === undefined) return
+    this.savedWordsWatermark = Math.max(this.savedWordsWatermark, this.pendingSaveWatermark)
+    this.pendingSaveWatermark = undefined
+  }
+
   private handlePersistenceResult(error: unknown | undefined): void {
     if (this.snapshot.status !== 'ready') return
     if (error === undefined) {
-      this.insertedWordsAtSaveRequest = 0
       if (this.snapshot.saveError === undefined) return
       this.snapshot = { ...this.snapshot, saveError: undefined }
     } else {
-      this.insertedWordsSinceSave += this.insertedWordsAtSaveRequest
-      this.insertedWordsAtSaveRequest = 0
       this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
       this.changesPending = true
       this.scheduleIdleSave()

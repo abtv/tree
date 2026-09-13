@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ipcChannels } from '../shared/ipc'
 import type { FileServices } from '../infrastructure/main/file-services'
 import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
+import { decodePngWithZlib, onePixelPng } from './png-test-utils'
 
 const rendererUrl = 'file:///app/out/renderer/index.html'
 const validState = {
@@ -30,8 +31,17 @@ function createHarness() {
   }
   const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true) }
   const onQuitConfirmed = vi.fn()
-  registerIpcHandlers({ ipcMain, rendererUrl, fileServices, nativeClipboard, quitHandshake, onQuitConfirmed })
-  return { handlers, fileServices, nativeClipboard, quitHandshake, onQuitConfirmed }
+  const decodePng = vi.fn(decodePngWithZlib)
+  registerIpcHandlers({
+    ipcMain,
+    rendererUrl,
+    fileServices,
+    nativeClipboard,
+    quitHandshake,
+    decodePng,
+    onQuitConfirmed,
+  })
+  return { handlers, fileServices, nativeClipboard, quitHandshake, onQuitConfirmed, decodePng }
 }
 
 describe('main IPC handlers', () => {
@@ -90,10 +100,7 @@ describe('main IPC handlers', () => {
   it('forwards validated persistence and attachment arguments', async () => {
     const { handlers, fileServices } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
-    const bytes = new Uint8Array([
-      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0,
-    ])
+    const bytes = onePixelPng
 
     await handlers.get(ipcChannels.save)!(event, validState)
     await handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', bytes)
@@ -103,6 +110,42 @@ describe('main IPC handlers', () => {
     expect(vi.mocked(fileServices.save).mock.calls[0]![0]).toBe(validState)
     expect(fileServices.writeAttachment).toHaveBeenCalledWith('image-1', bytes)
     expect(fileServices.cleanupAttachments).toHaveBeenCalledWith(['image-1'])
+  })
+
+  it('rejects invalid attachment bytes before any filesystem write', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const invalidPng = new Uint8Array([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0,
+    ])
+
+    await expect(
+      Promise.resolve().then(() => handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', invalidPng)),
+    ).rejects.toThrow('PNG')
+    expect(fileServices.writeAttachment).not.toHaveBeenCalled()
+  })
+
+  it('propagates attachment write failures', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    vi.mocked(fileServices.writeAttachment).mockRejectedValueOnce(new Error('disk full'))
+
+    await expect(
+      Promise.resolve().then(() => handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', onePixelPng)),
+    ).rejects.toThrow('disk full')
+  })
+
+  it('decodes each accepted attachment exactly once', async () => {
+    const { handlers, decodePng } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    await handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', onePixelPng)
+    expect(decodePng).toHaveBeenCalledOnce()
+
+    await handlers.get(ipcChannels.hasAttachment)!(event, 'image-1')
+    await handlers.get(ipcChannels.readAttachment)!(event, 'image-1')
+    expect(decodePng).toHaveBeenCalledOnce()
   })
 
   it('forwards cleanup ids, returns successfully, and propagates cleanup failures', async () => {

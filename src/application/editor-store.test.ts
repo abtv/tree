@@ -50,6 +50,28 @@ function loadedState(document: unknown, location: unknown): EditorServices & { s
   return services
 }
 
+function deferredSaveServices(): {
+  services: EditorServices & { saves: unknown[] }
+  pending: Array<{ resolve: () => void; reject: (error: Error) => void }>
+} {
+  const services = loadedState(
+    { roots: [{ id: 'root', text: '', children: [] }] },
+    { currentParentId: null, selectedNodeId: 'root' },
+  )
+  const pending: Array<{ resolve: () => void; reject: (error: Error) => void }> = []
+  services.save = (state) => {
+    services.saves.push(state)
+    return new Promise<void>((resolve, reject) => {
+      pending.push({ resolve, reject })
+    })
+  }
+  return { services, pending }
+}
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 describe('EditorStore', () => {
   it('reports maximum depth without changing editor state, history, IDs, or persistence', async () => {
     const root: TreeNode = { id: 'n0', text: 'root', children: [] }
@@ -1576,6 +1598,186 @@ describe('EditorStore', () => {
     store.editText('root', 'a b c d e f g h i j')
     await new Promise((resolve) => setTimeout(resolve, 0))
 
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('requests a save for words inserted after an earlier successful snapshot when a later save fails', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const clock = new FakeClock()
+    const pending: Array<{ resolve: () => void; reject: (error: Error) => void }> = []
+    services.save = (state) => {
+      services.saves.push(state)
+      return new Promise<void>((resolve, reject) => {
+        pending.push({ resolve, reject })
+      })
+    }
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(services.saves).toHaveLength(1)
+
+    store.editText('root', tenWords + tenWords)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(services.saves).toHaveLength(1)
+
+    pending[0]!.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(services.saves).toHaveLength(2)
+
+    pending[1]!.reject(new Error('second save failed'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    store.editText('root', `${tenWords}${tenWords}eleven `)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(services.saves).toHaveLength(3)
+  })
+
+  it('continues with the coalesced save after the first save fails', async () => {
+    const { services, pending } = deferredSaveServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await tick()
+    store.editText('root', tenWords + tenWords)
+    await tick()
+    expect(services.saves).toHaveLength(1)
+
+    pending[0]!.reject(new Error('first save failed'))
+    await tick()
+    expect(services.saves).toHaveLength(2)
+
+    pending[1]!.resolve()
+    await tick()
+
+    store.editText('root', `${tenWords}${tenWords}eleven `)
+    await tick()
+    expect(services.saves).toHaveLength(2)
+  })
+
+  it('retains all inserted words after consecutive failed saves until one succeeds', async () => {
+    const { services, pending } = deferredSaveServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await tick()
+    store.editText('root', tenWords + tenWords)
+    await tick()
+
+    pending[0]!.reject(new Error('first save failed'))
+    await tick()
+    pending[1]!.reject(new Error('second save failed'))
+    await tick()
+
+    store.editText('root', `${tenWords}${tenWords}eleven `)
+    await tick()
+    expect(services.saves).toHaveLength(3)
+
+    pending[2]!.resolve()
+    await tick()
+
+    store.editText('root', `${tenWords}${tenWords}eleven twelve `)
+    await tick()
+    expect(services.saves).toHaveLength(3)
+  })
+
+  it('acknowledges each successful snapshot without re-saving already-saved words', async () => {
+    const { services, pending } = deferredSaveServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await tick()
+    store.editText('root', tenWords + tenWords)
+    await tick()
+
+    pending[0]!.resolve()
+    await tick()
+    pending[1]!.resolve()
+    await tick()
+    expect(services.saves).toHaveLength(2)
+
+    store.editText('root', `${tenWords}${tenWords}eleven `)
+    await tick()
+    expect(services.saves).toHaveLength(2)
+  })
+
+  it('does not request another save for edits below the threshold while a save is pending', async () => {
+    const { services, pending } = deferredSaveServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+
+    store.editText('root', 'a b c')
+    clock.runAll()
+    await tick()
+    expect(services.saves).toHaveLength(1)
+
+    store.editText('root', 'a b c d e f g h i')
+    await tick()
+    expect(services.saves).toHaveLength(1)
+
+    pending[0]!.resolve()
+    await tick()
+    store.editText('root', 'a b c d e f g h i j')
+    await tick()
+    expect(services.saves).toHaveLength(1)
+
+    store.editText('root', 'a b c d e f g h i j k l m n')
+    await tick()
+    expect(services.saves).toHaveLength(2)
+  })
+
+  it('keeps the words saved by a successful save when the following cleanup fails', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [{ id: 'child', text: '', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'child' },
+    )
+    const pending: Array<{ resolve: () => void; reject: (error: Error) => void }> = []
+    services.save = (state) => {
+      services.saves.push(state)
+      return new Promise<void>((resolve, reject) => {
+        pending.push({ resolve, reject })
+      })
+    }
+    const store = new EditorStore(services, ids('unused'), new FakeClock())
+    await store.initialize()
+    await store.flushPersistence()
+    services.cleanupAttachments = async () => {
+      throw new Error('cleanup failed')
+    }
+
+    store.deleteSelected()
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await tick()
+    expect(services.saves).toHaveLength(1)
+
+    pending[0]!.resolve()
+    await tick()
+    expect(services.saves).toHaveLength(1)
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'cleanup failed' })
+
+    store.editText('root', `${tenWords}eleven `)
+    await tick()
     expect(services.saves).toHaveLength(1)
   })
 

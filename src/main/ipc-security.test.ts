@@ -8,12 +8,15 @@ import {
   validateClipboardWritePayload,
   validatePersistedEditorState,
 } from './ipc-security'
+import { decodePngWithZlib, onePixelPng, pngWith, transparentPng } from './png-test-utils'
 
 const state = {
   version: 1,
   document: { roots: [{ id: 'root', text: '', children: [] }] },
   location: { currentParentId: null, selectedNodeId: 'root' },
 }
+
+const validIhdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 describe('IPC security validation', () => {
   it('accepts only the expected renderer URL', () => {
@@ -45,36 +48,83 @@ describe('IPC security validation', () => {
     expect(() => validateAttachmentIds('one')).toThrow('Attachment IDs')
   })
 
-  it('requires non-empty binary data within the size limit', () => {
-    const png = new Uint8Array([
+  it('accepts genuinely decodable PNGs and supported byte forms', () => {
+    expect(validateAttachmentBytes(onePixelPng, decodePngWithZlib)).toBe(onePixelPng)
+    expect(validateAttachmentBytes([...onePixelPng], decodePngWithZlib)).toEqual(onePixelPng)
+    expect(validateAttachmentBytes({ type: 'Buffer', data: [...onePixelPng] }, decodePngWithZlib)).toEqual(onePixelPng)
+    expect(validateAttachmentBytes(transparentPng, decodePngWithZlib)).toBe(transparentPng)
+    expect(() => validateAttachmentBytes(new Uint8Array(), decodePngWithZlib)).toThrow('empty')
+    expect(() => validateAttachmentBytes(new Uint8Array(MAX_ATTACHMENT_BYTES + 1), decodePngWithZlib)).toThrow(
+      'too large',
+    )
+  })
+
+  it('rejects the signature-and-IEND payload that contains no image data', () => {
+    const invalidPng = Uint8Array.from([
       137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
       0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0,
     ])
-    expect(validateAttachmentBytes(png)).toBe(png)
-    expect(validateAttachmentBytes([...png])).toEqual(png)
-    expect(validateAttachmentBytes({ type: 'Buffer', data: [...png] })).toEqual(png)
-    expect(() => validateAttachmentBytes(new Uint8Array())).toThrow('empty')
-    expect(() => validateAttachmentBytes(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]))).toThrow('PNG')
-    expect(() => validateAttachmentBytes(new Uint8Array(MAX_ATTACHMENT_BYTES + 1))).toThrow('too large')
+    expect(() => validateAttachmentBytes(invalidPng, decodePngWithZlib)).toThrow('PNG')
   })
 
-  it('rejects malformed PNG chunk structure and zero-sized images', () => {
+  it('rejects truncated chunks, missing image data, bad CRCs, and zero dimensions', () => {
     const signature = [137, 80, 78, 71, 13, 10, 26, 10]
-    const ihdr = [0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 0, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
-    expect(() => validateAttachmentBytes(new Uint8Array([...signature, 0, 0, 0, 13, 73]))).toThrow('PNG')
-    expect(() => validateAttachmentBytes(new Uint8Array([...signature, ...ihdr, 0, 0, 0, 0]))).toThrow('PNG')
+    expect(() => validateAttachmentBytes(new Uint8Array([...signature, 0, 0, 0, 13, 73]), decodePngWithZlib)).toThrow(
+      'PNG',
+    )
+    expect(() =>
+      validateAttachmentBytes(
+        pngWith([
+          ['IHDR', validIhdr],
+          ['IEND', []],
+        ]),
+        decodePngWithZlib,
+      ),
+    ).toThrow('PNG')
+
+    const badCrc = Uint8Array.from(onePixelPng)
+    badCrc[32] = badCrc[32]! ^ 0xff
+    expect(() => validateAttachmentBytes(badCrc, decodePngWithZlib)).toThrow('PNG')
+
+    const zeroWidth = [...validIhdr]
+    zeroWidth[0] = 0
+    zeroWidth[1] = 0
+    zeroWidth[2] = 0
+    zeroWidth[3] = 0
+    expect(() =>
+      validateAttachmentBytes(
+        pngWith([
+          ['IHDR', zeroWidth],
+          ['IDAT', [1, 2, 3]],
+          ['IEND', []],
+        ]),
+        decodePngWithZlib,
+      ),
+    ).toThrow('PNG')
+
+    expect(() => validateAttachmentBytes(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), decodePngWithZlib)).toThrow(
+      'PNG',
+    )
+  })
+
+  it('rejects structurally valid PNGs whose image data cannot decode', () => {
+    const corrupt = pngWith([
+      ['IHDR', validIhdr],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(() => validateAttachmentBytes(corrupt, decodePngWithZlib)).toThrow('decodable')
+    expect(() => validateAttachmentBytes(onePixelPng, () => false)).toThrow('decodable')
   })
 
   it('accepts typed-array views and rejects invalid byte values', () => {
-    const png = new Uint8Array([
-      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
-      0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0,
-    ])
-    const buffer = new ArrayBuffer(png.byteLength + 2)
-    new Uint8Array(buffer, 1, png.byteLength).set(png)
+    const buffer = new ArrayBuffer(onePixelPng.byteLength + 2)
+    new Uint8Array(buffer, 1, onePixelPng.byteLength).set(onePixelPng)
 
-    expect(validateAttachmentBytes(new DataView(buffer, 1, png.byteLength))).toEqual(png)
-    expect(() => validateAttachmentBytes([256])).toThrow('invalid')
+    expect(validateAttachmentBytes(new DataView(buffer, 1, onePixelPng.byteLength), decodePngWithZlib)).toEqual(
+      onePixelPng,
+    )
+    expect(() => validateAttachmentBytes([256], decodePngWithZlib)).toThrow('invalid')
   })
 })

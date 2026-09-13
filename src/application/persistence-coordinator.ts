@@ -9,6 +9,8 @@ export interface PersistenceCoordinatorDependencies {
   currentState(): { document: Document; location: Location } | undefined
   referencedAttachmentIds(): Iterable<AttachmentId>
   hasPendingDocumentChanges(): boolean
+  onSaveCaptured(): void
+  onDocumentSaved(): void
   onResult(error: unknown | undefined): void
 }
 
@@ -67,9 +69,11 @@ export class PersistenceCoordinator {
             const state = this.dependencies.currentState()
             if (state === undefined) continue
             if (saveRequested) {
+              this.dependencies.onSaveCaptured()
               try {
                 await this.services.save(serializeState(state.document, state.location))
                 this.saveError = undefined
+                this.dependencies.onDocumentSaved()
               } catch (error) {
                 this.saveError = error
                 if (cleanupRequested) this.cleanupRequested = true

@@ -1,4 +1,14 @@
-import { app, BrowserWindow, ClipboardItem, clipboard, globalShortcut, ipcMain, Menu, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  ClipboardItem,
+  clipboard,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  shell,
+} from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
@@ -10,6 +20,7 @@ import {
 } from '../infrastructure/main/window-state'
 import { registerIpcHandlers } from './ipc-handlers'
 import { bootstrapApplication } from './bootstrap'
+import { createPngDecoder } from './png-decoder'
 import {
   configureSingleInstance,
   isAllowedExternalUrl,
@@ -112,6 +123,7 @@ bootstrapApplication({
       fileServices,
       nativeClipboard,
       quitHandshake,
+      decodePng: createPngDecoder(nativeImage),
       onQuitConfirmed: () => {
         appQuitting = true
         onQuitConfirmed()

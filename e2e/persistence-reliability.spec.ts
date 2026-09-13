@@ -252,4 +252,64 @@ test.describe('persistence reliability regressions', () => {
     await closed
     expect(readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
   })
+
+  test('retries the volume save for words inserted after an earlier successful snapshot', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+    allowRendererError(/^Changes could not be saved: .*second save failed$/)
+
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
+        ._invokeHandlers
+      const original = handlers.get('tree:save')
+      if (original === undefined) throw new Error('Save handler is unavailable.')
+      const control = globalThis as typeof globalThis & {
+        saveCalls?: number
+        firstSaveStarted?: boolean
+        releaseFirstSave?: () => void
+      }
+      control.saveCalls = 0
+      const gate = new Promise<void>((resolve) => {
+        control.releaseFirstSave = resolve
+      })
+      ipcMain.removeHandler('tree:save')
+      ipcMain.handle('tree:save', async (...args) => {
+        control.saveCalls = (control.saveCalls ?? 0) + 1
+        if (control.saveCalls === 1) {
+          control.firstSaveStarted = true
+          await gate
+          return original(...args)
+        }
+        if (control.saveCalls === 2) throw new Error('second save failed')
+        return original(...args)
+      })
+    })
+
+    const tenWords = 'one two three four five six seven eight nine ten'
+    await typeInto(node(window, 1), `${tenWords} `)
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as typeof globalThis & { firstSaveStarted?: boolean }).firstSaveStarted),
+      )
+      .toBe(true)
+
+    await typeInto(node(window, 1), `${tenWords} `)
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseFirstSave?: () => void }).releaseFirstSave?.())
+
+    await expect(window.getByText(/Changes could not be saved: .*second save failed/)).toBeVisible()
+
+    await typeInto(node(window, 1), 'eleven ')
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { saveCalls?: number }).saveCalls ?? 0))
+      .toBeGreaterThanOrEqual(3)
+
+    const expectedText = await node(window, 1).inputValue()
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(expectedText)
+
+    const restarted = await launchTree(userDataDir)
+    await expect(node(restarted.window, 1)).toHaveValue(expectedText)
+  })
 })

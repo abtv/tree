@@ -1,5 +1,67 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
+
+const IMAGE_ERROR_MESSAGE = 'Image could not be loaded.'
+
+type AttachmentState =
+  | { attachmentId: string; status: 'loading' }
+  | { attachmentId: string; status: 'ready'; url: string }
+  | { attachmentId: string; status: 'error' }
+
+function useAttachmentImage(attachmentId: string): {
+  state: AttachmentState
+  onImageError: () => void
+} {
+  const [state, setState] = useState<AttachmentState>({ attachmentId, status: 'loading' })
+  if (state.attachmentId !== attachmentId) {
+    setState({ attachmentId, status: 'loading' })
+  }
+  const objectUrl = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    let disposed = false
+    void attachmentByteCache
+      .get(attachmentId)
+      .then((bytes) => {
+        if (disposed) return
+        if (bytes === null) {
+          setState({ attachmentId, status: 'error' })
+          return
+        }
+        const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
+        objectUrl.current = url
+        setState({ attachmentId, status: 'ready', url })
+      })
+      .catch(() => {
+        if (!disposed) setState({ attachmentId, status: 'error' })
+      })
+    return () => {
+      disposed = true
+      if (objectUrl.current !== undefined) {
+        URL.revokeObjectURL(objectUrl.current)
+        objectUrl.current = undefined
+      }
+    }
+  }, [attachmentId])
+
+  const onImageError = useCallback(() => {
+    if (objectUrl.current !== undefined) {
+      URL.revokeObjectURL(objectUrl.current)
+      objectUrl.current = undefined
+    }
+    setState((current) => (current.attachmentId === attachmentId ? { attachmentId, status: 'error' } : current))
+  }, [attachmentId])
+
+  return { state, onImageError }
+}
+
+function ImageErrorMessage(): React.JSX.Element {
+  return (
+    <p className="attachment-error" role="status">
+      {IMAGE_ERROR_MESSAGE}
+    </p>
+  )
+}
 
 export function AttachmentImage({
   attachmentId,
@@ -8,24 +70,9 @@ export function AttachmentImage({
   attachmentId: string
   onOpen: (attachmentId: string) => void
 }): React.JSX.Element | null {
-  const [url, setUrl] = useState<string>()
-  useEffect(() => {
-    let disposed = false
-    let objectUrl: string | undefined
-    void attachmentByteCache
-      .get(attachmentId)
-      .then((bytes) => {
-        if (disposed || bytes === null) return
-        objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
-        setUrl(objectUrl)
-      })
-      .catch(() => undefined)
-    return () => {
-      disposed = true
-      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
-    }
-  }, [attachmentId])
-  if (url === undefined) return null
+  const { state, onImageError } = useAttachmentImage(attachmentId)
+  if (state.status === 'loading') return null
+  if (state.status === 'error') return <ImageErrorMessage />
   return (
     <button
       aria-label="Open image preview"
@@ -33,7 +80,7 @@ export function AttachmentImage({
       onClick={() => onOpen(attachmentId)}
       type="button"
     >
-      <img className="attachment-image" src={url} alt="Attached image" />
+      <img className="attachment-image" src={state.url} alt="Attached image" onError={onImageError} />
     </button>
   )
 }
@@ -45,7 +92,7 @@ export function ImagePreview({
   attachmentId: string
   onClose: () => void
 }): React.JSX.Element {
-  const [url, setUrl] = useState<string>()
+  const { state, onImageError } = useAttachmentImage(attachmentId)
   const closeButton = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<Element | null>(null)
@@ -54,23 +101,6 @@ export function ImagePreview({
   useEffect(() => {
     onCloseRef.current = onClose
   }, [onClose])
-
-  useEffect(() => {
-    let disposed = false
-    let objectUrl: string | undefined
-    void attachmentByteCache
-      .get(attachmentId)
-      .then((bytes) => {
-        if (disposed || bytes === null) return
-        objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
-        setUrl(objectUrl)
-      })
-      .catch(() => undefined)
-    return () => {
-      disposed = true
-      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
-    }
-  }, [attachmentId])
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement
@@ -134,7 +164,10 @@ export function ImagePreview({
         >
           ×
         </button>
-        {url === undefined ? null : <img className="image-preview-image" src={url} alt="Attached image preview" />}
+        {state.status === 'ready' ? (
+          <img className="image-preview-image" src={state.url} alt="Attached image preview" onError={onImageError} />
+        ) : null}
+        {state.status === 'error' ? <ImageErrorMessage /> : null}
       </div>
     </div>
   )

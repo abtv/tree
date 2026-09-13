@@ -312,3 +312,141 @@ describe('EditorStore invariants under command sequences', () => {
     )
   })
 })
+
+type SaveEvent = { kind: 'insert'; words: number } | { kind: 'success' } | { kind: 'failure' }
+
+interface DeferredSave {
+  resolve: () => void
+  reject: (error: Error) => void
+}
+
+function noopClock(): { setTimeout: () => undefined; clearTimeout: () => undefined } {
+  return { setTimeout: () => undefined, clearTimeout: () => undefined }
+}
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+describe('EditorStore save accounting', () => {
+  it('requests saves according to an independent watermark model', async () => {
+    const event: fc.Arbitrary<SaveEvent> = fc.oneof(
+      fc.record({ kind: fc.constant('insert' as const), words: fc.integer({ min: 1, max: 10 }) }),
+      fc.record({ kind: fc.constant('success' as const) }),
+      fc.record({ kind: fc.constant('failure' as const) }),
+    )
+
+    await fc.assert(
+      fc.asyncProperty(fc.array(event, { maxLength: 40 }), async (events) => {
+        const saves: unknown[] = []
+        const pending: DeferredSave[] = []
+        const services: EditorServices & { saves: unknown[] } = {
+          saves,
+          load: async () => ({
+            version: 1,
+            document: { roots: [{ id: 'root', text: '', children: [] }] },
+            location: { currentParentId: null, selectedNodeId: 'root' },
+          }),
+          save: (state) =>
+            new Promise<void>((resolve, reject) => {
+              saves.push(state)
+              pending.push({ resolve, reject })
+            }),
+          readClipboard: async () => ({ kind: 'text', text: '' }),
+          writeAttachment: async () => undefined,
+          hasAttachment: async () => true,
+          cleanupAttachments: async () => undefined,
+        }
+        const store = new EditorStore(services, () => 'created', noopClock())
+        await store.initialize()
+        await store.flushPersistence()
+        saves.length = 0
+
+        const threshold = 10
+        let inserted = 0
+        let acknowledged = 0
+        let requested = false
+        let inFlight: number | undefined
+        let started = 0
+        const startIfIdle = (): void => {
+          if (inFlight === undefined && requested) {
+            inFlight = inserted
+            requested = false
+            started += 1
+          }
+        }
+        let wordCount = 0
+        const textFor = (words: number): string =>
+          `${Array.from({ length: words }, (_, index) => `w${index}`).join(' ')} `
+
+        for (const current of events) {
+          if (current.kind === 'insert') {
+            wordCount += current.words
+            store.editText('root', textFor(wordCount))
+            inserted += current.words
+            if (inserted - acknowledged >= threshold) requested = true
+            await tick()
+            startIfIdle()
+            expect(saves.length).toBe(started)
+            continue
+          }
+
+          if (inFlight === undefined) continue
+          const next = pending.shift()
+          expect(next).toBeDefined()
+          if (current.kind === 'success') {
+            next!.resolve()
+            acknowledged = Math.max(acknowledged, inFlight)
+          } else {
+            next!.reject(new Error('save failed'))
+          }
+          inFlight = undefined
+          startIfIdle()
+          await tick()
+          expect(saves.length).toBe(started)
+        }
+
+        while (inFlight !== undefined || requested) {
+          startIfIdle()
+          if (inFlight === undefined) break
+          pending.shift()!.resolve()
+          acknowledged = Math.max(acknowledged, inFlight)
+          inFlight = undefined
+          startIfIdle()
+          await tick()
+        }
+        while (pending.length > 0) {
+          pending.shift()!.resolve()
+          await tick()
+        }
+        expect(saves.length).toBe(started)
+
+        wordCount += threshold
+        store.editText('root', textFor(wordCount))
+        inserted += threshold
+        if (inserted - acknowledged >= threshold) requested = true
+        await tick()
+        startIfIdle()
+        let guard = 0
+        while ((inFlight !== undefined || requested || pending.length > 0) && guard < 100) {
+          guard += 1
+          startIfIdle()
+          if (pending.length > 0) {
+            pending.shift()!.resolve()
+            acknowledged = Math.max(acknowledged, inFlight ?? acknowledged)
+            inFlight = undefined
+            startIfIdle()
+          }
+          await tick()
+        }
+        expect(acknowledged).toBe(inserted)
+
+        wordCount += 1
+        store.editText('root', textFor(wordCount))
+        await tick()
+        expect(saves.length).toBe(started)
+      }),
+      { numRuns: 200 },
+    )
+  })
+})

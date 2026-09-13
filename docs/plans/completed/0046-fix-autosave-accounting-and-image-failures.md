@@ -1,7 +1,8 @@
 # Fix Overlapping Autosave Accounting and Image Failure Handling
 
-Status: Active
+Status: Completed
 Created: 2026-09-13
+Completed: 2026-09-13
 
 ## Goal and authorization
 
@@ -132,35 +133,36 @@ Update `docs/PRODUCT.md` §17.1 during implementation to record this failure beh
 
 ## Performance assessment and guards
 
-Record final measurements and any deviations here before completion, as required by Product §22.1.
+Required by Product §22.1. Recorded after implementation.
 
-* **Disk writes and syncs:** autosave should add only the policy-required retries missing today. No per-keystroke saves. Invalid attachments must produce zero attachment writes. Display errors must produce no document writes, cleanup requests, or automatic read loops.
-* **Interactive CPU:** save accounting should be O(1) per edit/completion, without document/history traversal. PNG validation may scan O(B) encoded bytes and decode image pixels on insertion; do not repeat decoding on typing or attachment existence checks. Measure representative small and larger valid images and report main-process latency. Encoded size alone does not bound decoded pixel memory; assess that risk explicitly without silently adding a new product limit.
-* **Memory:** keep save bookkeeping bounded regardless of edit/request count. Retain the byte-cache budget and release object URLs. Avoid retaining decoded platform images or duplicate byte buffers after validation finishes.
-* **Automated guards:** deterministic tests must assert save/write/read counts, bounded accounting over repeated cycles, and cache/URL lifecycle. Add a focused guard against repeated validation/decoding per insertion. Run the existing eight performance scenarios; add a measured insertion guard if the decoder changes work at scale. Do not weaken budgets to accommodate a regression.
+* **Disk writes and syncs:** the save-accounting change adds no save trigger. It removes a spurious missing retry and prevents lost retries; it cannot add writes for ordinary editing. The PNG change rejects invalid payloads before `writeAttachment`, so invalid attachments produce zero writes and no file. Display failures perform no document writes or cleanup and cannot loop reads. Measured image-insertion `write-attachment` latency (validation + decode + write) was 0.65 ms for a 32×32 image and 0.65 ms for a 512×512 image in the new performance scenario.
+* **Interactive CPU:** accounting is two integers per store; every edit and result handles them in O(1) with no document, history, or request-list traversal. PNG validation scans O(B) encoded bytes once per insertion, verifies chunk CRCs and structure, and decodes through the platform decoder once; the IPC contract test asserts the decoder is invoked exactly once per accepted write and never on `hasAttachment`/`readAttachment`. Validation and decoding are not repeated on typing or attachment-existence checks.
+* **Memory:** accounting is a fixed pair of scalars regardless of edit or request count. The renderer keeps its bounded byte-cache budget, revokes object URLs when an image is replaced or a component unmounts, and revokes again on a decode failure. No decoded platform image or duplicate byte buffer is retained after validation; the decoder adapter converts to a temporary `Buffer` inside the handler and returns only a boolean.
+* **Automated guards:** deterministic `editor-store.test.ts` save-count tests cover A-success/B-failure, A-failure/B-success, consecutive failures, both successes, below-threshold edits while a save is pending, and cleanup success/failure separation. `EditorStore save accounting` in `editor-store.property.test.ts` checks 200 random edit/outcome sequences against an independent watermark model. `ipc-handlers.test.ts` asserts a single decode per accepted attachment write, that invalid bytes reject before the filesystem call, and that write failures propagate. `AttachmentPreview.test.tsx` asserts message visibility, late-response disposal, URL release, and cache reuse. The performance suite's ninth scenario measures insertion decode latency.
+
+## Verification evidence
+
+* **Finding 1:** the deferred-promise regression `requests a save for words inserted after an earlier successful snapshot when a later save fails` failed against pre-fix `editor-store.ts`/`persistence-coordinator.ts` with 2 saves instead of 3. Four focused store tests plus the coordinator cleanup tests also failed pre-fix and pass after the fix. The new Electron regression holds save A, coalesces B through editing, succeeds A, fails B, inserts another word, observes the volume retry through the real IPC boundary, then verifies the persisted content and a restart.
+* **Finding 2:** the exact 45-byte signature/IHDR/IEND payload is now rejected by `isPng` (placeholder CRCs fail); the strengthened validator additionally rejects truncated chunks, missing `IDAT`, bad CRCs, zero dimensions, and structurally valid payloads whose data cannot decode, while accepting real one-pixel and transparent PNGs. The `nativeImage` adapter is `src/main/png-decoder.ts` and is injected through `IpcHandlerDependencies`.
+* **Finding 3:** both inline and preview components now expose `Image could not be loaded.` for missing bytes, rejected reads, and browser decode errors; the plan's silence assertions were replaced with visible-behavior assertions. Electron tests cover a real read failure and corrupt stored bytes after restart, and confirm the editor stays usable.
 
 ## Validation and documentation
 
-1. Reproduce each finding with a failing test before its implementation change. Record test names and observed failures in this plan.
-2. Implement and run the focused tests. Where practical, bypass the fix to confirm the regression fails again.
-3. Update Product §17.1 for image failure visibility, Architecture §13 for actual save acknowledgment semantics, and the development guide for the new guards. Document decoder wiring if it changes technical responsibilities within the existing boundaries.
-4. Review affected Product §§16–17 and 22 against unit, contract, and E2E coverage. Preserve existing shutdown success/failure/timeout/retry/duplicate-request/menu/window-close/renderer-unavailable tests; add coverage where changed behavior exposes a gap.
-5. Run `npm run check:full` on supported macOS with a display. All unit, boundary, E2E, and performance checks must execute; report exact failures or environment blockers. Follow the suite-owned Electron cleanup rules on launch failures.
-6. Review the diff, record verification/performance evidence, mark this same plan Completed with its completion date, and move it to `docs/plans/completed/` without copying it.
-7. Commit the completed implementation and provide the required session handoff. The planning commit is separate; do not amend it merely because implementation follows this plan.
-
-## Planning baseline
-
-The quality-assessment run on 2026-09-13 passed `npm run check:full`: 380 unit/component/property tests, 92 Electron E2E tests, and 8 performance tests; type checking, lint, formatting, coverage enforcement, build, and dependency audit also passed. Statement coverage was 96.86% and branch coverage 90.79%. These passing results coexist with the reproduced gaps above and are not evidence that this plan is implemented.
+1. Findings were reproduced with failing tests before implementation (recorded above).
+2. Focused tests pass; the regression was confirmed to fail against the pre-fix implementation.
+3. Product §17.1, Architecture §§7 and 13, and Development §12 were updated.
+4. Affected Product §§16–17 and 22 coverage was reviewed and extended at unit, contract, and Electron levels; existing shutdown tests were retained.
+5. `npm run check:full` passed on macOS with a display: type checking, lint, format check, 401 coverage-enforced unit/component/property tests, production build, dependency audit, 97 Electron E2E tests, and 9 performance tests. No required test was skipped.
+6. The plan is marked Completed and moved to `docs/plans/completed/` without copying.
 
 ## Execution checklist
 
-* [ ] Reproduce and fix overlapping-save accounting, including cleanup-result distinctions.
-* [ ] Add deferred-save, property, contract, and Electron regressions.
-* [ ] Reject invalid PNGs and replace invalid positive fixtures.
-* [ ] Verify real decoder and write-boundary behavior.
-* [ ] Add accessible inline/preview image failure states and lifecycle regressions.
-* [ ] Update product, architecture, and development documentation.
-* [ ] Record the performance assessment and pass automated guards.
-* [ ] Pass `npm run check:full` with no required tests skipped.
-* [ ] Record evidence, complete and move this plan, and commit implementation.
+* [x] Reproduce and fix overlapping-save accounting, including cleanup-result distinctions.
+* [x] Add deferred-save, property, contract, and Electron regressions.
+* [x] Reject invalid PNGs and replace invalid positive fixtures.
+* [x] Verify real decoder and write-boundary behavior.
+* [x] Add accessible inline/preview image failure states and lifecycle regressions.
+* [x] Update product, architecture, and development documentation.
+* [x] Record the performance assessment and pass automated guards.
+* [x] Pass `npm run check:full` with no required tests skipped.
+* [x] Record evidence, complete and move this plan, and commit implementation.

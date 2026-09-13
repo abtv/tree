@@ -1,4 +1,14 @@
-import { expect, largeAttachmentSeed, launchTree, round, seedAttachmentFiles, seedDocument, test } from './fixtures'
+import {
+  expect,
+  firePaste,
+  largeAttachmentSeed,
+  launchTree,
+  round,
+  seedAttachmentFiles,
+  seedDocument,
+  test,
+  writeClipboardImageSized,
+} from './fixtures'
 
 interface SaveControl {
   saves: number
@@ -158,5 +168,53 @@ test.describe('state and persistence work', () => {
     expect(historyMs).toBeLessThan(5_000)
     expect(cleanupScanMs).toBeGreaterThan(0)
     expect(cleanupScanMs).toBeLessThan(1_000)
+  })
+
+  test('image insertion decode latency for small and larger images', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
+        ._invokeHandlers
+      const original = handlers.get('tree:write-attachment')
+      if (original === undefined) throw new Error('Attachment handler is unavailable.')
+      const control = globalThis as typeof globalThis & { __decodeProbe?: number[] }
+      control.__decodeProbe = []
+      ipcMain.removeHandler('tree:write-attachment')
+      ipcMain.handle('tree:write-attachment', async (...args) => {
+        const start = performance.now()
+        try {
+          return await original(...args)
+        } finally {
+          control.__decodeProbe!.push(performance.now() - start)
+        }
+      })
+    })
+
+    const measurements: Record<string, number> = {}
+    for (const [name, width, height] of [
+      ['small', 32, 32],
+      ['large', 512, 512],
+    ] as const) {
+      await writeClipboardImageSized(app, width, height)
+      await firePaste(window.getByRole('textbox').first())
+      await expect(window.getByAltText('Attached image').last()).toBeVisible()
+      const durations = await app.evaluate(
+        () => (globalThis as typeof globalThis & { __decodeProbe?: number[] }).__decodeProbe ?? [],
+      )
+      measurements[name] = round(durations.at(-1) ?? 0)
+    }
+
+    console.log(
+      `PERF ${JSON.stringify({
+        kind: 'attachment',
+        scenario: 'image-insertion-decode',
+        smallMs: measurements['small'],
+        largeMs: measurements['large'],
+      })}`,
+    )
+
+    expect(measurements['small']).toBeGreaterThan(0)
+    expect(measurements['small']).toBeLessThan(1_000)
+    expect(measurements['large']).toBeLessThan(3_000)
   })
 })

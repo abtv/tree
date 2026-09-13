@@ -6,6 +6,7 @@ import {
   validateClipboardWritePayload,
   validatePersistedEditorState,
   isTrustedRendererUrl,
+  type PngDecoder,
 } from './ipc-security'
 import { ipcChannels } from '../shared/ipc'
 import type { FileServices } from '../infrastructure/main/file-services'
@@ -25,6 +26,7 @@ export interface IpcHandlerDependencies {
   fileServices: FileServices
   nativeClipboard: NativeClipboard
   quitHandshake: Pick<QuitHandshake, 'request' | 'confirm'>
+  decodePng: PngDecoder
   onQuitConfirmed: () => void
 }
 
@@ -34,6 +36,7 @@ export function registerIpcHandlers({
   fileServices,
   nativeClipboard,
   quitHandshake,
+  decodePng,
   onQuitConfirmed,
 }: IpcHandlerDependencies): void {
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
@@ -67,7 +70,7 @@ export function registerIpcHandlers({
   })
   ipcMain.handle(ipcChannels.writeAttachment, (event, id, png) => {
     requireTrustedRenderer(event)
-    return fileServices.writeAttachment(validateAttachmentId(id), validateAttachmentBytes(png))
+    return fileServices.writeAttachment(validateAttachmentId(id), validateAttachmentBytes(png, decodePng))
   })
   ipcMain.handle(ipcChannels.hasAttachment, (event, id) => {
     requireTrustedRenderer(event)

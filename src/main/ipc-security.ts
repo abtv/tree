@@ -39,12 +39,15 @@ export function validateAttachmentId(value: unknown): string {
   return value
 }
 
-export function validateAttachmentBytes(value: unknown): Uint8Array {
+export type PngDecoder = (bytes: Uint8Array) => boolean
+
+export function validateAttachmentBytes(value: unknown, decode: PngDecoder): Uint8Array {
   const bytes = toUint8Array(value)
   if (bytes === undefined) throw new Error('Attachment data is invalid.')
   if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Attachment is too large.')
   if (bytes.byteLength === 0) throw new Error('Attachment data is empty.')
   if (!isPng(bytes)) throw new Error('Attachment data is not a valid PNG image.')
+  if (!decode(bytes)) throw new Error('Attachment data is not a decodable PNG image.')
   return bytes
 }
 
@@ -54,6 +57,8 @@ export function isPng(bytes: Uint8Array): boolean {
 
   let offset = signature.length
   let sawHeader = false
+  let sawData = false
+  let sawEnd = false
   while (offset + 12 <= bytes.length) {
     const length = readUint32(bytes, offset)
     const typeStart = offset + 4
@@ -61,22 +66,64 @@ export function isPng(bytes: Uint8Array): boolean {
     const dataEnd = dataStart + length
     const chunkEnd = dataEnd + 4
     if (dataEnd > bytes.length || chunkEnd > bytes.length) return false
-    const type = String.fromCharCode(...bytes.slice(typeStart, dataStart))
+    if (readUint32(bytes, dataEnd) !== crc32(bytes, typeStart, dataEnd)) return false
+    const type = String.fromCharCode(
+      bytes[typeStart]!,
+      bytes[typeStart + 1]!,
+      bytes[typeStart + 2]!,
+      bytes[typeStart + 3]!,
+    )
     if (!sawHeader) {
-      if (
-        type !== 'IHDR' ||
-        length !== 13 ||
-        readUint32(bytes, dataStart) === 0 ||
-        readUint32(bytes, dataStart + 4) === 0
-      ) {
-        return false
-      }
+      if (type !== 'IHDR' || length !== 13 || !isValidHeader(bytes, dataStart)) return false
       sawHeader = true
+    } else if (sawEnd) {
+      return false
+    }
+    if (type === 'IDAT') {
+      if (length === 0) return false
+      sawData = true
     }
     offset = chunkEnd
-    if (type === 'IEND') return sawHeader && length === 0 && offset === bytes.length
+    if (type === 'IEND') {
+      if (length !== 0) return false
+      sawEnd = true
+      break
+    }
   }
-  return false
+  return sawHeader && sawData && sawEnd && offset === bytes.length
+}
+
+function isValidHeader(bytes: Uint8Array, dataStart: number): boolean {
+  if (readUint32(bytes, dataStart) === 0 || readUint32(bytes, dataStart + 4) === 0) return false
+  const bitDepth = bytes[dataStart + 8]
+  const colorType = bytes[dataStart + 9]
+  if (bytes[dataStart + 10] !== 0 || bytes[dataStart + 11] !== 0) return false
+  const interlace = bytes[dataStart + 12]
+  if (interlace !== 0 && interlace !== 1) return false
+  const allowedDepths: Record<number, number[]> = {
+    0: [1, 2, 4, 8, 16],
+    2: [8, 16],
+    3: [1, 2, 4, 8],
+    4: [8, 16],
+    6: [8, 16],
+  }
+  return bitDepth !== undefined && allowedDepths[colorType!]?.includes(bitDepth) === true
+}
+
+const crcTable = (() => {
+  const table = new Uint32Array(256)
+  for (let index = 0; index < 256; index += 1) {
+    let value = index
+    for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
+    table[index] = value >>> 0
+  }
+  return table
+})()
+
+function crc32(bytes: Uint8Array, start: number, end: number): number {
+  let crc = 0xffffffff
+  for (let index = start; index < end; index += 1) crc = crcTable[(crc ^ bytes[index]!) & 0xff]! ^ (crc >>> 8)
+  return (crc ^ 0xffffffff) >>> 0
 }
 
 function readUint32(bytes: Uint8Array, offset: number): number {

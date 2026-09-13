@@ -23,6 +23,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => [],
         hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult: () => {
           if (requestedAgain) return
           requestedAgain = true
@@ -59,6 +61,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => ['attachment'],
         hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult: vi.fn(),
       },
     )
@@ -88,6 +92,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => [],
         hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult: vi.fn(),
       },
     )
@@ -109,6 +115,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => [],
         hasPendingDocumentChanges: () => pending,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult: vi.fn(),
       },
     )
@@ -134,6 +142,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => [],
         hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult,
       },
     )
@@ -163,6 +173,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => [],
         hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult: vi.fn(),
       },
     )
@@ -178,6 +190,61 @@ describe('PersistenceCoordinator', () => {
     expect(cleanupAttachments).toHaveBeenCalledOnce()
   })
 
+  it('does not acknowledge a document save for cleanup-only work', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => undefined)
+    const onSaveCaptured = vi.fn()
+    const onDocumentSaved = vi.fn()
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured,
+        onDocumentSaved,
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestAttachmentCleanup()
+    await coordinator.flush()
+
+    expect(cleanupAttachments).toHaveBeenCalledOnce()
+    expect(save).not.toHaveBeenCalled()
+    expect(onSaveCaptured).not.toHaveBeenCalled()
+    expect(onDocumentSaved).not.toHaveBeenCalled()
+  })
+
+  it('acknowledges the document save even when the following cleanup fails', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => {
+      throw new Error('cleanup failed')
+    })
+    const onSaveCaptured = vi.fn()
+    const onDocumentSaved = vi.fn()
+    const onResult = vi.fn()
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured,
+        onDocumentSaved,
+        onResult,
+      },
+    )
+
+    coordinator.requestSave()
+    coordinator.requestAttachmentCleanup()
+    await expect(coordinator.flush()).rejects.toThrow('cleanup failed')
+
+    expect(onSaveCaptured).toHaveBeenCalledOnce()
+    expect(onDocumentSaved).toHaveBeenCalledOnce()
+    expect(onResult).toHaveBeenLastCalledWith(expect.objectContaining({ message: 'cleanup failed' }))
+  })
+
   it('clears a cleanup failure after cleanup succeeds without an unnecessary save', async () => {
     const save = vi.fn(async () => undefined)
     const cleanupAttachments = vi.fn(async () => undefined).mockRejectedValueOnce(new Error('cleanup failed'))
@@ -188,6 +255,8 @@ describe('PersistenceCoordinator', () => {
         currentState: () => state,
         referencedAttachmentIds: () => [],
         hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
         onResult,
       },
     )

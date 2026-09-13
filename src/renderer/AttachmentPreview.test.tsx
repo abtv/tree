@@ -49,17 +49,15 @@ describe('AttachmentImage', () => {
     expect(revoke).toHaveBeenCalledWith(createdObjectUrl)
   })
 
-  it('renders nothing when the attachment bytes are missing', async () => {
+  it('reports missing attachment bytes', async () => {
     mockTreeApi({ readAttachment: async () => null })
     render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
 
-    await Promise.resolve()
-    await Promise.resolve()
-
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open image preview' })).not.toBeInTheDocument()
   })
 
-  it('renders nothing and does not reject when the attachment read fails', async () => {
+  it('reports a failed attachment read without rejecting', async () => {
     mockTreeApi({
       readAttachment: async () => {
         throw new Error('read failed')
@@ -67,10 +65,76 @@ describe('AttachmentImage', () => {
     })
     render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
 
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+  })
+
+  it('reports a browser decode error and releases the object URL', async () => {
+    const revoke = vi.fn()
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
+    render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
+
+    const image = await screen.findByAltText('Attached image')
+    fireEvent.error(image)
+
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+    expect(revoke).toHaveBeenCalledWith(createdObjectUrl)
+  })
+
+  it('clears a failure after switching to a valid attachment', async () => {
+    mockTreeApi({
+      readAttachment: async (id) => (id === 'broken' ? null : attachmentBytes),
+    })
+    const { rerender } = render(<AttachmentImage attachmentId="broken" onOpen={() => undefined} />)
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+
+    rerender(<AttachmentImage attachmentId="working" onOpen={() => undefined} />)
+
+    expect(await screen.findByRole('button', { name: 'Open image preview' })).toBeInTheDocument()
+    expect(screen.queryByText('Image could not be loaded.')).not.toBeInTheDocument()
+  })
+
+  it('ignores a late success for an attachment that is no longer displayed', async () => {
+    let releaseFirst: ((bytes: Uint8Array) => void) | undefined
+    mockTreeApi({
+      readAttachment: (id) =>
+        id === 'first'
+          ? new Promise<Uint8Array>((resolve) => {
+              releaseFirst = resolve
+            })
+          : Promise.resolve(null),
+    })
+    const { rerender } = render(<AttachmentImage attachmentId="first" onOpen={() => undefined} />)
+    rerender(<AttachmentImage attachmentId="second" onOpen={() => undefined} />)
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+
+    releaseFirst!(attachmentBytes)
     await Promise.resolve()
     await Promise.resolve()
 
+    expect(screen.getByText('Image could not be loaded.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open image preview' })).not.toBeInTheDocument()
+  })
+
+  it('ignores a late failure for an attachment that is no longer displayed', async () => {
+    let rejectFirst: ((error: Error) => void) | undefined
+    mockTreeApi({
+      readAttachment: (id) =>
+        id === 'first'
+          ? new Promise<Uint8Array>((_resolve, reject) => {
+              rejectFirst = reject
+            })
+          : Promise.resolve(attachmentBytes),
+    })
+    const { rerender } = render(<AttachmentImage attachmentId="first" onOpen={() => undefined} />)
+    rerender(<AttachmentImage attachmentId="second" onOpen={() => undefined} />)
+    expect(await screen.findByRole('button', { name: 'Open image preview' })).toBeInTheDocument()
+
+    rejectFirst!(new Error('late failure'))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(screen.getByRole('button', { name: 'Open image preview' })).toBeInTheDocument()
+    expect(screen.queryByText('Image could not be loaded.')).not.toBeInTheDocument()
   })
 
   it('reads the attachment once across remounts', async () => {
@@ -191,17 +255,27 @@ describe('ImagePreview', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it('renders nothing and does not reject when the preview attachment read fails', async () => {
+  it('reports a failed preview attachment read without rejecting', async () => {
     mockTreeApi({
       readAttachment: async () => {
         throw new Error('read failed')
       },
     })
-    const { container } = render(<ImagePreview attachmentId="image" onClose={() => undefined} />)
+    render(<ImagePreview attachmentId="image" onClose={() => undefined} />)
 
-    await Promise.resolve()
-    await Promise.resolve()
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+    expect(screen.queryByAltText('Attached image preview')).not.toBeInTheDocument()
+  })
 
-    expect(container.querySelector('.image-preview-image')).toBeNull()
+  it('keeps the preview closable when the image fails to decode', async () => {
+    const onClose = vi.fn()
+    render(<ImagePreview attachmentId="image" onClose={onClose} />)
+
+    const image = await screen.findByAltText('Attached image preview')
+    fireEvent.error(image)
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledOnce()
   })
 })
