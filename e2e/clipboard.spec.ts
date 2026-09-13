@@ -1,10 +1,14 @@
+import type { ElectronApplication } from '@playwright/test'
 import {
+  allowRendererError,
   attachmentFiles,
+  clickApplicationMenuQuit,
   expect,
   firePaste,
   launchTree,
   node,
   nodeTexts,
+  readPersisted,
   setCursor,
   test,
   typeInto,
@@ -12,6 +16,27 @@ import {
   writeClipboardImageAndText,
   writeClipboardText,
 } from './fixtures'
+
+// Wrap the registered handler so a delayed write still exercises the real
+// validation and native clipboard path. Injection is confined to the owned test app.
+async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ ipcMain }) => {
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
+      ._invokeHandlers
+    const original = handlers.get('tree:write-clipboard')
+    if (original === undefined) throw new Error('Clipboard write handler is unavailable.')
+    const control = globalThis as typeof globalThis & { clipboardStarted?: boolean; releaseClipboard?: () => void }
+    const gate = new Promise<void>((resolve) => {
+      control.releaseClipboard = resolve
+    })
+    ipcMain.removeHandler('tree:write-clipboard')
+    ipcMain.handle('tree:write-clipboard', async (...args) => {
+      control.clipboardStarted = true
+      await gate
+      return original(...args)
+    })
+  })
+}
 
 test.describe('clipboard', () => {
   test('pastes plain text at the cursor', async ({ userDataDir }) => {
@@ -229,5 +254,49 @@ test.describe('clipboard', () => {
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
     await expect(window.getByAltText('Attached image')).toHaveCount(2)
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(2)
+  })
+
+  test('cancels a cut when the node changes during the clipboard write', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    allowRendererError(/^Operation failed: The cut could not finish because the text changed\.$/)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'abc')
+    await editor.evaluate((element) => {
+      const field = element as HTMLTextAreaElement
+      field.focus()
+      field.setSelectionRange(1, 2)
+    })
+    await window.evaluate(() => {
+      document.addEventListener(
+        'cut',
+        (event) => {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+        },
+        true,
+      )
+    })
+    await holdClipboardWrite(app)
+    await window.keyboard.press('Meta+x')
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as typeof globalThis & { clipboardStarted?: boolean }).clipboardStarted),
+      )
+      .toBe(true)
+
+    await setCursor(editor, 0)
+    await editor.pressSequentially('X')
+    await expect(editor).toHaveValue('Xabc')
+
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseClipboard?: () => void }).releaseClipboard?.())
+    await expect(editor).toHaveValue('Xabc')
+    await expect(window.getByText('Operation failed: The cut could not finish because the text changed.')).toBeVisible()
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('b')
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Xabc')
   })
 })

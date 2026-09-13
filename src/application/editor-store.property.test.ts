@@ -256,4 +256,59 @@ describe('EditorStore invariants under command sequences', () => {
       { numRuns: 100 },
     )
   })
+
+  it('never removes text for a delayed cut once the target content has changed', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 1, maxLength: 20 }),
+        fc.string({ maxLength: 20 }),
+        async (original, intervening) => {
+          let release: (() => void) | undefined
+          const services = createServices(
+            {
+              version: 1,
+              document: { roots: [{ id: 'root', text: original, children: [] }] },
+              location: { currentParentId: null, selectedNodeId: 'root' },
+            },
+            () => ({ kind: 'text', text: '' }),
+          )
+          services.writeClipboard = () =>
+            new Promise<void>((resolve) => {
+              release = resolve
+            })
+          const store = new EditorStore(services, () => 'unused')
+          await store.initialize()
+
+          const pending = store.cut('root', 0, original.length)
+          expect(release).toBeTypeOf('function')
+          store.editText('root', intervening)
+          release!()
+          await pending
+
+          const state = store.getSnapshot()
+          expect(state.status).toBe('ready')
+          if (state.status !== 'ready') {
+            return
+          }
+          if (intervening === original) {
+            expect(state.document.roots[0]!.text).toBe('')
+            expect(state.operationError).toBeUndefined()
+            store.undo()
+            expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: original }] } })
+            store.redo()
+            expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+          } else {
+            expect(state.document.roots[0]!.text).toBe(intervening)
+            expect(state.operationError).toBe('The cut could not finish because the text changed.')
+            store.undo()
+            expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: original }] } })
+            store.redo()
+            expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: intervening }] } })
+          }
+          assertInvariants(store)
+        },
+      ),
+      { numRuns: 200 },
+    )
+  })
 })

@@ -4,6 +4,7 @@ import {
   deleteLink,
   editNodeContent,
   isValidLocation,
+  locateNode,
   parsePersistedState,
   removeTextRange,
   requireNode,
@@ -217,9 +218,17 @@ export class EditorStore {
     const state = this.ready()
     const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
     if (transition === undefined || this.services.writeClipboard === undefined) return false
+    this.endTextSession()
+    const expectedContent = nodeContent(requireNode(state.document, nodeId).node)
     const operation = (async (): Promise<void> => {
       await this.services.writeClipboard!(transition.payload)
       if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) return
+      const current = locateNode(this.snapshot.document, nodeId)?.node
+      if (current === undefined) return
+      if (!sameNodeContent(current, expectedContent)) {
+        this.reportError(new Error(CUT_CONFLICT_MESSAGE))
+        return
+      }
       this.applyStructural(
         removeTextRange(this.snapshot.document, nodeId, transition.from, transition.to),
         this.snapshot.location,
@@ -519,6 +528,29 @@ export class EditorStore {
   }
 }
 
+const CUT_CONFLICT_MESSAGE = 'The cut could not finish because the text changed.'
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'The editor could not complete the requested operation.'
+}
+
+interface NodeContent {
+  text: string
+  links: LinkRange[]
+}
+
+function nodeContent(node: { text: string; links?: LinkRange[] }): NodeContent {
+  return { text: node.text, links: (node.links ?? []).map((link) => ({ ...link })) }
+}
+
+function sameNodeContent(node: { text: string; links?: LinkRange[] }, expected: NodeContent): boolean {
+  if (node.text !== expected.text) return false
+  const links = node.links ?? []
+  return (
+    links.length === expected.links.length &&
+    links.every((link, index) => {
+      const other = expected.links[index]
+      return other !== undefined && link.start === other.start && link.end === other.end && link.url === other.url
+    })
+  )
 }

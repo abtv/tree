@@ -493,6 +493,161 @@ describe('EditorStore', () => {
     expect(state.document.roots[0]!.text).toBe('copy me')
   })
 
+  it('does not remove text when the target content changes during the clipboard write', async () => {
+    let release: (() => void) | undefined
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abc', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.writeClipboard = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.cut('root', 1, 2)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    store.editText('root', 'Xabc')
+    release!()
+    await expect(pending).resolves.toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ text: 'Xabc' }] },
+      operationError: 'The cut could not finish because the text changed.',
+    })
+  })
+
+  it('applies a delayed cut with the original payload when the target is unchanged', async () => {
+    let release: (() => void) | undefined
+    const payloads: Array<{ text: string; html: string }> = []
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abc', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.writeClipboard = (payload) => {
+      payloads.push(payload)
+      return new Promise<void>((resolve) => {
+        release = resolve
+      })
+    }
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.cut('root', 1, 2)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    release!()
+    await expect(pending).resolves.toBe(true)
+    expect(payloads).toEqual([{ text: 'b', html: 'b' }])
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ text: 'ac' }] },
+      focus: { nodeId: 'root', cursor: 1 },
+    })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+    store.redo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'ac' }] } })
+  })
+
+  it('still cuts when only an unrelated node changes during the clipboard write', async () => {
+    let release: (() => void) | undefined
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'root', text: 'abc', children: [] },
+          { id: 'other', text: '', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.writeClipboard = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.cut('root', 1, 2)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    store.editText('other', 'changed')
+    release!()
+    await expect(pending).resolves.toBe(true)
+    const state = store.getSnapshot()
+    expect(state).toMatchObject({
+      status: 'ready',
+      document: {
+        roots: [{ text: 'ac' }, { text: 'changed' }],
+      },
+    })
+    if (state.status === 'ready') expect(state.operationError).toBeUndefined()
+  })
+
+  it('does not cut after the target node is deleted during the clipboard write', async () => {
+    let release: (() => void) | undefined
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'root', text: 'abc', children: [] },
+          { id: 'other', text: 'other', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.writeClipboard = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.cut('root', 1, 2)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    store.deleteSelected()
+    release!()
+    await expect(pending).resolves.toBe(true)
+    const state = store.getSnapshot()
+    expect(state).toMatchObject({ status: 'ready', document: { roots: [{ id: 'other', text: 'other' }] } })
+    if (state.status === 'ready') expect(state.operationError).toBeUndefined()
+  })
+
+  it('applies the cut when an intervening edit is undone back to the original content', async () => {
+    let release: (() => void) | undefined
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abc', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.writeClipboard = () =>
+      new Promise<void>((resolve) => {
+        release = resolve
+      })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const pending = store.cut('root', 1, 2)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    store.editText('root', 'abcX')
+    store.undo()
+    release!()
+    await expect(pending).resolves.toBe(true)
+    const state = store.getSnapshot()
+    expect(state).toMatchObject({ status: 'ready', document: { roots: [{ text: 'ac' }] } })
+    if (state.status === 'ready') expect(state.operationError).toBeUndefined()
+  })
+
+  it('records a cut separately from surrounding text edits', async () => {
+    const services = createServices()
+    services.writeClipboard = async () => undefined
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+
+    store.editText('root', 'hello')
+    await expect(store.cut('root', 0, 2)).resolves.toBe(true)
+    store.editText('root', 'lloX')
+
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'llo' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'hello' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+  })
+
   it('does not apply a paste after the asynchronous clipboard read changes selection', async () => {
     let release: ((value: ClipboardValue) => void) | undefined
     const services = loadedState(
