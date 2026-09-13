@@ -8,7 +8,7 @@ Completed: 2026-09-13
 
 Fix review finding P2: an asynchronous cut must never remove text different from the selection copied to the clipboard because the document changed while the clipboard write was pending.
 
-The Product Owner requested this active plan for implementation by another model. This session prepares the plan only. No P2 implementation or regression tests have been added. Baseline commit: `6f267dd` (the amended persistence-recovery and shutdown fix, including P1).
+The Product Owner requested this plan for another model to implement. The plan was prepared first; the P2 implementation, tests, and validation results are recorded under "Results" below. Baseline commit: `6f267dd` (the amended persistence-recovery and shutdown fix, including P1).
 
 Read `AGENTS.md`, Product sections 10, 13.1, and 16, Architecture sections 7, 11, 13, and 15, and the development guide before implementation. Preserve the completed P1 fix and plan 0029. The Product Owner explicitly requested this separate active plan in the existing session.
 
@@ -119,7 +119,3 @@ The Product Owner approved the recommended conflict policy: when the target cont
 ### Validation
 
 `npm run check:full` passed: type checking, linting, formatting, 255 unit/component/property tests, production build, dependency audit with zero vulnerabilities, 88 Electron E2E tests, and five performance tests. No required tests were skipped and no validation failures remain.
-
-## Suggested Resume Prompt
-
-Read `docs/plans/active/0030-fix-delayed-cut-race.md` and implement P2. First confirm the pending product decision about conflict behavior; the recommended policy is to preserve intervening edits and report a failed cut. Follow the defect-first workflow, retain clipboard and shutdown safety, run full validation, and complete the plan. Do not repeat the general repository quality review.

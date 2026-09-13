@@ -8,7 +8,7 @@ Completed: 2026-09-13
 
 Address the four findings from the repository quality assessment: loose performance budgets, a typing benchmark that overrides its seeded selection, understated attachment-history costs, and missing documented per-file coverage gates.
 
-The Product Owner requested this active plan for implementation by another model. This commit contains the plan only; the implementation checklist remains outstanding. These are implementation, validation, and documentation corrections within the existing architecture. Preserve all product behavior, including the 200-entry history limit, attachment retention, autosave triggers, and persisted schema. A numerical review score is not an acceptance criterion.
+The Product Owner requested this plan for another model to implement. The plan was prepared first; the implementation, measurements, and validation are recorded below. These are implementation, validation, and documentation corrections within the existing architecture. Preserve all product behavior, including the 200-entry history limit, attachment retention, autosave triggers, and persisted schema. A numerical review score is not an acceptance criterion.
 
 ## Read before implementation
 
@@ -128,6 +128,8 @@ Three independent full performance-suite repetitions on macOS 26.6.2 (build 25G8
 | `inputTurnaround` p95 | 0.1 ms | not asserted | Renamed from the misleading `commit*` sample; it measures the input event's microtask only. |
 | Startup launch/renderer max | 352.68–589.64 ms / 95.1–128.1 ms | 2,000 ms / 1,000 ms (retained) | Existing startup budgets are unchanged. |
 
+Subsequent to this plan, plan 0046 added a third `perf/state.spec.ts` scenario (`image-insertion-decode`) with its own ceilings. The `perf/` suite is the authoritative owner of current budgets and scenario parameters; this table records the eight scenarios enforced when this plan completed.
+
 ## Regression, enforcement, and sensitivity evidence
 
 * **Typing target.** Before correcting the helper, `measureTyping` focused `getByRole('textbox').first()`. With the explicit target assertion, `wide-1000` failed with `expect(locator).toBeFocused()`: the selected child `Node 1` was `inactive` because the first textbox is the current-parent heading. After selecting the field by accessible name, all three typing scenarios pass and assert the field received the typed text and that the parent heading was not edited.
@@ -162,6 +164,6 @@ No product behavior change is intended, so Product requirements should remain un
 * [x] Remove temporary fault injections and inspect the diff for unrelated changes.
 * [x] Run `npm run check:full`; fix failures or explicitly report environmental blockers without claiming success.
 * [x] Mark this same plan Completed, add the completion date, and move it to `docs/plans/completed/` without creating a copy.
-* [ ] Commit the implementation and provide the repository's required validation handoff.
+* [x] Commit the implementation and provide the repository's required validation handoff.
 
 Out of scope: new product features, release packaging, CI setup, new dependencies, broad refactoring, persistence/schema changes, backup archives, new autosave policy, or changing history depth. Implement this plan as one logical task in a new session; do not amend the earlier product-fix commit merely because this review followed it.

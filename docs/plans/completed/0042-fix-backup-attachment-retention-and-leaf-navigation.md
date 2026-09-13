@@ -11,7 +11,7 @@ Fix the two concrete findings from the repository quality review:
 1. Attachment cleanup can delete an image still referenced by the recovery backup, preventing recovery when the primary document is subsequently damaged.
 2. A childless node's circular indicator is decorative and cannot be clicked to enter the node, contrary to Product §2.1.
 
-The Product Owner requested this implementation plan after the review and will use another model to implement it. This commit creates the plan only. Both fixes remain outstanding. The intended work stays within the existing JSON document, backup, attachment, IPC, and application-command architecture.
+The Product Owner requested this implementation plan after the review for another model to implement. The plan was prepared first; both fixes were subsequently implemented and validated as recorded under "Execution and completion checklist". The work stays within the existing JSON document, backup, attachment, IPC, and application-command architecture.
 
 ## Read before implementation
 

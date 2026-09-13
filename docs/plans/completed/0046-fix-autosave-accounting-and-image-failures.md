@@ -12,7 +12,7 @@ Resolve the three findings from the repository quality assessment:
 2. Attachment validation accepts a PNG-shaped payload containing no image data.
 3. Inline images and previews silently discard attachment-read failures.
 
-The Product Owner requested a committed active plan for another model to implement. This commit is planning only: no fixes have been implemented. The requested scope includes making image failures visible. Existing autosave policy, attachment storage, and architecture remain the source of truth; do not introduce new save triggers, a new schema, automatic attachment deletion, or a new dependency without applying the repository's approval rules.
+The Product Owner requested this plan for another model to implement. The plan was prepared first; the fixes were subsequently implemented and validated as recorded under "Verification evidence". The requested scope includes making image failures visible. Existing autosave policy, attachment storage, and architecture remain the source of truth; do not introduce new save triggers, a new schema, automatic attachment deletion, or a new dependency without applying the repository's approval rules.
 
 ## Read before implementation
 
