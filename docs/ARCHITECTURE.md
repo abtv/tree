@@ -409,6 +409,7 @@ Electron-specific behavior belongs outside the domain.
 Electron is responsible for desktop functionality such as:
 
 * creating and managing the application window;
+* persisting and restoring the main window's size and position;
 * application activation;
 * global or main-process keyboard shortcuts where required;
 * integration with macOS;

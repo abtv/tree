@@ -17,6 +17,13 @@ export interface PersistedState {
   location: { currentParentId: string | null; selectedNodeId: string }
 }
 
+export interface PersistedWindowBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export interface Launched {
   app: ElectronApplication
   window: Page
@@ -246,6 +253,14 @@ export async function setCursor(input: ReturnType<Page['locator']>, position: nu
 
 export function documentPath(userDataDir: string): string {
   return join(userDataDir, 'data', 'document.json')
+}
+
+export function windowBoundsPath(userDataDir: string): string {
+  return join(userDataDir, 'data', 'window-bounds.json')
+}
+
+export function readWindowBounds(userDataDir: string): PersistedWindowBounds {
+  return JSON.parse(readFileSync(windowBoundsPath(userDataDir), 'utf8')) as PersistedWindowBounds
 }
 
 export function seedDocument(userDataDir: string, seed: { document: unknown; location: unknown }): void {

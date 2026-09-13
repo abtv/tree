@@ -675,6 +675,8 @@ There is no Save button.
 
 The document must persist between application restarts.
 
+The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
+
 When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes.
 
 The following state must be persisted:

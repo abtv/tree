@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
+import { createWindowBoundsStore, type WindowBounds } from '../infrastructure/main/window-state'
 import { registerIpcHandlers } from './ipc-handlers'
 import { bootstrapApplication } from './bootstrap'
 import {
@@ -33,9 +34,10 @@ const nativeClipboard: NativeClipboard = {
 
 function createMainWindow(): void {
   if (appQuitting) return
+  const windowBoundsStore = createWindowBoundsStore(join(app.getPath('userData'), 'data', 'window-bounds.json'))
+  const savedBounds = windowBoundsStore.load()
   const window = new BrowserWindow({
-    width: 1000,
-    height: 700,
+    ...(savedBounds ?? { width: 1000, height: 700 }),
     minWidth: 640,
     minHeight: 480,
     title: 'Tree',
@@ -47,6 +49,13 @@ function createMainWindow(): void {
     },
   })
   mainWindow = window
+  const saveWindowBounds = (): void => {
+    const { x, y, width, height } = window.getBounds()
+    const bounds: WindowBounds = { x, y, width, height }
+    windowBoundsStore.save(bounds)
+  }
+  window.on('move', saveWindowBounds)
+  window.on('resize', saveWindowBounds)
   const rendererUrl =
     process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
   window.webContents.on('will-navigate', (event, url) => {
@@ -61,6 +70,7 @@ function createMainWindow(): void {
     return { action: 'deny' }
   })
   window.on('close', () => {
+    saveWindowBounds()
     if (mainWindow === window) mainWindow = null
   })
   window.on('closed', () => {

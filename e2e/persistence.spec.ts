@@ -7,6 +7,7 @@ import {
   node,
   parent,
   readPersisted,
+  readWindowBounds,
   seedDocument,
   test,
   typeInto,
@@ -80,6 +81,24 @@ test.describe('persistence', () => {
     await expect(parent(second.window)).toHaveValue('Projects')
     await expect(node(second.window, 1)).toHaveValue('Work')
     await expect(node(second.window, 1)).toBeFocused()
+  })
+
+  test('restores the main window size and position after restart', async ({ userDataDir }) => {
+    const first = await launchTree(userDataDir)
+    const requestedBounds = { x: 120, y: 140, width: 900, height: 600 }
+
+    await first.app.evaluate(({ BrowserWindow }, bounds) => {
+      BrowserWindow.getFocusedWindow()?.setBounds(bounds)
+    }, requestedBounds)
+    await expect.poll(() => readWindowBounds(userDataDir)).toEqual(requestedBounds)
+
+    await closeApp(first.app)
+    const second = await launchTree(userDataDir)
+    const restoredBounds = await second.app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getFocusedWindow()?.getBounds(),
+    )
+
+    expect(restoredBounds).toEqual(expect.objectContaining(requestedBounds))
   })
 
   test('restores an image attachment after restart', async ({ userDataDir }) => {
