@@ -48,39 +48,53 @@ export interface LocatedNode {
 
 export type NodeIndex = ReadonlyMap<NodeId, NodeId | null>
 
+interface IndexInfo {
+  parent: NodeIndex
+  siblingIndex: ReadonlyMap<NodeId, number>
+}
+
 let cachedIndexDocument: Document | undefined
-let cachedNodeIndex: NodeIndex | undefined
+let cachedIndexInfo: IndexInfo | undefined
 
 const attachmentCountCache = new WeakMap<Document, ReadonlyMap<AttachmentId, number>>()
 
-export function buildNodeIndex(document: Document): NodeIndex {
-  const parents = new Map<NodeId, NodeId | null>()
+function buildIndexInfo(document: Document): IndexInfo {
+  const parent = new Map<NodeId, NodeId | null>()
+  const siblingIndex = new Map<NodeId, number>()
   const stack: TreeNode[] = []
-  for (const root of document.roots) {
-    parents.set(root.id, null)
+  for (let index = document.roots.length - 1; index >= 0; index -= 1) {
+    const root = document.roots[index]!
+    parent.set(root.id, null)
+    siblingIndex.set(root.id, index)
     stack.push(root)
   }
   while (stack.length > 0) {
     const node = stack.pop()!
-    for (const child of node.children) {
-      parents.set(child.id, node.id)
+    for (let index = node.children.length - 1; index >= 0; index -= 1) {
+      const child = node.children[index]!
+      parent.set(child.id, node.id)
+      siblingIndex.set(child.id, index)
       stack.push(child)
     }
   }
-  return parents
+  return { parent, siblingIndex }
 }
 
-function indexFor(document: Document): NodeIndex {
-  if (cachedIndexDocument === document && cachedNodeIndex !== undefined) {
-    return cachedNodeIndex
+export function buildNodeIndex(document: Document): NodeIndex {
+  return indexInfoFor(document).parent
+}
+
+function indexInfoFor(document: Document): IndexInfo {
+  if (cachedIndexDocument === document && cachedIndexInfo !== undefined) {
+    return cachedIndexInfo
   }
-  cachedNodeIndex = buildNodeIndex(document)
+  cachedIndexInfo = buildIndexInfo(document)
   cachedIndexDocument = document
-  return cachedNodeIndex
+  return cachedIndexInfo
 }
 
 function shareIndex(from: Document, to: Document): void {
-  if (cachedIndexDocument === from && cachedNodeIndex !== undefined) {
+  if (cachedIndexDocument === from && cachedIndexInfo !== undefined) {
     cachedIndexDocument = to
   }
 }
@@ -153,25 +167,27 @@ function replaceNode(document: Document, located: LocatedNode, replacement: Tree
 }
 
 export function locateNode(document: Document, id: NodeId): LocatedNode | undefined {
-  const nodeIndex = indexFor(document)
-  if (!nodeIndex.has(id)) return undefined
+  const index = indexInfoFor(document)
+  if (!index.parent.has(id)) return undefined
 
   const pathIds: NodeId[] = []
   let cursor: NodeId | null | undefined = id
   while (cursor !== null && cursor !== undefined) {
     pathIds.push(cursor)
-    cursor = nodeIndex.get(cursor) ?? null
+    cursor = index.parent.get(cursor) ?? null
   }
   pathIds.reverse()
 
   const ancestors: TreeNode[] = []
   let parent: TreeNode | null = null
   for (let position = 0; position < pathIds.length; position += 1) {
+    const pathId = pathIds[position]!
     const siblings: TreeNode[] = parent === null ? document.roots : parent.children
-    const node: TreeNode | undefined = siblings.find((candidate) => candidate.id === pathIds[position])
-    if (node === undefined) return undefined
+    const siblingIndex = index.siblingIndex.get(pathId)
+    const node = siblingIndex === undefined ? undefined : siblings[siblingIndex]
+    if (node === undefined || node.id !== pathId) return undefined
     if (position === pathIds.length - 1) {
-      return { node, parent, siblings, index: siblings.indexOf(node), ancestors }
+      return { node, parent, siblings, index: siblingIndex!, ancestors }
     }
     ancestors.push(node)
     parent = node

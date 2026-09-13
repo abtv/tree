@@ -416,6 +416,30 @@ describe('document operations', () => {
     expect(locateNode(first, 'a')?.node.id).toBe('a')
   })
 
+  it('resolves a warm lookup with a single sibling access instead of scanning the level', () => {
+    const siblings: TreeNode[] = Array.from({ length: 1000 }, (_, index) => ({
+      id: `n${index}`,
+      text: '',
+      children: [],
+    }))
+    let elementReads = 0
+    const roots = new Proxy(siblings, {
+      get(target, property, receiver) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) elementReads += 1
+        return Reflect.get(target, property, receiver)
+      },
+    })
+    const document: Document = { roots }
+
+    locateNode(document, 'n0')
+    elementReads = 0
+
+    const located = locateNode(document, 'n999')
+
+    expect(located?.index).toBe(999)
+    expect(elementReads).toBe(1)
+  })
+
   it('resolves a warm lookup without traversing unrelated subtrees', () => {
     const unrelatedChildren: TreeNode[] = [{ id: 'unrelated-child', text: '', children: [] }]
     const unrelated: TreeNode = { id: 'unrelated', text: '', children: unrelatedChildren }

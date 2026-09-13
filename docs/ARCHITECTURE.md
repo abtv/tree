@@ -133,7 +133,7 @@ The domain invariant `MAX_DOCUMENT_DEPTH = 20` counts top-level roots as level 1
 
 Do not store redundant `parentId` fields unless there is a demonstrated technical need and the data model is explicitly changed.
 
-Lookups use a derived, in-memory parent index rather than a persisted field. `buildNodeIndex` maps every node id to its parent id (`null` for top-level roots); `locateNode` walks that chain and descends the tree, so a lookup costs O(depth + fanout) instead of a full traversal. The index is memoized per immutable document object and reused across text edits and renders, but it is never part of the document object or the persisted JSON; it is derived on demand and discarded with the process.
+Lookups use a derived, in-memory parent index rather than a persisted field. `buildNodeIndex` maps every node id to its parent id (`null` for top-level roots); the same single traversal also records each node's index within its sibling list. `locateNode` walks the parent chain and then descends each level by direct sibling index, so a lookup costs O(depth) instead of a full traversal or a per-level scan. The index is memoized per immutable document object and reused across text edits and renders, but it is never part of the document object or the persisted JSON; it is derived on demand and discarded with the process.
 
 Node IDs are stable identifiers.
 
