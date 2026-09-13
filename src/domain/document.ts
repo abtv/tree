@@ -83,23 +83,12 @@ function shareIndex(from: Document, to: Document): void {
   }
 }
 
-function invalidateIndex(document: Document): void {
-  if (cachedIndexDocument === document) {
-    cachedIndexDocument = undefined
-    cachedNodeIndex = undefined
-  }
-}
-
 export function createInitialDocument(id: NodeId): Document {
   return { roots: [{ id, text: '', children: [] }] }
 }
 
 export function ensureRoot(document: Document, id: NodeId): Document {
-  if (document.roots.length > 0) {
-    const next = cloneDocument(document)
-    shareIndex(document, next)
-    return next
-  }
+  if (document.roots.length > 0) return document
   return createInitialDocument(id)
 }
 
@@ -129,6 +118,34 @@ function cloneNodeShallow(node: TreeNode): TreeNode {
     ...(node.attachment === undefined ? {} : { attachment: { ...node.attachment } }),
     children: [],
   }
+}
+
+function copyToRoot(document: Document, located: LocatedNode, nextSiblings: TreeNode[]): Document {
+  if (located.parent === null) {
+    return { roots: nextSiblings }
+  }
+
+  let replacement: TreeNode = { ...located.parent, children: nextSiblings }
+  for (let index = located.ancestors.length - 2; index >= 0; index -= 1) {
+    const ancestor = located.ancestors[index]!
+    const childIndex = ancestor.children.indexOf(located.ancestors[index + 1]!)
+    if (childIndex < 0) throw new Error(`Node ${located.node.id} does not exist.`)
+    const children = ancestor.children.slice()
+    children[childIndex] = replacement
+    replacement = { ...ancestor, children }
+  }
+
+  const rootIndex = document.roots.indexOf(located.ancestors[0]!)
+  if (rootIndex < 0) throw new Error(`Node ${located.node.id} does not exist.`)
+  const roots = document.roots.slice()
+  roots[rootIndex] = replacement
+  return { roots }
+}
+
+function replaceNode(document: Document, located: LocatedNode, replacement: TreeNode): Document {
+  const siblings = located.siblings.slice()
+  siblings[located.index] = replacement
+  return copyToRoot(document, located, siblings)
 }
 
 export function locateNode(document: Document, id: NodeId): LocatedNode | undefined {
@@ -197,75 +214,63 @@ export function editNodeText(document: Document, nodeId: NodeId, text: string): 
 export function editNodeContent(document: Document, nodeId: NodeId, text: string, links: LinkRange[]): Document {
   const normalized = normalizeLinks(links, text)
   const located = requireNode(document, nodeId)
-  let replacement: TreeNode = {
+  const replacement: TreeNode = {
     ...located.node,
     text,
     ...(normalized.length === 0 ? { links: undefined } : { links: normalized }),
   }
-
-  for (let index = located.ancestors.length - 1; index >= 0; index -= 1) {
-    const ancestor = located.ancestors[index]!
-    const childId = index === located.ancestors.length - 1 ? nodeId : located.ancestors[index + 1]!.id
-    const childIndex = ancestor.children.findIndex((child) => child.id === childId)
-    if (childIndex < 0) throw new Error(`Node ${nodeId} does not exist.`)
-    const children = ancestor.children.slice()
-    children[childIndex] = replacement
-    replacement = { ...ancestor, children }
-  }
-
-  const rootIndex = document.roots.findIndex((root) => root.id === (located.ancestors[0]?.id ?? nodeId))
-  if (rootIndex < 0) throw new Error(`Node ${nodeId} does not exist.`)
-  const roots = document.roots.slice()
-  roots[rootIndex] = replacement
-  const next: Document = { roots }
+  const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
   return next
 }
 
 export function deleteLink(document: Document, nodeId: NodeId, cursor: number): Document | undefined {
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const node = requireNode(next, nodeId).node
-  const link = node.links?.find((candidate) => candidate.end === cursor)
+  const located = requireNode(document, nodeId)
+  const link = located.node.links?.find((candidate) => candidate.end === cursor)
   if (link === undefined) return undefined
-  node.text = `${node.text.slice(0, link.start)}${node.text.slice(link.end)}`
+  const text = `${located.node.text.slice(0, link.start)}${located.node.text.slice(link.end)}`
+  const replacement: TreeNode = { ...located.node, text }
   setLinks(
-    node,
+    replacement,
     normalizeLinks(
-      (node.links ?? [])
+      (located.node.links ?? [])
         .filter((candidate) => candidate !== link)
         .map((candidate) => ({
           ...candidate,
           start: candidate.start >= link.end ? candidate.start - (link.end - link.start) : candidate.start,
           end: candidate.end >= link.end ? candidate.end - (link.end - link.start) : candidate.end,
         })),
-      node.text,
+      text,
     ),
   )
+  const next = replaceNode(document, located, replacement)
+  shareIndex(document, next)
   return next
 }
 
 export function removeTextRange(document: Document, nodeId: NodeId, start: number, end: number): Document {
-  const next = cloneDocument(document)
+  const located = requireNode(document, nodeId)
+  const from = snapToCodePoint(located.node.text, Math.min(start, end))
+  const to = snapToCodePoint(located.node.text, Math.max(start, end))
+  const replacement: TreeNode = { ...located.node }
+  if (from !== to) {
+    replacement.text = `${located.node.text.slice(0, from)}${located.node.text.slice(to)}`
+    setLinks(
+      replacement,
+      normalizeLinks(
+        (located.node.links ?? [])
+          .filter((link) => link.end <= from || link.start >= to)
+          .map((link) => ({
+            ...link,
+            start: link.start >= to ? link.start - (to - from) : link.start,
+            end: link.end >= to ? link.end - (to - from) : link.end,
+          })),
+        replacement.text,
+      ),
+    )
+  }
+  const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
-  const node = requireNode(next, nodeId).node
-  const from = snapToCodePoint(node.text, Math.min(start, end))
-  const to = snapToCodePoint(node.text, Math.max(start, end))
-  if (from === to) return next
-  node.text = `${node.text.slice(0, from)}${node.text.slice(to)}`
-  setLinks(
-    node,
-    normalizeLinks(
-      (node.links ?? [])
-        .filter((link) => link.end <= from || link.start >= to)
-        .map((link) => ({
-          ...link,
-          start: link.start >= to ? link.start - (to - from) : link.start,
-          end: link.end >= to ? link.end - (to - from) : link.end,
-        })),
-      node.text,
-    ),
-  )
   return next
 }
 
@@ -276,80 +281,72 @@ export function insertSiblingAfter(
   text = '',
   attachment?: AttachmentReference,
 ): Document {
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const located = requireNode(next, nodeId)
-  invalidateIndex(next)
-  located.siblings.splice(located.index + 1, 0, {
+  const located = requireNode(document, nodeId)
+  const siblings = located.siblings.slice()
+  siblings.splice(located.index + 1, 0, {
     id: newNodeId,
     text,
     ...(text.length > 0 && isHttpUrl(text) ? { links: [{ start: 0, end: text.length, url: text }] } : {}),
     ...(attachment === undefined ? {} : { attachment }),
     children: [],
   })
-  return next
+  return copyToRoot(document, located, siblings)
 }
 
 export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeId: NodeId): Document {
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const located = requireNode(next, nodeId)
-  invalidateIndex(next)
-  located.siblings.splice(located.index, 0, { id: newNodeId, text: '', children: [] })
-  return next
+  const located = requireNode(document, nodeId)
+  const siblings = located.siblings.slice()
+  siblings.splice(located.index, 0, { id: newNodeId, text: '', children: [] })
+  return copyToRoot(document, located, siblings)
 }
 
 export function createFirstChild(document: Document, parentId: NodeId, childId: NodeId): Document {
-  const parentDepth = requireNode(document, parentId).ancestors.length + 1
+  const located = requireNode(document, parentId)
+  const parentDepth = located.ancestors.length + 1
   if (parentDepth >= MAX_DOCUMENT_DEPTH) {
     throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
   }
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const parent = requireNode(next, parentId)
-  invalidateIndex(next)
-  parent.node.children.unshift({ id: childId, text: '', children: [] })
-  return next
+  const replacement: TreeNode = {
+    ...located.node,
+    children: [{ id: childId, text: '', children: [] }, ...located.node.children],
+  }
+  return replaceNode(document, located, replacement)
 }
 
 export function splitNode(document: Document, nodeId: NodeId, cursor: number, newNodeId: NodeId): Document {
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const located = requireNode(next, nodeId)
-  invalidateIndex(next)
+  const located = requireNode(document, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)
   const suffix = located.node.text.slice(position)
   const links = splitLinks(located.node.links ?? [], position)
-  located.node.text = located.node.text.slice(0, position)
-  setLinks(located.node, links.before)
-  located.siblings.splice(located.index + 1, 0, {
+  const original: TreeNode = { ...located.node, text: located.node.text.slice(0, position) }
+  setLinks(original, links.before)
+  const siblings = located.siblings.slice()
+  siblings[located.index] = original
+  siblings.splice(located.index + 1, 0, {
     id: newNodeId,
     text: suffix,
     ...(links.after.length === 0 ? {} : { links: links.after }),
     children: [],
   })
-  return next
+  return copyToRoot(document, located, siblings)
 }
 
 export function deleteNode(document: Document, nodeId: NodeId): Document {
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const located = requireNode(next, nodeId)
-  invalidateIndex(next)
-  located.siblings.splice(located.index, 1)
-  return next
+  const located = requireNode(document, nodeId)
+  const siblings = located.siblings.slice()
+  siblings.splice(located.index, 1)
+  return copyToRoot(document, located, siblings)
 }
 
 export function moveSibling(document: Document, nodeId: NodeId, destinationIndex: number): Document {
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const located = requireNode(next, nodeId)
-  const [node] = located.siblings.splice(located.index, 1)
+  const located = requireNode(document, nodeId)
+  const siblings = located.siblings.slice()
+  const [node] = siblings.splice(located.index, 1)
   if (node === undefined) {
     throw new Error(`Node ${nodeId} could not be moved.`)
   }
-  located.siblings.splice(clamp(destinationIndex, 0, located.siblings.length), 0, node)
-  return next
+  siblings.splice(clamp(destinationIndex, 0, siblings.length), 0, node)
+  return copyToRoot(document, located, siblings)
 }
 
 export function pasteText(
@@ -359,12 +356,15 @@ export function pasteText(
   text: string,
   richLinks?: LinkRange[],
 ): Document {
-  const next = cloneDocument(document)
+  const located = requireNode(document, nodeId)
+  const position = snapToCodePoint(located.node.text, cursor)
+  const replacement: TreeNode = {
+    ...located.node,
+    text: `${located.node.text.slice(0, position)}${text}${located.node.text.slice(position)}`,
+  }
+  setLinks(replacement, insertLinks(located.node.links ?? [], position, text, richLinks))
+  const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
-  const node = requireNode(next, nodeId).node
-  const position = snapToCodePoint(node.text, cursor)
-  node.text = `${node.text.slice(0, position)}${text}${node.text.slice(position)}`
-  setLinks(node, insertLinks(node.links ?? [], position, text, richLinks))
   return next
 }
 
@@ -380,19 +380,16 @@ export function pasteMultilineText(
     throw new Error('Multiline paste requires one new node ID for every line after the first.')
   }
 
-  const next = cloneDocument(document)
-  shareIndex(document, next)
-  const located = requireNode(next, nodeId)
-  invalidateIndex(next)
+  const located = requireNode(document, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)
   const prefix = located.node.text.slice(0, position)
   const suffix = located.node.text.slice(position)
   const attachment = located.node.attachment
   const links = splitLinks(located.node.links ?? [], position)
 
-  located.node.text = `${prefix}${lines[0] ?? ''}`
+  const original: TreeNode = { ...located.node, text: `${prefix}${lines[0] ?? ''}` }
   setLinks(
-    located.node,
+    original,
     insertLinks(
       links.before,
       position,
@@ -400,7 +397,7 @@ export function pasteMultilineText(
       richLinks === undefined ? undefined : linksForLine(richLinks, lines, 0),
     ),
   )
-  delete located.node.attachment
+  delete original.attachment
 
   const created: TreeNode[] = newNodeIds.map((id, index) => ({
     id,
@@ -424,14 +421,17 @@ export function pasteMultilineText(
   if (finalNode !== undefined && attachment !== undefined) {
     finalNode.attachment = attachment
   }
-  located.siblings.splice(located.index + 1, 0, ...created)
-  return next
+  const siblings = located.siblings.slice()
+  siblings[located.index] = original
+  siblings.splice(located.index + 1, 0, ...created)
+  return copyToRoot(document, located, siblings)
 }
 
 export function attachImage(document: Document, nodeId: NodeId, attachment: AttachmentReference): Document {
-  const next = cloneDocument(document)
+  const located = requireNode(document, nodeId)
+  const replacement: TreeNode = { ...located.node, attachment: { ...attachment } }
+  const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
-  requireNode(next, nodeId).node.attachment = { ...attachment }
   return next
 }
 

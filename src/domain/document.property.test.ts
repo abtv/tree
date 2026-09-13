@@ -434,6 +434,43 @@ describe('document invariants', () => {
     )
   })
 
+  it('shares every node outside the edited path by reference', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, text) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const located = locateNode(document, node.id)!
+        const path = new Set<string>([...located.ancestors.map((ancestor) => ancestor.id), node.id])
+        const before = new Map(allNodes(document).map((entry) => [entry.id, entry]))
+        const results: Document[] = [
+          editNodeText(document, node.id, text),
+          editNodeContent(document, node.id, text, []),
+          deleteLink(document, node.id, cursor) ?? document,
+          removeTextRange(document, node.id, cursor, cursor + 1),
+          insertSiblingAfter(document, node.id, 'new-after'),
+          insertSiblingBefore(document, node.id, 'new-before'),
+          createFirstChild(document, node.id, 'new-child'),
+          splitNode(document, node.id, cursor, 'new-split'),
+          deleteNode(document, node.id),
+          moveSibling(document, node.id, cursor),
+          pasteText(document, node.id, cursor, text),
+          pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node']),
+          attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' }),
+          ensureRoot(document, 'new-root'),
+        ]
+        for (const result of results) {
+          for (const candidate of allNodes(result)) {
+            if (path.has(candidate.id)) continue
+            const original = before.get(candidate.id)
+            if (original === undefined) continue
+            expect(candidate).toBe(original)
+          }
+        }
+      }),
+      { numRuns: 25 },
+    )
+  })
+
   it('locates every node exactly like a full-traversal reference', () => {
     fc.assert(
       fc.property(forest, (rawForest) => {

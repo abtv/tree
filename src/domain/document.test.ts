@@ -43,6 +43,34 @@ describe('document operations', () => {
     expect(result.roots[1]!.children[0]).toBe(document.roots[1]!.children[0])
   })
 
+  it('path-copies structural commands and shares untouched roots and siblings', () => {
+    const document = createFirstChild(createInitialDocument('a'), 'a', 'a-child')
+    document.roots[0]!.children[0]!.children.push({ id: 'a-grandchild', text: 'G', children: [] })
+    document.roots.push({ id: 'b', text: 'B', children: [{ id: 'b-child', text: 'Bc', children: [] }] })
+
+    const inserted = insertSiblingAfter(document, 'a-child', 'new-after')
+
+    expect(inserted.roots[1]).toBe(document.roots[1])
+    expect(inserted.roots[1]!.children[0]).toBe(document.roots[1]!.children[0])
+    expect(inserted.roots[0]).not.toBe(document.roots[0])
+    expect(inserted.roots[0]!.children[0]).toBe(document.roots[0]!.children[0])
+    expect(inserted.roots[0]!.children[0]!.children[0]).toBe(document.roots[0]!.children[0]!.children[0])
+    expect(inserted.roots[0]!.children.map((node) => node.id)).toEqual(['a-child', 'new-after'])
+  })
+
+  it('rebuilds only the ancestor path when deleting a deep node', () => {
+    const document = createFirstChild(createInitialDocument('a'), 'a', 'a-child')
+    document.roots[0]!.children[0]!.children.push({ id: 'a-grandchild', text: 'G', children: [] })
+    document.roots.push({ id: 'b', text: 'B', children: [] })
+
+    const result = deleteNode(document, 'a-grandchild')
+
+    expect(result.roots[1]).toBe(document.roots[1])
+    expect(result.roots[0]).not.toBe(document.roots[0])
+    expect(result.roots[0]!.children[0]).not.toBe(document.roots[0]!.children[0])
+    expect(result.roots[0]!.children[0]!.children).toEqual([])
+  })
+
   it('inserts an empty sibling before a node without changing its subtree', () => {
     const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
     document.roots[0]!.text = 'Current'

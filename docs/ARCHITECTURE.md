@@ -302,7 +302,7 @@ The implementation should make it possible to undo and redo complex operations s
 * image attachment;
 * node splitting.
 
-The history implementation uses whole-document snapshots. The domain never mutates an existing document; every operation returns a new document, and structural commands deep-copy before mutating. Because of that invariant, the history retains the current document objects by reference instead of deep-cloning them on `begin`, `undo`, or `redo`. Text-edit states share unchanged subtrees with the live document, while structural states already hold an independent copy.
+The history implementation uses whole-document snapshots. The domain never mutates an existing document; every operation returns a new document. Every editing and structural command path-copies only the nodes from the top-level root to the affected sibling array, and shares every unaffected subtree by reference with its input. Because of that invariant, the history retains the current document objects by reference instead of deep-cloning them on `begin`, `undo`, or `redo`, and consecutive states share unchanged subtrees whether the change was a text edit or a structural command.
 
 The history is bounded to 200 entries. One entry is one text-editing session or one structural command. When the limit is exceeded, the oldest entry is discarded and can no longer be undone. The redo stack is bounded by the same limit.
 

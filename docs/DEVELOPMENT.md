@@ -335,6 +335,8 @@ Save serialization is guarded by reference identity rather than timing. `documen
 
 Node lookups are guarded against full-document traversal rather than by timing at the unit level. `document.test.ts` confirms that a warm lookup does not read an unrelated subtree, and the `document.property.test.ts` properties compare the indexed lookup against a full-traversal reference for every node, both directly and after every domain operation. Those properties also guard that sharing the index across a text edit and rebuilding it after a topology change never returns a stale location. The end-to-end guard is the ceiling on wall-clock typing for the worst-case `large-100000` scenario, which fails if a keystroke's lookup traverses the document again.
 
+Domain commands are guarded against falling back to full-document copies. `document.test.ts` asserts that a structural command leaves untouched roots and sibling subtrees reference-identical to the input, and the `document.property.test.ts` property "shares every node outside the edited path by reference" checks every operation against that rule. The existing input-immutability and indexed-lookup properties continue to prove the shared nodes are never mutated and the shared index stays valid. The `perf/state.spec.ts` structural burst is the end-to-end observation; path-copying keeps the 200-command burst well under its ceiling (about 416 ms at 10,000 nodes on the current hardware).
+
 ---
 
 ## 13. Persistence Testing
