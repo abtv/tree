@@ -76,6 +76,21 @@ describe('EditorHistory', () => {
     expect(count).toBe(HISTORY_LIMIT)
   })
 
+  it('reports a reachability change when a new edit discards the redo branch', () => {
+    const history = new EditorHistory()
+    history.begin(root('v1'))
+    history.undo(root('v2'), location)
+
+    expect(history.begin(root('v3'))).toBe(true)
+  })
+
+  it('reports no reachability change when there is no eviction or redo branch', () => {
+    const history = new EditorHistory()
+
+    expect(history.begin(root('v1'))).toBe(false)
+    expect(history.begin(root('v2'))).toBe(false)
+  })
+
   it('tracks attachment references across undo and redo', () => {
     const history = new EditorHistory()
     history.begin(attached('image'))

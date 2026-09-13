@@ -1510,6 +1510,30 @@ describe('EditorStore', () => {
     expect(cleanups.at(-1)).toContain('image')
   })
 
+  it('cleans up attachments discarded only through the redo branch', async () => {
+    const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+    const cleanups: string[][] = []
+    services.cleanupAttachments = async (referencedIds) => {
+      cleanups.push([...referencedIds])
+    }
+    const store = new EditorStore(services, ids('root', 'image'))
+    await store.initialize()
+    await store.paste('root', 0)
+    await store.flushPersistence()
+    expect(cleanups.at(-1)).toContain('image')
+
+    store.undo()
+    await store.flushPersistence()
+    expect(cleanups.at(-1)).toContain('image')
+
+    cleanups.length = 0
+    store.editText('root', 'changed')
+    await store.flushPersistence()
+
+    expect(cleanups).toHaveLength(1)
+    expect(cleanups.at(-1)).not.toContain('image')
+  })
+
   it('does not save on every keystroke and saves when ten words have been inserted', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))

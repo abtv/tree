@@ -29,9 +29,10 @@ export class EditorHistory {
     this.past.push(this.retain(document))
     const evicted = this.past.length > HISTORY_LIMIT
     if (evicted) this.release(this.past.shift()!)
+    const discardedRedo = this.future.length > 0
     for (const entry of this.future) this.release(entry)
     this.future.length = 0
-    return evicted
+    return evicted || discardedRedo
   }
 
   public undo(document: Document, location: Location): { document: Document; location: Location } | undefined {

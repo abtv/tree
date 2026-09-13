@@ -15,7 +15,7 @@ Undo/redo history retains document objects by reference rather than deep-cloning
 
 Automatic saving follows the policy in `PRODUCT.md` §16.1 instead of saving on every keystroke: an image insertion, a hyperlink insertion, ten inserted words since the last successful save, or ten seconds with no document change while changes are pending. Structural commands that insert no content mark changes pending and reset the idle timer without saving by themselves. Quit flushes all pending changes. Failed saves retain pending changes, surface the error, and retry on the next idle interval, volume trigger, or quit.
 
-Attachment cleanup is scheduled only when attachment reachability may have changed: structural deletes, undo, redo, history eviction, and initialization. Cleanup runs after the save that persists the new referenced set and never before it. Attachment files referenced by the live document, any retained history snapshot, or a pending attachment write are retained.
+Attachment cleanup is scheduled only when attachment reachability may have changed: structural deletes, undo, redo, history eviction, discarding the redo branch when a new edit begins, and initialization. Cleanup runs after the save that persists the new referenced set and never before it. Attachment files referenced by the live document, any retained history snapshot, or a pending attachment write are retained.
 
 ## Consequences
 
