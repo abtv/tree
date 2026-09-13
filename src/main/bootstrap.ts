@@ -14,6 +14,7 @@ export interface ApplicationLifecycle {
 
 export interface MainWindowReference {
   isDestroyed(): boolean
+  on(event: 'close', listener: (event: BeforeQuitEvent) => void): void
   webContents: {
     send(channel: string, ...args: unknown[]): void
   }
@@ -71,6 +72,16 @@ export function bootstrapApplication({
     unregisterShortcut()
   })
 
+  const watchMainWindowClose = (): void => {
+    const mainWindow = getMainWindow()
+    if (mainWindow === null) return
+    mainWindow.on('close', (event) => {
+      if (appQuitting || mainWindow.isDestroyed()) return
+      event.preventDefault()
+      app.quit()
+    })
+  }
+
   void app
     .whenReady()
     .then(() => {
@@ -86,8 +97,12 @@ export function bootstrapApplication({
       }
       setApplicationMenu(() => app.quit())
       createMainWindow()
+      watchMainWindowClose()
       app.on('activate', () => {
-        if (!appQuitting && getWindowCount() === 0) createMainWindow()
+        if (!appQuitting && getWindowCount() === 0) {
+          createMainWindow()
+          watchMainWindowClose()
+        }
       })
     })
     .catch(onStartupError)

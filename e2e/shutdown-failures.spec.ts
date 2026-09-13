@@ -27,7 +27,9 @@ test.describe('shutdown failure handling', () => {
     rmSync(dataDirectory, { recursive: true, force: true })
     writeFileSync(dataDirectory, 'blocks persistence directory creation')
 
-    await typeInto(node(window, 1), 'unsaved')
+    const initialText = 'unsaved one two three four five six seven eight nine'
+    const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
+    await typeInto(node(window, 1), initialText)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
     await node(window, 1).press('Meta+q')
@@ -39,12 +41,14 @@ test.describe('shutdown failure handling', () => {
 
     rmSync(dataDirectory, { force: true })
     mkdirSync(dataDirectory, { recursive: true })
-    await typeInto(node(window, 1), ' recovered')
+    await typeInto(node(window, 1), recoveryText)
 
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
     await expect
-      .poll(() => (existsSync(documentPath(userDataDir)) ? readPersisted(userDataDir).document.roots[0]?.text : ''))
-      .toBe('unsaved recovered')
+      .poll(() => (existsSync(documentPath(userDataDir)) ? readPersisted(userDataDir).document.roots[0]?.text : ''), {
+        timeout: 15_000,
+      })
+      .toBe(`${initialText}${recoveryText}`)
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await clickApplicationMenuQuit(app)
@@ -54,6 +58,7 @@ test.describe('shutdown failure handling', () => {
   test('suppresses duplicate quit requests, reports timeout, and permits retry', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     allowRendererError(/Operation failed: The application could not finish saving before quit\./)
+    allowRendererError(/Operation failed: Error invoking remote method 'tree:quit': Error: Invalid quit request\./)
     await delaySaveIpc(app, 5_500)
     await window.evaluate(() => {
       const state = globalThis as typeof globalThis & {
@@ -86,18 +91,17 @@ test.describe('shutdown failure handling', () => {
     await closed
   })
 
-  test('preserves saved state across window close and quits without a renderer', async ({ userDataDir }) => {
+  test('flushes pending changes and quits when the window is closed', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
-    const text = 'saved window-close persistence '.repeat(100)
+    const text = 'window close flush pending'
 
     await typeInto(node(window, 1), text)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
-    await window.close()
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
-    const closed = new Promise<void>((resolve) => app.once('close', resolve))
-    await clickApplicationMenuQuit(app)
-    await closed
   })
 })

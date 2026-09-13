@@ -22,6 +22,7 @@ describe('PersistenceCoordinator', () => {
       {
         currentState: () => state,
         referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
         onResult: () => {
           if (requestedAgain) return
           requestedAgain = true
@@ -57,6 +58,7 @@ describe('PersistenceCoordinator', () => {
       {
         currentState: () => state,
         referencedAttachmentIds: () => ['attachment'],
+        hasPendingDocumentChanges: () => false,
         onResult: vi.fn(),
       },
     )
@@ -68,21 +70,77 @@ describe('PersistenceCoordinator', () => {
     await coordinator.flush()
 
     expect(save).toHaveBeenCalledTimes(1)
-    expect(cleanupAttachments).toHaveBeenCalledTimes(2)
+    expect(cleanupAttachments).toHaveBeenCalledTimes(1)
     expect(cleanupAttachments).toHaveBeenLastCalledWith(['attachment'])
+  })
+
+  it('runs cleanup after the save that persists the new references', async () => {
+    const order: string[] = []
+    const save = vi.fn(async () => {
+      order.push('save')
+    })
+    const cleanupAttachments = vi.fn(async () => {
+      order.push('cleanup')
+    })
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestSave()
+    coordinator.requestAttachmentCleanup()
+    await coordinator.flush()
+
+    expect(order).toEqual(['save', 'cleanup'])
+  })
+
+  it('defers cleanup while document changes are pending until a save runs', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => undefined)
+    let pending = true
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => pending,
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestAttachmentCleanup()
+    await coordinator.flush()
+    expect(cleanupAttachments).not.toHaveBeenCalled()
+
+    pending = false
+    coordinator.requestSave()
+    await coordinator.flush()
+    expect(cleanupAttachments).toHaveBeenCalledOnce()
   })
 
   it('retains a failed save through cleanup until a document save succeeds', async () => {
     const failure = new Error('disk full')
     const onResult = vi.fn()
     const save = vi.fn(async (): Promise<void> => Promise.reject(failure))
+    const cleanupAttachments = vi.fn(async () => undefined)
     const coordinator = new PersistenceCoordinator(
-      { save, cleanupAttachments: vi.fn(async () => undefined) },
-      { currentState: () => state, referencedAttachmentIds: () => [], onResult },
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onResult,
+      },
     )
 
     coordinator.requestSave()
     await expect(coordinator.flush()).rejects.toThrow('disk full')
+    expect(cleanupAttachments).not.toHaveBeenCalled()
 
     coordinator.requestAttachmentCleanup()
     await expect(coordinator.flush()).rejects.toThrow('disk full')
@@ -95,20 +153,50 @@ describe('PersistenceCoordinator', () => {
     expect(onResult).toHaveBeenLastCalledWith(undefined)
   })
 
+  it('retains cleanup after a save failure so it runs after the next successful save', async () => {
+    const failure = new Error('disk full')
+    const save = vi.fn(async (): Promise<void> => Promise.reject(failure))
+    const cleanupAttachments = vi.fn(async () => undefined)
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestSave()
+    coordinator.requestAttachmentCleanup()
+    await expect(coordinator.flush()).rejects.toThrow('disk full')
+    expect(cleanupAttachments).not.toHaveBeenCalled()
+
+    save.mockResolvedValue(undefined)
+    coordinator.requestSave()
+    await expect(coordinator.flush()).resolves.toBeUndefined()
+    expect(cleanupAttachments).toHaveBeenCalledOnce()
+  })
+
   it('clears a cleanup failure after cleanup succeeds without an unnecessary save', async () => {
     const save = vi.fn(async () => undefined)
     const cleanupAttachments = vi.fn(async () => undefined).mockRejectedValueOnce(new Error('cleanup failed'))
     const onResult = vi.fn()
     const coordinator = new PersistenceCoordinator(
       { save, cleanupAttachments },
-      { currentState: () => state, referencedAttachmentIds: () => [], onResult },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onResult,
+      },
     )
 
-    coordinator.requestSave()
+    coordinator.requestAttachmentCleanup()
     await expect(coordinator.flush()).rejects.toThrow('cleanup failed')
     coordinator.requestAttachmentCleanup()
     await expect(coordinator.flush()).resolves.toBeUndefined()
-    expect(save).toHaveBeenCalledOnce()
+    expect(save).not.toHaveBeenCalled()
     expect(onResult).toHaveBeenLastCalledWith(undefined)
   })
 })

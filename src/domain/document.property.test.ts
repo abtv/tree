@@ -2,18 +2,26 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   assertDocument,
+  attachImage,
   cloneDocument,
   cloneNode,
   collectAttachmentIds,
+  createFirstChild,
+  deleteLink,
   deleteNode,
-  isValidLocation,
+  editNodeContent,
+  editNodeText,
+  ensureRoot,
+  insertSiblingAfter,
   insertSiblingBefore,
+  isValidLocation,
   locateNode,
   moveSibling,
   nodePath,
   parsePersistedState,
   pasteMultilineText,
   pasteText,
+  removeTextRange,
   serializeState,
   splitNode,
   MAX_DOCUMENT_DEPTH,
@@ -335,6 +343,33 @@ describe('document invariants', () => {
         const node = pick(document, seed)
 
         expect(() => serializeState(document, { currentParentId: 'missing', selectedNodeId: node.id })).toThrow()
+      }),
+    )
+  })
+
+  it('does not mutate its input document for any operation', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, text) => {
+        const document = materialize(rawForest)
+        const before = JSON.parse(JSON.stringify(document)) as Document
+        const node = pick(document, seed)
+
+        editNodeText(document, node.id, text)
+        editNodeContent(document, node.id, text, [])
+        deleteLink(document, node.id, cursor)
+        removeTextRange(document, node.id, cursor, cursor + 1)
+        insertSiblingAfter(document, node.id, 'new-after')
+        insertSiblingBefore(document, node.id, 'new-before')
+        createFirstChild(document, node.id, 'new-child')
+        splitNode(document, node.id, cursor, 'new-split')
+        deleteNode(document, node.id)
+        moveSibling(document, node.id, cursor)
+        pasteText(document, node.id, cursor, text)
+        pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node'])
+        attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' })
+        ensureRoot(document, 'new-root')
+
+        expect(JSON.parse(JSON.stringify(document))).toEqual(before)
       }),
     )
   })

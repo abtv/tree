@@ -1,5 +1,6 @@
-Status: Active
+Status: Completed
 Created: 2026-09-13
+Completed: 2026-09-13
 
 # State memory and persistence I/O
 
@@ -93,13 +94,15 @@ Structural operations still produce a full new document (clone-then-mutate), so 
 
 ## Affected modules
 
-- `src/application/editor-history.ts`, `src/application/editor-history.test.ts`
+- `src/application/editor-history.ts`, `src/application/editor-history.test.ts`, `src/application/editor-history.property.test.ts`
 - `src/application/editor-store.ts`, `src/application/editor-store.test.ts`, `src/application/editor-store.property.test.ts`
 - `src/application/persistence-coordinator.ts`, `src/application/persistence-coordinator.test.ts`
+- `src/application/save-policy.ts`, `src/application/save-policy.test.ts`, `src/application/save-policy.property.test.ts`
 - `src/domain/document.property.test.ts` (input-immutability invariant)
 - `src/domain/document.ts` (only if the optional `serializeState` change is approved)
 - `docs/ARCHITECTURE.md`, `docs/PRODUCT.md`, `docs/DEVELOPMENT.md`, `docs/decisions/` (ADR)
-- `e2e/persistence.spec.ts`, `e2e/persistence-reliability.spec.ts` (autosave flush and cleanup coverage)
+- `e2e/persistence.spec.ts`, `e2e/persistence-reliability.spec.ts`, `e2e/shutdown-failures.spec.ts`
+- `perf/state.spec.ts`
 
 ## Data model and persistence changes
 
@@ -121,13 +124,13 @@ Required by `docs/PRODUCT.md` §22.1.
 - Unit: reference-retained history; 200-entry cap eviction preserves undo/redo and attachment reachability; save policy triggers (image, link, ten words, ten-second idle), no save per keystroke, forced flush of pending changes, and error retention and retry; cleanup triggered only by reference-changing operations and always after the save.
 - Property: domain operations do not mutate their input; undo/redo consistency across cap eviction.
 - Boundary/contract: existing file-service and IPC tests remain; add coverage that a forced flush of pending changes reaches `save` before quit acknowledgment, and that cleanup does not run before the save that removes the reference.
-- E2E: rapid edits still persist (existing `persistence.spec.ts` scenario); quit with pending changes persists them; a delete that removes an attachment restarts with the file gone and the document consistent; startup cleanup of stale attachments still holds.
+- E2E: rapid edits still persist (existing `persistence.spec.ts` scenario); quit with pending changes persists them; closing the main window flushes pending changes and quits; a delete that removes an attachment restarts with the file gone and the document consistent; startup cleanup of stale attachments still holds.
 - Perf: required bounded-work scenario for a structural edit burst.
 
 ## Documentation
 
-- `docs/ARCHITECTURE.md` §11 and §13: immutable snapshot retention, bounded history (200 entries), the autosave policy, and cleanup-on-reference-change ordering.
-- `docs/PRODUCT.md` §16.1 and §10: the autosave policy (already added) and bounded undo depth (200 steps).
+- `docs/ARCHITECTURE.md` §11 and §13: immutable snapshot retention, bounded history (200 entries), the autosave policy, cleanup-on-reference-change ordering, and window close as a quit request.
+- `docs/PRODUCT.md` §16.1 and §10: the autosave policy (already added) and bounded undo depth (200 steps); §9.2: closing the main window quits and flushes.
 - `docs/decisions/`: add an ADR (next free number) covering snapshot retention, bounded history, the autosave policy, and attachment retention; update or supersede `0001-snapshot-history-and-attachment-retention.md`.
 - `docs/DEVELOPMENT.md` §12: document the new perf guard.
 
@@ -146,6 +149,7 @@ Required by `docs/PRODUCT.md` §22.1.
 - History bound: 200 entries; an entry is one text-editing session or one structural command.
 - Persisted `document.json` stays 2-space pretty-printed.
 - The `serializeState` defensive clone is retained (deferred as an optional follow-up).
+- Closing the main window quits the application and flushes pending changes, using the same save-before-quit handshake as `Cmd+Q` (`docs/PRODUCT.md` §9.2).
 
 ## Out of scope
 

@@ -1,6 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
-import { EditorStore, type ClipboardValue, type EditorServices } from './editor-store'
+import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from './editor-store'
 import { MAX_DOCUMENT_DEPTH, type TreeNode } from '../domain/document'
+
+class FakeClock implements Clock {
+  private readonly timers = new Map<number, () => void>()
+  private nextId = 1
+
+  public setTimeout(callback: () => void): number {
+    const id = this.nextId
+    this.nextId += 1
+    this.timers.set(id, callback)
+    return id
+  }
+
+  public clearTimeout(handle: unknown): void {
+    this.timers.delete(handle as number)
+  }
+
+  public runAll(): void {
+    const callbacks = [...this.timers.values()]
+    this.timers.clear()
+    for (const callback of callbacks) callback()
+  }
+}
 
 function createServices(clipboard: ClipboardValue = { kind: 'text', text: '' }): EditorServices & { saves: unknown[] } {
   const saves: unknown[] = []
@@ -1443,5 +1465,120 @@ describe('EditorStore', () => {
 
     const restored = store.getSnapshot()
     expect(restored.status === 'ready' && restored.document.roots[0]!.attachment?.id).toBe('image')
+  })
+
+  it('does not save on every keystroke and saves when ten words have been inserted', async () => {
+    const services = createServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    let text = ''
+    for (let index = 0; index < 9; index += 1) {
+      text = text === '' ? `w${index}` : `${text} w${index}`
+      store.editText('root', text)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    expect(services.saves).toEqual([])
+
+    store.editText('root', `${text} w9`)
+    await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('saves pending changes after the idle interval', async () => {
+    const services = createServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    store.editText('root', 'hello')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(services.saves).toEqual([])
+
+    clock.runAll()
+    await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('saves immediately when an image is pasted', async () => {
+    const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+    const store = new EditorStore(services, ids('root', 'image'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    await store.paste('root', 0)
+    await store.flushPersistence()
+    expect(services.saves.at(-1)).toMatchObject({
+      document: { roots: [{ attachment: { id: 'image', mimeType: 'image/png' } }] },
+    })
+  })
+
+  it('saves immediately when a hyperlink is pasted', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    await store.paste('root', 0)
+    await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('runs attachment cleanup only after a reference-changing save', async () => {
+    const order: string[] = []
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.cleanupAttachments = async () => {
+      order.push('cleanup')
+    }
+    services.save = async () => {
+      order.push('save')
+    }
+    const store = new EditorStore(services, ids('replacement'))
+    await store.initialize()
+    await store.flushPersistence()
+    expect(order).toEqual(['cleanup'])
+
+    order.length = 0
+    store.editText('root', 'Changed')
+    await store.flushPersistence()
+    expect(order).toEqual(['save'])
+
+    order.length = 0
+    store.deleteSelected()
+    await store.flushPersistence()
+    expect(order).toEqual(['save', 'cleanup'])
+  })
+
+  it('keeps changes pending after a failed save and retries on the next idle interval', async () => {
+    const services = createServices()
+    let fail = true
+    services.save = async (state) => {
+      if (fail) throw new Error('disk full')
+      services.saves.push(state)
+    }
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await expect(store.flushPersistence()).rejects.toThrow('disk full')
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'disk full' })
+
+    fail = false
+    clock.runAll()
+    await store.flushPersistence()
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: undefined })
+    expect(services.saves).toHaveLength(1)
   })
 })

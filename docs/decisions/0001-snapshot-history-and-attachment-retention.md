@@ -1,6 +1,6 @@
 # Snapshot History and Attachment Retention
 
-Status: Accepted
+Status: Superseded by ADR 0004
 Date: 2026-09-11
 
 ## Context

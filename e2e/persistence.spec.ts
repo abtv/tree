@@ -58,7 +58,7 @@ test.describe('persistence', () => {
     const text = 'rapid '.repeat(100)
 
     await typeInto(node(window, 1), text)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text, { timeout: 15_000 }).toBe(text)
   })
 
   test('restores the document, current parent, and selected node after restart', async ({ userDataDir }) => {
@@ -69,13 +69,14 @@ test.describe('persistence', () => {
     await first.window.keyboard.press('Enter')
     await typeInto(node(first.window, 1), 'Work')
 
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.children[0]?.text).toBe('Work')
+    await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
+    expect(persisted.document.roots[0]?.text).toBe('Projects')
     const parentId = persisted.document.roots[0]!.id
     const childId = persisted.document.roots[0]!.children[0]!.id
+    expect(persisted.document.roots[0]!.children[0]!.text).toBe('Work')
     expect(persisted.location).toEqual({ currentParentId: parentId, selectedNodeId: childId })
 
-    await closeApp(first.app)
     const second = await launchTree(userDataDir)
 
     await expect(parent(second.window)).toHaveValue('Projects')

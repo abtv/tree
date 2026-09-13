@@ -1,25 +1,32 @@
-import { cloneDocument, isValidLocation, locateNode, type Document, type Location } from '../domain/document'
+import { isValidLocation, locateNode, type Document, type Location } from '../domain/document'
+
+export const HISTORY_LIMIT = 200
 
 export class EditorHistory {
   private readonly past: Document[] = []
   private readonly future: Document[] = []
 
-  public begin(document: Document): void {
-    this.past.push(cloneDocument(document))
+  public begin(document: Document): boolean {
+    this.past.push(document)
+    const evicted = this.past.length > HISTORY_LIMIT
+    if (evicted) this.past.shift()
     this.future.length = 0
+    return evicted
   }
 
   public undo(document: Document, location: Location): { document: Document; location: Location } | undefined {
     const previous = this.past.pop()
     if (previous === undefined) return undefined
-    this.future.push(cloneDocument(document))
+    this.future.push(document)
+    if (this.future.length > HISTORY_LIMIT) this.future.shift()
     return { document: previous, location: reconcileLocation(previous, document, location) }
   }
 
   public redo(document: Document, location: Location): { document: Document; location: Location } | undefined {
     const next = this.future.pop()
     if (next === undefined) return undefined
-    this.past.push(cloneDocument(document))
+    this.past.push(document)
+    if (this.past.length > HISTORY_LIMIT) this.past.shift()
     return { document: next, location: reconcileLocation(next, document, location) }
   }
 

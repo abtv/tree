@@ -8,6 +8,7 @@ export interface PersistenceServices {
 export interface PersistenceCoordinatorDependencies {
   currentState(): { document: Document; location: Location } | undefined
   referencedAttachmentIds(): Iterable<AttachmentId>
+  hasPendingDocumentChanges(): boolean
   onResult(error: unknown | undefined): void
 }
 
@@ -16,6 +17,7 @@ export class PersistenceCoordinator {
   private workQueued = false
   private requested = false
   private saveRequested = false
+  private cleanupRequested = false
   private error: unknown
   private saveError: unknown
 
@@ -29,16 +31,22 @@ export class PersistenceCoordinator {
   }
 
   public requestAttachmentCleanup(): void {
+    this.cleanupRequested = true
     this.request(false)
   }
 
   public async flush(): Promise<void> {
+    this.schedulePendingCleanup()
     let queue: Promise<void>
     do {
       queue = this.saveQueue
       await queue
     } while (queue !== this.saveQueue)
     if (this.error !== undefined) throw this.error
+  }
+
+  private schedulePendingCleanup(): void {
+    if (this.cleanupRequested && !this.workQueued) this.request(false)
   }
 
   private request(save: boolean): void {
@@ -52,7 +60,9 @@ export class PersistenceCoordinator {
         while (this.requested) {
           this.requested = false
           const saveRequested = this.saveRequested
+          const cleanupRequested = this.cleanupRequested
           this.saveRequested = false
+          this.cleanupRequested = false
           try {
             const state = this.dependencies.currentState()
             if (state === undefined) continue
@@ -62,10 +72,11 @@ export class PersistenceCoordinator {
                 this.saveError = undefined
               } catch (error) {
                 this.saveError = error
+                if (cleanupRequested) this.cleanupRequested = true
                 throw error
               }
             }
-            await this.services.cleanupAttachments([...this.dependencies.referencedAttachmentIds()])
+            if (cleanupRequested) await this.runCleanup(saveRequested)
             this.error = this.saveError
             this.dependencies.onResult(this.error)
           } catch (error) {
@@ -78,5 +89,18 @@ export class PersistenceCoordinator {
         this.workQueued = false
         if (this.requested) this.request(this.saveRequested)
       })
+  }
+
+  private async runCleanup(saveRequested: boolean): Promise<void> {
+    if (!saveRequested && this.dependencies.hasPendingDocumentChanges()) {
+      this.cleanupRequested = true
+      return
+    }
+    try {
+      await this.services.cleanupAttachments([...this.dependencies.referencedAttachmentIds()])
+    } catch (error) {
+      this.cleanupRequested = true
+      throw error
+    }
   }
 }

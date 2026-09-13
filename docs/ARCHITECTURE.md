@@ -300,9 +300,11 @@ The implementation should make it possible to undo and redo complex operations s
 * image attachment;
 * node splitting.
 
-The exact history implementation may use snapshots, commands, inverse operations, or another approach.
+The history implementation uses whole-document snapshots. The domain never mutates an existing document; every operation returns a new document, and structural commands deep-copy before mutating. Because of that invariant, the history retains the current document objects by reference instead of deep-cloning them on `begin`, `undo`, or `redo`. Text-edit states share unchanged subtrees with the live document, while structural states already hold an independent copy.
 
-The choice should prioritize correctness, simplicity, and maintainability.
+The history is bounded to 200 entries. One entry is one text-editing session or one structural command. When the limit is exceeded, the oldest entry is discarded and can no longer be undone. The redo stack is bounded by the same limit.
+
+The choice of snapshots keeps undo/redo correct and simple. A future history bound change or a move to command/inverse-operation history must preserve the same user-visible undo depth and attachment reachability.
 
 ---
 
@@ -350,9 +352,15 @@ Persistence must support future schema evolution.
 
 The application must flush queued saves before a normal quit completes. A persistence failure must not silently discard the in-memory document; it is surfaced to the user and a later successful save clears the error state.
 
+Closing the main window is treated as a quit request: the main process intercepts the window close, runs the same renderer flush handshake as `Cmd+Q`, and only allows the application to quit after the renderer confirms. If the flush fails or times out, the window remains open and the failure is surfaced.
+
+The renderer applies an automatic save policy rather than saving on every keystroke. The store tracks whether changes are pending, counts inserted words against a ten-word volume threshold, and resets a ten-second idle timer on every persisted change. Image insertion and hyperlink insertion request an immediate save. Structural commands that insert no content mark changes pending and reset the idle timer without saving by themselves. Counters are captured and reset when a save is requested; a failed save keeps the changes pending and schedules a retry on the next idle interval, volume trigger, or flush. `flushPersistence` forces a save of pending changes before awaiting the queue, so quit always persists them.
+
 The editor tracks pending asynchronous cut and paste operations. Shutdown flushing waits for those operations, then their queued persistence, and checks for additional pending edits before completing. Operation failures reject the active flush and prevent its quit acknowledgment. The persistence coordinator retains document-save failures separately from cleanup results so cleanup alone cannot authorize quit with unsaved changes.
 
 Document saves and attachment filesystem operations are serialized by the file-service operation queue. The application also queues attachment cleanup with persistence work, so cleanup cannot race a save or another cleanup, and cleanup failures follow the same visible error and shutdown-flush path as save failures. File-service operations emit structured operation names, phases, and filesystem paths for diagnosing boundary failures.
+
+Attachment cleanup is no longer part of every save cycle. The store marks cleanup dirty only where attachment reachability can change: structural deletes, undo, redo, history eviction, and initialization. The coordinator runs cleanup after the save that persists the new referenced set, never before it, so a crash cannot leave the persisted document referencing a file that was already deleted. When document changes are pending, a requested cleanup waits for the next save; startup cleanup with no pending changes may run without a save. Attachment cleanup retains files referenced by the live document, every retained history snapshot, and pending attachment writes.
 
 Loading invalid or unsupported data must fail safely rather than silently corrupting the document.
 

@@ -439,6 +439,10 @@ Behavior:
 
 `Cmd+Q` quits the application, including when focus is in an editable node.
 
+### 9.2 Window Close
+
+Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry.
+
 ---
 
 ## 10. Undo and Redo

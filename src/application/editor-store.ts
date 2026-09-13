@@ -3,6 +3,7 @@ import {
   createInitialDocument,
   deleteLink,
   editNodeContent,
+  isHttpUrl,
   isValidLocation,
   locateNode,
   parsePersistedState,
@@ -32,6 +33,7 @@ import {
   moveSelectionTransition,
 } from './editor-command-transitions'
 import { PersistenceCoordinator } from './persistence-coordinator'
+import { countInsertedWords, countPastedWords, SAVE_IDLE_MILLISECONDS, SAVE_WORD_THRESHOLD } from './save-policy'
 
 export type ClipboardValue = ClipboardPayload
 
@@ -81,6 +83,9 @@ export class EditorStore {
   private snapshot: EditorSnapshot = { status: 'loading' }
   private activeTextNodeId: NodeId | undefined
   private textTimer: unknown
+  private saveTimer: unknown
+  private changesPending = false
+  private insertedWordsSinceSave = 0
   private standaloneNextTextEdit = false
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
@@ -93,6 +98,7 @@ export class EditorStore {
     this.persistence = new PersistenceCoordinator(services, {
       currentState: () => (this.snapshot.status === 'ready' ? this.snapshot : undefined),
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
+      hasPendingDocumentChanges: () => this.changesPending,
       onResult: (error) => this.handlePersistenceResult(error),
     })
   }
@@ -107,6 +113,7 @@ export class EditorStore {
   public async flushPersistence(): Promise<void> {
     do {
       await Promise.all(this.pendingEdits)
+      if (this.changesPending) this.requestPolicySave()
       await this.persistence.flush()
     } while (this.pendingEdits.size > 0)
   }
@@ -130,6 +137,7 @@ export class EditorStore {
         }
         this.emit()
         this.persistence.requestSave()
+        this.queueAttachmentCleanup()
         return
       }
 
@@ -159,10 +167,12 @@ export class EditorStore {
       return
     }
     this.endTextSession()
-    this.replaceReady(
-      { ...state, location: { ...state.location, selectedNodeId: nodeId }, focus: this.newFocus(nodeId, cursor) },
-      true,
-    )
+    this.replaceReady({
+      ...state,
+      location: { ...state.location, selectedNodeId: nodeId },
+      focus: this.newFocus(nodeId, cursor),
+    })
+    this.markPersistedChange()
   }
 
   public editText(nodeId: NodeId, text: string): void {
@@ -177,11 +187,14 @@ export class EditorStore {
     }
     if (this.activeTextNodeId !== nodeId) {
       this.endTextSession()
-      this.history.begin(state.document)
+      if (this.history.begin(state.document)) this.queueAttachmentCleanup()
       this.activeTextNodeId = nodeId
     }
+    const insertedWords = countInsertedWords(node.text, text)
+    const linkInserted = hasNewLink(node.links, links)
     const next = editNodeContent(state.document, nodeId, text, links)
-    this.replaceReady({ ...state, document: next }, true)
+    this.replaceReady({ ...state, document: next })
+    this.noteChange(insertedWords, linkInserted)
     this.scheduleTextBoundary()
     if (this.standaloneNextTextEdit) {
       this.standaloneNextTextEdit = false
@@ -276,14 +289,12 @@ export class EditorStore {
     const transition = enterTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady(
-      {
-        ...state,
-        location: transition.location,
-        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
-      },
-      true,
-    )
+    this.replaceReady({
+      ...state,
+      location: transition.location,
+      focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    })
+    this.markPersistedChange()
   }
 
   public leave(): void {
@@ -291,14 +302,12 @@ export class EditorStore {
     const transition = leaveTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady(
-      {
-        ...state,
-        location: transition.location,
-        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
-      },
-      true,
-    )
+    this.replaceReady({
+      ...state,
+      location: transition.location,
+      focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    })
+    this.markPersistedChange()
   }
 
   public navigateToAncestor(parentId: NodeId | null): void {
@@ -306,14 +315,12 @@ export class EditorStore {
     const transition = ancestorNavigationTransition(state.document, state.location, parentId)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady(
-      {
-        ...state,
-        location: transition.location,
-        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
-      },
-      true,
-    )
+    this.replaceReady({
+      ...state,
+      location: transition.location,
+      focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    })
+    this.markPersistedChange()
   }
 
   public createSiblingOrFirstChild(cursor: number): void {
@@ -340,6 +347,7 @@ export class EditorStore {
       transition.location,
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
+    this.queueAttachmentCleanup()
   }
 
   public deleteEmptySelected(): void {
@@ -352,6 +360,7 @@ export class EditorStore {
       transition.location,
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
+    this.queueAttachmentCleanup()
   }
 
   public moveSelectedTo(insertionIndex: number): void {
@@ -413,6 +422,7 @@ export class EditorStore {
           transition.location,
           this.newFocus(transition.focus.nodeId, transition.focus.cursor),
         )
+        this.requestImmediateSave()
       } finally {
         this.pendingAttachmentIds.delete(attachment.id)
         this.queueAttachmentCleanup()
@@ -423,11 +433,15 @@ export class EditorStore {
     const transition = textPasteTransition(current.document, current.location, nodeId, cursor, clipboard, (count) =>
       Array.from({ length: count }, () => this.createId()),
     )
+    const node = requireNode(current.document, nodeId).node
+    const position = Math.max(0, Math.min(cursor, node.text.length))
+    const insertedWords = countPastedWords(clipboard.text, position > 0 ? node.text[position - 1] : undefined)
     this.applyStructural(
       transition.document,
       transition.location,
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
+    this.noteChange(insertedWords, clipboardIntroducesLink(clipboard))
   }
 
   public undo(): void {
@@ -435,15 +449,14 @@ export class EditorStore {
     const state = this.ready()
     const previous = this.history.undo(state.document, state.location)
     if (previous === undefined) return
-    this.replaceReady(
-      {
-        ...state,
-        document: previous.document,
-        location: previous.location,
-        focus: this.newFocus(previous.location.selectedNodeId, 0),
-      },
-      true,
-    )
+    this.replaceReady({
+      ...state,
+      document: previous.document,
+      location: previous.location,
+      focus: this.newFocus(previous.location.selectedNodeId, 0),
+    })
+    this.markPersistedChange()
+    this.queueAttachmentCleanup()
   }
 
   public redo(): void {
@@ -451,21 +464,21 @@ export class EditorStore {
     const state = this.ready()
     const next = this.history.redo(state.document, state.location)
     if (next === undefined) return
-    this.replaceReady(
-      {
-        ...state,
-        document: next.document,
-        location: next.location,
-        focus: this.newFocus(next.location.selectedNodeId, 0),
-      },
-      true,
-    )
+    this.replaceReady({
+      ...state,
+      document: next.document,
+      location: next.location,
+      focus: this.newFocus(next.location.selectedNodeId, 0),
+    })
+    this.markPersistedChange()
+    this.queueAttachmentCleanup()
   }
 
   private applyStructural(document: Document, location: Location, focus: FocusIntent): void {
     const state = this.ready()
-    this.history.begin(state.document)
-    this.replaceReady({ ...state, document, location, focus }, true)
+    if (this.history.begin(state.document)) this.queueAttachmentCleanup()
+    this.replaceReady({ ...state, document, location, focus })
+    this.markPersistedChange()
   }
 
   private scheduleTextBoundary(): void {
@@ -475,12 +488,46 @@ export class EditorStore {
     this.textTimer = this.clock.setTimeout(() => this.endTextSession(), 5_000)
   }
 
-  private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, persist: boolean): void {
+  private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>): void {
     this.snapshot = state.operationError === undefined ? state : { ...state, operationError: undefined }
     this.emit()
-    if (persist) {
-      this.persistence.requestSave()
+  }
+
+  private markPersistedChange(): void {
+    this.changesPending = true
+    this.scheduleIdleSave()
+  }
+
+  private noteChange(insertedWords: number, saveImmediately: boolean): void {
+    if (insertedWords > 0) {
+      this.insertedWordsSinceSave += insertedWords
+      if (this.insertedWordsSinceSave >= SAVE_WORD_THRESHOLD) saveImmediately = true
     }
+    this.markPersistedChange()
+    if (saveImmediately) this.requestPolicySave()
+  }
+
+  private requestImmediateSave(): void {
+    this.requestPolicySave()
+  }
+
+  private requestPolicySave(): void {
+    if (!this.changesPending) return
+    if (this.saveTimer !== undefined) {
+      this.clock.clearTimeout(this.saveTimer)
+      this.saveTimer = undefined
+    }
+    this.changesPending = false
+    this.insertedWordsSinceSave = 0
+    this.persistence.requestSave()
+  }
+
+  private scheduleIdleSave(): void {
+    if (this.saveTimer !== undefined) this.clock.clearTimeout(this.saveTimer)
+    this.saveTimer = this.clock.setTimeout(() => {
+      this.saveTimer = undefined
+      this.requestPolicySave()
+    }, SAVE_IDLE_MILLISECONDS)
   }
 
   private queueAttachmentCleanup(): void {
@@ -507,6 +554,8 @@ export class EditorStore {
       this.snapshot = { ...this.snapshot, saveError: undefined }
     } else {
       this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
+      this.changesPending = true
+      this.scheduleIdleSave()
     }
     this.emit()
   }
@@ -553,4 +602,22 @@ function sameNodeContent(node: { text: string; links?: LinkRange[] }, expected: 
       return other !== undefined && link.start === other.start && link.end === other.end && link.url === other.url
     })
   )
+}
+
+function hasNewLink(existing: LinkRange[] | undefined, next: LinkRange[]): boolean {
+  const previous = existing ?? []
+  return next.some(
+    (link) =>
+      !previous.some(
+        (candidate) => candidate.start === link.start && candidate.end === link.end && candidate.url === link.url,
+      ),
+  )
+}
+
+function clipboardIntroducesLink(clipboard: Extract<ClipboardPayload, { kind: 'text' }>): boolean {
+  if (clipboard.links !== undefined && clipboard.links.length > 0) return true
+  return clipboard.text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .some((line) => isHttpUrl(line))
 }

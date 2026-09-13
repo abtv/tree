@@ -117,9 +117,7 @@ test.describe('persistence reliability regressions', () => {
     expect(readFileSync(`${documentPath(userDataDir)}.tmp`)).toEqual(candidate)
   })
 
-  test('keeps a failed save visible after image-paste cleanup and blocks quit until a successful save', async ({
-    userDataDir,
-  }) => {
+  test('keeps a failed save visible and runs deferred cleanup after a successful save', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
     allowRendererError(/^Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked$/)
@@ -153,14 +151,17 @@ test.describe('persistence reliability regressions', () => {
         throw new Error('image blocked')
       })
     })
-    await typeInto(node(window, 1), 'unsaved')
+    const initialText = 'unsaved one two three four five six seven eight nine'
+    const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
+    await typeInto(node(window, 1), initialText)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
-    await expect
-      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0))
-      .toBeGreaterThan(0)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
+    await window.waitForTimeout(250)
+    expect(
+      await app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0),
+    ).toBe(0)
 
     await clickApplicationMenuQuit(app)
     await expect(
@@ -168,12 +169,15 @@ test.describe('persistence reliability regressions', () => {
     ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
     await app.evaluate(() => (globalThis as typeof globalThis & { restoreSave?: () => void }).restoreSave?.())
-    await typeInto(node(window, 1), ' recovered')
+    await typeInto(node(window, 1), recoveryText)
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0))
+      .toBeGreaterThan(0)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await clickApplicationMenuQuit(app)
     await closed
-    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('unsaved recovered')
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${initialText}${recoveryText}`)
   })
 
   test('waits for an image paste before menu quit and restores the image on restart', async ({ userDataDir }) => {

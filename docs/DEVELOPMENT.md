@@ -323,6 +323,8 @@ npm run test:perf
 
 They measure startup and typing latency at several document scales and print one JSON line per scenario. Startup runs three repetitions per scenario and enforces an Electron launch-to-interactive ceiling of 2,000 ms and a renderer-start-to-interactive ceiling of 1,000 ms. Typing samples 104 keystrokes per scenario, measures from the input event through two consecutive animation frames, and enforces a paint p95 below 100 ms and a maximum below 250 ms. The approved budgets and final observations are recorded in the completed depth-and-quality plan.
 
+The state/persistence scenario in `perf/state.spec.ts` seeds a 10,000-node document and performs a fixed structural-edit burst, a typed-word burst, and a reference-changing delete. It prints the structural burst wall clock, typing wall clock, save count, and attachment cleanup scan duration, and enforces ceilings on each. The save count confirms the automatic save policy triggers on inserted-word volume rather than per keystroke. The cleanup scan duration guards the reference-changing path against unbounded history or document scanning.
+
 ---
 
 ## 13. Persistence Testing

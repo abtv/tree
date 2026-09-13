@@ -12,6 +12,7 @@ function createHarness(locked = true) {
     beforeQuit?: (event: BeforeQuitEvent) => void
     activate?: () => void
   } = {}
+  const windowListeners: { close?: (event: BeforeQuitEvent) => void } = {}
   const app: ApplicationLifecycle = {
     on: (event, listener) => {
       if (event === 'before-quit') listeners.beforeQuit = listener
@@ -23,6 +24,9 @@ function createHarness(locked = true) {
   }
   const window: MainWindowReference = {
     isDestroyed: () => false,
+    on: (event, listener) => {
+      if (event === 'close') windowListeners.close = listener
+    },
     webContents: { send: vi.fn() },
   }
   const registerReadyServices = vi.fn<(handshake: QuitHandshake, onQuitConfirmed: () => void) => void>()
@@ -41,7 +45,7 @@ function createHarness(locked = true) {
     onStartupError: vi.fn(),
   }
   bootstrapApplication(dependencies)
-  return { app, window, listeners, dependencies, registerReadyServices }
+  return { app, window, windowListeners, listeners, dependencies, registerReadyServices }
 }
 
 describe('bootstrapApplication', () => {
@@ -96,6 +100,29 @@ describe('bootstrapApplication', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(window.webContents.send).toHaveBeenCalledWith('tree:quit-requested', expect.any(String))
     expect(registerReadyServices).toHaveBeenCalledOnce()
+  })
+
+  it('quits and prevents the close when the main window is closed', async () => {
+    const { app, windowListeners } = createHarness()
+
+    await Promise.resolve()
+    const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+    windowListeners.close?.(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(app.quit).toHaveBeenCalledOnce()
+  })
+
+  it('allows the window to close once quitting has been confirmed', async () => {
+    const { app, windowListeners, registerReadyServices } = createHarness()
+
+    await Promise.resolve()
+    registerReadyServices.mock.calls[0]![1]()
+    const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+    windowListeners.close?.(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(app.quit).not.toHaveBeenCalled()
   })
 
   it('reports shortcut registration failure without preventing startup', async () => {

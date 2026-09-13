@@ -71,7 +71,6 @@ function createMainWindow(): void {
   })
   window.on('close', () => {
     saveWindowBounds()
-    if (mainWindow === window) mainWindow = null
   })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
