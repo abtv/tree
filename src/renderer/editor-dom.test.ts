@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
   getCaret,
@@ -79,6 +79,19 @@ describe('editor DOM adapters', () => {
     setDomSelection(outside, 2)
     expect(getCaret(element)).toBe(0)
     expect(getSelectionRange(element)).toEqual({ start: 0, end: 0 })
+  })
+
+  it('falls back to the caret when no DOM selection exists', () => {
+    const element = document.createElement('div')
+    element.textContent = 'hello'
+    document.body.append(element)
+    const getSelection = vi.spyOn(globalThis, 'getSelection').mockReturnValue(null)
+
+    expect(getCaret(element)).toBe(0)
+    expect(getSelectionRange(element)).toEqual({ start: 0, end: 0 })
+    expect(isCollapsedSelection()).toBe(true)
+
+    getSelection.mockRestore()
   })
 
   it('reads a contenteditable range in document order and restores the selection', () => {

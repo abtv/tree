@@ -309,7 +309,9 @@ describe('App', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Enter node 1' }))
+    const disclosure = screen.getByRole('button', { name: 'Enter node 1' })
+    fireEvent.mouseDown(disclosure)
+    fireEvent.click(disclosure)
 
     expect(screen.getByRole('textbox', { name: 'Current parent' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
@@ -375,6 +377,58 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('')
   })
 
+  it('moves a node to the boundary below a row and clears drag state on drag end', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    const transfer = {
+      dropEffect: '',
+      effectAllowed: '',
+      value: '',
+      setData(_type: string, value: string) {
+        this.value = value
+      },
+      getData() {
+        return this.value
+      },
+    }
+
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
+    const secondRow = screen.getByRole('textbox', { name: 'Node 2' }).parentElement!
+    vi.spyOn(secondRow, 'getBoundingClientRect').mockReturnValue({ height: 20, top: 10 } as DOMRect)
+
+    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
+    fireEvent.dragOver(secondRow, { dataTransfer: transfer, clientY: 29 })
+    fireEvent.drop(secondRow, { dataTransfer: transfer, clientY: 29 })
+    fireEvent.dragEnd(screen.getByRole('textbox', { name: 'Node 2' }).parentElement!, { dataTransfer: transfer })
+
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
+  })
+
+  it('ignores a drop that has neither a transfer ID nor an active dragged node', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(first, { target: { value: 'A' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
+
+    const transfer = { getData: () => '' }
+    fireEvent.drop(screen.getByLabelText('Drop position 3'), { dataTransfer: transfer })
+
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('B')
+  })
+
   it('moves nodes through the drop zones before the first and after the last node', async () => {
     const store = createStore()
     await act(async () => {
@@ -399,7 +453,10 @@ describe('App', () => {
     fireEvent.keyDown(first, { key: 'Enter' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
     fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
-    fireEvent.drop(screen.getByLabelText('Drop position 3'), { dataTransfer: transfer })
+    const endDropZone = screen.getByLabelText('Drop position 3')
+    fireEvent.dragOver(endDropZone, { dataTransfer: transfer })
+    expect(transfer.dropEffect).toBe('move')
+    fireEvent.drop(endDropZone, { dataTransfer: transfer })
 
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')

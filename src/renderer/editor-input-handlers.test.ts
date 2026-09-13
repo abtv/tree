@@ -137,4 +137,34 @@ describe('editor keyboard handler', () => {
     expect(store.deleteLink).toHaveBeenCalledWith('node', 4)
     expect(deleteEvent.preventDefault).toHaveBeenCalledOnce()
   })
+
+  it('leaves collapsed copy and cut selections to the browser', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(2, 2)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const copyEvent = keyEvent(input, 'c', { metaKey: true })
+    const cutEvent = keyEvent(input, 'x', { metaKey: true })
+    handle(copyEvent)
+    handle(cutEvent)
+
+    expect(copyEvent.preventDefault).not.toHaveBeenCalled()
+    expect(cutEvent.preventDefault).not.toHaveBeenCalled()
+    expect(store.copy).not.toHaveBeenCalled()
+    expect(store.cut).not.toHaveBeenCalled()
+  })
+
+  it('does not open a preview for an image command when the node has no attachment', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, onPreviewAttachment } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const event = keyEvent(input, 'Enter', { metaKey: true })
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(onPreviewAttachment).not.toHaveBeenCalled()
+  })
 })
