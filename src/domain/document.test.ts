@@ -162,6 +162,28 @@ describe('document operations', () => {
     ).toThrow('does not match its tree')
   })
 
+  it('validates persisted state with a single traversal and no derived index build', () => {
+    const childSiblings: unknown[] = []
+    const child: Record<string, unknown> = { id: 'b', text: '', children: childSiblings }
+    const rootChildren = [child]
+    let childListReads = 0
+    const countingChildren = new Proxy(rootChildren, {
+      get(target, property, receiver) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) childListReads += 1
+        return Reflect.get(target, property, receiver)
+      },
+    })
+    const root: Record<string, unknown> = { id: 'a', text: '', children: countingChildren }
+    const state = {
+      version: 2,
+      document: { roots: [root] },
+      location: { currentParentId: 'a', selectedNodeId: 'b' },
+    }
+
+    expect(validatePersistedState(state)).toBe(state)
+    expect(childListReads).toBe(1)
+  })
+
   it('deletes a subtree as one operation', () => {
     const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
     const result = deleteNode(document, 'a')

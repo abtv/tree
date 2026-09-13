@@ -558,19 +558,40 @@ export function validatePersistedState(value: unknown): PersistedEditorState {
   if (!Array.isArray(roots)) {
     throw new Error('Node children must be an array.')
   }
-  walkNodes(roots, new Set(), false)
+  const currentParentId = value.location.currentParentId
+  const selectedNodeId = value.location.selectedNodeId
+  let selectedParentId: NodeId | null | undefined
+  let selectedFound = false
+  let currentParentFound = false
+  walkNodes(roots, new Set(), false, (id, parentId) => {
+    if (id === selectedNodeId) {
+      selectedFound = true
+      selectedParentId = parentId
+    }
+    if (id === currentParentId) currentParentFound = true
+  })
   if (roots.length === 0) {
     throw new Error('The saved document must contain at least one root node.')
   }
-  const currentParentId = value.location.currentParentId
-  const selectedNodeId = value.location.selectedNodeId
   if ((typeof currentParentId !== 'string' && currentParentId !== null) || typeof selectedNodeId !== 'string') {
     throw new Error('The saved document location is invalid.')
   }
-  if (!isValidLocation(value.document as unknown as Document, { currentParentId, selectedNodeId })) {
+  if (!isLocationReachable(selectedFound, selectedParentId, currentParentFound, currentParentId, selectedNodeId)) {
     throw new Error('The saved document location does not match its tree.')
   }
   return value as unknown as PersistedEditorState
+}
+
+function isLocationReachable(
+  selectedFound: boolean,
+  selectedParentId: NodeId | null | undefined,
+  currentParentFound: boolean,
+  currentParentId: NodeId | null,
+  selectedNodeId: NodeId,
+): boolean {
+  if (!selectedFound) return false
+  if (currentParentId === null) return selectedParentId === null
+  return currentParentFound && (selectedNodeId === currentParentId || selectedParentId === currentParentId)
 }
 
 export function parsePersistedState(value: unknown): PersistedEditorState {
@@ -610,17 +631,28 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
   return walkNodes(value, nodeIds, true)
 }
 
-function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: false): void
-function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: true): TreeNode[]
-function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: boolean): TreeNode[] | undefined {
+type NodeObserver = (id: NodeId, parentId: NodeId | null) => void
+
+function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: false, observe?: NodeObserver): void
+function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: true, observe?: NodeObserver): TreeNode[]
+function walkNodes(
+  value: unknown,
+  nodeIds: Set<NodeId>,
+  build: boolean,
+  observe?: NodeObserver,
+): TreeNode[] | undefined {
   if (!Array.isArray(value)) {
     throw new Error('Node children must be an array.')
   }
 
   const output: TreeNode[] | undefined = build ? [] : undefined
-  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[] | undefined; depth: number }> = [
-    { input: value, index: 0, output, depth: 1 },
-  ]
+  const stack: Array<{
+    input: unknown[]
+    index: number
+    output: TreeNode[] | undefined
+    depth: number
+    parentId: NodeId | null
+  }> = [{ input: value, index: 0, output, depth: 1, parentId: null }]
 
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
@@ -645,6 +677,7 @@ function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: boolean): TreeNo
       throw new Error('Node IDs must be unique.')
     }
     nodeIds.add(candidate.id)
+    observe?.(candidate.id, frame.parentId)
     const attachment = parseAttachment(candidate.attachment)
     const links = parseLinks(candidate.links, candidate.text)
     const children = candidate.children
@@ -663,7 +696,7 @@ function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: boolean): TreeNo
       frame.output.push(node)
       childOutput = node.children
     }
-    stack.push({ input: children, index: 0, output: childOutput, depth: frame.depth + 1 })
+    stack.push({ input: children, index: 0, output: childOutput, depth: frame.depth + 1, parentId: candidate.id })
   }
 
   return output
