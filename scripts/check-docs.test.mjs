@@ -7,6 +7,8 @@ import {
   findBrokenReferences,
   findProductQuantityRestatements,
   runChecks,
+  validateAdr,
+  validateAdrIndex,
   validatePlan,
 } from './check-docs.mjs'
 
@@ -83,6 +85,45 @@ describe('validatePlan', () => {
     const result = validatePlan({ fileName: 'plan-one.md', inCompleted: false, content: 'Status: Active\n' })
     expect(result.number).toBeUndefined()
     expect(result.issues[0]).toContain('filename must match')
+  })
+})
+
+describe('validateAdr', () => {
+  it('accepts an accepted ADR', () => {
+    const result = validateAdr({
+      fileName: '0002-example.md',
+      content: 'Status: Accepted\nDate: 2026-09-13\n',
+      adrNumbers: new Set([2]),
+    })
+    expect(result.issues).toEqual([])
+  })
+
+  it('accepts a superseded ADR whose successor exists', () => {
+    const result = validateAdr({
+      fileName: '0001-example.md',
+      content: 'Status: Superseded by ADR 0002\n',
+      adrNumbers: new Set([1, 2]),
+    })
+    expect(result.issues).toEqual([])
+  })
+
+  it('rejects a supersession by a missing ADR and an unknown status', () => {
+    const missing = validateAdr({
+      fileName: '0001-example.md',
+      content: 'Status: Superseded by ADR 0099\n',
+      adrNumbers: new Set([1]),
+    })
+    expect(missing.issues.some((issue) => issue.includes('missing ADR'))).toBe(true)
+    const unknown = validateAdr({ fileName: '0003-example.md', content: 'Status: Draft\n', adrNumbers: new Set([3]) })
+    expect(unknown.issues.some((issue) => issue.includes('Status must be'))).toBe(true)
+  })
+})
+
+describe('validateAdrIndex', () => {
+  it('requires an entry for every ADR', () => {
+    const issues = validateAdrIndex({ content: '[0001](0001-one.md)', adrNumbers: new Set([1, 2]) })
+    expect(issues).toHaveLength(1)
+    expect(issues[0]).toContain('0002')
   })
 })
 

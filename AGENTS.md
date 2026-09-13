@@ -162,6 +162,8 @@ docs/decisions/
 
 Create these directories only when they are first needed. Do not create empty directories in advance.
 
+Every ADR records a `Status` of `Accepted` or `Superseded by ADR NNNN`, and `docs/decisions/README.md` indexes every ADR. `npm run check:docs` enforces both.
+
 Plans and ADRs must not be used to silently introduce or change product requirements.
 
 If a plan or architectural decision would affect product behavior, the Product Owner must approve the relevant product change first.

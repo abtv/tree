@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const PLAN_FILE_PATTERN = /^(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/
+const ADR_FILE_PATTERN = /^(\d{4})-[a-z0-9-]+\.md$/
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 export const COMPLETED_FORBIDDEN_PHRASES = [
@@ -75,6 +76,38 @@ export function validatePlan({ fileName, inCompleted, content }) {
     issues.push(`${fileName}: an active plan must have Status: Active`)
   }
   return { issues, number }
+}
+
+export function validateAdr({ fileName, content, adrNumbers }) {
+  const issues = []
+  const match = ADR_FILE_PATTERN.exec(fileName)
+  if (!match) {
+    return { issues: [`${fileName}: ADR filename must match NNNN-short-description.md`], number: undefined }
+  }
+  const number = Number(match[1])
+  const status = content.match(/^Status:\s*(.+)$/m)?.[1]?.trim()
+  if (!status) {
+    issues.push(`${fileName}: missing Status metadata`)
+  } else if (status !== 'Accepted') {
+    const superseded = /^Superseded by ADR (\d{4})$/.exec(status)
+    if (!superseded) {
+      issues.push(`${fileName}: Status must be "Accepted" or "Superseded by ADR NNNN"`)
+    } else if (!adrNumbers.has(Number(superseded[1]))) {
+      issues.push(`${fileName}: superseded by missing ADR ${superseded[1]}`)
+    }
+  }
+  return { issues, number }
+}
+
+export function validateAdrIndex({ content, adrNumbers }) {
+  const issues = []
+  for (const number of [...adrNumbers].sort((left, right) => left - right)) {
+    const padded = String(number).padStart(4, '0')
+    if (!content.includes(`](${padded}-`)) {
+      issues.push(`docs/decisions/README.md: missing an index entry for ADR ${padded}`)
+    }
+  }
+  return issues
 }
 
 export function findBrokenLinks({ content, filePath, displayPath = filePath, exists = existsSync }) {
@@ -203,11 +236,27 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     }
   }
   const adrNumbers = new Set()
-  const decisions = join(rootDirectory, 'docs', 'decisions')
-  if (existsSync(decisions)) {
-    for (const entry of readdirSync(decisions, { withFileTypes: true })) {
-      const match = /^(\d{4})-[a-z0-9-]+\.md$/.exec(entry.name)
-      if (entry.isFile() && match) adrNumbers.add(Number(match[1]))
+  const decisionsDirectory = join(rootDirectory, 'docs', 'decisions')
+  const adrFiles = []
+  if (existsSync(decisionsDirectory)) {
+    for (const entry of readdirSync(decisionsDirectory, { withFileTypes: true })) {
+      if (entry.isFile() && ADR_FILE_PATTERN.test(entry.name)) adrFiles.push(entry.name)
+    }
+  }
+  for (const fileName of adrFiles) {
+    const match = ADR_FILE_PATTERN.exec(fileName)
+    if (match) adrNumbers.add(Number(match[1]))
+  }
+  for (const fileName of adrFiles) {
+    const content = readFileSync(join(decisionsDirectory, fileName), 'utf8')
+    issues.push(...validateAdr({ fileName, content, adrNumbers }).issues)
+  }
+  if (adrFiles.length > 0) {
+    const adrIndexPath = join(decisionsDirectory, 'README.md')
+    if (existsSync(adrIndexPath)) {
+      issues.push(...validateAdrIndex({ content: readFileSync(adrIndexPath, 'utf8'), adrNumbers }))
+    } else {
+      issues.push('docs/decisions/README.md: missing ADR index')
     }
   }
   const liveDocuments = collectLiveDocuments(rootDirectory)
