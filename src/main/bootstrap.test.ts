@@ -138,4 +138,42 @@ describe('bootstrapApplication', () => {
 
     expect(onStartupError).toHaveBeenCalledWith(error)
   })
+
+  it('keeps the application open and reports a quit timeout when the renderer does not confirm', async () => {
+    vi.useFakeTimers()
+    try {
+      const { app, listeners, window } = createHarness()
+      const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+
+      await Promise.resolve()
+      listeners.beforeQuit?.(event)
+      vi.advanceTimersByTime(5_000)
+
+      expect(app.quit).not.toHaveBeenCalled()
+      expect(window.webContents.send).toHaveBeenLastCalledWith(
+        'tree:quit-failed',
+        'The application could not finish saving before quit.',
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cleans up after a destroyed window and does not recreate windows after quitting', async () => {
+    const { listeners, dependencies } = createHarness()
+    const window = dependencies.getMainWindow()
+    vi.spyOn(window, 'isDestroyed').mockReturnValue(true)
+    const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+
+    await Promise.resolve()
+    listeners.beforeQuit?.(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(dependencies.setMainWindow).toHaveBeenCalledWith(null)
+    expect(dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+
+    dependencies.getWindowCount.mockReturnValue(0)
+    listeners.activate?.()
+    expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
+  })
 })

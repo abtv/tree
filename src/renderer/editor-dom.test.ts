@@ -107,6 +107,17 @@ describe('editor DOM adapters', () => {
     expect(window.getSelection()?.focusNode).toBe(second)
   })
 
+  it('calculates caret offsets through nested inline elements', () => {
+    const element = document.createElement('div')
+    element.innerHTML = '<span>one<strong>two</strong></span><span>three</span>'
+    document.body.append(element)
+    const nestedText = element.querySelector('strong')?.firstChild
+    if (nestedText === undefined || nestedText === null) throw new Error('Nested text was not created.')
+    setDomSelection(nestedText, 1)
+
+    expect(getCaret(element)).toBe(4)
+  })
+
   it('selects all content and reports a non-collapsed selection', () => {
     const element = document.createElement('div')
     element.textContent = 'select me'

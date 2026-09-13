@@ -239,6 +239,34 @@ describe('App', () => {
     expect(caret.startOffset).toBeGreaterThan(0)
   })
 
+  it('updates linked content through the contenteditable boundary and ends a selected edit session', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+    const editor = screen.getByRole('textbox', { name: 'Node 1' })
+
+    fireEvent.focus(editor)
+    fireEvent.mouseDown(editor)
+    editor.textContent = 'edited text'
+    fireEvent.input(editor)
+    fireEvent.change(editor)
+    const selection = window.getSelection()!
+    const range = document.createRange()
+    range.selectNodeContents(editor)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    fireEvent.select(editor)
+    fireEvent.blur(editor)
+
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ text: 'edited text' }] },
+    })
+  })
+
   it('places a linked caret at the nearest editable boundary', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
     await act(async () => {
