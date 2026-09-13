@@ -163,7 +163,7 @@ undo
 redo
 ```
 
-Sibling creation, splitting, pasting, editing, and reordering do not increase node depth and remain available at level 20. A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
+Sibling creation, splitting, pasting, editing, and reordering do not increase node depth and remain available at the maximum depth defined in `docs/PRODUCT.md` §2.3. A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
 
 The exact API and naming may evolve.
 
