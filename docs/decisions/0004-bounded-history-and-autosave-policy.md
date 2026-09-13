@@ -7,7 +7,7 @@ Date: 2026-09-13
 
 The original snapshot-history decision (ADR 0001) retained an independent deep clone of the document for every history entry and ran attachment cleanup on every save cycle. That approach grows memory without bound as edit count rises, and writing the whole document plus scanning the full history for every keystroke costs disk I/O and CPU that scale with document size.
 
-The domain already guarantees input safety: every operation returns a new document, text edits are path-copying and share unchanged subtrees, and structural commands deep-copy before mutating. This invariant makes defensive cloning redundant. The product target scale is documents of about 10,000 nodes.
+The domain already guarantees input safety: every operation returns a new document, and both text edits and structural commands path-copy the changed path while sharing every unchanged subtree by reference (plan 0039). This invariant makes defensive cloning redundant. The product target scale was about 10,000 nodes when this decision was made; it is now 100,000 (plan 0038).
 
 ## Decision
 
