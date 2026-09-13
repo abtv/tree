@@ -310,6 +310,8 @@ The choice of snapshots keeps undo/redo correct and simple. A future history bou
 
 The history also maintains an incremental reference count of the attachment IDs present in its retained snapshots. Reading the retained attachment set returns those counts instead of re-traversing every snapshot, so attachment cleanup does not scale with history depth.
 
+Each derived document also carries an in-memory attachment reference count, held through a weak map keyed by document identity. Operations propagate that count to the document they return, adding an inserted attachment, subtracting a deleted subtree's references, or sharing it unchanged, so retaining a snapshot or reading the live referenced set is O(1) rather than a full traversal. The count is derived state: it is not part of the document object, is never serialized, and is discarded with the document.
+
 ---
 
 ## 12. Infrastructure Layer

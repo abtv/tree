@@ -337,6 +337,8 @@ Node lookups are guarded against full-document traversal rather than by timing a
 
 Domain commands are guarded against falling back to full-document copies. `document.test.ts` asserts that a structural command leaves untouched roots and sibling subtrees reference-identical to the input, and the `document.property.test.ts` property "shares every node outside the edited path by reference" checks every operation against that rule. The existing input-immutability and indexed-lookup properties continue to prove the shared nodes are never mutated and the shared index stays valid. The `perf/state.spec.ts` structural burst is the end-to-end observation; path-copying keeps the 200-command burst well under its ceiling (about 416 ms at 10,000 nodes on the current hardware).
 
+Attachment-id collection is guarded against rescanning the live document. `document.test.ts` asserts that collecting a path-copied result does not read an unrelated subtree and that an attachment id is removed only when its last referencing node is deleted, including duplicate references. The `document.property.test.ts` property "reports exactly the referenced attachment ids after any operation" compares the propagated per-document counts against a full traversal after every operation, which catches an incorrect increment or decrement.
+
 ---
 
 ## 13. Persistence Testing

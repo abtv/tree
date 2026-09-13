@@ -51,6 +51,8 @@ export type NodeIndex = ReadonlyMap<NodeId, NodeId | null>
 let cachedIndexDocument: Document | undefined
 let cachedNodeIndex: NodeIndex | undefined
 
+const attachmentCountCache = new WeakMap<Document, ReadonlyMap<AttachmentId, number>>()
+
 export function buildNodeIndex(document: Document): NodeIndex {
   const parents = new Map<NodeId, NodeId | null>()
   const stack: TreeNode[] = []
@@ -84,7 +86,9 @@ function shareIndex(from: Document, to: Document): void {
 }
 
 export function createInitialDocument(id: NodeId): Document {
-  return { roots: [{ id, text: '', children: [] }] }
+  const document: Document = { roots: [{ id, text: '', children: [] }] }
+  attachmentCountCache.set(document, new Map())
+  return document
 }
 
 export function ensureRoot(document: Document, id: NodeId): Document {
@@ -221,6 +225,7 @@ export function editNodeContent(document: Document, nodeId: NodeId, text: string
   }
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
+  inheritAttachmentIds(document, next)
   return next
 }
 
@@ -245,6 +250,7 @@ export function deleteLink(document: Document, nodeId: NodeId, cursor: number): 
   )
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
+  inheritAttachmentIds(document, next)
   return next
 }
 
@@ -271,6 +277,7 @@ export function removeTextRange(document: Document, nodeId: NodeId, start: numbe
   }
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
+  inheritAttachmentIds(document, next)
   return next
 }
 
@@ -290,14 +297,19 @@ export function insertSiblingAfter(
     ...(attachment === undefined ? {} : { attachment }),
     children: [],
   })
-  return copyToRoot(document, located, siblings)
+  const next = copyToRoot(document, located, siblings)
+  if (attachment === undefined) inheritAttachmentIds(document, next)
+  else addAttachmentId(document, next, attachment.id)
+  return next
 }
 
 export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeId: NodeId): Document {
   const located = requireNode(document, nodeId)
   const siblings = located.siblings.slice()
   siblings.splice(located.index, 0, { id: newNodeId, text: '', children: [] })
-  return copyToRoot(document, located, siblings)
+  const next = copyToRoot(document, located, siblings)
+  inheritAttachmentIds(document, next)
+  return next
 }
 
 export function createFirstChild(document: Document, parentId: NodeId, childId: NodeId): Document {
@@ -310,7 +322,9 @@ export function createFirstChild(document: Document, parentId: NodeId, childId: 
     ...located.node,
     children: [{ id: childId, text: '', children: [] }, ...located.node.children],
   }
-  return replaceNode(document, located, replacement)
+  const next = replaceNode(document, located, replacement)
+  inheritAttachmentIds(document, next)
+  return next
 }
 
 export function splitNode(document: Document, nodeId: NodeId, cursor: number, newNodeId: NodeId): Document {
@@ -328,14 +342,19 @@ export function splitNode(document: Document, nodeId: NodeId, cursor: number, ne
     ...(links.after.length === 0 ? {} : { links: links.after }),
     children: [],
   })
-  return copyToRoot(document, located, siblings)
+  const next = copyToRoot(document, located, siblings)
+  inheritAttachmentIds(document, next)
+  return next
 }
 
 export function deleteNode(document: Document, nodeId: NodeId): Document {
   const located = requireNode(document, nodeId)
+  const removed = countAttachmentIdsByTraversal([located.node])
   const siblings = located.siblings.slice()
   siblings.splice(located.index, 1)
-  return copyToRoot(document, located, siblings)
+  const next = copyToRoot(document, located, siblings)
+  removeAttachmentIds(document, next, removed)
+  return next
 }
 
 export function moveSibling(document: Document, nodeId: NodeId, destinationIndex: number): Document {
@@ -346,7 +365,9 @@ export function moveSibling(document: Document, nodeId: NodeId, destinationIndex
     throw new Error(`Node ${nodeId} could not be moved.`)
   }
   siblings.splice(clamp(destinationIndex, 0, siblings.length), 0, node)
-  return copyToRoot(document, located, siblings)
+  const next = copyToRoot(document, located, siblings)
+  inheritAttachmentIds(document, next)
+  return next
 }
 
 export function pasteText(
@@ -365,6 +386,7 @@ export function pasteText(
   setLinks(replacement, insertLinks(located.node.links ?? [], position, text, richLinks))
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
+  inheritAttachmentIds(document, next)
   return next
 }
 
@@ -424,7 +446,9 @@ export function pasteMultilineText(
   const siblings = located.siblings.slice()
   siblings[located.index] = original
   siblings.splice(located.index + 1, 0, ...created)
-  return copyToRoot(document, located, siblings)
+  const next = copyToRoot(document, located, siblings)
+  inheritAttachmentIds(document, next)
+  return next
 }
 
 export function attachImage(document: Document, nodeId: NodeId, attachment: AttachmentReference): Document {
@@ -432,22 +456,63 @@ export function attachImage(document: Document, nodeId: NodeId, attachment: Atta
   const replacement: TreeNode = { ...located.node, attachment: { ...attachment } }
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
+  if (located.node.attachment === undefined) {
+    addAttachmentId(document, next, attachment.id)
+  } else if (located.node.attachment.id === attachment.id) {
+    inheritAttachmentIds(document, next)
+  }
   return next
 }
 
 export function collectAttachmentIds(document: Document): Set<AttachmentId> {
-  const ids = new Set<AttachmentId>()
-  const stack = [...document.roots]
+  return new Set(attachmentCountsFor(document).keys())
+}
+
+function attachmentCountsFor(document: Document): ReadonlyMap<AttachmentId, number> {
+  const cached = attachmentCountCache.get(document)
+  if (cached !== undefined) return cached
+  const counts = countAttachmentIdsByTraversal(document.roots)
+  attachmentCountCache.set(document, counts)
+  return counts
+}
+
+function inheritAttachmentIds(from: Document, to: Document): void {
+  attachmentCountCache.set(to, attachmentCountsFor(from))
+}
+
+function addAttachmentId(from: Document, to: Document, id: AttachmentId): void {
+  const counts = new Map(attachmentCountsFor(from))
+  counts.set(id, (counts.get(id) ?? 0) + 1)
+  attachmentCountCache.set(to, counts)
+}
+
+function removeAttachmentIds(from: Document, to: Document, removed: ReadonlyMap<AttachmentId, number>): void {
+  if (removed.size === 0) {
+    inheritAttachmentIds(from, to)
+    return
+  }
+  const counts = new Map(attachmentCountsFor(from))
+  for (const [id, count] of removed) {
+    const remaining = (counts.get(id) ?? 0) - count
+    if (remaining > 0) counts.set(id, remaining)
+    else counts.delete(id)
+  }
+  attachmentCountCache.set(to, counts)
+}
+
+function countAttachmentIdsByTraversal(nodes: readonly TreeNode[]): Map<AttachmentId, number> {
+  const counts = new Map<AttachmentId, number>()
+  const stack = [...nodes]
   while (stack.length > 0) {
     const node = stack.pop()!
     if (node.attachment !== undefined) {
-      ids.add(node.attachment.id)
+      counts.set(node.attachment.id, (counts.get(node.attachment.id) ?? 0) + 1)
     }
     for (const child of node.children) {
       stack.push(child)
     }
   }
-  return ids
+  return counts
 }
 
 export function serializeState(document: Document, location: Location): PersistedEditorState {

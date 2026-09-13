@@ -438,4 +438,68 @@ describe('document operations', () => {
     expect(locateNode(document, 'target-child')?.node.id).toBe('target-child')
     expect(unrelatedReads).toBe(0)
   })
+
+  it('inherits the derived attachment ids for a path-copied result without rescanning', () => {
+    const related: TreeNode = {
+      id: 'target',
+      text: '',
+      children: [
+        { id: 'target-child', text: '', attachment: { id: 'target-image', mimeType: 'image/png' }, children: [] },
+      ],
+    }
+    const unrelatedChildren: TreeNode[] = [{ id: 'unrelated-child', text: '', children: [] }]
+    const unrelated: TreeNode = { id: 'unrelated', text: '', children: unrelatedChildren }
+    let unrelatedReads = 0
+    Object.defineProperty(unrelated, 'children', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        unrelatedReads += 1
+        return unrelatedChildren
+      },
+    })
+    const document: Document = { roots: [related, unrelated] }
+
+    expect([...collectAttachmentIds(document)]).toEqual(['target-image'])
+    locateNode(document, 'target-child')
+    unrelatedReads = 0
+
+    const inserted = insertSiblingAfter(document, 'target-child', 'new-after')
+    const added = insertSiblingAfter(document, 'target-child', 'new-image', '', {
+      id: 'added-image',
+      mimeType: 'image/png',
+    })
+
+    expect([...collectAttachmentIds(inserted)].sort()).toEqual(['target-image'])
+    expect([...collectAttachmentIds(added)].sort()).toEqual(['added-image', 'target-image'])
+    expect(unrelatedReads).toBe(0)
+  })
+
+  it('tracks attachment id changes when attaching an image', () => {
+    const empty = createInitialDocument('a')
+    const attached = attachImage(empty, 'a', { id: 'one', mimeType: 'image/png' })
+    expect([...collectAttachmentIds(attached)]).toEqual(['one'])
+
+    const same = attachImage(attached, 'a', { id: 'one', mimeType: 'image/png' })
+    expect([...collectAttachmentIds(same)]).toEqual(['one'])
+
+    const replaced = attachImage(attached, 'a', { id: 'two', mimeType: 'image/png' })
+    expect([...collectAttachmentIds(replaced)]).toEqual(['two'])
+  })
+
+  it('removes an attachment id only when the last referencing node is deleted', () => {
+    const document: Document = {
+      roots: [
+        { id: 'a', text: '', attachment: { id: 'shared', mimeType: 'image/png' }, children: [] },
+        { id: 'b', text: '', attachment: { id: 'shared', mimeType: 'image/png' }, children: [] },
+      ],
+    }
+    collectAttachmentIds(document)
+
+    const withoutA = deleteNode(document, 'a')
+    expect([...collectAttachmentIds(withoutA)]).toEqual(['shared'])
+
+    const withoutB = deleteNode(withoutA, 'b')
+    expect([...collectAttachmentIds(withoutB)]).toEqual([])
+  })
 })
