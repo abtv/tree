@@ -56,8 +56,7 @@ interface IndexInfo {
   siblingIndex: ReadonlyMap<NodeId, number>
 }
 
-let cachedIndexDocument: Document | undefined
-let cachedIndexInfo: IndexInfo | undefined
+const indexCache = new WeakMap<Document, IndexInfo>()
 
 const attachmentCountCache = new WeakMap<Document, ReadonlyMap<AttachmentId, number>>()
 
@@ -88,18 +87,15 @@ export function buildNodeIndex(document: Document): NodeIndex {
 }
 
 function indexInfoFor(document: Document): IndexInfo {
-  if (cachedIndexDocument === document && cachedIndexInfo !== undefined) {
-    return cachedIndexInfo
-  }
-  cachedIndexInfo = buildIndexInfo(document)
-  cachedIndexDocument = document
-  return cachedIndexInfo
+  const cached = indexCache.get(document)
+  if (cached !== undefined) return cached
+  const info = buildIndexInfo(document)
+  indexCache.set(document, info)
+  return info
 }
 
 function shareIndex(from: Document, to: Document): void {
-  if (cachedIndexDocument === from && cachedIndexInfo !== undefined) {
-    cachedIndexDocument = to
-  }
+  indexCache.set(to, indexInfoFor(from))
 }
 
 export function createInitialDocument(id: NodeId): Document {

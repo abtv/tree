@@ -439,6 +439,43 @@ describe('document operations', () => {
     expect(locateNode(first, 'a')?.node.id).toBe('a')
   })
 
+  it('retains the index for each document across interleaved lookups', () => {
+    const makeCountingDocument = (prefix: string) => {
+      const siblings: TreeNode[] = Array.from({ length: 1000 }, (_, index) => ({
+        id: `${prefix}${index}`,
+        text: '',
+        children: [],
+      }))
+      let elementReads = 0
+      const roots = new Proxy(siblings, {
+        get(target, property, receiver) {
+          if (typeof property === 'string' && /^\d+$/.test(property)) elementReads += 1
+          return Reflect.get(target, property, receiver)
+        },
+      })
+      return {
+        document: { roots } as Document,
+        reads: () => elementReads,
+        reset: () => {
+          elementReads = 0
+        },
+      }
+    }
+
+    const first = makeCountingDocument('a')
+    const second = makeCountingDocument('b')
+    locateNode(first.document, 'a0')
+    locateNode(second.document, 'b0')
+
+    first.reset()
+    expect(locateNode(first.document, 'a999')?.index).toBe(999)
+    expect(first.reads()).toBe(1)
+
+    second.reset()
+    expect(locateNode(second.document, 'b999')?.index).toBe(999)
+    expect(second.reads()).toBe(1)
+  })
+
   it('resolves a warm lookup with a single sibling access instead of scanning the level', () => {
     const siblings: TreeNode[] = Array.from({ length: 1000 }, (_, index) => ({
       id: `n${index}`,
