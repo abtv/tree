@@ -10,7 +10,9 @@ import {
   validateAdr,
   validateAdrIndex,
   validatePlan,
+  validatePlanIndex,
 } from './check-docs.mjs'
+import { generatePlanIndex } from './plan-index.mjs'
 
 const temporaryDirectories = []
 
@@ -119,6 +121,32 @@ describe('validateAdr', () => {
   })
 })
 
+describe('validatePlanIndex', () => {
+  it('requires a link for every plan', () => {
+    const issues = validatePlanIndex({ content: '| [0001](completed/0001-one.md) |', planNumbers: new Set([1, 2]) })
+    expect(issues).toHaveLength(1)
+    expect(issues[0]).toContain('0002')
+  })
+})
+
+describe('generatePlanIndex', () => {
+  it('renders a row per plan and records supersession metadata', () => {
+    const index = generatePlanIndex([
+      {
+        number: 9,
+        directory: 'completed',
+        fileName: '0009-one.md',
+        title: 'One',
+        status: 'Completed',
+        completed: '2026-09-13',
+        supersedes: undefined,
+        supersededBy: '0028',
+      },
+    ])
+    expect(index).toContain('| [0009](completed/0009-one.md) | One | Completed | 2026-09-13 | Superseded by 0028 |')
+  })
+})
+
 describe('validateAdrIndex', () => {
   it('requires an entry for every ADR', () => {
     const issues = validateAdrIndex({ content: '[0001](0001-one.md)', adrNumbers: new Set([1, 2]) })
@@ -181,6 +209,7 @@ describe('runChecks', () => {
     const root = createTemporaryRoot()
     writeFile(root, 'README.md', '# Fixture\n')
     writeFile(root, 'docs/PRODUCT.md', '# Product\n')
+    writeFile(root, 'docs/plans/README.md', '| [0001](completed/0001-first-plan.md) |\n')
     writeFile(
       root,
       'docs/plans/completed/0001-first-plan.md',
@@ -192,6 +221,7 @@ describe('runChecks', () => {
 
   it('detects a completed plan that still says the work is pending', () => {
     const root = createTemporaryRoot()
+    writeFile(root, 'docs/plans/README.md', '| [0001](completed/0001-first-plan.md) |\n')
     writeFile(
       root,
       'docs/plans/completed/0001-first-plan.md',
@@ -199,5 +229,17 @@ describe('runChecks', () => {
     )
     const result = runChecks({ rootDirectory: root })
     expect(result.issues.some((issue) => issue.includes('no fixes have been implemented'))).toBe(true)
+  })
+
+  it('requires every plan to appear in the plan index', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'docs/plans/README.md', '# Implementation Plans\n')
+    writeFile(
+      root,
+      'docs/plans/completed/0001-first-plan.md',
+      'Status: Completed\nCreated: 2026-09-13\nCompleted: 2026-09-13\n\n# First\n',
+    )
+    const result = runChecks({ rootDirectory: root })
+    expect(result.issues.some((issue) => issue.includes('missing an index entry for plan 0001'))).toBe(true)
   })
 })

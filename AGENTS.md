@@ -164,6 +164,8 @@ When a plan is completed:
 
 Do not create a second copy of a plan when completing it.
 
+A plan may record optional `Supersedes: NNNN` or `Superseded-by: NNNN` metadata when another plan wholly replaces it. `docs/plans/README.md` indexes every plan and is regenerated with `npm run plan:index`; `npm run check:docs` requires an entry for every plan.
+
 Use Architecture Decision Records (ADRs) for important technical or architectural decisions that are worth preserving for future development.
 
 ADRs belong in:
@@ -270,7 +272,13 @@ Use Git throughout development.
 
 Prefer one logical task per commit.
 
-Commit messages should clearly describe the implemented change.
+### Commit messages
+
+Use Conventional Commits: `type(scope): summary`, where `type` is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood and keep it focused on the implemented change.
+
+When the change implements an implementation plan, add a `Plan: NNNN` footer to the commit body.
+
+`npm run changelog` regenerates `CHANGELOG.md` from the Conventional Commit history.
 
 Do not mix unrelated refactoring with a feature unless the refactoring is required for that feature.
 

@@ -31,7 +31,7 @@ export const PRODUCT_QUANTITY_PATTERNS = [
 
 export function parsePlanMetadata(content) {
   const metadata = {}
-  for (const key of ['Status', 'Created', 'Completed']) {
+  for (const key of ['Status', 'Created', 'Completed', 'Supersedes', 'Superseded-by']) {
     const match = content.match(new RegExp(`^${key}:\\s*(\\S.*)$`, 'm'))
     if (match) metadata[key.toLowerCase()] = match[1].trim()
   }
@@ -97,6 +97,17 @@ export function validateAdr({ fileName, content, adrNumbers }) {
     }
   }
   return { issues, number }
+}
+
+export function validatePlanIndex({ content, planNumbers }) {
+  const issues = []
+  for (const number of [...planNumbers].sort((left, right) => left - right)) {
+    const padded = String(number).padStart(4, '0')
+    if (!new RegExp(`\\]\\((?:active|completed)/${padded}-`).test(content)) {
+      issues.push(`docs/plans/README.md: missing an index entry for plan ${padded}`)
+    }
+  }
+  return issues
 }
 
 export function validateAdrIndex({ content, adrNumbers }) {
@@ -233,6 +244,14 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
         `plan numbering gap: expected ${String(index + 1).padStart(4, '0')} but found ${String(orderedNumbers[index]).padStart(4, '0')}`,
       )
       break
+    }
+  }
+  if (planNumbers.size > 0) {
+    const planIndexPath = join(rootDirectory, 'docs', 'plans', 'README.md')
+    if (existsSync(planIndexPath)) {
+      issues.push(...validatePlanIndex({ content: readFileSync(planIndexPath, 'utf8'), planNumbers }))
+    } else {
+      issues.push('docs/plans/README.md: missing plan index')
     }
   }
   const adrNumbers = new Set()

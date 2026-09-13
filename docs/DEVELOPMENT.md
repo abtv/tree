@@ -388,6 +388,8 @@ Electron Vite writes production build output to `out/`. This directory is genera
 
 Git discipline — one logical commit per task, commit messages, preserving user changes, immediate follow-up fixes, and session boundaries — is defined in `AGENTS.md` §12.
 
+Commit messages follow the Conventional Commits format defined in `AGENTS.md` §12. Run `npm run changelog` to regenerate `CHANGELOG.md` from that history, and `npm run plan:index` to regenerate `docs/plans/README.md`.
+
 Before committing, review the change with:
 
 ```bash

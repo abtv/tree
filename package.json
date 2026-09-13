@@ -23,6 +23,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:docs": "node scripts/check-docs.mjs",
+    "changelog": "node scripts/changelog.mjs --write",
+    "plan:index": "node scripts/plan-index.mjs --write",
     "audit": "npm audit",
     "test": "vitest run",
     "test:watch": "vitest",
