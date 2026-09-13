@@ -241,11 +241,15 @@ export function largeAttachmentSeed(roots: number, perRoot: number): Seed {
   }
 }
 
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
 export function seedAttachmentFiles(userDataDir: string, ids: string[]): void {
   const directory = join(userDataDir, 'data', 'attachments')
   mkdirSync(directory, { recursive: true })
-  const png = Buffer.from([137, 80, 78, 71])
-  for (const id of ids) writeFileSync(join(directory, `${id}.png`), png)
+  for (const id of ids) writeFileSync(join(directory, `${id}.png`), ONE_PIXEL_PNG)
 }
 
 export function round(value: number): number {

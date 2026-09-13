@@ -1,5 +1,6 @@
 export type NodeId = string
 export type AttachmentId = string
+export type AttachmentSummary = ReadonlyMap<AttachmentId, number>
 
 export const MAX_DOCUMENT_DEPTH = 20
 export const MAX_DOCUMENT_DEPTH_ERROR = 'Nodes cannot be nested deeper than 20 levels.'
@@ -482,6 +483,10 @@ export function attachImage(document: Document, nodeId: NodeId, attachment: Atta
 
 export function collectAttachmentIds(document: Document): Set<AttachmentId> {
   return new Set(attachmentCountsFor(document).keys())
+}
+
+export function attachmentSummary(document: Document): AttachmentSummary {
+  return attachmentCountsFor(document)
 }
 
 function attachmentCountsFor(document: Document): ReadonlyMap<AttachmentId, number> {

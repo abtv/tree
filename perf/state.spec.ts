@@ -97,10 +97,65 @@ test.describe('state and persistence work', () => {
       })}`,
     )
 
-    expect(structuralBurstMs).toBeLessThan(15_000)
-    expect(typingMs).toBeLessThan(10_000)
+    expect(structuralBurstMs).toBeLessThan(2_000)
+    expect(typingMs).toBeLessThan(1_000)
     expect(saveCount).toBeGreaterThan(0)
     expect(saveCount).toBeLessThanOrEqual(Math.ceil(wordCount / 10) + 2)
+    expect(cleanupScanMs).toBeGreaterThan(0)
+    expect(cleanupScanMs).toBeLessThan(1_000)
+  })
+
+  test('large-10000 attachment history through edits and undo/redo', async ({ userDataDir }) => {
+    seedDocument(userDataDir, largeAttachmentSeed(100, 100))
+    seedAttachmentFiles(
+      userDataDir,
+      Array.from({ length: 100 }, (_, index) => `child-image-${index}`),
+    )
+    const { app, window } = await launchTree(userDataDir)
+    await installPersistenceProbes(app)
+    const baseline = await readProbe(app)
+    await window.getByRole('textbox', { name: 'Node 1', exact: true }).focus()
+
+    const historyStart = performance.now()
+    for (let index = 0; index < 100; index += 1) {
+      await window.keyboard.press('Enter')
+    }
+    for (let index = 0; index < 100; index += 1) {
+      await window.keyboard.press('Meta+z')
+    }
+    for (let index = 0; index < 100; index += 1) {
+      await window.keyboard.press('Meta+Shift+z')
+    }
+    const historyMs = performance.now() - historyStart
+
+    await window.keyboard.type('tail words to force a save one two three four five six seven eight nine ten')
+
+    const deadline = Date.now() + 20_000
+    let cleanupScanMs = 0
+    while (Date.now() < deadline) {
+      const probe = await readProbe(app)
+      if (probe.cleanupDurations.length > 0) {
+        cleanupScanMs = Math.max(...probe.cleanupDurations)
+        break
+      }
+      await window.waitForTimeout(50)
+    }
+
+    const probe = await readProbe(app)
+    const saveCount = probe.saves - baseline.saves
+
+    console.log(
+      `PERF ${JSON.stringify({
+        kind: 'state',
+        scenario: 'large-10000-attachment-history',
+        historyMs: round(historyMs),
+        saveCount,
+        cleanupScanMs: round(cleanupScanMs),
+      })}`,
+    )
+
+    expect(saveCount).toBeGreaterThan(0)
+    expect(historyMs).toBeLessThan(5_000)
     expect(cleanupScanMs).toBeGreaterThan(0)
     expect(cleanupScanMs).toBeLessThan(1_000)
   })

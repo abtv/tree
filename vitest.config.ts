@@ -12,6 +12,8 @@ export default defineConfig({
         branches: 83,
         functions: 92,
         lines: 93,
+        'src/domain/document.ts': { branches: 80 },
+        'src/application/editor-store.ts': { branches: 80 },
       },
       include: ['src/**/*.{ts,tsx}'],
       exclude: [

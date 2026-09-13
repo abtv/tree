@@ -1,27 +1,29 @@
 import {
-  collectAttachmentIds,
+  attachmentSummary,
   isValidLocation,
   locateNode,
   type AttachmentId,
+  type AttachmentSummary,
   type Document,
   type Location,
 } from '../domain/document'
 
 export const HISTORY_LIMIT = 200
 
-export type AttachmentIdCollector = (document: Document) => ReadonlySet<AttachmentId>
+export type AttachmentSummaryProvider = (document: Document) => AttachmentSummary
 
 interface HistoryEntry {
   document: Document
-  attachmentIds: ReadonlySet<AttachmentId>
+  summary: AttachmentSummary
 }
 
 export class EditorHistory {
   private readonly past: HistoryEntry[] = []
   private readonly future: HistoryEntry[] = []
   private readonly attachmentCounts = new Map<AttachmentId, number>()
+  private readonly summaryRefCounts = new Map<AttachmentSummary, number>()
 
-  public constructor(private readonly collectIds: AttachmentIdCollector = collectAttachmentIds) {}
+  public constructor(private readonly summarize: AttachmentSummaryProvider = attachmentSummary) {}
 
   public begin(document: Document): boolean {
     this.past.push(this.retain(document))
@@ -59,15 +61,25 @@ export class EditorHistory {
   }
 
   private retain(document: Document): HistoryEntry {
-    const entry: HistoryEntry = { document, attachmentIds: this.collectIds(document) }
-    for (const id of entry.attachmentIds) {
-      this.attachmentCounts.set(id, (this.attachmentCounts.get(id) ?? 0) + 1)
+    const summary = this.summarize(document)
+    const refs = this.summaryRefCounts.get(summary) ?? 0
+    if (refs === 0) {
+      for (const id of summary.keys()) {
+        this.attachmentCounts.set(id, (this.attachmentCounts.get(id) ?? 0) + 1)
+      }
     }
-    return entry
+    this.summaryRefCounts.set(summary, refs + 1)
+    return { document, summary }
   }
 
   private release(entry: HistoryEntry): void {
-    for (const id of entry.attachmentIds) {
+    const refs = (this.summaryRefCounts.get(entry.summary) ?? 0) - 1
+    if (refs > 0) {
+      this.summaryRefCounts.set(entry.summary, refs)
+      return
+    }
+    this.summaryRefCounts.delete(entry.summary)
+    for (const id of entry.summary.keys()) {
       const remaining = (this.attachmentCounts.get(id) ?? 0) - 1
       if (remaining > 0) this.attachmentCounts.set(id, remaining)
       else this.attachmentCounts.delete(id)

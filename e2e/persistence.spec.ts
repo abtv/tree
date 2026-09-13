@@ -161,6 +161,7 @@ test.describe('persistence', () => {
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()
@@ -198,6 +199,7 @@ test.describe('persistence', () => {
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()

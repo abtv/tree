@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assertDocument,
   attachImage,
+  attachmentSummary,
   buildNodeIndex,
   cloneDocument,
   collectAttachmentIds,
@@ -525,5 +526,37 @@ describe('document operations', () => {
 
     const withoutB = deleteNode(withoutA, 'b')
     expect([...collectAttachmentIds(withoutB)]).toEqual([])
+  })
+
+  it('shares one attachment summary across path-copied text edits', () => {
+    const document = attachImage(createInitialDocument('root'), 'root', { id: 'a', mimeType: 'image/png' })
+    const first = attachmentSummary(document)
+    const second = attachmentSummary(editNodeContent(document, 'root', 'changed', []))
+
+    expect(second).toBe(first)
+    expect([...second.keys()]).toEqual(['a'])
+  })
+
+  it('replaces the attachment summary when membership changes', () => {
+    const document = attachImage(createInitialDocument('root'), 'root', { id: 'a', mimeType: 'image/png' })
+    const first = attachmentSummary(document)
+    const edited = editNodeContent(document, 'root', 'changed', [])
+
+    expect(attachmentSummary(edited)).toBe(first)
+    expect(
+      attachmentSummary(insertSiblingAfter(edited, 'root', 'new', '', { id: 'b', mimeType: 'image/png' })),
+    ).not.toBe(first)
+    expect([...attachmentSummary(deleteNode(edited, 'root')).keys()]).toEqual([])
+  })
+
+  it('returns a defensive attachment id copy without exposing the cached summary', () => {
+    const document = attachImage(createInitialDocument('root'), 'root', { id: 'a', mimeType: 'image/png' })
+    const summary = attachmentSummary(document)
+    const collected = collectAttachmentIds(document)
+
+    collected.add('mutated')
+    expect([...summary.keys()]).toEqual(['a'])
+    expect([...collectAttachmentIds(document)]).toEqual(['a'])
+    expect(collected).not.toBe(summary as unknown as Set<string>)
   })
 })

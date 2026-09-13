@@ -2,27 +2,40 @@ import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, typ
 
 const TYPED = 'abcdefghijklmnopqrstuvwxyz'.repeat(4)
 
+interface TypingTarget {
+  label: string
+  initialText: string
+  parentLabel?: string
+}
+
 function summarize(samples: number[]): { median: number; p95: number; max: number } {
   const sorted = [...samples].sort((left, right) => left - right)
   const at = (fraction: number): number => sorted[Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))]!
   return { median: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1]! }
 }
 
-async function measureTyping(userDataDir: string, scenario: string, seed: Seed): Promise<number> {
+async function measureTyping(userDataDir: string, scenario: string, seed: Seed, target: TypingTarget): Promise<number> {
   seedDocument(userDataDir, seed)
   const { window } = await launchTree(userDataDir)
-  await window.getByRole('textbox').first().focus()
+  const expected = window.getByRole('textbox', { name: target.label, exact: true })
+  const parentHeading =
+    target.parentLabel === undefined
+      ? undefined
+      : window.getByRole('textbox', { name: target.parentLabel, exact: true })
+  await expected.focus()
+  await expect(expected).toBeFocused()
+  await expect(expected).toHaveValue(target.initialText)
+  const parentBefore = parentHeading === undefined ? undefined : await parentHeading.inputValue()
 
-  await window.evaluate(() => {
-    const commits: number[] = []
+  await expected.evaluate((element) => {
+    const inputTurnaround: number[] = []
     const paints: number[] = []
-    const store = window as unknown as { commits: number[]; paints: number[] }
-    store.commits = commits
+    const store = window as unknown as { inputTurnaround: number[]; paints: number[] }
+    store.inputTurnaround = inputTurnaround
     store.paints = paints
-    const target = document.activeElement as HTMLElement
-    target.addEventListener('input', (event) => {
+    element.addEventListener('input', (event) => {
       const start = event.timeStamp
-      queueMicrotask(() => commits.push(performance.now() - start))
+      queueMicrotask(() => inputTurnaround.push(performance.now() - start))
       requestAnimationFrame(() => requestAnimationFrame(() => paints.push(performance.now() - start)))
     })
   })
@@ -35,11 +48,16 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
     TYPED.length,
   )
   const measured = await window.evaluate(() => {
-    const store = window as unknown as { commits: number[]; paints: number[] }
-    return { commits: store.commits.slice(), paints: store.paints.slice() }
+    const store = window as unknown as { inputTurnaround: number[]; paints: number[] }
+    return { inputTurnaround: store.inputTurnaround.slice(), paints: store.paints.slice() }
   })
 
-  const commit = summarize(measured.commits)
+  await expect(expected).toHaveValue(new RegExp(TYPED))
+  if (parentHeading !== undefined && parentBefore !== undefined) {
+    await expect(parentHeading).toHaveValue(parentBefore)
+  }
+
+  const turnaround = summarize(measured.inputTurnaround)
   const paint = summarize(measured.paints)
 
   console.log(
@@ -47,8 +65,8 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
       kind: 'typing',
       scenario,
       typingMs: round(typingMs),
-      commitMedianMs: round(commit.median),
-      commitP95Ms: round(commit.p95),
+      inputTurnaroundMedianMs: round(turnaround.median),
+      inputTurnaroundP95Ms: round(turnaround.p95),
       paintMedianMs: round(paint.median),
       paintP95Ms: round(paint.p95),
       paintMaxMs: round(paint.max),
@@ -65,17 +83,28 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
 
 test.describe('typing latency', () => {
   test('wide-1000', async ({ userDataDir }) => {
-    await measureTyping(userDataDir, 'wide-1000', wideSeed(1_000))
+    await measureTyping(userDataDir, 'wide-1000', wideSeed(1_000), {
+      label: 'Node 1',
+      initialText: 'Child 0',
+      parentLabel: 'Current parent',
+    })
   })
 
   test('large-10000', async ({ userDataDir }) => {
-    await measureTyping(userDataDir, 'large-10000', largeSeed(100, 100))
+    await measureTyping(userDataDir, 'large-10000', largeSeed(100, 100), {
+      label: 'Node 1',
+      initialText: 'Root 0',
+    })
   })
 
   test('large-100000', async ({ userDataDir }) => {
     const seed = largeSeed(316, 316)
     seed.location = { currentParentId: 'r315', selectedNodeId: 'r315c315' }
-    const typingMs = await measureTyping(userDataDir, 'large-100000', seed)
+    const typingMs = await measureTyping(userDataDir, 'large-100000', seed, {
+      label: 'Node 316',
+      initialText: 'Node 315.315',
+      parentLabel: 'Current parent',
+    })
     expect(typingMs).toBeLessThan(1_500)
   })
 })
