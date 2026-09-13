@@ -329,6 +329,8 @@ Two unit guards cover disk-write and attachment-read work that the perf suite do
 
 The renderer's retention of attachment references is guarded separately. `editor-history.test.ts` asserts that reading the retained attachment IDs does not re-traverse history snapshots, and the `EditorHistory` property test checks that the maintained reference counts always equal the union of attachment IDs over the retained snapshots.
 
+Renderer attachment-byte reuse is guarded by `attachment-bytes-cache.test.ts`: a second read of the same id is served from the cache, concurrent reads are deduplicated, entries are evicted least-recently-used under a byte budget, a single oversized entry is retained, and missing or failed reads are not cached. `AttachmentPreview.test.tsx` and `App.test.tsx` assert that remounting an image, and opening the preview after the inline image, call `readAttachment` only once.
+
 Save serialization is guarded by reference identity rather than timing. `document.test.ts` asserts that `serializeState` returns the input document without cloning and that `validatePersistedState` returns its input without rebuilding, and `ipc-handlers.test.ts` asserts that the `save` handler forwards the validated reference to `fileServices.save`. The `document.property.test.ts` round-trip property checks the same identity and validation for arbitrary documents.
 
 ---

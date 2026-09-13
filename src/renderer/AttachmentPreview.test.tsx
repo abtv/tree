@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 
@@ -28,6 +29,7 @@ function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
 
 beforeEach(() => {
   mockTreeApi()
+  attachmentByteCache.clear()
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => createdObjectUrl })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined })
 })
@@ -69,6 +71,29 @@ describe('AttachmentImage', () => {
     await Promise.resolve()
 
     expect(screen.queryByRole('button', { name: 'Open image preview' })).not.toBeInTheDocument()
+  })
+
+  it('reads the attachment once across remounts', async () => {
+    const read = vi.fn(async () => attachmentBytes)
+    mockTreeApi({ readAttachment: read })
+    const first = render(<AttachmentImage attachmentId="shared" onOpen={() => undefined} />)
+    await screen.findByRole('button', { name: 'Open image preview' })
+    first.unmount()
+    render(<AttachmentImage attachmentId="shared" onOpen={() => undefined} />)
+    await screen.findByRole('button', { name: 'Open image preview' })
+
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it('reuses the inline bytes when the preview opens', async () => {
+    const read = vi.fn(async () => attachmentBytes)
+    mockTreeApi({ readAttachment: read })
+    render(<AttachmentImage attachmentId="shared" onOpen={() => undefined} />)
+    await screen.findByRole('button', { name: 'Open image preview' })
+    render(<ImagePreview attachmentId="shared" onClose={() => undefined} />)
+    await screen.findByAltText('Attached image preview')
+
+    expect(read).toHaveBeenCalledTimes(1)
   })
 })
 

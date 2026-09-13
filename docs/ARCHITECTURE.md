@@ -402,6 +402,8 @@ Reads, writes, and cleanup operations are ordered through the same infrastructur
 
 Attachment existence checks use filesystem metadata (`stat`) rather than reading file contents, so validating referenced attachments at load time does not scale with attachment size.
 
+The renderer caches attachment bytes returned by the read path in a bounded least-recently-used cache keyed by attachment id. Remounting an image reuses the cached bytes instead of repeating the IPC call and the whole-file read. The cache is process-local renderer state, retains at most a fixed byte budget, and never changes stored bytes; filesystem reads remain in infrastructure.
+
 Moving a node must not require copying its attachment file.
 
 ---

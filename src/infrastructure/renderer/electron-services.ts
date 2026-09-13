@@ -1,4 +1,7 @@
 import type { EditorServices } from '../../application/editor-store'
+import { createAttachmentBytesCache } from './attachment-bytes-cache'
+
+export const ATTACHMENT_BYTES_CACHE_LIMIT = 64 * 1024 * 1024
 
 export function createElectronEditorServices(): EditorServices {
   return {
@@ -15,3 +18,5 @@ export function createElectronEditorServices(): EditorServices {
 export function readAttachment(id: string): Promise<Uint8Array | null> {
   return window.treeApi.readAttachment(id)
 }
+
+export const attachmentByteCache = createAttachmentBytesCache(readAttachment, ATTACHMENT_BYTES_CACHE_LIMIT)

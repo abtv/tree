@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { readAttachment } from '../infrastructure/renderer/electron-services'
+import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
 
 export function AttachmentImage({
   attachmentId,
@@ -12,7 +12,8 @@ export function AttachmentImage({
   useEffect(() => {
     let disposed = false
     let objectUrl: string | undefined
-    void readAttachment(attachmentId)
+    void attachmentByteCache
+      .get(attachmentId)
       .then((bytes) => {
         if (disposed || bytes === null) return
         objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
@@ -57,7 +58,8 @@ export function ImagePreview({
   useEffect(() => {
     let disposed = false
     let objectUrl: string | undefined
-    void readAttachment(attachmentId)
+    void attachmentByteCache
+      .get(attachmentId)
       .then((bytes) => {
         if (disposed || bytes === null) return
         objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))

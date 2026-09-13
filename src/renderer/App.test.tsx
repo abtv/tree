@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
+import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { App } from './App'
 
@@ -11,6 +12,7 @@ afterEach(cleanup)
 const attachmentBytes = new Uint8Array([137, 80, 78, 71])
 
 beforeEach(() => {
+  attachmentByteCache.clear()
   window.treeApi = {
     quit: async () => undefined,
     onQuitRequested: () => () => undefined,
@@ -147,6 +149,25 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close image preview' }))
     expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
+  })
+
+  it('reuses cached attachment bytes when the preview opens after the inline image', async () => {
+    const readAttachment = vi.fn(async () => attachmentBytes)
+    window.treeApi.readAttachment = readAttachment
+    const store = createStore({ kind: 'image', png: attachmentBytes })
+    await act(async () => {
+      await store.initialize()
+    })
+    await act(async () => {
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+    const node = screen.getByRole('textbox', { name: 'Node 1' })
+    await screen.findByRole('button', { name: 'Open image preview' })
+    fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
+    await screen.findByAltText('Attached image preview')
+
+    expect(readAttachment).toHaveBeenCalledTimes(1)
   })
 
   it('opens the image preview from the current parent with Cmd+Enter', async () => {

@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClipboardPayload, TreeApi } from '../../shared/ipc'
-import { createElectronEditorServices, readAttachment } from './electron-services'
+import { attachmentByteCache, createElectronEditorServices, readAttachment } from './electron-services'
 
 describe('renderer Electron services', () => {
   const api: TreeApi = {
@@ -21,6 +21,7 @@ describe('renderer Electron services', () => {
 
   beforeEach(() => {
     window.treeApi = api
+    attachmentByteCache.clear()
     vi.clearAllMocks()
   })
 
@@ -73,5 +74,25 @@ describe('renderer Electron services', () => {
 
     await expect(createElectronEditorServices().writeClipboard?.({ text: '', html: '' })).resolves.toBeUndefined()
     expect(writeClipboard).not.toHaveBeenCalled()
+  })
+
+  it('caches attachment reads for repeated access', async () => {
+    api.readAttachment = vi.fn(async () => new Uint8Array([1, 2, 3]))
+    window.treeApi = api
+
+    await expect(attachmentByteCache.get('attachment-1')).resolves.toEqual(new Uint8Array([1, 2, 3]))
+    await expect(attachmentByteCache.get('attachment-1')).resolves.toEqual(new Uint8Array([1, 2, 3]))
+
+    expect(api.readAttachment).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps cached attachment read failures as rejected promises', async () => {
+    const failure = new Error('renderer bridge failed')
+    api.readAttachment = vi.fn(async () => {
+      throw failure
+    })
+    window.treeApi = api
+
+    await expect(attachmentByteCache.get('attachment-1')).rejects.toBe(failure)
   })
 })
