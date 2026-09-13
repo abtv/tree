@@ -339,6 +339,8 @@ Domain commands are guarded against falling back to full-document copies. `docum
 
 Attachment-id collection is guarded against rescanning the live document. `document.test.ts` asserts that collecting a path-copied result does not read an unrelated subtree and that an attachment id is removed only when its last referencing node is deleted, including duplicate references. The `document.property.test.ts` property "reports exactly the referenced attachment ids after any operation" compares the propagated per-document counts against a full traversal after every operation, which catches an incorrect increment or decrement.
 
+External hyperlink opening is guarded end-to-end. `e2e/hyperlink.spec.ts` pastes a URL, replaces the main-process `shell.openExternal` with a spy, clicks the rendered link, and asserts that the URL reaches the shell while the application window does not navigate. This covers the click-to-shell boundary that the unit-level URL validation test cannot.
+
 ---
 
 ## 13. Persistence Testing
