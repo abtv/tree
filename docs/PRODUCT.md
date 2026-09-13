@@ -95,6 +95,21 @@ When navigation moves to an ancestor through the location path, the direct child
 
 The location toolbar is confined to a single line. When space is limited, shorter segments are preserved and longer segments are truncated first. A truncated segment ends with an ellipsis; its full text remains available as a tooltip. The toolbar never causes the window to scroll horizontally, regardless of path depth or segment length.
 
+### 2.3 Maximum Depth
+
+Node depth is counted from the top-level root nodes. A top-level root node is at level 1, its children are at level 2, and so on.
+
+The maximum node depth is 20 levels. A node at level 20 may be entered, selected, and edited normally, but it cannot have children.
+
+If an action would create a node below level 20:
+
+* do not change the document, selection, focus, undo/redo history, or persisted state;
+* display `Nodes cannot be nested deeper than 20 levels.` as an operation error.
+
+Sibling creation, multiline paste, image paste, editing, and reordering remain available at level 20 because they do not increase node depth.
+
+A persisted document containing a node below level 20 is invalid. Loading such a document must fail safely, display the document-error state, and leave the persisted data unchanged.
+
 ---
 
 ## 3. Initial State
