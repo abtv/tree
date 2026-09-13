@@ -346,9 +346,20 @@ Conceptually:
 
 ```json id="x4p9mt"
 {
-  "version": 1,
-  "tree": {},
-  "uiState": {}
+  "version": 2,
+  "document": {
+    "roots": [
+      {
+        "id": "root-id",
+        "text": "Root text",
+        "children": []
+      }
+    ]
+  },
+  "location": {
+    "currentParentId": null,
+    "selectedNodeId": "root-id"
+  }
 }
 ```
 
