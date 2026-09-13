@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
 import { registerIpcHandlers } from './ipc-handlers'
+import { bootstrapApplication } from './bootstrap'
 import {
   configureSingleInstance,
   isAllowedExternalUrl,
@@ -11,27 +12,9 @@ import {
   reportMainProcessError,
   surfaceWindow,
 } from './window'
-import { QuitHandshake } from './quit-handshake'
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
-const hasSingleInstanceLock = configureSingleInstance(app, () => surfaceWindow(mainWindow))
-const quitHandshake = new QuitHandshake(
-  (requestId) => mainWindow?.webContents.send('tree:quit-requested', requestId),
-  () => mainWindow?.webContents.send('tree:quit-failed', 'The application could not finish saving before quit.'),
-  () => app.quit(),
-)
-
-app.on('before-quit', (event) => {
-  if (!appQuitting && mainWindow !== null && !mainWindow.isDestroyed()) {
-    event.preventDefault()
-    quitHandshake.request()
-    return
-  }
-  appQuitting = true
-  mainWindow = null
-  globalShortcut.unregister('CommandOrControl+0')
-})
 
 const nativeClipboard: NativeClipboard = {
   read: () => clipboard.read(),
@@ -50,7 +33,6 @@ const nativeClipboard: NativeClipboard = {
 
 function createMainWindow(): void {
   if (appQuitting) return
-
   const window = new BrowserWindow({
     width: 1000,
     height: 700,
@@ -64,16 +46,12 @@ function createMainWindow(): void {
       sandbox: true,
     },
   })
-
   mainWindow = window
-
   const rendererUrl =
     process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
-
   window.webContents.on('will-navigate', (event, url) => {
     if (!isAllowedRendererUrl(url, rendererUrl)) event.preventDefault()
   })
-
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) {
       void shell
@@ -82,40 +60,37 @@ function createMainWindow(): void {
     }
     return { action: 'deny' }
   })
-
   window.on('close', () => {
     if (mainWindow === window) mainWindow = null
   })
-
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
   })
-
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    void window.loadURL(rendererUrl).catch((error: unknown) => {
-      reportMainProcessError('Could not load the renderer', error)
-      appQuitting = true
-      app.quit()
-    })
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html')).catch((error: unknown) => {
-      reportMainProcessError('Could not load the renderer', error)
-      appQuitting = true
-      app.quit()
-    })
-  }
+  const load = process.env['ELECTRON_RENDERER_URL']
+    ? window.loadURL(rendererUrl)
+    : window.loadFile(join(__dirname, '../renderer/index.html'))
+  void load.catch((error: unknown) => {
+    reportMainProcessError('Could not load the renderer', error)
+    appQuitting = true
+    app.quit()
+  })
 }
 
-void app
-  .whenReady()
-  .then(() => {
-    if (!hasSingleInstanceLock) {
-      app.exit(0)
-      return
-    }
-    const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
+const hasSingleInstanceLock = configureSingleInstance(app, () => surfaceWindow(mainWindow))
+
+bootstrapApplication({
+  app,
+  hasSingleInstanceLock,
+  getMainWindow: () => mainWindow,
+  setMainWindow: (window) => {
+    mainWindow = window as BrowserWindow | null
+  },
+  createMainWindow,
+  getWindowCount: () => BrowserWindow.getAllWindows().length,
+  registerReadyServices: (quitHandshake, onQuitConfirmed) => {
     const rendererUrl =
       process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+    const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
     registerIpcHandlers({
       ipcMain,
       rendererUrl,
@@ -124,41 +99,25 @@ void app
       quitHandshake,
       onQuitConfirmed: () => {
         appQuitting = true
+        onQuitConfirmed()
       },
     })
-    if (!globalShortcut.register('CommandOrControl+0', () => surfaceWindow(mainWindow))) {
-      reportMainProcessError('Could not register the Cmd+0 shortcut', new Error('The accelerator is unavailable.'))
-    }
+  },
+  registerShortcut: (surface) => globalShortcut.register('CommandOrControl+0', surface),
+  surfaceWindow: () => surfaceWindow(mainWindow),
+  setApplicationMenu: (requestQuit) =>
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
         {
           label: 'Tree',
-          submenu: [
-            {
-              label: 'Quit Tree',
-              accelerator: 'CommandOrControl+Q',
-              click: () => quitHandshake.request(),
-            },
-          ],
+          submenu: [{ label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: requestQuit }],
         },
       ]),
-    )
-    createMainWindow()
-
-    app.on('activate', () => {
-      if (!appQuitting && BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow()
-      }
-    })
-  })
-  .catch((error: unknown) => {
+    ),
+  unregisterShortcut: () => globalShortcut.unregister('CommandOrControl+0'),
+  onStartupError: (error) => {
     reportMainProcessError('Could not start the application', error)
     appQuitting = true
     app.quit()
-  })
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  },
 })
