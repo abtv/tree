@@ -4,8 +4,14 @@ This changelog is generated from Conventional Commit history. Regenerate it with
 
 ## Unreleased
 
+### Changed
+
+- centralize product messages and tighten TypeScript (`c23e13d`)
+
 ### Documentation
 
+- add a security policy with a verification map (`a061479`)
+- add commit conventions, changelog, and plan index (`5801357`)
 - add session bootstrap and layer-specific agent instructions (`a8227fa`)
 - index ADRs and enforce their status (`d31d8c6`)
 - reference the product depth limit instead of restating it (`7fda611`)
@@ -16,4 +22,5 @@ This changelog is generated from Conventional Commit history. Regenerate it with
 
 ### Chores
 
+- add an environment readiness doctor (`4cc6deb`)
 - add machine-checkable documentation governance (`f1e2317`)
