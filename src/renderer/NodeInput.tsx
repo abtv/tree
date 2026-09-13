@@ -2,10 +2,7 @@ import type { ChangeEvent, ClipboardEvent, FocusEvent, FormEvent, KeyboardEvent,
 import type { TreeNode } from '../domain/document'
 import { richTextHtml } from './editor-dom'
 
-interface NodeInputProps {
-  node: TreeNode
-  label: string
-  parent?: boolean
+export interface NodeInputBindings {
   selectedAll: boolean
   inputRef: (input: HTMLElement | null) => void
   onBlur: () => void
@@ -20,6 +17,12 @@ interface NodeInputProps {
   onMouseDown: () => void
   onPaste: (event: ClipboardEvent<HTMLElement>) => void
   onSelect: (event: SyntheticEvent<HTMLElement>) => void
+}
+
+interface NodeInputProps extends NodeInputBindings {
+  node: TreeNode
+  label: string
+  parent?: boolean
 }
 
 export function NodeInput({
