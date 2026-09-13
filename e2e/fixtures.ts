@@ -77,9 +77,8 @@ export async function clickApplicationMenuQuit(app: ElectronApplication): Promis
 }
 
 export async function delaySaveIpc(app: ElectronApplication, milliseconds: number): Promise<void> {
-  await app.evaluate(({ ipcMain }, delay) => {
-    ipcMain.removeHandler('tree:save')
-    ipcMain.handle('tree:save', () => new Promise<void>((resolve) => globalThis.setTimeout(resolve, delay)))
+  await app.evaluate(({}, delay) => {
+    globalThis.__treeIpc.wrap('tree:save', () => new Promise<void>((resolve) => globalThis.setTimeout(resolve, delay)))
   }, milliseconds)
 }
 
@@ -140,7 +139,7 @@ export async function launchTree(userDataDir: string, options: { expectReady?: b
   let app: ElectronApplication
   try {
     app = await electron.launch({
-      args: [`--user-data-dir=${userDataDir}`, '.'],
+      args: [`--user-data-dir=${userDataDir}`, join(process.cwd(), 'e2e', 'electron-entry.cjs')],
       cwd: process.cwd(),
     })
   } catch (error) {

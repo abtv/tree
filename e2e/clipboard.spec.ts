@@ -20,17 +20,12 @@ import {
 // Wrap the registered handler so a delayed write still exercises the real
 // validation and native clipboard path. Injection is confined to the owned test app.
 async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ ipcMain }) => {
-    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-      ._invokeHandlers
-    const original = handlers.get('tree:write-clipboard')
-    if (original === undefined) throw new Error('Clipboard write handler is unavailable.')
+  await app.evaluate(() => {
     const control = globalThis as typeof globalThis & { clipboardStarted?: boolean; releaseClipboard?: () => void }
     const gate = new Promise<void>((resolve) => {
       control.releaseClipboard = resolve
     })
-    ipcMain.removeHandler('tree:write-clipboard')
-    ipcMain.handle('tree:write-clipboard', async (...args) => {
+    globalThis.__treeIpc.wrap('tree:write-clipboard', async (original, ...args) => {
       control.clipboardStarted = true
       await gate
       return original(...args)

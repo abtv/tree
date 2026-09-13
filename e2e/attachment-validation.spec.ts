@@ -58,12 +58,8 @@ test.describe('attachment validation and image failures', () => {
 
   test('reports a read failure without disabling the editor', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
-    await app.evaluate(({ ipcMain }) => {
-      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-        ._invokeHandlers
-      if (!handlers.has('tree:read-attachment')) throw new Error('Read handler is unavailable.')
-      ipcMain.removeHandler('tree:read-attachment')
-      ipcMain.handle('tree:read-attachment', () => {
+    await app.evaluate(() => {
+      globalThis.__treeIpc.wrap('tree:read-attachment', () => {
         throw new Error('read blocked')
       })
     })

@@ -56,7 +56,7 @@ export async function launchTree(userDataDir: string): Promise<Launched> {
   let app: ElectronApplication
   try {
     app = await electron.launch({
-      args: [`--user-data-dir=${userDataDir}`, '.'],
+      args: [`--user-data-dir=${userDataDir}`, join(process.cwd(), 'e2e', 'electron-entry.cjs')],
       cwd: process.cwd(),
     })
   } catch (error) {

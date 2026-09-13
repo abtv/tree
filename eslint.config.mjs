@@ -34,7 +34,7 @@ export default tseslint.config(
       'playwright.config.ts',
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts}',
-      'e2e/**/*.ts',
+      'e2e/**/*.{ts,cjs}',
       'perf/**/*.ts',
       'src/main/**/*.ts',
       'src/preload/**/*.ts',
@@ -42,6 +42,12 @@ export default tseslint.config(
     ],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    files: ['e2e/**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
   {

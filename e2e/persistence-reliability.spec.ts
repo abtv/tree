@@ -20,17 +20,12 @@ import {
 // Wrap the registered handler so a delayed success still exercises the real
 // validation and filesystem path. Injection is confined to the owned test app.
 async function holdAttachmentWrite(app: ElectronApplication, rejectFirst = false): Promise<void> {
-  await app.evaluate(({ ipcMain }, fail) => {
-    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-      ._invokeHandlers
-    const original = handlers.get('tree:write-attachment')
-    if (original === undefined) throw new Error('Attachment handler is unavailable.')
+  await app.evaluate(({}, fail) => {
     const control = globalThis as typeof globalThis & { attachmentStarted?: boolean; releaseAttachment?: () => void }
     const gate = new Promise<void>((resolve) => {
       control.releaseAttachment = resolve
     })
-    ipcMain.removeHandler('tree:write-attachment')
-    ipcMain.handle('tree:write-attachment', async (...args) => {
+    globalThis.__treeIpc.wrap('tree:write-attachment', async (original, ...args) => {
       control.attachmentStarted = true
       await gate
       if (fail) {
@@ -125,29 +120,24 @@ test.describe('persistence reliability regressions', () => {
     allowRendererError(/^Operation failed: Error invoking remote method 'tree:save': Error: save blocked$/)
     allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
     await app.evaluate(({ ipcMain }) => {
-      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-        ._invokeHandlers
-      const save = handlers.get('tree:save')
-      if (save === undefined) throw new Error('Save handler is unavailable.')
       const control = globalThis as typeof globalThis & { restoreSave?: () => void; cleanupCount?: number }
+      const save = globalThis.__treeIpc.get('tree:save')
+      if (save === undefined) throw new Error('Save handler is unavailable.')
       control.restoreSave = () => {
         ipcMain.removeHandler('tree:save')
         ipcMain.handle('tree:save', save)
       }
-      const cleanup = handlers.get('tree:cleanup-attachments')
+      const cleanup = globalThis.__treeIpc.get('tree:cleanup-attachments')
       if (cleanup === undefined) throw new Error('Cleanup handler is unavailable.')
-      ipcMain.removeHandler('tree:cleanup-attachments')
-      ipcMain.handle('tree:cleanup-attachments', async (...args) => {
-        const result = await cleanup(...args)
+      globalThis.__treeIpc.wrap('tree:cleanup-attachments', async (original, ...args) => {
+        const result = await original(...args)
         control.cleanupCount = (control.cleanupCount ?? 0) + 1
         return result
       })
-      ipcMain.removeHandler('tree:save')
-      ipcMain.handle('tree:save', () => {
+      globalThis.__treeIpc.wrap('tree:save', () => {
         throw new Error('save blocked')
       })
-      ipcMain.removeHandler('tree:write-attachment')
-      ipcMain.handle('tree:write-attachment', () => {
+      globalThis.__treeIpc.wrap('tree:write-attachment', () => {
         throw new Error('image blocked')
       })
     })
@@ -258,11 +248,7 @@ test.describe('persistence reliability regressions', () => {
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
     allowRendererError(/^Changes could not be saved: .*second save failed$/)
 
-    await app.evaluate(({ ipcMain }) => {
-      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-        ._invokeHandlers
-      const original = handlers.get('tree:save')
-      if (original === undefined) throw new Error('Save handler is unavailable.')
+    await app.evaluate(() => {
       const control = globalThis as typeof globalThis & {
         saveCalls?: number
         firstSaveStarted?: boolean
@@ -272,8 +258,7 @@ test.describe('persistence reliability regressions', () => {
       const gate = new Promise<void>((resolve) => {
         control.releaseFirstSave = resolve
       })
-      ipcMain.removeHandler('tree:save')
-      ipcMain.handle('tree:save', async (...args) => {
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
         control.saveCalls = (control.saveCalls ?? 0) + 1
         if (control.saveCalls === 1) {
           control.firstSaveStarted = true

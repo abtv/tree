@@ -16,30 +16,22 @@ interface SaveControl {
 }
 
 async function installPersistenceProbes(app: Awaited<ReturnType<typeof launchTree>>['app']): Promise<void> {
-  await app.evaluate(({ ipcMain }) => {
-    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-      ._invokeHandlers
+  await app.evaluate(() => {
     const control = globalThis as typeof globalThis & {
       __saveProbe?: { saves: number; cleanupDurations: number[] }
     }
     control.__saveProbe = { saves: 0, cleanupDurations: [] }
 
-    const save = handlers.get('tree:save')
-    if (save === undefined) throw new Error('Save handler is unavailable.')
-    ipcMain.removeHandler('tree:save')
-    ipcMain.handle('tree:save', async (...args) => {
-      const result = await save(...args)
+    globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+      const result = await original(...args)
       control.__saveProbe!.saves += 1
       return result
     })
 
-    const cleanup = handlers.get('tree:cleanup-attachments')
-    if (cleanup === undefined) throw new Error('Cleanup handler is unavailable.')
-    ipcMain.removeHandler('tree:cleanup-attachments')
-    ipcMain.handle('tree:cleanup-attachments', async (...args) => {
+    globalThis.__treeIpc.wrap('tree:cleanup-attachments', async (original, ...args) => {
       const start = performance.now()
       try {
-        return await cleanup(...args)
+        return await original(...args)
       } finally {
         control.__saveProbe!.cleanupDurations.push(performance.now() - start)
       }
@@ -172,15 +164,10 @@ test.describe('state and persistence work', () => {
 
   test('image insertion decode latency for small and larger images', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
-    await app.evaluate(({ ipcMain }) => {
-      const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })
-        ._invokeHandlers
-      const original = handlers.get('tree:write-attachment')
-      if (original === undefined) throw new Error('Attachment handler is unavailable.')
+    await app.evaluate(() => {
       const control = globalThis as typeof globalThis & { __decodeProbe?: number[] }
       control.__decodeProbe = []
-      ipcMain.removeHandler('tree:write-attachment')
-      ipcMain.handle('tree:write-attachment', async (...args) => {
+      globalThis.__treeIpc.wrap('tree:write-attachment', async (original, ...args) => {
         const start = performance.now()
         try {
           return await original(...args)
