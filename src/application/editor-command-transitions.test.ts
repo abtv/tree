@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { Document } from '../domain/document'
 import {
   ancestorNavigationTransition,
+  createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deleteSelectedTransition,
   enterTransition,
   leaveTransition,
   moveHorizontalTransition,
+  moveNodeTransition,
   moveSelectionTransition,
 } from './editor-command-transitions'
 
@@ -108,6 +110,57 @@ describe('editor command transitions', () => {
         { roots: [{ id: 'root', text: '', children: [] }] },
         { currentParentId: null, selectedNodeId: 'root' },
       ),
+    ).toBeUndefined()
+  })
+
+  it('creates siblings before or through splits, and creates a first child from the current parent', () => {
+    const before = createSiblingOrFirstChildTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      0,
+      () => 'before',
+    )
+    expect(before.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
+      ['before', ''],
+      ['first', 'First'],
+      ['second', 'Second'],
+    ])
+    expect(before.location).toEqual({ currentParentId: 'root', selectedNodeId: 'before' })
+    expect(before.focus).toEqual({ nodeId: 'before', cursor: 0 })
+
+    const split = createSiblingOrFirstChildTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      2,
+      () => 'split',
+    )
+    expect(split.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
+      ['first', 'Fi'],
+      ['split', 'rst'],
+      ['second', 'Second'],
+    ])
+    expect(split.location).toEqual({ currentParentId: 'root', selectedNodeId: 'split' })
+
+    const child = createSiblingOrFirstChildTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'root' },
+      0,
+      () => 'child',
+    )
+    expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'first', 'second'])
+    expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
+  })
+
+  it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {
+    const moved = moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 2)
+    expect(moved?.document.roots[0]!.children.map((node) => node.id)).toEqual(['second', 'first'])
+    expect(moved?.location).toEqual({ currentParentId: 'root', selectedNodeId: 'first' })
+    expect(moved?.focus).toEqual({ nodeId: 'first', cursor: 0 })
+    expect(
+      moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'root', 0),
+    ).toBeUndefined()
+    expect(
+      moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 1),
     ).toBeUndefined()
   })
 })

@@ -1,17 +1,12 @@
 import {
   collectAttachmentIds,
-  createFirstChild,
   createInitialDocument,
   deleteLink,
-  displayedNodes,
   editNodeContent,
-  insertSiblingBefore,
   isValidLocation,
-  moveSibling,
   parsePersistedState,
   removeTextRange,
   requireNode,
-  splitNode,
   type AttachmentId,
   type AttachmentReference,
   type Document,
@@ -26,11 +21,13 @@ import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition
 import { EditorHistory } from './editor-history'
 import {
   ancestorNavigationTransition,
+  createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deleteSelectedTransition,
   enterTransition,
   leaveTransition,
   moveHorizontalTransition,
+  moveNodeTransition,
   moveSelectionTransition,
 } from './editor-command-transitions'
 import { PersistenceCoordinator } from './persistence-coordinator'
@@ -309,20 +306,12 @@ export class EditorStore {
   public createSiblingOrFirstChild(cursor: number): void {
     const state = this.ready()
     this.endTextSession()
-    if (state.location.currentParentId === state.location.selectedNodeId) {
-      const id = this.createId()
-      const document = createFirstChild(state.document, state.location.selectedNodeId, id)
-      this.applyStructural(document, { ...state.location, selectedNodeId: id }, this.newFocus(id, 0))
-      return
-    }
-
-    const id = this.createId()
-    const selected = requireNode(state.document, state.location.selectedNodeId).node
-    const document =
-      cursor === 0 && selected.text !== ''
-        ? insertSiblingBefore(state.document, state.location.selectedNodeId, id)
-        : splitNode(state.document, state.location.selectedNodeId, cursor, id)
-    this.applyStructural(document, { ...state.location, selectedNodeId: id }, this.newFocus(id, 0))
+    const transition = createSiblingOrFirstChildTransition(state.document, state.location, cursor, this.createId)
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
   }
 
   public deleteSelected(): void {
@@ -355,20 +344,13 @@ export class EditorStore {
 
   public moveNodeTo(nodeId: NodeId, insertionIndex: number): void {
     const state = this.ready()
-    const nodes = displayedNodes(state.document, state.location.currentParentId)
-    const sourceIndex = nodes.findIndex((node) => node.id === nodeId)
-    if (sourceIndex < 0) {
-      return
-    }
-    const destination = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
-    if (destination === sourceIndex) {
-      return
-    }
+    const transition = moveNodeTransition(state.document, state.location, nodeId, insertionIndex)
+    if (transition === undefined) return
     this.endTextSession()
     this.applyStructural(
-      moveSibling(state.document, nodeId, destination),
-      { ...state.location, selectedNodeId: nodeId },
-      this.newFocus(nodeId, 0),
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
   }
 

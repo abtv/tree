@@ -1,9 +1,13 @@
 import {
+  createFirstChild,
   deleteNode,
   displayedNodes,
   ensureRoot,
+  insertSiblingBefore,
+  moveSibling,
   nodePath,
   requireNode,
+  splitNode,
   type Document,
   type Location,
   type NodeId,
@@ -21,6 +25,51 @@ export interface LocationTransition {
 
 export interface StructuralTransition extends LocationTransition {
   document: Document
+}
+
+export function createSiblingOrFirstChildTransition(
+  document: Document,
+  location: Location,
+  cursor: number,
+  createId: () => NodeId,
+): StructuralTransition {
+  const id = createId()
+  if (location.currentParentId === location.selectedNodeId) {
+    return {
+      document: createFirstChild(document, location.selectedNodeId, id),
+      location: { ...location, selectedNodeId: id },
+      focus: { nodeId: id, cursor: 0 },
+    }
+  }
+
+  const selected = requireNode(document, location.selectedNodeId).node
+  const nextDocument =
+    cursor === 0 && selected.text !== ''
+      ? insertSiblingBefore(document, location.selectedNodeId, id)
+      : splitNode(document, location.selectedNodeId, cursor, id)
+  return {
+    document: nextDocument,
+    location: { ...location, selectedNodeId: id },
+    focus: { nodeId: id, cursor: 0 },
+  }
+}
+
+export function moveNodeTransition(
+  document: Document,
+  location: Location,
+  nodeId: NodeId,
+  insertionIndex: number,
+): StructuralTransition | undefined {
+  const nodes = displayedNodes(document, location.currentParentId)
+  const sourceIndex = nodes.findIndex((node) => node.id === nodeId)
+  if (sourceIndex < 0) return undefined
+  const destination = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
+  if (destination === sourceIndex) return undefined
+  return {
+    document: moveSibling(document, nodeId, destination),
+    location: { ...location, selectedNodeId: nodeId },
+    focus: { nodeId, cursor: 0 },
+  }
 }
 
 export function moveSelectionTransition(
