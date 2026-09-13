@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { createWindowBoundsStore, isValidWindowBounds, type WindowBounds } from './window-state'
+import {
+  createDebouncedWindowBoundsSaver,
+  createWindowBoundsStore,
+  isValidWindowBounds,
+  type WindowBounds,
+} from './window-state'
 
 function createPath(): string {
   return join(mkdtempSync(join(tmpdir(), 'tree-window-state-')), 'data', 'window-bounds.json')
@@ -43,5 +48,53 @@ describe('createWindowBoundsStore', () => {
     expect(store.load()).toBeNull()
     writeFileSync(path, JSON.stringify({ ...bounds, height: 100 }))
     expect(store.load()).toBeNull()
+  })
+})
+
+describe('createDebouncedWindowBoundsSaver', () => {
+  it('coalesces rapid saves into one write and keeps the latest bounds', () => {
+    vi.useFakeTimers()
+    try {
+      const saved: WindowBounds[] = []
+      const saver = createDebouncedWindowBoundsSaver({ load: () => null, save: (value) => saved.push(value) }, 300)
+
+      saver.save({ ...bounds, x: 1 })
+      saver.save({ ...bounds, x: 2 })
+      saver.save({ ...bounds, x: 3 })
+
+      expect(saved).toEqual([])
+      vi.advanceTimersByTime(299)
+      expect(saved).toEqual([])
+      vi.advanceTimersByTime(1)
+      expect(saved).toEqual([{ ...bounds, x: 3 }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('flushes pending bounds immediately and cancels the pending timer', () => {
+    vi.useFakeTimers()
+    try {
+      const saved: WindowBounds[] = []
+      const saver = createDebouncedWindowBoundsSaver({ load: () => null, save: (value) => saved.push(value) }, 300)
+
+      saver.save({ ...bounds, y: 7 })
+      saver.flush()
+
+      expect(saved).toEqual([{ ...bounds, y: 7 }])
+      vi.advanceTimersByTime(300)
+      expect(saved).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does nothing when flushed with no pending bounds', () => {
+    const saved: WindowBounds[] = []
+    const saver = createDebouncedWindowBoundsSaver({ load: () => null, save: (value) => saved.push(value) })
+
+    saver.flush()
+
+    expect(saved).toEqual([])
   })
 })

@@ -3,7 +3,11 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
-import { createWindowBoundsStore, type WindowBounds } from '../infrastructure/main/window-state'
+import {
+  createDebouncedWindowBoundsSaver,
+  createWindowBoundsStore,
+  type WindowBounds,
+} from '../infrastructure/main/window-state'
 import { registerIpcHandlers } from './ipc-handlers'
 import { bootstrapApplication } from './bootstrap'
 import {
@@ -36,6 +40,7 @@ function createMainWindow(): void {
   if (appQuitting) return
   const windowBoundsStore = createWindowBoundsStore(join(app.getPath('userData'), 'data', 'window-bounds.json'))
   const savedBounds = windowBoundsStore.load()
+  const windowBounds = createDebouncedWindowBoundsSaver(windowBoundsStore)
   const window = new BrowserWindow({
     ...(savedBounds ?? { width: 1000, height: 700 }),
     minWidth: 640,
@@ -52,7 +57,7 @@ function createMainWindow(): void {
   const saveWindowBounds = (): void => {
     const { x, y, width, height } = window.getBounds()
     const bounds: WindowBounds = { x, y, width, height }
-    windowBoundsStore.save(bounds)
+    windowBounds.save(bounds)
   }
   window.on('move', saveWindowBounds)
   window.on('resize', saveWindowBounds)
@@ -71,6 +76,7 @@ function createMainWindow(): void {
   })
   window.on('close', () => {
     saveWindowBounds()
+    windowBounds.flush()
   })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null

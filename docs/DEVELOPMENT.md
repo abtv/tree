@@ -325,6 +325,8 @@ They measure startup and typing latency at several document scales and print one
 
 The state/persistence scenario in `perf/state.spec.ts` seeds a 10,000-node document and performs a fixed structural-edit burst, a typed-word burst, and a reference-changing delete. It prints the structural burst wall clock, typing wall clock, save count, and attachment cleanup scan duration, and enforces ceilings on each. The save count confirms the automatic save policy triggers on inserted-word volume rather than per keystroke. The cleanup scan duration guards the reference-changing path against unbounded history or document scanning.
 
+Two unit guards cover disk-write and attachment-read work that the perf suite does not sample. `window-state.test.ts` uses fake timers to assert that rapid window-geometry changes coalesce into one write, that the latest bounds win, and that closing flushes the pending geometry. `file-services.test.ts` asserts that attachment existence checks use filesystem metadata and do not read attachment contents.
+
 ---
 
 ## 13. Persistence Testing

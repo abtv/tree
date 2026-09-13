@@ -302,6 +302,14 @@ export function readWindowBounds(userDataDir: string): PersistedWindowBounds {
   return JSON.parse(readFileSync(windowBoundsPath(userDataDir), 'utf8')) as PersistedWindowBounds
 }
 
+export function tryReadWindowBounds(userDataDir: string): PersistedWindowBounds | null {
+  try {
+    return readWindowBounds(userDataDir)
+  } catch {
+    return null
+  }
+}
+
 export function seedDocument(userDataDir: string, seed: { document: unknown; location: unknown }): void {
   const directory = join(userDataDir, 'data')
   mkdirSync(directory, { recursive: true })

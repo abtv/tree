@@ -396,6 +396,8 @@ Attachment storage is responsible for:
 
 Reads, writes, and cleanup operations are ordered through the same infrastructure queue. Cleanup is therefore idempotent with respect to overlapping application requests rather than relying on concurrent unlink calls to succeed.
 
+Attachment existence checks use filesystem metadata (`stat`) rather than reading file contents, so validating referenced attachments at load time does not scale with attachment size.
+
 Moving a node must not require copying its attachment file.
 
 ---
@@ -437,6 +439,8 @@ Electron is responsible for desktop functionality such as:
 * access to desktop APIs.
 
 The domain must not import Electron APIs.
+
+Window geometry is persisted with a short debounce, so moving or resizing the window does not perform a synchronous disk write for every event. The pending geometry is flushed when the window closes.
 
 ---
 

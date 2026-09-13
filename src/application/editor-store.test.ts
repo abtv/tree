@@ -771,6 +771,31 @@ describe('EditorStore', () => {
     expect(services.saves).toEqual([])
   })
 
+  it('checks every attachment and reports the first missing one in traversal order', async () => {
+    const services = createServices()
+    services.load = async () => ({
+      version: 1,
+      document: {
+        roots: [
+          { id: 'first-node', text: '', attachment: { id: 'first', mimeType: 'image/png' }, children: [] },
+          { id: 'second-node', text: '', attachment: { id: 'second', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first-node' },
+    })
+    const checked: string[] = []
+    services.hasAttachment = async (id) => {
+      checked.push(id)
+      return false
+    }
+    const store = new EditorStore(services, ids('unused'))
+
+    await store.initialize()
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'error', message: expect.stringContaining('second') })
+    expect(checked).toEqual(['second', 'first'])
+  })
+
   it('returns to the parent level when a second image is pasted into the current parent', async () => {
     const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
     services.load = async () => ({

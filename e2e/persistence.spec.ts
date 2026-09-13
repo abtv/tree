@@ -7,9 +7,9 @@ import {
   node,
   parent,
   readPersisted,
-  readWindowBounds,
   seedDocument,
   test,
+  tryReadWindowBounds,
   typeInto,
   writeClipboardImage,
   writeClipboardText,
@@ -91,7 +91,7 @@ test.describe('persistence', () => {
     await first.app.evaluate(({ BrowserWindow }, bounds) => {
       BrowserWindow.getFocusedWindow()?.setBounds(bounds)
     }, requestedBounds)
-    await expect.poll(() => readWindowBounds(userDataDir)).toEqual(requestedBounds)
+    await expect.poll(() => tryReadWindowBounds(userDataDir)).toEqual(requestedBounds)
 
     await closeApp(first.app)
     const second = await launchTree(userDataDir)

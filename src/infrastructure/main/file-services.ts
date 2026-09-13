@@ -1,4 +1,4 @@
-import { copyFile, mkdir, open, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { collectAttachmentIds, parsePersistedState, type PersistedEditorState } from '../../domain/document'
 
@@ -54,13 +54,8 @@ export function createFileServices(
           try {
             const state = parsePersistedState(value)
             for (const id of collectAttachmentIds(state.document)) {
-              try {
-                await readFile(attachmentPath(attachmentsDirectory, id))
-              } catch (error) {
-                if (isNotFound(error)) {
-                  throw new Error(`Attachment ${id} is missing from local storage.`, { cause: error })
-                }
-                throw error
+              if (!(await attachmentExists(attachmentsDirectory, id))) {
+                throw new Error(`Attachment ${id} is missing from local storage.`)
               }
             }
             await rename(candidate, documentPath)
@@ -104,16 +99,7 @@ export function createFileServices(
     },
     hasAttachment(id) {
       const logPath = join(attachmentsDirectory, `${id}.png`)
-      return enqueue('hasAttachment', [logPath], async () => {
-        const path = attachmentPath(attachmentsDirectory, id)
-        try {
-          await readFile(path)
-          return true
-        } catch (error) {
-          if (isNotFound(error)) return false
-          throw error
-        }
-      })
+      return enqueue('hasAttachment', [logPath], () => attachmentExists(attachmentsDirectory, id))
     },
     cleanupAttachments(referencedIds) {
       return enqueue('cleanupAttachments', [attachmentsDirectory], async () => {
@@ -191,6 +177,16 @@ function attachmentPath(attachmentsDirectory: string, id: string): string {
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+}
+
+async function attachmentExists(attachmentsDirectory: string, id: string): Promise<boolean> {
+  try {
+    await stat(attachmentPath(attachmentsDirectory, id))
+    return true
+  } catch (error) {
+    if (isNotFound(error)) return false
+    throw error
+  }
 }
 
 async function writeDurableFile(path: string, contents: string): Promise<void> {

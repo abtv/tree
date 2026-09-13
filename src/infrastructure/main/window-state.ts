@@ -16,6 +16,51 @@ export interface WindowBoundsStore {
   save(bounds: WindowBounds): void
 }
 
+export interface BoundsTimers {
+  setTimeout(callback: () => void, milliseconds: number): unknown
+  clearTimeout(handle: unknown): void
+}
+
+export interface WindowBoundsSaver {
+  save(bounds: WindowBounds): void
+  flush(): void
+}
+
+export const WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS = 300
+
+const systemTimers: BoundsTimers = {
+  setTimeout: (callback, milliseconds) => globalThis.setTimeout(callback, milliseconds),
+  clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
+}
+
+export function createDebouncedWindowBoundsSaver(
+  store: WindowBoundsStore,
+  delayMilliseconds: number = WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS,
+  timers: BoundsTimers = systemTimers,
+): WindowBoundsSaver {
+  let handle: unknown
+  let pending: WindowBounds | undefined
+
+  const flush = (): void => {
+    if (handle !== undefined) {
+      timers.clearTimeout(handle)
+      handle = undefined
+    }
+    if (pending === undefined) return
+    const bounds = pending
+    pending = undefined
+    store.save(bounds)
+  }
+
+  const save = (bounds: WindowBounds): void => {
+    pending = bounds
+    if (handle !== undefined) timers.clearTimeout(handle)
+    handle = timers.setTimeout(flush, delayMilliseconds)
+  }
+
+  return { save, flush }
+}
+
 export function isValidWindowBounds(value: unknown): value is WindowBounds {
   if (typeof value !== 'object' || value === null) return false
   const bounds = value as Partial<WindowBounds>

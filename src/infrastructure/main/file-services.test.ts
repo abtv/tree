@@ -1,8 +1,17 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFileServices } from './file-services'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    readFile: vi.fn(actual.readFile),
+    stat: vi.fn(actual.stat),
+  } as typeof import('node:fs/promises')
+})
 
 const temporaryDirectories: string[] = []
 
@@ -247,5 +256,19 @@ describe('file services', () => {
 
     await expect(services.writeAttachment('bad/id', new Uint8Array([1]))).rejects.toThrow('Attachment IDs')
     await expect(services.readAttachment('bad/id')).rejects.toThrow('Attachment IDs')
+  })
+
+  it('checks attachment existence using metadata without reading contents', async () => {
+    const { services } = await servicesForTest()
+    await services.writeAttachment('present', new Uint8Array([1, 2, 3]))
+
+    vi.mocked(stat).mockClear()
+    vi.mocked(readFile).mockClear()
+
+    await expect(services.hasAttachment('present')).resolves.toBe(true)
+    await expect(services.hasAttachment('missing')).resolves.toBe(false)
+
+    expect(stat).toHaveBeenCalled()
+    expect(readFile).not.toHaveBeenCalled()
   })
 })
