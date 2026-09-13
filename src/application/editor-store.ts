@@ -1,6 +1,5 @@
 import {
   attachImage,
-  cloneDocument,
   collectAttachmentIds,
   createFirstChild,
   createInitialDocument,
@@ -12,7 +11,6 @@ import {
   insertSiblingAfter,
   insertSiblingBefore,
   isValidLocation,
-  locateNode,
   moveSibling,
   nodePath,
   parsePersistedState,
@@ -20,7 +18,6 @@ import {
   pasteText,
   removeTextRange,
   requireNode,
-  serializeState,
   splitNode,
   type AttachmentId,
   type AttachmentReference,
@@ -28,15 +25,18 @@ import {
   type Location,
   type LinkRange,
   type NodeId,
+  type PersistedEditorState,
 } from '../domain/document'
 import type { ClipboardPayload } from '../shared/ipc'
 import type { ClipboardWritePayload } from '../shared/ipc'
+import { EditorHistory } from './editor-history'
+import { PersistenceCoordinator } from './persistence-coordinator'
 
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
   load(): Promise<unknown | null>
-  save(state: ReturnType<typeof serializeState>): Promise<void>
+  save(state: PersistedEditorState): Promise<void>
   readClipboard(): Promise<ClipboardValue>
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
   writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
@@ -74,26 +74,26 @@ const systemClock: Clock = {
 
 export class EditorStore {
   private readonly listeners = new Set<() => void>()
-  private readonly past: Document[] = []
-  private readonly future: Document[] = []
+  private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
+  private readonly persistence: PersistenceCoordinator
   private snapshot: EditorSnapshot = { status: 'loading' }
   private activeTextNodeId: NodeId | undefined
   private textTimer: unknown
   private standaloneNextTextEdit = false
   private pendingClipboardOperation: Promise<void> | undefined
   private focusToken = 0
-  private saveQueue: Promise<void> = Promise.resolve()
-  private persistenceWorkQueued = false
-  private persistenceRequested = false
-  private persistenceSaveRequested = false
-  private persistenceError: unknown
-
   public constructor(
     private readonly services: EditorServices,
     private readonly createId: () => string,
     private readonly clock: Clock = systemClock,
-  ) {}
+  ) {
+    this.persistence = new PersistenceCoordinator(services, {
+      currentState: () => (this.snapshot.status === 'ready' ? this.snapshot : undefined),
+      referencedAttachmentIds: () => this.referencedAttachmentIds(),
+      onResult: (error) => this.handlePersistenceResult(error),
+    })
+  }
 
   public getSnapshot = (): EditorSnapshot => this.snapshot
 
@@ -103,8 +103,7 @@ export class EditorStore {
   }
 
   public async flushPersistence(): Promise<void> {
-    await this.saveQueue
-    if (this.persistenceError !== undefined) throw this.persistenceError
+    await this.persistence.flush()
   }
 
   public reportError(error: unknown): void {
@@ -125,7 +124,7 @@ export class EditorStore {
           focus: this.newFocus(rootId, 0),
         }
         this.emit()
-        this.queuePersistence()
+        this.persistence.requestSave()
         return
       }
 
@@ -173,7 +172,7 @@ export class EditorStore {
     }
     if (this.activeTextNodeId !== nodeId) {
       this.endTextSession()
-      this.beginHistoryEntry(state.document)
+      this.history.begin(state.document)
       this.activeTextNodeId = nodeId
     }
     const next = editNodeContent(state.document, nodeId, text, links)
@@ -563,40 +562,40 @@ export class EditorStore {
 
   public undo(): void {
     this.endTextSession()
-    const previous = this.past.pop()
-    if (previous === undefined) {
-      return
-    }
     const state = this.ready()
-    this.future.push(cloneDocument(state.document))
-    const location = this.reconcileLocation(previous, state.document, state.location)
+    const previous = this.history.undo(state.document, state.location)
+    if (previous === undefined) return
     this.replaceReady(
-      { ...state, document: previous, location, focus: this.newFocus(location.selectedNodeId, 0) },
+      {
+        ...state,
+        document: previous.document,
+        location: previous.location,
+        focus: this.newFocus(previous.location.selectedNodeId, 0),
+      },
       true,
     )
   }
 
   public redo(): void {
     this.endTextSession()
-    const next = this.future.pop()
-    if (next === undefined) {
-      return
-    }
     const state = this.ready()
-    this.past.push(cloneDocument(state.document))
-    const location = this.reconcileLocation(next, state.document, state.location)
-    this.replaceReady({ ...state, document: next, location, focus: this.newFocus(location.selectedNodeId, 0) }, true)
+    const next = this.history.redo(state.document, state.location)
+    if (next === undefined) return
+    this.replaceReady(
+      {
+        ...state,
+        document: next.document,
+        location: next.location,
+        focus: this.newFocus(next.location.selectedNodeId, 0),
+      },
+      true,
+    )
   }
 
   private applyStructural(document: Document, location: Location, focus: FocusIntent): void {
     const state = this.ready()
-    this.beginHistoryEntry(state.document)
+    this.history.begin(state.document)
     this.replaceReady({ ...state, document, location, focus }, true)
-  }
-
-  private beginHistoryEntry(document: Document): void {
-    this.past.push(cloneDocument(document))
-    this.future.length = 0
   }
 
   private scheduleTextBoundary(): void {
@@ -604,28 +603,6 @@ export class EditorStore {
       this.clock.clearTimeout(this.textTimer)
     }
     this.textTimer = this.clock.setTimeout(() => this.endTextSession(), 5_000)
-  }
-
-  private reconcileLocation(document: Document, previousDocument: Document, previousLocation: Location): Location {
-    if (isValidLocation(document, previousLocation)) {
-      return previousLocation
-    }
-    const current =
-      previousLocation.currentParentId === null
-        ? undefined
-        : locateNode(previousDocument, previousLocation.currentParentId)
-    const candidates =
-      current === undefined ? [] : [...current.ancestors.map((node) => node.id), current.node.id].reverse()
-    for (const candidate of candidates) {
-      if (locateNode(document, candidate) !== undefined) {
-        return { currentParentId: candidate, selectedNodeId: candidate }
-      }
-    }
-    const root = document.roots[0]
-    if (root === undefined) {
-      throw new Error('An undo state must contain a root node.')
-    }
-    return { currentParentId: null, selectedNodeId: root.id }
   }
 
   private locationForSiblingOf(
@@ -644,50 +621,12 @@ export class EditorStore {
     this.snapshot = state.operationError === undefined ? state : { ...state, operationError: undefined }
     this.emit()
     if (persist) {
-      this.queuePersistence()
+      this.persistence.requestSave()
     }
   }
 
-  private queuePersistence(save = true): void {
-    this.persistenceRequested = true
-    this.persistenceSaveRequested ||= save
-    if (this.persistenceWorkQueued) return
-
-    this.persistenceWorkQueued = true
-    this.saveQueue = this.saveQueue
-      .then(async () => {
-        while (this.persistenceRequested) {
-          this.persistenceRequested = false
-          const saveRequested = this.persistenceSaveRequested
-          this.persistenceSaveRequested = false
-          try {
-            const state = this.ready()
-            if (saveRequested) {
-              await this.services.save(serializeState(state.document, state.location))
-            }
-            await this.services.cleanupAttachments([...this.referencedAttachmentIds()])
-            this.persistenceError = undefined
-            if (this.snapshot.status === 'ready' && this.snapshot.saveError !== undefined) {
-              this.snapshot = { ...this.snapshot, saveError: undefined }
-              this.emit()
-            }
-          } catch (error) {
-            this.persistenceError = error
-            if (this.snapshot.status === 'ready') {
-              this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
-              this.emit()
-            }
-          }
-        }
-      })
-      .finally(() => {
-        this.persistenceWorkQueued = false
-        if (this.persistenceRequested) this.queuePersistence()
-      })
-  }
-
   private queueAttachmentCleanup(): void {
-    this.queuePersistence(false)
+    this.persistence.requestAttachmentCleanup()
   }
 
   private referencedAttachmentIds(): Set<AttachmentId> {
@@ -698,10 +637,20 @@ export class EditorStore {
     if (this.snapshot.status === 'ready') {
       add(this.snapshot.document)
     }
-    this.past.forEach(add)
-    this.future.forEach(add)
+    for (const document of this.history.documents()) add(document)
     this.pendingAttachmentIds.forEach((id) => ids.add(id))
     return ids
+  }
+
+  private handlePersistenceResult(error: unknown | undefined): void {
+    if (this.snapshot.status !== 'ready') return
+    if (error === undefined) {
+      if (this.snapshot.saveError === undefined) return
+      this.snapshot = { ...this.snapshot, saveError: undefined }
+    } else {
+      this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
+    }
+    this.emit()
   }
 
   private newFocus(nodeId: NodeId, cursor: number): FocusIntent {
