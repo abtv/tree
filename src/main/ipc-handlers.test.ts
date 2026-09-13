@@ -99,7 +99,8 @@ describe('main IPC handlers', () => {
     await handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', bytes)
     await handlers.get(ipcChannels.cleanupAttachments)!(event, ['image-1'])
 
-    expect(fileServices.save).toHaveBeenCalledWith({ ...validState, version: 2 })
+    expect(fileServices.save).toHaveBeenCalledWith(validState)
+    expect(vi.mocked(fileServices.save).mock.calls[0]![0]).toBe(validState)
     expect(fileServices.writeAttachment).toHaveBeenCalledWith('image-1', bytes)
     expect(fileServices.cleanupAttachments).toHaveBeenCalledWith(['image-1'])
   })

@@ -22,6 +22,7 @@ import {
   splitNode,
   isHttpUrl,
   normalizeLinks,
+  validatePersistedState,
   MAX_DOCUMENT_DEPTH,
   MAX_DOCUMENT_DEPTH_ERROR,
   type TreeNode,
@@ -106,6 +107,7 @@ describe('document operations', () => {
     const document = createInitialDocument('root')
     const state = serializeState(document, { currentParentId: null, selectedNodeId: 'root' })
 
+    expect(state.document).toBe(document)
     expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
     expect(() =>
       parsePersistedState({
@@ -113,6 +115,19 @@ describe('document operations', () => {
         document: { roots: [{ ...document.roots[0]!, children: [{ id: 'root', text: '', children: [] }] }] },
       }),
     ).toThrow('unique')
+  })
+
+  it('validates persisted state without rebuilding the document', () => {
+    const document = createInitialDocument('root')
+    const state = serializeState(document, { currentParentId: null, selectedNodeId: 'root' })
+
+    expect(validatePersistedState(state)).toBe(state)
+    expect(validatePersistedState({ ...state, version: 1 })).toEqual({ ...state, version: 1 })
+    expect(() => validatePersistedState({ ...state, version: 3 })).toThrow('unsupported format')
+    expect(() => validatePersistedState({ ...state, document: { roots: [] } })).toThrow('at least one root node')
+    expect(() =>
+      validatePersistedState({ ...state, location: { currentParentId: 'missing', selectedNodeId: 'root' } }),
+    ).toThrow('does not match its tree')
   })
 
   it('deletes a subtree as one operation', () => {
@@ -249,6 +264,48 @@ describe('document operations', () => {
         },
       }),
     ).toThrow('links')
+  })
+
+  it('rejects malformed persisted nodes and links when validating', () => {
+    const base = {
+      version: 1,
+      document: { roots: [{ id: 'a', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    }
+    expect(() => validatePersistedState({ ...base, document: { roots: 'not an array' } })).toThrow('children')
+    expect(() =>
+      validatePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', links: {}, children: [] }] } }),
+    ).toThrow('links')
+    expect(() =>
+      validatePersistedState({ ...base, document: { roots: [{ id: '', text: '', children: [] }] } }),
+    ).toThrow('node is invalid')
+    expect(() =>
+      validatePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', children: {} }] } }),
+    ).toThrow('children')
+    expect(() =>
+      validatePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', attachment: {}, children: [] }] } }),
+    ).toThrow('attachment')
+    expect(() =>
+      validatePersistedState({
+        ...base,
+        document: {
+          roots: [
+            {
+              id: 'a',
+              text: 'hello',
+              links: [{ start: '0', end: 2, url: 'https://example.com' }],
+              children: [],
+            },
+          ],
+        },
+      }),
+    ).toThrow('links')
+    expect(() =>
+      validatePersistedState({
+        ...base,
+        document: { roots: [{ id: 'a', text: '', children: [{ id: 'a', text: '', children: [] }] }] },
+      }),
+    ).toThrow('unique')
   })
 
   it('handles link removal, insertion, and range edge cases', () => {

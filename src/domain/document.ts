@@ -395,7 +395,36 @@ export function serializeState(document: Document, location: Location): Persiste
   if (!isValidLocation(document, location)) {
     throw new Error('The selected node is not valid for the persisted location.')
   }
-  return { version: 2, document: cloneDocument(document), location: { ...location } }
+  return { version: 2, document, location: { ...location } }
+}
+
+export function validatePersistedState(value: unknown): PersistedEditorState {
+  if (
+    !isRecord(value) ||
+    (value.version !== 1 && value.version !== 2) ||
+    !isRecord(value.document) ||
+    !isRecord(value.location)
+  ) {
+    throw new Error('The saved document has an unsupported format.')
+  }
+
+  const roots = value.document.roots
+  if (!Array.isArray(roots)) {
+    throw new Error('Node children must be an array.')
+  }
+  walkNodes(roots, new Set(), false)
+  if (roots.length === 0) {
+    throw new Error('The saved document must contain at least one root node.')
+  }
+  const currentParentId = value.location.currentParentId
+  const selectedNodeId = value.location.selectedNodeId
+  if ((typeof currentParentId !== 'string' && currentParentId !== null) || typeof selectedNodeId !== 'string') {
+    throw new Error('The saved document location is invalid.')
+  }
+  if (!isValidLocation(value.document as unknown as Document, { currentParentId, selectedNodeId })) {
+    throw new Error('The saved document location does not match its tree.')
+  }
+  return value as unknown as PersistedEditorState
 }
 
 export function parsePersistedState(value: unknown): PersistedEditorState {
@@ -428,16 +457,22 @@ export function assertDocument(document: Document): void {
   if (!Array.isArray(document.roots) || document.roots.length === 0) {
     throw new Error('A document must contain at least one root node.')
   }
-  parseNodes(document.roots, new Set())
+  walkNodes(document.roots, new Set(), false)
 }
 
 function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
+  return walkNodes(value, nodeIds, true)
+}
+
+function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: false): void
+function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: true): TreeNode[]
+function walkNodes(value: unknown, nodeIds: Set<NodeId>, build: boolean): TreeNode[] | undefined {
   if (!Array.isArray(value)) {
     throw new Error('Node children must be an array.')
   }
 
-  const output: TreeNode[] = []
-  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[]; depth: number }> = [
+  const output: TreeNode[] | undefined = build ? [] : undefined
+  const stack: Array<{ input: unknown[]; index: number; output: TreeNode[] | undefined; depth: number }> = [
     { input: value, index: 0, output, depth: 1 },
   ]
 
@@ -470,15 +505,19 @@ function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {
     if (!Array.isArray(children)) {
       throw new Error('Node children must be an array.')
     }
-    const node: TreeNode = {
-      id: candidate.id,
-      text: candidate.text,
-      ...(links.length === 0 ? {} : { links }),
-      ...(attachment === undefined ? {} : { attachment }),
-      children: [],
+    let childOutput: TreeNode[] | undefined
+    if (frame.output !== undefined) {
+      const node: TreeNode = {
+        id: candidate.id,
+        text: candidate.text,
+        ...(links.length === 0 ? {} : { links }),
+        ...(attachment === undefined ? {} : { attachment }),
+        children: [],
+      }
+      frame.output.push(node)
+      childOutput = node.children
     }
-    frame.output.push(node)
-    stack.push({ input: children, index: 0, output: node.children, depth: frame.depth + 1 })
+    stack.push({ input: children, index: 0, output: childOutput, depth: frame.depth + 1 })
   }
 
   return output

@@ -1,5 +1,5 @@
 import type { PersistedEditorState } from '../domain/document'
-import { parsePersistedState } from '../domain/document'
+import { validatePersistedState } from '../domain/document'
 import type { ClipboardWritePayload } from '../shared/ipc'
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -22,7 +22,7 @@ export function isTrustedRendererUrl(value: string | undefined, expected: string
 }
 
 export function validatePersistedEditorState(value: unknown): PersistedEditorState {
-  return parsePersistedState(value)
+  return validatePersistedState(value)
 }
 
 export function validateClipboardWritePayload(value: unknown): ClipboardWritePayload {

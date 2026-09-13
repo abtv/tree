@@ -329,6 +329,8 @@ Two unit guards cover disk-write and attachment-read work that the perf suite do
 
 The renderer's retention of attachment references is guarded separately. `editor-history.test.ts` asserts that reading the retained attachment IDs does not re-traverse history snapshots, and the `EditorHistory` property test checks that the maintained reference counts always equal the union of attachment IDs over the retained snapshots.
 
+Save serialization is guarded by reference identity rather than timing. `document.test.ts` asserts that `serializeState` returns the input document without cloning and that `validatePersistedState` returns its input without rebuilding, and `ipc-handlers.test.ts` asserts that the `save` handler forwards the validated reference to `fileServices.save`. The `document.property.test.ts` round-trip property checks the same identity and validation for arbitrary documents.
+
 ---
 
 ## 13. Persistence Testing

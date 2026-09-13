@@ -24,8 +24,8 @@ describe('IPC security validation', () => {
     expect(isTrustedRendererUrl(undefined, 'file:///app/out/renderer/index.html')).toBe(false)
   })
 
-  it('validates persisted state through the domain parser', () => {
-    expect(validatePersistedEditorState(state).version).toBe(2)
+  it('validates persisted state without rebuilding it', () => {
+    expect(validatePersistedEditorState(state)).toBe(state)
     expect(() => validatePersistedEditorState({ version: 1 })).toThrow('unsupported format')
   })
 

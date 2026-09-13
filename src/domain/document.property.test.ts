@@ -24,6 +24,7 @@ import {
   removeTextRange,
   serializeState,
   splitNode,
+  validatePersistedState,
   MAX_DOCUMENT_DEPTH,
   type Document,
   type Location,
@@ -133,6 +134,8 @@ describe('document invariants', () => {
         const node = pick(document, seed)
         const state = serializeState(document, locationFor(document, node))
 
+        expect(state.document).toBe(document)
+        expect(validatePersistedState(state)).toBe(state)
         expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
       }),
     )
