@@ -400,6 +400,10 @@ The clipboard service should support:
 
 Clipboard-specific platform details must remain outside the domain.
 
+### Editing commands
+
+The application installs only a minimal application menu, so macOS does not route the standard editing commands (Undo, Redo, Cut, Copy, Paste, Select All) to the renderer, and the native `copy`, `cut`, and `paste` DOM events do not fire. The editor key handler must own these commands: intercept the shortcut, prevent the native default, and perform the operation through the editor store and the clipboard service. The application must not rely on native menu routing or native clipboard DOM events. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
+
 ---
 
 ## 16. Electron Integration

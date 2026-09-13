@@ -188,6 +188,20 @@ describe('editor keyboard handler', () => {
     expect(store.copy).toHaveBeenCalledWith('node', 0, 4)
   })
 
+  it('cuts a non-empty plain-text selection through the store', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 4)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const event = keyEvent(input, 'x', { metaKey: true })
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(store.cut).toHaveBeenCalledWith('node', 0, 4)
+  })
+
   it('pastes the clipboard through the store on Cmd+V', () => {
     const store = createStore()
     const input = document.createElement('textarea')

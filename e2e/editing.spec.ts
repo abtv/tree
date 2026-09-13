@@ -48,6 +48,29 @@ test.describe('creating nodes with Enter', () => {
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Plain text')
   })
 
+  test('Cmd+A and Cmd+X cut all text without the browser cut command', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'Plain text')
+    await writeClipboardText(app, 'sentinel')
+    await window.evaluate(() => {
+      document.addEventListener(
+        'cut',
+        (event) => {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+        },
+        true,
+      )
+    })
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Meta+x')
+
+    await expect(editor).toHaveValue('')
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Plain text')
+  })
+
   test('keeps plain text selected after Cmd+C', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
