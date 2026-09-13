@@ -1530,6 +1530,31 @@ describe('EditorStore', () => {
     expect(services.saves).toHaveLength(1)
   })
 
+  it('counts inserted words since the last successful save across a failed save', async () => {
+    const services = createServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    let fail = true
+    services.save = async (state) => {
+      if (fail) throw new Error('disk full')
+      services.saves.push(state)
+    }
+
+    store.editText('root', 'a b c')
+    clock.runAll()
+    await expect(store.flushPersistence()).rejects.toThrow('disk full')
+
+    fail = false
+    store.editText('root', 'a b c d e f g h i j')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(services.saves).toHaveLength(1)
+  })
+
   it('saves pending changes after the idle interval', async () => {
     const services = createServices()
     const clock = new FakeClock()
@@ -1574,6 +1599,47 @@ describe('EditorStore', () => {
 
     await store.paste('root', 0)
     await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('does not save when typing before an existing hyperlink shifts its range', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'https://example.com',
+            links: [{ start: 0, end: 19, url: 'https://example.com' }],
+            children: [],
+          },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    store.editContent('root', 'xhttps://example.com', [{ start: 1, end: 20, url: 'https://example.com' }])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(services.saves).toEqual([])
+  })
+
+  it('saves immediately when an edit inserts a new hyperlink', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'x', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    store.editContent('root', 'x https://example.com', [{ start: 2, end: 21, url: 'https://example.com' }])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(services.saves).toHaveLength(1)
   })
 

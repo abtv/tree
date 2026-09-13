@@ -86,6 +86,7 @@ export class EditorStore {
   private saveTimer: unknown
   private changesPending = false
   private insertedWordsSinceSave = 0
+  private insertedWordsAtSaveRequest = 0
   private standaloneNextTextEdit = false
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
@@ -523,6 +524,7 @@ export class EditorStore {
       this.saveTimer = undefined
     }
     this.changesPending = false
+    this.insertedWordsAtSaveRequest += this.insertedWordsSinceSave
     this.insertedWordsSinceSave = 0
     this.persistence.requestSave()
   }
@@ -552,9 +554,12 @@ export class EditorStore {
   private handlePersistenceResult(error: unknown | undefined): void {
     if (this.snapshot.status !== 'ready') return
     if (error === undefined) {
+      this.insertedWordsAtSaveRequest = 0
       if (this.snapshot.saveError === undefined) return
       this.snapshot = { ...this.snapshot, saveError: undefined }
     } else {
+      this.insertedWordsSinceSave += this.insertedWordsAtSaveRequest
+      this.insertedWordsAtSaveRequest = 0
       this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
       this.changesPending = true
       this.scheduleIdleSave()
@@ -607,13 +612,16 @@ function sameNodeContent(node: { text: string; links?: LinkRange[] }, expected: 
 }
 
 function hasNewLink(existing: LinkRange[] | undefined, next: LinkRange[]): boolean {
-  const previous = existing ?? []
-  return next.some(
-    (link) =>
-      !previous.some(
-        (candidate) => candidate.start === link.start && candidate.end === link.end && candidate.url === link.url,
-      ),
-  )
+  const remaining = new Map<string, number>()
+  for (const link of existing ?? []) {
+    remaining.set(link.url, (remaining.get(link.url) ?? 0) + 1)
+  }
+  for (const link of next) {
+    const count = remaining.get(link.url) ?? 0
+    if (count === 0) return true
+    remaining.set(link.url, count - 1)
+  }
+  return false
 }
 
 function clipboardIntroducesLink(clipboard: Extract<ClipboardPayload, { kind: 'text' }>): boolean {
