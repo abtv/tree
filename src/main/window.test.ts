@@ -1,11 +1,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   configureSingleInstance,
+  createWindowWebPreferences,
   isAllowedExternalUrl,
   isAllowedRendererUrl,
   reportMainProcessError,
   surfaceWindow,
 } from './window'
+
+describe('createWindowWebPreferences', () => {
+  it('isolates the renderer with the secure Electron settings', () => {
+    expect(createWindowWebPreferences('/app/preload/index.js')).toEqual({
+      preload: '/app/preload/index.js',
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    })
+  })
+})
 
 describe('configureSingleInstance', () => {
   it('registers second-instance handling when the lock is acquired', () => {

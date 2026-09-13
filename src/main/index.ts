@@ -23,6 +23,7 @@ import { bootstrapApplication } from './bootstrap'
 import { createPngDecoder } from './png-decoder'
 import {
   configureSingleInstance,
+  createWindowWebPreferences,
   isAllowedExternalUrl,
   isAllowedRendererUrl,
   reportMainProcessError,
@@ -57,12 +58,7 @@ function createMainWindow(): void {
     minWidth: 640,
     minHeight: 480,
     title: 'Tree',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
+    webPreferences: createWindowWebPreferences(join(__dirname, '../preload/index.js')),
   })
   mainWindow = window
   const saveWindowBounds = (): void => {

@@ -1,3 +1,5 @@
+import type { WebPreferences } from 'electron'
+
 export interface WindowSurface {
   isDestroyed(): boolean
   isFocused(): boolean
@@ -5,6 +7,10 @@ export interface WindowSurface {
   restore(): void
   show(): void
   focus(): void
+}
+
+export function createWindowWebPreferences(preload: string): WebPreferences {
+  return { preload, contextIsolation: true, nodeIntegration: false, sandbox: true }
 }
 
 export interface SingleInstanceApp {
