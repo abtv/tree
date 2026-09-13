@@ -33,6 +33,21 @@ test.describe('creating nodes with Enter', () => {
     await app.close()
   })
 
+  test('Cmd+A and Cmd+C copy all text without the browser copy command', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const source = node(window, 1)
+
+    await typeInto(source, 'Plain text')
+    await writeClipboardText(app, 'sentinel')
+    await window.evaluate(() => {
+      document.addEventListener('copy', (event) => event.preventDefault(), true)
+    })
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Meta+c')
+
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Plain text')
+  })
+
   test('keeps plain text selected after Cmd+C', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -49,6 +64,26 @@ test.describe('creating nodes with Enter', () => {
         ]),
       )
       .toEqual([0, 3])
+  })
+
+  test('Cmd+V pastes clipboard text without the browser paste command', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await writeClipboardText(app, 'Plain text')
+    await window.evaluate(() => {
+      document.addEventListener(
+        'paste',
+        (event) => {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+        },
+        true,
+      )
+    })
+    await window.keyboard.press('Meta+v')
+
+    await expect(editor).toHaveValue('Plain text')
   })
 
   test('pastes copied plain text with Cmd+V after typing in the target node', async ({ userDataDir }) => {

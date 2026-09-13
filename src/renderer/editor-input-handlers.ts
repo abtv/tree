@@ -22,7 +22,8 @@ export function createEditorKeyDownHandler({
     if (isComposing()) return
     const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
     const copying = event.metaKey && event.key.toLowerCase() === 'c'
-    if (!selectingAll && !copying) {
+    const pasting = event.metaKey && event.key.toLowerCase() === 'v'
+    if (!selectingAll && !copying && !pasting) {
       setSelectAllNodeId(undefined)
       event.currentTarget.classList.remove('select-all')
     }
@@ -36,12 +37,14 @@ export function createEditorKeyDownHandler({
         input.classList.add('select-all')
       })
     } else if (event.metaKey && event.key.toLowerCase() === 'c') {
-      if (event.currentTarget instanceof HTMLTextAreaElement) return
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {
         event.preventDefault()
         void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
       }
+    } else if (event.metaKey && event.key.toLowerCase() === 'v') {
+      event.preventDefault()
+      void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
     } else if (event.metaKey && event.key.toLowerCase() === 'x') {
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {

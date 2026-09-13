@@ -19,6 +19,7 @@ function createStore(): EditorStore {
     leave: vi.fn(),
     moveHorizontal: vi.fn(() => false),
     moveSelection: vi.fn(),
+    paste: vi.fn(async () => {}),
     redo: vi.fn(),
     reportError: vi.fn(),
     undo: vi.fn(),
@@ -173,7 +174,7 @@ describe('editor keyboard handler', () => {
     expect(store.cut).not.toHaveBeenCalled()
   })
 
-  it('leaves non-empty plain-text copy to the browser', () => {
+  it('copies a non-empty plain-text selection through the store', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
@@ -183,8 +184,22 @@ describe('editor keyboard handler', () => {
     const event = keyEvent(input, 'c', { metaKey: true })
     handle(event)
 
-    expect(event.preventDefault).not.toHaveBeenCalled()
-    expect(store.copy).not.toHaveBeenCalled()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(store.copy).toHaveBeenCalledWith('node', 0, 4)
+  })
+
+  it('pastes the clipboard through the store on Cmd+V', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(2, 2)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const event = keyEvent(input, 'v', { metaKey: true })
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(store.paste).toHaveBeenCalledWith('node', 2)
   })
 
   it('does not open a preview for an image command when the node has no attachment', () => {
