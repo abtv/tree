@@ -262,6 +262,7 @@ Keep each document focused on its responsibility:
 * `PRODUCT.md` — what the product does.
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
+* `SECURITY.md` — the security model and how it is verified.
 * `AGENTS.md` — how the coding agent should work.
 
 ---

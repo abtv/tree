@@ -7,6 +7,7 @@ A macOS desktop application for working with a hierarchical tree of text nodes a
 * [Product Requirements](docs/PRODUCT.md) — user-visible product behavior and requirements.
 * [Architecture](docs/ARCHITECTURE.md) — technology stack, technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development environment, commands, testing, validation, and repository conventions.
+* [Security Policy](SECURITY.md) — the security model and the tests that verify it.
 * [Agent Instructions](AGENTS.md) — instructions for AI coding agents working on the repository.
 * [License](LICENSE) — MIT License.
 
