@@ -363,6 +363,8 @@ Before adding a new dependency:
 
 Major dependency changes should be documented and, when appropriate, recorded as an architectural decision.
 
+Direct dependencies are declared with exact versions and no range operators (`docs/decisions/0006-exact-dependency-pinning.md`). Upgrade a dependency by changing its exact version, reinstalling, and running `npm run check:full`; do not widen it to a range.
+
 `npm audit` runs as the final step of `npm run check`, so known vulnerabilities are reported before a commit. It requires registry access and fails when offline.
 
 ## Formatting
