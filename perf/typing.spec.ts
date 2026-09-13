@@ -8,7 +8,7 @@ function summarize(samples: number[]): { median: number; p95: number; max: numbe
   return { median: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1]! }
 }
 
-async function measureTyping(userDataDir: string, scenario: string, seed: Seed): Promise<void> {
+async function measureTyping(userDataDir: string, scenario: string, seed: Seed): Promise<number> {
   seedDocument(userDataDir, seed)
   const { window } = await launchTree(userDataDir)
   await window.getByRole('textbox').first().focus()
@@ -27,7 +27,9 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
     })
   })
 
+  const typingStart = performance.now()
   await window.keyboard.type(TYPED)
+  const typingMs = performance.now() - typingStart
   await window.waitForFunction(
     (count) => (window as unknown as { paints: number[] }).paints.length >= count,
     TYPED.length,
@@ -44,6 +46,7 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
     `PERF ${JSON.stringify({
       kind: 'typing',
       scenario,
+      typingMs: round(typingMs),
       commitMedianMs: round(commit.median),
       commitP95Ms: round(commit.p95),
       paintMedianMs: round(paint.median),
@@ -57,6 +60,7 @@ async function measureTyping(userDataDir: string, scenario: string, seed: Seed):
   expect(measured.paints.length).toBeGreaterThanOrEqual(100)
   expect(paint.p95).toBeLessThan(100)
   expect(paint.max).toBeLessThan(250)
+  return typingMs
 }
 
 test.describe('typing latency', () => {
@@ -66,5 +70,12 @@ test.describe('typing latency', () => {
 
   test('large-10000', async ({ userDataDir }) => {
     await measureTyping(userDataDir, 'large-10000', largeSeed(100, 100))
+  })
+
+  test('large-100000', async ({ userDataDir }) => {
+    const seed = largeSeed(316, 316)
+    seed.location = { currentParentId: 'r315', selectedNodeId: 'r315c315' }
+    const typingMs = await measureTyping(userDataDir, 'large-100000', seed)
+    expect(typingMs).toBeLessThan(1_500)
   })
 })

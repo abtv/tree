@@ -46,13 +46,59 @@ export interface LocatedNode {
   ancestors: TreeNode[]
 }
 
+export type NodeIndex = ReadonlyMap<NodeId, NodeId | null>
+
+let cachedIndexDocument: Document | undefined
+let cachedNodeIndex: NodeIndex | undefined
+
+export function buildNodeIndex(document: Document): NodeIndex {
+  const parents = new Map<NodeId, NodeId | null>()
+  const stack: TreeNode[] = []
+  for (const root of document.roots) {
+    parents.set(root.id, null)
+    stack.push(root)
+  }
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    for (const child of node.children) {
+      parents.set(child.id, node.id)
+      stack.push(child)
+    }
+  }
+  return parents
+}
+
+function indexFor(document: Document): NodeIndex {
+  if (cachedIndexDocument === document && cachedNodeIndex !== undefined) {
+    return cachedNodeIndex
+  }
+  cachedNodeIndex = buildNodeIndex(document)
+  cachedIndexDocument = document
+  return cachedNodeIndex
+}
+
+function shareIndex(from: Document, to: Document): void {
+  if (cachedIndexDocument === from && cachedNodeIndex !== undefined) {
+    cachedIndexDocument = to
+  }
+}
+
+function invalidateIndex(document: Document): void {
+  if (cachedIndexDocument === document) {
+    cachedIndexDocument = undefined
+    cachedNodeIndex = undefined
+  }
+}
+
 export function createInitialDocument(id: NodeId): Document {
   return { roots: [{ id, text: '', children: [] }] }
 }
 
 export function ensureRoot(document: Document, id: NodeId): Document {
   if (document.roots.length > 0) {
-    return cloneDocument(document)
+    const next = cloneDocument(document)
+    shareIndex(document, next)
+    return next
   }
   return createInitialDocument(id)
 }
@@ -86,33 +132,28 @@ function cloneNodeShallow(node: TreeNode): TreeNode {
 }
 
 export function locateNode(document: Document, id: NodeId): LocatedNode | undefined {
-  const parents = new Map<TreeNode, TreeNode | null>()
-  const stack: TreeNode[] = []
-  for (let index = document.roots.length - 1; index >= 0; index -= 1) {
-    const node = document.roots[index]!
-    parents.set(node, null)
-    stack.push(node)
-  }
+  const nodeIndex = indexFor(document)
+  if (!nodeIndex.has(id)) return undefined
 
-  while (stack.length > 0) {
-    const node = stack.pop()!
-    if (node.id === id) {
-      const parent = parents.get(node) ?? null
-      const siblings = parent === null ? document.roots : parent.children
-      const ancestors: TreeNode[] = []
-      let current = parent
-      while (current !== null) {
-        ancestors.push(current)
-        current = parents.get(current) ?? null
-      }
-      ancestors.reverse()
+  const pathIds: NodeId[] = []
+  let cursor: NodeId | null | undefined = id
+  while (cursor !== null && cursor !== undefined) {
+    pathIds.push(cursor)
+    cursor = nodeIndex.get(cursor) ?? null
+  }
+  pathIds.reverse()
+
+  const ancestors: TreeNode[] = []
+  let parent: TreeNode | null = null
+  for (let position = 0; position < pathIds.length; position += 1) {
+    const siblings: TreeNode[] = parent === null ? document.roots : parent.children
+    const node: TreeNode | undefined = siblings.find((candidate) => candidate.id === pathIds[position])
+    if (node === undefined) return undefined
+    if (position === pathIds.length - 1) {
       return { node, parent, siblings, index: siblings.indexOf(node), ancestors }
     }
-    for (let index = node.children.length - 1; index >= 0; index -= 1) {
-      const child = node.children[index]!
-      parents.set(child, node)
-      stack.push(child)
-    }
+    ancestors.push(node)
+    parent = node
   }
 
   return undefined
@@ -176,11 +217,14 @@ export function editNodeContent(document: Document, nodeId: NodeId, text: string
   if (rootIndex < 0) throw new Error(`Node ${nodeId} does not exist.`)
   const roots = document.roots.slice()
   roots[rootIndex] = replacement
-  return { roots }
+  const next: Document = { roots }
+  shareIndex(document, next)
+  return next
 }
 
 export function deleteLink(document: Document, nodeId: NodeId, cursor: number): Document | undefined {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const node = requireNode(next, nodeId).node
   const link = node.links?.find((candidate) => candidate.end === cursor)
   if (link === undefined) return undefined
@@ -203,6 +247,7 @@ export function deleteLink(document: Document, nodeId: NodeId, cursor: number): 
 
 export function removeTextRange(document: Document, nodeId: NodeId, start: number, end: number): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const node = requireNode(next, nodeId).node
   const from = snapToCodePoint(node.text, Math.min(start, end))
   const to = snapToCodePoint(node.text, Math.max(start, end))
@@ -232,7 +277,9 @@ export function insertSiblingAfter(
   attachment?: AttachmentReference,
 ): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const located = requireNode(next, nodeId)
+  invalidateIndex(next)
   located.siblings.splice(located.index + 1, 0, {
     id: newNodeId,
     text,
@@ -245,7 +292,9 @@ export function insertSiblingAfter(
 
 export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeId: NodeId): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const located = requireNode(next, nodeId)
+  invalidateIndex(next)
   located.siblings.splice(located.index, 0, { id: newNodeId, text: '', children: [] })
   return next
 }
@@ -256,14 +305,18 @@ export function createFirstChild(document: Document, parentId: NodeId, childId: 
     throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
   }
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const parent = requireNode(next, parentId)
+  invalidateIndex(next)
   parent.node.children.unshift({ id: childId, text: '', children: [] })
   return next
 }
 
 export function splitNode(document: Document, nodeId: NodeId, cursor: number, newNodeId: NodeId): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const located = requireNode(next, nodeId)
+  invalidateIndex(next)
   const position = snapToCodePoint(located.node.text, cursor)
   const suffix = located.node.text.slice(position)
   const links = splitLinks(located.node.links ?? [], position)
@@ -280,13 +333,16 @@ export function splitNode(document: Document, nodeId: NodeId, cursor: number, ne
 
 export function deleteNode(document: Document, nodeId: NodeId): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const located = requireNode(next, nodeId)
+  invalidateIndex(next)
   located.siblings.splice(located.index, 1)
   return next
 }
 
 export function moveSibling(document: Document, nodeId: NodeId, destinationIndex: number): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const located = requireNode(next, nodeId)
   const [node] = located.siblings.splice(located.index, 1)
   if (node === undefined) {
@@ -304,6 +360,7 @@ export function pasteText(
   richLinks?: LinkRange[],
 ): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const node = requireNode(next, nodeId).node
   const position = snapToCodePoint(node.text, cursor)
   node.text = `${node.text.slice(0, position)}${text}${node.text.slice(position)}`
@@ -324,7 +381,9 @@ export function pasteMultilineText(
   }
 
   const next = cloneDocument(document)
+  shareIndex(document, next)
   const located = requireNode(next, nodeId)
+  invalidateIndex(next)
   const position = snapToCodePoint(located.node.text, cursor)
   const prefix = located.node.text.slice(0, position)
   const suffix = located.node.text.slice(position)
@@ -371,6 +430,7 @@ export function pasteMultilineText(
 
 export function attachImage(document: Document, nodeId: NodeId, attachment: AttachmentReference): Document {
   const next = cloneDocument(document)
+  shareIndex(document, next)
   requireNode(next, nodeId).node.attachment = { ...attachment }
   return next
 }

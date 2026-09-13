@@ -27,6 +27,7 @@ import {
   validatePersistedState,
   MAX_DOCUMENT_DEPTH,
   type Document,
+  type LocatedNode,
   type Location,
   type TreeNode,
 } from './document'
@@ -123,6 +124,62 @@ function positionOf(text: string, cursor: number): number {
     }
   }
   return position
+}
+
+interface NormalizedLocation {
+  nodeId: string
+  parentId: string | null
+  siblingIds: string[]
+  index: number
+  ancestorIds: string[]
+}
+
+function normalizeLocation(located: LocatedNode | undefined): NormalizedLocation | undefined {
+  if (located === undefined) return undefined
+  return {
+    nodeId: located.node.id,
+    parentId: located.parent?.id ?? null,
+    siblingIds: located.siblings.map((node) => node.id),
+    index: located.index,
+    ancestorIds: located.ancestors.map((node) => node.id),
+  }
+}
+
+function locateNodeReference(document: Document, id: string): NormalizedLocation | undefined {
+  const parents = new Map<TreeNode, TreeNode | null>()
+  const stack: TreeNode[] = []
+  for (let index = document.roots.length - 1; index >= 0; index -= 1) {
+    const node = document.roots[index]!
+    parents.set(node, null)
+    stack.push(node)
+  }
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    if (node.id === id) {
+      const parent = parents.get(node) ?? null
+      const siblings = parent === null ? document.roots : parent.children
+      const ancestors: string[] = []
+      let current = parent
+      while (current !== null) {
+        ancestors.push(current.id)
+        current = parents.get(current) ?? null
+      }
+      ancestors.reverse()
+      return {
+        nodeId: node.id,
+        parentId: parent?.id ?? null,
+        siblingIds: siblings.map((sibling) => sibling.id),
+        index: siblings.indexOf(node),
+        ancestorIds: ancestors,
+      }
+    }
+    for (let index = node.children.length - 1; index >= 0; index -= 1) {
+      const child = node.children[index]!
+      parents.set(child, node)
+      stack.push(child)
+    }
+  }
+  return undefined
 }
 
 describe('document invariants', () => {
@@ -374,6 +431,53 @@ describe('document invariants', () => {
 
         expect(JSON.parse(JSON.stringify(document))).toEqual(before)
       }),
+    )
+  })
+
+  it('locates every node exactly like a full-traversal reference', () => {
+    fc.assert(
+      fc.property(forest, (rawForest) => {
+        const document = materialize(rawForest)
+        for (const node of allNodes(document)) {
+          expect(normalizeLocation(locateNode(document, node.id))).toEqual(locateNodeReference(document, node.id))
+        }
+        expect(locateNode(document, 'not-a-node')).toBeUndefined()
+        expect(locateNodeReference(document, 'not-a-node')).toBeUndefined()
+      }),
+    )
+  })
+
+  it('locates every node exactly like the reference after any operation', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, text) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const results: Document[] = [
+          editNodeText(document, node.id, text),
+          editNodeContent(document, node.id, text, []),
+          deleteLink(document, node.id, cursor) ?? document,
+          removeTextRange(document, node.id, cursor, cursor + 1),
+          insertSiblingAfter(document, node.id, 'new-after'),
+          insertSiblingBefore(document, node.id, 'new-before'),
+          createFirstChild(document, node.id, 'new-child'),
+          splitNode(document, node.id, cursor, 'new-split'),
+          deleteNode(document, node.id),
+          moveSibling(document, node.id, cursor),
+          pasteText(document, node.id, cursor, text),
+          pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node']),
+          attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' }),
+          ensureRoot(document, 'new-root'),
+        ]
+        for (const result of results) {
+          for (const candidate of allNodes(result)) {
+            expect(normalizeLocation(locateNode(result, candidate.id))).toEqual(
+              locateNodeReference(result, candidate.id),
+            )
+          }
+          expect(locateNode(result, 'not-a-node')).toBeUndefined()
+        }
+      }),
+      { numRuns: 25 },
     )
   })
 })

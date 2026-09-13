@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   assertDocument,
   attachImage,
+  buildNodeIndex,
   cloneDocument,
   collectAttachmentIds,
   createInitialDocument,
   createFirstChild,
+  insertSiblingAfter,
   insertSiblingBefore,
   deleteLink,
   deleteNode,
@@ -25,6 +27,7 @@ import {
   validatePersistedState,
   MAX_DOCUMENT_DEPTH,
   MAX_DOCUMENT_DEPTH_ERROR,
+  type Document,
   type TreeNode,
 } from './document'
 
@@ -354,5 +357,57 @@ describe('document operations', () => {
     expect(parsed.version).toBe(2)
     const document = pasteText(parsed.document, 'a', 0, 'https://example.com')
     expect(serializeState(document, parsed.location).version).toBe(2)
+  })
+
+  it('builds a parent index that maps every node to its parent or the root collection', () => {
+    const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
+    const index = buildNodeIndex(document)
+
+    expect(index.get('root')).toBeNull()
+    expect(index.get('child')).toBe('root')
+    expect(index.has('missing')).toBe(false)
+  })
+
+  it('locates a node created by a topology-changing operation', () => {
+    const document = createInitialDocument('a')
+    const result = insertSiblingAfter(document, 'a', 'b')
+
+    const located = locateNode(result, 'b')
+    expect(located?.node.id).toBe('b')
+    expect(located?.parent).toBeNull()
+    expect(located?.siblings.map((node) => node.id)).toEqual(['a', 'b'])
+    expect(located?.index).toBe(1)
+  })
+
+  it('does not reuse an index across different documents', () => {
+    const first = createInitialDocument('a')
+    const second = createFirstChild(createInitialDocument('b'), 'b', 'b-child')
+
+    expect(locateNode(first, 'b-child')).toBeUndefined()
+    expect(locateNode(second, 'b-child')?.node.id).toBe('b-child')
+    expect(locateNode(first, 'a')?.node.id).toBe('a')
+  })
+
+  it('resolves a warm lookup without traversing unrelated subtrees', () => {
+    const unrelatedChildren: TreeNode[] = [{ id: 'unrelated-child', text: '', children: [] }]
+    const unrelated: TreeNode = { id: 'unrelated', text: '', children: unrelatedChildren }
+    let unrelatedReads = 0
+    Object.defineProperty(unrelated, 'children', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        unrelatedReads += 1
+        return unrelatedChildren
+      },
+    })
+    const document: Document = {
+      roots: [{ id: 'target', text: '', children: [{ id: 'target-child', text: '', children: [] }] }, unrelated],
+    }
+
+    locateNode(document, 'target-child')
+    unrelatedReads = 0
+
+    expect(locateNode(document, 'target-child')?.node.id).toBe('target-child')
+    expect(unrelatedReads).toBe(0)
   })
 })
