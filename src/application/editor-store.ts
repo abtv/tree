@@ -1,18 +1,14 @@
 import {
-  attachImage,
   collectAttachmentIds,
   createFirstChild,
   createInitialDocument,
   deleteLink,
   displayedNodes,
   editNodeContent,
-  insertSiblingAfter,
   insertSiblingBefore,
   isValidLocation,
   moveSibling,
   parsePersistedState,
-  pasteMultilineText,
-  pasteText,
   removeTextRange,
   requireNode,
   splitNode,
@@ -26,6 +22,7 @@ import {
 } from '../domain/document'
 import type { ClipboardPayload } from '../shared/ipc'
 import type { ClipboardWritePayload } from '../shared/ipc'
+import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 import { EditorHistory } from './editor-history'
 import {
   ancestorNavigationTransition,
@@ -203,15 +200,9 @@ export class EditorStore {
 
   public async copy(nodeId: NodeId, start: number, end: number): Promise<boolean> {
     const state = this.ready()
-    const node = requireNode(state.document, nodeId).node
-    const from = Math.max(0, Math.min(start, end))
-    const to = Math.min(node.text.length, Math.max(start, end))
-    if (from === to || this.services.writeClipboard === undefined) return false
-    const text = node.text.slice(from, to)
-    const links = (node.links ?? [])
-      .filter((link) => link.start >= from && link.end <= to)
-      .map((link) => ({ ...link, start: link.start - from, end: link.end - from }))
-    const operation = this.services.writeClipboard({ text, html: clipboardHtml(text, links) })
+    const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
+    if (transition === undefined || this.services.writeClipboard === undefined) return false
+    const operation = this.services.writeClipboard(transition.payload)
     this.pendingClipboardOperation = operation
     try {
       await operation
@@ -223,21 +214,15 @@ export class EditorStore {
 
   public async cut(nodeId: NodeId, start: number, end: number): Promise<boolean> {
     const state = this.ready()
-    const node = requireNode(state.document, nodeId).node
-    const from = Math.max(0, Math.min(start, end))
-    const to = Math.min(node.text.length, Math.max(start, end))
-    if (from === to || this.services.writeClipboard === undefined) return false
-    const text = node.text.slice(from, to)
-    const links = (node.links ?? [])
-      .filter((link) => link.start >= from && link.end <= to)
-      .map((link) => ({ ...link, start: link.start - from, end: link.end - from }))
+    const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
+    if (transition === undefined || this.services.writeClipboard === undefined) return false
     const operation = (async (): Promise<void> => {
-      await this.services.writeClipboard!({ text, html: clipboardHtml(text, links) })
+      await this.services.writeClipboard!(transition.payload)
       if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) return
       this.applyStructural(
-        removeTextRange(this.snapshot.document, nodeId, from, to),
+        removeTextRange(this.snapshot.document, nodeId, transition.from, transition.to),
         this.snapshot.location,
-        this.newFocus(nodeId, from),
+        this.newFocus(nodeId, transition.from),
       )
     })()
     this.pendingClipboardOperation = operation
@@ -404,22 +389,18 @@ export class EditorStore {
         if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) {
           return
         }
-        const target = requireNode(this.snapshot.document, nodeId).node
-        if (target.attachment === undefined) {
-          this.applyStructural(
-            attachImage(this.snapshot.document, nodeId, attachment),
-            this.snapshot.location,
-            this.newFocus(nodeId, target.text.length),
-          )
-        } else {
-          const newId = this.createId()
-          const outerLocation = this.locationForSiblingOf(this.snapshot.document, nodeId, newId, this.snapshot.location)
-          this.applyStructural(
-            insertSiblingAfter(this.snapshot.document, nodeId, newId, '', attachment),
-            outerLocation,
-            this.newFocus(newId, 0),
-          )
-        }
+        const transition = imagePasteTransition(
+          this.snapshot.document,
+          this.snapshot.location,
+          nodeId,
+          attachment,
+          this.createId,
+        )
+        this.applyStructural(
+          transition.document,
+          transition.location,
+          this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+        )
       } finally {
         this.pendingAttachmentIds.delete(attachment.id)
         this.queueAttachmentCleanup()
@@ -427,22 +408,13 @@ export class EditorStore {
       return
     }
 
-    if (!clipboard.text.includes('\n') && !clipboard.text.includes('\r')) {
-      this.applyStructural(
-        pasteText(current.document, nodeId, cursor, clipboard.text, clipboard.links),
-        current.location,
-        this.newFocus(nodeId, cursor + clipboard.text.length),
-      )
-      return
-    }
-    const lines = clipboard.text.replace(/\r\n?/g, '\n').split('\n')
-    const ids = lines.slice(1).map(() => this.createId())
-    const finalNodeId = ids.at(-1)
-    const finalLine = lines.at(-1) ?? ''
+    const transition = textPasteTransition(current.document, current.location, nodeId, cursor, clipboard, (count) =>
+      Array.from({ length: count }, () => this.createId()),
+    )
     this.applyStructural(
-      pasteMultilineText(current.document, nodeId, cursor, lines, ids, clipboard.links),
-      this.locationForSiblingOf(current.document, nodeId, finalNodeId ?? nodeId, current.location),
-      this.newFocus(finalNodeId ?? nodeId, finalLine.length),
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
   }
 
@@ -489,18 +461,6 @@ export class EditorStore {
       this.clock.clearTimeout(this.textTimer)
     }
     this.textTimer = this.clock.setTimeout(() => this.endTextSession(), 5_000)
-  }
-
-  private locationForSiblingOf(
-    document: Document,
-    nodeId: NodeId,
-    selectedNodeId: NodeId,
-    location: Location,
-  ): Location {
-    if (location.currentParentId !== nodeId) {
-      return { ...location, selectedNodeId }
-    }
-    return { currentParentId: requireNode(document, nodeId).parent?.id ?? null, selectedNodeId }
   }
 
   private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, persist: boolean): void {
@@ -558,21 +518,4 @@ export class EditorStore {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : 'The editor could not complete the requested operation.'
-}
-
-function clipboardHtml(text: string, links: Array<{ start: number; end: number; url: string }>): string {
-  const parts: string[] = []
-  let position = 0
-  for (const link of links) {
-    parts.push(escapeClipboardHtml(text.slice(position, link.start)))
-    const label = escapeClipboardHtml(text.slice(link.start, link.end))
-    parts.push(`<a href="${escapeClipboardHtml(link.url)}">${label}</a>`)
-    position = link.end
-  }
-  parts.push(escapeClipboardHtml(text.slice(position)))
-  return parts.join('').replaceAll('\n', '<br>')
-}
-
-function escapeClipboardHtml(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 }
