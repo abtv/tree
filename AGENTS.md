@@ -52,6 +52,7 @@ The Product Owner may communicate with the agent in any language.
 * Do not silently change product behavior.
 * Keep application shortcuts scoped to the application. Use Electron's `globalShortcut` only when the product requirement explicitly says the shortcut must work while the application is inactive; ordinary application commands, including quit, must use an application-scoped menu or window input handler.
 * Do not silently change the data model, persistence model, technology stack, or major architectural boundaries.
+* Treat performance as a first-class requirement for state and persistence changes. Every such change must include the performance assessment required by `docs/PRODUCT.md` §22 (disk writes and syncs, CPU on interactive paths, and memory growth), and must add or update an automated performance guard when the change can affect behavior at scale.
 * Make small implementation decisions autonomously when they do not affect product behavior or architecture.
 * Ask the Product Owner when an ambiguity can materially affect UX, product behavior, data, persistence, or architecture.
 

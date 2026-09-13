@@ -485,6 +485,8 @@ Undo and redo do not restore the previous selection, text cursor position, or na
 
 Undo/redo history does not need to survive application restart.
 
+The undo/redo history retains at most the 200 most recent entries. A history entry is one text-editing session or one structural command. When the limit is exceeded, the oldest entries are discarded and can no longer be undone.
+
 ---
 
 ## 11. Drag and Drop
@@ -675,6 +677,25 @@ The application automatically saves changes.
 
 There is no Save button.
 
+### 16.1 Automatic Save Policy
+
+The application does not save on every keystroke.
+
+A save is performed when:
+
+* an image is inserted;
+* a hyperlink is inserted;
+* ten words have been inserted since the last successful save;
+* no document change has occurred for ten seconds while changes are pending.
+
+Changes that do not insert content — creating, splitting, deleting, reordering, or undoing/redoing nodes — do not by themselves trigger a save. They remain pending and are saved by the next volume, idle, or quit trigger.
+
+Only inserted words count toward the volume threshold. Deletions and other changes still reset the idle timer and keep changes pending.
+
+Every pending change is flushed before a normal quit completes.
+
+If a save fails, the pending changes are retained and the failure is surfaced. The application retries on the next idle interval, volume trigger, or quit. A later successful save clears the error.
+
 The document must persist between application restarts.
 
 The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
@@ -797,3 +818,21 @@ If the renderer encounters an unexpected error while rendering, the application 
 Instead, it displays an error message and a `Reload` action. Reloading restarts the renderer and loads the last saved document.
 
 Changes that were queued in memory but not yet persisted may be lost when the user reloads.
+
+---
+
+## 22. Non-Functional Requirements
+
+### 22.1 Performance of State and Persistence Changes
+
+The application must stay responsive and must not accumulate unbounded memory or perform unnecessary disk operations as the document and edit history grow.
+
+Any change to editor state or persistence must include an explicit assessment of its performance implications, covering:
+
+* disk operations, especially writes and filesystem syncs, which must be minimized to limit SSD wear;
+* CPU work added to interactive paths, such as typing, navigation, and commands;
+* memory usage, especially any structure that can grow without bound with document size or edit count.
+
+The assessment must consider how the cost scales with document size and the number of edits, and the change must state the expected cost and any mitigation.
+
+Concrete budgets are not fixed here. When a change can affect performance at scale, the implementation must add or update an automated performance guard at the appropriate level (unit, boundary, or performance suite). Budgets are derived from measured baselines and recorded with the relevant implementation plan.
