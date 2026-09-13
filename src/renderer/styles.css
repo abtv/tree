@@ -246,7 +246,8 @@ textarea {
   cursor: pointer;
 }
 
-.node-input.select-all a {
+.node-input.select-all a,
+.node-input a.link-selected {
   color: HighlightText;
   background: Highlight;
 }

@@ -124,6 +124,38 @@ test.describe('clipboard', () => {
     await expect(editor).toContainText('https://example.comx')
   })
 
+  test('visually marks a hyperlink when node content is selected with the mouse', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.pressSequentially('see ')
+    await writeClipboardText(app, 'https://example.com')
+    await firePaste(editor)
+    const link = window.getByRole('link', { name: 'https://example.com' })
+    await expect(link).toHaveCount(1)
+
+    await editor.click()
+    const points = await editor.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const rects = range.getClientRects()
+      const first = rects[0]!
+      const last = rects[rects.length - 1]!
+      return {
+        startX: first.left + 1,
+        startY: first.top + first.height / 2,
+        endX: last.right - 1,
+        endY: last.top + last.height / 2,
+      }
+    })
+    await window.mouse.move(points.startX, points.startY)
+    await window.mouse.down()
+    await window.mouse.move(points.endX, points.endY, { steps: 10 })
+    await window.mouse.up()
+
+    await expect(link).toHaveClass(/link-selected/)
+  })
+
   test('removes the whole hyperlink with Backspace at its end', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 

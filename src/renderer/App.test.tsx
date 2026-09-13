@@ -214,6 +214,26 @@ describe('App', () => {
     expect(editor).toHaveClass('select-all')
   })
 
+  it('visually marks hyperlinks when node content is selected', async () => {
+    const store = createStore({ kind: 'text', text: 'https://example.com' })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+    const editor = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLDivElement
+    const link = screen.getByRole('link', { name: 'https://example.com' })
+
+    const selection = window.getSelection()!
+    const range = document.createRange()
+    range.selectNodeContents(editor)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    document.dispatchEvent(new Event('selectionchange'))
+
+    expect(link).toHaveClass('link-selected')
+  })
+
   it('preserves the caret after typing in a linked node', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
     await act(async () => {

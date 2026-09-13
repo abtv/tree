@@ -91,6 +91,15 @@ export function selectAll(element: HTMLElement): void {
   selection.addRange(range)
 }
 
+export function updateSelectedLinks(element: HTMLElement): void {
+  const selection = globalThis.getSelection()
+  const active = selection !== null && selection.rangeCount > 0 && !selection.isCollapsed
+  const range = active && selection !== null ? selection.getRangeAt(0) : null
+  for (const link of element.querySelectorAll('a')) {
+    link.classList.toggle('link-selected', range !== null && range.intersectsNode(link))
+  }
+}
+
 export function setCaret(element: HTMLElement, position: number): void {
   const selection = globalThis.getSelection()
   if (selection === null) return

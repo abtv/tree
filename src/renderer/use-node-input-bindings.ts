@@ -1,8 +1,8 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
-import { getCaret, isCollapsedSelection, readEditableContent, setCaret } from './editor-dom'
+import { getCaret, isCollapsedSelection, readEditableContent, setCaret, updateSelectedLinks } from './editor-dom'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
 
@@ -50,6 +50,16 @@ export function useNodeInputBindings({
     setCaret(pending.input, pending.cursor)
     pendingCaret.current = undefined
   })
+
+  useEffect(() => {
+    const update = (): void => {
+      for (const input of inputs.current.values()) {
+        if (!(input instanceof HTMLTextAreaElement)) updateSelectedLinks(input)
+      }
+    }
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  }, [])
 
   const setInput =
     (id: string) =>

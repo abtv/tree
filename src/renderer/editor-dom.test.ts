@@ -10,6 +10,7 @@ import {
   richTextHtml,
   selectAll,
   setCaret,
+  updateSelectedLinks,
 } from './editor-dom'
 
 function node(text: string, links?: TreeNode['links']): TreeNode {
@@ -149,5 +150,33 @@ describe('editor DOM adapters', () => {
     expect(getCaret(element)).toBe(1)
     setCaret(element, 4)
     expect(getCaret(element)).toBe(5)
+  })
+
+  it('marks links that intersect the current selection and clears them when it collapses', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    if (link === null) throw new Error('The link was not created.')
+
+    setDomSelection(element.firstChild!, 0, element.lastChild!, 1)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(true)
+
+    setDomSelection(element.firstChild!, 0)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(false)
+  })
+
+  it('does not mark a link that the selection does not cover', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    if (link === null) throw new Error('The link was not created.')
+
+    setDomSelection(element.firstChild!, 0, element.firstChild!, 1)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(false)
   })
 })
