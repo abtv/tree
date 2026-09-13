@@ -33,6 +33,7 @@ export default tseslint.config(
       'vitest.config.ts',
       'playwright.config.ts',
       'perf.config.ts',
+      'scripts/**/*.{js,mjs,ts}',
       'e2e/**/*.ts',
       'perf/**/*.ts',
       'src/main/**/*.ts',

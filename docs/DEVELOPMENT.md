@@ -172,9 +172,12 @@ It should run:
 1. type checking;
 2. linting;
 3. formatting check (`prettier --check`);
-4. tests with coverage enforcement;
-5. production build;
-6. dependency audit (`npm audit`).
+4. documentation governance (`npm run check:docs`);
+5. tests with coverage enforcement;
+6. production build;
+7. dependency audit (`npm audit`).
+
+The documentation governance step validates plan filenames and metadata, rejects unchecked or stale-`Completed` plans, checks that relative links and plan/ADR references in live documents resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
 The repository must also provide the complete validation command:
 
