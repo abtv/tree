@@ -554,6 +554,30 @@ describe('App', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Operation failed: attachment cleanup failed')
   })
 
+  it('shows a save error when persistence fails', async () => {
+    const services: EditorServices = {
+      load: async () => null,
+      save: async () => {
+        throw new Error('disk full')
+      },
+      readClipboard: async () => ({ kind: 'text', text: '' }),
+      writeAttachment: async () => undefined,
+      hasAttachment: async () => true,
+      cleanupAttachments: async () => undefined,
+    }
+    const store = new EditorStore(services, () => 'root')
+    await act(async () => {
+      await store.initialize()
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    render(<App store={store} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Changes could not be saved: disk full')
+  })
+
   it('selects a node when its input receives focus', async () => {
     const store = createStore()
     await act(async () => {

@@ -227,4 +227,67 @@ describe('editor keyboard handler', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(onPreviewAttachment).not.toHaveBeenCalled()
   })
+
+  it('prevents the default for Cmd+0 without dispatching a command', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(2, 2)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const event = keyEvent(input, '0', { metaKey: true })
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(store.endTextSession).not.toHaveBeenCalled()
+  })
+
+  it('ends the text session for boundary keys that do not move the selection', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(2, 2)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    for (const key of ['Home', 'End', 'PageUp', 'PageDown']) handle(keyEvent(input, key))
+
+    expect(store.endTextSession).toHaveBeenCalledTimes(4)
+    expect(store.moveHorizontal).not.toHaveBeenCalled()
+  })
+
+  it('moves horizontally at a text boundary and prevents the browser default', () => {
+    const store = createStore()
+    vi.mocked(store.moveHorizontal).mockReturnValue(true)
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(2, 2)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    const left = keyEvent(input, 'ArrowLeft')
+    const right = keyEvent(input, 'ArrowRight')
+    handle(left)
+    handle(right)
+
+    expect(store.moveHorizontal).toHaveBeenNthCalledWith(1, 'left', 2)
+    expect(store.moveHorizontal).toHaveBeenNthCalledWith(2, 'right', 2)
+    expect(left.preventDefault).toHaveBeenCalledOnce()
+    expect(right.preventDefault).toHaveBeenCalledOnce()
+    expect(store.endTextSession).not.toHaveBeenCalled()
+  })
+
+  it('ends the text session instead of moving when text is selected', () => {
+    const store = createStore()
+    vi.mocked(store.moveHorizontal).mockReturnValue(true)
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 4)
+    const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'ArrowLeft'))
+
+    expect(store.moveHorizontal).not.toHaveBeenCalled()
+    expect(store.endTextSession).toHaveBeenCalledOnce()
+  })
 })

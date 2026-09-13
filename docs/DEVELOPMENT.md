@@ -309,7 +309,7 @@ Platform-routed shortcuts need boundary-faithful end-to-end tests. Playwright in
 
 Coverage reporting (`npm run test:coverage`) is a gap-finder, not a target. Do not add tests solely to raise the number. When behavior changes, review the affected product requirements and confirm each one still has coverage at the appropriate level.
 
-The coverage-enabled unit suite enforces global floors of 91% statements, 83% branches, 92% functions, and 93% lines. These floors are derived from the measured post-change baseline of 92.84%, 84.64%, 92.94%, and 94.57%, respectively, with a small margin for ordinary test-run variance. They are higher than the previous floors and must not be weakened to make validation pass. The focused floors for `src/domain/document.ts` and `src/application/editor-store.ts` are 80% branches. `npm run check` runs this coverage-enabled suite.
+The coverage-enabled unit suite enforces global floors of 91% statements, 83% branches, 92% functions, and 93% lines. These floors are derived from the measured post-change baseline of 96.31%, 90.12%, 95.78%, and 97.97%, respectively, with a small margin for ordinary test-run variance. They are higher than the previous floors and must not be weakened to make validation pass. The focused floors for `src/domain/document.ts` and `src/application/editor-store.ts` are 80% branches. `npm run check` runs this coverage-enabled suite.
 
 Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files.
 

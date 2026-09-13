@@ -179,4 +179,42 @@ describe('editor DOM adapters', () => {
     updateSelectedLinks(element)
     expect(link.classList.contains('link-selected')).toBe(false)
   })
+
+  it('reads text nested inside inline elements and anchors without an href attribute', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'before<span>inner <em>deep</em></span><a>linked</a>'
+
+    expect(readEditableContent(element)).toEqual({
+      text: 'beforeinner deeplinked',
+      links: [{ start: 16, end: 22, url: '' }],
+    })
+  })
+
+  it('computes caret offsets through nested inline elements and first-level children', () => {
+    const element = document.createElement('div')
+    element.innerHTML = '<span>a</span><span>x<b>two</b></span>'
+    document.body.append(element)
+    const bold = element.querySelector('b')
+    if (bold === null) throw new Error('The nested element was not created.')
+
+    setDomSelection(bold, 0)
+    expect(getCaret(element)).toBe(2)
+
+    const firstSpan = element.querySelector('span')
+    if (firstSpan === null) throw new Error('The first span was not created.')
+    setDomSelection(firstSpan, 0)
+    expect(getCaret(element)).toBe(0)
+  })
+
+  it('leaves the caret and selection untouched when no DOM selection is available', () => {
+    const element = document.createElement('div')
+    element.textContent = 'hello'
+    document.body.append(element)
+    const getSelection = vi.spyOn(globalThis, 'getSelection').mockReturnValue(null)
+
+    expect(() => setCaret(element, 2)).not.toThrow()
+    expect(() => selectAll(element)).not.toThrow()
+
+    getSelection.mockRestore()
+  })
 })
