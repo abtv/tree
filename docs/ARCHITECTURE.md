@@ -225,6 +225,8 @@ For example, an `Enter` key handler should not directly manipulate the tree stru
 
 Instead, it should invoke the appropriate application/domain operation.
 
+A top-level React error boundary wraps the application in `src/renderer/ErrorBoundary.tsx`. It catches render and lifecycle errors that would otherwise leave an empty window, logs diagnostics, and shows a fallback with a `Reload` action that restarts the renderer from persisted state. Errors from event handlers and asynchronous work continue to flow through the application error surface rather than the boundary.
+
 ---
 
 ## 9. UI State vs Document State

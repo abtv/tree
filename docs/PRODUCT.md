@@ -787,3 +787,13 @@ The user normally interacts with the application through:
 * mouse drag-and-drop for sibling reordering.
 
 The tree hierarchy is primarily navigated by entering and leaving nodes rather than by expanding and collapsing a full tree view.
+
+---
+
+## 21. Unexpected Renderer Errors
+
+If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.
+
+Instead, it displays an error message and a `Reload` action. Reloading restarts the renderer and loads the last saved document.
+
+Changes that were queued in memory but not yet persisted may be lost when the user reloads.

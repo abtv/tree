@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { EditorStore } from '../application/editor-store'
 import { createElectronEditorServices } from '../infrastructure/renderer/electron-services'
 import { App } from './App'
+import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import './styles.css'
 
@@ -17,6 +18,8 @@ startRendererLifecycle(store, window.treeApi)
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App store={store} />
+    <ErrorBoundary>
+      <App store={store} />
+    </ErrorBoundary>
   </StrictMode>,
 )
