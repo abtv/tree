@@ -679,6 +679,12 @@ The main window's size and position must persist between application restarts. O
 
 When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes.
 
+Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
+
+When recovering from a missing or malformed document file, a temporary or backup document must be validated, including the availability of its referenced attachments, before it replaces the primary file. If stored document files exist but no valid document can be loaded, loading fails without changing those files. If no document files exist, the normal first-launch behavior applies.
+
+A primary file containing JSON `null` is invalid stored data, not a first launch. Loading shows an error and preserves the primary and any temporary or backup documents.
+
 The following state must be persisted:
 
 * the ordered top-level root nodes and their trees;

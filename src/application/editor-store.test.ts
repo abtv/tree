@@ -925,6 +925,73 @@ describe('EditorStore', () => {
     expect(flushed).toBe(true)
   })
 
+  it.each(['clipboard read', 'attachment write', 'cut'] as const)(
+    'waits for a pending %s and its resulting save during flush',
+    async (stage) => {
+      const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+      const store = new EditorStore(services, ids('root', 'image'))
+      await store.initialize()
+      store.editText('root', 'text')
+      store.endTextSession()
+      await store.flushPersistence()
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const blocked = vi.fn(async () => gate)
+      if (stage === 'clipboard read') {
+        services.readClipboard = async () => {
+          await blocked()
+          return { kind: 'text', text: 'pasted' }
+        }
+      } else if (stage === 'attachment write') services.writeAttachment = blocked
+      else services.writeClipboard = blocked
+
+      const operation = stage === 'cut' ? store.cut('root', 0, 4) : store.paste('root', 0)
+      await vi.waitFor(() => expect(blocked).toHaveBeenCalledOnce())
+      let flushed = false
+      const flush = store.flushPersistence().then(() => {
+        flushed = true
+      })
+      try {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        expect(flushed).toBe(false)
+      } finally {
+        release()
+        await operation
+        await flush
+      }
+      const expected =
+        stage === 'attachment write'
+          ? { text: 'text', attachment: { id: 'image', mimeType: 'image/png' } }
+          : { text: stage === 'cut' ? '' : 'pastedtext' }
+      expect(services.saves.at(-1)).toMatchObject({ document: { roots: [expected] } })
+    },
+  )
+
+  it('rejects a flush when a pending attachment write fails and permits a later retry', async () => {
+    const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+    const store = new EditorStore(services, ids('root', 'image'))
+    await store.initialize()
+    await store.flushPersistence()
+    let reject!: (error: Error) => void
+    services.writeAttachment = vi.fn(
+      () =>
+        new Promise<void>((_resolve, fail) => {
+          reject = fail
+        }),
+    )
+    const paste = store.paste('root', 0)
+    const pasteFailure = expect(paste).rejects.toThrow('attachment failed')
+    await vi.waitFor(() => expect(services.writeAttachment).toHaveBeenCalledOnce())
+    const flushFailure = expect(store.flushPersistence()).rejects.toThrow('attachment failed')
+    reject(new Error('attachment failed'))
+    await pasteFailure
+    await flushFailure
+    await expect(store.flushPersistence()).resolves.toBeUndefined()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+  })
+
   it('surfaces operation errors until the next successful command', async () => {
     const store = new EditorStore(createServices(), ids('root'))
     await store.initialize()

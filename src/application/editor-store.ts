@@ -82,6 +82,7 @@ export class EditorStore {
   private textTimer: unknown
   private standaloneNextTextEdit = false
   private pendingClipboardOperation: Promise<void> | undefined
+  private readonly pendingEdits = new Set<Promise<void>>()
   private focusToken = 0
   public constructor(
     private readonly services: EditorServices,
@@ -103,7 +104,10 @@ export class EditorStore {
   }
 
   public async flushPersistence(): Promise<void> {
-    await this.persistence.flush()
+    do {
+      await Promise.all(this.pendingEdits)
+      await this.persistence.flush()
+    } while (this.pendingEdits.size > 0)
   }
 
   public reportError(error: unknown): void {
@@ -224,7 +228,7 @@ export class EditorStore {
     })()
     this.pendingClipboardOperation = operation
     try {
-      await operation
+      await this.trackEdit(operation)
       return true
     } finally {
       if (this.pendingClipboardOperation === operation) this.pendingClipboardOperation = undefined
@@ -359,6 +363,19 @@ export class EditorStore {
   }
 
   public async paste(nodeId: NodeId, cursor: number): Promise<void> {
+    await this.trackEdit(this.pasteFromClipboard(nodeId, cursor))
+  }
+
+  private async trackEdit(operation: Promise<void>): Promise<void> {
+    this.pendingEdits.add(operation)
+    try {
+      await operation
+    } finally {
+      this.pendingEdits.delete(operation)
+    }
+  }
+
+  private async pasteFromClipboard(nodeId: NodeId, cursor: number): Promise<void> {
     this.ready()
     this.endTextSession()
     await this.pendingClipboardOperation

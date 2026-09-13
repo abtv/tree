@@ -1,6 +1,6 @@
 import { copyFile, mkdir, open, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { PersistedEditorState } from '../../domain/document'
+import { collectAttachmentIds, parsePersistedState, type PersistedEditorState } from '../../domain/document'
 
 export interface FileServices {
   load(): Promise<unknown | null>
@@ -39,11 +39,31 @@ export function createFileServices(
       return runOperation('load', [documentPath, temporaryDocumentPath, backupDocumentPath], async () => {
         let firstError: unknown
         for (const candidate of [documentPath, temporaryDocumentPath, backupDocumentPath]) {
+          let value: unknown
           try {
-            const value = JSON.parse(await readFile(candidate, 'utf8'))
-            if (candidate !== documentPath) {
-              await rename(candidate, documentPath)
+            value = JSON.parse(await readFile(candidate, 'utf8'))
+          } catch (error) {
+            if (!isNotFound(error) && firstError === undefined) firstError = error
+            continue
+          }
+          if (candidate === documentPath) {
+            // Only missing files may produce the first-launch null sentinel.
+            if (value === null) throw new Error('The saved document has an unsupported format.')
+            return value
+          }
+          try {
+            const state = parsePersistedState(value)
+            for (const id of collectAttachmentIds(state.document)) {
+              try {
+                await readFile(attachmentPath(attachmentsDirectory, id))
+              } catch (error) {
+                if (isNotFound(error)) {
+                  throw new Error(`Attachment ${id} is missing from local storage.`, { cause: error })
+                }
+                throw error
+              }
             }
+            await rename(candidate, documentPath)
             return value
           } catch (error) {
             if (!isNotFound(error) && firstError === undefined) {

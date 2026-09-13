@@ -56,6 +56,28 @@ describe('file services', () => {
     await expect(services.load()).rejects.toThrow()
   })
 
+  it.each([false, true])(
+    'rejects a null primary without changing files (with recovery files: %s)',
+    async (withRecovery) => {
+      const { directory, services } = await servicesForTest()
+      const files = new Map([[join(directory, 'document.json'), 'null']])
+      if (withRecovery) {
+        const state = JSON.stringify({
+          version: 1,
+          document: { roots: [{ id: 'root', text: 'Preserve me', children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        files.set(join(directory, 'document.json.tmp'), state)
+        files.set(join(directory, 'document.json.bak'), state)
+      }
+      for (const [path, bytes] of files) await writeFile(path, bytes)
+
+      await expect(services.load()).rejects.toThrow('The saved document has an unsupported format.')
+
+      for (const [path, bytes] of files) expect(await readFile(path, 'utf8')).toBe(bytes)
+    },
+  )
+
   it('recovers a durable temporary document after an interrupted replacement', async () => {
     const { directory, services } = await servicesForTest()
     const state = {
@@ -95,6 +117,69 @@ describe('file services', () => {
 
     await expect(Promise.all(states.map((state) => services.save(state)))).resolves.toHaveLength(states.length)
     await expect(services.load()).resolves.toEqual(expect.objectContaining({ version: 1 }))
+  })
+
+  it.each([
+    null,
+    { version: 999 },
+    {
+      version: 1,
+      document: {
+        roots: [{ id: 'root', text: '', children: [], attachment: { id: 'missing', mimeType: 'image/png' } }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    },
+  ])('leaves every file unchanged when a recovery candidate is invalid: %j', async (candidate) => {
+    const { directory, services } = await servicesForTest()
+    const primary = '{ damaged'
+    const temporary = JSON.stringify(candidate)
+    const backup = '{ also damaged'
+    await writeFile(join(directory, 'document.json'), primary)
+    await writeFile(join(directory, 'document.json.tmp'), temporary)
+    await writeFile(join(directory, 'document.json.bak'), backup)
+
+    await expect(services.load()).rejects.toThrow()
+
+    expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(primary)
+    expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe(temporary)
+    expect(await readFile(join(directory, 'document.json.bak'), 'utf8')).toBe(backup)
+  })
+
+  it('skips an unsupported temporary document and recovers a valid backup', async () => {
+    const { directory, services } = await servicesForTest()
+    const backup = {
+      version: 1,
+      document: { roots: [{ id: 'root', text: 'Recovered', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    }
+    await writeFile(join(directory, 'document.json'), '{ damaged')
+    await writeFile(join(directory, 'document.json.tmp'), '{"version":999}')
+    await writeFile(join(directory, 'document.json.bak'), JSON.stringify(backup))
+
+    await expect(services.load()).resolves.toEqual(backup)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(backup)
+    expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe('{"version":999}')
+  })
+
+  it('does not treat a recovery document with a missing image as an empty first launch', async () => {
+    const { directory, services } = await servicesForTest()
+    const candidate = {
+      version: 1,
+      document: {
+        roots: [{ id: 'root', text: '', children: [], attachment: { id: 'image', mimeType: 'image/png' } }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    }
+    const bytes = JSON.stringify(candidate)
+    await writeFile(join(directory, 'document.json.tmp'), bytes)
+
+    await expect(services.load()).rejects.toThrow('Attachment image is missing from local storage.')
+    expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe(bytes)
+    await expect(readFile(join(directory, 'document.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+
+    await services.writeAttachment('image', new Uint8Array([1]))
+    await expect(services.load()).resolves.toEqual(candidate)
+    expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(bytes)
   })
 
   it('serializes attachment writes and cleanup so overlapping cleanup cannot report ENOENT', async () => {

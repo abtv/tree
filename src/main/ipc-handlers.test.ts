@@ -117,4 +117,21 @@ describe('main IPC handlers', () => {
       Promise.resolve().then(() => handlers.get(ipcChannels.writeAttachment)!(event, '../escape', new Uint8Array())),
     ).rejects.toThrow('Attachment IDs')
   })
+
+  it('preserves load results and propagates persistence failures across registered channels', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    await expect(handlers.get(ipcChannels.load)!(event)).resolves.toBeNull()
+    vi.mocked(fileServices.load).mockResolvedValueOnce(validState)
+    await expect(handlers.get(ipcChannels.load)!(event)).resolves.toEqual(validState)
+    expect(fileServices.load).toHaveBeenCalledWith()
+
+    const failure = new Error('recovery or persistence failed')
+    vi.mocked(fileServices.load).mockRejectedValueOnce(failure)
+    vi.mocked(fileServices.save).mockRejectedValueOnce(failure)
+    vi.mocked(fileServices.cleanupAttachments).mockRejectedValueOnce(failure)
+    await expect(handlers.get(ipcChannels.load)!(event)).rejects.toBe(failure)
+    await expect(handlers.get(ipcChannels.save)!(event, validState)).rejects.toBe(failure)
+    await expect(handlers.get(ipcChannels.cleanupAttachments)!(event, [])).rejects.toBe(failure)
+  })
 })

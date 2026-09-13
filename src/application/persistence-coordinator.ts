@@ -17,6 +17,7 @@ export class PersistenceCoordinator {
   private requested = false
   private saveRequested = false
   private error: unknown
+  private saveError: unknown
 
   public constructor(
     private readonly services: PersistenceServices,
@@ -32,7 +33,11 @@ export class PersistenceCoordinator {
   }
 
   public async flush(): Promise<void> {
-    await this.saveQueue
+    let queue: Promise<void>
+    do {
+      queue = this.saveQueue
+      await queue
+    } while (queue !== this.saveQueue)
     if (this.error !== undefined) throw this.error
   }
 
@@ -51,10 +56,18 @@ export class PersistenceCoordinator {
           try {
             const state = this.dependencies.currentState()
             if (state === undefined) continue
-            if (saveRequested) await this.services.save(serializeState(state.document, state.location))
+            if (saveRequested) {
+              try {
+                await this.services.save(serializeState(state.document, state.location))
+                this.saveError = undefined
+              } catch (error) {
+                this.saveError = error
+                throw error
+              }
+            }
             await this.services.cleanupAttachments([...this.dependencies.referencedAttachmentIds()])
-            this.error = undefined
-            this.dependencies.onResult(undefined)
+            this.error = this.saveError
+            this.dependencies.onResult(this.error)
           } catch (error) {
             this.error = error
             this.dependencies.onResult(error)

@@ -348,9 +348,15 @@ Persistence must support future schema evolution.
 
 The application must flush queued saves before a normal quit completes. A persistence failure must not silently discard the in-memory document; it is surfaced to the user and a later successful save clears the error state.
 
+The editor tracks pending asynchronous cut and paste operations. Shutdown flushing waits for those operations, then their queued persistence, and checks for additional pending edits before completing. Operation failures reject the active flush and prevent its quit acknowledgment. The persistence coordinator retains document-save failures separately from cleanup results so cleanup alone cannot authorize quit with unsaved changes.
+
 Document saves and attachment filesystem operations are serialized by the file-service operation queue. The application also queues attachment cleanup with persistence work, so cleanup cannot race a save or another cleanup, and cleanup failures follow the same visible error and shutdown-flush path as save failures. File-service operations emit structured operation names, phases, and filesystem paths for diagnosing boundary failures.
 
 Loading invalid or unsupported data must fail safely rather than silently corrupting the document.
+
+File recovery checks temporary and backup candidates with the domain parser and verifies their referenced attachment files before promoting a candidate to the primary path. Invalid candidates are left untouched while the next fallback is considered. A syntactically readable primary document continues through ordinary application validation; recovery does not silently replace an unsupported primary document.
+
+The file-service `null` load result is reserved for missing document files. A primary file containing JSON `null` is rejected as unsupported at the file boundary, preserving the primary and recovery files instead of triggering first-launch initialization.
 
 Absolute filesystem paths must not be stored in the document.
 
