@@ -3,16 +3,13 @@ import {
   collectAttachmentIds,
   createFirstChild,
   createInitialDocument,
-  deleteNode,
   deleteLink,
   displayedNodes,
   editNodeContent,
-  ensureRoot,
   insertSiblingAfter,
   insertSiblingBefore,
   isValidLocation,
   moveSibling,
-  nodePath,
   parsePersistedState,
   pasteMultilineText,
   pasteText,
@@ -30,6 +27,15 @@ import {
 import type { ClipboardPayload } from '../shared/ipc'
 import type { ClipboardWritePayload } from '../shared/ipc'
 import { EditorHistory } from './editor-history'
+import {
+  ancestorNavigationTransition,
+  deleteEmptySelectedTransition,
+  deleteSelectedTransition,
+  enterTransition,
+  leaveTransition,
+  moveHorizontalTransition,
+  moveSelectionTransition,
+} from './editor-command-transitions'
 import { PersistenceCoordinator } from './persistence-coordinator'
 
 export type ClipboardValue = ClipboardPayload
@@ -258,89 +264,28 @@ export class EditorStore {
 
   public moveSelection(direction: 'up' | 'down', cursor: number): void {
     const state = this.ready()
-    if (state.location.currentParentId === state.location.selectedNodeId) {
-      if (direction === 'up') {
-        const parent = requireNode(state.document, state.location.currentParentId).node
-        this.selectNode(parent.id, 0)
-      }
-      if (direction === 'down') {
-        const child = displayedNodes(state.document, state.location.currentParentId)[0]
-        if (child !== undefined) {
-          this.selectNode(child.id, Math.min(cursor, child.text.length))
-        } else {
-          const parent = requireNode(state.document, state.location.currentParentId).node
-          this.selectNode(parent.id, parent.text.length)
-        }
-      }
-      return
-    }
-    const nodes = displayedNodes(state.document, state.location.currentParentId)
-    const index = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
-    if (direction === 'up' && index === 0 && state.location.currentParentId === null) {
-      this.selectNode(nodes[0]!.id, 0)
-      return
-    }
-    if (direction === 'up' && index === 0 && state.location.currentParentId !== null) {
-      const parent = requireNode(state.document, state.location.currentParentId).node
-      this.selectNode(parent.id, Math.min(cursor, parent.text.length))
-      return
-    }
-    if (direction === 'down' && index === nodes.length - 1) {
-      this.selectNode(nodes[index]!.id, nodes[index]!.text.length)
-      return
-    }
-    const target = nodes[index + (direction === 'up' ? -1 : 1)]
-    if (target !== undefined) {
-      this.selectNode(target.id, Math.min(cursor, target.text.length))
-    }
+    const target = moveSelectionTransition(state.document, state.location, direction, cursor)
+    if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 
   public moveHorizontal(direction: 'left' | 'right', cursor: number): boolean {
     const state = this.ready()
-    if (state.location.currentParentId === state.location.selectedNodeId) {
-      if (direction === 'right') {
-        const parent = requireNode(state.document, state.location.currentParentId).node
-        const child = parent.children[0]
-        if (cursor === parent.text.length && child !== undefined) {
-          this.selectNode(child.id, 0)
-          return true
-        }
-      }
-      return false
-    }
-
-    const selected = requireNode(state.document, state.location.selectedNodeId)
-    const atBoundary = direction === 'left' ? cursor === 0 : cursor === selected.node.text.length
-    if (!atBoundary) return false
-
-    const target = selected.siblings[selected.index + (direction === 'left' ? -1 : 1)]
-    if (target !== undefined) {
-      this.selectNode(target.id, direction === 'left' ? target.text.length : 0)
-      return true
-    }
-
-    if (direction === 'left' && selected.parent !== null) {
-      this.selectNode(selected.parent.id, direction === 'left' ? selected.parent.text.length : 0)
-      return true
-    }
-
-    return false
+    const target = moveHorizontalTransition(state.document, state.location, direction, cursor)
+    if (target === undefined) return false
+    this.selectNode(target.nodeId, target.cursor)
+    return true
   }
 
   public enter(): void {
     const state = this.ready()
-    if (state.location.currentParentId === state.location.selectedNodeId) {
-      return
-    }
+    const transition = enterTransition(state.document, state.location)
+    if (transition === undefined) return
     this.endTextSession()
-    const entered = requireNode(state.document, state.location.selectedNodeId).node
-    const child = entered.children[0]
-    const selectedNodeId = child?.id ?? entered.id
     this.replaceReady(
       {
         ...state,
-        location: { currentParentId: entered.id, selectedNodeId },
-        focus: this.newFocus(selectedNodeId, 0),
+        location: transition.location,
+        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
       true,
     )
@@ -348,17 +293,14 @@ export class EditorStore {
 
   public leave(): void {
     const state = this.ready()
-    const currentParentId = state.location.currentParentId
-    if (currentParentId === null) {
-      return
-    }
+    const transition = leaveTransition(state.document, state.location)
+    if (transition === undefined) return
     this.endTextSession()
-    const currentParent = requireNode(state.document, currentParentId)
     this.replaceReady(
       {
         ...state,
-        location: { currentParentId: currentParent.parent?.id ?? null, selectedNodeId: currentParentId },
-        focus: this.newFocus(currentParentId, 0),
+        location: transition.location,
+        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
       true,
     )
@@ -366,24 +308,14 @@ export class EditorStore {
 
   public navigateToAncestor(parentId: NodeId | null): void {
     const state = this.ready()
-    const currentParentId = state.location.currentParentId
-    if (parentId === currentParentId || currentParentId === null) {
-      return
-    }
-
-    const path = nodePath(state.document, currentParentId)
-    const parentIndex = parentId === null ? -1 : path.findIndex((node) => node.id === parentId)
-    const selected = path[parentIndex + 1]
-    if ((parentIndex === -1 && parentId !== null) || selected === undefined) {
-      return
-    }
-
+    const transition = ancestorNavigationTransition(state.document, state.location, parentId)
+    if (transition === undefined) return
     this.endTextSession()
     this.replaceReady(
       {
         ...state,
-        location: { currentParentId: parentId, selectedNodeId: selected.id },
-        focus: this.newFocus(selected.id, 0),
+        location: transition.location,
+        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
       true,
     )
@@ -411,70 +343,24 @@ export class EditorStore {
   public deleteSelected(): void {
     const state = this.ready()
     this.endTextSession()
-    const selected = requireNode(state.document, state.location.selectedNodeId)
-    const parentIsSelected = state.location.currentParentId === selected.node.id
-    const siblings = selected.siblings
-    const nextSibling = siblings[selected.index + 1]
-    const previousSibling = siblings[selected.index - 1]
-    let document = deleteNode(state.document, selected.node.id)
-    let location: Location
-
-    if (parentIsSelected) {
-      if (selected.parent !== null) {
-        location = { currentParentId: selected.parent.id, selectedNodeId: selected.parent.id }
-      } else {
-        document = ensureRoot(document, this.createId())
-        const destination = nextSibling ?? previousSibling ?? document.roots[0]
-        if (destination === undefined) {
-          throw new Error('A root replacement was not created.')
-        }
-        location = { currentParentId: null, selectedNodeId: destination.id }
-      }
-    } else if (nextSibling !== undefined || previousSibling !== undefined) {
-      const destination = nextSibling ?? previousSibling
-      if (destination === undefined) {
-        throw new Error('A sibling destination was not found.')
-      }
-      location = { ...state.location, selectedNodeId: destination.id }
-    } else if (state.location.currentParentId !== null) {
-      location = { ...state.location, selectedNodeId: state.location.currentParentId }
-    } else {
-      document = ensureRoot(document, this.createId())
-      location = { currentParentId: null, selectedNodeId: document.roots[0]!.id }
-    }
-
-    this.applyStructural(document, location, this.newFocus(location.selectedNodeId, 0))
+    const transition = deleteSelectedTransition(state.document, state.location, this.createId)
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
   }
 
   public deleteEmptySelected(): void {
     const state = this.ready()
-    const selected = requireNode(state.document, state.location.selectedNodeId)
-    if (selected.node.id === state.location.currentParentId || selected.node.text !== '') {
-      return
-    }
+    const transition = deleteEmptySelectedTransition(state.document, state.location)
+    if (transition === undefined) return
     this.endTextSession()
-    const previous = selected.siblings[selected.index - 1]
-    const next = selected.siblings[selected.index + 1]
-    const document = deleteNode(state.document, selected.node.id)
-    if (previous !== undefined) {
-      this.applyStructural(
-        document,
-        { ...state.location, selectedNodeId: previous.id },
-        this.newFocus(previous.id, previous.text.length),
-      )
-      return
-    }
-    if (selected.parent !== null) {
-      this.applyStructural(
-        document,
-        { currentParentId: selected.parent.id, selectedNodeId: selected.parent.id },
-        this.newFocus(selected.parent.id, selected.parent.text.length),
-      )
-      return
-    }
-    if (next !== undefined) {
-      this.applyStructural(document, { ...state.location, selectedNodeId: next.id }, this.newFocus(next.id, 0))
-    }
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
   }
 
   public moveSelectedTo(insertionIndex: number): void {
