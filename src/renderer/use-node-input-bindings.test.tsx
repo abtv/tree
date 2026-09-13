@@ -31,31 +31,6 @@ function renderBindings(options: {
 }
 
 describe('useNodeInputBindings', () => {
-  it('exposes DOM-compatible value and selection accessors for contenteditable inputs', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const bindings = result.current({ id: 'node', text: '', children: [] })
-    const input = document.createElement('div') as HTMLDivElement & {
-      value: string
-      setSelectionRange(start: number, end: number): void
-    }
-    bindings.inputRef(input)
-    document.body.append(input)
-
-    input.textContent = 'hello'
-    expect(input.value).toBe('hello')
-
-    input.value = 'bye'
-    expect(input.textContent).toBe('bye')
-
-    input.textContent = 'hello'
-    input.setSelectionRange(2, 2)
-    expect(window.getSelection()?.anchorOffset).toBe(2)
-
-    input.setSelectionRange(1, 4)
-    expect(window.getSelection()?.anchorOffset).toBe(2)
-  })
-
   it('edits content on content change using the node links, defaulting to none', () => {
     const store = createStore()
     const { result } = renderBindings({ store, selectedNodeId: 'node' })

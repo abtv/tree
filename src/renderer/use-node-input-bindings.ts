@@ -68,24 +68,6 @@ export function useNodeInputBindings({
         inputs.current.delete(id)
         return
       }
-      // These DOM-compatible accessors keep the contenteditable editor easy
-      // to exercise with form-oriented test helpers while the production
-      // control is a div.
-      if (!(input instanceof HTMLTextAreaElement) && !Object.prototype.hasOwnProperty.call(input, 'value')) {
-        Object.defineProperty(input, 'value', {
-          configurable: true,
-          get: () => input.textContent ?? '',
-          set: (value: string) => {
-            input.textContent = value
-          },
-        })
-        Object.defineProperty(input, 'setSelectionRange', {
-          configurable: true,
-          value: (start: number, end: number) => {
-            if (start === end) setCaret(input, start)
-          },
-        })
-      }
       inputs.current.set(id, input)
     }
 

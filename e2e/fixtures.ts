@@ -240,14 +240,53 @@ export function nodeCount(window: Page): Promise<number> {
 export function nodeTexts(window: Page): Promise<string[]> {
   return window
     .locator('[aria-label^="Node "]')
-    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLTextAreaElement).value))
+    .evaluateAll((inputs) =>
+      inputs.map((input) => (input instanceof HTMLTextAreaElement ? input.value : (input.textContent ?? ''))),
+    )
 }
 
 export async function setCursor(input: ReturnType<Page['locator']>, position: number): Promise<void> {
   await input.evaluate((element, cursor) => {
-    const field = element as HTMLTextAreaElement
+    if (element instanceof HTMLTextAreaElement) {
+      element.focus()
+      element.setSelectionRange(cursor, cursor)
+      return
+    }
+    const field = element as HTMLElement
     field.focus()
-    field.setSelectionRange(cursor, cursor)
+    const selection = field.ownerDocument.defaultView?.getSelection()
+    if (!selection) return
+    const range = field.ownerDocument.createRange()
+    const walker = field.ownerDocument.createTreeWalker(field, NodeFilter.SHOW_TEXT)
+    let remaining = cursor
+    let current = walker.nextNode()
+    while (current !== null) {
+      const length = current.textContent?.length ?? 0
+      const link = current.parentElement?.closest('a[contenteditable="false"]')
+      if (link !== null && link !== undefined && remaining <= length) {
+        const parent = link.parentNode ?? field
+        const linkIndex = Array.from(parent.childNodes).indexOf(link)
+        const beforeLink = remaining <= length / 2
+        range.setStart(parent, beforeLink ? linkIndex : linkIndex + 1)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+        return
+      }
+      if (remaining < length) {
+        range.setStart(current, remaining)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+        return
+      }
+      remaining -= length
+      current = walker.nextNode()
+    }
+    range.selectNodeContents(field)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }, position)
 }
 
