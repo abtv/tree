@@ -405,6 +405,7 @@ textarea {
   .node-input:focus {
     background: #1e2022;
   }
+
   .current-parent-input:focus {
     background: transparent;
   }

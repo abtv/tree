@@ -46,6 +46,7 @@ export function ImagePreview({
 }): React.JSX.Element {
   const [url, setUrl] = useState<string>()
   const closeButton = useRef<HTMLButtonElement>(null)
+  const dialog = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<Element | null>(null)
   const onCloseRef = useRef(onClose)
 
@@ -73,14 +74,47 @@ export function ImagePreview({
     previouslyFocused.current = document.activeElement
     closeButton.current?.focus()
     const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.defaultPrevented) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onCloseRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusableElements = Array.from(
+        dialog.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      )
+      if (focusableElements.length === 0) {
+        event.preventDefault()
+        return
+      }
+
+      const first = focusableElements[0]!
+      const last = focusableElements[focusableElements.length - 1]!
+      if (event.shiftKey && (document.activeElement === first || !dialog.current?.contains(document.activeElement))) {
+        event.preventDefault()
+        last.focus()
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !dialog.current?.contains(document.activeElement))
+      ) {
+        event.preventDefault()
+        first.focus()
       }
     }
+    const onFocusIn = (event: FocusEvent): void => {
+      if (!dialog.current?.contains(event.target as Node)) closeButton.current?.focus()
+    }
+    document.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('keydown', onKeyDown)
+    document.addEventListener('focusin', onFocusIn, true)
     return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('focusin', onFocusIn, true)
       const previous = previouslyFocused.current
       if (previous instanceof HTMLElement) previous.focus()
     }
@@ -88,7 +122,7 @@ export function ImagePreview({
 
   return (
     <div className="image-preview-overlay">
-      <div aria-label="Image preview" aria-modal="true" className="image-preview" role="dialog">
+      <div ref={dialog} aria-label="Image preview" aria-modal="true" className="image-preview" role="dialog">
         <button
           ref={closeButton}
           aria-label="Close image preview"
