@@ -745,6 +745,8 @@ An attachment is no longer referenced only after every live document reference, 
 
 Image attachments must survive application restart.
 
+A completed image insertion is flushed to local storage before the document that references it is saved, so an attachment that a saved document references is not lost to an abrupt application termination or power loss.
+
 ### 17.1 Inline Presentation and Preview
 
 An attached image is displayed inline beneath its node's text.

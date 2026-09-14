@@ -1,5 +1,6 @@
 import type { ElectronApplication } from '@playwright/test'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   allowRendererError,
   attachmentFiles,
@@ -305,5 +306,32 @@ test.describe('persistence reliability regressions', () => {
 
     const restarted = await launchTree(userDataDir)
     await expect(node(restarted.window, 1)).toHaveValue(expectedText)
+  })
+
+  test('restores a completed image paste after abrupt process termination', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+    await writeClipboardImage(app)
+    await firePaste(node(window, 1))
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id ?? null, { timeout: 10_000 })
+      .not.toBeNull()
+    const attachmentId = readPersisted(userDataDir).document.roots[0]?.attachment?.id
+    expect(attachmentId).toEqual(expect.any(String))
+    const attachmentPath = join(userDataDir, 'data', 'attachments', `${attachmentId}.png`)
+    await expect.poll(() => existsSync(attachmentPath)).toBe(true)
+    const stored = readFileSync(attachmentPath)
+
+    const child = app.process()
+    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
+    child.kill('SIGKILL')
+    await exited
+    await closeApp(app)
+
+    const restarted = await launchTree(userDataDir)
+    await expect(restarted.window.getByAltText('Attached image')).toBeVisible()
+    expect(readPersisted(userDataDir).document.roots[0]?.attachment?.id).toBe(attachmentId)
+    expect(readFileSync(attachmentPath)).toEqual(stored)
   })
 })

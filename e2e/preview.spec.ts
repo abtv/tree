@@ -75,6 +75,7 @@ test.describe('image presentation and preview', () => {
 
     await writeClipboardImageSized(app, 400, 200)
     await firePaste(node(window, 1))
+    await expect(window.getByAltText('Attached image')).toBeVisible()
     await node(window, 1).focus()
     await window.keyboard.press('Meta+Enter')
 

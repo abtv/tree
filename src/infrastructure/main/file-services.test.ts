@@ -421,6 +421,83 @@ describe('file services', () => {
   })
 })
 
+describe('attachment durability', () => {
+  it('flushes attachment bytes and the attachments directory before reporting success', async () => {
+    const { directory, services } = await servicesForTest()
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    const events: string[] = []
+    const bytes = new Uint8Array([1, 2, 3])
+    vi.mocked(open).mockImplementation(async (path, flags) => {
+      const handle = await real.open(path, flags)
+      return {
+        async writeFile(contents: string | Uint8Array) {
+          events.push('write')
+          if (typeof contents === 'string') await handle.writeFile(contents, 'utf8')
+          else await handle.writeFile(contents)
+        },
+        async sync() {
+          events.push(flags === 'r' ? 'sync-directory' : 'sync-file')
+          await handle.sync()
+        },
+        async close() {
+          events.push(flags === 'r' ? 'close-directory' : 'close-file')
+          await handle.close()
+        },
+      } as unknown as Awaited<ReturnType<typeof open>>
+    })
+
+    await services.writeAttachment('durable', bytes)
+
+    expect(events).toEqual(['write', 'sync-file', 'close-file', 'sync-directory', 'close-directory'])
+    expect(new Uint8Array(await readFile(join(directory, 'attachments', 'durable.png')))).toEqual(bytes)
+  })
+
+  it('propagates a file flush failure instead of reporting success', async () => {
+    const { services } = await servicesForTest()
+    vi.mocked(open).mockImplementationOnce(
+      async () =>
+        ({
+          async writeFile() {},
+          async sync() {
+            throw new Error('attachment flush failed')
+          },
+          async close() {},
+        }) as unknown as Awaited<ReturnType<typeof open>>,
+    )
+
+    await expect(services.writeAttachment('unflushed', new Uint8Array([1]))).rejects.toThrow('attachment flush failed')
+    expect(open).toHaveBeenCalledTimes(1)
+  })
+
+  it('propagates a directory flush failure instead of reporting success', async () => {
+    const { services } = await servicesForTest()
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    let opens = 0
+    vi.mocked(open).mockImplementation(async (path, flags) => {
+      opens += 1
+      const handle = await real.open(path, flags)
+      return {
+        async writeFile(contents: string | Uint8Array) {
+          if (typeof contents === 'string') await handle.writeFile(contents, 'utf8')
+          else await handle.writeFile(contents)
+        },
+        async sync() {
+          if (flags === 'r') throw new Error('directory flush failed')
+          await handle.sync()
+        },
+        async close() {
+          await handle.close()
+        },
+      } as unknown as Awaited<ReturnType<typeof open>>
+    })
+
+    await expect(services.writeAttachment('unflushed-entry', new Uint8Array([1]))).rejects.toThrow(
+      'directory flush failed',
+    )
+    expect(opens).toBe(2)
+  })
+})
+
 describe('save interruption recovery', () => {
   it('keeps the committed document when the temporary write is interrupted after real bytes land', async () => {
     const { directory, services } = await servicesForTest()

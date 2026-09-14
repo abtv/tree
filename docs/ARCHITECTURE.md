@@ -384,6 +384,8 @@ The editor tracks pending asynchronous cut and paste operations. Shutdown flushi
 
 Document saves and attachment filesystem operations are serialized by the file-service operation queue. The application also queues attachment cleanup with persistence work, so cleanup cannot race a save or another cleanup, and cleanup failures follow the same visible error and shutdown-flush path as save failures. File-service operations emit structured operation names, phases, and filesystem paths for diagnosing boundary failures.
 
+Document and attachment writes share the same durable-write sequence: the bytes go through a file handle, are flushed with `fsync`, and the handle is closed before the operation reports success. An attachment write additionally flushes the attachments directory, because the attachment file is created for the first time and the document reference recorded by a later save must never outlive the attachment data or its directory entry. A failed flush rejects the write instead of reporting success, so the renderer cannot record a reference to an attachment that was not stored.
+
 Persisted state is serialized without cloning the in-memory document, which the domain immutability invariant guarantees is never mutated after creation. The renderer validates the document and its location before sending the payload. The main process enforces the same persisted-state invariants on the untrusted IPC payload without rebuilding the document, and rejects malformed or over-depth input before any filesystem operation. Persisted-state validation performs a single traversal: while it checks every node, it records the selected node's parent and whether the current parent exists, so it resolves the location without constructing the derived node index or walking the document a second time. Parsing, schema migration, and link normalization remain on the load path, where older or non-canonical files are read.
 
 Attachment cleanup is no longer part of every save cycle. The store marks cleanup dirty only where attachment reachability can change: structural deletes, undo, redo, history eviction, discarding the redo branch when a new edit begins, and initialization. The coordinator runs cleanup after the save that persists the new referenced set, never before it, so a crash cannot leave the persisted document referencing a file that was already deleted. When document changes are pending, a requested cleanup waits for the next save; startup cleanup with no pending changes may run without a save. Attachment cleanup retains files referenced by the live document, every retained history snapshot, and pending attachment writes. The referenced set is computed from the live document's derived attachment summary plus the history's incrementally maintained union over retained summaries, so cleanup rescans neither the live document nor retained snapshots.
@@ -420,7 +422,8 @@ Attachment storage is responsible for:
 * creating attachment files;
 * reading attachment files;
 * deleting unused attachment files;
-* ensuring attachment references remain valid.
+* ensuring attachment references remain valid;
+* flushing attachment bytes and the attachments directory entry before a write reports success.
 
 Reads, writes, and cleanup operations are ordered through the same infrastructure queue. Cleanup is therefore idempotent with respect to overlapping application requests rather than relying on concurrent unlink calls to succeed.
 

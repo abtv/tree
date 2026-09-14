@@ -1,4 +1,4 @@
-import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   collectAttachmentIds,
@@ -85,7 +85,8 @@ export function createFileServices(
       return enqueue('writeAttachment', [logPath], async () => {
         const path = attachmentPath(attachmentsDirectory, id)
         await prepare()
-        await writeFile(path, png)
+        await writeDurableFile(path, png)
+        await syncFile(attachmentsDirectory)
       })
     },
     readAttachment(id) {
@@ -212,10 +213,11 @@ async function readRecoveryAttachmentIds(path: string): Promise<ReadonlySet<Atta
   }
 }
 
-async function writeDurableFile(path: string, contents: string): Promise<void> {
+async function writeDurableFile(path: string, contents: string | Uint8Array): Promise<void> {
   const file = await open(path, 'w')
   try {
-    await file.writeFile(contents, 'utf8')
+    if (typeof contents === 'string') await file.writeFile(contents, 'utf8')
+    else await file.writeFile(contents)
     await file.sync()
   } finally {
     await file.close()
