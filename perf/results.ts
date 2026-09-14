@@ -43,16 +43,20 @@ export function compareMetrics(
   baseline: Record<string, number>,
   tolerance: number,
 ): string[] {
-  const regressions: string[] = []
+  const failures: string[] = []
   for (const [key, currentValue] of Object.entries(current)) {
     const baselineValue = baseline[key]
-    if (baselineValue === undefined || baselineValue <= 0) continue
+    if (baselineValue === undefined) {
+      failures.push(`${key}: missing from baseline`)
+      continue
+    }
+    if (baselineValue <= 0) continue
     const ratio = currentValue / baselineValue
     if (ratio > tolerance) {
-      regressions.push(`${key}: ${currentValue} vs baseline ${baselineValue} (${ratio.toFixed(2)}x > ${tolerance}x)`)
+      failures.push(`${key}: ${currentValue} vs baseline ${baselineValue} (${ratio.toFixed(2)}x > ${tolerance}x)`)
     }
   }
-  return regressions
+  return failures
 }
 
 export function readArtifact(path: string): PerfArtifact {
@@ -90,17 +94,16 @@ function compareWithBaseline(kind: string, scenario: string, metrics: Record<str
   const key = `${kind}:${scenario}`
   const baselineMetrics = baseline.metrics[key]
   if (baselineMetrics === undefined) {
-    console.warn(`PERF baseline has no entry for ${key}; recording only.`)
-    return
+    throw new Error(`Performance baseline has no entry for ${key}; record a new baseline.`)
   }
   if (baseline.environment.platform !== process.platform || baseline.environment.arch !== process.arch) {
     console.warn(
       `PERF baseline was recorded on ${baseline.environment.platform}/${baseline.environment.arch}; same-machine comparison is more reliable.`,
     )
   }
-  const regressions = compareMetrics(metrics, baselineMetrics, readTolerance())
-  if (regressions.length > 0) {
-    throw new Error(`Performance regressions in ${key}:\n${regressions.join('\n')}`)
+  const failures = compareMetrics(metrics, baselineMetrics, readTolerance())
+  if (failures.length > 0) {
+    throw new Error(`Performance baseline comparison failed for ${key}:\n${failures.join('\n')}`)
   }
 }
 

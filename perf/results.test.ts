@@ -39,8 +39,12 @@ describe('compareMetrics', () => {
     expect(compareMetrics({ paintP95Ms: 140, typingMs: 80 }, { paintP95Ms: 100, typingMs: 100 }, 1.5)).toEqual([])
   })
 
-  it('ignores metrics missing from the baseline and non-positive baselines', () => {
-    expect(compareMetrics({ newMetric: 100, zeroMetric: 100 }, { zeroMetric: 0 }, 1.5)).toEqual([])
+  it('reports metrics missing from the baseline', () => {
+    expect(compareMetrics({ newMetric: 100 }, {}, 1.5)).toEqual(['newMetric: missing from baseline'])
+  })
+
+  it('ignores non-positive baselines', () => {
+    expect(compareMetrics({ zeroMetric: 100 }, { zeroMetric: 0 }, 1.5)).toEqual([])
   })
 })
 
@@ -70,7 +74,29 @@ describe('recordPerfResult', () => {
     process.env['PERF_BASELINE'] = baselinePath
 
     expect(() => recordPerfResult({ kind: 'typing', scenario: 'wide-1000', metrics: { paintP95Ms: 20 } })).toThrow(
-      /Performance regressions in typing:wide-1000/,
+      /Performance baseline comparison failed for typing:wide-1000/,
+    )
+  })
+
+  it('fails when a metric is missing from the baseline', () => {
+    const baselinePath = temporaryPath('baseline.json')
+    writeBaseline(baselinePath, { paintP95Ms: 10 })
+    process.env['PERF_RESULTS'] = temporaryPath('perf-results.json')
+    process.env['PERF_BASELINE'] = baselinePath
+
+    expect(() => recordPerfResult({ kind: 'typing', scenario: 'wide-1000', metrics: { typingMs: 20 } })).toThrow(
+      /typingMs: missing from baseline/,
+    )
+  })
+
+  it('fails when the baseline has no entry for the scenario', () => {
+    const baselinePath = temporaryPath('baseline.json')
+    writeBaseline(baselinePath, { paintP95Ms: 10 })
+    process.env['PERF_RESULTS'] = temporaryPath('perf-results.json')
+    process.env['PERF_BASELINE'] = baselinePath
+
+    expect(() => recordPerfResult({ kind: 'typing', scenario: 'narrow-100', metrics: { paintP95Ms: 10 } })).toThrow(
+      /Performance baseline has no entry for typing:narrow-100/,
     )
   })
 
