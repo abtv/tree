@@ -68,6 +68,7 @@ export type EditorSnapshot =
       document: Document
       location: Location
       focus: FocusIntent
+      structuralVersion: number
       saveError?: string
       operationError?: string
     }
@@ -83,6 +84,7 @@ export class EditorStore {
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly persistence: PersistenceCoordinator
   private snapshot: EditorSnapshot = { status: 'loading' }
+  private structuralVersion = 0
   private activeTextNodeId: NodeId | undefined
   private textTimer: unknown
   private saveTimer: unknown
@@ -140,6 +142,7 @@ export class EditorStore {
           document: createInitialDocument(rootId),
           location: { currentParentId: null, selectedNodeId: rootId },
           focus: this.newFocus(rootId, 0),
+          structuralVersion: this.structuralVersion,
         }
         this.emit()
         this.persistence.requestSave()
@@ -157,6 +160,7 @@ export class EditorStore {
         document: parsed.document,
         location: parsed.location,
         focus: this.newFocus(parsed.location.selectedNodeId, 0),
+        structuralVersion: this.structuralVersion,
       }
       this.emit()
       this.queueAttachmentCleanup()
@@ -300,11 +304,14 @@ export class EditorStore {
     const transition = enterTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady({
-      ...state,
-      location: transition.location,
-      focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
-    })
+    this.replaceReady(
+      {
+        ...state,
+        location: transition.location,
+        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      },
+      true,
+    )
     this.markPersistedChange()
   }
 
@@ -313,11 +320,14 @@ export class EditorStore {
     const transition = leaveTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady({
-      ...state,
-      location: transition.location,
-      focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
-    })
+    this.replaceReady(
+      {
+        ...state,
+        location: transition.location,
+        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      },
+      true,
+    )
     this.markPersistedChange()
   }
 
@@ -326,11 +336,14 @@ export class EditorStore {
     const transition = ancestorNavigationTransition(state.document, state.location, parentId)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady({
-      ...state,
-      location: transition.location,
-      focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
-    })
+    this.replaceReady(
+      {
+        ...state,
+        location: transition.location,
+        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      },
+      true,
+    )
     this.markPersistedChange()
   }
 
@@ -460,12 +473,15 @@ export class EditorStore {
     const state = this.ready()
     const previous = this.history.undo(state.document, state.location)
     if (previous === undefined) return
-    this.replaceReady({
-      ...state,
-      document: previous.document,
-      location: previous.location,
-      focus: this.newFocus(previous.location.selectedNodeId, 0),
-    })
+    this.replaceReady(
+      {
+        ...state,
+        document: previous.document,
+        location: previous.location,
+        focus: this.newFocus(previous.location.selectedNodeId, 0),
+      },
+      true,
+    )
     this.markPersistedChange()
     this.queueAttachmentCleanup()
   }
@@ -475,12 +491,15 @@ export class EditorStore {
     const state = this.ready()
     const next = this.history.redo(state.document, state.location)
     if (next === undefined) return
-    this.replaceReady({
-      ...state,
-      document: next.document,
-      location: next.location,
-      focus: this.newFocus(next.location.selectedNodeId, 0),
-    })
+    this.replaceReady(
+      {
+        ...state,
+        document: next.document,
+        location: next.location,
+        focus: this.newFocus(next.location.selectedNodeId, 0),
+      },
+      true,
+    )
     this.markPersistedChange()
     this.queueAttachmentCleanup()
   }
@@ -488,7 +507,7 @@ export class EditorStore {
   private applyStructural(document: Document, location: Location, focus: FocusIntent): void {
     const state = this.ready()
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-    this.replaceReady({ ...state, document, location, focus })
+    this.replaceReady({ ...state, document, location, focus }, true)
     this.markPersistedChange()
   }
 
@@ -499,12 +518,13 @@ export class EditorStore {
     this.textTimer = this.clock.setTimeout(() => this.endTextSession(), 5_000)
   }
 
-  private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>): void {
+  private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, changedStructure = false): void {
     const previous = this.snapshot
-    if (state.operationError === undefined) {
-      this.snapshot = state
+    if (changedStructure) this.structuralVersion += 1
+    const next = { ...state, structuralVersion: this.structuralVersion }
+    if (next.operationError === undefined) {
+      this.snapshot = next
     } else {
-      const next = { ...state }
       delete next.operationError
       this.snapshot = next
     }

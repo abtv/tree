@@ -47,6 +47,10 @@ test.describe('startup', () => {
     await measureStartup(userDataDir, 'wide-10000', { seed: wideSeed(10_000), rendererCeilingMs: 2_000 })
   })
 
+  test('wide-30000', async ({ userDataDir }) => {
+    await measureStartup(userDataDir, 'wide-30000', { seed: wideSeed(30_000), rendererCeilingMs: 2_500 })
+  })
+
   test('large-10000', async ({ userDataDir }) => {
     await measureStartup(userDataDir, 'large-10000', { seed: largeSeed(100, 100) })
   })

@@ -1,11 +1,12 @@
 # Windowed Rendering for Wide Node Lists
 
-Status: Active
+Status: Completed
 Created: 2026-09-14
+Completed: 2026-09-14
 
 ## Goal
 
-Make typing latency independent of the number of displayed siblings, closing the follow-up deferred by Plan 0054. Plan 0054 bounded rendering and memory for wide documents but left typing at roughly 100 ms per keystroke at 30,000 displayed siblings because the entire list stays mounted. This plan is a proposal based on prototypes and measurements; the product-behavior decisions in "Product Owner Decisions Required" need approval before implementation starts.
+Make typing latency independent of the number of displayed siblings, closing the follow-up deferred by Plan 0054. Plan 0054 bounded rendering and memory for wide documents but left typing at roughly 100 ms per keystroke at 30,000 displayed siblings because the entire list stays mounted. This plan is based on prototypes and measurements; the Product Owner approved the product-behavior decisions on 2026-09-14 before implementation started.
 
 No domain, persistence, or data-model change is proposed. The change is confined to the renderer and, if approved, keeps the existing editing, navigation, drag-and-drop, undo/redo, and autosave behavior.
 
@@ -47,12 +48,14 @@ The store change from the prototype (per-node subscriptions and a structural ver
 
 If the Product Owner does not accept off-screen rows being absent from the DOM, the recorded fallback is input-only mounting: keep every row in the DOM as static text and mount a textarea only for the focused row. The control measurement (96 ms for 20 characters with 30,000 static rows) suggests this could also be sufficiently fast, but it requires new click-to-caret placement and text-selection mechanics and was not prototyped in the application.
 
-## Product Owner Decisions Required
+## Product Owner Decisions
 
-1. Off-screen rows are absent from the DOM above the threshold. Consequences: browser find-in-page and assistive technology expose only the mounted window, and selecting or copying text across off-screen rows requires scrolling. Approve, reject, or choose the input-only alternative.
-2. Threshold value (proposal: 500 displayed siblings). Below it, behavior is unchanged, including find-in-page and accessibility.
-3. Scroll behavior: keep the existing page scroll (recommended) rather than introducing a scroll container that fixes the location bar and current-parent heading.
-4. Drag beyond the viewport: approve edge auto-scroll during a drag so a sibling can be moved to an off-screen position on the displayed level.
+Approved by the Product Owner on 2026-09-14, as proposed:
+
+1. Off-screen rows are absent from the DOM above the threshold. Browser find-in-page and assistive technology expose only the mounted window, and selecting or copying text across off-screen rows requires scrolling.
+2. Threshold: 500 displayed siblings. At or below it, behavior is unchanged, including find-in-page and accessibility.
+3. Scroll behavior: keep the existing page scroll; no nested scroll container that fixes the location bar and current-parent heading.
+4. Drag beyond the viewport: edge auto-scroll during a drag, so a sibling can be moved to an off-screen position on the displayed level.
 
 ## Implementation Outline
 
@@ -77,6 +80,7 @@ Required by `docs/PRODUCT.md` §22.1 for state and persistence changes:
 * Unit tests for the window/offset math, including variable heights, the focused-row pin, width changes, and structural changes.
 * Renderer component tests: the window updates on scroll; the focused row is mounted when out of view; the full-list path is used below the threshold.
 * End-to-end tests above the threshold: keyboard navigation into an off-screen row, undo/redo while scrolled, drag-and-drop with edge auto-scroll, and typing near the window edge.
+* End-to-end tests for dynamic row heights above the threshold: narrowing the window re-wraps rows, editing a row to wrapped text grows it, and an attachment image loading in a mounted row grows it; each scenario also checks that later rows shift, the list height reflects the measured heights, and keyboard navigation and row tiling stay correct.
 * Existing renderer, domain, Electron E2E, and performance tests must stay green, including the current `wide-10000` and `large-100000` typing guards.
 
 ## Documentation
@@ -90,3 +94,31 @@ Required by `docs/PRODUCT.md` §22.1 for state and persistence changes:
 * Demonstrate the new guard failing before the change and passing after.
 * Run focused renderer, performance, and Electron tests, then `npm run check:full` before committing.
 * Update this plan with results, set `Status: Completed`, add the completion date, and move it to `docs/plans/completed/`.
+
+## Results
+
+### Implementation
+
+* `src/renderer/list-window.ts` holds the pure threshold, offset, window, and edge-auto-scroll math. `src/renderer/NodeList.tsx` routes on the threshold: at or below it the full list renders as before; above it only the viewport window plus an overscan mounts, with leading and trailing spacers sized from the offset table. Mounted rows report their height through a `ResizeObserver` (unmeasured rows use the estimate, and a width change invalidates the table), the focused row is mounted outside the window with the same React key so React moves the same input instead of remounting it when the window catches up, and a drag near the viewport edge auto-scrolls the page.
+* `src/renderer/App.tsx` passes the focused node id and the store's structural version. `EditorStore` advances `structuralVersion` on structural document replacement, navigation between levels, undo, and redo, but not on text edits or selection, so layout recomputation stays out of the typing path.
+* `.node-list` no longer uses `display: grid`; windowed rows are laid out with spacers and the pinned row is absolutely positioned at its offset.
+* The Product Owner approved the four decisions on 2026-09-14. `docs/PRODUCT.md` §20.1 records the behavior and ADR 0007 records the off-screen-DOM decision. `docs/ARCHITECTURE.md` §8/§9 and `docs/DEVELOPMENT.md` §12 are updated.
+
+### Measurements
+
+* Typing `wide-30000` (104 characters): 125–162 ms, about 1.2–1.6 ms per keystroke, paint p95 31.7–32.4 ms, paint maximum 33.2–34.9 ms. The plan's unwindowed baseline for the same shape was 10.3–22.1 s.
+* `wide-10000` typing fell from 2.7–4.9 s to 124–138 ms. `large-100000` measured 161–168 ms.
+* Startup `wide-30000` rendered in 242–307 ms across launches against its 2,500 ms ceiling; launch stayed within the shared 2,000 ms ceiling at 648–891 ms.
+
+### Guard sensitivity
+
+* With windowing disabled (threshold raised so every row mounts), `wide-30000` typed in 11,888 ms with paint p95 113 ms, failing the existing 100 ms paint budget before reaching the scenario ceiling. With windowing enabled it passes at 125 ms and paint p95 31.7 ms.
+
+### Dynamic row-height coverage
+
+* Three end-to-end scenarios cover height changes in a wide list: narrowing the window re-wraps measured rows while focus, values, and keyboard navigation stay correct; editing a row to wrapped text grows the row and the list height and moves later rows; and an attachment image loading when its row mounts grows the row, shifts later rows, and updates the list height.
+* The image scenario exposed a measurement defect. The attachment button's bottom margin collapsed through the row box, so the `ResizeObserver` border-box height (183 px) was 6 px less than the row's layout advance (189 px), and every mounted image row left the offset table 6 px short of the flow. `display: flow-root` on `.node-row` contains the margin, so the measured height equals the layout advance. On the pre-fix build the regression test fails with a 6 px list-height mismatch and 6 px gaps between rendered rows; on the fixed build it passes.
+
+### Validation
+
+`npm run check:full` passed: type checking, linting, formatting, documentation governance, 469 unit/component/property tests with coverage (95.39% statements, 89.03% branches, 95.71% functions, 97.49% lines), production build, dependency audit with zero vulnerabilities, 104 Electron E2E tests including the six windowed-list tests, and 14 performance tests. No required tests were skipped and no validation failures remain.

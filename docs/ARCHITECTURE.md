@@ -231,6 +231,10 @@ Instead, it should invoke the appropriate application/domain operation.
 
 A top-level React error boundary wraps the application in `src/renderer/ErrorBoundary.tsx`. It catches render and lifecycle errors that would otherwise leave an empty window, logs diagnostics, and shows a fallback with a `Reload` action that restarts the renderer from persisted state. Errors from event handlers and asynchronous work continue to flow through the application error surface rather than the boundary.
 
+The displayed sibling list is rendered by `src/renderer/NodeList.tsx`. Above the displayed-sibling threshold owned by `docs/PRODUCT.md` §20.1 it mounts only the rows near the viewport plus an overscan and represents the skipped rows as leading and trailing spacers, so the page scrollbar and scroll position still cover the whole list. The focused row stays mounted even when it is off-screen, so a focus intent always has an input to receive the caret; because the mounted rows are keyed by node id in one list, React moves the same input into the window instead of remounting it. Mounted rows report their height through a `ResizeObserver` and unmeasured rows use an estimate, so wrapped rows keep offsets correct; a width change invalidates the measured heights. Dragging near the window edge auto-scrolls the page so a drag can reach an off-screen position. The pure window and offset math lives in `src/renderer/list-window.ts` and is unit-testable without a browser. At or below the threshold the list renders every row exactly as before.
+
+`EditorStore` exposes a `structuralVersion` on ready snapshots that advances when the displayed node identities or order can change — structural document replacement, navigation between levels, undo, and redo — but not for text edits or selection changes. The renderer uses it to keep layout recomputation out of the typing path.
+
 ---
 
 ## 9. UI State vs Document State
@@ -258,11 +262,12 @@ May include:
 * text cursor position;
 * focus;
 * drag state;
-* undo/redo history.
+* undo/redo history;
+* the mounted window of the displayed sibling list, its measured row heights, and drag auto-scroll state.
 
 Only the state explicitly required by the product specification should be persisted.
 
-Exact cursor position, focus state, navigation stack, and undo/redo history are runtime state unless the product specification changes.
+Exact cursor position, focus state, navigation stack, undo/redo history, and the windowed list's mounted range and height table are runtime state unless the product specification changes.
 
 ---
 

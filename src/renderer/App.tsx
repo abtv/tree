@@ -90,7 +90,14 @@ export function App({ store }: AppProps): React.JSX.Element {
             )}
           </section>
         )}
-        <NodeList nodes={nodes} onEnter={enterNode} onMove={moveNode} renderInput={renderInput} />
+        <NodeList
+          focusedNodeId={focus?.nodeId}
+          nodes={nodes}
+          onEnter={enterNode}
+          onMove={moveNode}
+          renderInput={renderInput}
+          structuralVersion={state.structuralVersion}
+        />
         {state.saveError === undefined ? null : (
           <p className="save-error" role="status">
             {SAVE_ERROR_PREFIX} {state.saveError}

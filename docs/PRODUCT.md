@@ -817,6 +817,18 @@ The user normally interacts with the application through:
 
 The tree hierarchy is primarily navigated by entering and leaving nodes rather than by expanding and collapsing a full tree view.
 
+### 20.1 Very Wide Node Lists
+
+When a displayed level contains more than 500 siblings, the application renders only the rows near the viewport plus a small overscan. The off-screen rows are absent from the DOM: browser find-in-page and assistive technology expose only the mounted rows, and selecting or copying text that spans off-screen rows requires scrolling to them.
+
+The focused row stays mounted even when it is off-screen, so keyboard navigation, focus restoration, typing, and the caret never lose their input.
+
+A drag that reaches the top or bottom edge of the window scrolls the page automatically, so a sibling can be moved to a position outside the mounted rows.
+
+The page continues to scroll as a single document. The location bar and the current-parent heading scroll with the content.
+
+At or below 500 displayed siblings, the list renders every row and behaves exactly as before, including find-in-page and accessibility.
+
 ---
 
 ## 21. Unexpected Renderer Errors

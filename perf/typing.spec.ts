@@ -100,6 +100,15 @@ test.describe('typing latency', () => {
     expect(typingMs).toBeLessThan(8_000)
   })
 
+  test('wide-30000', async ({ userDataDir }) => {
+    const typingMs = await measureTyping(userDataDir, 'wide-30000', wideSeed(30_000), {
+      label: 'Node 1',
+      initialText: 'Child 0',
+      parentLabel: 'Current parent',
+    })
+    expect(typingMs).toBeLessThan(2_000)
+  })
+
   test('large-10000', async ({ userDataDir }) => {
     await measureTyping(userDataDir, 'large-10000', largeSeed(100, 100), {
       label: 'Node 1',

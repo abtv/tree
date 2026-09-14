@@ -10,5 +10,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0004](0004-bounded-history-and-autosave-policy.md) | Bounded Snapshot History and Automatic Save Policy | Accepted | 2026-09-13 |
 | [0005](0005-non-rebuilding-save-validation.md) | Non-Rebuilding Save Validation | Accepted | 2026-09-13 |
 | [0006](0006-exact-dependency-pinning.md) | Exact Dependency Pinning | Accepted | 2026-09-13 |
+| [0007](0007-windowed-node-list-rendering.md) | Windowed Rendering for Wide Node Lists | Accepted | 2026-09-14 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

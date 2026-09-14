@@ -108,6 +108,38 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
   })
 
+  it('advances the structural version for displayed-list changes but not for text edits or selection', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('next'))
+    await store.initialize()
+    const initial = store.getSnapshot()
+    if (initial.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    store.editText('root', 'Changed')
+    store.selectNode('child', 0)
+    const afterEdits = store.getSnapshot()
+    if (afterEdits.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(afterEdits.structuralVersion).toBe(initial.structuralVersion)
+
+    store.enter()
+    const afterEnter = store.getSnapshot()
+    if (afterEnter.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(afterEnter.structuralVersion).toBeGreaterThan(initial.structuralVersion)
+
+    store.createSiblingOrFirstChild(0)
+    const afterStructural = store.getSnapshot()
+    if (afterStructural.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(afterStructural.structuralVersion).toBeGreaterThan(afterEnter.structuralVersion)
+
+    store.undo()
+    const afterUndo = store.getSnapshot()
+    if (afterUndo.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(afterUndo.structuralVersion).toBeGreaterThan(afterStructural.structuralVersion)
+  })
+
   it('creates an initial root and a sibling split', async () => {
     const store = new EditorStore(createServices(), ids('root', 'next'))
     await store.initialize()
