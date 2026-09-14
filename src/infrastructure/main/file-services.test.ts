@@ -4,21 +4,28 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFileServices } from './file-services'
 
+const mocks = vi.hoisted(() => ({
+  readdir: vi.fn<(path: string) => Promise<string[]>>(),
+}))
+
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
+  mocks.readdir.mockImplementation((path) => actual.readdir(path))
   return {
     ...actual,
     open: vi.fn(actual.open),
     readFile: vi.fn(actual.readFile),
+    readdir: mocks.readdir,
     rename: vi.fn(actual.rename),
     stat: vi.fn(actual.stat),
-  } as typeof import('node:fs/promises')
+  } as unknown as typeof import('node:fs/promises')
 })
 
 const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  mocks.readdir.mockClear()
   vi.mocked(open).mockReset()
   vi.mocked(rename).mockReset()
 })
@@ -103,6 +110,22 @@ describe('file services', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(first)
   })
 
+  it('loads the highest-numbered generation when generation write times tie', async () => {
+    const { directory, services } = await servicesForTest()
+    const older = stateWithoutImage('Older')
+    const newer = stateWithoutImage('Newer')
+    await writeFile(join(directory, 'document.1.json'), JSON.stringify(older), 'utf8')
+    await writeFile(join(directory, 'document.2.json'), JSON.stringify(newer), 'utf8')
+    const when = new Date(Date.now() - 1_000)
+    await utimes(join(directory, 'document.1.json'), when, when)
+    await utimes(join(directory, 'document.2.json'), when, when)
+    await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
+    mocks.readdir.mockResolvedValueOnce(['document.1.json', 'document.2.json'])
+
+    await expect(services.load()).resolves.toEqual(newer)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(newer)
+  })
+
   it('loads a legacy backup as a recovery candidate', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
@@ -111,6 +134,37 @@ describe('file services', () => {
 
     await expect(services.load()).resolves.toEqual(previous)
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(previous)
+  })
+
+  it('loads and promotes a newer interrupted save over an older primary', async () => {
+    const { directory, services } = await servicesForTest()
+    const committed = stateWithoutImage('Committed')
+    const interrupted = stateWithoutImage('Interrupted')
+    await writeFile(join(directory, 'document.json'), JSON.stringify(committed), 'utf8')
+    await ageFile(join(directory, 'document.json'), 60)
+    await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(interrupted), 'utf8')
+
+    await expect(services.load()).resolves.toEqual(interrupted)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(interrupted)
+    await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('recovers a valid generation when the primary is structurally invalid', async () => {
+    const { directory, services } = await servicesForTest()
+    const recovered = stateWithoutImage('Recovered')
+    await writeFile(join(directory, 'document.1.json'), JSON.stringify(recovered), 'utf8')
+    await writeFile(
+      join(directory, 'document.json'),
+      JSON.stringify({
+        version: 2,
+        document: { roots: 'not an array' },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      }),
+      'utf8',
+    )
+
+    await expect(services.load()).resolves.toEqual(recovered)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(recovered)
   })
 
   it('keeps referenced attachments and removes unreferenced files', async () => {
@@ -209,21 +263,25 @@ describe('file services', () => {
     )
   })
 
-  it('keeps the newest generation past the safety window when it falls outside the retention cap', async () => {
+  it('prunes only generations older than the retained safety generation', async () => {
     const { directory, services } = await servicesForTest()
-    for (let index = 1; index <= 22; index += 1) {
-      const path = join(directory, `document.${index}.json`)
-      await writeFile(path, JSON.stringify(stateWithoutImage(`State ${index}`)), 'utf8')
-      await ageFile(path, index === 1 ? 60 : 24 - index)
+    for (let index = 1; index <= 26; index += 1) {
+      await writeFile(
+        join(directory, `document.${index}.json`),
+        JSON.stringify(stateWithoutImage(`State ${index}`)),
+        'utf8',
+      )
+    }
+    for (let index = 1; index <= 26; index += 1) {
+      await ageFile(join(directory, `document.${index}.json`), index <= 5 ? 46 - index : 27 - index)
     }
     await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
 
     await services.save(stateWithoutImage('Final'))
 
-    expect(await generationFiles(directory)).toEqual([
-      'document.1.json',
-      ...Array.from({ length: 20 }, (_, index) => `document.${index + 4}.json`),
-    ])
+    expect(await generationFiles(directory)).toEqual(
+      Array.from({ length: 23 }, (_, index) => `document.${index + 5}.json`),
+    )
   })
 
   it('ignores absent, malformed, and unsupported recovery documents without rewriting them', async () => {
@@ -582,7 +640,7 @@ describe('save interruption recovery', () => {
     await expect(restarted.load()).resolves.toEqual(previous)
   })
 
-  it('keeps the committed document when the generation rotation is interrupted', async () => {
+  it('recovers the newer interrupted save when the generation rotation is interrupted', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
     const next = stateWithoutImage('Next')
@@ -598,12 +656,9 @@ describe('save interruption recovery', () => {
     expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
 
     const restarted = createFileServices(directory)
-    await expect(restarted.load()).resolves.toEqual(previous)
-    expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
-
-    await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
     await expect(restarted.load()).resolves.toEqual(next)
-    expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(JSON.stringify(next, null, 2))
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
+    await expect(readFile(temporaryPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('recovers the next document when the replacement rename is interrupted after the generation is preserved', async () => {
@@ -646,13 +701,8 @@ describe('save interruption recovery', () => {
       await expect(services.save(next)).rejects.toThrow('simulated interruption during replacement rename')
 
       const restarted = createFileServices(directory)
-      if (withPrimary) await expect(restarted.load()).resolves.toEqual(previous)
-      else await expect(restarted.load()).resolves.toEqual(next)
-
-      if (withPrimary) {
-        await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
-        await expect(restarted.load()).resolves.toEqual(next)
-      }
+      await expect(restarted.load()).resolves.toEqual(next)
+      expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
     },
   )
 

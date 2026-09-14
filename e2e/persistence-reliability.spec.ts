@@ -1,5 +1,5 @@
 import type { ElectronApplication } from '@playwright/test'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   allowRendererError,
@@ -93,6 +93,86 @@ test.describe('persistence reliability regressions', () => {
     await expect(node(window, 1)).toHaveValue('Recovered backup')
     expect(readFileSync(documentPath(userDataDir))).toEqual(backup)
     expect(readFileSync(`${documentPath(userDataDir)}.tmp`, 'utf8')).toBe('{"version":999}')
+  })
+
+  test('loads a newer interrupted save over an older committed primary', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Committed', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const interrupted = JSON.stringify({
+      version: 1,
+      document: { roots: [{ id: 'root', text: 'Interrupted', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    writeFileSync(`${documentPath(userDataDir)}.tmp`, interrupted)
+    const past = new Date(Date.now() - 60_000)
+    utimesSync(documentPath(userDataDir), past, past)
+
+    const { window } = await launchTree(userDataDir)
+
+    await expect(node(window, 1)).toHaveValue('Interrupted')
+    expect(readFileSync(documentPath(userDataDir), 'utf8')).toBe(interrupted)
+    expect(existsSync(`${documentPath(userDataDir)}.tmp`)).toBe(false)
+  })
+
+  test('recovers a valid generation when the primary fails domain validation', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Generation', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const generationPath = join(userDataDir, 'data', 'document.1.json')
+    writeFileSync(generationPath, readFileSync(documentPath(userDataDir)))
+    const past = new Date(Date.now() - 60_000)
+    utimesSync(generationPath, past, past)
+    writeFileSync(
+      documentPath(userDataDir),
+      JSON.stringify({
+        version: 2,
+        document: { roots: 'not an array' },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      }),
+    )
+
+    const { window } = await launchTree(userDataDir)
+
+    await expect(node(window, 1)).toHaveValue('Generation')
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Generation')
+  })
+
+  test('loads the highest-numbered generation when generation write times tie', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Primary', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const dataDirectory = join(userDataDir, 'data')
+    const olderPath = join(dataDirectory, 'document.1.json')
+    const newerPath = join(dataDirectory, 'document.2.json')
+    writeFileSync(
+      olderPath,
+      JSON.stringify({
+        version: 1,
+        document: { roots: [{ id: 'root', text: 'Older generation', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      }),
+    )
+    writeFileSync(
+      newerPath,
+      JSON.stringify({
+        version: 1,
+        document: { roots: [{ id: 'root', text: 'Newer generation', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      }),
+    )
+    const tied = new Date()
+    utimesSync(olderPath, tied, tied)
+    utimesSync(newerPath, tied, tied)
+    writeFileSync(documentPath(userDataDir), '{ damaged')
+
+    const { window } = await launchTree(userDataDir)
+
+    await expect(node(window, 1)).toHaveValue('Newer generation')
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Newer generation')
   })
 
   test('opens a recovery document whose image is missing', async ({ userDataDir }) => {

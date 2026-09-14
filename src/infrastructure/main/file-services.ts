@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import {
   collectAttachmentIds,
   parsePersistedState,
+  validatePersistedState,
   type AttachmentId,
   type PersistedEditorState,
 } from '../../domain/document'
@@ -30,6 +31,7 @@ const MAX_RETAINED_GENERATIONS = 20
 interface DocumentGeneration {
   path: string
   modifiedMs: number
+  sequence?: number
 }
 
 export type FileOperationLogger = (event: FileOperationEvent) => void
@@ -51,33 +53,42 @@ export function createFileServices(
   return {
     async load(): Promise<unknown | null> {
       return runOperation('load', [documentPath, temporaryDocumentPath, dataDirectory], async () => {
-        const generations = (await listDocumentGenerations(dataDirectory)).sort(
-          (left, right) => right.modifiedMs - left.modifiedMs,
-        )
-        const candidates = [documentPath, temporaryDocumentPath, ...generations.map((generation) => generation.path)]
+        const candidates = await listLoadCandidates(dataDirectory, documentPath, temporaryDocumentPath)
+        const reads = new Map<string, { value: unknown } | { error: unknown }>()
+        const readCandidate = async (path: string): Promise<{ value: unknown } | { error: unknown }> => {
+          const cached = reads.get(path)
+          if (cached !== undefined) return cached
+          let result: { value: unknown } | { error: unknown }
+          try {
+            result = { value: JSON.parse(await readFile(path, 'utf8')) }
+          } catch (error) {
+            result = { error }
+          }
+          reads.set(path, result)
+          return result
+        }
+        const primary = await readCandidate(documentPath)
+        if ('value' in primary && primary.value === null) {
+          // Only missing files may produce the first-launch null sentinel.
+          throw new Error('The saved document has an unsupported format.')
+        }
         let firstError: unknown
         for (const candidate of candidates) {
-          let value: unknown
-          try {
-            value = JSON.parse(await readFile(candidate, 'utf8'))
-          } catch (error) {
-            if (!isNotFound(error) && firstError === undefined) firstError = error
+          const read = await readCandidate(candidate.path)
+          if ('error' in read) {
+            if (!isNotFound(read.error) && firstError === undefined) firstError = read.error
             continue
           }
-          if (candidate === documentPath) {
-            // Only missing files may produce the first-launch null sentinel.
-            if (value === null) throw new Error('The saved document has an unsupported format.')
-            return value
-          }
           try {
-            parsePersistedState(value)
-            await rename(candidate, documentPath)
-            return value
+            validatePersistedState(read.value)
           } catch (error) {
             if (!isNotFound(error) && firstError === undefined) {
               firstError = error
             }
+            continue
           }
+          if (candidate.path !== documentPath) await rename(candidate.path, documentPath)
+          return read.value
         }
         if (firstError !== undefined) throw firstError
         return null
@@ -195,9 +206,9 @@ export function createFileServices(
       return
     }
     const safetyIndex = generations.findIndex((generation) => Date.now() - generation.modifiedMs >= SAFETY_WINDOW_MS)
-    const keep = new Set<string>()
-    for (const generation of generations.slice(0, MAX_RETAINED_GENERATIONS)) keep.add(generation.path)
-    if (safetyIndex >= 0) keep.add(generations[safetyIndex]!.path)
+    const retainedCount =
+      safetyIndex < 0 ? MAX_RETAINED_GENERATIONS : Math.max(MAX_RETAINED_GENERATIONS, safetyIndex + 1)
+    const keep = new Set(generations.slice(0, retainedCount).map((generation) => generation.path))
     await Promise.all(
       generations
         .filter((generation) => !keep.has(generation.path))
@@ -238,16 +249,51 @@ async function listDocumentGenerations(dataDirectory: string): Promise<DocumentG
   }
   const generations: DocumentGeneration[] = []
   for (const name of names) {
-    if (!GENERATION_PATTERN.test(name) && name !== LEGACY_BACKUP_NAME) continue
+    const match = GENERATION_PATTERN.exec(name)
+    if (match === null && name !== LEGACY_BACKUP_NAME) continue
     const path = join(dataDirectory, name)
     try {
       const information = await stat(path)
-      generations.push({ path, modifiedMs: information.mtimeMs })
+      generations.push(
+        match === null
+          ? { path, modifiedMs: information.mtimeMs }
+          : { path, modifiedMs: information.mtimeMs, sequence: Number(match[1]) },
+      )
     } catch (error) {
       if (!isNotFound(error)) throw error
     }
   }
   return generations
+}
+
+async function listLoadCandidates(
+  dataDirectory: string,
+  documentPath: string,
+  temporaryDocumentPath: string,
+): Promise<DocumentGeneration[]> {
+  const candidates = await listDocumentGenerations(dataDirectory)
+  for (const path of [documentPath, temporaryDocumentPath]) {
+    try {
+      const information = await stat(path)
+      candidates.push({ path, modifiedMs: information.mtimeMs })
+    } catch (error) {
+      if (!isNotFound(error)) throw error
+    }
+  }
+  return candidates.sort((left, right) => {
+    if (right.modifiedMs !== left.modifiedMs) return right.modifiedMs - left.modifiedMs
+    const rank =
+      candidateRank(left.path, documentPath, temporaryDocumentPath) -
+      candidateRank(right.path, documentPath, temporaryDocumentPath)
+    if (rank !== 0) return rank
+    return (right.sequence ?? -1) - (left.sequence ?? -1)
+  })
+}
+
+function candidateRank(path: string, documentPath: string, temporaryDocumentPath: string): number {
+  if (path === documentPath) return 0
+  if (path === temporaryDocumentPath) return 1
+  return 2
 }
 
 async function readRecoveryAttachmentIds(path: string): Promise<ReadonlySet<AttachmentId>> {
