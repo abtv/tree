@@ -273,6 +273,10 @@ Use Git throughout development.
 
 Prefer one logical task per commit.
 
+Commit each completed logical change once validation passes; do not wait for the Product Owner to ask. Before committing, confirm the change is complete and validated, review `git status` and `git diff`, and stage only the intended files.
+
+Never amend, rebase, or otherwise rewrite an existing commit without the Product Owner's explicit approval. Ask first.
+
 ### Commit messages
 
 Use Conventional Commits: `type(scope): summary`, where `type` is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood and keep it focused on the implemented change.
@@ -289,7 +293,7 @@ Before modifying files with existing uncommitted changes, inspect those changes 
 
 ### Immediate follow-up fixes
 
-When the Product Owner requests a fix directly related to the most recently committed change, do not create a new plan or a new commit. Update the existing plan and amend the last commit with `git commit --amend` instead. If the fix changes the plan's scope, update the plan content and rename the plan file to match. This applies only to direct follow-ups to the most recent commit; unrelated changes get their own plan and commit.
+When the Product Owner requests a fix directly related to the most recently committed change, do not create a new plan or a new commit. Ask the Product Owner whether to amend the last commit, and amend with `git commit --amend` only after they approve. If the fix changes the plan's scope, update the plan content and rename the plan file to match. This applies only to direct follow-ups to the most recent commit; unrelated changes get their own plan and commit.
 
 ### Session boundaries
 
