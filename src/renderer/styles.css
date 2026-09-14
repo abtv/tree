@@ -286,6 +286,10 @@ textarea {
   background: transparent;
 }
 
+.node-row.node-row-dragging {
+  background: #eef0f1;
+}
+
 .current-parent-input {
   padding: 0 6px 4px;
   font-size: 28px;
@@ -461,6 +465,10 @@ textarea {
   }
   .node-input:focus {
     background: #1e2022;
+  }
+
+  .node-row.node-row-dragging {
+    background: #303438;
   }
 
   .current-parent-input:focus {

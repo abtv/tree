@@ -509,6 +509,8 @@ A drag operation:
 
 The row's editable surface is also a grab area when it is not focused, providing a broad drag target. The circular indicator remains a pointer target for entering the node, and a focused text field remains an editing target.
 
+While a node is being dragged, its row displays a subtle gray background until the drag ends.
+
 The entire subtree moves together with its node.
 
 Use drop zones between nodes.
