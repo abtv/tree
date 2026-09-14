@@ -198,6 +198,18 @@ textarea {
   cursor: grabbing;
 }
 
+.node-row[draggable='true'] .node-input {
+  cursor: grab;
+}
+
+.node-row[draggable='true']:active .node-input {
+  cursor: grabbing;
+}
+
+.node-row[draggable='true'] .node-input:focus {
+  cursor: text;
+}
+
 .drop-zone {
   position: relative;
   height: 16px;
@@ -268,6 +280,10 @@ textarea {
 
 .node-input:focus {
   background: #fff;
+}
+
+.node-row.node-row-dragging .node-input:focus {
+  background: transparent;
 }
 
 .current-parent-input {

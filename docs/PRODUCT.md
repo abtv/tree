@@ -507,6 +507,8 @@ A drag operation:
 * cannot make one node a child of another;
 * cannot move a node to another level.
 
+The row's editable surface is also a grab area when it is not focused, providing a broad drag target. The circular indicator remains a pointer target for entering the node, and a focused text field remains an editing target.
+
 The entire subtree moves together with its node.
 
 Use drop zones between nodes.

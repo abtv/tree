@@ -55,6 +55,25 @@ function dropAt(target: Element, nodeId: string, clientY: number): void {
 }
 
 describe('NodeList', () => {
+  it('marks the source row while it is being dragged and clears the mark afterward', () => {
+    const { container } = render(
+      <NodeList
+        nodes={nodes}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+        onEnter={() => undefined}
+        onMove={() => undefined}
+      />,
+    )
+    const row = container.querySelector('.node-row')
+    if (row === null) throw new Error('The first row was not rendered.')
+
+    fireEvent.dragStart(row, { dataTransfer: createTransfer('a') })
+    expect(row).toHaveClass('node-row-dragging')
+
+    fireEvent.dragEnd(row)
+    expect(row).not.toHaveClass('node-row-dragging')
+  })
+
   it('inserts above or below a row based on the drop position within it', () => {
     const onMove = vi.fn()
     const { container } = render(

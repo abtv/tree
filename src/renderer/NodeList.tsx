@@ -340,11 +340,19 @@ const NodeRow = memo(function NodeRow({
   )
   const onDragStart = useCallback(
     (event: DragEvent<HTMLDivElement>): void => {
+      event.currentTarget.classList.add('node-row-dragging')
       event.dataTransfer.effectAllowed = 'move'
       event.dataTransfer.setData('text/plain', node.id)
       draggedNodeIdRef.current = node.id
     },
     [draggedNodeIdRef, node.id],
+  )
+  const onDragEndRow = useCallback(
+    (event: DragEvent<HTMLDivElement>): void => {
+      event.currentTarget.classList.remove('node-row-dragging')
+      onDragEnd()
+    },
+    [onDragEnd],
   )
 
   return (
@@ -352,7 +360,7 @@ const NodeRow = memo(function NodeRow({
       className={pinned ? 'node-row node-row-pinned' : 'node-row'}
       data-node-id={node.id}
       draggable={!locked}
-      onDragEnd={onDragEnd}
+      onDragEnd={onDragEndRow}
       onDragOver={onDragOver}
       onDragStart={onDragStart}
       onDrop={onDropRow}
