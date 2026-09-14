@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   MAX_ATTACHMENT_BYTES,
   isTrustedRendererUrl,
@@ -8,7 +8,7 @@ import {
   validateClipboardWritePayload,
   validatePersistedEditorState,
 } from './ipc-security'
-import { decodePngWithZlib, onePixelPng, pngWith, transparentPng } from './png-test-utils'
+import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith, transparentPng } from './png-test-utils'
 
 const state = {
   version: 1,
@@ -116,6 +116,58 @@ describe('IPC security validation', () => {
     ])
     expect(() => validateAttachmentBytes(corrupt, decodePngWithZlib)).toThrow('decodable')
     expect(() => validateAttachmentBytes(onePixelPng, () => false)).toThrow('decodable')
+  })
+
+  it('rejects PNGs above the decoded size budget before invoking the decoder', () => {
+    const decode = vi.fn(() => true)
+    const oversizedPixels = pngWith([
+      ['IHDR', pngIhdr(30_000, 30_000)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(() => validateAttachmentBytes(oversizedPixels, decode)).toThrow('image is too large')
+
+    const oversizedSide = pngWith([
+      ['IHDR', pngIhdr(32_768, 1)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(() => validateAttachmentBytes(oversizedSide, decode)).toThrow('image is too large')
+
+    const oversizedHeight = pngWith([
+      ['IHDR', pngIhdr(1, 32_768)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(() => validateAttachmentBytes(oversizedHeight, decode)).toThrow('image is too large')
+
+    const justOverPixels = pngWith([
+      ['IHDR', pngIhdr(8_192, 8_193)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(() => validateAttachmentBytes(justOverPixels, decode)).toThrow('image is too large')
+
+    expect(decode).not.toHaveBeenCalled()
+  })
+
+  it('accepts PNGs at the decoded size budget boundary', () => {
+    const decode = vi.fn(() => true)
+    const exactPixels = pngWith([
+      ['IHDR', pngIhdr(8_192, 8_192)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(validateAttachmentBytes(exactPixels, decode)).toBe(exactPixels)
+
+    const tallWithinBudget = pngWith([
+      ['IHDR', pngIhdr(32_767, 2_048)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+    expect(validateAttachmentBytes(tallWithinBudget, decode)).toBe(tallWithinBudget)
+
+    expect(decode).toHaveBeenCalledTimes(2)
   })
 
   it('accepts typed-array views and rejects invalid byte values', () => {

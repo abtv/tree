@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ipcChannels } from '../shared/ipc'
 import type { FileServices } from '../infrastructure/main/file-services'
 import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
-import { decodePngWithZlib, onePixelPng } from './png-test-utils'
+import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 
 const rendererUrl = 'file:///app/out/renderer/index.html'
 const validState = {
@@ -123,6 +123,22 @@ describe('main IPC handlers', () => {
     await expect(
       Promise.resolve().then(() => handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', invalidPng)),
     ).rejects.toThrow('PNG')
+    expect(fileServices.writeAttachment).not.toHaveBeenCalled()
+  })
+
+  it('rejects oversized attachment dimensions before decoding or writing', async () => {
+    const { handlers, fileServices, decodePng } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const oversizedPng = pngWith([
+      ['IHDR', pngIhdr(30_000, 30_000)],
+      ['IDAT', [1, 2, 3]],
+      ['IEND', []],
+    ])
+
+    await expect(
+      Promise.resolve().then(() => handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', oversizedPng)),
+    ).rejects.toThrow('image is too large')
+    expect(decodePng).not.toHaveBeenCalled()
     expect(fileServices.writeAttachment).not.toHaveBeenCalled()
   })
 

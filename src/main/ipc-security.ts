@@ -3,6 +3,8 @@ import { validatePersistedState } from '../domain/document'
 import type { ClipboardWritePayload } from '../shared/ipc'
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+export const MAX_ATTACHMENT_DIMENSION = 32_767
+export const MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024
 
 const attachmentIdPattern = /^[A-Za-z0-9_-]+$/
 
@@ -47,8 +49,15 @@ export function validateAttachmentBytes(value: unknown, decode: PngDecoder): Uin
   if (bytes.byteLength > MAX_ATTACHMENT_BYTES) throw new Error('Attachment is too large.')
   if (bytes.byteLength === 0) throw new Error('Attachment data is empty.')
   if (!isPng(bytes)) throw new Error('Attachment data is not a valid PNG image.')
+  if (exceedsDecodeBudget(bytes)) throw new Error('Attachment image is too large.')
   if (!decode(bytes)) throw new Error('Attachment data is not a decodable PNG image.')
   return bytes
+}
+
+function exceedsDecodeBudget(bytes: Uint8Array): boolean {
+  const width = readUint32(bytes, 16)
+  const height = readUint32(bytes, 20)
+  return width > MAX_ATTACHMENT_DIMENSION || height > MAX_ATTACHMENT_DIMENSION || width * height > MAX_ATTACHMENT_PIXELS
 }
 
 export function isPng(bytes: Uint8Array): boolean {

@@ -14,7 +14,7 @@ The main controls are:
 * **Restricted navigation.** The renderer may navigate only to the packaged renderer document or the configured development URL; external URLs open only through the validated HTTP(S) shell path (`src/main/window.ts`, `src/main/index.ts`).
 * **Trusted callers and validated payloads.** Every IPC call must originate from the configured renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/main/ipc-handlers.ts`, `src/main/ipc-security.ts`).
 * **Validated persistence input.** The save boundary validates the untrusted persisted state, including the depth invariant, without rebuilding the document (`src/domain/document.ts`, `src/main/ipc-security.ts`).
-* **Bounded attachments.** Attachment writes accept only validated PNG data within a bounded payload size, and the image must decode through the platform decoder before bytes are stored (`src/main/ipc-security.ts`, `src/main/png-decoder.ts`).
+* **Bounded attachments.** Attachment writes accept only validated PNG data within a bounded payload size and with bounded decoded dimensions (maximum 32767 pixels per side and 64 megapixels total), and the image must decode through the platform decoder before bytes are stored (`src/main/ipc-security.ts`, `src/main/png-decoder.ts`).
 * **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs.
 * **Domain purity.** The domain does not depend on Electron, Node, the filesystem, or the DOM, and dependencies point toward it (`docs/ARCHITECTURE.md` §4, §18). ESLint enforces the import boundaries (`eslint.config.mjs`).
 

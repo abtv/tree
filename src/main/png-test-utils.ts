@@ -41,6 +41,24 @@ export function pngWith(chunks: Array<[string, number[]]>): Uint8Array {
   return Uint8Array.from([...signature, ...chunks.flatMap(([type, data]) => chunk(type, data))])
 }
 
+export function pngIhdr(width: number, height: number, bitDepth = 8, colorType = 6): number[] {
+  return [
+    (width >>> 24) & 255,
+    (width >>> 16) & 255,
+    (width >>> 8) & 255,
+    width & 255,
+    (height >>> 24) & 255,
+    (height >>> 16) & 255,
+    (height >>> 8) & 255,
+    height & 255,
+    bitDepth,
+    colorType,
+    0,
+    0,
+    0,
+  ]
+}
+
 export function decodePngWithZlib(bytes: Uint8Array): boolean {
   if (bytes.length < signature.length || !signature.every((byte, index) => bytes[index] === byte)) return false
   let offset = signature.length

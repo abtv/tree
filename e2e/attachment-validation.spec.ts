@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { pngIhdr, pngWith } from '../src/main/png-test-utils'
 import {
   attachmentFiles,
   clickApplicationMenuQuit,
@@ -36,6 +37,32 @@ test.describe('attachment validation and image failures', () => {
 
     expect(message).toMatch(/PNG/)
     expect(attachmentFiles(userDataDir)).not.toContain('invalid-image.png')
+  })
+
+  test('rejects an oversized PNG at the preload boundary before writing a file', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const oversizedPng = [
+      ...pngWith([
+        ['IHDR', pngIhdr(30_000, 30_000)],
+        ['IDAT', [1, 2, 3]],
+        ['IEND', []],
+      ]),
+    ]
+
+    const message = await window.evaluate(async (bytes) => {
+      const api = (
+        globalThis as unknown as { treeApi: { writeAttachment(id: string, data: Uint8Array): Promise<void> } }
+      ).treeApi
+      try {
+        await api.writeAttachment('oversized-image', new Uint8Array(bytes))
+        return 'resolved'
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error)
+      }
+    }, oversizedPng)
+
+    expect(message).toMatch(/image is too large/)
+    expect(attachmentFiles(userDataDir)).not.toContain('oversized-image.png')
   })
 
   test('pastes a real image, decodes it in the browser, and restores it after restart', async ({ userDataDir }) => {
