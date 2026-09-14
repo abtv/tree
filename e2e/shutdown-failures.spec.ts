@@ -105,4 +105,46 @@ test.describe('shutdown failure handling', () => {
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
   })
+
+  test('flushes text typed while the quit save is in flight', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & {
+        saveCalls?: number
+        firstSaveStarted?: boolean
+        releaseFirstSave?: () => void
+      }
+      control.saveCalls = 0
+      const gate = new Promise<void>((resolve) => {
+        control.releaseFirstSave = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        control.saveCalls = (control.saveCalls ?? 0) + 1
+        if (control.saveCalls === 1) {
+          control.firstSaveStarted = true
+          await gate
+        }
+        return original(...args)
+      })
+    })
+
+    const beforeQuit = 'before quit'
+    const typedWhilePending = ' typed while quit save pending'
+    await typeInto(node(window, 1), beforeQuit)
+    await clickApplicationMenuQuit(app)
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as typeof globalThis & { firstSaveStarted?: boolean }).firstSaveStarted),
+      )
+      .toBe(true)
+
+    await typeInto(node(window, 1), typedWhilePending)
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseFirstSave?: () => void }).releaseFirstSave?.())
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${beforeQuit}${typedWhilePending}`)
+  })
 })

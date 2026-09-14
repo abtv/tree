@@ -120,7 +120,7 @@ export class EditorStore {
       await Promise.all(this.pendingEdits)
       if (this.changesPending) this.requestPolicySave()
       await this.persistence.flush()
-    } while (this.pendingEdits.size > 0)
+    } while (this.pendingEdits.size > 0 || this.changesPending)
   }
 
   public reportError(error: unknown): void {

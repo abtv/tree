@@ -1151,6 +1151,32 @@ describe('EditorStore', () => {
     expect(flushed).toBe(true)
   })
 
+  it('flushes text typed while a quit save is in flight', async () => {
+    const { services, pending } = deferredSaveServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+
+    store.editText('root', 'before quit')
+    let flushed = false
+    const flush = store.flushPersistence().then(() => {
+      flushed = true
+    })
+    await vi.waitFor(() => expect(pending).toHaveLength(1))
+
+    store.editText('root', 'before quit typed while quit save pending')
+    pending[0]!.resolve()
+    await tick()
+
+    expect(flushed).toBe(false)
+    expect(pending).toHaveLength(2)
+    pending[1]!.resolve()
+    await flush
+    expect(flushed).toBe(true)
+    expect(services.saves.at(-1)).toMatchObject({
+      document: { roots: [{ text: 'before quit typed while quit save pending' }] },
+    })
+  })
+
   it.each(['clipboard read', 'attachment write', 'cut'] as const)(
     'waits for a pending %s and its resulting save during flush',
     async (stage) => {
