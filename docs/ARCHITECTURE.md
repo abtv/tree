@@ -133,7 +133,7 @@ The domain invariant `MAX_DOCUMENT_DEPTH` enforces the product depth limit defin
 
 Do not store redundant `parentId` fields unless there is a demonstrated technical need and the data model is explicitly changed.
 
-Lookups use a derived, in-memory parent index rather than a persisted field. `buildNodeIndex` maps every node id to its parent id (`null` for top-level roots); the same single traversal also records each node's index within its sibling list. `locateNode` walks the parent chain and then descends each level by direct sibling index, so a lookup costs O(depth) instead of a full traversal or a per-level scan. The index is memoized in a weak map keyed by the immutable document object, so each live document keeps its own index across text edits and renders and the entry is released with the document; it is never part of the document object or the persisted JSON.
+Lookups use a derived, in-memory parent index rather than a persisted field. `buildNodeIndex` maps every node id to its parent id (`null` for top-level roots); the same single traversal also records each node's index within its sibling list. `locateNode` walks the parent chain and then descends each level by direct sibling index, so a lookup costs O(depth) instead of a full traversal or a per-level scan. The index is memoized in a weak map keyed by the immutable document object, so a document keeps its index across text edits and renders. When the editor replaces a document snapshot, it releases the replaced document's cache entry, so history snapshots retain only the document rather than one full index each; restoring a snapshot rebuilds its index on the next lookup. The index is never part of the document object or the persisted JSON.
 
 Node IDs are stable identifiers.
 

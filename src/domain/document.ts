@@ -98,6 +98,10 @@ function shareIndex(from: Document, to: Document): void {
   indexCache.set(to, indexInfoFor(from))
 }
 
+export function releaseNodeIndex(document: Document): void {
+  indexCache.delete(document)
+}
+
 export function createInitialDocument(id: NodeId): Document {
   const document: Document = { roots: [{ id, text: '', children: [] }] }
   attachmentCountCache.set(document, new Map())

@@ -50,13 +50,17 @@ async function closeTrackedApps(): Promise<void> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
 }
 
-export async function launchTree(userDataDir: string): Promise<Launched> {
+export async function launchTree(userDataDir: string, options: { memoryProbe?: boolean } = {}): Promise<Launched> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   await cleanupStaleElectronProcesses('tree-perf-')
   let app: ElectronApplication
   try {
     app = await electron.launch({
-      args: [`--user-data-dir=${userDataDir}`, join(process.cwd(), 'e2e', 'electron-entry.cjs')],
+      args: [
+        `--user-data-dir=${userDataDir}`,
+        ...(options.memoryProbe === true ? ['--enable-precise-memory-info', '--js-flags=--expose-gc'] : []),
+        join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+      ],
       cwd: process.cwd(),
     })
   } catch (error) {
@@ -279,4 +283,19 @@ export async function firePaste(input: ReturnType<Page['locator']>): Promise<voi
 
 export function round(value: number): number {
   return Math.round(value * 100) / 100
+}
+
+export async function collectRendererHeap(window: Page): Promise<number> {
+  const usedHeap = await window.evaluate(() => {
+    const gc = (globalThis as { gc?: () => void }).gc
+    if (typeof gc !== 'function') return undefined
+    gc()
+    return (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize
+  })
+  if (usedHeap === undefined) {
+    throw new Error(
+      'Renderer heap measurement is unavailable; launch with --enable-precise-memory-info and --js-flags=--expose-gc.',
+    )
+  }
+  return usedHeap
 }

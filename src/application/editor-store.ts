@@ -7,6 +7,7 @@ import {
   isValidLocation,
   locateNode,
   parsePersistedState,
+  releaseNodeIndex,
   removeTextRange,
   requireNode,
   type AttachmentId,
@@ -499,12 +500,16 @@ export class EditorStore {
   }
 
   private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>): void {
+    const previous = this.snapshot
     if (state.operationError === undefined) {
       this.snapshot = state
     } else {
       const next = { ...state }
       delete next.operationError
       this.snapshot = next
+    }
+    if (previous.status === 'ready' && previous.document !== this.snapshot.document) {
+      releaseNodeIndex(previous.document)
     }
     this.emit()
   }

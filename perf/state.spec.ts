@@ -1,7 +1,9 @@
 import {
+  collectRendererHeap,
   expect,
   firePaste,
   largeAttachmentSeed,
+  largeSeed,
   launchTree,
   round,
   seedAttachmentFiles,
@@ -161,6 +163,35 @@ test.describe('state and persistence work', () => {
     expect(historyMs).toBeLessThan(5_000)
     expect(cleanupScanMs).toBeGreaterThan(0)
     expect(cleanupScanMs).toBeLessThan(1_000)
+  })
+
+  test('sustained-10000 structural edits keep renderer memory bounded', async ({ userDataDir }) => {
+    seedDocument(userDataDir, largeSeed(100, 100))
+    const { window } = await launchTree(userDataDir, { memoryProbe: true })
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+
+    const structuralCycle = async (): Promise<void> => {
+      await window.keyboard.press('Enter')
+      await window.keyboard.press('Meta+Backspace')
+    }
+    for (let index = 0; index < 50; index += 1) await structuralCycle()
+    const warmHeapBytes = await collectRendererHeap(window)
+
+    const cycles = 250
+    for (let index = 0; index < cycles; index += 1) await structuralCycle()
+    const finalHeapBytes = await collectRendererHeap(window)
+    const growthBytes = finalHeapBytes - warmHeapBytes
+
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'sustained-memory',
+      metrics: { warmHeapBytes, finalHeapBytes, growthBytes, cycles },
+    })
+
+    expect(warmHeapBytes).toBeGreaterThan(0)
+    expect(growthBytes).toBeLessThan(5_000_000)
   })
 
   test('image insertion decode latency for small and larger images', async ({ userDataDir }) => {

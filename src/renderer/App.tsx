@@ -1,6 +1,6 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
-import { displayedNodes, nodePath, requireNode } from '../domain/document'
+import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 import { LocationBar } from './LocationBar'
@@ -22,6 +22,30 @@ export function App({ store }: AppProps): React.JSX.Element {
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
   })
+  const enterNode = useCallback(
+    (node: TreeNode): void => {
+      store.selectNode(node.id, 0)
+      store.enter()
+    },
+    [store],
+  )
+  const moveNode = useCallback(
+    (nodeId: string, insertionIndex: number): void => {
+      store.moveNodeTo(nodeId, insertionIndex)
+    },
+    [store],
+  )
+  const renderInput = useCallback(
+    (node: TreeNode, label: string): React.JSX.Element => (
+      <>
+        <NodeInput node={node} label={label} {...nodeInputBindings(node)} />
+        {node.attachment === undefined ? null : (
+          <AttachmentImage attachmentId={node.attachment.id} onOpen={setPreviewAttachmentId} />
+        )}
+      </>
+    ),
+    [nodeInputBindings],
+  )
 
   if (state.status === 'loading')
     return (
@@ -66,22 +90,7 @@ export function App({ store }: AppProps): React.JSX.Element {
             )}
           </section>
         )}
-        <NodeList
-          nodes={nodes}
-          onEnter={(node) => {
-            store.selectNode(node.id, 0)
-            store.enter()
-          }}
-          onMove={(nodeId, insertionIndex) => store.moveNodeTo(nodeId, insertionIndex)}
-          renderInput={(node, label) => (
-            <>
-              {input(node, label)}
-              {node.attachment === undefined ? null : (
-                <AttachmentImage attachmentId={node.attachment.id} onOpen={setPreviewAttachmentId} />
-              )}
-            </>
-          )}
-        />
+        <NodeList nodes={nodes} onEnter={enterNode} onMove={moveNode} renderInput={renderInput} />
         {state.saveError === undefined ? null : (
           <p className="save-error" role="status">
             {SAVE_ERROR_PREFIX} {state.saveError}

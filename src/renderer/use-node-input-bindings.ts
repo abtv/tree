@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
@@ -61,65 +61,61 @@ export function useNodeInputBindings({
     return () => document.removeEventListener('selectionchange', update)
   }, [])
 
-  const setInput =
-    (id: string) =>
-    (input: HTMLElement | null): void => {
-      if (input === null) {
-        inputs.current.delete(id)
-        return
-      }
-      inputs.current.set(id, input)
-    }
-
-  return (node): NodeInputBindings => ({
-    selectedAll: selectAllNodeId === node.id,
-    inputRef: setInput(node.id),
-    onBlur: () => {
-      setSelectAllNodeId(undefined)
-      store.endTextSession()
-    },
-    onTextChange: (event) => store.editText(node.id, event.currentTarget.value),
-    onContentInput: (event: FormEvent<HTMLElement>) => {
-      const cursor = getCaret(event.currentTarget)
-      const content = readEditableContent(event.currentTarget)
-      pendingCaret.current = { input: event.currentTarget, cursor }
-      store.editContent(node.id, content.text, content.links)
-    },
-    onContentChange: (event: FormEvent<HTMLElement>) => {
-      store.editContent(node.id, event.currentTarget.textContent ?? '', node.links ?? [])
-    },
-    onCompositionEnd: () => {
-      setComposing(false)
-    },
-    onCompositionStart: () => {
-      setComposing(true)
-    },
-    onCut: () => store.markNextTextEditStandalone(),
-    onFocus: (event: FocusEvent<HTMLElement>) => {
-      if (selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
-    },
-    onKeyDown: createEditorKeyDownHandler({
-      store,
-      node,
-      isComposing: () => composing,
-      setSelectAllNodeId,
-      onPreviewAttachment,
+  return useCallback(
+    (node: TreeNode): NodeInputBindings => ({
+      selectedAll: selectAllNodeId === node.id,
+      inputRef: (input: HTMLElement | null) => {
+        if (input === null) inputs.current.delete(node.id)
+        else inputs.current.set(node.id, input)
+      },
+      onBlur: () => {
+        setSelectAllNodeId(undefined)
+        store.endTextSession()
+      },
+      onTextChange: (event) => store.editText(node.id, event.currentTarget.value),
+      onContentInput: (event: FormEvent<HTMLElement>) => {
+        const cursor = getCaret(event.currentTarget)
+        const content = readEditableContent(event.currentTarget)
+        pendingCaret.current = { input: event.currentTarget, cursor }
+        store.editContent(node.id, content.text, content.links)
+      },
+      onContentChange: (event: FormEvent<HTMLElement>) => {
+        store.editContent(node.id, event.currentTarget.textContent ?? '', node.links ?? [])
+      },
+      onCompositionEnd: () => {
+        setComposing(false)
+      },
+      onCompositionStart: () => {
+        setComposing(true)
+      },
+      onCut: () => store.markNextTextEditStandalone(),
+      onFocus: (event: FocusEvent<HTMLElement>) => {
+        if (selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
+      },
+      onKeyDown: createEditorKeyDownHandler({
+        store,
+        node,
+        isComposing: () => composing,
+        setSelectAllNodeId,
+        onPreviewAttachment,
+      }),
+      onMouseDown: () => {
+        setSelectAllNodeId(undefined)
+        inputs.current.get(node.id)?.classList.remove('select-all')
+        store.endTextSession()
+      },
+      onPaste: (event: ClipboardEvent<HTMLElement>) => {
+        setSelectAllNodeId(undefined)
+        event.preventDefault()
+        void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
+      },
+      onSelect: (event: SyntheticEvent<HTMLElement>) => {
+        const target = event.currentTarget
+        if (target instanceof HTMLTextAreaElement) {
+          if (target.selectionStart !== target.selectionEnd) store.endTextSession()
+        } else if (!isCollapsedSelection()) store.endTextSession()
+      },
     }),
-    onMouseDown: () => {
-      setSelectAllNodeId(undefined)
-      inputs.current.get(node.id)?.classList.remove('select-all')
-      store.endTextSession()
-    },
-    onPaste: (event: ClipboardEvent<HTMLElement>) => {
-      setSelectAllNodeId(undefined)
-      event.preventDefault()
-      void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
-    },
-    onSelect: (event: SyntheticEvent<HTMLElement>) => {
-      const target = event.currentTarget
-      if (target instanceof HTMLTextAreaElement) {
-        if (target.selectionStart !== target.selectionEnd) store.endTextSession()
-      } else if (!isCollapsedSelection()) store.endTextSession()
-    },
-  })
+    [composing, onPreviewAttachment, selectAllNodeId, selectedNodeId, store],
+  )
 }
