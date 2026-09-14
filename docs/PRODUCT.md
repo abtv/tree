@@ -509,11 +509,13 @@ A drag operation:
 
 The row's editable surface is also a grab area when it is not focused, providing a broad drag target. The circular indicator remains a pointer target for entering the node, and a focused text field remains an editing target.
 
-While a node is being dragged, its row displays a subtle gray background until the drag ends.
+While a node is being dragged, its row displays a subtle gray background. The highlight clears when the drag ends.
 
 The entire subtree moves together with its node.
 
 Use drop zones between nodes.
+
+The drop zones before the first sibling and after the last sibling have expanded hit areas while preserving the list's normal spacing. The bottom edge target is larger than the top edge target to make use of the available space after the final sibling.
 
 There must be no "drop inside node" target.
 

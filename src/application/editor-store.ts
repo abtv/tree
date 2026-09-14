@@ -416,7 +416,8 @@ export class EditorStore {
   public moveNodeTo(nodeId: NodeId, insertionIndex: number): void {
     const state = this.ready()
     if (this.isPersistenceLocked()) return
-    const transition = moveNodeTransition(state.document, state.location, nodeId, insertionIndex)
+    const cursor = state.focus.nodeId === nodeId ? state.focus.cursor : 0
+    const transition = moveNodeTransition(state.document, state.location, nodeId, insertionIndex, cursor)
     if (transition === undefined) return
     this.endTextSession()
     this.applyStructural(

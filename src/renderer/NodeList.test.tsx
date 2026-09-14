@@ -55,6 +55,20 @@ function dropAt(target: Element, nodeId: string, clientY: number): void {
 }
 
 describe('NodeList', () => {
+  it('renders expanded edge drop targets without changing their insertion positions', () => {
+    const { container } = render(
+      <NodeList
+        nodes={nodes}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+        onEnter={() => undefined}
+        onMove={() => undefined}
+      />,
+    )
+
+    expect(container.querySelector('.drop-zone-start')).toHaveClass('drop-zone-edge')
+    expect(container.querySelector('.drop-zone-end')).toHaveClass('drop-zone-edge')
+  })
+
   it('marks the source row while it is being dragged and clears the mark afterward', () => {
     const { container } = render(
       <NodeList
@@ -72,6 +86,28 @@ describe('NodeList', () => {
 
     fireEvent.dragEnd(row)
     expect(row).not.toHaveClass('node-row-dragging')
+  })
+
+  it('highlights the dragged row only while it is moving', () => {
+    const { container } = render(
+      <NodeList
+        nodes={nodes}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+        onEnter={() => undefined}
+        onMove={() => undefined}
+      />,
+    )
+    const rows = container.querySelectorAll('.node-row')
+    const source = rows[0]
+    const target = rows[1]
+    if (source === undefined || target === undefined) throw new Error('The node rows were not rendered.')
+    const transfer = createTransfer('a')
+
+    fireEvent.dragStart(source, { dataTransfer: transfer })
+    expect(source).toHaveClass('node-row-dragging')
+
+    fireEvent.dragEnd(source)
+    expect(source).not.toHaveClass('node-row-dragging')
   })
 
   it('inserts above or below a row based on the drop position within it', () => {

@@ -215,6 +215,19 @@ textarea {
   height: 16px;
 }
 
+.drop-zone-edge {
+  height: 40px;
+}
+
+.drop-zone-start.drop-zone-edge {
+  margin-top: -24px;
+}
+
+.drop-zone-end.drop-zone-edge {
+  height: 64px;
+  margin-bottom: -48px;
+}
+
 .drop-zone::after {
   position: absolute;
   top: 7px;
@@ -283,6 +296,14 @@ textarea {
 }
 
 .node-row.node-row-dragging .node-input:focus {
+  background: transparent;
+}
+
+.node-row[draggable='true']:active {
+  background: #eef0f1;
+}
+
+.node-row[draggable='true']:active .node-input:focus {
   background: transparent;
 }
 
@@ -468,6 +489,10 @@ textarea {
   }
 
   .node-row.node-row-dragging {
+    background: #303438;
+  }
+
+  .node-row[draggable='true']:active {
     background: #303438;
   }
 

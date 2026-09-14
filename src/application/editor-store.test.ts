@@ -823,11 +823,14 @@ describe('EditorStore', () => {
     const store = new EditorStore(createServices(), ids('root', 'second'))
     await store.initialize()
     store.createSiblingOrFirstChild(0)
+    store.editText('second', 'second')
+    store.selectNode('second', 4)
     store.moveNodeTo('second', 0)
 
     const state = store.getSnapshot()
     expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['second', 'root'])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('second')
+    expect(state.status === 'ready' && state.focus.cursor).toBe(4)
   })
 
   it('opens a document whose referenced attachment file is missing', async () => {

@@ -71,6 +71,7 @@ export function moveNodeTransition(
   location: Location,
   nodeId: NodeId,
   insertionIndex: number,
+  cursor = 0,
 ): StructuralTransition | undefined {
   const nodes = displayedNodes(document, location.currentParentId)
   const sourceIndex = nodes.findIndex((node) => node.id === nodeId)
@@ -80,7 +81,7 @@ export function moveNodeTransition(
   return {
     document: moveSibling(document, nodeId, destination),
     location: { ...location, selectedNodeId: nodeId },
-    focus: { nodeId, cursor: 0 },
+    focus: { nodeId, cursor },
   }
 }
 

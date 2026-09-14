@@ -197,7 +197,6 @@ export function NodeList({
     setAutoScrollDirection(0)
     draggedNodeIdRef.current = undefined
   }, [])
-
   const onListDragOver = useCallback(
     (event: DragEvent<HTMLElement>): void => {
       if (!windowed) return
@@ -237,9 +236,9 @@ export function NodeList({
       onDragOver={onListDragOver}
       ref={listRef}
     >
-      <DropZone index={0} onDrop={onDrop} start />
+      <DropZone index={0} onDragOver={onDragOver} onDrop={onDrop} start />
       {listWindow === undefined ? nodes.map((node, index) => renderRow(node, index)) : renderWindowed(listWindow)}
-      <DropZone end index={nodes.length} onDrop={onDrop} />
+      <DropZone end index={nodes.length} onDragOver={onDragOver} onDrop={onDrop} />
     </section>
   )
 
@@ -387,17 +386,19 @@ function onDragOver(event: DragEvent<HTMLElement>): void {
 function DropZone({
   end = false,
   index,
+  onDragOver,
   onDrop,
   start = false,
 }: {
   end?: boolean
   index: number
+  onDragOver: (event: DragEvent<HTMLElement>) => void
   onDrop: DropHandler
   start?: boolean
 }): React.JSX.Element {
   return (
     <div
-      className={`drop-zone${start ? ' drop-zone-start' : ''}${end ? ' drop-zone-end' : ''}`}
+      className={`drop-zone${start ? ' drop-zone-start' : ''}${end ? ' drop-zone-end' : ''}${start || end ? ' drop-zone-edge' : ''}`}
       aria-label={`Drop position ${index + 1}`}
       onDragOver={onDragOver}
       onDrop={(event) => onDrop(index, event)}

@@ -179,10 +179,10 @@ describe('editor command transitions', () => {
   })
 
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {
-    const moved = moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 2)
+    const moved = moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 2, 3)
     expect(moved?.document.roots[0]!.children.map((node) => node.id)).toEqual(['second', 'first'])
     expect(moved?.location).toEqual({ currentParentId: 'root', selectedNodeId: 'first' })
-    expect(moved?.focus).toEqual({ nodeId: 'first', cursor: 0 })
+    expect(moved?.focus).toEqual({ nodeId: 'first', cursor: 3 })
     expect(
       moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'root', 0),
     ).toBeUndefined()
