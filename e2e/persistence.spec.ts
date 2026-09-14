@@ -2,6 +2,7 @@ import {
   allowRendererError,
   attachmentFiles,
   closeApp,
+  documentGenerations,
   documentPath,
   expect,
   firePaste,
@@ -17,6 +18,7 @@ import {
   writeClipboardText,
 } from './fixtures'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 function depthSeed(depth: number) {
   const root = { id: 'n0', text: 'Level 1', children: [] as Array<{ id: string; text: string; children: never[] }> }
@@ -151,9 +153,7 @@ test.describe('persistence', () => {
     await expect(second.window.getByRole('link', { name: 'https://example.com' })).toBeVisible()
   })
 
-  test('retains an attachment referenced by the recovery backup and deletes it after backup rotation', async ({
-    userDataDir,
-  }) => {
+  test('retains an attachment referenced only by a generation across restart', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
 
     await typeInto(node(first.window, 1), 'Recover me')
@@ -170,10 +170,13 @@ test.describe('persistence', () => {
 
     await closeApp(first.app)
     expect(readPersisted(userDataDir).document.roots[0]?.attachment).toBeUndefined()
-    const backup = JSON.parse(readFileSync(`${documentPath(userDataDir)}.bak`, 'utf8')) as {
-      document: { roots: { attachment?: { id: string } }[] }
-    }
-    expect(backup.document.roots[0]?.attachment?.id).toBe(attachmentId)
+    const generation = documentGenerations(userDataDir).find((name) => {
+      const state = JSON.parse(readFileSync(join(userDataDir, 'data', name), 'utf8')) as {
+        document: { roots: { attachment?: { id: string } }[] }
+      }
+      return state.document.roots[0]?.attachment?.id === attachmentId
+    })
+    expect(generation).toBeDefined()
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
 
     const second = await launchTree(userDataDir)
@@ -181,17 +184,9 @@ test.describe('persistence', () => {
     await expect.poll(() => attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
     await closeApp(second.app)
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
-
-    const third = await launchTree(userDataDir)
-    await typeInto(node(third.window, 1), 'Rotated')
-    await closeApp(third.app)
-
-    const fourth = await launchTree(userDataDir)
-    await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(0)
-    await closeApp(fourth.app)
   })
 
-  test('recovers the backup document including its image after the primary is damaged', async ({ userDataDir }) => {
+  test('recovers a generation document including its image after the primary is damaged', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
 
     await typeInto(node(first.window, 1), 'Recover me')
@@ -207,23 +202,21 @@ test.describe('persistence', () => {
     await expect(first.window.getByAltText('Attached image')).toHaveCount(0)
     await closeApp(first.app)
 
-    const backup = JSON.parse(readFileSync(`${documentPath(userDataDir)}.bak`, 'utf8')) as {
-      document: { roots: { attachment?: { id: string } }[] }
-    }
-    expect(backup.document.roots[0]?.attachment?.id).toBe(attachmentId)
-
-    const second = await launchTree(userDataDir)
-    await expect(second.window.locator('[aria-label^="Node "]')).toHaveCount(1)
-    await expect(second.window.getByAltText('Attached image')).toHaveCount(0)
-    await closeApp(second.app)
+    const generation = documentGenerations(userDataDir).find((name) => {
+      const state = JSON.parse(readFileSync(join(userDataDir, 'data', name), 'utf8')) as {
+        document: { roots: { attachment?: { id: string } }[] }
+      }
+      return state.document.roots[0]?.attachment?.id === attachmentId
+    })
+    expect(generation).toBeDefined()
 
     writeFileSync(documentPath(userDataDir), '{ damaged')
-    const third = await launchTree(userDataDir)
+    const second = await launchTree(userDataDir)
 
-    await expect(node(third.window, 1)).toHaveValue('Recover me')
-    await expect(third.window.getByAltText('Attached image')).toBeVisible()
+    await expect(node(second.window, 1)).toHaveValue('Recover me')
+    await expect(second.window.getByAltText('Attached image')).toBeVisible()
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
-    await closeApp(third.app)
+    await closeApp(second.app)
   })
 
   test('enters a level-20 leaf through its indicator and still rejects creating a child', async ({ userDataDir }) => {

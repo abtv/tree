@@ -343,6 +343,14 @@ export function attachmentFiles(userDataDir: string): string[] {
   return existsSync(directory) ? readdirSync(directory) : []
 }
 
+export function documentGenerations(userDataDir: string): string[] {
+  const directory = join(userDataDir, 'data')
+  if (!existsSync(directory)) return []
+  return readdirSync(directory)
+    .filter((name) => /^document\.\d+\.json$/.test(name))
+    .sort((left, right) => Number(left.slice(9, -5)) - Number(right.slice(9, -5)))
+}
+
 export async function writeClipboardText(app: ElectronApplication, text: string): Promise<void> {
   await app.evaluate(async ({ clipboard }, value) => {
     clipboard.clear()

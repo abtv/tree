@@ -14,7 +14,6 @@ describe('renderer Electron services', () => {
     readClipboard: vi.fn(async (): Promise<ClipboardPayload> => ({ kind: 'text', text: '' })),
     writeClipboard: vi.fn(async () => undefined),
     writeAttachment: vi.fn(async () => undefined),
-    hasAttachment: vi.fn(async () => true),
     readAttachment: vi.fn(async () => new Uint8Array([1, 2, 3])),
     cleanupAttachments: vi.fn(async () => undefined),
   }
@@ -40,7 +39,6 @@ describe('renderer Electron services', () => {
     await expect(services.readClipboard()).resolves.toEqual({ kind: 'text', text: '' })
     await services.writeClipboard?.(payload)
     await services.writeAttachment('attachment-1', bytes)
-    await expect(services.hasAttachment('attachment-1')).resolves.toBe(true)
     await services.cleanupAttachments(['attachment-1'])
     await expect(readAttachment('attachment-1')).resolves.toEqual(bytes)
 
@@ -49,7 +47,6 @@ describe('renderer Electron services', () => {
     expect(api.readClipboard).toHaveBeenCalledWith()
     expect(api.writeClipboard).toHaveBeenCalledWith(payload)
     expect(api.writeAttachment).toHaveBeenCalledWith('attachment-1', bytes)
-    expect(api.hasAttachment).toHaveBeenCalledWith('attachment-1')
     expect(api.cleanupAttachments).toHaveBeenCalledWith(['attachment-1'])
     expect(api.readAttachment).toHaveBeenCalledWith('attachment-1')
   })

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +8,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
-    copyFile: vi.fn(actual.copyFile),
     open: vi.fn(actual.open),
     readFile: vi.fn(actual.readFile),
     rename: vi.fn(actual.rename),
@@ -20,7 +19,6 @@ const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
-  vi.mocked(copyFile).mockReset()
   vi.mocked(open).mockReset()
   vi.mocked(rename).mockReset()
 })
@@ -49,6 +47,16 @@ function stateWithoutImage(text = 'Plain') {
   }
 }
 
+async function ageFile(path: string, seconds: number): Promise<void> {
+  const when = new Date(Date.now() - seconds * 1000)
+  await utimes(path, when, when)
+}
+
+async function generationFiles(directory: string): Promise<string[]> {
+  const names = (await readdir(directory)).filter((name) => /^document\.\d+\.json$/.test(name))
+  return names.sort((left, right) => Number(left.slice(9, -5)) - Number(right.slice(9, -5)))
+}
+
 describe('file services', () => {
   it('saves and loads a versioned state without absolute attachment paths', async () => {
     const { directory, services } = await servicesForTest()
@@ -66,6 +74,45 @@ describe('file services', () => {
     expect(await readFile(join(directory, 'document.json'), 'utf8')).not.toContain(directory)
   })
 
+  it('preserves each replaced document as a numbered generation', async () => {
+    const { directory, services } = await servicesForTest()
+    const first = stateWithoutImage('First')
+    const second = stateWithoutImage('Second')
+    await services.save(first)
+    await services.save(second)
+
+    expect(JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))).toEqual(first)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(second)
+
+    const restarted = createFileServices(directory)
+    const third = stateWithoutImage('Third')
+    await restarted.save(third)
+    expect(JSON.parse(await readFile(join(directory, 'document.2.json'), 'utf8'))).toEqual(second)
+  })
+
+  it('loads the newest valid generation when the primary and temporary files are damaged', async () => {
+    const { directory, services } = await servicesForTest()
+    const first = stateWithoutImage('First')
+    const second = stateWithoutImage('Second')
+    await services.save(first)
+    await services.save(second)
+    await writeFile(join(directory, 'document.json'), '{ damaged')
+    await writeFile(join(directory, 'document.json.tmp'), '{ damaged too')
+
+    await expect(services.load()).resolves.toEqual(first)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(first)
+  })
+
+  it('loads a legacy backup as a recovery candidate', async () => {
+    const { directory, services } = await servicesForTest()
+    const previous = stateWithoutImage('Previous')
+    await writeFile(join(directory, 'document.json.bak'), JSON.stringify(previous), 'utf8')
+    await writeFile(join(directory, 'document.json'), '{ damaged')
+
+    await expect(services.load()).resolves.toEqual(previous)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(previous)
+  })
+
   it('keeps referenced attachments and removes unreferenced files', async () => {
     const { services } = await servicesForTest()
     await services.writeAttachment('keep', new Uint8Array([1]))
@@ -77,21 +124,21 @@ describe('file services', () => {
     expect(await services.readAttachment('remove')).toBeNull()
   })
 
-  it('retains an attachment referenced only by the recovery backup', async () => {
+  it('retains an attachment referenced only by a retained generation', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([9, 9, 9])
-    await services.writeAttachment('backup-image', bytes)
-    await services.save(stateWithImage('backup-image'))
+    await services.writeAttachment('generation-image', bytes)
+    await services.save(stateWithImage('generation-image'))
     await services.save(stateWithoutImage())
 
-    const backup = JSON.parse(await readFile(join(directory, 'document.json.bak'), 'utf8')) as {
+    const generation = JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8')) as {
       document: { roots: { attachment?: { id: string } }[] }
     }
-    expect(backup.document.roots[0]?.attachment?.id).toBe('backup-image')
+    expect(generation.document.roots[0]?.attachment?.id).toBe('generation-image')
 
     await services.cleanupAttachments([])
 
-    expect(await services.readAttachment('backup-image')).toEqual(bytes)
+    expect(await services.readAttachment('generation-image')).toEqual(bytes)
   })
 
   it('retains an attachment referenced only by the temporary recovery document', async () => {
@@ -126,18 +173,57 @@ describe('file services', () => {
     expect(await services.readAttachment('orphan')).toBeNull()
   })
 
-  it('releases an attachment after save rotation removes the backup reference', async () => {
-    const { services } = await servicesForTest()
+  it('releases an attachment after pruning removes the generation that referenced it', async () => {
+    const { directory, services } = await servicesForTest()
     await services.writeAttachment('rotated', new Uint8Array([3]))
-    await services.save(stateWithImage('rotated'))
-    await services.save(stateWithoutImage())
+    for (let index = 1; index <= 22; index += 1) {
+      const path = join(directory, `document.${index}.json`)
+      await writeFile(path, JSON.stringify(index === 1 ? stateWithImage('rotated') : stateWithoutImage()), 'utf8')
+      await ageFile(path, index === 1 ? 60 : index === 2 ? 50 : 0)
+    }
 
     await services.cleanupAttachments([])
     expect(await services.readAttachment('rotated')).not.toBeNull()
 
-    await services.save(stateWithoutImage('Second'))
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
+    await services.save(stateWithoutImage('Prune trigger'))
     await services.cleanupAttachments([])
+
     expect(await services.readAttachment('rotated')).toBeNull()
+    await expect(readFile(join(directory, 'document.1.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('keeps the retention cap of young generations during pruning', async () => {
+    const { directory, services } = await servicesForTest()
+    for (let index = 1; index <= 22; index += 1) {
+      const path = join(directory, `document.${index}.json`)
+      await writeFile(path, JSON.stringify(stateWithoutImage(`State ${index}`)), 'utf8')
+      await ageFile(path, 23 - index)
+    }
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
+
+    await services.save(stateWithoutImage('Final'))
+
+    expect(await generationFiles(directory)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `document.${index + 4}.json`),
+    )
+  })
+
+  it('keeps the newest generation past the safety window when it falls outside the retention cap', async () => {
+    const { directory, services } = await servicesForTest()
+    for (let index = 1; index <= 22; index += 1) {
+      const path = join(directory, `document.${index}.json`)
+      await writeFile(path, JSON.stringify(stateWithoutImage(`State ${index}`)), 'utf8')
+      await ageFile(path, index === 1 ? 60 : 24 - index)
+    }
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
+
+    await services.save(stateWithoutImage('Final'))
+
+    expect(await generationFiles(directory)).toEqual([
+      'document.1.json',
+      ...Array.from({ length: 20 }, (_, index) => `document.${index + 4}.json`),
+    ])
   })
 
   it('ignores absent, malformed, and unsupported recovery documents without rewriting them', async () => {
@@ -276,31 +362,24 @@ describe('file services', () => {
     await expect(services.load()).resolves.toEqual(expect.objectContaining({ version: 1 }))
   })
 
-  it.each([
-    null,
-    { version: 999 },
-    {
-      version: 1,
-      document: {
-        roots: [{ id: 'root', text: '', children: [], attachment: { id: 'missing', mimeType: 'image/png' } }],
-      },
-      location: { currentParentId: null, selectedNodeId: 'root' },
+  it.each([null, { version: 999 }])(
+    'leaves every file unchanged when a recovery candidate is invalid: %j',
+    async (candidate) => {
+      const { directory, services } = await servicesForTest()
+      const primary = '{ damaged'
+      const temporary = JSON.stringify(candidate)
+      const backup = '{ also damaged'
+      await writeFile(join(directory, 'document.json'), primary)
+      await writeFile(join(directory, 'document.json.tmp'), temporary)
+      await writeFile(join(directory, 'document.json.bak'), backup)
+
+      await expect(services.load()).rejects.toThrow()
+
+      expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(primary)
+      expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe(temporary)
+      expect(await readFile(join(directory, 'document.json.bak'), 'utf8')).toBe(backup)
     },
-  ])('leaves every file unchanged when a recovery candidate is invalid: %j', async (candidate) => {
-    const { directory, services } = await servicesForTest()
-    const primary = '{ damaged'
-    const temporary = JSON.stringify(candidate)
-    const backup = '{ also damaged'
-    await writeFile(join(directory, 'document.json'), primary)
-    await writeFile(join(directory, 'document.json.tmp'), temporary)
-    await writeFile(join(directory, 'document.json.bak'), backup)
-
-    await expect(services.load()).rejects.toThrow()
-
-    expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(primary)
-    expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe(temporary)
-    expect(await readFile(join(directory, 'document.json.bak'), 'utf8')).toBe(backup)
-  })
+  )
 
   it('skips an unsupported temporary document and recovers a valid backup', async () => {
     const { directory, services } = await servicesForTest()
@@ -318,7 +397,7 @@ describe('file services', () => {
     expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe('{"version":999}')
   })
 
-  it('does not treat a recovery document with a missing image as an empty first launch', async () => {
+  it('opens a recovery document whose referenced attachment is missing', async () => {
     const { directory, services } = await servicesForTest()
     const candidate = {
       version: 1,
@@ -330,11 +409,6 @@ describe('file services', () => {
     const bytes = JSON.stringify(candidate)
     await writeFile(join(directory, 'document.json.tmp'), bytes)
 
-    await expect(services.load()).rejects.toThrow('Attachment image is missing from local storage.')
-    expect(await readFile(join(directory, 'document.json.tmp'), 'utf8')).toBe(bytes)
-    await expect(readFile(join(directory, 'document.json'))).rejects.toMatchObject({ code: 'ENOENT' })
-
-    await services.writeAttachment('image', new Uint8Array([1]))
     await expect(services.load()).resolves.toEqual(candidate)
     expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(bytes)
   })
@@ -395,29 +469,12 @@ describe('file services', () => {
     info.mockRestore()
   })
 
-  it('reports attachment presence and rejects unsafe attachment IDs', async () => {
+  it('rejects unsafe attachment IDs on read and write', async () => {
     const { services } = await servicesForTest()
     await services.writeAttachment('present', new Uint8Array([1]))
 
-    expect(await services.hasAttachment('present')).toBe(true)
-    expect(await services.hasAttachment('missing')).toBe(false)
-
     await expect(services.writeAttachment('bad/id', new Uint8Array([1]))).rejects.toThrow('Attachment IDs')
     await expect(services.readAttachment('bad/id')).rejects.toThrow('Attachment IDs')
-  })
-
-  it('checks attachment existence using metadata without reading contents', async () => {
-    const { services } = await servicesForTest()
-    await services.writeAttachment('present', new Uint8Array([1, 2, 3]))
-
-    vi.mocked(stat).mockClear()
-    vi.mocked(readFile).mockClear()
-
-    await expect(services.hasAttachment('present')).resolves.toBe(true)
-    await expect(services.hasAttachment('missing')).resolves.toBe(false)
-
-    expect(stat).toHaveBeenCalled()
-    expect(readFile).not.toHaveBeenCalled()
   })
 })
 
@@ -525,42 +582,51 @@ describe('save interruption recovery', () => {
     await expect(restarted.load()).resolves.toEqual(previous)
   })
 
-  it.each([
-    { label: 'before it starts', partial: false },
-    { label: 'after it has overwritten part of the old backup', partial: true },
-  ])('keeps the committed document when the backup rotation is interrupted $label', async ({ partial }) => {
+  it('keeps the committed document when the generation rotation is interrupted', async () => {
     const { directory, services } = await servicesForTest()
-    const first = stateWithoutImage('First')
     const previous = stateWithoutImage('Previous')
     const next = stateWithoutImage('Next')
-    await services.save(first)
     await services.save(previous)
 
-    vi.mocked(copyFile).mockImplementationOnce(async (source, destination) => {
-      if (partial) {
-        const contents = await readFile(source, 'utf8')
-        await writeFile(destination, contents.slice(0, 30), 'utf8')
-      }
-      throw new Error('simulated interruption during backup rotation')
+    vi.mocked(rename).mockImplementationOnce(async () => {
+      throw new Error('simulated interruption during generation rotation')
     })
 
-    await expect(services.save(next)).rejects.toThrow('simulated interruption during backup rotation')
+    await expect(services.save(next)).rejects.toThrow('simulated interruption during generation rotation')
 
     const temporaryPath = join(directory, 'document.json.tmp')
-    const backupPath = join(directory, 'document.json.bak')
     expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
-    if (partial) {
-      const backup = await readFile(backupPath, 'utf8')
-      expect(() => JSON.parse(backup)).toThrow()
-    } else {
-      expect(JSON.parse(await readFile(backupPath, 'utf8'))).toEqual(first)
-    }
 
     const restarted = createFileServices(directory)
     await expect(restarted.load()).resolves.toEqual(previous)
     expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
 
     await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
+    await expect(restarted.load()).resolves.toEqual(next)
+    expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(JSON.stringify(next, null, 2))
+  })
+
+  it('recovers the next document when the replacement rename is interrupted after the generation is preserved', async () => {
+    const { directory, services } = await servicesForTest()
+    const previous = stateWithoutImage('Previous')
+    const next = stateWithoutImage('Next')
+    await services.save(previous)
+
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    let renames = 0
+    vi.mocked(rename).mockImplementation(async (from, to) => {
+      renames += 1
+      if (renames === 2) throw new Error('simulated interruption during replacement rename')
+      await real.rename(from, to)
+    })
+
+    await expect(services.save(next)).rejects.toThrow('simulated interruption during replacement rename')
+
+    const generation = JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))
+    expect(generation).toEqual(previous)
+    await expect(readFile(join(directory, 'document.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+
+    const restarted = createFileServices(directory)
     await expect(restarted.load()).resolves.toEqual(next)
     expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(JSON.stringify(next, null, 2))
   })
@@ -590,15 +656,15 @@ describe('save interruption recovery', () => {
     },
   )
 
-  it('saves normally again after an interrupted backup rotation', async () => {
+  it('saves normally again after an interrupted generation rotation', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
     await services.save(previous)
-    vi.mocked(copyFile).mockImplementationOnce(async () => {
-      throw new Error('simulated interruption during backup rotation')
+    vi.mocked(rename).mockImplementationOnce(async () => {
+      throw new Error('simulated interruption during generation rotation')
     })
     await expect(services.save(stateWithoutImage('Next'))).rejects.toThrow(
-      'simulated interruption during backup rotation',
+      'simulated interruption during generation rotation',
     )
 
     const final = stateWithoutImage('Final')

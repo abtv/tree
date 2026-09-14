@@ -708,9 +708,15 @@ When the user quits, the application waits for queued automatic saves to finish.
 
 Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
 
-When recovering from a missing or malformed document file, a temporary or backup document must be validated, including the availability of its referenced attachments, before it replaces the primary file. A valid retained temporary or backup document's referenced attachments continue to count as references during cleanup, so recovery remains possible after the primary file is damaged. If stored document files exist but no valid document can be loaded, loading fails without changing those files. If no document files exist, the normal first-launch behavior applies.
+The application keeps recent document generations. Each save preserves the document it replaces as a retained generation. At least one generation written more than 30 seconds ago is always retained, together with generations written after it, so an abrupt termination or power loss can lose only work newer than the newest surviving generation, and only destruction of the storage device can remove every generation.
 
-A primary file containing JSON `null` is invalid stored data, not a first launch. Loading shows an error and preserves the primary and any temporary or backup documents.
+On load, the newest stored document that can be parsed and validated becomes the document, whether it is the primary file, a retained generation, or an interrupted save. The application must open that document rather than start empty or refuse to start. Unreadable or invalid candidates are skipped while older candidates are considered, and the loaded candidate becomes the primary file. Retained generations count as references during attachment cleanup, so recovery remains possible after the newest document is damaged.
+
+A document opens even when an attachment file it references is missing; the affected image shows the image error instead of preventing the document from opening.
+
+If stored document files exist but none can be loaded, loading fails without changing those files. If no document files exist, the normal first-launch behavior applies.
+
+A primary file containing JSON `null` is invalid stored data, not a first launch. Loading shows an error and preserves the stored document files.
 
 The following state must be persisted:
 

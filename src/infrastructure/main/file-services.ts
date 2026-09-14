@@ -1,4 +1,4 @@
-import { copyFile, mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   collectAttachmentIds,
@@ -11,16 +11,25 @@ export interface FileServices {
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
-  hasAttachment(id: string): Promise<boolean>
   readAttachment(id: string): Promise<Uint8Array | null>
   cleanupAttachments(referencedIds: string[]): Promise<void>
 }
 
 export interface FileOperationEvent {
-  operation: 'load' | 'save' | 'writeAttachment' | 'readAttachment' | 'hasAttachment' | 'cleanupAttachments'
+  operation: 'load' | 'save' | 'writeAttachment' | 'readAttachment' | 'cleanupAttachments'
   paths: string[]
   phase: 'start' | 'success' | 'failure'
   error?: string
+}
+
+const GENERATION_PATTERN = /^document\.(\d+)\.json$/
+const LEGACY_BACKUP_NAME = 'document.json.bak'
+const SAFETY_WINDOW_MS = 30_000
+const MAX_RETAINED_GENERATIONS = 20
+
+interface DocumentGeneration {
+  path: string
+  modifiedMs: number
 }
 
 export type FileOperationLogger = (event: FileOperationEvent) => void
@@ -31,9 +40,9 @@ export function createFileServices(
 ): FileServices {
   const documentPath = join(dataDirectory, 'document.json')
   const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
-  const backupDocumentPath = join(dataDirectory, 'document.json.bak')
   const attachmentsDirectory = join(dataDirectory, 'attachments')
   let operationQueue: Promise<void> = Promise.resolve()
+  let nextGeneration: number | undefined
 
   const prepare = async (): Promise<void> => {
     await mkdir(attachmentsDirectory, { recursive: true })
@@ -41,9 +50,13 @@ export function createFileServices(
 
   return {
     async load(): Promise<unknown | null> {
-      return runOperation('load', [documentPath, temporaryDocumentPath, backupDocumentPath], async () => {
+      return runOperation('load', [documentPath, temporaryDocumentPath, dataDirectory], async () => {
+        const generations = (await listDocumentGenerations(dataDirectory)).sort(
+          (left, right) => right.modifiedMs - left.modifiedMs,
+        )
+        const candidates = [documentPath, temporaryDocumentPath, ...generations.map((generation) => generation.path)]
         let firstError: unknown
-        for (const candidate of [documentPath, temporaryDocumentPath, backupDocumentPath]) {
+        for (const candidate of candidates) {
           let value: unknown
           try {
             value = JSON.parse(await readFile(candidate, 'utf8'))
@@ -57,12 +70,7 @@ export function createFileServices(
             return value
           }
           try {
-            const state = parsePersistedState(value)
-            for (const id of collectAttachmentIds(state.document)) {
-              if (!(await attachmentExists(attachmentsDirectory, id))) {
-                throw new Error(`Attachment ${id} is missing from local storage.`)
-              }
-            }
+            parsePersistedState(value)
             await rename(candidate, documentPath)
             return value
           } catch (error) {
@@ -76,9 +84,7 @@ export function createFileServices(
       })
     },
     save(state) {
-      return enqueue('save', [dataDirectory, documentPath, temporaryDocumentPath, backupDocumentPath], () =>
-        saveDocument(state),
-      )
+      return enqueue('save', [dataDirectory, documentPath, temporaryDocumentPath], () => saveDocument(state))
     },
     writeAttachment(id, png) {
       const logPath = join(attachmentsDirectory, `${id}.png`)
@@ -103,15 +109,15 @@ export function createFileServices(
         }
       })
     },
-    hasAttachment(id) {
-      const logPath = join(attachmentsDirectory, `${id}.png`)
-      return enqueue('hasAttachment', [logPath], () => attachmentExists(attachmentsDirectory, id))
-    },
     cleanupAttachments(referencedIds) {
       return enqueue('cleanupAttachments', [attachmentsDirectory], async () => {
         await prepare()
         const keep = new Set<AttachmentId>(referencedIds)
-        for (const path of [temporaryDocumentPath, backupDocumentPath]) {
+        const recoveryPaths = [
+          temporaryDocumentPath,
+          ...(await listDocumentGenerations(dataDirectory)).map((generation) => generation.path),
+        ]
+        for (const path of recoveryPaths) {
           for (const id of await readRecoveryAttachmentIds(path)) keep.add(id)
         }
         const names = await readdir(attachmentsDirectory)
@@ -156,13 +162,47 @@ export function createFileServices(
   async function saveDocument(state: PersistedEditorState): Promise<void> {
     await prepare()
     await writeDurableFile(temporaryDocumentPath, JSON.stringify(state, null, 2))
+    await preserveReplacedDocument()
+    await rename(temporaryDocumentPath, documentPath)
+    await pruneGenerations()
+  }
+
+  async function preserveReplacedDocument(): Promise<void> {
+    if (nextGeneration === undefined) {
+      let highest = 0
+      for (const name of await readdir(dataDirectory)) {
+        const match = GENERATION_PATTERN.exec(name)
+        if (match !== null) highest = Math.max(highest, Number(match[1]))
+      }
+      nextGeneration = highest + 1
+    }
     try {
-      await copyFile(documentPath, backupDocumentPath)
-      await syncFile(backupDocumentPath)
+      await rename(documentPath, join(dataDirectory, `document.${nextGeneration}.json`))
     } catch (error) {
       if (!isNotFound(error)) throw error
+      return
     }
-    await rename(temporaryDocumentPath, documentPath)
+    nextGeneration += 1
+  }
+
+  async function pruneGenerations(): Promise<void> {
+    let generations: DocumentGeneration[]
+    try {
+      generations = (await listDocumentGenerations(dataDirectory)).sort(
+        (left, right) => right.modifiedMs - left.modifiedMs,
+      )
+    } catch {
+      return
+    }
+    const safetyIndex = generations.findIndex((generation) => Date.now() - generation.modifiedMs >= SAFETY_WINDOW_MS)
+    const keep = new Set<string>()
+    for (const generation of generations.slice(0, MAX_RETAINED_GENERATIONS)) keep.add(generation.path)
+    if (safetyIndex >= 0) keep.add(generations[safetyIndex]!.path)
+    await Promise.all(
+      generations
+        .filter((generation) => !keep.has(generation.path))
+        .map((generation) => unlink(generation.path).catch(() => undefined)),
+    )
   }
 }
 
@@ -188,14 +228,26 @@ function isNotFound(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
 }
 
-async function attachmentExists(attachmentsDirectory: string, id: string): Promise<boolean> {
+async function listDocumentGenerations(dataDirectory: string): Promise<DocumentGeneration[]> {
+  let names: string[]
   try {
-    await stat(attachmentPath(attachmentsDirectory, id))
-    return true
+    names = await readdir(dataDirectory)
   } catch (error) {
-    if (isNotFound(error)) return false
+    if (isNotFound(error)) return []
     throw error
   }
+  const generations: DocumentGeneration[] = []
+  for (const name of names) {
+    if (!GENERATION_PATTERN.test(name) && name !== LEGACY_BACKUP_NAME) continue
+    const path = join(dataDirectory, name)
+    try {
+      const information = await stat(path)
+      generations.push({ path, modifiedMs: information.mtimeMs })
+    } catch (error) {
+      if (!isNotFound(error)) throw error
+    }
+  }
+  return generations
 }
 
 async function readRecoveryAttachmentIds(path: string): Promise<ReadonlySet<AttachmentId>> {

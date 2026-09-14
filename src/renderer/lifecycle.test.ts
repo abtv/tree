@@ -79,7 +79,6 @@ describe('renderer lifecycle', () => {
         save: vi.fn(async () => undefined),
         cleanupAttachments: async () => undefined,
         readClipboard: async () => ({ kind: 'image', png: new Uint8Array([1]) }),
-        hasAttachment: async () => true,
         writeAttachment: vi.fn(async () => {
           await gate
           if (fail) throw new Error('attachment failed')

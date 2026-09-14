@@ -12,5 +12,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0006](0006-exact-dependency-pinning.md) | Exact Dependency Pinning | Accepted | 2026-09-13 |
 | [0007](0007-windowed-node-list-rendering.md) | Windowed Rendering for Wide Node Lists | Accepted | 2026-09-14 |
 | [0008](0008-fsync-based-persistence-durability.md) | Fsync-Based Persistence Durability | Accepted | 2026-09-14 |
+| [0009](0009-bounded-loss-document-generations.md) | Bounded-Loss Document Generations | Accepted | 2026-09-14 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

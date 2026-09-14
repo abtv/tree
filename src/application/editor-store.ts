@@ -45,7 +45,6 @@ export interface EditorServices {
   readClipboard(): Promise<ClipboardValue>
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
   writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
-  hasAttachment(id: AttachmentId): Promise<boolean>
   cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
 }
 
@@ -151,10 +150,6 @@ export class EditorStore {
       }
 
       const parsed = parsePersistedState(loaded)
-      const missingAttachmentId = await this.findMissingAttachmentId(parsed.document)
-      if (missingAttachmentId !== undefined) {
-        throw new Error(`Attachment ${missingAttachmentId} is missing from local storage.`)
-      }
       this.snapshot = {
         status: 'ready',
         document: parsed.document,
@@ -168,12 +163,6 @@ export class EditorStore {
       this.snapshot = { status: 'error', message: messageOf(error) }
       this.emit()
     }
-  }
-
-  private async findMissingAttachmentId(document: Document): Promise<AttachmentId | undefined> {
-    const ids = [...collectAttachmentIds(document)]
-    const present = await Promise.all(ids.map((id) => this.services.hasAttachment(id)))
-    return ids.find((_, index) => !present[index])
   }
 
   public selectNode(nodeId: NodeId, cursor: number): void {

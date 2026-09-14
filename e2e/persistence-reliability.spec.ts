@@ -95,7 +95,7 @@ test.describe('persistence reliability regressions', () => {
     expect(readFileSync(`${documentPath(userDataDir)}.tmp`, 'utf8')).toBe('{"version":999}')
   })
 
-  test('preserves a recovery document whose image is missing', async ({ userDataDir }) => {
+  test('opens a recovery document whose image is missing', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [{ id: 'root', text: '', children: [], attachment: { id: 'missing', mimeType: 'image/png' } }],
@@ -106,11 +106,10 @@ test.describe('persistence reliability regressions', () => {
     writeFileSync(`${documentPath(userDataDir)}.tmp`, candidate)
     writeFileSync(documentPath(userDataDir), '{ damaged')
 
-    const { window } = await launchTree(userDataDir, { expectReady: false })
+    const { window } = await launchTree(userDataDir)
 
-    await expect(window.getByRole('alert')).toContainText('Tree could not open this document')
-    expect(readFileSync(documentPath(userDataDir), 'utf8')).toBe('{ damaged')
-    expect(readFileSync(`${documentPath(userDataDir)}.tmp`)).toEqual(candidate)
+    await expect(window.getByText('Image could not be loaded.')).toBeVisible()
+    expect(readFileSync(documentPath(userDataDir))).toEqual(candidate)
   })
 
   test('keeps a failed save visible and runs deferred cleanup after a successful save', async ({ userDataDir }) => {

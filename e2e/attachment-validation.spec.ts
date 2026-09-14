@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pngIhdr, pngWith } from '../src/main/png-test-utils'
 import {
@@ -81,6 +81,25 @@ test.describe('attachment validation and image failures', () => {
 
     const restarted = await launchTree(userDataDir)
     await expect(restarted.window.getByAltText('Attached image')).toBeVisible()
+  })
+
+  test('opens a document whose stored attachment file is missing', async ({ userDataDir }) => {
+    const first = await launchTree(userDataDir)
+    await writeClipboardImage(first.app)
+    await firePaste(node(first.window, 1))
+    await expect(first.window.getByAltText('Attached image')).toBeVisible()
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
+    const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
+    const closed = new Promise<void>((resolve) => first.app.once('close', resolve))
+    await clickApplicationMenuQuit(first.app)
+    await closed
+
+    rmSync(join(userDataDir, 'data', 'attachments', `${attachmentId}.png`))
+
+    const restarted = await launchTree(userDataDir)
+    await expect(restarted.window.getByText('Image could not be loaded.')).toBeVisible()
+    await typeInto(node(restarted.window, 1), 'still editable')
+    await expect(node(restarted.window, 1)).toHaveValue('still editable')
   })
 
   test('reports a read failure without disabling the editor', async ({ userDataDir }) => {

@@ -21,7 +21,6 @@ beforeEach(() => {
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),
     writeAttachment: async () => undefined,
-    hasAttachment: async () => true,
     readAttachment: async () => attachmentBytes,
     cleanupAttachments: async () => undefined,
   }
@@ -35,7 +34,6 @@ function createStore(clipboard: ClipboardValue = { kind: 'text', text: '' }): Ed
     save: async () => undefined,
     readClipboard: async () => clipboard,
     writeAttachment: async () => undefined,
-    hasAttachment: async () => true,
     cleanupAttachments: async () => undefined,
   }
   let id = 0
@@ -571,7 +569,6 @@ describe('App', () => {
       save: async () => undefined,
       readClipboard: async () => ({ kind: 'text', text: '' }),
       writeAttachment: async () => undefined,
-      hasAttachment: async () => true,
       cleanupAttachments: async () => undefined,
     }
     const store = new EditorStore(services, () => 'root')
@@ -604,7 +601,6 @@ describe('App', () => {
       },
       readClipboard: async () => ({ kind: 'text', text: '' }),
       writeAttachment: async () => undefined,
-      hasAttachment: async () => true,
       cleanupAttachments: async () => undefined,
     }
     const store = new EditorStore(services, () => 'root')

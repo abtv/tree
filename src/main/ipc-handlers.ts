@@ -72,10 +72,6 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     return fileServices.writeAttachment(validateAttachmentId(id), validateAttachmentBytes(png, decodePng))
   })
-  ipcMain.handle(ipcChannels.hasAttachment, (event, id) => {
-    requireTrustedRenderer(event)
-    return fileServices.hasAttachment(validateAttachmentId(id))
-  })
   ipcMain.handle(ipcChannels.readAttachment, (event, id) => {
     requireTrustedRenderer(event)
     return fileServices.readAttachment(validateAttachmentId(id))

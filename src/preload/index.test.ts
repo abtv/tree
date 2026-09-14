@@ -49,7 +49,6 @@ describe('preload bridge', () => {
     await treeApi.readClipboard()
     await treeApi.writeClipboard?.(payload)
     await treeApi.writeAttachment('attachment-1', bytes)
-    await treeApi.hasAttachment('attachment-1')
     await treeApi.readAttachment('attachment-1')
     await treeApi.cleanupAttachments(['attachment-1'])
 
@@ -59,7 +58,6 @@ describe('preload bridge', () => {
       [ipcChannels.readClipboard],
       [ipcChannels.writeClipboard, payload],
       [ipcChannels.writeAttachment, 'attachment-1', bytes],
-      [ipcChannels.hasAttachment, 'attachment-1'],
       [ipcChannels.readAttachment, 'attachment-1'],
       [ipcChannels.cleanupAttachments, ['attachment-1']],
     ])

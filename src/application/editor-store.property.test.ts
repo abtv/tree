@@ -101,7 +101,6 @@ function createServices(
     },
     readClipboard: async () => clipboard(),
     writeAttachment: async () => undefined,
-    hasAttachment: async () => true,
     cleanupAttachments: async () => undefined,
   }
 }
@@ -354,7 +353,6 @@ describe('EditorStore save accounting', () => {
             }),
           readClipboard: async () => ({ kind: 'text', text: '' }),
           writeAttachment: async () => undefined,
-          hasAttachment: async () => true,
           cleanupAttachments: async () => undefined,
         }
         const store = new EditorStore(services, () => 'created', noopClock())

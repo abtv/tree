@@ -8,7 +8,6 @@ export const ipcChannels = {
   readClipboard: 'tree:read-clipboard',
   writeClipboard: 'tree:write-clipboard',
   writeAttachment: 'tree:write-attachment',
-  hasAttachment: 'tree:has-attachment',
   readAttachment: 'tree:read-attachment',
   cleanupAttachments: 'tree:cleanup-attachments',
 } as const
@@ -30,7 +29,6 @@ export interface TreeApi {
   readClipboard(): Promise<ClipboardPayload>
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
-  hasAttachment(id: string): Promise<boolean>
   readAttachment(id: string): Promise<Uint8Array | null>
   cleanupAttachments(referencedIds: string[]): Promise<void>
 }

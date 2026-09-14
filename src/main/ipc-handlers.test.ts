@@ -21,7 +21,6 @@ function createHarness() {
     load: vi.fn(async () => null),
     save: vi.fn(async () => undefined),
     writeAttachment: vi.fn(async () => undefined),
-    hasAttachment: vi.fn(async () => true),
     readAttachment: vi.fn(async () => null),
     cleanupAttachments: vi.fn(async () => undefined),
   }
@@ -159,7 +158,6 @@ describe('main IPC handlers', () => {
     await handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', onePixelPng)
     expect(decodePng).toHaveBeenCalledOnce()
 
-    await handlers.get(ipcChannels.hasAttachment)!(event, 'image-1')
     await handlers.get(ipcChannels.readAttachment)!(event, 'image-1')
     expect(decodePng).toHaveBeenCalledOnce()
   })
