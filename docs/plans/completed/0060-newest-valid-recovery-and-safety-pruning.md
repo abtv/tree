@@ -31,7 +31,7 @@ Fix three persistence defects in `src/infrastructure/main/file-services.ts` that
 ### Load
 
 * Candidate discovery includes the primary, the temporary file, and every retained generation (including the legacy `document.json.bak`), each with its write time. Generations are listed as today.
-* Candidates are ordered newest first by write time. Equal write times keep the committed primary first, then the temporary file, then older recoveries, so ordering is deterministic.
+* Candidates are ordered newest first by write time. Equal write times keep the committed primary first, then the temporary file, then generations by descending sequence number with the legacy backup last, so ordering is deterministic.
 * Every candidate passes domain validation before promotion. Validation is a single traversal that does not rebuild the document. A candidate that fails JSON parsing or validation is left untouched and the next candidate is considered; the loaded candidate is renamed over the primary.
 * The primary is no longer special-cased for validation, but a primary containing JSON `null` is still rejected as unsupported at the file boundary before candidate ordering, preserving the stored files instead of recovering around invalid data.
 * If stored files exist but none validates, the first non-missing error is thrown without changing files. If no stored files exist, `null` is returned for first launch.
@@ -69,7 +69,7 @@ Required by `docs/PRODUCT.md` §22.1:
 
 ### Implementation
 
-* `load` lists the primary, the temporary file, and every retained generation together with their write times, orders them newest first, and validates each candidate with the domain validator before renaming it over the primary. Equal write times keep the primary first, then the temporary file, then older recoveries.
+* `load` lists the primary, the temporary file, and every retained generation together with their write times, orders them newest first, and validates each candidate with the domain validator before renaming it over the primary. Equal write times keep the primary first, then the temporary file, then the highest-numbered generation first, with the legacy backup last.
 * The primary is validated like every other candidate, so an invalid primary no longer blocks recovery from an older valid generation. A primary containing JSON `null` is still rejected as unsupported at the file boundary before candidate ordering.
 * Pruning retains the newest fixed cap extended through the newest generation older than the safety window, so it deletes only generations strictly older than that safety generation.
 
