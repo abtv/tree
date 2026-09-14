@@ -10,4 +10,10 @@ export const OPERATION_ERROR_PREFIX = 'Operation failed:'
 
 export const QUIT_SAVE_ERROR = 'The application could not finish saving before quit.'
 
+export const SAVE_LOCKED_MESSAGE =
+  'Saving failed repeatedly. The last saved version is safe. Fix the problem and restart the application. Changes made since the last successful save are not saved.'
+
+export const QUIT_WITHOUT_SAVING_PROMPT =
+  'Quit without saving? Changes made since the last successful save will be lost.'
+
 export const GENERIC_OPERATION_ERROR = 'The editor could not complete the requested operation.'

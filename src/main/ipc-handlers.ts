@@ -25,7 +25,7 @@ export interface IpcHandlerDependencies {
   rendererUrl: string
   fileServices: FileServices
   nativeClipboard: NativeClipboard
-  quitHandshake: Pick<QuitHandshake, 'request' | 'confirm'>
+  quitHandshake: Pick<QuitHandshake, 'request' | 'confirm' | 'force'>
   decodePng: PngDecoder
   onQuitConfirmed: () => void
 }
@@ -51,6 +51,11 @@ export function registerIpcHandlers({
     }
     if (requestId !== undefined) throw new Error('Invalid quit request.')
     quitHandshake.request()
+  })
+  ipcMain.handle(ipcChannels.quitWithoutSaving, (event) => {
+    requireTrustedRenderer(event)
+    quitHandshake.force()
+    onQuitConfirmed()
   })
   ipcMain.handle(ipcChannels.load, (event) => {
     requireTrustedRenderer(event)

@@ -3,6 +3,7 @@ import type { LinkRange } from '../domain/document'
 
 export const ipcChannels = {
   quit: 'tree:quit',
+  quitWithoutSaving: 'tree:quit-without-saving',
   load: 'tree:load',
   save: 'tree:save',
   readClipboard: 'tree:read-clipboard',
@@ -22,6 +23,7 @@ export interface ClipboardWritePayload {
 
 export interface TreeApi {
   quit(requestId?: string): Promise<void>
+  quitWithoutSaving(): Promise<void>
   onQuitRequested(listener: (requestId: string) => void): () => void
   onQuitFailed(listener: (message: string) => void): () => void
   load(): Promise<unknown | null>

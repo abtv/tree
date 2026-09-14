@@ -4,6 +4,7 @@ export interface RendererLifecycleStore {
   initialize(): Promise<void>
   flushPersistence(): Promise<void>
   reportError(error: unknown): void
+  requestQuitWithoutSavingPrompt(): void
 }
 
 export function startRendererLifecycle(
@@ -15,7 +16,10 @@ export function startRendererLifecycle(
     void store
       .flushPersistence()
       .then(() => treeApi.quit(requestId))
-      .catch((error: unknown) => store.reportError(error))
+      .catch((error: unknown) => {
+        store.reportError(error)
+        store.requestQuitWithoutSavingPrompt()
+      })
   })
   const removeQuitFailed = treeApi.onQuitFailed((message) => store.reportError(new Error(message)))
   return () => {

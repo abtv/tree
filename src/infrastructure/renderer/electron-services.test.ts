@@ -7,6 +7,7 @@ import { attachmentByteCache, createElectronEditorServices, readAttachment } fro
 describe('renderer Electron services', () => {
   const api: TreeApi = {
     quit: vi.fn(async () => undefined),
+    quitWithoutSaving: vi.fn(async () => undefined),
     onQuitRequested: vi.fn(() => () => undefined),
     onQuitFailed: vi.fn(() => () => undefined),
     load: vi.fn(async () => null),

@@ -43,6 +43,14 @@ export class QuitHandshake {
     return true
   }
 
+  public force(): void {
+    if (this.quitting) return
+    this.clearTimeout()
+    this.pendingRequestId = undefined
+    this.quitting = true
+    queueMicrotask(this.quit)
+  }
+
   public isQuitting(): boolean {
     return this.quitting
   }

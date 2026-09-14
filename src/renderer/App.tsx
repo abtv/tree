@@ -1,11 +1,12 @@
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
-import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX } from '../domain/product-messages'
+import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
+import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
 
 interface AppProps {
@@ -16,11 +17,13 @@ export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const focus = state.status === 'ready' ? state.focus : undefined
+  const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
   const nodeInputBindings = useNodeInputBindings({
     store,
     selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
+    persistenceLocked,
   })
   const enterNode = useCallback(
     (node: TreeNode): void => {
@@ -35,6 +38,12 @@ export function App({ store }: AppProps): React.JSX.Element {
     },
     [store],
   )
+  const dismissQuitWithoutSaving = useCallback((): void => {
+    store.dismissQuitWithoutSavingPrompt()
+  }, [store])
+  const quitWithoutSaving = useCallback((): void => {
+    void window.treeApi.quitWithoutSaving()
+  }, [])
   const renderInput = useCallback(
     (node: TreeNode, label: string): React.JSX.Element => (
       <>
@@ -92,6 +101,7 @@ export function App({ store }: AppProps): React.JSX.Element {
         )}
         <NodeList
           focusedNodeId={focus?.nodeId}
+          locked={persistenceLocked}
           nodes={nodes}
           onEnter={enterNode}
           onMove={moveNode}
@@ -108,7 +118,15 @@ export function App({ store }: AppProps): React.JSX.Element {
             {OPERATION_ERROR_PREFIX} {state.operationError}
           </p>
         )}
+        {persistenceLocked ? (
+          <p className="save-error persistence-locked" role="alert">
+            {SAVE_LOCKED_MESSAGE}
+          </p>
+        ) : null}
       </section>
+      {state.quitWithoutSavingPrompt === true ? (
+        <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />
+      ) : null}
       {previewAttachmentId === undefined ? null : (
         <ImagePreview attachmentId={previewAttachmentId} onClose={() => setPreviewAttachmentId(undefined)} />
       )}

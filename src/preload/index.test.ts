@@ -34,6 +34,14 @@ describe('preload bridge', () => {
     expect(mocks.invoke).toHaveBeenCalledWith(ipcChannels.quit, 'request-1')
   })
 
+  it('forwards the quit-without-saving request to the main process', async () => {
+    const { treeApi } = await import('../preload/index')
+
+    await treeApi.quitWithoutSaving()
+
+    expect(mocks.invoke).toHaveBeenCalledWith(ipcChannels.quitWithoutSaving)
+  })
+
   it('forwards every request channel and argument', async () => {
     const { treeApi } = (await import('../preload/index')) as { treeApi: TreeApi }
     const state = {

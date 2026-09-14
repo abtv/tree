@@ -18,6 +18,7 @@ interface NodeListProps {
   onMove: (nodeId: string, insertionIndex: number) => void
   focusedNodeId?: string | undefined
   structuralVersion?: number
+  locked?: boolean
 }
 
 type DropHandler = (insertionIndex: number, event: DragEvent<HTMLElement>) => void
@@ -48,6 +49,7 @@ export function NodeList({
   onMove,
   focusedNodeId,
   structuralVersion = 0,
+  locked = false,
 }: NodeListProps): React.JSX.Element {
   const draggedNodeIdRef = useRef<string | undefined>(undefined)
   const listRef = useRef<HTMLElement | null>(null)
@@ -215,6 +217,7 @@ export function NodeList({
       draggedNodeIdRef={draggedNodeIdRef}
       index={index}
       key={node.id}
+      locked={locked}
       node={node}
       onDragEnd={onDragEnd}
       onDrop={onDrop}
@@ -312,6 +315,7 @@ interface NodeRowProps {
   rowRef: (nodeId: string, element: HTMLDivElement | null) => void
   pinned?: boolean
   pinnedOffset?: number
+  locked: boolean
 }
 
 const NodeRow = memo(function NodeRow({
@@ -325,6 +329,7 @@ const NodeRow = memo(function NodeRow({
   rowRef,
   pinned = false,
   pinnedOffset = 0,
+  locked,
 }: NodeRowProps): React.JSX.Element {
   const onDropRow = useCallback(
     (event: DragEvent<HTMLDivElement>): void => {
@@ -346,7 +351,7 @@ const NodeRow = memo(function NodeRow({
     <div
       className={pinned ? 'node-row node-row-pinned' : 'node-row'}
       data-node-id={node.id}
-      draggable
+      draggable={!locked}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDragStart={onDragStart}

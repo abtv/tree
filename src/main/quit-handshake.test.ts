@@ -55,4 +55,29 @@ describe('QuitHandshake', () => {
     handshake.request()
     expect(sent).toEqual(['request-1', 'request-2'])
   })
+
+  it('forces an immediate quit, clears the pending timeout, and ignores later requests', async () => {
+    const sent: string[] = []
+    const quit = vi.fn()
+    const { clock } = createClock()
+    const handshake = new QuitHandshake(
+      (requestId) => sent.push(requestId),
+      vi.fn(),
+      quit,
+      () => 'request-1',
+      clock,
+    )
+
+    handshake.request()
+    handshake.force()
+    await Promise.resolve()
+    expect(quit).toHaveBeenCalledOnce()
+    expect(clock.clearTimeout).toHaveBeenCalled()
+
+    handshake.request()
+    handshake.force()
+    await Promise.resolve()
+    expect(quit).toHaveBeenCalledOnce()
+    expect(sent).toEqual(['request-1'])
+  })
 })

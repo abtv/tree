@@ -3,6 +3,7 @@ import { ipcChannels, type TreeApi } from '../shared/ipc'
 
 export const treeApi: TreeApi = {
   quit: (requestId) => ipcRenderer.invoke(ipcChannels.quit, requestId),
+  quitWithoutSaving: () => ipcRenderer.invoke(ipcChannels.quitWithoutSaving),
   onQuitRequested: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, requestId: string): void => listener(requestId)
     ipcRenderer.on('tree:quit-requested', handler)

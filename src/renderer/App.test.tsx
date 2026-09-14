@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
+import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { App } from './App'
@@ -15,6 +16,7 @@ beforeEach(() => {
   attachmentByteCache.clear()
   window.treeApi = {
     quit: async () => undefined,
+    quitWithoutSaving: async () => undefined,
     onQuitRequested: () => () => undefined,
     onQuitFailed: () => () => undefined,
     load: async () => null,
@@ -38,6 +40,30 @@ function createStore(clipboard: ClipboardValue = { kind: 'text', text: '' }): Ed
   }
   let id = 0
   return new EditorStore(services, () => ['root', 'child', 'sibling'][id++] ?? `node-${id}`)
+}
+
+async function createLockedStore(): Promise<EditorStore> {
+  const services: EditorServices = {
+    load: async () => null,
+    save: async () => {
+      throw new Error('disk full')
+    },
+    readClipboard: async () => ({ kind: 'text', text: '' }),
+    writeAttachment: async () => undefined,
+    cleanupAttachments: async () => undefined,
+  }
+  const store = new EditorStore(services, () => 'root')
+  await act(async () => {
+    await store.initialize()
+  })
+  for (let index = 1; index <= 3; index += 1) {
+    const text = Array.from({ length: index * 10 }, (_, word) => `w${word}`).join(' ')
+    await act(async () => {
+      store.editText('root', text)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+  return store
 }
 
 describe('App', () => {
@@ -614,6 +640,50 @@ describe('App', () => {
     render(<App store={store} />)
 
     expect(screen.getByRole('status')).toHaveTextContent('Changes could not be saved: disk full')
+  })
+
+  it('disables editing and shows the lock message after three failed saves', async () => {
+    const store = await createLockedStore()
+    render(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', persistenceLocked: true })
+    expect(screen.getByText(SAVE_LOCKED_MESSAGE)).toBeInTheDocument()
+    expect(input.readOnly).toBe(true)
+
+    const before = store.getSnapshot()
+    fireEvent.change(input, { target: { value: 'changed' } })
+    const after = store.getSnapshot()
+    if (before.status !== 'ready' || after.status !== 'ready') throw new Error('The editor is not ready.')
+    expect(after.document).toBe(before.document)
+  })
+
+  it('traps focus, cancels with Escape, and confirms quitting without saving while locked', async () => {
+    const store = await createLockedStore()
+    render(<App store={store} />)
+    const quitWithoutSaving = vi.spyOn(window.treeApi, 'quitWithoutSaving')
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    input.focus()
+
+    act(() => store.requestQuitWithoutSavingPrompt())
+    expect(screen.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeInTheDocument()
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    const quit = screen.getByRole('button', { name: 'Quit without saving' })
+    expect(cancel).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(quit).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(cancel).toHaveFocus()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByText(QUIT_WITHOUT_SAVING_PROMPT)).not.toBeInTheDocument()
+    expect(quitWithoutSaving).not.toHaveBeenCalled()
+    expect(input).toHaveFocus()
+
+    act(() => store.requestQuitWithoutSavingPrompt())
+    fireEvent.click(screen.getByRole('button', { name: 'Quit without saving' }))
+    expect(quitWithoutSaving).toHaveBeenCalledOnce()
   })
 
   it('selects a node when its input receives focus', async () => {

@@ -4,6 +4,7 @@ import { richTextHtml } from './editor-dom'
 
 export interface NodeInputBindings {
   selectedAll: boolean
+  disabled: boolean
   inputRef: (input: HTMLElement | null) => void
   onBlur: () => void
   onTextChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
@@ -30,6 +31,7 @@ export function NodeInput({
   label,
   parent = false,
   selectedAll,
+  disabled,
   inputRef,
   onBlur,
   onTextChange,
@@ -67,6 +69,7 @@ export function NodeInput({
       <textarea
         {...commonProps}
         ref={inputRef as (input: HTMLTextAreaElement | null) => void}
+        readOnly={disabled}
         rows={1}
         value={node.text}
         onChange={onTextChange}
@@ -77,7 +80,7 @@ export function NodeInput({
   return (
     <div
       {...commonProps}
-      contentEditable
+      contentEditable={!disabled}
       ref={inputRef}
       aria-multiline="true"
       role="textbox"

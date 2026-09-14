@@ -11,8 +11,10 @@ export interface PersistenceCoordinatorDependencies {
   hasPendingDocumentChanges(): boolean
   onSaveCaptured(): void
   onDocumentSaved(): void
-  onResult(error: unknown | undefined): void
+  onResult(error: unknown | undefined, kind?: PersistenceFailureKind): void
 }
+
+export type PersistenceFailureKind = 'save' | 'cleanup'
 
 export class PersistenceCoordinator {
   private saveQueue: Promise<void> = Promise.resolve()
@@ -22,6 +24,7 @@ export class PersistenceCoordinator {
   private cleanupRequested = false
   private error: unknown
   private saveError: unknown
+  private failureKind: PersistenceFailureKind | undefined
 
   public constructor(
     private readonly services: PersistenceServices,
@@ -35,6 +38,11 @@ export class PersistenceCoordinator {
   public requestAttachmentCleanup(): void {
     this.cleanupRequested = true
     this.request(false)
+  }
+
+  public discardPendingSaves(): void {
+    this.saveRequested = false
+    if (!this.cleanupRequested) this.requested = false
   }
 
   public async flush(): Promise<void> {
@@ -76,6 +84,7 @@ export class PersistenceCoordinator {
                 this.dependencies.onDocumentSaved()
               } catch (error) {
                 this.saveError = error
+                this.failureKind = 'save'
                 if (cleanupRequested) this.cleanupRequested = true
                 throw error
               }
@@ -85,7 +94,8 @@ export class PersistenceCoordinator {
             this.dependencies.onResult(this.error)
           } catch (error) {
             this.error = error
-            this.dependencies.onResult(error)
+            this.dependencies.onResult(error, this.failureKind)
+            this.failureKind = undefined
           }
         }
       })
@@ -104,6 +114,7 @@ export class PersistenceCoordinator {
       await this.services.cleanupAttachments([...this.dependencies.referencedAttachmentIds()])
     } catch (error) {
       this.cleanupRequested = true
+      this.failureKind = 'cleanup'
       throw error
     }
   }

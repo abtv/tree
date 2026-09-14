@@ -71,6 +71,28 @@ function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+async function lockEditor(
+  clock: FakeClock,
+): Promise<{ store: EditorStore; services: EditorServices & { saves: unknown[] }; attempts: () => number }> {
+  const services = createServices()
+  let attempts = 0
+  const store = new EditorStore(services, ids('root'), clock)
+  await store.initialize()
+  await store.flushPersistence()
+  services.saves.length = 0
+  services.save = async () => {
+    attempts += 1
+    throw new Error('disk full')
+  }
+  store.editText('root', 'one two three four five six seven eight nine ten')
+  await tick()
+  clock.runAll()
+  await tick()
+  clock.runAll()
+  await tick()
+  return { store, services, attempts: () => attempts }
+}
+
 describe('EditorStore', () => {
   it('reports maximum depth without changing editor state, history, IDs, or persistence', async () => {
     const deepest: TreeNode = {
@@ -1956,5 +1978,215 @@ describe('EditorStore', () => {
     expect(recovered).toMatchObject({ status: 'ready' })
     if (recovered.status === 'ready') expect(recovered.saveError).toBeUndefined()
     expect(services.saves).toHaveLength(1)
+  })
+
+  it('locks the editor after three consecutive failed save attempts and stops retrying', async () => {
+    const clock = new FakeClock()
+    const { store, attempts } = await lockEditor(clock)
+
+    expect(attempts()).toBe(3)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      saveError: 'disk full',
+      persistenceLocked: true,
+    })
+
+    store.selectNode('root', 0)
+    clock.runAll()
+    await tick()
+    expect(attempts()).toBe(3)
+
+    store.editText('root', 'one two three four five six seven eight nine ten eleven')
+    clock.runAll()
+    await tick()
+    expect(attempts()).toBe(3)
+    const locked = store.getSnapshot()
+    expect(locked.status === 'ready' && locked.document.roots[0]!.text).toBe(
+      'one two three four five six seven eight nine ten',
+    )
+  })
+
+  it('rejects document mutations while locked but keeps navigation, selection, and copy available', async () => {
+    const clock = new FakeClock()
+    const { store, services } = await lockEditor(clock)
+    const writes: unknown[] = []
+    services.writeClipboard = async (payload) => {
+      writes.push(payload)
+    }
+    const readClipboard = vi.fn(async (): Promise<ClipboardValue> => ({ kind: 'text', text: 'clipboard' }))
+    services.readClipboard = readClipboard
+
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    store.editText('root', 'changed')
+    store.createSiblingOrFirstChild(0)
+    store.deleteSelected()
+    store.undo()
+    store.redo()
+    await store.paste('root', 0)
+    await store.cut('root', 0, 1)
+
+    expect(readClipboard).not.toHaveBeenCalled()
+    const after = store.getSnapshot()
+    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(after.document).toBe(before.document)
+    expect(after.document.roots).toHaveLength(1)
+
+    store.selectNode('root', 1)
+    const selected = store.getSnapshot()
+    expect(selected.status === 'ready' && selected.location.selectedNodeId).toBe('root')
+    await expect(store.copy('root', 0, 1)).resolves.toBe(true)
+    expect(writes).toHaveLength(1)
+  })
+
+  it('retries failed cleanup without saving the document, never locks, and recovers on cleanup success', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [{ id: 'child', text: '', children: [] }] }] },
+      { currentParentId: 'root', selectedNodeId: 'child' },
+    )
+    const clock = new FakeClock()
+    let cleanupAttempts = 0
+    let cleanupFails = true
+    services.cleanupAttachments = async () => {
+      cleanupAttempts += 1
+      if (cleanupFails) throw new Error('cleanup failed')
+    }
+    const store = new EditorStore(services, ids('unused'), clock)
+    await store.initialize()
+    await tick()
+    expect(cleanupAttempts).toBe(1)
+
+    clock.runAll()
+    await tick()
+    clock.runAll()
+    await tick()
+
+    expect(cleanupAttempts).toBe(3)
+    expect(services.saves).toEqual([])
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'cleanup failed' })
+    const locked = store.getSnapshot()
+    expect(locked.status === 'ready' && locked.persistenceLocked).toBeUndefined()
+
+    cleanupFails = false
+    store.deleteSelected()
+    await store.flushPersistence()
+    await tick()
+
+    expect(cleanupAttempts).toBeGreaterThanOrEqual(4)
+    const recovered = store.getSnapshot()
+    expect(recovered.status === 'ready' && recovered.saveError).toBeUndefined()
+  })
+
+  it('attempts a save on flush while locked and unlocks after success', async () => {
+    const clock = new FakeClock()
+    const { store, services } = await lockEditor(clock)
+    services.save = async (state) => {
+      services.saves.push(state)
+    }
+
+    await expect(store.flushPersistence()).resolves.toBeUndefined()
+
+    expect(services.saves).toHaveLength(1)
+    const recovered = store.getSnapshot()
+    expect(recovered).toMatchObject({ status: 'ready' })
+    if (recovered.status === 'ready') {
+      expect(recovered.persistenceLocked).toBeUndefined()
+      expect(recovered.saveError).toBeUndefined()
+    }
+  })
+
+  it('resets the failure count after a successful save', async () => {
+    const services = createServices()
+    const clock = new FakeClock()
+    let fail = false
+    services.save = async (state) => {
+      if (fail) throw new Error('disk full')
+      services.saves.push(state)
+    }
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    fail = true
+    await tick()
+    clock.runAll()
+    await tick()
+    expect(services.saves).toEqual([])
+
+    fail = false
+    clock.runAll()
+    await tick()
+    expect(services.saves).toHaveLength(1)
+
+    fail = true
+    store.editText('root', `${tenWords}eleven twelve `)
+    await tick()
+    clock.runAll()
+    await tick()
+    clock.runAll()
+    await tick()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.persistenceLocked).toBeUndefined()
+  })
+
+  it('does not start a save queued before the third failure after locking', async () => {
+    const { services, pending } = deferredSaveServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await tick()
+    store.editText('root', `${tenWords}eleven `)
+    await tick()
+    pending[0]!.reject(new Error('first save failed'))
+    await tick()
+    await tick()
+
+    store.editText('root', `${tenWords}eleven twelve `)
+    await tick()
+    pending[1]!.reject(new Error('second save failed'))
+    await tick()
+    await tick()
+
+    store.editText('root', `${tenWords}eleven twelve thirteen `)
+    await tick()
+    pending[2]!.reject(new Error('third save failed'))
+    await tick()
+    await tick()
+    await tick()
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.persistenceLocked).toBe(true)
+    expect(services.saves).toHaveLength(3)
+    expect(pending).toHaveLength(3)
+  })
+
+  it('prompts for quit without saving only while locked and dismisses it', async () => {
+    const unlockedServices = createServices()
+    const unlocked = new EditorStore(unlockedServices, ids('root'), new FakeClock())
+    await unlocked.initialize()
+    unlocked.requestQuitWithoutSavingPrompt()
+    const before = unlocked.getSnapshot()
+    expect(before.status === 'ready' && before.quitWithoutSavingPrompt).toBeUndefined()
+
+    const clock = new FakeClock()
+    const { store } = await lockEditor(clock)
+
+    store.requestQuitWithoutSavingPrompt()
+    const locked = store.getSnapshot()
+    expect(locked.status === 'ready' && locked.quitWithoutSavingPrompt).toBe(true)
+
+    store.dismissQuitWithoutSavingPrompt()
+    const dismissed = store.getSnapshot()
+    expect(dismissed.status === 'ready' && dismissed.quitWithoutSavingPrompt).toBeUndefined()
   })
 })

@@ -110,6 +110,20 @@ describe('file services', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(first)
   })
 
+  it('loads a valid candidate when the promotion rename fails', async () => {
+    const { directory, services } = await servicesForTest()
+    const first = stateWithoutImage('First')
+    const second = stateWithoutImage('Second')
+    await services.save(first)
+    await services.save(second)
+    await writeFile(join(directory, 'document.json'), '{ damaged')
+    await writeFile(join(directory, 'document.json.tmp'), '{ damaged too')
+    vi.mocked(rename).mockRejectedValueOnce(new Error('disk full'))
+
+    await expect(services.load()).resolves.toEqual(first)
+    expect(JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))).toEqual(first)
+  })
+
   it('loads the highest-numbered generation when generation write times tie', async () => {
     const { directory, services } = await servicesForTest()
     const older = stateWithoutImage('Older')

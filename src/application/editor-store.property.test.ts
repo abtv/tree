@@ -328,15 +328,23 @@ function tick(): Promise<void> {
 }
 
 describe('EditorStore save accounting', () => {
-  it('requests saves according to an independent watermark model', async () => {
+  it('requests saves according to an independent watermark model before the failure lock', async () => {
     const event: fc.Arbitrary<SaveEvent> = fc.oneof(
       fc.record({ kind: fc.constant('insert' as const), words: fc.integer({ min: 1, max: 10 }) }),
       fc.record({ kind: fc.constant('success' as const) }),
       fc.record({ kind: fc.constant('failure' as const) }),
     )
+    const boundedEvents = fc.array(event, { maxLength: 40 }).map((events) => {
+      let failures = 0
+      return events.map((current) => {
+        if (current.kind !== 'failure') return current
+        failures += 1
+        return failures <= 2 ? current : ({ kind: 'success' } as const)
+      })
+    })
 
     await fc.assert(
-      fc.asyncProperty(fc.array(event, { maxLength: 40 }), async (events) => {
+      fc.asyncProperty(boundedEvents, async (events) => {
         const saves: unknown[] = []
         const pending: DeferredSave[] = []
         const services: EditorServices & { saves: unknown[] } = {

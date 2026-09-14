@@ -150,6 +150,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     await expect(coordinator.flush()).rejects.toThrow('disk full')
+    expect(onResult).toHaveBeenLastCalledWith(failure, 'save')
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     coordinator.requestAttachmentCleanup()
@@ -242,7 +243,7 @@ describe('PersistenceCoordinator', () => {
 
     expect(onSaveCaptured).toHaveBeenCalledOnce()
     expect(onDocumentSaved).toHaveBeenCalledOnce()
-    expect(onResult).toHaveBeenLastCalledWith(expect.objectContaining({ message: 'cleanup failed' }))
+    expect(onResult).toHaveBeenLastCalledWith(expect.objectContaining({ message: 'cleanup failed' }), 'cleanup')
   })
 
   it('clears a cleanup failure after cleanup succeeds without an unnecessary save', async () => {
@@ -267,5 +268,70 @@ describe('PersistenceCoordinator', () => {
     await expect(coordinator.flush()).resolves.toBeUndefined()
     expect(save).not.toHaveBeenCalled()
     expect(onResult).toHaveBeenLastCalledWith(undefined)
+  })
+
+  it('discards a queued save without dropping a queued cleanup', async () => {
+    let resolveSave!: () => void
+    const save = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve
+        }),
+    )
+    const cleanupAttachments = vi.fn(async () => undefined)
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestSave()
+    await vi.waitFor(() => expect(save).toHaveBeenCalledOnce())
+    coordinator.requestSave()
+    coordinator.requestAttachmentCleanup()
+    coordinator.discardPendingSaves()
+    resolveSave()
+    await coordinator.flush()
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(cleanupAttachments).toHaveBeenCalledOnce()
+  })
+
+  it('drops a queued save when no cleanup is pending', async () => {
+    let resolveSave!: () => void
+    const save = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve
+        }),
+    )
+    const cleanupAttachments = vi.fn(async () => undefined)
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestSave()
+    await vi.waitFor(() => expect(save).toHaveBeenCalledOnce())
+    coordinator.requestSave()
+    coordinator.discardPendingSaves()
+    resolveSave()
+    await coordinator.flush()
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(cleanupAttachments).not.toHaveBeenCalled()
   })
 })

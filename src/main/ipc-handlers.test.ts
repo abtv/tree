@@ -28,7 +28,7 @@ function createHarness() {
     read: vi.fn(async () => []),
     readText: vi.fn(async () => ''),
   }
-  const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true) }
+  const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true), force: vi.fn() }
   const onQuitConfirmed = vi.fn()
   const decodePng = vi.fn(decodePngWithZlib)
   registerIpcHandlers({
@@ -93,6 +93,16 @@ describe('main IPC handlers', () => {
 
     expect(quitHandshake.request).toHaveBeenCalledOnce()
     expect(quitHandshake.confirm).toHaveBeenCalledWith('request-1')
+    expect(onQuitConfirmed).toHaveBeenCalledOnce()
+  })
+
+  it('quits without saving through the handshake', async () => {
+    const { handlers, quitHandshake, onQuitConfirmed } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    await handlers.get(ipcChannels.quitWithoutSaving)!(event)
+
+    expect(quitHandshake.force).toHaveBeenCalledOnce()
     expect(onQuitConfirmed).toHaveBeenCalledOnce()
   })
 

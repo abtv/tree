@@ -14,6 +14,7 @@ const createdObjectUrl = 'blob:attachment'
 function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
   window.treeApi = {
     quit: async () => undefined,
+    quitWithoutSaving: async () => undefined,
     onQuitRequested: () => () => undefined,
     onQuitFailed: () => () => undefined,
     load: async () => null,

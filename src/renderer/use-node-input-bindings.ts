@@ -11,6 +11,7 @@ interface UseNodeInputBindingsOptions {
   selectedNodeId?: string | undefined
   focus?: FocusIntent | undefined
   onPreviewAttachment: (attachmentId: string) => void
+  persistenceLocked?: boolean
 }
 
 export function useNodeInputBindings({
@@ -18,6 +19,7 @@ export function useNodeInputBindings({
   selectedNodeId,
   focus,
   onPreviewAttachment,
+  persistenceLocked = false,
 }: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
   const inputs = useRef(new Map<string, HTMLElement>())
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
@@ -64,6 +66,7 @@ export function useNodeInputBindings({
   return useCallback(
     (node: TreeNode): NodeInputBindings => ({
       selectedAll: selectAllNodeId === node.id,
+      disabled: persistenceLocked,
       inputRef: (input: HTMLElement | null) => {
         if (input === null) inputs.current.delete(node.id)
         else inputs.current.set(node.id, input)
@@ -116,6 +119,6 @@ export function useNodeInputBindings({
         } else if (!isCollapsedSelection()) store.endTextSession()
       },
     }),
-    [composing, onPreviewAttachment, selectAllNodeId, selectedNodeId, store],
+    [composing, onPreviewAttachment, persistenceLocked, selectAllNodeId, selectedNodeId, store],
   )
 }

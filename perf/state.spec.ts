@@ -15,19 +15,21 @@ import { recordPerfResult } from './results'
 
 interface SaveControl {
   saves: number
+  bytesWritten: number
   cleanupDurations: number[]
 }
 
 async function installPersistenceProbes(app: Awaited<ReturnType<typeof launchTree>>['app']): Promise<void> {
   await app.evaluate(() => {
     const control = globalThis as typeof globalThis & {
-      __saveProbe?: { saves: number; cleanupDurations: number[] }
+      __saveProbe?: { saves: number; bytesWritten: number; cleanupDurations: number[] }
     }
-    control.__saveProbe = { saves: 0, cleanupDurations: [] }
+    control.__saveProbe = { saves: 0, bytesWritten: 0, cleanupDurations: [] }
 
     globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
       const result = await original(...args)
       control.__saveProbe!.saves += 1
+      control.__saveProbe!.bytesWritten += Buffer.byteLength(JSON.stringify(args[1], null, 2))
       return result
     })
 
@@ -45,7 +47,11 @@ async function installPersistenceProbes(app: Awaited<ReturnType<typeof launchTre
 async function readProbe(app: Awaited<ReturnType<typeof launchTree>>['app']): Promise<SaveControl> {
   return app.evaluate(() => {
     const probe = (globalThis as typeof globalThis & { __saveProbe?: SaveControl }).__saveProbe
-    return { saves: probe?.saves ?? 0, cleanupDurations: probe?.cleanupDurations ?? [] }
+    return {
+      saves: probe?.saves ?? 0,
+      bytesWritten: probe?.bytesWritten ?? 0,
+      cleanupDurations: probe?.cleanupDurations ?? [],
+    }
   })
 }
 
@@ -89,6 +95,7 @@ test.describe('state and persistence work', () => {
 
     const probe = await readProbe(app)
     const saveCount = probe.saves - baseline.saves
+    const documentBytesWritten = probe.bytesWritten - baseline.bytesWritten
     const wordCount = typed.split(/\s+/).filter((word) => word.length > 0).length
 
     recordPerfResult({
@@ -98,6 +105,7 @@ test.describe('state and persistence work', () => {
         structuralBurstMs: round(structuralBurstMs),
         typingMs: round(typingMs),
         saveCount,
+        documentBytesWritten,
         cleanupScanMs: round(cleanupScanMs),
       },
     })
@@ -106,6 +114,7 @@ test.describe('state and persistence work', () => {
     expect(typingMs).toBeLessThan(1_000)
     expect(saveCount).toBeGreaterThan(0)
     expect(saveCount).toBeLessThanOrEqual(Math.ceil(wordCount / 10) + 2)
+    expect(documentBytesWritten).toBeLessThan(20_000_000)
     expect(cleanupScanMs).toBeGreaterThan(0)
     expect(cleanupScanMs).toBeLessThan(1_000)
   })

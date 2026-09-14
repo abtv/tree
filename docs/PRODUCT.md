@@ -441,7 +441,7 @@ Behavior:
 
 ### 9.2 Window Close
 
-Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry.
+Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry. In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2.
 
 ---
 
@@ -698,13 +698,13 @@ Only inserted words count toward the volume threshold. Deletions and other chang
 
 Every pending change is flushed before a normal quit completes.
 
-If a save fails, the pending changes are retained and the failure is surfaced. The application retries on the next idle interval, volume trigger, or quit. A later successful save clears the error.
+If a save fails, the pending changes are retained and the failure is surfaced. The application retries at the next idle interval. After three consecutive failed save attempts, the application enters the locked save-failure state defined in §16.2. A later successful save clears the error.
 
 The document must persist between application restarts.
 
 The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
 
-When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes.
+When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2.
 
 Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
 
@@ -731,6 +731,24 @@ The runtime navigation history does not need to be persisted.
 
 Undo/redo history does not need to be persisted.
 
+### 16.2 Locked Save-Failure State
+
+A save attempt fails when the application cannot persist the current document.
+
+After three consecutive failed save attempts, the application stops saving automatically and enters the locked save-failure state:
+
+* every document-mutating command is disabled: text editing, creating and splitting nodes, deleting nodes, reordering, cut, paste including image paste, and undo/redo;
+* navigation, selection, and copy remain available so the document can still be viewed;
+* no further automatic save attempts are made;
+* the save failure remains visible together with `Saving failed repeatedly. The last saved version is safe. Fix the problem and restart the application. Changes made since the last successful save are not saved.`
+
+Quitting and closing the window from the locked state still attempt a final save:
+
+* if the save succeeds, the application exits with every pending change persisted;
+* if the save fails, the application asks `Quit without saving? Changes made since the last successful save will be lost.` Confirming quits without saving, and the next launch opens the newest stored version that can be parsed and validated. Cancelling keeps the application open.
+
+A failed save, including when the storage is full, must never destroy or damage the previously saved document. The next launch opens the newest stored version that can be parsed and validated, whether it is the primary file, a retained generation, or an interrupted save.
+
 ---
 
 ## 17. Images and Attachments
@@ -748,6 +766,8 @@ Deleting a node must also delete its attachment when that attachment is no longe
 Deleting a subtree must clean up attachments belonging to deleted nodes when they are no longer referenced.
 
 An attachment is no longer referenced only after every live document reference, every retained runtime (undo/redo) reference, and every valid retained recovery document reference is gone. A temporary or backup document that still references an attachment keeps that file available for recovery until a later save rotation removes the reference and a subsequent cleanup runs. Cleanup must not remove an attachment that a valid recovery document still references.
+
+A failed attachment cleanup does not lock the editor and does not trigger document saves. It is surfaced to the user, retried at the idle interval for at most three consecutive failed attempts, and attempted again on the next document save or quit.
 
 Image attachments must survive application restart.
 

@@ -1,5 +1,7 @@
 export const SAVE_WORD_THRESHOLD = 10
 export const SAVE_IDLE_MILLISECONDS = 10_000
+export const SAVE_MAX_CONSECUTIVE_FAILURES = 3
+export const CLEANUP_MAX_CONSECUTIVE_FAILURES = 3
 
 function isWhitespace(character: string | undefined): boolean {
   return character === undefined || /\s/.test(character)

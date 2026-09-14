@@ -20,6 +20,7 @@ function createHarness() {
     initialize: vi.fn(async () => undefined),
     flushPersistence: vi.fn(async () => undefined),
     reportError: vi.fn(),
+    requestQuitWithoutSavingPrompt: vi.fn(),
   }
   return {
     treeApi,
@@ -54,6 +55,7 @@ describe('renderer lifecycle', () => {
     await Promise.resolve()
 
     expect(store.reportError).toHaveBeenCalledWith(new Error('save failed'))
+    expect(store.requestQuitWithoutSavingPrompt).toHaveBeenCalledOnce()
     expect(treeApi.quit).not.toHaveBeenCalled()
   })
 

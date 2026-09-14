@@ -34,8 +34,15 @@ import {
   moveNodeTransition,
   moveSelectionTransition,
 } from './editor-command-transitions'
-import { PersistenceCoordinator } from './persistence-coordinator'
-import { countInsertedWords, countPastedWords, SAVE_IDLE_MILLISECONDS, SAVE_WORD_THRESHOLD } from './save-policy'
+import { PersistenceCoordinator, type PersistenceFailureKind } from './persistence-coordinator'
+import {
+  CLEANUP_MAX_CONSECUTIVE_FAILURES,
+  countInsertedWords,
+  countPastedWords,
+  SAVE_IDLE_MILLISECONDS,
+  SAVE_MAX_CONSECUTIVE_FAILURES,
+  SAVE_WORD_THRESHOLD,
+} from './save-policy'
 
 export type ClipboardValue = ClipboardPayload
 
@@ -70,6 +77,8 @@ export type EditorSnapshot =
       structuralVersion: number
       saveError?: string
       operationError?: string
+      persistenceLocked?: boolean
+      quitWithoutSavingPrompt?: boolean
     }
 
 const systemClock: Clock = {
@@ -95,6 +104,8 @@ export class EditorStore {
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
   private focusToken = 0
+  private consecutiveSaveFailures = 0
+  private consecutiveCleanupFailures = 0
   public constructor(
     private readonly services: EditorServices,
     private readonly createId: () => string,
@@ -106,7 +117,7 @@ export class EditorStore {
       hasPendingDocumentChanges: () => this.changesPending,
       onSaveCaptured: () => this.handleSaveCaptured(),
       onDocumentSaved: () => this.handleDocumentSaved(),
-      onResult: (error) => this.handlePersistenceResult(error),
+      onResult: (error, kind) => this.handlePersistenceResult(error, kind),
     })
   }
 
@@ -128,6 +139,21 @@ export class EditorStore {
   public reportError(error: unknown): void {
     if (this.snapshot.status !== 'ready') return
     this.snapshot = { ...this.snapshot, operationError: messageOf(error) }
+    this.emit()
+  }
+
+  public requestQuitWithoutSavingPrompt(): void {
+    if (this.snapshot.status !== 'ready' || this.snapshot.persistenceLocked !== true) return
+    if (this.snapshot.quitWithoutSavingPrompt === true) return
+    this.snapshot = { ...this.snapshot, quitWithoutSavingPrompt: true }
+    this.emit()
+  }
+
+  public dismissQuitWithoutSavingPrompt(): void {
+    if (this.snapshot.status !== 'ready' || this.snapshot.quitWithoutSavingPrompt !== true) return
+    const next = { ...this.snapshot }
+    delete next.quitWithoutSavingPrompt
+    this.snapshot = next
     this.emit()
   }
 
@@ -185,6 +211,7 @@ export class EditorStore {
 
   public editContent(nodeId: NodeId, text: string, links: readonly LinkRange[]): void {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
     if (node.text === text) {
       return
@@ -208,6 +235,7 @@ export class EditorStore {
 
   public deleteLink(nodeId: NodeId, cursor: number): boolean {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return false
     const linkStart = requireNode(state.document, nodeId).node.links?.find((link) => link.end === cursor)?.start
     if (linkStart === undefined) return false
     const next = deleteLink(state.document, nodeId, cursor)
@@ -233,6 +261,7 @@ export class EditorStore {
 
   public async cut(nodeId: NodeId, start: number, end: number): Promise<boolean> {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return false
     const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
     if (transition === undefined || this.services.writeClipboard === undefined) return false
     this.endTextSession()
@@ -338,6 +367,7 @@ export class EditorStore {
 
   public createSiblingOrFirstChild(cursor: number): void {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     const transition = createSiblingOrFirstChildTransition(state.document, state.location, cursor, this.createId)
     if (transition.kind === 'rejected') {
       this.reportError(new Error(transition.message))
@@ -353,6 +383,7 @@ export class EditorStore {
 
   public deleteSelected(): void {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     this.endTextSession()
     const transition = deleteSelectedTransition(state.document, state.location, this.createId)
     this.applyStructural(
@@ -365,6 +396,7 @@ export class EditorStore {
 
   public deleteEmptySelected(): void {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     const transition = deleteEmptySelectedTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
@@ -383,6 +415,7 @@ export class EditorStore {
 
   public moveNodeTo(nodeId: NodeId, insertionIndex: number): void {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     const transition = moveNodeTransition(state.document, state.location, nodeId, insertionIndex)
     if (transition === undefined) return
     this.endTextSession()
@@ -394,6 +427,7 @@ export class EditorStore {
   }
 
   public async paste(nodeId: NodeId, cursor: number): Promise<void> {
+    if (this.isPersistenceLocked()) return
     await this.trackEdit(this.pasteFromClipboard(nodeId, cursor))
   }
 
@@ -460,6 +494,7 @@ export class EditorStore {
   public undo(): void {
     this.endTextSession()
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     const previous = this.history.undo(state.document, state.location)
     if (previous === undefined) return
     this.replaceReady(
@@ -478,6 +513,7 @@ export class EditorStore {
   public redo(): void {
     this.endTextSession()
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     const next = this.history.redo(state.document, state.location)
     if (next === undefined) return
     this.replaceReady(
@@ -495,6 +531,7 @@ export class EditorStore {
 
   private applyStructural(document: Document, location: Location, focus: FocusIntent): void {
     const state = this.ready()
+    if (this.isPersistenceLocked()) return
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.replaceReady({ ...state, document, location, focus }, true)
     this.markPersistedChange()
@@ -525,6 +562,7 @@ export class EditorStore {
 
   private markPersistedChange(): void {
     this.changesPending = true
+    if (this.snapshot.status === 'ready' && this.snapshot.persistenceLocked === true) return
     this.scheduleIdleSave()
   }
 
@@ -583,19 +621,57 @@ export class EditorStore {
     this.pendingSaveWatermark = undefined
   }
 
-  private handlePersistenceResult(error: unknown | undefined): void {
+  private handlePersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void {
     if (this.snapshot.status !== 'ready') return
     if (error === undefined) {
-      if (this.snapshot.saveError === undefined) return
+      this.consecutiveSaveFailures = 0
+      this.consecutiveCleanupFailures = 0
+      const changed =
+        this.snapshot.saveError !== undefined ||
+        this.snapshot.persistenceLocked === true ||
+        this.snapshot.quitWithoutSavingPrompt === true
       const next = { ...this.snapshot }
       delete next.saveError
+      delete next.persistenceLocked
+      delete next.quitWithoutSavingPrompt
       this.snapshot = next
-    } else {
+      if (changed) this.emit()
+      return
+    }
+    if (kind === 'cleanup') {
+      this.consecutiveCleanupFailures += 1
+      this.consecutiveSaveFailures = 0
       this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
-      this.changesPending = true
+      if (this.consecutiveCleanupFailures < CLEANUP_MAX_CONSECUTIVE_FAILURES) this.scheduleCleanupRetry()
+      this.emit()
+      return
+    }
+    if (kind === 'save') this.consecutiveSaveFailures += 1
+    this.changesPending = true
+    this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
+    if (this.consecutiveSaveFailures < SAVE_MAX_CONSECUTIVE_FAILURES) {
       this.scheduleIdleSave()
+    } else {
+      if (this.saveTimer !== undefined) {
+        this.clock.clearTimeout(this.saveTimer)
+        this.saveTimer = undefined
+      }
+      this.snapshot = { ...this.snapshot, persistenceLocked: true }
+      this.persistence.discardPendingSaves()
     }
     this.emit()
+  }
+
+  private scheduleCleanupRetry(): void {
+    if (this.saveTimer !== undefined) this.clock.clearTimeout(this.saveTimer)
+    this.saveTimer = this.clock.setTimeout(() => {
+      this.saveTimer = undefined
+      this.persistence.requestAttachmentCleanup()
+    }, SAVE_IDLE_MILLISECONDS)
+  }
+
+  private isPersistenceLocked(): boolean {
+    return this.snapshot.status === 'ready' && this.snapshot.persistenceLocked === true
   }
 
   private newFocus(nodeId: NodeId, cursor: number): FocusIntent {

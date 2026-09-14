@@ -87,7 +87,9 @@ export function createFileServices(
             }
             continue
           }
-          if (candidate.path !== documentPath) await rename(candidate.path, documentPath)
+          if (candidate.path !== documentPath) {
+            await rename(candidate.path, documentPath).catch(() => undefined)
+          }
           return read.value
         }
         if (firstError !== undefined) throw firstError
