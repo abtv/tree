@@ -125,6 +125,7 @@ export function createFileServices(
         await prepare()
         const keep = new Set<AttachmentId>(referencedIds)
         const recoveryPaths = [
+          documentPath,
           temporaryDocumentPath,
           ...(await listDocumentGenerations(dataDirectory)).map((generation) => generation.path),
         ]

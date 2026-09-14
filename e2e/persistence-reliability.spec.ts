@@ -413,4 +413,64 @@ test.describe('persistence reliability regressions', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.attachment?.id).toBe(attachmentId)
     expect(readFileSync(attachmentPath)).toEqual(stored)
   })
+
+  test('keeps an image referenced by a save that is edited while its flush is pending', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & {
+        cleanupCount?: number
+        releaseSave?: () => void
+        saveStarted?: boolean
+        savedAttachmentId?: string
+      }
+      const gate = new Promise<void>((resolve) => {
+        control.releaseSave = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        const state = args[1] as { document?: { roots?: { attachment?: { id?: string } }[] } }
+        const attachmentId = state.document?.roots?.[0]?.attachment?.id
+        if (attachmentId !== undefined) control.savedAttachmentId = attachmentId
+        control.saveStarted = true
+        await gate
+        return original(...args)
+      })
+      globalThis.__treeIpc.wrap('tree:cleanup-attachments', async (original, ...args) => {
+        const result = await original(...args)
+        control.cleanupCount = (control.cleanupCount ?? 0) + 1
+        return result
+      })
+    })
+
+    await writeClipboardImage(app)
+    await firePaste(node(window, 1))
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { saveStarted?: boolean }).saveStarted))
+      .toBe(true)
+    const attachmentId = await app.evaluate(
+      () => (globalThis as typeof globalThis & { savedAttachmentId?: string }).savedAttachmentId,
+    )
+    expect(attachmentId).toEqual(expect.any(String))
+    const attachmentPath = join(userDataDir, 'data', 'attachments', `${attachmentId}.png`)
+    await expect.poll(() => existsSync(attachmentPath)).toBe(true)
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+
+    await node(window, 1).focus()
+    await window.keyboard.press('Meta+z')
+    await expect(window.getByAltText('Attached image')).toHaveCount(0)
+    await typeInto(node(window, 1), 'after undo')
+    await window.keyboard.press('Meta+Shift+z')
+    await expect(window.getByAltText('Attached image')).toHaveCount(0)
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseSave?: () => void }).releaseSave?.())
+    const cleanupsBefore = await app.evaluate(
+      () => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0,
+    )
+
+    await typeInto(node(window, 1), ' one two three four five six seven eight nine ten')
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0))
+      .toBeGreaterThan(cleanupsBefore)
+    expect(existsSync(attachmentPath)).toBe(true)
+    await closeApp(app)
+  })
 })

@@ -195,6 +195,17 @@ describe('file services', () => {
     expect(await services.readAttachment('generation-image')).toEqual(bytes)
   })
 
+  it('retains an attachment referenced only by the primary document', async () => {
+    const { directory, services } = await servicesForTest()
+    const bytes = new Uint8Array([8, 8, 8, 8])
+    await services.writeAttachment('primary-image', bytes)
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithImage('primary-image')), 'utf8')
+
+    await services.cleanupAttachments([])
+
+    expect(await services.readAttachment('primary-image')).toEqual(bytes)
+  })
+
   it('retains an attachment referenced only by the temporary recovery document', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([7, 7])
@@ -340,7 +351,11 @@ describe('file services', () => {
     await services.cleanupAttachments([])
 
     const paths = vi.mocked(readFile).mock.calls.map(([path]) => String(path))
-    expect(paths).toEqual([join(directory, 'document.json.tmp'), join(directory, 'document.json.bak')])
+    expect(paths).toEqual([
+      join(directory, 'document.json'),
+      join(directory, 'document.json.tmp'),
+      join(directory, 'document.json.bak'),
+    ])
     expect(paths.some((path) => path.includes('attachments'))).toBe(false)
     expect(await services.readAttachment('backup-image')).toEqual(new Uint8Array([1]))
   })
