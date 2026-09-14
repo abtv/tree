@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +8,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    copyFile: vi.fn(actual.copyFile),
+    open: vi.fn(actual.open),
     readFile: vi.fn(actual.readFile),
+    rename: vi.fn(actual.rename),
     stat: vi.fn(actual.stat),
   } as typeof import('node:fs/promises')
 })
@@ -17,6 +20,9 @@ const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  vi.mocked(copyFile).mockReset()
+  vi.mocked(open).mockReset()
+  vi.mocked(rename).mockReset()
 })
 
 async function servicesForTest() {
@@ -412,5 +418,117 @@ describe('file services', () => {
 
     expect(stat).toHaveBeenCalled()
     expect(readFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('save interruption recovery', () => {
+  it('keeps the committed document when the temporary write is interrupted after real bytes land', async () => {
+    const { directory, services } = await servicesForTest()
+    const previous = stateWithoutImage('Previous')
+    const next = stateWithoutImage('Next')
+    await services.save(previous)
+
+    vi.mocked(open).mockImplementationOnce(async (path) => {
+      return {
+        async writeFile(contents: string) {
+          await writeFile(path, contents.slice(0, 24), 'utf8')
+          throw new Error('simulated interruption during temporary write')
+        },
+        async sync() {},
+        async close() {},
+      } as unknown as Awaited<ReturnType<typeof open>>
+    })
+
+    await expect(services.save(next)).rejects.toThrow('simulated interruption during temporary write')
+
+    const temporary = await readFile(join(directory, 'document.json.tmp'), 'utf8')
+    expect(() => JSON.parse(temporary)).toThrow()
+
+    const restarted = createFileServices(directory)
+    await expect(restarted.load()).resolves.toEqual(previous)
+  })
+
+  it.each([
+    { label: 'before it starts', partial: false },
+    { label: 'after it has overwritten part of the old backup', partial: true },
+  ])('keeps the committed document when the backup rotation is interrupted $label', async ({ partial }) => {
+    const { directory, services } = await servicesForTest()
+    const first = stateWithoutImage('First')
+    const previous = stateWithoutImage('Previous')
+    const next = stateWithoutImage('Next')
+    await services.save(first)
+    await services.save(previous)
+
+    vi.mocked(copyFile).mockImplementationOnce(async (source, destination) => {
+      if (partial) {
+        const contents = await readFile(source, 'utf8')
+        await writeFile(destination, contents.slice(0, 30), 'utf8')
+      }
+      throw new Error('simulated interruption during backup rotation')
+    })
+
+    await expect(services.save(next)).rejects.toThrow('simulated interruption during backup rotation')
+
+    const temporaryPath = join(directory, 'document.json.tmp')
+    const backupPath = join(directory, 'document.json.bak')
+    expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
+    if (partial) {
+      const backup = await readFile(backupPath, 'utf8')
+      expect(() => JSON.parse(backup)).toThrow()
+    } else {
+      expect(JSON.parse(await readFile(backupPath, 'utf8'))).toEqual(first)
+    }
+
+    const restarted = createFileServices(directory)
+    await expect(restarted.load()).resolves.toEqual(previous)
+    expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
+
+    await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
+    await expect(restarted.load()).resolves.toEqual(next)
+    expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(JSON.stringify(next, null, 2))
+  })
+
+  it.each([true, false])(
+    'recovers the interrupted replacement after a failed rename (committed document exists: %s)',
+    async (withPrimary) => {
+      const { directory, services } = await servicesForTest()
+      const previous = stateWithoutImage('Previous')
+      const next = stateWithoutImage('Next')
+      if (withPrimary) await services.save(previous)
+
+      vi.mocked(rename).mockImplementationOnce(async () => {
+        throw new Error('simulated interruption during replacement rename')
+      })
+
+      await expect(services.save(next)).rejects.toThrow('simulated interruption during replacement rename')
+
+      const restarted = createFileServices(directory)
+      if (withPrimary) await expect(restarted.load()).resolves.toEqual(previous)
+      else await expect(restarted.load()).resolves.toEqual(next)
+
+      if (withPrimary) {
+        await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
+        await expect(restarted.load()).resolves.toEqual(next)
+      }
+    },
+  )
+
+  it('saves normally again after an interrupted backup rotation', async () => {
+    const { directory, services } = await servicesForTest()
+    const previous = stateWithoutImage('Previous')
+    await services.save(previous)
+    vi.mocked(copyFile).mockImplementationOnce(async () => {
+      throw new Error('simulated interruption during backup rotation')
+    })
+    await expect(services.save(stateWithoutImage('Next'))).rejects.toThrow(
+      'simulated interruption during backup rotation',
+    )
+
+    const final = stateWithoutImage('Final')
+    await services.save(final)
+
+    const restarted = createFileServices(directory)
+    await expect(restarted.load()).resolves.toEqual(final)
+    await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
