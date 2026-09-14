@@ -74,14 +74,16 @@ function tick(): Promise<void> {
 
 describe('EditorStore', () => {
   it('reports maximum depth without changing editor state, history, IDs, or persistence', async () => {
-    const root: TreeNode = { id: 'n0', text: 'root', children: [] }
-    let current = root
-    for (let index = 1; index < MAX_DOCUMENT_DEPTH; index += 1) {
-      const child: TreeNode = { id: `n${index}`, text: `node-${index}`, children: [] }
-      current.children.push(child)
-      current = child
+    const deepest: TreeNode = {
+      id: `n${MAX_DOCUMENT_DEPTH - 1}`,
+      text: `node-${MAX_DOCUMENT_DEPTH - 1}`,
+      children: [],
     }
-    const services = loadedState({ roots: [root] }, { currentParentId: current.id, selectedNodeId: current.id })
+    let root: TreeNode = deepest
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      root = { id: `n${index}`, text: index === 0 ? 'root' : `node-${index}`, children: [root] }
+    }
+    const services = loadedState({ roots: [root] }, { currentParentId: deepest.id, selectedNodeId: deepest.id })
     const createId = vi.fn(() => 'must-not-be-consumed')
     const store = new EditorStore(services, createId)
     await store.initialize()
@@ -93,7 +95,7 @@ describe('EditorStore', () => {
     const after = store.getSnapshot()
     expect(after).toMatchObject({
       status: 'ready',
-      location: { currentParentId: current.id, selectedNodeId: current.id },
+      location: { currentParentId: deepest.id, selectedNodeId: deepest.id },
       operationError: 'Nodes cannot be nested deeper than 20 levels.',
     })
     if (after.status !== 'ready') throw new Error('Expected a ready editor.')
@@ -103,7 +105,7 @@ describe('EditorStore', () => {
     expect(services.saves).toEqual([])
 
     store.undo()
-    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: current.id } })
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
   })
 
   it('creates an initial root and a sibling split', async () => {

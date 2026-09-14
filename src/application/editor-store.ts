@@ -190,7 +190,7 @@ export class EditorStore {
     this.editContent(nodeId, text, [])
   }
 
-  public editContent(nodeId: NodeId, text: string, links: LinkRange[]): void {
+  public editContent(nodeId: NodeId, text: string, links: readonly LinkRange[]): void {
     const state = this.ready()
     const node = requireNode(state.document, nodeId).node
     if (node.text === text) {
@@ -615,11 +615,11 @@ interface NodeContent {
   links: LinkRange[]
 }
 
-function nodeContent(node: { text: string; links?: LinkRange[] }): NodeContent {
+function nodeContent(node: { text: string; links?: readonly LinkRange[] }): NodeContent {
   return { text: node.text, links: (node.links ?? []).map((link) => ({ ...link })) }
 }
 
-function sameNodeContent(node: { text: string; links?: LinkRange[] }, expected: NodeContent): boolean {
+function sameNodeContent(node: { text: string; links?: readonly LinkRange[] }, expected: NodeContent): boolean {
   if (node.text !== expected.text) return false
   const links = node.links ?? []
   return (
@@ -631,7 +631,7 @@ function sameNodeContent(node: { text: string; links?: LinkRange[] }, expected: 
   )
 }
 
-function hasNewLink(existing: LinkRange[] | undefined, next: LinkRange[]): boolean {
+function hasNewLink(existing: readonly LinkRange[] | undefined, next: readonly LinkRange[]): boolean {
   const remaining = new Map<string, number>()
   for (const link of existing ?? []) {
     remaining.set(link.url, (remaining.get(link.url) ?? 0) + 1)

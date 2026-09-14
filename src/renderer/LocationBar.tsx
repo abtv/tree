@@ -5,7 +5,7 @@ export function LocationBar({
   currentParentId,
   onNavigate,
 }: {
-  path: TreeNode[]
+  path: readonly TreeNode[]
   currentParentId: string | null
   onNavigate: (parentId: string | null) => void
 }): React.JSX.Element {

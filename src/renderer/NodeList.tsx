@@ -3,7 +3,7 @@ import type { DragEvent, ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 
 interface NodeListProps {
-  nodes: TreeNode[]
+  nodes: readonly TreeNode[]
   renderInput: (node: TreeNode, label: string) => ReactNode
   onEnter: (node: TreeNode) => void
   onMove: (nodeId: string, insertionIndex: number) => void

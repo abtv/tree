@@ -35,8 +35,13 @@ import {
 
 describe('document operations', () => {
   it('updates text by cloning only the path to the edited node', () => {
-    const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
-    document.roots.push({ id: 'other', text: 'Other', children: [{ id: 'other-child', text: 'Child', children: [] }] })
+    const base = createFirstChild(createInitialDocument('root'), 'root', 'child')
+    const document: Document = {
+      roots: [
+        ...base.roots,
+        { id: 'other', text: 'Other', children: [{ id: 'other-child', text: 'Child', children: [] }] },
+      ],
+    }
     const result = editNodeContent(document, 'child', 'Updated', [])
 
     expect(result.roots[0]).not.toBe(document.roots[0])
@@ -46,9 +51,15 @@ describe('document operations', () => {
   })
 
   it('path-copies structural commands and shares untouched roots and siblings', () => {
-    const document = createFirstChild(createInitialDocument('a'), 'a', 'a-child')
-    document.roots[0]!.children[0]!.children.push({ id: 'a-grandchild', text: 'G', children: [] })
-    document.roots.push({ id: 'b', text: 'B', children: [{ id: 'b-child', text: 'Bc', children: [] }] })
+    const base = createFirstChild(createInitialDocument('a'), 'a', 'a-child')
+    const root = base.roots[0]!
+    const aChild = root.children[0]!
+    const document: Document = {
+      roots: [
+        { ...root, children: [{ ...aChild, children: [{ id: 'a-grandchild', text: 'G', children: [] }] }] },
+        { id: 'b', text: 'B', children: [{ id: 'b-child', text: 'Bc', children: [] }] },
+      ],
+    }
 
     const inserted = insertSiblingAfter(document, 'a-child', 'new-after')
 
@@ -61,9 +72,15 @@ describe('document operations', () => {
   })
 
   it('rebuilds only the ancestor path when deleting a deep node', () => {
-    const document = createFirstChild(createInitialDocument('a'), 'a', 'a-child')
-    document.roots[0]!.children[0]!.children.push({ id: 'a-grandchild', text: 'G', children: [] })
-    document.roots.push({ id: 'b', text: 'B', children: [] })
+    const base = createFirstChild(createInitialDocument('a'), 'a', 'a-child')
+    const root = base.roots[0]!
+    const aChild = root.children[0]!
+    const document: Document = {
+      roots: [
+        { ...root, children: [{ ...aChild, children: [{ id: 'a-grandchild', text: 'G', children: [] }] }] },
+        { id: 'b', text: 'B', children: [] },
+      ],
+    }
 
     const result = deleteNode(document, 'a-grandchild')
 
@@ -74,8 +91,8 @@ describe('document operations', () => {
   })
 
   it('inserts an empty sibling before a node without changing its subtree', () => {
-    const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
-    document.roots[0]!.text = 'Current'
+    const base = createFirstChild(createInitialDocument('a'), 'a', 'child')
+    const document: Document = { roots: base.roots.map((node) => ({ ...node, text: 'Current' })) }
 
     const result = insertSiblingBefore(document, 'a', 'before')
 
@@ -86,8 +103,8 @@ describe('document operations', () => {
   })
 
   it('keeps an image on the first part when splitting a node', () => {
-    const document = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
-    document.roots[0]!.text = 'Current'
+    const base = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
+    const document: Document = { roots: base.roots.map((node) => ({ ...node, text: 'Current' })) }
 
     const result = splitNode(document, 'a', 3, 'b')
 
@@ -98,8 +115,8 @@ describe('document operations', () => {
   })
 
   it('moves an image to the final node of multiline paste', () => {
-    const document = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
-    document.roots[0]!.text = 'abcdef'
+    const base = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
+    const document: Document = { roots: base.roots.map((node) => ({ ...node, text: 'abcdef' })) }
 
     const result = pasteMultilineText(document, 'a', 3, ['one', 'two', 'three'], ['b', 'c'])
 
@@ -111,8 +128,8 @@ describe('document operations', () => {
   })
 
   it('moves a complete subtree without changing its identity', () => {
-    const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
-    document.roots.push({ id: 'b', text: 'B', children: [] })
+    const base = createFirstChild(createInitialDocument('a'), 'a', 'child')
+    const document: Document = { roots: [...base.roots, { id: 'b', text: 'B', children: [] }] }
 
     const result = moveSibling(document, 'a', 1)
 
@@ -129,9 +146,11 @@ describe('document operations', () => {
   })
 
   it('derives the complete node path without storing parent IDs', () => {
-    const document = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
-    document.roots[0]!.text = 'Parent'
-    document.roots[0]!.children[0]!.text = 'Child'
+    const base = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
+    const root = base.roots[0]!
+    const document: Document = {
+      roots: [{ ...root, text: 'Parent', children: [{ ...root.children[0]!, text: 'Child' }] }],
+    }
 
     expect(nodePath(document, 'child').map((node) => node.text)).toEqual(['Parent', 'Child'])
   })
@@ -193,14 +212,15 @@ describe('document operations', () => {
 
   it('accepts exactly the maximum depth and rejects the next level', () => {
     const depth = MAX_DOCUMENT_DEPTH
-    const root: TreeNode = { id: 'n0', text: 'root', children: [] }
-    let current = root
-    for (let index = 1; index < depth; index += 1) {
-      const child: TreeNode = { id: `n${index}`, text: `t${index}`, children: [] }
-      current.children.push(child)
-      current = child
+    const rooted = (count: number): Document => {
+      let node: TreeNode = { id: `n${count - 1}`, text: `t${count - 1}`, children: [] }
+      for (let index = count - 2; index >= 0; index -= 1) {
+        node = { id: `n${index}`, text: index === 0 ? 'root' : `t${index}`, children: [node] }
+      }
+      return { roots: [node] }
     }
-    const document = { roots: [root] }
+    const document = rooted(depth)
+    const overDepth = rooted(depth + 1)
 
     expect(() => assertDocument(document)).not.toThrow()
     expect(() => cloneDocument(document)).not.toThrow()
@@ -213,30 +233,31 @@ describe('document operations', () => {
       parsePersistedState({ version: 1, document, location: { currentParentId: null, selectedNodeId: 'n0' } }),
     ).not.toThrow()
 
-    current.children.push({ id: 'too-deep', text: '', children: [] })
-    expect(() => assertDocument(document)).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+    expect(() => assertDocument(overDepth)).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
     expect(() =>
-      parsePersistedState({ version: 2, document, location: { currentParentId: null, selectedNodeId: 'n0' } }),
+      parsePersistedState({
+        version: 2,
+        document: overDepth,
+        location: { currentParentId: null, selectedNodeId: 'n0' },
+      }),
     ).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
   })
 
   it('rejects creating a child below the maximum depth without cloning or changing the source', () => {
-    const root: TreeNode = { id: 'n0', text: '', children: [] }
-    let current = root
-    for (let index = 1; index < MAX_DOCUMENT_DEPTH; index += 1) {
-      const child: TreeNode = { id: `n${index}`, text: '', children: [] }
-      current.children.push(child)
-      current = child
+    let node: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      node = { id: `n${index}`, text: '', children: [node] }
     }
-    const document = { roots: [root] }
+    const document: Document = { roots: [node] }
+    const deepest = nodePath(document, `n${MAX_DOCUMENT_DEPTH - 1}`).at(-1)!
 
-    expect(() => createFirstChild(document, current.id, 'new')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
-    expect(current.children).toEqual([])
+    expect(() => createFirstChild(document, deepest.id, 'new')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+    expect(deepest.children).toEqual([])
   })
 
   it('does not split a surrogate pair when the cursor is inside it', () => {
-    const document = createInitialDocument('a')
-    document.roots[0]!.text = '😀b'
+    const base = createInitialDocument('a')
+    const document: Document = { roots: base.roots.map((node) => ({ ...node, text: '😀b' })) }
 
     expect(splitNode(document, 'a', 1, 'b').roots.map((node) => node.text)).toEqual(['', '😀b'])
     expect(pasteText(document, 'a', 1, 'X').roots[0]!.text).toBe('X😀b')
@@ -643,5 +664,23 @@ describe('document operations', () => {
     expect([...summary.keys()]).toEqual(['a'])
     expect([...collectAttachmentIds(document)]).toEqual(['a'])
     expect(collected).not.toBe(summary as unknown as Set<string>)
+  })
+
+  it('exposes read-only document and node collections', () => {
+    const document = createInitialDocument('root')
+    const mutateRoots = (): void => {
+      // @ts-expect-error Document roots are read-only.
+      document.roots.push({ id: 'other', text: '', children: [] })
+    }
+    const mutateNode = (): void => {
+      const node = document.roots[0]!
+      // @ts-expect-error Node children are read-only.
+      node.children.push({ id: 'child', text: '', children: [] })
+      // @ts-expect-error Node text is read-only.
+      node.text = 'changed'
+    }
+
+    expect(mutateRoots).toBeTypeOf('function')
+    expect(mutateNode).toBeTypeOf('function')
   })
 })

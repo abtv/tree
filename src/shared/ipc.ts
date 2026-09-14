@@ -13,7 +13,8 @@ export const ipcChannels = {
   cleanupAttachments: 'tree:cleanup-attachments',
 } as const
 
-export type ClipboardPayload = { kind: 'text'; text: string; links?: LinkRange[] } | { kind: 'image'; png: Uint8Array }
+export type ClipboardPayload =
+  { kind: 'text'; text: string; links?: readonly LinkRange[] } | { kind: 'image'; png: Uint8Array }
 
 export interface ClipboardWritePayload {
   text: string

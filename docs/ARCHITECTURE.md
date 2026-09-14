@@ -139,6 +139,8 @@ Node IDs are stable identifiers.
 
 Changing a node's position must not change its ID.
 
+The public `Document`, `TreeNode`, `LinkRange`, and `AttachmentReference` types are read-only: roots, children, links, and scalar fields cannot be reassigned, so application, renderer, and test callers cannot mutate a live snapshot or a history entry through the type system. Domain operations build new nodes internally and return them as read-only trees.
+
 ---
 
 ## 6. Domain Operations

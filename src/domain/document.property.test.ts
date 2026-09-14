@@ -4,7 +4,6 @@ import {
   assertDocument,
   attachImage,
   attachmentSummary,
-  cloneDocument,
   cloneNode,
   collectAttachmentIds,
   createFirstChild,
@@ -389,8 +388,9 @@ describe('document invariants', () => {
     fc.assert(
       fc.property(forest, (rawForest) => {
         const document = materialize(rawForest)
-        const duplicate = cloneDocument(document)
-        duplicate.roots.push({ ...cloneNode(document.roots[0]!), children: [] })
+        const duplicate: Document = {
+          roots: [...document.roots, { ...cloneNode(document.roots[0]!), children: [] }],
+        }
 
         expect(() => assertDocument(duplicate)).toThrow('unique')
       }),

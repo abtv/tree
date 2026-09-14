@@ -8,45 +8,53 @@ export const MAX_DOCUMENT_DEPTH = 20
 export { MAX_DOCUMENT_DEPTH_ERROR }
 
 export interface AttachmentReference {
-  id: AttachmentId
-  mimeType: 'image/png'
+  readonly id: AttachmentId
+  readonly mimeType: 'image/png'
 }
 
 export interface LinkRange {
-  start: number
-  end: number
-  url: string
+  readonly start: number
+  readonly end: number
+  readonly url: string
 }
 
 export interface TreeNode {
+  readonly id: NodeId
+  readonly text: string
+  readonly links?: readonly LinkRange[]
+  readonly attachment?: AttachmentReference
+  readonly children: readonly TreeNode[]
+}
+
+export interface Document {
+  readonly roots: readonly TreeNode[]
+}
+
+export interface Location {
+  readonly currentParentId: NodeId | null
+  readonly selectedNodeId: NodeId
+}
+
+export interface PersistedEditorState {
+  readonly version: 1 | 2
+  readonly document: Document
+  readonly location: Location
+}
+
+export interface LocatedNode {
+  readonly node: TreeNode
+  readonly parent: TreeNode | null
+  readonly siblings: readonly TreeNode[]
+  readonly index: number
+  readonly ancestors: readonly TreeNode[]
+}
+
+interface BuildNode {
   id: NodeId
   text: string
   links?: LinkRange[]
   attachment?: AttachmentReference
-  children: TreeNode[]
-}
-
-export interface Document {
-  roots: TreeNode[]
-}
-
-export interface Location {
-  currentParentId: NodeId | null
-  selectedNodeId: NodeId
-}
-
-export interface PersistedEditorState {
-  version: 1 | 2
-  document: Document
-  location: Location
-}
-
-export interface LocatedNode {
-  node: TreeNode
-  parent: TreeNode | null
-  siblings: TreeNode[]
-  index: number
-  ancestors: TreeNode[]
+  children: BuildNode[]
 }
 
 export type NodeIndex = ReadonlyMap<NodeId, NodeId | null>
@@ -119,7 +127,7 @@ export function cloneDocument(document: Document): Document {
 
 export function cloneNode(node: TreeNode): TreeNode {
   const root = cloneNodeShallow(node)
-  const stack: Array<{ source: TreeNode; target: TreeNode }> = [{ source: node, target: root }]
+  const stack: Array<{ source: TreeNode; target: BuildNode }> = [{ source: node, target: root }]
   while (stack.length > 0) {
     const { source, target } = stack.pop()!
     for (const child of source.children) {
@@ -131,7 +139,7 @@ export function cloneNode(node: TreeNode): TreeNode {
   return root
 }
 
-function cloneNodeShallow(node: TreeNode): TreeNode {
+function cloneNodeShallow(node: TreeNode): BuildNode {
   return {
     id: node.id,
     text: node.text,
@@ -169,6 +177,21 @@ function replaceNode(document: Document, located: LocatedNode, replacement: Tree
   return copyToRoot(document, located, siblings)
 }
 
+function contentReplacement(
+  node: TreeNode,
+  text: string,
+  links: readonly LinkRange[],
+  attachment: AttachmentReference | undefined,
+): TreeNode {
+  return {
+    id: node.id,
+    text,
+    ...(links.length === 0 ? {} : { links }),
+    ...(attachment === undefined ? {} : { attachment }),
+    children: node.children,
+  }
+}
+
 export function locateNode(document: Document, id: NodeId): LocatedNode | undefined {
   const index = indexInfoFor(document)
   if (!index.parent.has(id)) return undefined
@@ -185,7 +208,7 @@ export function locateNode(document: Document, id: NodeId): LocatedNode | undefi
   let parent: TreeNode | null = null
   for (let position = 0; position < pathIds.length; position += 1) {
     const pathId = pathIds[position]!
-    const siblings: TreeNode[] = parent === null ? document.roots : parent.children
+    const siblings: readonly TreeNode[] = parent === null ? document.roots : parent.children
     const siblingIndex = index.siblingIndex.get(pathId)
     const node = siblingIndex === undefined ? undefined : siblings[siblingIndex]
     if (node === undefined || node.id !== pathId) return undefined
@@ -207,11 +230,11 @@ export function requireNode(document: Document, id: NodeId): LocatedNode {
   return located
 }
 
-export function displayedNodes(document: Document, currentParentId: NodeId | null): TreeNode[] {
+export function displayedNodes(document: Document, currentParentId: NodeId | null): readonly TreeNode[] {
   return currentParentId === null ? document.roots : requireNode(document, currentParentId).node.children
 }
 
-export function nodePath(document: Document, nodeId: NodeId): TreeNode[] {
+export function nodePath(document: Document, nodeId: NodeId): readonly TreeNode[] {
   const located = requireNode(document, nodeId)
   return [...located.ancestors, located.node]
 }
@@ -234,13 +257,19 @@ export function editNodeText(document: Document, nodeId: NodeId, text: string): 
   return editNodeContent(document, nodeId, text, [])
 }
 
-export function editNodeContent(document: Document, nodeId: NodeId, text: string, links: LinkRange[]): Document {
+export function editNodeContent(
+  document: Document,
+  nodeId: NodeId,
+  text: string,
+  links: readonly LinkRange[],
+): Document {
   const normalized = normalizeLinks(links, text)
   const located = requireNode(document, nodeId)
-  const replacement: TreeNode = { ...located.node, text }
-  if (normalized.length === 0) delete replacement.links
-  else replacement.links = normalized
-  const next = replaceNode(document, located, replacement)
+  const next = replaceNode(
+    document,
+    located,
+    contentReplacement(located.node, text, normalized, located.node.attachment),
+  )
   shareIndex(document, next)
   inheritAttachmentIds(document, next)
   return next
@@ -251,21 +280,17 @@ export function deleteLink(document: Document, nodeId: NodeId, cursor: number): 
   const link = located.node.links?.find((candidate) => candidate.end === cursor)
   if (link === undefined) return undefined
   const text = `${located.node.text.slice(0, link.start)}${located.node.text.slice(link.end)}`
-  const replacement: TreeNode = { ...located.node, text }
-  setLinks(
-    replacement,
-    normalizeLinks(
-      (located.node.links ?? [])
-        .filter((candidate) => candidate !== link)
-        .map((candidate) => ({
-          ...candidate,
-          start: candidate.start >= link.end ? candidate.start - (link.end - link.start) : candidate.start,
-          end: candidate.end >= link.end ? candidate.end - (link.end - link.start) : candidate.end,
-        })),
-      text,
-    ),
+  const links = normalizeLinks(
+    (located.node.links ?? [])
+      .filter((candidate) => candidate !== link)
+      .map((candidate) => ({
+        ...candidate,
+        start: candidate.start >= link.end ? candidate.start - (link.end - link.start) : candidate.start,
+        end: candidate.end >= link.end ? candidate.end - (link.end - link.start) : candidate.end,
+      })),
+    text,
   )
-  const next = replaceNode(document, located, replacement)
+  const next = replaceNode(document, located, contentReplacement(located.node, text, links, located.node.attachment))
   shareIndex(document, next)
   inheritAttachmentIds(document, next)
   return next
@@ -275,11 +300,12 @@ export function removeTextRange(document: Document, nodeId: NodeId, start: numbe
   const located = requireNode(document, nodeId)
   const from = snapToCodePoint(located.node.text, Math.min(start, end))
   const to = snapToCodePoint(located.node.text, Math.max(start, end))
-  const replacement: TreeNode = { ...located.node }
+  let replacement: TreeNode = { ...located.node }
   if (from !== to) {
-    replacement.text = `${located.node.text.slice(0, from)}${located.node.text.slice(to)}`
-    setLinks(
-      replacement,
+    const text = `${located.node.text.slice(0, from)}${located.node.text.slice(to)}`
+    replacement = contentReplacement(
+      located.node,
+      text,
       normalizeLinks(
         (located.node.links ?? [])
           .filter((link) => link.end <= from || link.start >= to)
@@ -288,8 +314,9 @@ export function removeTextRange(document: Document, nodeId: NodeId, start: numbe
             start: link.start >= to ? link.start - (to - from) : link.start,
             end: link.end >= to ? link.end - (to - from) : link.end,
           })),
-        replacement.text,
+        text,
       ),
+      located.node.attachment,
     )
   }
   const next = replaceNode(document, located, replacement)
@@ -349,8 +376,12 @@ export function splitNode(document: Document, nodeId: NodeId, cursor: number, ne
   const position = snapToCodePoint(located.node.text, cursor)
   const suffix = located.node.text.slice(position)
   const links = splitLinks(located.node.links ?? [], position)
-  const original: TreeNode = { ...located.node, text: located.node.text.slice(0, position) }
-  setLinks(original, links.before)
+  const original = contentReplacement(
+    located.node,
+    located.node.text.slice(0, position),
+    links.before,
+    located.node.attachment,
+  )
   const siblings = located.siblings.slice()
   siblings[located.index] = original
   siblings.splice(located.index + 1, 0, {
@@ -392,15 +423,16 @@ export function pasteText(
   nodeId: NodeId,
   cursor: number,
   text: string,
-  richLinks?: LinkRange[],
+  richLinks?: readonly LinkRange[],
 ): Document {
   const located = requireNode(document, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)
-  const replacement: TreeNode = {
-    ...located.node,
-    text: `${located.node.text.slice(0, position)}${text}${located.node.text.slice(position)}`,
-  }
-  setLinks(replacement, insertLinks(located.node.links ?? [], position, text, richLinks))
+  const replacement = contentReplacement(
+    located.node,
+    `${located.node.text.slice(0, position)}${text}${located.node.text.slice(position)}`,
+    insertLinks(located.node.links ?? [], position, text, richLinks),
+    located.node.attachment,
+  )
   const next = replaceNode(document, located, replacement)
   shareIndex(document, next)
   inheritAttachmentIds(document, next)
@@ -413,7 +445,7 @@ export function pasteMultilineText(
   cursor: number,
   lines: string[],
   newNodeIds: NodeId[],
-  richLinks?: LinkRange[],
+  richLinks?: readonly LinkRange[],
 ): Document {
   if (lines.length < 2 || newNodeIds.length !== lines.length - 1) {
     throw new Error('Multiline paste requires one new node ID for every line after the first.')
@@ -426,40 +458,37 @@ export function pasteMultilineText(
   const attachment = located.node.attachment
   const links = splitLinks(located.node.links ?? [], position)
 
-  const original: TreeNode = { ...located.node, text: `${prefix}${lines[0] ?? ''}` }
-  setLinks(
-    original,
+  const original = contentReplacement(
+    located.node,
+    `${prefix}${lines[0] ?? ''}`,
     insertLinks(
       links.before,
       position,
       lines[0] ?? '',
       richLinks === undefined ? undefined : linksForLine(richLinks, lines, 0),
     ),
+    undefined,
   )
-  delete original.attachment
 
-  const created: TreeNode[] = newNodeIds.map((id, index) => ({
-    id,
-    text: index === newNodeIds.length - 1 ? `${lines[index + 1] ?? ''}${suffix}` : (lines[index + 1] ?? ''),
-    ...(() => {
-      const line = lines[index + 1] ?? ''
-      const lineLinks = linksForLine(richLinks, lines, index + 1)
-      if (richLinks === undefined && isHttpUrl(line)) lineLinks.push({ start: 0, end: line.length, url: line })
-      const finalLinks =
-        index === newNodeIds.length - 1
-          ? [
-              ...lineLinks,
-              ...links.after.map((link) => ({ ...link, start: link.start + line.length, end: link.end + line.length })),
-            ]
-          : lineLinks
-      return finalLinks.length === 0 ? {} : { links: finalLinks }
-    })(),
-    children: [],
-  }))
-  const finalNode = created.at(-1)
-  if (finalNode !== undefined && attachment !== undefined) {
-    finalNode.attachment = attachment
-  }
+  const created: TreeNode[] = newNodeIds.map((id, index) => {
+    const isFinal = index === newNodeIds.length - 1
+    const line = lines[index + 1] ?? ''
+    const lineLinks = linksForLine(richLinks, lines, index + 1)
+    if (richLinks === undefined && isHttpUrl(line)) lineLinks.push({ start: 0, end: line.length, url: line })
+    const finalLinks = isFinal
+      ? [
+          ...lineLinks,
+          ...links.after.map((link) => ({ ...link, start: link.start + line.length, end: link.end + line.length })),
+        ]
+      : lineLinks
+    return {
+      id,
+      text: isFinal ? `${line}${suffix}` : line,
+      ...(finalLinks.length === 0 ? {} : { links: finalLinks }),
+      ...(isFinal && attachment !== undefined ? { attachment } : {}),
+      children: [],
+    }
+  })
   const siblings = located.siblings.slice()
   siblings[located.index] = original
   siblings.splice(located.index + 1, 0, ...created)
@@ -645,11 +674,11 @@ function walkNodes(
     throw new Error('Node children must be an array.')
   }
 
-  const output: TreeNode[] | undefined = build ? [] : undefined
+  const output: BuildNode[] | undefined = build ? [] : undefined
   const stack: Array<{
     input: unknown[]
     index: number
-    output: TreeNode[] | undefined
+    output: BuildNode[] | undefined
     depth: number
     parentId: NodeId | null
   }> = [{ input: value, index: 0, output, depth: 1, parentId: null }]
@@ -684,9 +713,9 @@ function walkNodes(
     if (!Array.isArray(children)) {
       throw new Error('Node children must be an array.')
     }
-    let childOutput: TreeNode[] | undefined
+    let childOutput: BuildNode[] | undefined
     if (frame.output !== undefined) {
-      const node: TreeNode = {
+      const node: BuildNode = {
         id: candidate.id,
         text: candidate.text,
         ...(links.length === 0 ? {} : { links }),
@@ -760,7 +789,7 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
-export function normalizeLinks(links: LinkRange[], text: string, requireMatchingText = true): LinkRange[] {
+export function normalizeLinks(links: readonly LinkRange[], text: string, requireMatchingText = true): LinkRange[] {
   const sorted = links
     .filter(
       (link) =>
@@ -780,10 +809,10 @@ export function normalizeLinks(links: LinkRange[], text: string, requireMatching
 }
 
 function insertLinks(
-  links: LinkRange[],
+  links: readonly LinkRange[],
   position: number,
   insertedText: string,
-  insertedLinks?: LinkRange[],
+  insertedLinks?: readonly LinkRange[],
 ): LinkRange[] {
   const delta = insertedText.length
   const inserted =
@@ -808,7 +837,7 @@ function insertLinks(
   )
 }
 
-function linksForLine(links: LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {
+function linksForLine(links: readonly LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {
   if (links === undefined) return []
   let lineStart = 0
   for (let index = 0; index < lineIndex; index += 1) lineStart += (lines[index] ?? '').length + 1
@@ -818,16 +847,11 @@ function linksForLine(links: LinkRange[] | undefined, lines: string[], lineIndex
     .map((link) => ({ ...link, start: link.start - lineStart, end: link.end - lineStart }))
 }
 
-function splitLinks(links: LinkRange[], position: number): { before: LinkRange[]; after: LinkRange[] } {
+function splitLinks(links: readonly LinkRange[], position: number): { before: LinkRange[]; after: LinkRange[] } {
   return {
     before: links.filter((link) => link.end <= position).map((link) => ({ ...link })),
     after: links
       .filter((link) => link.start >= position)
       .map((link) => ({ ...link, start: link.start - position, end: link.end - position })),
   }
-}
-
-function setLinks(node: TreeNode, links: LinkRange[]): void {
-  if (links.length === 0) delete node.links
-  else node.links = links
 }

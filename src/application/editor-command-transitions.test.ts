@@ -29,22 +29,20 @@ const document: Document = {
 
 describe('editor command transitions', () => {
   it('rejects a child at maximum depth before requesting an ID', () => {
-    const root: TreeNode = {
-      id: 'n0',
+    const deepest: TreeNode = {
+      id: 'n19',
       text: '',
       children: [],
     }
-    let current = root
-    for (let index = 1; index < 20; index += 1) {
-      const child: TreeNode = { id: `n${index}`, text: '', children: [] }
-      current.children.push(child)
-      current = child
+    let root: TreeNode = deepest
+    for (let index = 18; index >= 0; index -= 1) {
+      root = { id: `n${index}`, text: '', children: [root] }
     }
     const deepDocument = { roots: [root] }
     const createId = vi.fn(() => 'unused')
     const result = createSiblingOrFirstChildTransition(
       deepDocument,
-      { currentParentId: current.id, selectedNodeId: current.id },
+      { currentParentId: deepest.id, selectedNodeId: deepest.id },
       0,
       createId,
     )
