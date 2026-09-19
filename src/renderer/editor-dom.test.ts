@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
+  collapseSelectionToAnchor,
   getCaret,
   getSelectionRange,
   isCollapsedSelection,
@@ -150,6 +151,55 @@ describe('editor DOM adapters', () => {
     expect(getCaret(element)).toBe(1)
     setCaret(element, 4)
     expect(getCaret(element)).toBe(5)
+  })
+
+  it('collapses a textarea selection to its anchor without moving a collapsed caret', () => {
+    const element = document.createElement('textarea')
+    element.value = 'hello'
+    element.setSelectionRange(1, 4, 'forward')
+
+    collapseSelectionToAnchor(element)
+    expect(getSelectionRange(element)).toEqual({ start: 1, end: 1 })
+
+    element.setSelectionRange(2, 5, 'backward')
+    collapseSelectionToAnchor(element)
+    expect(getSelectionRange(element)).toEqual({ start: 5, end: 5 })
+
+    element.setSelectionRange(3, 3)
+    collapseSelectionToAnchor(element)
+    expect(getSelectionRange(element)).toEqual({ start: 3, end: 3 })
+  })
+
+  it('collapses a contenteditable selection to its anchor', () => {
+    const element = document.createElement('div')
+    const first = document.createTextNode('one')
+    const second = document.createTextNode('two')
+    element.append(first, second)
+    document.body.append(element)
+    setDomSelection(first, 1, second, 2)
+
+    collapseSelectionToAnchor(element)
+
+    expect(window.getSelection()?.anchorNode).toBe(first)
+    expect(window.getSelection()?.anchorOffset).toBe(1)
+    expect(isCollapsedSelection()).toBe(true)
+  })
+
+  it('leaves selections outside the element and missing selections untouched', () => {
+    const element = document.createElement('div')
+    element.textContent = 'hello'
+    document.body.append(element)
+    const outside = document.createTextNode('outside')
+    document.body.append(outside)
+    setDomSelection(outside, 1, outside, 4)
+
+    collapseSelectionToAnchor(element)
+    expect(window.getSelection()?.anchorNode).toBe(outside)
+    expect(window.getSelection()?.isCollapsed).toBe(false)
+
+    const getSelection = vi.spyOn(globalThis, 'getSelection').mockReturnValue(null)
+    expect(() => collapseSelectionToAnchor(element)).not.toThrow()
+    getSelection.mockRestore()
   })
 
   it('marks links that intersect the current selection and clears them when it collapses', () => {

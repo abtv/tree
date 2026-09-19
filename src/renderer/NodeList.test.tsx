@@ -2,10 +2,12 @@
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import './test/setup'
 import { NodeList } from './NodeList'
 import { EDGE_SCROLL_STEP, WINDOWING_THRESHOLD } from './list-window'
+import { HOLD_ACTIVATION_MS } from './node-drag'
 
 afterEach(() => {
   cleanup()
@@ -23,140 +25,88 @@ function buildNodes(count: number): TreeNode[] {
   return Array.from({ length: count }, (_, index) => ({ id: `n${index}`, text: `Text ${index}`, children: [] }))
 }
 
-function mockRows(rectTop: number, height = 27): void {
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    () =>
-      ({
-        top: rectTop,
-        height,
-        bottom: rectTop + height,
-        left: 0,
-        right: 0,
-        width: 0,
-        x: 0,
-        y: rectTop,
-        toJSON: () => ({}),
-      }) as DOMRect,
-  )
-}
-
-function createTransfer(nodeId: string): DataTransfer {
+function rect(top: number, height = 27): DOMRect {
   return {
-    dropEffect: 'none',
-    effectAllowed: 'all',
-    getData: () => nodeId,
-    setData: () => undefined,
-  } as unknown as DataTransfer
+    top,
+    height,
+    bottom: top + height,
+    left: 0,
+    right: 600,
+    width: 600,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect
 }
 
-function dropAt(target: Element, nodeId: string, clientY: number): void {
-  const event = new MouseEvent('drop', { bubbles: true, cancelable: true, clientY })
-  Object.defineProperty(event, 'dataTransfer', { value: createTransfer(nodeId) })
-  target.dispatchEvent(event)
+function mockRowRects(originTop = 0, height = 27): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const index = this.dataset.nodeIndex
+    if (index === undefined) return rect(originTop, height)
+    return rect(originTop + Number(index) * height, height)
+  })
+}
+
+interface RenderOptions {
+  focusedNodeId?: string | undefined
+  locked?: boolean
+  list?: TreeNode[]
+  renderInput?: (node: TreeNode, label: string) => ReactNode
+}
+
+function renderRows(
+  options: RenderOptions = {},
+  onMove = vi.fn(),
+): ReturnType<typeof render> & { onMove: typeof onMove } {
+  const list = options.list ?? nodes
+  const view = render(
+    <NodeList
+      focusedNodeId={options.focusedNodeId}
+      locked={options.locked === true}
+      nodes={list}
+      renderInput={options.renderInput ?? ((node, label) => <textarea aria-label={label} readOnly value={node.text} />)}
+      onEnter={() => undefined}
+      onMove={onMove}
+    />,
+  )
+  return { ...view, onMove }
+}
+
+function pointerDownAt(target: Element, clientY: number, init: Partial<PointerEventInit> = {}): void {
+  fireEvent.pointerDown(target, {
+    pointerId: 1,
+    button: 0,
+    isPrimary: true,
+    pointerType: 'mouse',
+    clientX: 100,
+    clientY,
+    ...init,
+  })
+}
+
+function activate(target: Element, clientY: number): void {
+  pointerDownAt(target, clientY)
+  act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+}
+
+function pointerMoveAt(target: Element, clientY: number): void {
+  fireEvent.pointerMove(target, { pointerId: 1, clientX: 100, clientY })
+}
+
+function pointerUpAt(target: Element, clientY: number): void {
+  fireEvent.pointerUp(target, { pointerId: 1, clientX: 100, clientY })
+}
+
+function rowElements(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll('.node-row'))
 }
 
 describe('NodeList', () => {
   it('renders expanded edge drop targets without changing their insertion positions', () => {
-    const { container } = render(
-      <NodeList
-        nodes={nodes}
-        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
-        onEnter={() => undefined}
-        onMove={() => undefined}
-      />,
-    )
+    const { container } = renderRows()
 
     expect(container.querySelector('.drop-zone-start')).toHaveClass('drop-zone-edge')
     expect(container.querySelector('.drop-zone-end')).toHaveClass('drop-zone-edge')
-  })
-
-  it('marks the source row while it is being dragged and clears the mark afterward', () => {
-    const { container } = render(
-      <NodeList
-        nodes={nodes}
-        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
-        onEnter={() => undefined}
-        onMove={() => undefined}
-      />,
-    )
-    const row = container.querySelector('.node-row')
-    if (row === null) throw new Error('The first row was not rendered.')
-
-    fireEvent.dragStart(row, { dataTransfer: createTransfer('a') })
-    expect(row).toHaveClass('node-row-dragging')
-
-    fireEvent.dragEnd(row)
-    expect(row).not.toHaveClass('node-row-dragging')
-  })
-
-  it('shows the drag cursor only after the row has been hovered briefly', () => {
-    vi.useFakeTimers()
-    const { container } = render(
-      <NodeList
-        nodes={nodes}
-        renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
-        onEnter={() => undefined}
-        onMove={() => undefined}
-      />,
-    )
-    const row = container.querySelector('.node-row')
-    if (row === null) throw new Error('The first row was not rendered.')
-
-    expect(row).not.toHaveClass('node-row-grab-ready')
-    fireEvent.mouseEnter(row)
-    act(() => vi.advanceTimersByTime(499))
-    expect(row).not.toHaveClass('node-row-grab-ready')
-
-    act(() => vi.advanceTimersByTime(1))
-    expect(row).toHaveClass('node-row-grab-ready')
-
-    fireEvent.mouseLeave(row)
-    expect(row).not.toHaveClass('node-row-grab-ready')
-  })
-
-  it('highlights the dragged row only while it is moving', () => {
-    const { container } = render(
-      <NodeList
-        nodes={nodes}
-        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
-        onEnter={() => undefined}
-        onMove={() => undefined}
-      />,
-    )
-    const rows = container.querySelectorAll('.node-row')
-    const source = rows[0]
-    const target = rows[1]
-    if (source === undefined || target === undefined) throw new Error('The node rows were not rendered.')
-    const transfer = createTransfer('a')
-
-    fireEvent.dragStart(source, { dataTransfer: transfer })
-    expect(source).toHaveClass('node-row-dragging')
-
-    fireEvent.dragEnd(source)
-    expect(source).not.toHaveClass('node-row-dragging')
-  })
-
-  it('inserts above or below a row based on the drop position within it', () => {
-    const onMove = vi.fn()
-    const { container } = render(
-      <NodeList
-        nodes={nodes}
-        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
-        onEnter={() => undefined}
-        onMove={onMove}
-      />,
-    )
-    const firstRow = container.querySelector('.node-row')
-    if (firstRow === null) throw new Error('The first row was not rendered.')
-    const target = firstRow.querySelector('span')
-    if (target === null) throw new Error('The first row input was not rendered.')
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 10, height: 20 } as DOMRect)
-
-    dropAt(target, 'b', 11)
-    expect(onMove).toHaveBeenLastCalledWith('b', 0)
-
-    dropAt(target, 'b', 29)
-    expect(onMove).toHaveBeenLastCalledWith('b', 1)
   })
 
   it('enters a childless node when its circular indicator is clicked', () => {
@@ -201,17 +151,269 @@ describe('NodeList', () => {
   })
 })
 
-describe('NodeList windowing', () => {
-  function renderList(count: number, focusedNodeId?: string): ReturnType<typeof render> {
-    return render(
+describe('NodeList drag interaction', () => {
+  it('only marks the source row once the hold threshold elapses', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 13)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS - 1))
+    expect(rows[0]).not.toHaveClass('node-row-dragging')
+    expect(document.body).not.toHaveClass('node-drag-active')
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(rows[0]).toHaveClass('node-row-dragging')
+    expect(rows[1]).not.toHaveClass('node-row-dragging')
+    expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
+    expect(document.body).toHaveClass('node-drag-active')
+
+    pointerUpAt(rows[0]!, 13)
+    expect(rows[0]).not.toHaveClass('node-row-dragging')
+    expect(document.body).not.toHaveClass('node-drag-active')
+  })
+
+  it('never arms a drag for excluded pointer downs', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, getByRole } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 13, { button: 2 })
+    pointerDownAt(rows[0]!, 13, { isPrimary: false })
+    pointerDownAt(rows[0]!, 13, { pointerType: 'touch' })
+    pointerDownAt(getByRole('button', { name: 'Enter node 1' }), 13)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+  })
+
+  it('ignores a duplicate press while a gesture is already pending', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 13)
+    pointerDownAt(rows[1]!, 40, { pointerId: 2 })
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    pointerMoveAt(rows[0]!, 47)
+    pointerUpAt(rows[0]!, 47)
+
+    expect(onMove).toHaveBeenCalledTimes(1)
+    expect(onMove).toHaveBeenCalledWith('a', 2)
+  })
+
+  it('does not enter drag mode on a release before the threshold', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 13)
+    act(() => vi.advanceTimersByTime(100))
+    pointerUpAt(rows[0]!, 13)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
+  it('keeps an eligible hold when the pointer moves within the row and cancels it when it leaves', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 10)
+    act(() => vi.advanceTimersByTime(200))
+    pointerMoveAt(rows[0]!, 20)
+    act(() => vi.advanceTimersByTime(200))
+    expect(rows[0]).toHaveClass('node-row-dragging')
+
+    pointerUpAt(rows[0]!, 20)
+    pointerDownAt(rows[0]!, 10)
+    act(() => vi.advanceTimersByTime(200))
+    pointerMoveAt(rows[0]!, 40)
+    act(() => vi.advanceTimersByTime(200))
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+  })
+
+  it('commits a move to the boundary chosen by the release position', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, 47)
+    expect(rows[1]).toHaveClass('node-row-drop-after')
+    expect(container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')).toHaveLength(1)
+
+    pointerUpAt(rows[0]!, 47)
+
+    expect(onMove).toHaveBeenCalledTimes(1)
+    expect(onMove).toHaveBeenCalledWith('a', 2)
+    expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
+  })
+
+  it('commits a move before a row when the pointer is in its top half', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    activate(rows[1]!, 40)
+    pointerMoveAt(rows[1]!, 5)
+    expect(rows[0]).toHaveClass('node-row-drop-before')
+
+    pointerUpAt(rows[1]!, 5)
+
+    expect(onMove).toHaveBeenCalledWith('b', 0)
+  })
+
+  it('releases without a position change and commits nothing', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    activate(rows[0]!, 20)
+    pointerUpAt(rows[0]!, 20)
+    expect(onMove).not.toHaveBeenCalled()
+
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, 5)
+    pointerUpAt(rows[0]!, 5)
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
+  it('does not reuse the previous gesture target when a new drag activates', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, 47)
+    expect(rows[1]).toHaveClass('node-row-drop-after')
+    pointerUpAt(rows[0]!, 47)
+
+    activate(rows[0]!, 13)
+    expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
+    pointerUpAt(rows[0]!, 13)
+  })
+
+  it('cancels an active drag on Escape, pointer cancellation, lost capture, and window blur', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+
+    const cases: Array<{ label: string; cancel: (row: Element, container: HTMLElement) => void }> = [
+      {
+        label: 'Escape',
+        cancel: () => fireEvent.keyDown(window, { key: 'Escape' }),
+      },
+      {
+        label: 'pointercancel',
+        cancel: (row) => fireEvent.pointerCancel(row, { pointerId: 1 }),
+      },
+      {
+        label: 'lostpointercapture',
+        cancel: (_row, container) =>
+          fireEvent.lostPointerCapture(container.querySelector('.node-list')!, {
+            pointerId: 1,
+          }),
+      },
+      {
+        label: 'blur',
+        cancel: () => fireEvent.blur(window),
+      },
+    ]
+
+    for (const { label, cancel } of cases) {
+      const { container, onMove, unmount } = renderRows()
+      const row = rowElements(container)[0]!
+      activate(row, 13)
+      pointerMoveAt(row, 47)
+      expect(container.querySelector('.node-row-drop-after'), label).not.toBeNull()
+
+      cancel(row, container)
+
+      expect(container.querySelector('.node-row-dragging'), label).toBeNull()
+      expect(container.querySelector('.node-row-drop-before, .node-row-drop-after'), label).toBeNull()
+      expect(document.body, label).not.toHaveClass('node-drag-active')
+      pointerUpAt(row, 47)
+      expect(onMove, label).not.toHaveBeenCalled()
+      unmount()
+    }
+  })
+
+  it('cancels a pending hold when the rows become locked or the source row disappears', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const first = renderRows()
+    const row = rowElements(first.container)[0]!
+    pointerDownAt(row, 13)
+    first.rerender(
       <NodeList
-        focusedNodeId={focusedNodeId}
-        nodes={buildNodes(count)}
+        locked
+        nodes={nodes}
         renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
         onEnter={() => undefined}
-        onMove={() => undefined}
+        onMove={first.onMove}
       />,
     )
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+    expect(first.container.querySelector('.node-row-dragging')).toBeNull()
+    first.unmount()
+
+    const second = renderRows({ list: buildNodes(4) })
+    const secondRow = rowElements(second.container)[0]!
+    pointerDownAt(secondRow, 13)
+    second.rerender(
+      <NodeList
+        nodes={buildNodes(4).slice(1)}
+        renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
+        onEnter={() => undefined}
+        onMove={second.onMove}
+      />,
+    )
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+    expect(second.container.querySelector('.node-row-dragging')).toBeNull()
+  })
+
+  it('suppresses the click that follows a drag while an ordinary click is delivered', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const onClick = vi.fn()
+    const { container } = renderRows({
+      renderInput: (node, label) => <textarea aria-label={label} readOnly value={node.text} onClick={onClick} />,
+    })
+    const row = rowElements(container)[0]!
+    const input = row.querySelector('textarea')!
+
+    fireEvent.click(input)
+    expect(onClick).toHaveBeenCalledTimes(1)
+
+    activate(row, 13)
+    pointerMoveAt(row, 47)
+    pointerUpAt(row, 47)
+    fireEvent.click(input)
+    expect(onClick).toHaveBeenCalledTimes(1)
+
+    pointerDownAt(row, 13)
+    pointerUpAt(row, 13)
+    fireEvent.click(input)
+    expect(onClick).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('NodeList windowing', () => {
+  function renderList(count: number, focusedNodeId?: string): ReturnType<typeof render> {
+    return renderRows({ focusedNodeId, list: buildNodes(count) })
   }
 
   it('renders every row without spacers at the threshold', () => {
@@ -261,51 +463,47 @@ describe('NodeList windowing', () => {
     expect(later).toHaveFocus()
   })
 
-  it('maps drops on the spacers to the window edges', () => {
-    mockRows(0)
-    const onMove = vi.fn()
-    const { container } = render(
-      <NodeList
-        nodes={buildNodes(600)}
-        renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
-        onEnter={() => undefined}
-        onMove={onMove}
-      />,
-    )
-    const spacers = container.querySelectorAll('.node-list-spacer')
-    expect(spacers).toHaveLength(2)
+  it('targets the list edges from the leading and trailing spacers', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows({ list: buildNodes(600) })
+    const rows = rowElements(container)
+    const mountedCount = rows.length
 
-    dropAt(spacers[0]!, 'n500', 10)
-    expect(onMove).toHaveBeenLastCalledWith('n500', 0)
+    activate(rows[1]!, 27 + 13)
+    pointerMoveAt(rows[1]!, -10)
+    expect(rows[0]).toHaveClass('node-row-drop-before')
+    pointerUpAt(rows[1]!, -10)
+    expect(onMove).toHaveBeenLastCalledWith('n1', 0)
 
-    dropAt(spacers[1]!, 'n500', 10)
-    expect(onMove.mock.calls.at(-1)?.[1]).toBeGreaterThan(0)
+    activate(rows[1]!, 27 + 13)
+    pointerMoveAt(rows[1]!, 27 * mountedCount + 10)
+    expect(rows[mountedCount - 1]).toHaveClass('node-row-drop-after')
+    pointerUpAt(rows[1]!, 27 * mountedCount + 10)
+    expect(onMove).toHaveBeenLastCalledWith('n1', mountedCount)
   })
 
-  it('stops auto-scrolling when the drag leaves the list', () => {
-    const frames: FrameRequestCallback[] = []
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      frames.push(callback)
-      return frames.length
-    })
-    const cancelAnimationFrame = vi.fn()
-    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
-    vi.stubGlobal('scrollBy', vi.fn())
-    mockRows(0)
-    const { container } = renderList(600)
-    const list = container.querySelector('.node-list')
-    if (list === null) throw new Error('The node list was not rendered.')
+  it('targets the pinned focused row without duplicating the marker', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows({ list: buildNodes(600), focusedNodeId: 'n550' })
+    const rows = rowElements(container)
+    const pinned = container.querySelector('.node-row-pinned')
+    if (pinned === null) throw new Error('The pinned row was not rendered.')
 
-    fireEvent(
-      list,
-      new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: globalThis.innerHeight - 1 }),
-    )
-    expect(frames).toHaveLength(1)
-    fireEvent(list, new MouseEvent('dragleave', { bubbles: true, cancelable: true, relatedTarget: document.body }))
-    expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, 550 * 27 + 10)
+
+    const markers = container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')
+    expect(markers).toHaveLength(1)
+    expect(pinned).toHaveClass('node-row-drop-before')
+
+    pointerUpAt(rows[0]!, 550 * 27 + 10)
+    expect(onMove).toHaveBeenCalledWith('n0', 550)
   })
 
-  it('auto-scrolls while a drag is near the bottom edge and stops on drag end', () => {
+  it('auto-scrolls only while dragging and stops on release', () => {
+    vi.useFakeTimers()
     const frames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       frames.push(callback)
@@ -315,23 +513,62 @@ describe('NodeList windowing', () => {
     vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
     const scrollBy = vi.fn()
     vi.stubGlobal('scrollBy', scrollBy)
-    mockRows(0)
-    const { container } = renderList(600)
-    const list = container.querySelector('.node-list')
-    if (list === null) throw new Error('The node list was not rendered.')
-    const row = container.querySelector('.node-row')
-    if (row === null) throw new Error('No row was rendered.')
+    mockRowRects()
+    const { container } = renderRows({ list: buildNodes(600) })
+    const row = rowElements(container)[0]!
 
-    fireEvent(
-      list,
-      new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: globalThis.innerHeight - 1 }),
-    )
+    pointerMoveAt(row, globalThis.innerHeight - 1)
+    expect(frames).toHaveLength(0)
+
+    activate(row, 13)
+    pointerMoveAt(row, globalThis.innerHeight - 1)
     expect(frames).toHaveLength(1)
     frames[0]!(0)
     expect(scrollBy).toHaveBeenCalledWith(0, EDGE_SCROLL_STEP)
 
-    fireEvent.dragEnd(row)
+    pointerUpAt(row, globalThis.innerHeight - 1)
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
-    expect(scrollBy).toHaveBeenCalledTimes(1)
+  })
+
+  it('recomputes the drop target after auto-scrolling changes the mounted rows', () => {
+    vi.useFakeTimers()
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    vi.stubGlobal('scrollBy', vi.fn())
+    mockRowRects()
+    const { container, onMove } = renderRows({ list: buildNodes(600) })
+    const row = rowElements(container)[0]!
+
+    activate(row, 13)
+    pointerMoveAt(row, globalThis.innerHeight - 1)
+    expect(frames).toHaveLength(1)
+
+    mockRowRects(-27 * 400)
+    fireEvent.scroll(window)
+
+    const list = container.querySelector('.node-list')
+    if (list === null) throw new Error('The node list was not rendered.')
+    const marker = container.querySelector('.node-row-drop-before, .node-row-drop-after')
+    expect(marker).not.toBeNull()
+    pointerUpAt(list, globalThis.innerHeight - 1)
+    expect(onMove).toHaveBeenCalledWith('n0', 428)
   })
 })
+
+function mockRows(rectTop: number, height = 27): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    top: rectTop,
+    height,
+    bottom: rectTop + height,
+    left: 0,
+    right: 0,
+    width: 0,
+    x: 0,
+    y: rectTop,
+    toJSON: () => ({}),
+  } as DOMRect)
+}

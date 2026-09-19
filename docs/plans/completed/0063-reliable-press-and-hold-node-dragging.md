@@ -1,7 +1,8 @@
 # Reliable Press-and-Hold Node Dragging
 
-Status: Active
+Status: Completed
 Created: 2026-09-19
+Completed: 2026-09-19
 
 ## Goal
 
@@ -160,3 +161,34 @@ Required by `docs/PRODUCT.md` §22:
 5. Record implementation, testing, performance, and validation results in this plan.
 6. Change the plan status to `Completed`, add the completion date, move this same file to `docs/plans/completed/`, and regenerate `docs/plans/README.md` with `npm run plan:index`.
 7. Review `git status` and `git diff`, stage only this logical change, and commit it with a Conventional Commit message and a `Plan: 0063` footer.
+
+## Implementation record
+
+* `docs/PRODUCT.md` §2.1 and §11 now describe the approved click-versus-hold behavior, the `grabbing` cursor, selection freezing, same-position release, and `Escape` cancellation.
+* Added `src/renderer/node-drag.ts` with the pure interaction model: the `pending`/`dragging` reducer, `HOLD_ACTIVATION_MS`, `insertionIndexAtPoint` (midpoint rule with edge and gap handling), `shouldCommitMove`, and `dropMarkerFor`. The node row no longer sets `draggable`; native `dragstart`/`dragover`/`drop` handling and `dataTransfer` usage were removed from `NodeList.tsx`.
+* `NodeList.tsx` now arms a pending hold on a primary mouse press on the editable row surface, ignores secondary buttons, unsupported pointer types, duplicate presses, and disclosure-button presses, and activates drag mode when the 400 ms timer elapses. Pending holds cancel when the pointer leaves the row, the source node is removed, or the editor locks.
+* Activation takes pointer capture on the list, applies `body.node-drag-active`, collapses any incidental selection to its anchor through the new `collapseSelectionToAnchor` helper in `editor-dom.ts`, suppresses `selectstart`, and keeps the selection collapsed. Release commits exactly one move through `onMove` only when the effective position changes; `Escape`, `pointercancel`, lost pointer capture, window blur, unmount, navigation, and lock activation cancel without moving.
+* Drop targeting resolves the insertion index from the client pointer Y and the current rects of the mounted rows, so it stays bounded by mounted rows. Windowed spacers map to the window edges; the pinned focused row is a single target with no duplicate marker. Auto-scroll still runs only for windowed lists and only while dragging, and the target is recomputed from the latest pointer position after layout or scroll changes.
+* `styles.css` removes the hover-delay `grab` affordance, adds the active `grabbing` cursor, the source-row highlight, the row-boundary drop marker styled like the previous drop-zone line, and `user-select: none` for the dragging input. The edge `.drop-zone` elements remain for their expanded spacing but no longer handle native drag events.
+* The source-row highlight, drop marker, and grabbing cursor appear only while drag mode is active; the click that follows a drag is suppressed for the next click only.
+
+## Testing record
+
+* Defect-first: before the change, real Electron pointer input pressing and holding inside an editable row never entered drag mode. The new `e2e/drag-and-drop.spec.ts` regression tests failed against the old build (`node-row-dragging` count 0 and unchanged order for the hold-and-move case, and no drop marker for the `Escape` case); after the replacement all pass.
+* Unit coverage: `node-drag.test.ts` covers the reducer transitions, midpoint/edge/gap insertion resolution, effective-position no-ops, and windowed/pinned marker selection. `editor-dom.test.ts` covers forward/backward textarea collapse, contenteditable collapse, and selections outside the element.
+* Component coverage in `NodeList.test.tsx` covers activation timing (400 ms, not before), excluded pointer downs, duplicate presses, pre-threshold movement inside and outside the row, before/after midpoint targeting, expanded edge targets, same-position no-ops, all cancellation paths, lock/source removal, click suppression, pinned-row and spacer targeting, auto-scroll start/stop, and target recomputation after scrolling changes mounted rows.
+* `App.test.tsx` covers the application command handoff (reorder and selection) and locked-row behavior.
+* Electron coverage in `e2e/drag-and-drop.spec.ts`: exact caret placement on a quick click, reorder after a hold from a focused row with the grabbing affordance, no drag from pre-threshold movement, `Escape` cancellation, incidental selection clearing and freezing, and same-position release. `e2e/windowed-list.spec.ts` keeps the viewport-edge auto-scroll reorder test with the new hold-then-move gesture.
+
+## Performance record
+
+* Disk writes and syncs: cancelled, pre-threshold, and same-position gestures never call `onMove`, so they create no document mutation, history entry, save request, write, or sync. Successful moves use the existing store transition.
+* CPU on interactive paths: a pending hold adds one timeout per gesture. Active targeting scans the mounted rows (about 40 in windowed lists, at most the displayed level otherwise) and uses current bounding rects; the windowed path never scans the full sibling collection. Target recomputation runs only on pointer moves and layout/scroll changes during drag mode.
+* Memory growth: constant transient state for one pointer, source node, target index, one timer, and one cached pointer Y. No per-move accumulation or document-sized copy.
+* Automated guard: no new performance scenario was added. Target lookup stays bounded by mounted rows, so the existing large-list performance coverage remains sufficient; the full performance suite passed unchanged (`wide-30000`, `large-100000`, and the state/persistence scenarios).
+
+## Validation record
+
+* `npm run check` passed: node/renderer/e2e type checking, ESLint, Prettier, documentation governance, coverage (statements 94.97%/91%, branches 88.95%/83%, functions 95.33%/92%, lines 97.41%/93%), production build, and `npm audit` with zero vulnerabilities.
+* `npm run check:full` passed: the complete unit/component suite with coverage, all 118 Electron end-to-end tests (no skipped or blocked required test), and all 14 performance tests.
+* Focused runs during development: `npx vitest run src/renderer` (151 tests), `npx playwright test e2e/drag-and-drop.spec.ts` (6 tests), and `npx playwright test e2e/windowed-list.spec.ts` (6 tests).

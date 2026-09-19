@@ -91,6 +91,22 @@ export function selectAll(element: HTMLElement): void {
   selection.addRange(range)
 }
 
+export function collapseSelectionToAnchor(element: HTMLElement): void {
+  if (element instanceof HTMLTextAreaElement) {
+    const { selectionStart, selectionEnd, selectionDirection } = element
+    if (selectionStart === selectionEnd) return
+    const anchor = selectionDirection === 'backward' ? selectionEnd : selectionStart
+    element.setSelectionRange(anchor, anchor)
+    return
+  }
+  const selection = globalThis.getSelection()
+  if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) return
+  const range = selection.getRangeAt(0)
+  if (!element.contains(range.startContainer) || !element.contains(range.endContainer)) return
+  if (selection.anchorNode === null) return
+  selection.collapse(selection.anchorNode, selection.anchorOffset)
+}
+
 export function updateSelectedLinks(element: HTMLElement): void {
   const selection = globalThis.getSelection()
   const active = selection !== null && selection.rangeCount > 0 && !selection.isCollapsed

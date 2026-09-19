@@ -7,8 +7,13 @@ import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../domain/produ
 import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { App } from './App'
+import { HOLD_ACTIVATION_MS } from './node-drag'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 const attachmentBytes = new Uint8Array([137, 80, 78, 71])
 
@@ -64,6 +69,24 @@ async function createLockedStore(): Promise<EditorStore> {
     })
   }
   return store
+}
+
+function mockAppRowRects(originTop = 0, height = 27): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const index = this.dataset.nodeIndex
+    const top = index === undefined ? originTop : originTop + Number(index) * height
+    return {
+      top,
+      height,
+      bottom: top + height,
+      left: 0,
+      right: 600,
+      width: 600,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    } as DOMRect
+  })
 }
 
 describe('App', () => {
@@ -457,7 +480,7 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
   })
 
-  it('moves a node to the boundary above a row and prevents the node ID from being dropped into its text', async () => {
+  it('reorders siblings through a press-and-hold drag over the editable surface', async () => {
     const store = createStore()
     await act(async () => {
       await store.initialize()
@@ -466,120 +489,60 @@ describe('App', () => {
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
-    const transfer = {
-      dropEffect: '',
-      effectAllowed: '',
-      value: '',
-      setData(_type: string, value: string) {
-        this.value = value
-      },
-      getData() {
-        return this.value
-      },
-    }
-    const secondRow = screen.getByRole('textbox', { name: 'Node 2' }).parentElement
-    const firstRow = first.parentElement
-    vi.spyOn(firstRow!, 'getBoundingClientRect').mockReturnValue({ height: 20, top: 10 } as DOMRect)
+    const second = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+    fireEvent.change(second, { target: { value: 'B' } })
+    fireEvent.keyDown(second, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 3' }), { target: { value: 'C' } })
 
-    fireEvent.dragStart(secondRow!, { dataTransfer: transfer })
-    fireEvent.dragOver(first, { dataTransfer: transfer, clientY: 11 })
-    fireEvent.drop(first, { dataTransfer: transfer, clientY: 11 })
+    mockAppRowRects()
+    vi.useFakeTimers()
+    const rows = document.querySelectorAll('.node-row')
+    const third = rows[2]
+    if (third === undefined) throw new Error('The third row was not rendered.')
 
-    expect(transfer.effectAllowed).toBe('move')
-    expect(transfer.dropEffect).toBe('move')
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
-    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('')
-  })
-
-  it('moves a node to the boundary below a row and clears drag state on drag end', async () => {
-    const store = createStore()
-    await act(async () => {
-      await store.initialize()
+    fireEvent.pointerDown(third, {
+      pointerId: 1,
+      button: 0,
+      isPrimary: true,
+      pointerType: 'mouse',
+      clientX: 100,
+      clientY: 60,
     })
-    render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
-    const transfer = {
-      dropEffect: '',
-      effectAllowed: '',
-      value: '',
-      setData(_type: string, value: string) {
-        this.value = value
-      },
-      getData() {
-        return this.value
-      },
-    }
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    expect(third).toHaveClass('node-row-dragging')
 
-    fireEvent.change(first, { target: { value: 'A' } })
-    fireEvent.keyDown(first, { key: 'Enter' })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
-    const secondRow = screen.getByRole('textbox', { name: 'Node 2' }).parentElement!
-    vi.spyOn(secondRow, 'getBoundingClientRect').mockReturnValue({ height: 20, top: 10 } as DOMRect)
+    fireEvent.pointerMove(third, { pointerId: 1, clientX: 100, clientY: 10 })
+    fireEvent.pointerUp(third, { pointerId: 1, clientX: 100, clientY: 10 })
 
-    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
-    fireEvent.dragOver(secondRow, { dataTransfer: transfer, clientY: 29 })
-    fireEvent.drop(secondRow, { dataTransfer: transfer, clientY: 29 })
-    fireEvent.dragEnd(screen.getByRole('textbox', { name: 'Node 2' }).parentElement!, { dataTransfer: transfer })
-
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('C')
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
+    expect(screen.getByRole('textbox', { name: 'Node 3' })).toHaveValue('B')
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'sibling' } })
   })
 
-  it('ignores a drop that has neither a transfer ID nor an active dragged node', async () => {
-    const store = createStore()
-    await act(async () => {
-      await store.initialize()
-    })
+  it('does not arm a drag while the editor is persistence-locked', async () => {
+    const store = await createLockedStore()
     render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
-    fireEvent.change(first, { target: { value: 'A' } })
-    fireEvent.keyDown(first, { key: 'Enter' })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
+    mockAppRowRects()
+    vi.useFakeTimers()
+    const row = document.querySelector('.node-row')
+    if (row === null) throw new Error('The node row was not rendered.')
 
-    const transfer = { getData: () => '' }
-    fireEvent.drop(screen.getByLabelText('Drop position 3'), { dataTransfer: transfer })
-
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
-    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('B')
-  })
-
-  it('moves nodes through the drop zones before the first and after the last node', async () => {
-    const store = createStore()
-    await act(async () => {
-      await store.initialize()
+    fireEvent.pointerDown(row, {
+      pointerId: 1,
+      button: 0,
+      isPrimary: true,
+      pointerType: 'mouse',
+      clientX: 100,
+      clientY: 13,
     })
-    render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
-    const transfer = {
-      dropEffect: '',
-      effectAllowed: '',
-      value: '',
-      setData(_type: string, value: string) {
-        this.value = value
-      },
-      getData() {
-        return this.value
-      },
-    }
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+    fireEvent.pointerMove(row, { pointerId: 1, clientX: 100, clientY: 13 })
+    fireEvent.pointerUp(row, { pointerId: 1, clientX: 100, clientY: 13 })
 
-    fireEvent.change(first, { target: { value: 'A' } })
-    first.setSelectionRange(1, 1)
-    fireEvent.keyDown(first, { key: 'Enter' })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
-    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
-    const endDropZone = screen.getByLabelText('Drop position 3')
-    fireEvent.dragOver(endDropZone, { dataTransfer: transfer })
-    expect(transfer.dropEffect).toBe('move')
-    fireEvent.drop(endDropZone, { dataTransfer: transfer })
-
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
-    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
-
-    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 2' }).parentElement!, { dataTransfer: transfer })
-    fireEvent.drop(screen.getByLabelText('Drop position 1'), { dataTransfer: transfer })
-
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
-    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('B')
+    expect(row).not.toHaveClass('node-row-dragging')
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', persistenceLocked: true })
   })
 
   it('shows a loading state before the document is ready', () => {
@@ -813,31 +776,5 @@ describe('App', () => {
 
     expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('A')
-  })
-
-  it('falls back to the dragged node when the drop carries no id', async () => {
-    const store = createStore()
-    await act(async () => {
-      await store.initialize()
-    })
-    render(<App store={store} />)
-    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
-    const transfer = {
-      dropEffect: '',
-      effectAllowed: '',
-      setData() {},
-      getData() {
-        return ''
-      },
-    }
-
-    fireEvent.change(first, { target: { value: 'A' } })
-    fireEvent.keyDown(first, { key: 'Enter' })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'B' } })
-    fireEvent.dragStart(screen.getByRole('textbox', { name: 'Node 1' }).parentElement!, { dataTransfer: transfer })
-    fireEvent.drop(screen.getByLabelText('Drop position 3'), { dataTransfer: transfer })
-
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('B')
-    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')
   })
 })

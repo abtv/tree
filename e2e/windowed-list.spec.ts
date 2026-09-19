@@ -132,6 +132,8 @@ test.describe('windowed node list', () => {
 
     await window.mouse.move(x, box.y + box.height / 2)
     await window.mouse.down()
+    await window.waitForTimeout(500)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(1)
     await window.mouse.move(x, box.y + box.height, { steps: 5 })
     await window.mouse.move(x, innerHeight - 8, { steps: 10 })
 
