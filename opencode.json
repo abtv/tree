@@ -1,18 +1,23 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "develop",
-  "model": "deepseek/deepseek-v4-pro",
+  "model": "deepseek/deepseek-flash",
   "subagent_depth": 1,
   "provider": {
     "deepseek": {
-      "whitelist": ["deepseek-v4-pro"]
+      "whitelist": ["deepseek-flash"],
+      "models": {
+        "deepseek-flash": {
+          "name": "DeepSeek V4.1 Flash"
+        }
+      }
     }
   },
   "agent": {
     "develop": {
       "description": "Owns an approved task from planning through implementation, independent review, verification, documentation, and commit",
       "mode": "primary",
-      "model": "deepseek/deepseek-v4-pro",
+      "model": "deepseek/deepseek-flash",
       "reasoningEffort": "high",
       "prompt": "{file:./.opencode/agents/develop.md}",
       "permission": {
@@ -52,7 +57,7 @@
     "planner": {
       "description": "Inspects the repository in a fresh context and proposes a focused implementation plan",
       "mode": "subagent",
-      "model": "deepseek/deepseek-v4-pro",
+      "model": "deepseek/deepseek-flash",
       "reasoningEffort": "max",
       "prompt": "{file:./.opencode/agents/planner.md}",
       "permission": {
@@ -68,7 +73,7 @@
     "reviewer": {
       "description": "Independently reviews an implementation and reports only meaningful findings",
       "mode": "subagent",
-      "model": "deepseek/deepseek-v4-pro",
+      "model": "deepseek/deepseek-flash",
       "reasoningEffort": "high",
       "prompt": "{file:./.opencode/agents/reviewer.md}",
       "permission": {
@@ -84,7 +89,7 @@
     "product-verifier": {
       "description": "Checks the changed behavior as a careful user and reports meaningful product issues",
       "mode": "subagent",
-      "model": "deepseek/deepseek-v4-pro",
+      "model": "deepseek/deepseek-flash",
       "reasoningEffort": "high",
       "prompt": "{file:./.opencode/agents/product-verifier.md}",
       "permission": {
