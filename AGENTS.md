@@ -235,6 +235,8 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 `npm run check:full` is the required validation before every commit; `npm run check` is the fast local loop when a full run is not practical. The pipeline definition and steps are in `docs/DEVELOPMENT.md` §9.
 
+Exception: when a commit changes only implementation plan files under `docs/plans/` and the generated `docs/plans/README.md` index, run `npm run format:check`, `npm run check:docs`, and `git diff --check` instead of `npm run check:full`. Application tests, Electron end-to-end tests, performance tests, type checking, and code linting are not required for such a plan-only commit. If any file outside `docs/plans/` changes, the normal `npm run check:full` requirement applies.
+
 If validation fails, fix the problem before considering the task complete.
 
 If a failure is unrelated to the current task, report it explicitly rather than hiding or ignoring it.
