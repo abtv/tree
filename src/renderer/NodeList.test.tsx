@@ -277,6 +277,24 @@ describe('NodeList drag interaction', () => {
     expect(input.selectionEnd).toBe(0)
   })
 
+  it('restores the frozen caret when the selection changes during a drag', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+    const input = rows[0]!.querySelector('textarea')
+    if (input === null) throw new Error('The first input was not rendered.')
+    input.focus()
+    input.setSelectionRange(1, 1)
+
+    activate(rows[0]!, 13)
+    input.setSelectionRange(0, 3)
+    fireEvent(document, new Event('selectionchange'))
+
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(1)
+  })
+
   it('commits a move to the boundary chosen by the release position', () => {
     vi.useFakeTimers()
     mockRowRects()

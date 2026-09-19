@@ -176,6 +176,61 @@ test.describe('drag and drop', () => {
     ).toBeGreaterThan(0)
   })
 
+  test('keeps the selection collapsed while dragging a node across the text', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    await typeInto(node(window, 1), 'Alpha text one')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 2), 'Bravo text two')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 3), 'Charlie text three')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 4), 'Delta text four')
+
+    const rows = window.locator('.node-row')
+    const source = rows.nth(3).locator('.node-input')
+    const box = await source.boundingBox()
+    if (box === null) throw new Error('The fourth row was not rendered.')
+    const x = box.x + 60
+    const y = box.y + box.height / 2
+
+    async function selectionState(): Promise<[number, number]> {
+      return source.evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return [input.selectionStart, input.selectionEnd]
+      })
+    }
+
+    await window.mouse.move(x, y)
+    await window.mouse.down()
+    await window.waitForTimeout(HOLD_MS)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
+    const frozen = await selectionState()
+    expect(frozen[0]).toBe(frozen[1])
+
+    await window.mouse.move(x + 120, y, { steps: 20 })
+    expect(await selectionState()).toEqual(frozen)
+    await window.mouse.move(x - 60, y - 20, { steps: 20 })
+    expect(await selectionState()).toEqual(frozen)
+
+    const target = await rowBox(window, 0)
+    await window.mouse.move(target.x + 10, target.y + 4, { steps: 5 })
+    await window.mouse.up()
+
+    await expect
+      .poll(() => nodeTexts(window))
+      .toEqual(['Delta text four', 'Alpha text one', 'Bravo text two', 'Charlie text three'])
+    const after = await window
+      .locator('.node-row')
+      .nth(0)
+      .locator('.node-input')
+      .evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return [input.selectionStart, input.selectionEnd]
+      })
+    expect(after[0]).toBe(after[1])
+  })
+
   test('releases in place without reordering', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     await seedSiblings(window)

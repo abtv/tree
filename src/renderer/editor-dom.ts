@@ -117,6 +117,11 @@ export function updateSelectedLinks(element: HTMLElement): void {
 }
 
 export function setCaret(element: HTMLElement, position: number): void {
+  if (element instanceof HTMLTextAreaElement) {
+    const clamped = Math.min(Math.max(position, 0), element.value.length)
+    element.setSelectionRange(clamped, clamped)
+    return
+  }
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()

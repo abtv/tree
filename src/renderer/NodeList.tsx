@@ -7,7 +7,7 @@ import type {
   SetStateAction,
 } from 'react'
 import type { TreeNode } from '../domain/document'
-import { collapseSelectionToAnchor } from './editor-dom'
+import { collapseSelectionToAnchor, getCaret, setCaret } from './editor-dom'
 import {
   autoScrollStep,
   computeListWindow,
@@ -74,6 +74,7 @@ export function NodeList({
   const [dropIndex, setDropIndex] = useState<number>()
   const pointerYRef = useRef<number | undefined>(undefined)
   const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
+  const dragCaretRef = useRef<number | undefined>(undefined)
   const suppressClickRef = useRef(false)
   const [layoutState, setLayoutState] = useState<LayoutState>(() => ({
     key: `initial:${nodes.length}`,
@@ -220,11 +221,24 @@ export function NodeList({
     const list = listRef.current
     if (list !== null) setCapture(list, pointerId)
     document.body.classList.add('node-drag-active')
-    collapseRowSelection(dragSource.nodeId, observedElementsRef.current)
+    const input = findRowInput(dragSource.nodeId, observedElementsRef.current)
+    if (input !== null) {
+      collapseSelectionToAnchor(input)
+      dragCaretRef.current = getCaret(input)
+    }
+    const collapseSelection = (): void => {
+      const target = findRowInput(dragSource.nodeId, observedElementsRef.current)
+      const caret = dragCaretRef.current
+      if (target === null || caret === undefined) return
+      setCaret(target, caret)
+    }
     const preventSelection = (event: Event): void => event.preventDefault()
     document.addEventListener('selectstart', preventSelection)
+    document.addEventListener('selectionchange', collapseSelection)
     return () => {
       document.removeEventListener('selectstart', preventSelection)
+      document.removeEventListener('selectionchange', collapseSelection)
+      dragCaretRef.current = undefined
       document.body.classList.remove('node-drag-active')
       if (list !== null) releaseCapture(list, pointerId)
     }
@@ -435,11 +449,11 @@ function releaseCapture(element: HTMLElement, pointerId: number): void {
   }
 }
 
-function collapseRowSelection(nodeId: string, rows: Map<string, HTMLElement>): void {
+function findRowInput(nodeId: string, rows: Map<string, HTMLElement>): HTMLElement | null {
   const row = rows.get(nodeId)
   const input = row?.querySelector<HTMLElement>('.node-input')
-  if (input === undefined || input === null || document.activeElement !== input) return
-  collapseSelectionToAnchor(input)
+  if (input === undefined || input === null || document.activeElement !== input) return null
+  return input
 }
 
 function collectWindowIndices(windowRange: ListWindow): number[] {

@@ -142,6 +142,19 @@ describe('editor DOM adapters', () => {
     expect(getCaret(element)).toBe(5)
   })
 
+  it('places a collapsed caret in a textarea and clamps to its value', () => {
+    const element = document.createElement('textarea')
+    element.value = 'hello'
+    element.setSelectionRange(0, 3)
+
+    setCaret(element, 2)
+    expect(getSelectionRange(element)).toEqual({ start: 2, end: 2 })
+    setCaret(element, -4)
+    expect(getSelectionRange(element)).toEqual({ start: 0, end: 0 })
+    setCaret(element, 99)
+    expect(getSelectionRange(element)).toEqual({ start: 5, end: 5 })
+  })
+
   it('places a caret before or after a non-editable link at the nearest boundary', () => {
     const element = document.createElement('div')
     element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
