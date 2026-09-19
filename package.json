@@ -24,7 +24,6 @@
     "format:check": "prettier --check .",
     "check:docs": "node scripts/check-docs.mjs",
     "changelog": "node scripts/changelog.mjs --write",
-    "plan:index": "node scripts/plan-index.mjs --write",
     "doctor": "node scripts/doctor.mjs",
     "audit": "npm audit",
     "test": "vitest run",

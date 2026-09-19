@@ -895,4 +895,4 @@ Any change to editor state or persistence must include an explicit assessment of
 
 The assessment must consider how the cost scales with document size and the number of edits, and the change must state the expected cost and any mitigation.
 
-Concrete budgets are not fixed here. When a change can affect performance at scale, the implementation must add or update an automated performance guard at the appropriate level (unit, boundary, or performance suite). Budgets are derived from measured baselines and recorded with the relevant implementation plan.
+Concrete budgets are not fixed here. When a change can affect performance at scale, the implementation must add or update an automated performance guard at the appropriate level (unit, boundary, or performance suite). Budgets are derived from measured baselines and recorded by the owning automated guard and its result artifacts.

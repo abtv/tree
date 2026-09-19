@@ -4,7 +4,7 @@
 
 At the start of a session:
 
-1. Read this file and the active plan in `docs/plans/active/`, if one exists.
+1. Read this file and `.opencode/plan.md` when an approved task is in progress.
 2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references.
 3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
 
@@ -79,11 +79,12 @@ When a requested change modifies product behavior:
 1. Identify the affected product requirements.
 2. If the requirement is ambiguous, ask the Product Owner.
 3. Update `docs/PRODUCT.md` when the new behavior is approved.
-4. Create an implementation plan when the change is large enough to require one.
-5. Implement the change.
+4. Obtain approval for the implementation plan before changing behavior.
+5. Implement the approved change.
 6. Add or update tests.
-7. Run the required validation.
-8. Commit the completed logical change.
+7. Complete automated verification, independent review, and product verification.
+8. Resolve confirmed meaningful findings and run final verification.
+9. Update durable documentation and commit the completed logical change.
 
 Do not make product decisions on behalf of the Product Owner.
 
@@ -128,43 +129,18 @@ Domain logic must be unit-testable without launching Electron or a browser envir
 
 ## 8. Plans and Architecture Decisions
 
-Use implementation plans for tasks that are large enough to benefit from explicit planning.
+For a substantive task, use the configured OpenCode planner in a fresh context after inspecting the relevant implementation and documentation. Present the plan to the Product Owner and do not begin implementation until it is explicitly approved.
 
-Plans belong in:
+After approval, keep the task's temporary working plan at `.opencode/plan.md`. The plan is an implementation contract, not permanent project documentation. Keep it current when approved scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
 
-```text
-docs/plans/active/
-docs/plans/completed/
-```
+Before completion, extract knowledge that remains useful into its durable owner:
 
-Plan filenames must use:
+* current product behavior into `docs/PRODUCT.md`;
+* current architecture and constraints into `docs/ARCHITECTURE.md`;
+* development and verification practices into `docs/DEVELOPMENT.md`;
+* significant architectural choices and rationale into an ADR.
 
-```text
-NNNN-short-description.md
-```
-
-The number is a zero-padded sequential number assigned in order of plan creation, using the next available number across active and completed plans. The short description must use lowercase words separated by hyphens, for example:
-
-```text
-0001-bootstrap-application.md
-```
-
-Every plan must include the following metadata near the beginning of the document:
-
-```text
-Status: Active
-Created: YYYY-MM-DD
-```
-
-When a plan is completed:
-
-1. Change its status to `Completed`.
-2. Add `Completed: YYYY-MM-DD` to its metadata.
-3. Move the same file from `docs/plans/active/` to `docs/plans/completed/` without changing its filename.
-
-Do not create a second copy of a plan when completing it.
-
-A plan may record optional `Supersedes: NNNN` or `Superseded-by: NNNN` metadata when another plan wholly replaces it. `docs/plans/README.md` indexes every plan and is regenerated with `npm run plan:index`; `npm run check:docs` requires an entry for every plan.
+Git history is sufficient for completed implementation plans. Do not create or maintain a plan archive.
 
 Use Architecture Decision Records (ADRs) for important technical or architectural decisions that are worth preserving for future development.
 
@@ -235,8 +211,6 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 `npm run check:full` is the required validation before every commit; `npm run check` is the fast local loop when a full run is not practical. The pipeline definition and steps are in `docs/DEVELOPMENT.md` §9.
 
-Exception: when a commit changes only implementation plan files under `docs/plans/` and the generated `docs/plans/README.md` index, run `npm run format:check`, `npm run check:docs`, and `git diff --check` instead of `npm run check:full`. Application tests, Electron end-to-end tests, performance tests, type checking, and code linting are not required for such a plan-only commit. If any file outside `docs/plans/` changes, the normal `npm run check:full` requirement applies.
-
 If validation fails, fix the problem before considering the task complete.
 
 If a failure is unrelated to the current task, report it explicitly rather than hiding or ignoring it.
@@ -277,13 +251,11 @@ Prefer one logical task per commit.
 
 Commit each completed logical change once validation passes; do not wait for the Product Owner to ask. Before committing, confirm the change is complete and validated, review `git status` and `git diff`, and stage only the intended files.
 
-Never amend, rebase, or otherwise rewrite an existing commit without the Product Owner's explicit approval. Ask first.
+Git history is append-only. Never amend, rebase, reset, replace commits, force-push, or otherwise rewrite history. Every follow-up fix is a separate commit.
 
 ### Commit messages
 
 Use Conventional Commits: `type(scope): summary`, where `type` is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood and keep it focused on the implemented change.
-
-When the change implements an implementation plan, add a `Plan: NNNN` footer to the commit body.
 
 `npm run changelog` regenerates `CHANGELOG.md` from the Conventional Commit history.
 
@@ -295,7 +267,7 @@ Before modifying files with existing uncommitted changes, inspect those changes 
 
 ### Immediate follow-up fixes
 
-When the Product Owner requests a fix directly related to the most recently committed change, do not create a new plan or a new commit. Ask the Product Owner whether to amend the last commit, and amend with `git commit --amend` only after they approve. If the fix changes the plan's scope, update the plan content and rename the plan file to match. This applies only to direct follow-ups to the most recent commit; unrelated changes get their own plan and commit.
+When the Product Owner reports that the most recently committed fix still does not work, reproduce the remaining defect and make the next attempt without committing. Ask the Product Owner to verify the uncommitted result. After they confirm the defect is fixed, run the required validation and create a separate follow-up commit. Do not rewrite the earlier commit.
 
 ### Session boundaries
 
@@ -333,7 +305,9 @@ A task is complete only when:
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 
-If the task is large enough to require a plan, the plan must also be updated to reflect the completed work.
+For a substantive task, the approved plan must be satisfied and its durable knowledge extracted before the temporary plan is deleted.
+
+One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Confirmed meaningful findings must be resolved and the affected checks rerun. A second full review pass is required only when fixes are substantial, architectural, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
 
 ---
 

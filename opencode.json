@@ -1,0 +1,107 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "develop",
+  "model": "deepseek/deepseek-v4-pro",
+  "subagent_depth": 1,
+  "provider": {
+    "deepseek": {
+      "whitelist": ["deepseek-v4-pro"]
+    }
+  },
+  "agent": {
+    "develop": {
+      "description": "Owns an approved task from planning through implementation, independent review, verification, documentation, and commit",
+      "mode": "primary",
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "high",
+      "prompt": "{file:./.opencode/agents/develop.md}",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "git *": "deny",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "git add*": "allow",
+          "git commit*": "allow",
+          "git commit*--amend*": "deny",
+          "npm test*": "allow",
+          "npm run *": "allow",
+          "npm install*": "allow",
+          "npx vitest*": "allow",
+          "npx playwright test*": "allow",
+          "pwd": "allow",
+          "find *": "allow",
+          "rg *": "allow",
+          "sed *": "allow"
+        },
+        "task": {
+          "*": "deny",
+          "planner": "allow",
+          "reviewer": "allow",
+          "product-verifier": "allow"
+        },
+        "external_directory": "deny",
+        "question": "allow",
+        "webfetch": "allow",
+        "websearch": "allow"
+      }
+    },
+    "planner": {
+      "description": "Inspects the repository in a fresh context and proposes a focused implementation plan",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "max",
+      "prompt": "{file:./.opencode/agents/planner.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "task": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
+      }
+    },
+    "reviewer": {
+      "description": "Independently reviews an implementation and reports only meaningful findings",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "high",
+      "prompt": "{file:./.opencode/agents/reviewer.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "task": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "webfetch": "deny",
+        "websearch": "deny"
+      }
+    },
+    "product-verifier": {
+      "description": "Checks the changed behavior as a careful user and reports meaningful product issues",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "high",
+      "prompt": "{file:./.opencode/agents/product-verifier.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "npm test": "allow",
+          "npm run test:e2e": "allow",
+          "npm run test:perf": "allow",
+          "npm run build": "allow"
+        },
+        "task": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "webfetch": "deny",
+        "websearch": "deny"
+      }
+    }
+  }
+}

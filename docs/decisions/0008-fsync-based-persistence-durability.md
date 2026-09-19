@@ -5,7 +5,7 @@ Date: 2026-09-14
 
 ## Context
 
-Plan 0058 found that attachment writes stored their bytes with `writeFile` and no flush, while document saves already wrote through a durable sequence. A resolved attachment write could therefore leave its bytes, or the directory entry naming them, only in the operating system's page cache while a later durable document save persisted a reference to them.
+Attachment writes stored their bytes with `writeFile` and no flush, while document saves already wrote through a durable sequence. A resolved attachment write could therefore leave its bytes, or the directory entry naming them, only in the operating system's page cache while a later durable document save persisted a reference to them.
 
 Node's `fs` API exposes `file.sync()`, which maps to POSIX `fsync()` and flushes modified data and metadata to the storage device. macOS additionally provides `F_FULLFSYNC` through `fcntl`, which asks the device to flush its own volatile cache to stable media; Node exposes neither `fcntl` nor `F_FULLFSYNC`, so using it would require a native addon dependency. The application is a local, single-user macOS desktop app that stores one document plus its attachments and keeps temporary and backup recovery documents beside the primary file.
 

@@ -5,7 +5,7 @@ Date: 2026-09-14
 
 ## Context
 
-Plan 0054 bounded wide-document rendering and memory by memoizing rows, but the entire displayed sibling list stays mounted. Measurements recorded in Plan 0056 showed that live form controls dominate typing cost: at 30,000 displayed siblings typing took about 100 ms per keystroke, and a Blink trace attributed over 100 ms per keystroke to layout even though JavaScript reconciliation was only a few milliseconds per run. Prototypes showed that mounting only the visible rows plus an overscan removes that cost.
+Memoizing rows bounded some wide-document rendering and memory work, but the entire displayed sibling list stayed mounted. Measurements showed that live form controls dominated typing cost: at 30,000 displayed siblings typing took about 100 ms per keystroke, and a Blink trace attributed over 100 ms per keystroke to layout even though JavaScript reconciliation was only a few milliseconds per run. Prototypes showed that mounting only the visible rows plus an overscan removes that cost.
 
 Off-screen rows being absent from the DOM is user-visible: browser find-in-page and assistive technology expose only the mounted rows, and cross-row selection requires scrolling. The page currently scrolls as one document, and drag-and-drop reorders siblings on the displayed level. The Product Owner approved the product behavior on 2026-09-14; the quantity owner is `docs/PRODUCT.md` §20.1.
 

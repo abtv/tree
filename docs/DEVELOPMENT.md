@@ -181,7 +181,7 @@ It should run:
 6. production build;
 7. dependency audit (`npm audit`).
 
-The documentation governance step validates plan filenames and metadata, rejects unchecked or stale-`Completed` plans, checks that relative links and plan/ADR references in live documents resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
+The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
 The repository must also provide the complete validation command:
 
@@ -209,42 +209,29 @@ File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttach
 
 ## 10. Development Workflow
 
-For a small, well-defined task:
+OpenCode uses the project configuration in `opencode.json`. Start a task with the `develop` primary agent. It coordinates one logical task through this lifecycle:
 
-1. Read `AGENTS.md`.
-2. Read the relevant sections of `docs/PRODUCT.md`.
-3. Read the relevant sections of `docs/ARCHITECTURE.md`.
-4. Reproduce the existing behavior or reported defect.
-5. Inspect the existing implementation.
-6. Implement the change.
-7. Add or update tests, including boundary tests where applicable.
-8. Update documentation if necessary.
-9. Run `npm run check:full`.
-10. Review the git diff and confirm no required test was blocked or skipped.
-11. Commit the completed logical change.
+1. Read `AGENTS.md` and the relevant current-state documentation and nested instructions.
+2. Delegate substantive planning to the read-only `planner` subagent in a fresh context.
+3. Present the plan and material open decisions to the Product Owner, then wait for explicit approval.
+4. Record an approved substantive plan temporarily in `.opencode/plan.md`.
+5. Implement the approved scope and add or update the required tests.
+6. Run focused checks during development and `npm run check:full` before review.
+7. Invoke the read-only `reviewer` and `product-verifier` subagents for independent passes.
+8. Resolve confirmed meaningful findings and rerun affected checks. Repeat a full review only after substantial or high-risk fixes.
+9. Run final `npm run check:full`.
+10. Extract durable knowledge into current-state documentation or an ADR and delete the temporary plan.
+11. Review the diff and status, then create the final focused commit.
 
-For a larger or potentially architectural task:
-
-1. Understand the requested product change.
-2. Inspect the current implementation.
-3. Create an implementation plan in `docs/plans/active/`.
-4. Identify affected product, architecture, and tests.
-5. Get Product Owner approval when the plan requires a product or architectural decision.
-6. Implement the plan.
-7. Update tests and documentation.
-8. Run `npm run check:full`.
-9. Move the completed plan to `docs/plans/completed/`.
-10. Commit the completed change.
+The primary agent handles ordinary engineering decisions autonomously after plan approval. It returns to the Product Owner only for a newly discovered choice that materially affects product behavior, data, persistence, architecture, compatibility, or an expensive-to-reverse direction.
 
 When a task ends at a commit or session boundary, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt for resuming the work. An incomplete validation result must never be presented without a follow-up action.
 
 ---
 
-## 11. Implementation Plans
+## 11. Temporary Implementation Plans
 
-Implementation plans are used for work that is too large or complex to safely implement as a single small task.
-
-Plans should describe:
+Substantive tasks use `.opencode/plan.md` as a temporary implementation contract. Plans should describe:
 
 * the goal;
 * current relevant behavior;
@@ -255,21 +242,7 @@ Plans should describe:
 * documentation changes;
 * important risks or open questions.
 
-Plans should not duplicate the entire product specification.
-
-Active plans:
-
-```text
-docs/plans/active/
-```
-
-Completed plans:
-
-```text
-docs/plans/completed/
-```
-
-Plan filenames are numbered sequentially, for example `0001-bootstrap-application.md`. See `AGENTS.md` §8 for the naming rules and required metadata.
+Plans should not duplicate the product specification. They are deleted after implementation, review, verification, and durable documentation updates; Git history is sufficient for historical task details. The complete lifecycle and approval rules are in `AGENTS.md` §8.
 
 ---
 
@@ -315,9 +288,9 @@ They measure startup, typing, state/persistence work, and sustained renderer-mem
 
 Each typing scenario focuses a specific input, asserts the seeded text is present and focused, types, and asserts the field received the typed text while the current-parent heading was not edited. This matters inside a parent, where the first textbox is the current-parent heading rather than the selected child. The scenario measures wall-clock typing time and paint latency; the `inputTurnaround` metric is an observation only, not React commit latency. The supported document-scale target is 100,000 nodes. A 30,000-sibling wide scenario guards that windowed rendering keeps typing cost independent of the displayed sibling count.
 
-The state/persistence scenario in `perf/state.spec.ts` seeds a large attachment-bearing document and runs a structural burst, a typed-word burst, and a reference-changing delete; a second scenario exercises attachment-bearing history through structural commands, undos, and redos; a third measures attachment image validation and write latency. Each prints its measurements and enforces ceilings. The save count and the summed document bytes written confirm the automatic save policy triggers on inserted-word volume rather than per keystroke, and the cleanup scan duration guards the reference-changing path against unbounded history or document scanning. The budgets and their measured baselines are recorded by the `perf/` suite and the completed implementation plan that introduced each scenario.
+The state/persistence scenario in `perf/state.spec.ts` seeds a large attachment-bearing document and runs a structural burst, a typed-word burst, and a reference-changing delete; a second scenario exercises attachment-bearing history through structural commands, undos, and redos; a third measures attachment image validation and write latency. Each prints its measurements and enforces ceilings. The save count and the summed document bytes written confirm the automatic save policy triggers on inserted-word volume rather than per keystroke, and the cleanup scan duration guards the reference-changing path against unbounded history or document scanning. The budgets and their measured baselines are recorded by the `perf/` suite and its result artifacts.
 
-Behavioral guards live next to the code they protect and are named after the behavior they assert. The main guard families are automatic-save accounting and quit-time flushing (`editor-store.test.ts`, `editor-store.property.test.ts`, `e2e/shutdown-failures.spec.ts`), bounded save-failure retries and the locked save-failure state (`editor-store.test.ts`, `e2e/persistence-lock.spec.ts`), attachment and PNG validation (`ipc-security.test.ts`, `ipc-handlers.test.ts`, `png-decoder.test.ts`, `e2e/attachment-validation.spec.ts`), image-display failures (`AttachmentPreview.test.tsx`, `e2e/attachment-validation.spec.ts`), window-geometry coalescing (`window-state.test.ts`), generation retention and recovery (`file-services.test.ts`, `e2e/persistence-reliability.spec.ts`), retention and byte reuse of attachment references (`editor-history.test.ts`, `attachment-bytes-cache.test.ts`), save serialization, node lookup, path copying, and attachment-id collection (`document.test.ts`, `document.property.test.ts`), external hyperlink opening (`e2e/hyperlink.spec.ts`), and attachment-write flushing under abrupt termination (`file-services.test.ts`, `e2e/persistence-reliability.spec.ts`). The completed implementation plan that introduced each guard records its requirement mapping and original rationale.
+Behavioral guards live next to the code they protect and are named after the behavior they assert. The main guard families are automatic-save accounting and quit-time flushing (`editor-store.test.ts`, `editor-store.property.test.ts`, `e2e/shutdown-failures.spec.ts`), bounded save-failure retries and the locked save-failure state (`editor-store.test.ts`, `e2e/persistence-lock.spec.ts`), attachment and PNG validation (`ipc-security.test.ts`, `ipc-handlers.test.ts`, `png-decoder.test.ts`, `e2e/attachment-validation.spec.ts`), image-display failures (`AttachmentPreview.test.tsx`, `e2e/attachment-validation.spec.ts`), window-geometry coalescing (`window-state.test.ts`), generation retention and recovery (`file-services.test.ts`, `e2e/persistence-reliability.spec.ts`), retention and byte reuse of attachment references (`editor-history.test.ts`, `attachment-bytes-cache.test.ts`), save serialization, node lookup, path copying, and attachment-id collection (`document.test.ts`, `document.property.test.ts`), external hyperlink opening (`e2e/hyperlink.spec.ts`), and attachment-write flushing under abrupt termination (`file-services.test.ts`, `e2e/persistence-reliability.spec.ts`). Current requirements are owned by product and architecture documentation, while test names and fixtures identify their executable guards.
 
 ---
 
@@ -394,7 +367,7 @@ Electron Vite writes production build output to `out/`. This directory is genera
 
 Git discipline — one logical commit per task, commit messages, preserving user changes, immediate follow-up fixes, and session boundaries — is defined in `AGENTS.md` §12.
 
-Commit messages follow the Conventional Commits format defined in `AGENTS.md` §12. Run `npm run changelog` to regenerate `CHANGELOG.md` from that history, and `npm run plan:index` to regenerate `docs/plans/README.md`.
+Commit messages follow the Conventional Commits format defined in `AGENTS.md` §12. Run `npm run changelog` to regenerate `CHANGELOG.md` from that history.
 
 Before committing, review the change with:
 

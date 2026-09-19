@@ -5,7 +5,7 @@ Date: 2026-09-13
 
 ## Context
 
-The save path performed several full-document passes. The renderer built and discarded a validation tree, deep-cloned the document for `serializeState`, and the main process rebuilt a fresh document with `parsePersistedState` at the untrusted IPC boundary before `JSON.stringify` wrote it. Plan 0033 deferred removing the `serializeState` clone and the main-process re-parse.
+The save path performed several full-document passes. The renderer built and discarded a validation tree, deep-cloned the document for `serializeState`, and the main process rebuilt a fresh document with `parsePersistedState` at the untrusted IPC boundary before `JSON.stringify` wrote it. Earlier state and persistence work deliberately deferred removing the `serializeState` clone and main-process re-parse until the domain immutability invariant and IPC validation contract could support the change safely.
 
 ADR 0004 established that documents are immutable: every domain operation returns a new document and never mutates its input, guarded by a property test. That invariant already lets `EditorHistory` retain snapshots by reference.
 

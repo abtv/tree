@@ -19,7 +19,7 @@ Prerequisites, dependency installation, the development command, and the full co
 
 Implementation code lives under `src/`. The architectural layers, module structure, and dependency direction are defined in [Architecture](docs/ARCHITECTURE.md).
 
-Implementation plans live in `docs/plans/` and Architecture Decision Records in `docs/decisions/`. Their naming and lifecycle conventions are defined in [Agent Instructions](AGENTS.md) §8.
+OpenCode task roles and model settings live in `opencode.json` and `.opencode/agents/`. The development lifecycle is defined in [Agent Instructions](AGENTS.md), while durable Architecture Decision Records live in `docs/decisions/`.
 
 ## Development Principles
 

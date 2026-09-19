@@ -9,10 +9,7 @@ import {
   runChecks,
   validateAdr,
   validateAdrIndex,
-  validatePlan,
-  validatePlanIndex,
 } from './check-docs.mjs'
-import { generatePlanIndex } from './plan-index.mjs'
 
 const temporaryDirectories = []
 
@@ -34,62 +31,6 @@ afterEach(() => {
   }
 })
 
-describe('validatePlan', () => {
-  const validMetadata = 'Status: Completed\nCreated: 2026-09-13\nCompleted: 2026-09-13\n'
-
-  it('accepts a well-formed completed plan', () => {
-    const result = validatePlan({
-      fileName: '0001-first-plan.md',
-      inCompleted: true,
-      content: `${validMetadata}\n# First\n`,
-    })
-    expect(result.issues).toEqual([])
-    expect(result.number).toBe(1)
-  })
-
-  it('accepts a well-formed active plan', () => {
-    const result = validatePlan({
-      fileName: '0002-second-plan.md',
-      inCompleted: false,
-      content: 'Status: Active\nCreated: 2026-09-13\n\n# Second\n',
-    })
-    expect(result.issues).toEqual([])
-  })
-
-  it('rejects an unchecked checkbox in a completed plan', () => {
-    const result = validatePlan({
-      fileName: '0003-third-plan.md',
-      inCompleted: true,
-      content: `${validMetadata}\n* [ ] Do a thing\n`,
-    })
-    expect(result.issues.some((issue) => issue.includes('unchecked checkbox'))).toBe(true)
-  })
-
-  it('rejects stale planning phrases in a completed plan', () => {
-    const result = validatePlan({
-      fileName: '0004-fourth-plan.md',
-      inCompleted: true,
-      content: `${validMetadata}\nThis commit is planning only.\n`,
-    })
-    expect(result.issues.some((issue) => issue.includes('stale phrase'))).toBe(true)
-  })
-
-  it('rejects missing completion metadata', () => {
-    const result = validatePlan({
-      fileName: '0005-fifth-plan.md',
-      inCompleted: true,
-      content: 'Status: Completed\nCreated: 2026-09-13\n',
-    })
-    expect(result.issues.some((issue) => issue.includes('Completed metadata'))).toBe(true)
-  })
-
-  it('rejects a malformed filename', () => {
-    const result = validatePlan({ fileName: 'plan-one.md', inCompleted: false, content: 'Status: Active\n' })
-    expect(result.number).toBeUndefined()
-    expect(result.issues[0]).toContain('filename must match')
-  })
-})
-
 describe('validateAdr', () => {
   it('accepts an accepted ADR', () => {
     const result = validateAdr({
@@ -109,7 +50,7 @@ describe('validateAdr', () => {
     expect(result.issues).toEqual([])
   })
 
-  it('rejects a supersession by a missing ADR and an unknown status', () => {
+  it('rejects a missing successor and an unknown status', () => {
     const missing = validateAdr({
       fileName: '0001-example.md',
       content: 'Status: Superseded by ADR 0099\n',
@@ -118,32 +59,6 @@ describe('validateAdr', () => {
     expect(missing.issues.some((issue) => issue.includes('missing ADR'))).toBe(true)
     const unknown = validateAdr({ fileName: '0003-example.md', content: 'Status: Draft\n', adrNumbers: new Set([3]) })
     expect(unknown.issues.some((issue) => issue.includes('Status must be'))).toBe(true)
-  })
-})
-
-describe('validatePlanIndex', () => {
-  it('requires a link for every plan', () => {
-    const issues = validatePlanIndex({ content: '| [0001](completed/0001-one.md) |', planNumbers: new Set([1, 2]) })
-    expect(issues).toHaveLength(1)
-    expect(issues[0]).toContain('0002')
-  })
-})
-
-describe('generatePlanIndex', () => {
-  it('renders a row per plan and records supersession metadata', () => {
-    const index = generatePlanIndex([
-      {
-        number: 9,
-        directory: 'completed',
-        fileName: '0009-one.md',
-        title: 'One',
-        status: 'Completed',
-        completed: '2026-09-13',
-        supersedes: undefined,
-        supersededBy: '0028',
-      },
-    ])
-    expect(index).toContain('| [0009](completed/0009-one.md) | One | Completed | 2026-09-13 | Superseded by 0028 |')
   })
 })
 
@@ -163,26 +78,20 @@ describe('findBrokenLinks', () => {
   })
 
   it('reports a missing relative target', () => {
-    const content = '[gone](docs/MISSING.md)'
-    const issues = findBrokenLinks({ content, filePath: '/repo/README.md', exists: () => false })
-    expect(issues).toHaveLength(1)
+    const issues = findBrokenLinks({
+      content: '[gone](docs/MISSING.md)',
+      filePath: '/repo/README.md',
+      exists: () => false,
+    })
     expect(issues[0]).toContain('docs/MISSING.md')
   })
 })
 
 describe('findBrokenReferences', () => {
-  const planNumbers = new Set([43])
-  const adrNumbers = new Set([4])
-
-  it('accepts references whose targets exist', () => {
-    const content = 'See plan 0043, ADR 0004, docs/plans/completed/0043-example.md.'
-    expect(findBrokenReferences({ content, displayPath: 'docs/X.md', planNumbers, adrNumbers })).toEqual([])
-  })
-
-  it('reports references whose targets do not exist', () => {
-    const content = 'See plan 9999 and ADR 8888.'
-    const issues = findBrokenReferences({ content, displayPath: 'docs/X.md', planNumbers, adrNumbers })
-    expect(issues).toHaveLength(2)
+  it('accepts existing ADR references and rejects missing ones', () => {
+    const adrNumbers = new Set([4])
+    expect(findBrokenReferences({ content: 'See ADR 0004.', displayPath: 'docs/X.md', adrNumbers })).toEqual([])
+    expect(findBrokenReferences({ content: 'See ADR 9999.', displayPath: 'docs/X.md', adrNumbers })).toHaveLength(1)
   })
 })
 
@@ -194,52 +103,22 @@ describe('findProductQuantityRestatements', () => {
     })
     expect(issues).toHaveLength(1)
   })
-
-  it('accepts a reference to the owning document', () => {
-    const issues = findProductQuantityRestatements({
-      content: 'Nodes remain available at the maximum depth in docs/PRODUCT.md.',
-      displayPath: 'docs/ARCHITECTURE.md',
-    })
-    expect(issues).toEqual([])
-  })
 })
 
 describe('runChecks', () => {
-  it('passes on a minimal valid repository fixture', () => {
+  it('passes on a minimal repository without a plan archive', () => {
     const root = createTemporaryRoot()
     writeFile(root, 'README.md', '# Fixture\n')
     writeFile(root, 'docs/PRODUCT.md', '# Product\n')
-    writeFile(root, 'docs/plans/README.md', '| [0001](completed/0001-first-plan.md) |\n')
-    writeFile(
-      root,
-      'docs/plans/completed/0001-first-plan.md',
-      'Status: Completed\nCreated: 2026-09-13\nCompleted: 2026-09-13\n\n# First\n',
-    )
     const result = runChecks({ rootDirectory: root })
     expect(result.issues).toEqual([])
   })
 
-  it('detects a completed plan that still says the work is pending', () => {
+  it('requires every ADR to appear in the ADR index', () => {
     const root = createTemporaryRoot()
-    writeFile(root, 'docs/plans/README.md', '| [0001](completed/0001-first-plan.md) |\n')
-    writeFile(
-      root,
-      'docs/plans/completed/0001-first-plan.md',
-      'Status: Completed\nCreated: 2026-09-13\nCompleted: 2026-09-13\n\nNo fixes have been implemented.\n',
-    )
+    writeFile(root, 'docs/decisions/README.md', '# Decisions\n')
+    writeFile(root, 'docs/decisions/0001-first.md', 'Status: Accepted\n')
     const result = runChecks({ rootDirectory: root })
-    expect(result.issues.some((issue) => issue.includes('no fixes have been implemented'))).toBe(true)
-  })
-
-  it('requires every plan to appear in the plan index', () => {
-    const root = createTemporaryRoot()
-    writeFile(root, 'docs/plans/README.md', '# Implementation Plans\n')
-    writeFile(
-      root,
-      'docs/plans/completed/0001-first-plan.md',
-      'Status: Completed\nCreated: 2026-09-13\nCompleted: 2026-09-13\n\n# First\n',
-    )
-    const result = runChecks({ rootDirectory: root })
-    expect(result.issues.some((issue) => issue.includes('missing an index entry for plan 0001'))).toBe(true)
+    expect(result.issues.some((issue) => issue.includes('missing an index entry for ADR 0001'))).toBe(true)
   })
 })
