@@ -225,6 +225,10 @@ OpenCode uses the project configuration in `opencode.json`. Start a task with th
 
 The primary agent handles ordinary engineering decisions autonomously after plan approval. It returns to the Product Owner only for a newly discovered choice that materially affects product behavior, data, persistence, architecture, compatibility, or an expensive-to-reverse direction.
 
+The `develop` agent's shell permissions are consent guardrails for host execution, not an operating-system sandbox. Routine repository inspection, the named npm development and validation workflows, append-only Git work, and fixture-owned process cleanup run without approval. Unfamiliar commands require approval, while command categories that are destructive, publish externally, rewrite history, mutate dependencies, escalate privileges, or execute unrestricted interpreters are denied. Rules use OpenCode's last-matching-rule semantics, so their order is security-sensitive. Keep the exact patterns in `opencode.json` rather than duplicating them here, and run `npm run check:opencode` after changing either the policy or the OpenCode version.
+
+Allowed npm scripts and Git hooks execute mutable repository code with the host user's authority. The policy assumes this repository is trusted and reduces accidental or unexpected shell use; it does not protect the host from deliberately malicious repository code. OpenCode-native file tools remain subject to the denied external-directory boundary.
+
 When a task ends at a commit or session boundary, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt for resuming the work. An incomplete validation result must never be presented without a follow-up action.
 
 ---
