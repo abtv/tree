@@ -177,9 +177,10 @@ It should run:
 2. linting;
 3. formatting check (`prettier --check`);
 4. documentation governance (`npm run check:docs`);
-5. tests with coverage enforcement;
-6. production build;
-7. dependency audit (`npm audit`).
+5. OpenCode permission checks (`npm run check:opencode`);
+6. tests with coverage enforcement;
+7. production build;
+8. dependency audit (`npm audit`).
 
 The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
@@ -225,7 +226,7 @@ OpenCode uses the project configuration in `opencode.json`. Start a task with th
 
 The primary agent handles ordinary engineering decisions autonomously after plan approval. It returns to the Product Owner only for a newly discovered choice that materially affects product behavior, data, persistence, architecture, compatibility, or an expensive-to-reverse direction.
 
-The `develop` agent's shell permissions are consent guardrails for host execution, not an operating-system sandbox. Routine repository inspection, the named npm development and validation workflows, append-only Git work, and fixture-owned process cleanup run without approval. Unfamiliar commands require approval, while command categories that are destructive, publish externally, rewrite history, mutate dependencies, escalate privileges, or execute unrestricted interpreters are denied. Rules use OpenCode's last-matching-rule semantics, so their order is security-sensitive. Keep the exact patterns in `opencode.json` rather than duplicating them here, and run `npm run check:opencode` after changing either the policy or the OpenCode version.
+The `develop` agent's shell permissions are consent guardrails for host execution, not an operating-system sandbox. Routine repository inspection, the named npm development and validation workflows, append-only Git work, and fixture-owned process cleanup run without approval. Unfamiliar commands require approval, while command categories that are destructive, publish externally, rewrite history, mutate dependencies, escalate privileges, or execute unrestricted interpreters are denied. Named npm workflows keep their ordinary arguments and attached output redirections inside the same approval boundary, and removing the temporary implementation plan (`.opencode/plan.md`) is the one permitted destructive file operation. Rules use OpenCode's last-matching-rule semantics, so their order is security-sensitive. Keep the exact patterns in `opencode.json` rather than duplicating them here, and run `npm run check:opencode` after changing either the policy or the OpenCode version.
 
 Allowed npm scripts and Git hooks execute mutable repository code with the host user's authority. The policy assumes this repository is trusted and reduces accidental or unexpected shell use; it does not protect the host from deliberately malicious repository code. OpenCode-native file tools remain subject to the denied external-directory boundary.
 

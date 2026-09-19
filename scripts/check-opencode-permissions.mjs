@@ -5,7 +5,7 @@ const config = JSON.parse(await readFile(new URL('../opencode.json', import.meta
 const rules = config.agent.develop.permission.bash
 
 function globMatches(pattern, value) {
-  const expression = [...pattern]
+  let expression = [...pattern]
     .map((character) => {
       if (character === '*') return '.*'
       if (character === '?') return '.'
@@ -13,7 +13,10 @@ function globMatches(pattern, value) {
     })
     .join('')
 
-  return new RegExp(`^${expression}$`, 'u').test(value)
+  // OpenCode treats a trailing " *" as optional, so "foo *" also matches "foo".
+  if (expression.endsWith(' .*')) expression = `${expression.slice(0, -3)}( .*)?`
+
+  return new RegExp(`^${expression}$`, 'us').test(value)
 }
 
 function permissionFor(command) {
@@ -36,6 +39,15 @@ const cases = {
     'npm run start',
     'npm run test:watch',
     'npm run check:full',
+    'npm run typecheck 2>&1',
+    'npm run typecheck:node 2>&1',
+    'npm run test -- src/domain/document.test.ts',
+    'npm run build 2>&1',
+    'npm run check 2>&1',
+    'npm run check:full 2>&1',
+    'npm audit --omit=dev',
+    'rm .opencode/plan.md',
+    'rm -f .opencode/plan.md',
     'npx vitest run src/domain/tree.test.ts',
     'npx playwright test e2e/tree.spec.ts',
     'find src -type d',
@@ -44,7 +56,13 @@ const cases = {
     'sed -n 1,80p opencode.json',
     'pkill -f tree-e2e-example',
   ],
-  ask: ['curl https://example.com', 'cp source destination', 'mv source destination', 'npm run unknown'],
+  ask: [
+    'curl https://example.com',
+    'cp source destination',
+    'mv source destination',
+    'npm run unknown',
+    'npm run unknown 2>&1',
+  ],
   deny: [
     'sudo npm run check',
     'bash',
@@ -53,6 +71,8 @@ const cases = {
     'node script.mjs',
     'python3 script.py',
     'rm -rf src',
+    'rm -rf .opencode/plan.md',
+    'rm .opencode/plan.md.bak',
     'git push origin main',
     'git reset --hard HEAD~1',
     'git commit --amend -m "rewrite"',
@@ -61,6 +81,11 @@ const cases = {
     'git commit -m "skip hooks" -n',
     'npm install left-pad',
     'npm audit fix --force',
+    'npm audit fix 2>&1',
+    'npm audit -- fix',
+    'npm run check fix',
+    'npm run check -- fix --force',
+    'npm run audit -- fix',
     'npx cowsay hello',
     'npx vitest-malicious',
     'npx playwright test-malicious',
