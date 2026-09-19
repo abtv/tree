@@ -71,6 +71,8 @@ Nodes with one or more direct children display a muted outer circle surrounding 
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
+When the pointer enters a draggable node, its text-editing cursor remains visible briefly before the drag cursor appears. Moving the pointer away before that delay cancels the drag-cursor affordance.
+
 Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a sibling (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
 
 Node rows retain the document-surface background when focused or hovered (white in the light appearance); focus and hover must not tint the editing row. A focused node must not display an additional more-options or selection-dot ornament.

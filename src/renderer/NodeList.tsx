@@ -41,6 +41,7 @@ interface LayoutState {
 
 const EMPTY_HEIGHTS: ReadonlyMap<string, number> = new Map()
 const EMPTY_LAYOUT: ListLayout = { offsets: new Float64Array(1), total: 0, count: 0 }
+const DRAG_CURSOR_DELAY_MS = 500
 
 export function NodeList({
   nodes,
@@ -330,6 +331,8 @@ const NodeRow = memo(function NodeRow({
   pinnedOffset = 0,
   locked,
 }: NodeRowProps): React.JSX.Element {
+  const dragCursorTimeoutRef = useRef<number | undefined>(undefined)
+  const [dragCursorReady, setDragCursorReady] = useState(false)
   const onDropRow = useCallback(
     (event: DragEvent<HTMLDivElement>): void => {
       const bounds = event.currentTarget.getBoundingClientRect()
@@ -353,15 +356,38 @@ const NodeRow = memo(function NodeRow({
     },
     [onDragEnd],
   )
+  const onMouseEnter = useCallback((): void => {
+    if (dragCursorTimeoutRef.current !== undefined) globalThis.clearTimeout(dragCursorTimeoutRef.current)
+    dragCursorTimeoutRef.current = globalThis.setTimeout(() => {
+      dragCursorTimeoutRef.current = undefined
+      setDragCursorReady(true)
+    }, DRAG_CURSOR_DELAY_MS)
+  }, [])
+  const onMouseLeave = useCallback((): void => {
+    if (dragCursorTimeoutRef.current !== undefined) {
+      globalThis.clearTimeout(dragCursorTimeoutRef.current)
+      dragCursorTimeoutRef.current = undefined
+    }
+    setDragCursorReady(false)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (dragCursorTimeoutRef.current !== undefined) globalThis.clearTimeout(dragCursorTimeoutRef.current)
+    },
+    [],
+  )
 
   return (
     <div
-      className={pinned ? 'node-row node-row-pinned' : 'node-row'}
+      className={`${pinned ? 'node-row node-row-pinned' : 'node-row'}${dragCursorReady ? ' node-row-grab-ready' : ''}`}
       data-node-id={node.id}
       draggable={!locked}
       onDragEnd={onDragEndRow}
       onDragOver={onDragOver}
       onDragStart={onDragStart}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onDrop={onDropRow}
       ref={(element) => rowRef(node.id, element)}
       style={pinned ? { top: pinnedOffset } : undefined}

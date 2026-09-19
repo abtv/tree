@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import './test/setup'
@@ -9,6 +9,7 @@ import { EDGE_SCROLL_STEP, WINDOWING_THRESHOLD } from './list-window'
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -86,6 +87,31 @@ describe('NodeList', () => {
 
     fireEvent.dragEnd(row)
     expect(row).not.toHaveClass('node-row-dragging')
+  })
+
+  it('shows the drag cursor only after the row has been hovered briefly', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <NodeList
+        nodes={nodes}
+        renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
+        onEnter={() => undefined}
+        onMove={() => undefined}
+      />,
+    )
+    const row = container.querySelector('.node-row')
+    if (row === null) throw new Error('The first row was not rendered.')
+
+    expect(row).not.toHaveClass('node-row-grab-ready')
+    fireEvent.mouseEnter(row)
+    act(() => vi.advanceTimersByTime(499))
+    expect(row).not.toHaveClass('node-row-grab-ready')
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(row).toHaveClass('node-row-grab-ready')
+
+    fireEvent.mouseLeave(row)
+    expect(row).not.toHaveClass('node-row-grab-ready')
   })
 
   it('highlights the dragged row only while it is moving', () => {

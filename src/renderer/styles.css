@@ -190,19 +190,19 @@ textarea {
   outline-offset: 1px;
 }
 
-.node-row[draggable='true'] {
-  cursor: grab;
-}
-
-.node-row[draggable='true']:active {
+.node-row[draggable='true'].node-row-grab-ready:active {
   cursor: grabbing;
 }
 
-.node-row[draggable='true'] .node-input {
+.node-row[draggable='true'].node-row-grab-ready {
   cursor: grab;
 }
 
-.node-row[draggable='true']:active .node-input {
+.node-row[draggable='true'].node-row-grab-ready .node-input {
+  cursor: grab;
+}
+
+.node-row[draggable='true'].node-row-grab-ready:active .node-input {
   cursor: grabbing;
 }
 
