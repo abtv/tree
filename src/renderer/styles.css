@@ -282,7 +282,7 @@ body.node-drag-active .node-disclosure {
   left: 0;
   height: 2px;
   border-radius: 2px;
-  background: #d9e9f7;
+  background: #eef0f1;
   content: '';
 }
 
@@ -477,7 +477,7 @@ body.node-drag-active .node-disclosure {
 
   .node-row-drop-before::before,
   .node-row-drop-after::after {
-    background: #31455a;
+    background: #303438;
   }
 
   .current-parent-input:focus {

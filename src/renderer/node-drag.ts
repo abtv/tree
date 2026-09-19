@@ -1,4 +1,4 @@
-export const HOLD_ACTIVATION_MS = 400
+export const HOLD_ACTIVATION_MS = 200
 
 export type NodeDragPhase = 'idle' | 'pending' | 'dragging'
 

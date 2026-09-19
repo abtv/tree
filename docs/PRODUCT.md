@@ -71,7 +71,7 @@ Nodes with one or more direct children display a muted outer circle surrounding 
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
-Sibling reordering is started by pressing and holding the primary mouse button on a node row for 400 ms. Before the hold threshold, the pointer behaves as a text-editing pointer: a quick press and release places the text cursor at the clicked position. Moving the pointer before the threshold does not start a drag, and leaving the row while the button is still held cancels the pending drag.
+Sibling reordering is started by pressing and holding the primary mouse button on a node row for 200 ms. Before the hold threshold, the pointer behaves as a text-editing pointer: a quick press and release places the text cursor at the clicked position. Moving the pointer before the threshold does not start a drag, and leaving the row while the button is still held cancels the pending drag.
 
 Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a sibling (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
 
@@ -499,7 +499,7 @@ The undo/redo history retains at most the 200 most recent entries. A history ent
 
 Mouse drag-and-drop is supported for sibling reordering.
 
-Sibling reordering begins when the primary mouse button is pressed and held on a node row for 400 ms. A quick press and release edits text and places the text cursor at the clicked position. Movement before the hold threshold does not start a drag, and small incidental pointer movement that stays on the row does not cancel the pending hold.
+Sibling reordering begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Movement before the hold threshold does not start a drag, and small incidental pointer movement that stays on the row does not cancel the pending hold.
 
 Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row shows its gray drag highlight. Moving the pointer highlights the current between-row drop target and releasing completes the move. Releasing without changing the position leaves the document unchanged. `Escape` cancels an active drag without moving the node.
 

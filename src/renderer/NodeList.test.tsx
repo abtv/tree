@@ -229,16 +229,16 @@ describe('NodeList drag interaction', () => {
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 10)
-    act(() => vi.advanceTimersByTime(200))
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS / 2))
     pointerMoveAt(rows[0]!, 20)
-    act(() => vi.advanceTimersByTime(200))
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
     expect(rows[0]).toHaveClass('node-row-dragging')
 
     pointerUpAt(rows[0]!, 20)
     pointerDownAt(rows[0]!, 10)
-    act(() => vi.advanceTimersByTime(200))
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS / 2))
     pointerMoveAt(rows[0]!, 40)
-    act(() => vi.advanceTimersByTime(200))
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
     expect(container.querySelector('.node-row-dragging')).toBeNull()
   })
 
