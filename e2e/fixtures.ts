@@ -68,6 +68,10 @@ export function allowRendererError(pattern: RegExp): void {
   allowedRendererErrors.push(pattern)
 }
 
+export function exactMessage(message: string): RegExp {
+  return new RegExp(`^${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+}
+
 export async function clickApplicationMenuQuit(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ BrowserWindow, Menu }) => {
     const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items[0]
@@ -99,6 +103,60 @@ export async function waitForDelayedSave(app: ElectronApplication): Promise<void
       app.evaluate(() => (globalThis as typeof globalThis & { __delayedSaveResolved?: boolean }).__delayedSaveResolved),
     )
     .toBe(true)
+}
+
+export async function blockSaves(app: ElectronApplication, options: { countAttempts?: boolean } = {}): Promise<void> {
+  await app.evaluate(({ ipcMain }, counting) => {
+    const control = globalThis as typeof globalThis & { saveAttempts?: number; restoreSave?: () => void }
+    const save = globalThis.__treeIpc.get('tree:save')
+    if (save === undefined) throw new Error('Save handler is unavailable.')
+    control.restoreSave = () => {
+      ipcMain.removeHandler('tree:save')
+      ipcMain.handle('tree:save', save)
+    }
+    control.saveAttempts = 0
+    globalThis.__treeIpc.wrap('tree:save', () => {
+      if (counting) control.saveAttempts = (control.saveAttempts ?? 0) + 1
+      throw new Error('save blocked')
+    })
+  }, options.countAttempts ?? false)
+}
+
+export async function restoreSaves(app: ElectronApplication): Promise<void> {
+  await app.evaluate(() => (globalThis as typeof globalThis & { restoreSave?: () => void }).restoreSave?.())
+}
+
+export function readSaveAttempts(app: ElectronApplication): Promise<number> {
+  return app.evaluate(() => (globalThis as typeof globalThis & { saveAttempts?: number }).saveAttempts ?? 0)
+}
+
+const RENDER_FAILURE_MARKER = 'tree-e2e-force-render-failure'
+const RENDER_FAILURE_CONSUMED = `${RENDER_FAILURE_MARKER}-consumed`
+
+// The renderer has no test hook (ADR 0002). `NodeList` reads `globalThis.innerWidth` in a `useRef`
+// initializer during its mount render, so arming a throwing getter before a reload raises a real render
+// error that the root `ErrorBoundary` catches. The `window.name` marker makes the injection one-shot:
+// the failing load consumes it, so the fallback's Reload action starts a clean document.
+export async function forceRenderFailure(window: Page, message = 'forced renderer failure'): Promise<void> {
+  await window.addInitScript(
+    ({ marker, consumed, errorMessage }) => {
+      const markerHost = globalThis as typeof globalThis & { name?: string }
+      if (markerHost.name !== marker) return
+      markerHost.name = consumed
+      Object.defineProperty(globalThis, 'innerWidth', {
+        configurable: true,
+        get() {
+          throw new Error(errorMessage)
+        },
+      })
+    },
+    { marker: RENDER_FAILURE_MARKER, consumed: RENDER_FAILURE_CONSUMED, errorMessage: message },
+  )
+  await window.evaluate((marker) => {
+    ;(globalThis as typeof globalThis & { name?: string }).name = marker
+  }, RENDER_FAILURE_MARKER)
+  await window.reload()
+  await expect(window.getByRole('alert')).toContainText('Tree encountered an unexpected error')
 }
 
 async function closeTrackedApps(): Promise<void> {
@@ -343,6 +401,10 @@ export function attachmentFiles(userDataDir: string): string[] {
   return existsSync(directory) ? readdirSync(directory) : []
 }
 
+export function attachmentPath(userDataDir: string, attachmentId: string): string {
+  return join(userDataDir, 'data', 'attachments', `${attachmentId}.png`)
+}
+
 export function documentGenerations(userDataDir: string): string[] {
   const directory = join(userDataDir, 'data')
   if (!existsSync(directory)) return []
@@ -407,4 +469,19 @@ export async function firePaste(input: ReturnType<Page['locator']>): Promise<voi
 export async function typeInto(input: ReturnType<Page['locator']>, text: string): Promise<void> {
   await input.focus()
   await input.pressSequentially(text)
+}
+
+const DRAG_HOLD_MS = 500
+
+export async function dragRow(window: Page, fromIndex: number, toIndex: number): Promise<void> {
+  const source = window.locator('.node-row').nth(fromIndex)
+  const sourceBox = await source.locator('.node-input').boundingBox()
+  if (sourceBox === null) throw new Error(`Node row ${fromIndex + 1} was not rendered.`)
+  await window.mouse.move(sourceBox.x + 8, sourceBox.y + sourceBox.height / 2)
+  await window.mouse.down()
+  await window.waitForTimeout(DRAG_HOLD_MS)
+  const targetBox = await window.locator('.node-row').nth(toIndex).boundingBox()
+  if (targetBox === null) throw new Error(`Node row ${toIndex + 1} was not rendered.`)
+  await window.mouse.move(targetBox.x + 8, targetBox.y + 4, { steps: 5 })
+  await window.mouse.up()
 }

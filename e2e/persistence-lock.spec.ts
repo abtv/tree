@@ -2,51 +2,29 @@ import { existsSync } from 'node:fs'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../src/domain/product-messages'
 import {
   allowRendererError,
+  blockSaves,
   clickApplicationMenuQuit,
   documentPath,
+  exactMessage,
   expect,
   launchTree,
   node,
   readPersisted,
+  readSaveAttempts,
+  restoreSaves,
   test,
   typeInto,
-  type Launched,
 } from './fixtures'
-
-function exact(message: string): RegExp {
-  return new RegExp(`^${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
-}
-
-function readSaveAttempts(app: Launched['app']): Promise<number> {
-  return app.evaluate(() => (globalThis as typeof globalThis & { saveAttempts?: number }).saveAttempts ?? 0)
-}
-
-async function blockSaves(app: Launched['app'], countAttempts: boolean): Promise<void> {
-  await app.evaluate(({ ipcMain }, counting) => {
-    const control = globalThis as typeof globalThis & { saveAttempts?: number; restoreSave?: () => void }
-    const save = globalThis.__treeIpc.get('tree:save')
-    if (save === undefined) throw new Error('Save handler is unavailable.')
-    control.restoreSave = () => {
-      ipcMain.removeHandler('tree:save')
-      ipcMain.handle('tree:save', save)
-    }
-    control.saveAttempts = 0
-    globalThis.__treeIpc.wrap('tree:save', () => {
-      if (counting) control.saveAttempts = (control.saveAttempts ?? 0) + 1
-      throw new Error('save blocked')
-    })
-  }, countAttempts)
-}
 
 test.describe('save failure lock', () => {
   test('stops after three failed saves and persists on quit once saving works again', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
     allowRendererError(
-      exact("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
-    allowRendererError(exact(SAVE_LOCKED_MESSAGE))
-    await blockSaves(app, true)
+    allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+    await blockSaves(app, { countAttempts: true })
 
     const text = 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
     await typeInto(node(window, 1), text)
@@ -61,7 +39,7 @@ test.describe('save failure lock', () => {
     expect(await readSaveAttempts(app)).toBe(attempts)
     expect(await node(window, 1).inputValue()).toBe(frozen)
 
-    await app.evaluate(() => (globalThis as typeof globalThis & { restoreSave?: () => void }).restoreSave?.())
+    await restoreSaves(app)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await clickApplicationMenuQuit(app)
     await closed
@@ -75,12 +53,12 @@ test.describe('save failure lock', () => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
     allowRendererError(
-      exact("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
-    allowRendererError(exact("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
+    allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
     allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
-    allowRendererError(exact(SAVE_LOCKED_MESSAGE))
-    await blockSaves(app, false)
+    allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+    await blockSaves(app)
 
     const text = 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau'
     await typeInto(node(window, 1), text)

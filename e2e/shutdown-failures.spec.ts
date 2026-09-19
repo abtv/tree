@@ -1,14 +1,18 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../src/domain/product-messages'
 import {
   allowRendererError,
+  blockSaves,
   clickApplicationMenuQuit,
   delaySaveIpc,
   documentPath,
+  exactMessage,
   expect,
   launchTree,
   node,
   readPersisted,
+  restoreSaves,
   test,
   typeInto,
   waitForDelayedSave,
@@ -146,5 +150,81 @@ test.describe('shutdown failure handling', () => {
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${beforeQuit}${typedWhilePending}`)
+  })
+
+  test('keeps the app open after a window-close save failure, reports the timeout, and quits after a retry', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    allowRendererError(
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+    )
+    allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
+    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
+    await blockSaves(app)
+
+    // Exactly ten words trigger one volume save attempt before the window close.
+    const initialText = 'window close failure alpha beta gamma delta epsilon zeta eta'
+    await typeInto(node(window, 1), initialText)
+    await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
+
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    expect(app.process().exitCode).toBeNull()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toBeVisible({ timeout: 7_000 })
+
+    await restoreSaves(app)
+    const recoveryText = ' recovered one two three four five six seven eight nine ten'
+    await typeInto(node(window, 1), recoveryText)
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${initialText}${recoveryText}`)
+  })
+
+  test('cancels a window-close quit while locked and confirms without saving on the next close', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    allowRendererError(
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+    )
+    allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
+    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
+    allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+    await blockSaves(app)
+
+    const text = 'locked window close alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
+    await typeInto(node(window, 1), text)
+    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
+
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
+
+    await window.getByRole('button', { name: 'Cancel' }).click()
+    await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toHaveCount(0)
+    expect(app.process().exitCode).toBeNull()
+    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible()
+
+    // The bounded quit handshake still expires after the cancellation before another close can be requested.
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toBeVisible({ timeout: 7_000 })
+
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await window.getByRole('button', { name: 'Quit without saving' }).click()
+    await closed
+
+    const relaunched = await launchTree(userDataDir)
+    await expect(relaunched.window.locator('main.tree-app')).toBeVisible()
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
+    await expect(node(relaunched.window, 1)).toBeEditable()
+    await expect(relaunched.window.getByText(SAVE_LOCKED_MESSAGE)).toHaveCount(0)
   })
 })
