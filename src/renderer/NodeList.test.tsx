@@ -277,22 +277,55 @@ describe('NodeList drag interaction', () => {
     expect(input.selectionEnd).toBe(0)
   })
 
-  it('restores the frozen caret when the selection changes during a drag', () => {
+  it('blurs the source input while dragging and restores its caret on release', () => {
     vi.useFakeTimers()
     mockRowRects()
-    const { container } = renderRows()
+    const { container } = renderRows({
+      list: [
+        { id: 'a', text: 'Alpha', children: [] },
+        { id: 'b', text: 'Bravo', children: [] },
+      ],
+    })
     const rows = rowElements(container)
     const input = rows[0]!.querySelector('textarea')
     if (input === null) throw new Error('The first input was not rendered.')
     input.focus()
-    input.setSelectionRange(1, 1)
+    input.setSelectionRange(1, 3)
 
     activate(rows[0]!, 13)
-    input.setSelectionRange(0, 3)
-    fireEvent(document, new Event('selectionchange'))
-
+    expect(document.activeElement).not.toBe(input)
     expect(input.selectionStart).toBe(1)
     expect(input.selectionEnd).toBe(1)
+
+    pointerUpAt(rows[0]!, 13)
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(1)
+  })
+
+  it('keeps the source input blurred after a cancelled drag until the pointer is released', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows({
+      list: [
+        { id: 'a', text: 'Alpha', children: [] },
+        { id: 'b', text: 'Bravo', children: [] },
+      ],
+    })
+    const rows = rowElements(container)
+    const input = rows[0]!.querySelector('textarea')
+    if (input === null) throw new Error('The first input was not rendered.')
+    input.focus()
+    input.setSelectionRange(2, 2)
+
+    activate(rows[0]!, 13)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.activeElement).not.toBe(input)
+
+    pointerUpAt(rows[0]!, 40)
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(2)
   })
 
   it('commits a move to the boundary chosen by the release position', () => {

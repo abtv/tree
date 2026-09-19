@@ -98,7 +98,8 @@ test.describe('drag and drop', () => {
     const { window } = await launchTree(userDataDir)
     await seedSiblings(window)
 
-    await pressAndHold(window, window.locator('.node-row').nth(3).locator('.node-input'))
+    const source = window.locator('.node-row').nth(3).locator('.node-input')
+    await pressAndHold(window, source)
     const target = await rowBox(window, 1)
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
@@ -108,8 +109,25 @@ test.describe('drag and drop', () => {
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
     await expect(window.locator('body')).not.toHaveClass(/node-drag-active/)
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
+
+    await window.mouse.move(target.x + 180, target.y + 40, { steps: 10 })
+    expect(
+      await source.evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return input.selectionEnd - input.selectionStart
+      }),
+    ).toBe(0)
+
     await window.mouse.up()
 
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(true)
+    expect(
+      await source.evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return input.selectionEnd - input.selectionStart
+      }),
+    ).toBe(0)
     expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
   })
 
@@ -186,6 +204,22 @@ test.describe('drag and drop', () => {
     await window.keyboard.press('Enter')
     await typeInto(node(window, 4), 'Delta text four')
 
+    await window.evaluate(() => {
+      const control = globalThis as typeof globalThis & { __selectionDuringDrag?: unknown[] }
+      control.__selectionDuringDrag = []
+      const sample = (): void => {
+        if (document.body.classList.contains('node-drag-active')) {
+          for (const element of document.querySelectorAll('.node-input')) {
+            if (element instanceof HTMLTextAreaElement && element.selectionStart !== element.selectionEnd) {
+              control.__selectionDuringDrag!.push([element.selectionStart, element.selectionEnd])
+            }
+          }
+        }
+        requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+    })
+
     const rows = window.locator('.node-row')
     const source = rows.nth(3).locator('.node-input')
     const box = await source.boundingBox()
@@ -207,6 +241,7 @@ test.describe('drag and drop', () => {
 
     const frozen = await selectionState()
     expect(frozen[0]).toBe(frozen[1])
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
 
     await window.mouse.move(x + 120, y, { steps: 20 })
     expect(await selectionState()).toEqual(frozen)
@@ -220,15 +255,18 @@ test.describe('drag and drop', () => {
     await expect
       .poll(() => nodeTexts(window))
       .toEqual(['Delta text four', 'Alpha text one', 'Bravo text two', 'Charlie text three'])
-    const after = await window
-      .locator('.node-row')
-      .nth(0)
-      .locator('.node-input')
-      .evaluate((element) => {
-        const input = element as HTMLTextAreaElement
-        return [input.selectionStart, input.selectionEnd]
-      })
+    const moved = window.locator('.node-row').nth(0).locator('.node-input')
+    const after = await moved.evaluate((element) => {
+      const input = element as HTMLTextAreaElement
+      return [input.selectionStart, input.selectionEnd]
+    })
     expect(after[0]).toBe(after[1])
+    expect(await moved.evaluate((element) => document.activeElement === element)).toBe(true)
+    expect(
+      await window.evaluate(
+        () => (globalThis as typeof globalThis & { __selectionDuringDrag?: unknown[] }).__selectionDuringDrag,
+      ),
+    ).toEqual([])
   })
 
   test('releases in place without reordering', async ({ userDataDir }) => {

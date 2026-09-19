@@ -74,7 +74,7 @@ export function NodeList({
   const [dropIndex, setDropIndex] = useState<number>()
   const pointerYRef = useRef<number | undefined>(undefined)
   const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
-  const dragCaretRef = useRef<number | undefined>(undefined)
+  const selectionGuardRef = useRef<{ nodeId: string; pointerId: number; caret: number } | undefined>(undefined)
   const suppressClickRef = useRef(false)
   const [layoutState, setLayoutState] = useState<LayoutState>(() => ({
     key: `initial:${nodes.length}`,
@@ -106,6 +106,16 @@ export function NodeList({
     dispatch({ type: 'cancel' })
     setDropIndex(undefined)
     setAutoScrollDirection(0)
+  }, [])
+
+  const clearSelectionGuard = useCallback((): void => {
+    const guard = selectionGuardRef.current
+    if (guard === undefined) return
+    selectionGuardRef.current = undefined
+    const input = findRowInput(guard.nodeId, observedElementsRef.current)
+    if (input === null) return
+    input.focus({ preventScroll: true })
+    setCaret(input, guard.caret)
   }, [])
 
   const computeInsertionIndex = useCallback((clientY: number): number | undefined => {
@@ -216,29 +226,31 @@ export function NodeList({
   }, [dragPhase, dragSource])
 
   useEffect(() => {
+    const onPointerEnd = (event: PointerEvent): void => {
+      if (event.pointerId === selectionGuardRef.current?.pointerId) clearSelectionGuard()
+    }
+    globalThis.addEventListener('pointerup', onPointerEnd)
+    globalThis.addEventListener('pointercancel', onPointerEnd)
+    return () => {
+      globalThis.removeEventListener('pointerup', onPointerEnd)
+      globalThis.removeEventListener('pointercancel', onPointerEnd)
+      selectionGuardRef.current = undefined
+    }
+  }, [clearSelectionGuard])
+
+  useEffect(() => {
     if (dragPhase !== 'dragging' || dragSource === undefined) return undefined
     const pointerId = dragSource.pointerId
     const list = listRef.current
     if (list !== null) setCapture(list, pointerId)
     document.body.classList.add('node-drag-active')
     const input = findRowInput(dragSource.nodeId, observedElementsRef.current)
-    if (input !== null) {
+    if (input !== null && document.activeElement === input) {
       collapseSelectionToAnchor(input)
-      dragCaretRef.current = getCaret(input)
+      selectionGuardRef.current = { nodeId: dragSource.nodeId, pointerId, caret: getCaret(input) }
+      input.blur()
     }
-    const collapseSelection = (): void => {
-      const target = findRowInput(dragSource.nodeId, observedElementsRef.current)
-      const caret = dragCaretRef.current
-      if (target === null || caret === undefined) return
-      setCaret(target, caret)
-    }
-    const preventSelection = (event: Event): void => event.preventDefault()
-    document.addEventListener('selectstart', preventSelection)
-    document.addEventListener('selectionchange', collapseSelection)
     return () => {
-      document.removeEventListener('selectstart', preventSelection)
-      document.removeEventListener('selectionchange', collapseSelection)
-      dragCaretRef.current = undefined
       document.body.classList.remove('node-drag-active')
       if (list !== null) releaseCapture(list, pointerId)
     }
@@ -280,6 +292,7 @@ export function NodeList({
     (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (locked) return
       if (event.target instanceof Element && event.target.closest('.node-disclosure') !== null) return
+      clearSelectionGuard()
       suppressClickRef.current = false
       pressPointRef.current = { x: event.clientX, y: event.clientY }
       pointerYRef.current = undefined
@@ -292,7 +305,7 @@ export function NodeList({
         pointerType: event.pointerType,
       })
     },
-    [locked],
+    [clearSelectionGuard, locked],
   )
 
   const onRowPointerLeave = useCallback(
@@ -337,6 +350,7 @@ export function NodeList({
         onMove(dragSource.nodeId, insertionIndex)
       }
     }
+    clearSelectionGuard()
     dispatch({ type: 'release', pointerId: event.pointerId })
     setDropIndex(undefined)
     setAutoScrollDirection(0)
@@ -451,9 +465,7 @@ function releaseCapture(element: HTMLElement, pointerId: number): void {
 
 function findRowInput(nodeId: string, rows: Map<string, HTMLElement>): HTMLElement | null {
   const row = rows.get(nodeId)
-  const input = row?.querySelector<HTMLElement>('.node-input')
-  if (input === undefined || input === null || document.activeElement !== input) return null
-  return input
+  return row?.querySelector<HTMLElement>('.node-input') ?? null
 }
 
 function collectWindowIndices(windowRange: ListWindow): number[] {
