@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   IDLE_NODE_DRAG,
   dropMarkerFor,
+  exceedsHoldTolerance,
   insertionIndexAtPoint,
   nodeDragReducer,
   shouldCommitMove,
@@ -63,6 +64,23 @@ describe('nodeDragReducer', () => {
     expect(nodeDragReducer(pending, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(dragging, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(IDLE_NODE_DRAG, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
+  })
+})
+
+describe('exceedsHoldTolerance', () => {
+  it('accepts movement within the tolerance in any direction', () => {
+    expect(exceedsHoldTolerance(100, 100, 100, 100)).toBe(false)
+    expect(exceedsHoldTolerance(100, 100, 104, 100)).toBe(false)
+    expect(exceedsHoldTolerance(100, 100, 96, 100)).toBe(false)
+    expect(exceedsHoldTolerance(100, 100, 100, 96)).toBe(false)
+    expect(exceedsHoldTolerance(100, 100, 102, 102)).toBe(false)
+  })
+
+  it('reports movement beyond the tolerance from the press point', () => {
+    expect(exceedsHoldTolerance(100, 100, 105, 100)).toBe(true)
+    expect(exceedsHoldTolerance(100, 100, 95, 100)).toBe(true)
+    expect(exceedsHoldTolerance(100, 100, 100, 105)).toBe(true)
+    expect(exceedsHoldTolerance(100, 100, 103, 103)).toBe(true)
   })
 })
 

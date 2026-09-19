@@ -21,6 +21,7 @@ import {
   HOLD_ACTIVATION_MS,
   IDLE_NODE_DRAG,
   dropMarkerFor,
+  exceedsHoldTolerance,
   insertionIndexAtPoint,
   nodeDragReducer,
   shouldCommitMove,
@@ -72,6 +73,7 @@ export function NodeList({
   const [drag, dispatch] = useReducer(nodeDragReducer, IDLE_NODE_DRAG)
   const [dropIndex, setDropIndex] = useState<number>()
   const pointerYRef = useRef<number | undefined>(undefined)
+  const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
   const suppressClickRef = useRef(false)
   const [layoutState, setLayoutState] = useState<LayoutState>(() => ({
     key: `initial:${nodes.length}`,
@@ -265,6 +267,7 @@ export function NodeList({
       if (locked) return
       if (event.target instanceof Element && event.target.closest('.node-disclosure') !== null) return
       suppressClickRef.current = false
+      pressPointRef.current = { x: event.clientX, y: event.clientY }
       pointerYRef.current = undefined
       setAutoScrollDirection(0)
       dispatch({
@@ -288,6 +291,11 @@ export function NodeList({
   const onListPointerMove = (event: ReactPointerEvent<HTMLElement>): void => {
     if (dragPhase === 'idle' || dragSource === undefined) return
     if (dragPhase === 'pending') {
+      const origin = pressPointRef.current
+      if (origin !== undefined && exceedsHoldTolerance(origin.x, origin.y, event.clientX, event.clientY)) {
+        cancelDrag()
+        return
+      }
       const row = observedElementsRef.current.get(dragSource.nodeId)
       if (row === undefined) {
         cancelDrag()

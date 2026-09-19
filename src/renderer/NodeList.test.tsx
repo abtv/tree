@@ -64,7 +64,10 @@ function renderRows(
       focusedNodeId={options.focusedNodeId}
       locked={options.locked === true}
       nodes={list}
-      renderInput={options.renderInput ?? ((node, label) => <textarea aria-label={label} readOnly value={node.text} />)}
+      renderInput={
+        options.renderInput ??
+        ((node, label) => <textarea aria-label={label} className="node-input" readOnly value={node.text} />)
+      }
       onEnter={() => undefined}
       onMove={onMove}
     />,
@@ -222,7 +225,7 @@ describe('NodeList drag interaction', () => {
     expect(onMove).not.toHaveBeenCalled()
   })
 
-  it('keeps an eligible hold when the pointer moves within the row and cancels it when it leaves', () => {
+  it('keeps an eligible hold within the move tolerance and cancels it when the pointer leaves the row', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container } = renderRows()
@@ -230,16 +233,48 @@ describe('NodeList drag interaction', () => {
 
     pointerDownAt(rows[0]!, 10)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS / 2))
-    pointerMoveAt(rows[0]!, 20)
+    pointerMoveAt(rows[0]!, 12)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
     expect(rows[0]).toHaveClass('node-row-dragging')
 
-    pointerUpAt(rows[0]!, 20)
+    pointerUpAt(rows[0]!, 12)
     pointerDownAt(rows[0]!, 10)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS / 2))
     pointerMoveAt(rows[0]!, 40)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
     expect(container.querySelector('.node-row-dragging')).toBeNull()
+  })
+
+  it('cancels the pending hold when the pointer moves beyond the tolerance', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 10)
+    pointerMoveAt(rows[0]!, 15)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+    pointerUpAt(rows[0]!, 15)
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
+  it('collapses an incidental selection when drag mode activates', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+    const input = rows[0]!.querySelector('textarea')
+    if (input === null) throw new Error('The first input was not rendered.')
+    input.focus()
+    input.setSelectionRange(0, 1)
+
+    activate(rows[0]!, 13)
+
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(0)
   })
 
   it('commits a move to the boundary chosen by the release position', () => {

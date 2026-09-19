@@ -1,4 +1,5 @@
 export const HOLD_ACTIVATION_MS = 200
+export const HOLD_MOVE_TOLERANCE_PX = 4
 
 export type NodeDragPhase = 'idle' | 'pending' | 'dragging'
 
@@ -48,6 +49,12 @@ export interface NodeDropRegion {
   index: number
   top: number
   bottom: number
+}
+
+export function exceedsHoldTolerance(startX: number, startY: number, clientX: number, clientY: number): boolean {
+  const deltaX = clientX - startX
+  const deltaY = clientY - startY
+  return deltaX * deltaX + deltaY * deltaY > HOLD_MOVE_TOLERANCE_PX * HOLD_MOVE_TOLERANCE_PX
 }
 
 export function insertionIndexAtPoint(regions: readonly NodeDropRegion[], pointerY: number): number | undefined {
