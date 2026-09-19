@@ -4,6 +4,7 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+.tmp/
 
 *.log
 .DS_Store
