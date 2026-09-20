@@ -3,7 +3,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
-    exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts'],
+    exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts', 'test-results/**'],
     css: { include: [/styles\.css/] },
     coverage: {
       provider: 'v8',

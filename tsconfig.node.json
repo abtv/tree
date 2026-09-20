@@ -19,6 +19,7 @@
     "electron.vite.config.ts",
     "eslint.config.mjs",
     "vitest.config.ts",
+    "vitest.config.test.ts",
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "src/domain/**/*.ts",
