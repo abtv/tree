@@ -558,7 +558,14 @@ const NodeRow = memo(function NodeRow({
         aria-label={`Enter node ${index + 1}`}
         className={`node-disclosure${node.children.length > 0 ? ' node-disclosure-has-children' : ''}`}
         onClick={() => onEnter(node)}
-        onMouseDown={(event) => event.preventDefault()}
+        onMouseDown={(event) => {
+          event.preventDefault()
+          globalThis.getSelection()?.removeAllRanges()
+        }}
+        onPointerDown={(event) => {
+          event.preventDefault()
+          globalThis.getSelection()?.removeAllRanges()
+        }}
         type="button"
       />
       {renderInput(node, `Node ${index + 1}`)}

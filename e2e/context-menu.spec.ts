@@ -54,4 +54,22 @@ test.describe('editable node context menu', () => {
     await expect.poll(() => window.evaluate(() => document.defaultView?.getSelection()?.toString() ?? '')).toBe('')
     await app.close()
   })
+
+  test('clears document selection when the disclosure circle is right-clicked', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await typeInto(node(window, 1), 'Parent')
+    await window.keyboard.press('End')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 2), 'Another parent')
+    await window.keyboard.press('End')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 3), 'aaa aaa fff - 1')
+    await window.keyboard.press('End')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 4), 'fdf')
+    await window.getByRole('button', { name: 'Enter node 4' }).click({ button: 'right' })
+
+    await expect.poll(() => window.evaluate(() => document.defaultView?.getSelection()?.toString() ?? '')).toBe('')
+    await app.close()
+  })
 })
