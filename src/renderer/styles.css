@@ -126,6 +126,12 @@ textarea {
   padding: 10px 18px 64px;
 }
 
+/* Matches a one-line heading block (30px line + 2px padding + 6px margin) so the first
+   root node sits at the same height as the first child below a single-line current parent. */
+.editor-shell-top-level {
+  padding-top: 48px;
+}
+
 .current-parent {
   margin: 0 0 6px 24px;
 }

@@ -67,7 +67,7 @@ test.describe('compact layout density', () => {
     const first = await rowRect(window, 0)
     expect(bar.height).toBeCloseTo(30, 0)
     expect(first.height).toBeCloseTo(24, 0)
-    expect(first.top - bar.bottom).toBeCloseTo(10, 0)
+    expect(first.top - bar.bottom).toBeCloseTo(48, 0)
 
     await expect(node(window, 15)).toBeInViewport({ ratio: 1 })
     expect(await window.evaluate(() => document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true)
@@ -86,9 +86,12 @@ test.describe('compact layout density', () => {
     await setMainWindowBounds(app, { width: 640, height: 480 })
     await expect.poll(() => window.evaluate(() => globalThis.innerWidth)).toBeLessThan(700)
 
+    const bar = await selectorRect(window, '.location-bar')
     const heading = await selectorRect(window, '.current-parent')
     const firstBefore = await rowRect(window, 0)
+    expect(heading.top - bar.bottom).toBeCloseTo(10, 0)
     expect(firstBefore.top - heading.bottom).toBeCloseTo(6, 0)
+    expect(firstBefore.top - bar.bottom).toBeCloseTo(48, 0)
     expect((await selectorRect(window, '.drop-zone-start')).height).toBe(0)
     expect((await selectorRect(window, '.drop-zone-end')).height).toBe(0)
 

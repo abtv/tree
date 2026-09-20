@@ -83,6 +83,8 @@ The current parent is presented above its children as a larger, bold, editable h
 
 The first child is separated from the current-parent heading by the same compact vertical spacing used between node rows. A drag-and-drop target must not introduce an additional blank gap there.
 
+At the root level, the first root node is positioned at the same height as the first child below a single-line current parent, so both levels share the same vertical rhythm.
+
 An attached image is displayed beneath its node's text and aligned with that node's text column.
 
 ### 2.2 Location Path

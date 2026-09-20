@@ -82,6 +82,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   )
 
   const path = state.location.currentParentId === null ? [] : nodePath(state.document, state.location.currentParentId)
+  const topLevel = state.location.currentParentId === null
 
   return (
     <main className="tree-app">
@@ -90,7 +91,7 @@ export function App({ store }: AppProps): React.JSX.Element {
         currentParentId={state.location.currentParentId}
         onNavigate={(parentId) => store.navigateToAncestor(parentId)}
       />
-      <section className="editor-shell">
+      <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
         {currentParent === undefined ? null : (
           <section className="current-parent" aria-label="Current parent">
             {input(currentParent, 'Current parent', true)}
