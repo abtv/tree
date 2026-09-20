@@ -4,6 +4,7 @@ import {
   closeApp,
   documentGenerations,
   documentPath,
+  exactMessage,
   expect,
   firePaste,
   launchTree,
@@ -59,6 +60,7 @@ test.describe('persistence', () => {
     seedDocument(userDataDir, depthSeed(20))
     const before = readFileSync(`${userDataDir}/data/document.json`)
     const { app, window } = await launchTree(userDataDir)
+    allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
 
     await window.keyboard.press('Enter')
     await expect(window.getByRole('alert')).toHaveText(
@@ -71,6 +73,7 @@ test.describe('persistence', () => {
   test('shows the document error and leaves an over-depth file byte-for-byte unchanged', async ({ userDataDir }) => {
     seedDocument(userDataDir, depthSeed(21))
     const before = readFileSync(`${userDataDir}/data/document.json`)
+    allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
     const { window } = await launchTree(userDataDir, { expectReady: false })
 
     await expect(window.getByRole('alert')).toContainText('Nodes cannot be nested deeper than 20 levels.')

@@ -6,6 +6,7 @@ import {
   expect,
   firePaste,
   launchTree,
+  lockSystemClipboard,
   node,
   nodeTexts,
   readPersisted,
@@ -253,6 +254,7 @@ test.describe('clipboard', () => {
 
   test('cancels a cut when the node changes during the clipboard write', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     allowRendererError(/^Operation failed: The cut could not finish because the text changed\.$/)
     const editor = node(window, 1)
 

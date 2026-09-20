@@ -1,4 +1,15 @@
-import { expect, firePaste, launchTree, node, parent, setCursor, test, typeInto, writeClipboardText } from './fixtures'
+import {
+  expect,
+  firePaste,
+  launchTree,
+  lockSystemClipboard,
+  node,
+  parent,
+  setCursor,
+  test,
+  typeInto,
+  writeClipboardText,
+} from './fixtures'
 
 test.describe('creating nodes with Enter', () => {
   test('Cmd+A selects all text in a link-free node', async ({ userDataDir }) => {
@@ -20,6 +31,7 @@ test.describe('creating nodes with Enter', () => {
 
   test('Cmd+A and Cmd+C copy all text from a link-free node', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const source = node(window, 1)
 
     await typeInto(source, 'Plain text')
@@ -73,6 +85,7 @@ test.describe('creating nodes with Enter', () => {
 
   test('keeps plain text selected after Cmd+C', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const editor = node(window, 1)
 
     await typeInto(editor, 'aaa')
@@ -111,6 +124,7 @@ test.describe('creating nodes with Enter', () => {
 
   test('pastes copied plain text with Cmd+V after typing in the target node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const source = node(window, 1)
 
     await typeInto(source, 'Plain text')
@@ -126,6 +140,7 @@ test.describe('creating nodes with Enter', () => {
 
   test('pastes copied plain text after typing a space in the copied node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const editor = node(window, 1)
 
     await typeInto(editor, 'Plain text')

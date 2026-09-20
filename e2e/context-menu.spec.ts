@@ -1,4 +1,14 @@
-import { expect, firePaste, launchTree, node, setCursor, test, typeInto, writeClipboardText } from './fixtures'
+import {
+  expect,
+  firePaste,
+  launchTree,
+  lockSystemClipboard,
+  node,
+  setCursor,
+  test,
+  typeInto,
+  writeClipboardText,
+} from './fixtures'
 import type { ElectronApplication } from '@playwright/test'
 
 async function chooseEditorMenuItem(app: ElectronApplication, label: string): Promise<void> {
@@ -18,6 +28,7 @@ async function chooseEditorMenuItem(app: ElectronApplication, label: string): Pr
 test.describe('editable node context menu', () => {
   test('routes Copy and Paste through the editor store path', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const editor = node(window, 1)
     await typeInto(editor, 'Context menu text')
     await window.keyboard.press('Meta+a')
@@ -35,6 +46,7 @@ test.describe('editable node context menu', () => {
 
   test('does not extend a text selection when the next node is right-clicked', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const first = node(window, 1)
     await writeClipboardText(app, 'https://first.example')
     await firePaste(first)

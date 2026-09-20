@@ -25,9 +25,11 @@ test.describe('shutdown failure handling', () => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
     allowRendererError(
-      /^Changes could not be saved: Error invoking remote method 'tree:save': Error: (?:EEXIST|ENOTDIR): /,
+      /^Changes could not be saved: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|ENOTDIR): /,
     )
-    allowRendererError(/^Operation failed: Error invoking remote method 'tree:save': Error: (?:EEXIST|ENOTDIR): /)
+    allowRendererError(
+      /^Operation failed: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|ENOTDIR): /,
+    )
     allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
 
     const dataDirectory = join(userDataDir, 'data')

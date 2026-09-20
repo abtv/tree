@@ -2,6 +2,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { acquireSystemClipboardLock, releaseSystemClipboardLock } from './clipboard-lock'
 import { cleanupStaleElectronProcesses } from './electron-process'
 
 export interface PersistedNode {
@@ -31,17 +32,34 @@ export interface Launched {
 
 export type WindowMode = 'hidden' | 'visible'
 
+export type ShortcutMode = 'real' | 'stub'
+
+// Every launch uses a user-data prefix that identifies this Playwright worker. Stale-process cleanup
+// then only ever addresses apps launched by this worker, so parallel workers cannot kill each
+// other's applications. `e2e/global-setup.ts` cleans leftovers from earlier runs before workers start.
+const userDataMarker = `tree-e2e-p${process.pid}-`
+
 // Hidden windows are the default so the suite does not steal desktop focus. Set
 // `TREE_E2E_VISIBLE=1` to watch the real UI, for example while product-verifying UI behavior.
 function ambientWindowMode(): WindowMode {
   return process.env['TREE_E2E_VISIBLE'] === '1' ? 'visible' : 'hidden'
 }
 
+// The global `Cmd+0` accelerator is machine-global, so parallel workers must stub it. Serial runs
+// (single worker, including visible product-verification runs) use the real registration.
+function ambientShortcutMode(): ShortcutMode {
+  return test.info().config.workers > 1 ? 'stub' : 'real'
+}
+
 // Playwright's Electron `env` option requires defined string values, which `process.env` does not
 // model. Replacing the child environment is required here because Playwright uses the given object
 // as the full child environment instead of merging it with `process.env`.
-function launchEnvironment(mode: WindowMode): Record<string, string> {
-  return { ...process.env, TREE_E2E_HIDDEN: mode === 'hidden' ? '1' : '0' } as Record<string, string>
+function launchEnvironment(mode: WindowMode, shortcutMode: ShortcutMode): Record<string, string> {
+  return {
+    ...process.env,
+    TREE_E2E_HIDDEN: mode === 'hidden' ? '1' : '0',
+    TREE_E2E_SHORTCUT_STUB: shortcutMode === 'stub' ? '1' : '0',
+  } as Record<string, string>
 }
 
 const launchedApps: ElectronApplication[] = []
@@ -55,26 +73,32 @@ const allowedRendererErrors: RegExp[] = []
 
 export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
-    const directory = mkdtempSync(join(tmpdir(), 'tree-e2e-'))
+    const directory = mkdtempSync(join(tmpdir(), userDataMarker))
     await use(directory)
-    await closeTrackedApps()
-    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
+    // Playwright caches imported helper modules for the lifetime of the worker process, so a hook
+    // declared here would attach only to the first test file's suite and silently stop running for
+    // later files. Fixture teardown runs for every test in every file.
+    try {
+      const observations = [...observedSaveErrors.values()]
+      await Promise.all(observations.map(({ collect }) => collect()))
+      await closeTrackedApps()
+      observations.forEach(({ timer }) => clearInterval(timer))
+      observedSaveErrors.clear()
+      const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
+      retainedSaveErrors.length = 0
+      const unexpectedErrors = errors.filter(
+        (message) => !allowedRendererErrors.some((pattern) => pattern.test(message)),
+      )
+      allowedRendererErrors.length = 0
+      if (unexpectedErrors.length > 0) {
+        throw new Error(`Renderer reported save errors:\n${unexpectedErrors.join('\n')}`)
+      }
+    } finally {
+      releaseSystemClipboardLock()
+      rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    }
   },
-})
-
-test.afterEach(async () => {
-  const observations = [...observedSaveErrors.values()]
-  await Promise.all(observations.map(({ collect }) => collect()))
-  await closeTrackedApps()
-  observations.forEach(({ timer }) => clearInterval(timer))
-  observedSaveErrors.clear()
-  const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
-  retainedSaveErrors.length = 0
-  const unexpectedErrors = errors.filter((message) => !allowedRendererErrors.some((pattern) => pattern.test(message)))
-  allowedRendererErrors.length = 0
-  if (unexpectedErrors.length > 0) {
-    throw new Error(`Renderer reported save errors:\n${unexpectedErrors.join('\n')}`)
-  }
 })
 
 export { expect }
@@ -260,20 +284,21 @@ async function waitForProcessExit(
 
 export async function launchTree(
   userDataDir: string,
-  options: { expectReady?: boolean; windows?: WindowMode } = {},
+  options: { expectReady?: boolean; windows?: WindowMode; shortcut?: ShortcutMode } = {},
 ): Promise<Launched> {
   await closeTrackedApps()
-  await cleanupStaleElectronProcesses('tree-e2e-')
+  await cleanupStaleElectronProcesses(userDataMarker)
   const windowMode = options.windows ?? ambientWindowMode()
+  const shortcutMode = options.shortcut ?? ambientShortcutMode()
   let app: ElectronApplication
   try {
     app = await electron.launch({
       args: [`--user-data-dir=${userDataDir}`, join(process.cwd(), 'e2e', 'electron-entry.cjs')],
       cwd: process.cwd(),
-      env: launchEnvironment(windowMode),
+      env: launchEnvironment(windowMode, shortcutMode),
     })
   } catch (error) {
-    await cleanupStaleElectronProcesses('tree-e2e-')
+    await cleanupStaleElectronProcesses(userDataMarker)
     throw new Error(`Electron failed to launch for E2E test: ${formatLaunchError(error)}`, { cause: error })
   }
   launchedApps.push(app)
@@ -287,6 +312,7 @@ export async function launchTree(
     const window = await app.firstWindow()
     await observeSaveErrors(window)
     await assertWindowMode(app, windowMode)
+    await assertShortcutMode(app, shortcutMode)
     if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
     return { app, window }
   } catch (error) {
@@ -313,6 +339,24 @@ async function assertWindowMode(app: ElectronApplication, mode: WindowMode): Pro
   }
   if (mode === 'visible' && visibility[0] === false) {
     throw new Error('The e2e window mode is visible, but the application window is hidden.')
+  }
+}
+
+// The shortcut mode is applied by the test-owned entry (`e2e/shortcut-stub.cjs`) and, like the
+// hidden-window override, depends on a Node module-load patch that an Electron or Node upgrade
+// could invalidate. Fail the launch immediately when the requested mode did not take effect instead
+// of silently registering the real machine-global accelerator in a parallel run.
+async function assertShortcutMode(app: ElectronApplication, mode: ShortcutMode): Promise<void> {
+  const registered = await app.evaluate(({ globalShortcut }) => globalShortcut.isRegistered('CommandOrControl+0'))
+  if (mode === 'stub' && registered) {
+    throw new Error(
+      'The e2e shortcut mode is stub, but the real global Cmd+0 shortcut is registered. The shortcut stub in e2e/shortcut-stub.cjs is not applying.',
+    )
+  }
+  if (mode === 'real' && !registered) {
+    throw new Error(
+      'The e2e shortcut mode is real, but the global Cmd+0 shortcut is not registered. The accelerator may be held by another process, or startup registration failed.',
+    )
   }
 }
 
@@ -509,7 +553,16 @@ export function documentGenerations(userDataDir: string): string[] {
     .sort((left, right) => Number(left.slice(9, -5)) - Number(right.slice(9, -5)))
 }
 
+// Tests that make the application read or write the system clipboard outside these helpers (for
+// example by pressing Cmd+C, Cmd+X, or a context-menu Copy item) must hold the clipboard lock for
+// the whole test. The helpers below acquire it automatically, and the fixture teardown releases it
+// after every test.
+export async function lockSystemClipboard(): Promise<void> {
+  await acquireSystemClipboardLock()
+}
+
 export async function writeClipboardText(app: ElectronApplication, text: string): Promise<void> {
+  await acquireSystemClipboardLock()
   await app.evaluate(async ({ clipboard }, value) => {
     clipboard.clear()
     await clipboard.writeText(value)
@@ -517,6 +570,7 @@ export async function writeClipboardText(app: ElectronApplication, text: string)
 }
 
 export async function writeClipboardImage(app: ElectronApplication): Promise<void> {
+  await acquireSystemClipboardLock()
   await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
     const png = nativeImage.createFromBitmap(Buffer.from([40, 90, 200, 255]), { width: 1, height: 1 }).toPNG()
     const item = new ClipboardItem({ 'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })
@@ -526,6 +580,7 @@ export async function writeClipboardImage(app: ElectronApplication): Promise<voi
 }
 
 export async function writeClipboardImageAndText(app: ElectronApplication): Promise<void> {
+  await acquireSystemClipboardLock()
   await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
     const png = nativeImage.createFromBitmap(Buffer.from([40, 90, 200, 255]), { width: 1, height: 1 }).toPNG()
     const item = new ClipboardItem({
@@ -538,6 +593,7 @@ export async function writeClipboardImageAndText(app: ElectronApplication): Prom
 }
 
 export async function writeClipboardImageSized(app: ElectronApplication, width: number, height: number): Promise<void> {
+  await acquireSystemClipboardLock()
   await app.evaluate(
     async ({ clipboard, ClipboardItem, nativeImage }, size) => {
       const pixels = Buffer.alloc(size.width * size.height * 4)
@@ -557,6 +613,7 @@ export async function writeClipboardImageSized(app: ElectronApplication, width: 
 }
 
 export async function firePaste(input: ReturnType<Page['locator']>): Promise<void> {
+  await acquireSystemClipboardLock()
   await input.evaluate((element) => {
     element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true }))
   })

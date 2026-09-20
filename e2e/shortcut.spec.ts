@@ -2,7 +2,7 @@ import { expect, launchTree, node, test, typeInto } from './fixtures'
 
 test.describe('Cmd+0', () => {
   test('is registered globally and preserves the document and selection', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir, { shortcut: 'real' })
 
     await typeInto(node(window, 1), 'Alpha')
     await window.keyboard.press('Enter')
@@ -22,7 +22,7 @@ test.describe('Cmd+0', () => {
 
 test.describe('Cmd+Q', () => {
   test('quits the application from an editable node', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir, { shortcut: 'real' })
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
 
     await node(window, 1)
@@ -33,7 +33,7 @@ test.describe('Cmd+Q', () => {
   })
 
   test('quits after an edit has queued persistence', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir, { shortcut: 'real' })
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
 
     await typeInto(node(window, 1), 'pending persistence '.repeat(100))

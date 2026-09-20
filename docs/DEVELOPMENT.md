@@ -151,7 +151,7 @@ End-to-end tests live in `e2e/` and run with:
 npm run test:e2e
 ```
 
-This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. The suite runs serially with a single worker because of the single-instance application and the global `Cmd+0` shortcut. The suite is macOS-only and requires a display.
+This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. Hidden runs execute spec files in parallel across three workers; visible runs stay serial. Parallel execution is safe because each worker cleans only its own `tree-e2e-p<pid>-` applications, the machine-global `Cmd+0` shortcut is stubbed for every launch except `e2e/shortcut.spec.ts`, and the shared system clipboard is serialized through a cross-process lock. The execution model and its rationale are recorded in `docs/decisions/0012-parallel-e2e-execution.md`. The suite is macOS-only, requires a display, and must not run as two concurrent Playwright invocations.
 
 Application windows are created hidden by default so the suite does not steal desktop focus. The test-owned entry `e2e/electron-entry.cjs` applies hidden mode through `e2e/hidden-windows.cjs` before the application bundle loads, and every launch asserts the selected window mode, so an Electron or Node upgrade that invalidates the override fails on the first launch instead of silently showing windows. Run with visible windows when observing the real UI, for example during product verification:
 
@@ -216,9 +216,9 @@ Shutdown and attachment changes should also verify that queued renderer saves ar
 
 The E2E and performance fixtures continuously observe the renderer's persistence and operation error messages. Any visible `.save-error` occurrence fails the test, including transient `Changes could not be saved:` and `Operation failed:` messages that disappear before the test completes. New persistence or autosave work must retain this guard and include a regression scenario for rapid edits or overlapping saves.
 
-The fixtures register each launched Electron child process before waiting for readiness. Teardown requests the application shutdown handshake, waits on the child process exit event, then uses bounded SIGTERM/SIGKILL escalation and fails if the owned process remains alive. Save-status observation uses both a DOM mutation observer and a final collection, so transient document-save and attachment-cleanup errors are retained even if the status disappears before test teardown. Observations are released with their owning app, so restart tests never query stale Playwright pages during worker teardown.
+The fixtures register each launched Electron child process before waiting for readiness. Teardown requests the application shutdown handshake, waits on the child process exit event, then uses bounded SIGTERM/SIGKILL escalation and fails if the owned process remains alive. Per-test teardown runs in the isolated-data fixture rather than a module-level hook, because Playwright caches imported helper modules for a worker's lifetime and a module-level hook would apply only to the first test file; the save-error guard and the clipboard-lock release share that teardown. Save-status observation uses both a DOM mutation observer and a final collection, so transient document-save and attachment-cleanup errors are retained even if the status disappears before test teardown. Observations are released with their owning app, so restart tests never query stale Playwright pages during worker teardown.
 
-If Electron shows a macOS crash dialog or a full suite fails during application launch, first treat it as a process-lifecycle failure. The E2E and performance fixtures clean up only stale Electron processes carrying their own temporary `tree-e2e-*` or `tree-perf-*` user-data marker, retry cleanup after launch failure, and include the launch error in the test failure. Do not use an unrestricted Electron process kill because it may terminate unrelated applications. After cleanup, rerun the isolated failing test and then the complete suite.
+If Electron shows a macOS crash dialog or a full suite fails during application launch, first treat it as a process-lifecycle failure. The E2E fixtures clean up stale applications per worker through their own `tree-e2e-p<pid>-` marker, and `e2e/global-setup.ts` removes leftovers from earlier runs before any worker starts. The performance fixtures clean up only stale Electron processes carrying their own temporary `tree-perf-*` user-data marker. Cleanup retries after launch failure and the launch error is included in the test failure. Do not use an unrestricted Electron process kill because it may terminate unrelated applications. After cleanup, rerun the isolated failing test and then the complete suite.
 
 File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttachment`, and `cleanupAttachments` operations, their phase, and the paths involved. Failures are logged with the original error message.
 
@@ -233,10 +233,10 @@ OpenCode uses the project configuration in `opencode.json`. Start a task with th
 3. Present the plan and material open decisions to the Product Owner, then wait for explicit approval.
 4. Record an approved substantive plan temporarily in `.opencode/plan.md`.
 5. Implement the approved scope and add or update the required tests.
-6. Run focused checks during development and `npm run check:full` before review.
+6. Run focused checks during development, including the E2E spec files that cover the changed behavior, and present that verification result to the review passes.
 7. Invoke the read-only `reviewer` and `product-verifier` subagents for independent passes.
-8. Resolve confirmed meaningful findings and rerun affected checks. Repeat a full review only after substantial or high-risk fixes.
-9. Run final `npm run check:full`.
+8. Resolve confirmed meaningful findings and rerun the affected checks. Repeat a full review only after substantial or high-risk fixes.
+9. Run the complete `npm run check:full` once per task, after the review findings are resolved and before the commit. Run the complete verification again only when a fix is substantial, architectural, or high-risk.
 10. Extract durable knowledge into current-state documentation or an ADR and delete the temporary plan.
 11. Review the diff and status, then create the final focused commit.
 
