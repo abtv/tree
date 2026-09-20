@@ -14,6 +14,24 @@ export default defineConfig({
         lines: 93,
         'src/domain/document.ts': { branches: 80 },
         'src/application/editor-store.ts': { branches: 80 },
+        'src/main/ipc-security.ts': {
+          statements: 90,
+          branches: 85,
+          functions: 100,
+          lines: 95,
+        },
+        'src/main/ipc-handlers.ts': {
+          statements: 95,
+          branches: 80,
+          functions: 100,
+          lines: 95,
+        },
+        'src/infrastructure/main/file-services.ts': {
+          statements: 90,
+          branches: 80,
+          functions: 95,
+          lines: 95,
+        },
       },
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
