@@ -170,7 +170,9 @@
           "basename *": "allow",
           "dirname *": "allow",
           "realpath *": "allow",
-          "which *": "allow"
+          "which *": "allow",
+          "unzip -l test-results/*/trace.zip": "allow",
+          "unzip -q -o test-results/*/trace.zip -d test-results/trace-unpacked": "allow"
         },
         "task": {
           "*": "deny",

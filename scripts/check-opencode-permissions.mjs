@@ -55,6 +55,8 @@ const cases = {
     'rg permission opencode.json',
     'sed -n 1,80p opencode.json',
     'pkill -f tree-e2e-example',
+    'unzip -l test-results/example/trace.zip',
+    'unzip -q -o test-results/example/trace.zip -d test-results/trace-unpacked',
   ],
   ask: [
     'curl https://example.com',
@@ -97,6 +99,10 @@ const cases = {
   ],
 }
 
+for (const command of ['unzip archive.zip', 'unzip -q -o test-results/example/trace.zip -d src']) {
+  assert.equal(permissionFor(command), 'ask', `${command} should resolve to ask`)
+}
+
 for (const [expected, commands] of Object.entries(cases)) {
   for (const command of commands) {
     assert.equal(permissionFor(command), expected, `${command} should resolve to ${expected}`)
@@ -113,4 +119,4 @@ for (const command of ['rg TODO src', 'curl https://example.com']) {
   assert.equal(permissionFor(command), expected, `mixed pipeline segment should resolve to ${expected}`)
 }
 
-console.log(`Checked ${Object.values(cases).flat().length + 4} OpenCode permission expectations.`)
+console.log(`Checked ${Object.values(cases).flat().length + 6} OpenCode permission expectations.`)
