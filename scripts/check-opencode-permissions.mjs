@@ -29,6 +29,38 @@ function permissionFor(command) {
   return permission
 }
 
+// OpenCode checks every parsed command in a pipeline; the strongest effect wins. Split on
+// unquoted pipes only, so an alternation such as -E "flake|retry" stays one argument.
+function pipelinePermissionFor(command) {
+  const segments = []
+  let current = ''
+  let quote
+  for (const character of command) {
+    if (quote !== undefined) {
+      current += character
+      if (character === quote) quote = undefined
+      continue
+    }
+    if (character === '"' || character === "'") {
+      quote = character
+      current += character
+      continue
+    }
+    if (character === '|') {
+      segments.push(current.trim())
+      current = ''
+      continue
+    }
+    current += character
+  }
+  segments.push(current.trim())
+
+  const effects = segments.map((segment) => permissionFor(segment))
+  if (effects.includes('deny')) return 'deny'
+  if (effects.includes('ask')) return 'ask'
+  return 'allow'
+}
+
 const cases = {
   allow: [
     'git status --short',
@@ -57,11 +89,30 @@ const cases = {
     'pkill -f tree-e2e-example',
     'unzip -l test-results/example/trace.zip',
     'unzip -q -o test-results/example/trace.zip -d test-results/trace-unpacked',
+    'grep -i flake src/renderer/NodeList.tsx',
+    'xxd test-results/example/trace.zip',
+    'shasum test-results/example/trace.zip',
+    'cksum test-results/example/trace.zip',
+    'md5 test-results/example/trace.zip',
+    'tmutil listlocalsnapshots /',
+    'mkdir -p test-results/trace-unpacked',
+    'npx tsc --noEmit -p tsconfig.e2e.json',
+    'git grep permission',
+    'git ls-files e2e',
+    'git rev-parse HEAD',
+    'git blame src/renderer/NodeList.tsx',
+    'cp test-results/example/trace.zip test-results/keep.zip',
+    'cp -R test-results/example test-results/keep',
+    'mv e2e/_drag-diagnostic.spec.ts test-results/',
+    'mv test-results/keep.zip test-results/archive.zip',
   ],
   ask: [
     'curl https://example.com',
     'cp source destination',
     'mv source destination',
+    'cp test-results/example/trace.zip ~/.ssh/authorized_keys',
+    'mv src/domain test-results/domain',
+    'mv e2e/history.spec.ts test-results/',
     'npm run unknown',
     'npm run unknown 2>&1',
   ],
@@ -96,6 +147,9 @@ const cases = {
     'find src -exec rm {} +',
     "rg --pre 'node helper.js' pattern",
     "sed -i '' s/a/b/ file.txt",
+    'git grep --open-files-in-pager=less pattern',
+    'git grep --open=sh pattern',
+    'git grep -O less pattern',
   ],
 }
 
@@ -119,4 +173,12 @@ for (const command of ['rg TODO src', 'curl https://example.com']) {
   assert.equal(permissionFor(command), expected, `mixed pipeline segment should resolve to ${expected}`)
 }
 
-console.log(`Checked ${Object.values(cases).flat().length + 6} OpenCode permission expectations.`)
+for (const [command, expected] of [
+  ['git log --oneline --all | grep -i -E "flake|retry|stabil|hold" | head -20', 'allow'],
+  ['git log --oneline|curl https://example.com', 'ask'],
+  ['git log --oneline | sudo cat /etc/hosts', 'deny'],
+]) {
+  assert.equal(pipelinePermissionFor(command), expected, `pipeline should resolve to ${expected}: ${command}`)
+}
+
+console.log(`Checked ${Object.values(cases).flat().length + 9} OpenCode permission expectations.`)
