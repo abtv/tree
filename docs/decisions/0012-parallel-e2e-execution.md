@@ -25,7 +25,7 @@ While implementing the change, an additional latent defect surfaced: the suite's
 
 ## Decision
 
-Hidden end-to-end runs execute spec files in parallel across three workers in `playwright.config.ts`; visible runs stay serial because they observe the real desktop UI. `fullyParallel` stays false so a spec file remains on one worker.
+Hidden end-to-end runs execute spec files in parallel across five workers in `playwright.config.ts`; visible runs stay serial because they observe the real desktop UI. `fullyParallel` stays false so a spec file remains on one worker. Playwright's `--workers` option remains the tuning escape hatch for environments, including future CI runners, that need a different concurrency limit.
 
 Worker isolation:
 
@@ -38,7 +38,7 @@ Per-test teardown — the save-error guard, app cleanup, and clipboard-lock rele
 ## Consequences
 
 - This ADR refines ADR 0002's serial-execution consequence and builds on ADR 0011's hidden-window mode. The rest of both decisions stands.
-- Measured on the development machine, the hidden suite drops from about 2.3 minutes to about 1.2 minutes; `--workers` remains a tuning escape hatch.
+- The initial three-worker implementation reduced the hidden suite from about 2.3 minutes to about 1.2 minutes on the development machine. Increasing the configured worker count to five reduced three subsequent runs to 58.0–58.9 seconds; `--workers` remains a tuning escape hatch.
 - The real global `Cmd+0` registration is covered only by `e2e/shortcut.spec.ts` during parallel runs; every other launch asserts the stub instead. Visible and single-worker runs keep the real registration everywhere.
 - The clipboard lock serializes the clipboard-sharing portion of the suite; it is a correctness boundary, not an optimization target. It is best-effort test tooling that prevents normal cross-worker interference and reclaims locks left by crashed workers; it is not a general-purpose mutual-exclusion primitive.
 - Two concurrent Playwright invocations remain unsupported and would terminate each other's applications.
