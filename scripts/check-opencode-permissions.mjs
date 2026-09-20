@@ -29,28 +29,48 @@ function permissionFor(command) {
   return permission
 }
 
-// OpenCode checks every parsed command in a pipeline; the strongest effect wins. Split on
-// unquoted pipes only, so an alternation such as -E "flake|retry" stays one argument.
-function pipelinePermissionFor(command) {
+// OpenCode checks every parsed command in a pipeline or chain and applies the strongest
+// effect across the segments. Split on unquoted &&, ||, ;, and |, so quoted separators such
+// as -E "flake|retry" and awk '$1 == "a" || $2 == "b"' stay inside one segment.
+function chainedPermissionFor(command) {
   const segments = []
   let current = ''
   let quote
-  for (const character of command) {
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index]
+
     if (quote !== undefined) {
       current += character
       if (character === quote) quote = undefined
       continue
     }
+
     if (character === '"' || character === "'") {
       quote = character
       current += character
       continue
     }
+
+    const next = command[index + 1]
+    if (character === '&' && next === '&') {
+      segments.push(current.trim())
+      current = ''
+      index += 1
+      continue
+    }
     if (character === '|') {
+      segments.push(current.trim())
+      current = ''
+      if (next === '|') index += 1
+      continue
+    }
+    if (character === ';') {
       segments.push(current.trim())
       current = ''
       continue
     }
+
     current += character
   }
   segments.push(current.trim())
@@ -82,9 +102,11 @@ const cases = {
     'rm -f .opencode/plan.md',
     'npx vitest run src/domain/tree.test.ts',
     'npx playwright test e2e/tree.spec.ts',
+    'true',
     'find src -type d',
     'sort',
     'rg permission opencode.json',
+    'rg TODO src',
     'sed -n 1,80p opencode.json',
     'pkill -f tree-e2e-example',
     'unzip -l test-results/example/trace.zip',
@@ -105,6 +127,30 @@ const cases = {
     'cp -R test-results/example test-results/keep',
     'mv e2e/_drag-diagnostic.spec.ts test-results/',
     'mv test-results/keep.zip test-results/archive.zip',
+    // Chained commands from real sessions: each segment must resolve to allow.
+    'ls -la .opencode; git stash list; git branch -a',
+    'rg pattern . || true',
+    "rg -il \"concentration|three-part|editor-store split|Task 3\" . --hidden -g '!node_modules' -g '!.git' || true",
+    "find src -name '*.ts' -o -name '*.tsx' | xargs wc -l | sort -rn | head -40",
+    'find src -type d | xargs wc -l | sort -rn | head -40',
+    "awk 'NR>=1 && NR<=5' file.ts",
+    "awk 'NR>=18825 && NR<=19200 && /waitForEvent/' node_modules/playwright-core/types/types.d.ts",
+    // Quoted separators stay inside one segment: logical || and --field-separator are allowed.
+    'awk \'$1 == "a" || $2 == "b"\' file.ts',
+    "awk --field-separator=: '{print $1}' file.ts",
+    // The awk execution denies must not over-block benign programs on spacing or filenames.
+    "awk -F' | ' '{print $1}' file.ts",
+    "awk '{print}' system.log",
+    'git log --grep="wip; fix" --oneline',
+    'git log --oneline --all | grep -i -E "flake|retry|stabil|hold" | head -20',
+    'git branch',
+    'git branch -a',
+    'git branch -v',
+    'git branch -vv',
+    'git branch --list',
+    'git branch --show-current',
+    'git stash list',
+    'git stash list --oneline',
   ],
   ask: [
     'curl https://example.com',
@@ -115,6 +161,15 @@ const cases = {
     'mv e2e/history.spec.ts test-results/',
     'npm run unknown',
     'npm run unknown 2>&1',
+    'unzip archive.zip',
+    'unzip -q -o test-results/example/trace.zip -d src',
+    // One asking segment makes the whole chain ask.
+    'npm run build && curl https://example.com',
+    'git stash list; curl https://example.com',
+    'git log --oneline|curl https://example.com',
+    // Generic xargs is not allowlisted; only xargs wc * is.
+    'xargs rm -rf src',
+    'xargs sh -c "git push"',
   ],
   deny: [
     'sudo npm run check',
@@ -150,35 +205,36 @@ const cases = {
     'git grep --open-files-in-pager=less pattern',
     'git grep --open=sh pattern',
     'git grep -O less pattern',
+    // Only read-only branch and stash forms are allowlisted.
+    'git branch -d feature',
+    'git branch -D main',
+    'git branch -m old new',
+    'git branch -M old new',
+    'git branch --delete main',
+    'git branch --move old new',
+    'git branch --list -D main',
+    'git stash',
+    'git stash drop',
+    'git stash pop',
+    'git stash clear',
+    'git stash apply',
+    'git stash push -m wip',
+    // One denied segment makes the whole chain deny.
+    'ls; git push origin main',
+    'git log --oneline && git push',
+    'git log --oneline | sudo cat /etc/hosts',
+    // awk system() calls and program file loading are denied.
+    'awk \'BEGIN{system("id")}\'',
+    'awk \'BEGIN{system ("id")}\'',
+    'awk -f script.awk file.ts',
+    "awk '{print}' --file=script.awk",
   ],
-}
-
-for (const command of ['unzip archive.zip', 'unzip -q -o test-results/example/trace.zip -d src']) {
-  assert.equal(permissionFor(command), 'ask', `${command} should resolve to ask`)
 }
 
 for (const [expected, commands] of Object.entries(cases)) {
   for (const command of commands) {
-    assert.equal(permissionFor(command), expected, `${command} should resolve to ${expected}`)
+    assert.equal(chainedPermissionFor(command), expected, `${command} should resolve to ${expected}`)
   }
 }
 
-// OpenCode checks every parsed command in a pipeline; all segments must be allowed.
-for (const command of ['find src -type d', 'sort']) {
-  assert.equal(permissionFor(command), 'allow', `pipeline segment should be allowed: ${command}`)
-}
-
-for (const command of ['rg TODO src', 'curl https://example.com']) {
-  const expected = command.startsWith('rg ') ? 'allow' : 'ask'
-  assert.equal(permissionFor(command), expected, `mixed pipeline segment should resolve to ${expected}`)
-}
-
-for (const [command, expected] of [
-  ['git log --oneline --all | grep -i -E "flake|retry|stabil|hold" | head -20', 'allow'],
-  ['git log --oneline|curl https://example.com', 'ask'],
-  ['git log --oneline | sudo cat /etc/hosts', 'deny'],
-]) {
-  assert.equal(pipelinePermissionFor(command), expected, `pipeline should resolve to ${expected}: ${command}`)
-}
-
-console.log(`Checked ${Object.values(cases).flat().length + 9} OpenCode permission expectations.`)
+console.log(`Checked ${Object.values(cases).flat().length} OpenCode permission expectations.`)
