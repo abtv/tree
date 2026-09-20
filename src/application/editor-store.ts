@@ -3,7 +3,6 @@ import {
   createInitialDocument,
   deleteLink,
   editNodeContent,
-  isHttpUrl,
   isValidLocation,
   locateNode,
   parsePersistedState,
@@ -13,16 +12,12 @@ import {
   type AttachmentId,
   type AttachmentReference,
   type Document,
-  type Location,
   type LinkRange,
+  type Location,
   type NodeId,
-  type PersistedEditorState,
 } from '../domain/document'
 import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
-import type { ClipboardPayload } from '../shared/ipc'
-import type { ClipboardWritePayload } from '../shared/ipc'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
-import { EditorHistory } from './editor-history'
 import {
   ancestorNavigationTransition,
   createSiblingOrFirstChildTransition,
@@ -34,90 +29,44 @@ import {
   moveNodeTransition,
   moveSelectionTransition,
 } from './editor-command-transitions'
-import { PersistenceCoordinator, type PersistenceFailureKind } from './persistence-coordinator'
+import { clipboardIntroducesLink, hasNewLink, nodeContent, sameNodeContent } from './editor-content-changes'
+import { EditorHistory } from './editor-history'
+import { EditorSaveScheduler } from './editor-save-scheduler'
+import { EditorTextSession } from './editor-text-session'
 import {
-  CLEANUP_MAX_CONSECUTIVE_FAILURES,
-  countInsertedWords,
-  countPastedWords,
-  SAVE_IDLE_MILLISECONDS,
-  SAVE_MAX_CONSECUTIVE_FAILURES,
-  SAVE_WORD_THRESHOLD,
-} from './save-policy'
+  systemClock,
+  type Clock,
+  type EditorServices,
+  type EditorSnapshot,
+  type FocusIntent,
+} from './editor-store-types'
+import type { PersistenceFailureKind } from './persistence-coordinator'
+import { countInsertedWords, countPastedWords } from './save-policy'
 
-export type ClipboardValue = ClipboardPayload
-
-export interface EditorServices {
-  load(): Promise<unknown | null>
-  save(state: PersistedEditorState): Promise<void>
-  readClipboard(): Promise<ClipboardValue>
-  writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
-  writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
-  cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
-}
-
-export interface Clock {
-  setTimeout(callback: () => void, milliseconds: number): unknown
-  clearTimeout(handle: unknown): void
-}
-
-export interface FocusIntent {
-  nodeId: NodeId
-  cursor: number
-  token: number
-}
-
-export type EditorSnapshot =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | {
-      status: 'ready'
-      document: Document
-      location: Location
-      focus: FocusIntent
-      structuralVersion: number
-      saveError?: string
-      operationError?: string
-      persistenceLocked?: boolean
-      quitWithoutSavingPrompt?: boolean
-    }
-
-const systemClock: Clock = {
-  setTimeout: (callback, milliseconds) => globalThis.setTimeout(callback, milliseconds),
-  clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
-}
+export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 
 export class EditorStore {
   private readonly listeners = new Set<() => void>()
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
-  private readonly persistence: PersistenceCoordinator
+  private readonly textSession: EditorTextSession
+  private readonly saveScheduler: EditorSaveScheduler
   private snapshot: EditorSnapshot = { status: 'loading' }
   private structuralVersion = 0
-  private activeTextNodeId: NodeId | undefined
-  private textTimer: unknown
-  private saveTimer: unknown
-  private changesPending = false
-  private insertedWordsWatermark = 0
-  private savedWordsWatermark = 0
-  private pendingSaveWatermark: number | undefined
-  private standaloneNextTextEdit = false
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
   private focusToken = 0
-  private consecutiveSaveFailures = 0
-  private consecutiveCleanupFailures = 0
   public constructor(
     private readonly services: EditorServices,
     private readonly createId: () => string,
-    private readonly clock: Clock = systemClock,
+    clock: Clock = systemClock,
   ) {
-    this.persistence = new PersistenceCoordinator(services, {
+    this.textSession = new EditorTextSession(clock)
+    this.saveScheduler = new EditorSaveScheduler(services, clock, {
       currentState: () => (this.snapshot.status === 'ready' ? this.snapshot : undefined),
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
-      hasPendingDocumentChanges: () => this.changesPending,
-      onSaveCaptured: () => this.handleSaveCaptured(),
-      onDocumentSaved: () => this.handleDocumentSaved(),
-      onResult: (error, kind) => this.handlePersistenceResult(error, kind),
+      isPersistenceLocked: () => this.isPersistenceLocked(),
+      onPersistenceResult: (error, kind) => this.handlePersistenceResult(error, kind),
     })
   }
 
@@ -131,9 +80,9 @@ export class EditorStore {
   public async flushPersistence(): Promise<void> {
     do {
       await Promise.all(this.pendingEdits)
-      if (this.changesPending) this.requestPolicySave()
-      await this.persistence.flush()
-    } while (this.pendingEdits.size > 0 || this.changesPending)
+      if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave()
+      await this.saveScheduler.flush()
+    } while (this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
   }
 
   public reportError(error: unknown): void {
@@ -170,7 +119,7 @@ export class EditorStore {
           structuralVersion: this.structuralVersion,
         }
         this.emit()
-        this.persistence.requestSave()
+        this.saveScheduler.requestSave()
         this.queueAttachmentCleanup()
         return
       }
@@ -216,21 +165,18 @@ export class EditorStore {
     if (node.text === text) {
       return
     }
-    if (this.activeTextNodeId !== nodeId) {
-      this.endTextSession()
+    if (!this.textSession.isActive(nodeId)) {
+      this.textSession.end()
       if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-      this.activeTextNodeId = nodeId
+      this.textSession.begin(nodeId)
     }
     const insertedWords = countInsertedWords(node.text, text)
     const linkInserted = hasNewLink(node.links, links)
     const next = editNodeContent(state.document, nodeId, text, links)
     this.replaceReady({ ...state, document: next })
     this.noteChange(insertedWords, linkInserted)
-    this.scheduleTextBoundary()
-    if (this.standaloneNextTextEdit) {
-      this.standaloneNextTextEdit = false
-      this.endTextSession()
-    }
+    this.textSession.scheduleBoundary()
+    this.textSession.endIfStandalone()
   }
 
   public deleteLink(nodeId: NodeId, cursor: number): boolean {
@@ -291,16 +237,11 @@ export class EditorStore {
   }
 
   public endTextSession(): void {
-    this.activeTextNodeId = undefined
-    if (this.textTimer !== undefined) {
-      this.clock.clearTimeout(this.textTimer)
-      this.textTimer = undefined
-    }
+    this.textSession.end()
   }
 
   public markNextTextEditStandalone(): void {
-    this.endTextSession()
-    this.standaloneNextTextEdit = true
+    this.textSession.markNextEditStandalone()
   }
 
   public moveSelection(direction: 'up' | 'down', cursor: number): void {
@@ -538,13 +479,6 @@ export class EditorStore {
     this.markPersistedChange()
   }
 
-  private scheduleTextBoundary(): void {
-    if (this.textTimer !== undefined) {
-      this.clock.clearTimeout(this.textTimer)
-    }
-    this.textTimer = this.clock.setTimeout(() => this.endTextSession(), 5_000)
-  }
-
   private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, changedStructure = false): void {
     const previous = this.snapshot
     if (changedStructure) this.structuralVersion += 1
@@ -562,44 +496,19 @@ export class EditorStore {
   }
 
   private markPersistedChange(): void {
-    this.changesPending = true
-    if (this.snapshot.status === 'ready' && this.snapshot.persistenceLocked === true) return
-    this.scheduleIdleSave()
+    this.saveScheduler.markPersistedChange()
   }
 
   private noteChange(insertedWords: number, saveImmediately: boolean): void {
-    if (insertedWords > 0) {
-      this.insertedWordsWatermark += insertedWords
-      if (this.insertedWordsWatermark - this.savedWordsWatermark >= SAVE_WORD_THRESHOLD) saveImmediately = true
-    }
-    this.markPersistedChange()
-    if (saveImmediately) this.requestPolicySave()
+    this.saveScheduler.noteChange(insertedWords, saveImmediately)
   }
 
   private requestImmediateSave(): void {
-    this.requestPolicySave()
-  }
-
-  private requestPolicySave(): void {
-    if (!this.changesPending) return
-    if (this.saveTimer !== undefined) {
-      this.clock.clearTimeout(this.saveTimer)
-      this.saveTimer = undefined
-    }
-    this.changesPending = false
-    this.persistence.requestSave()
-  }
-
-  private scheduleIdleSave(): void {
-    if (this.saveTimer !== undefined) this.clock.clearTimeout(this.saveTimer)
-    this.saveTimer = this.clock.setTimeout(() => {
-      this.saveTimer = undefined
-      this.requestPolicySave()
-    }, SAVE_IDLE_MILLISECONDS)
+    this.saveScheduler.requestImmediateSave()
   }
 
   private queueAttachmentCleanup(): void {
-    this.persistence.requestAttachmentCleanup()
+    this.saveScheduler.requestAttachmentCleanup()
   }
 
   private referencedAttachmentIds(): Set<AttachmentId> {
@@ -612,21 +521,10 @@ export class EditorStore {
     return ids
   }
 
-  private handleSaveCaptured(): void {
-    this.pendingSaveWatermark = this.insertedWordsWatermark
-  }
-
-  private handleDocumentSaved(): void {
-    if (this.pendingSaveWatermark === undefined) return
-    this.savedWordsWatermark = Math.max(this.savedWordsWatermark, this.pendingSaveWatermark)
-    this.pendingSaveWatermark = undefined
-  }
-
   private handlePersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void {
     if (this.snapshot.status !== 'ready') return
     if (error === undefined) {
-      this.consecutiveSaveFailures = 0
-      this.consecutiveCleanupFailures = 0
+      this.saveScheduler.resetFailures()
       const changed =
         this.snapshot.saveError !== undefined ||
         this.snapshot.persistenceLocked === true ||
@@ -640,35 +538,22 @@ export class EditorStore {
       return
     }
     if (kind === 'cleanup') {
-      this.consecutiveCleanupFailures += 1
-      this.consecutiveSaveFailures = 0
+      const retry = this.saveScheduler.registerCleanupFailure()
       this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
-      if (this.consecutiveCleanupFailures < CLEANUP_MAX_CONSECUTIVE_FAILURES) this.scheduleCleanupRetry()
+      if (retry) this.saveScheduler.scheduleCleanupRetry()
       this.emit()
       return
     }
-    if (kind === 'save') this.consecutiveSaveFailures += 1
-    this.changesPending = true
+    const retry = this.saveScheduler.registerSaveFailure(kind)
     this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
-    if (this.consecutiveSaveFailures < SAVE_MAX_CONSECUTIVE_FAILURES) {
-      this.scheduleIdleSave()
+    if (retry) {
+      this.saveScheduler.scheduleIdleSave()
     } else {
-      if (this.saveTimer !== undefined) {
-        this.clock.clearTimeout(this.saveTimer)
-        this.saveTimer = undefined
-      }
+      this.saveScheduler.cancelSaveTimer()
       this.snapshot = { ...this.snapshot, persistenceLocked: true }
-      this.persistence.discardPendingSaves()
+      this.saveScheduler.discardPendingSaves()
     }
     this.emit()
-  }
-
-  private scheduleCleanupRetry(): void {
-    if (this.saveTimer !== undefined) this.clock.clearTimeout(this.saveTimer)
-    this.saveTimer = this.clock.setTimeout(() => {
-      this.saveTimer = undefined
-      this.persistence.requestAttachmentCleanup()
-    }, SAVE_IDLE_MILLISECONDS)
   }
 
   private isPersistenceLocked(): boolean {
@@ -694,46 +579,4 @@ export class EditorStore {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : GENERIC_OPERATION_ERROR
-}
-
-interface NodeContent {
-  text: string
-  links: LinkRange[]
-}
-
-function nodeContent(node: { text: string; links?: readonly LinkRange[] }): NodeContent {
-  return { text: node.text, links: (node.links ?? []).map((link) => ({ ...link })) }
-}
-
-function sameNodeContent(node: { text: string; links?: readonly LinkRange[] }, expected: NodeContent): boolean {
-  if (node.text !== expected.text) return false
-  const links = node.links ?? []
-  return (
-    links.length === expected.links.length &&
-    links.every((link, index) => {
-      const other = expected.links[index]
-      return other !== undefined && link.start === other.start && link.end === other.end && link.url === other.url
-    })
-  )
-}
-
-function hasNewLink(existing: readonly LinkRange[] | undefined, next: readonly LinkRange[]): boolean {
-  const remaining = new Map<string, number>()
-  for (const link of existing ?? []) {
-    remaining.set(link.url, (remaining.get(link.url) ?? 0) + 1)
-  }
-  for (const link of next) {
-    const count = remaining.get(link.url) ?? 0
-    if (count === 0) return true
-    remaining.set(link.url, count - 1)
-  }
-  return false
-}
-
-function clipboardIntroducesLink(clipboard: Extract<ClipboardPayload, { kind: 'text' }>): boolean {
-  if (clipboard.links !== undefined && clipboard.links.length > 0) return true
-  return clipboard.text
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .some((line) => isHttpUrl(line))
 }

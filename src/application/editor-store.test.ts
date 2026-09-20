@@ -2173,6 +2173,48 @@ describe('EditorStore', () => {
     expect(pending).toHaveLength(3)
   })
 
+  it('cancels a pending idle save when the third consecutive failure locks the editor', async () => {
+    const { services, pending } = deferredSaveServices()
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('root'), clock)
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    const tenWords = 'one two three four five six seven eight nine ten '
+    store.editText('root', tenWords)
+    await tick()
+    pending[0]!.reject(new Error('first save failed'))
+    await tick()
+    await tick()
+
+    clock.runAll()
+    await tick()
+    pending[1]!.reject(new Error('second save failed'))
+    await tick()
+    await tick()
+
+    clock.runAll()
+    await tick()
+    expect(pending).toHaveLength(3)
+
+    store.selectNode('root', 0)
+
+    pending[2]!.reject(new Error('third save failed'))
+    await tick()
+    await tick()
+
+    const locked = store.getSnapshot()
+    expect(locked.status === 'ready' && locked.persistenceLocked).toBe(true)
+    expect(services.saves).toHaveLength(3)
+    expect(pending).toHaveLength(3)
+
+    clock.runAll()
+    await tick()
+    expect(services.saves).toHaveLength(3)
+    expect(pending).toHaveLength(3)
+  })
+
   it('prompts for quit without saving only while locked and dismisses it', async () => {
     const unlockedServices = createServices()
     const unlocked = new EditorStore(unlockedServices, ids('root'), new FakeClock())

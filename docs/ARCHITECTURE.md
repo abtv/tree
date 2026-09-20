@@ -625,6 +625,8 @@ The renderer currently isolates DOM/caret behavior in `editor-dom.ts`, location 
 
 The domain currently isolates shared document types, hyperlink normalization, the derived node index, attachment accounting, tree operations, and persisted-state parsing in `document-types.ts`, `document-links.ts`, `document-index.ts`, `document-attachments.ts`, `document-operations.ts`, and `document-serialization.ts`. `document.ts` remains the public domain entry point and re-exports the domain API from those modules.
 
+The application layer currently isolates the editor store's shared types, pure content-change helpers, text-session boundary state, and save scheduling and watermark accounting in `editor-store-types.ts`, `editor-content-changes.ts`, `editor-text-session.ts`, and `editor-save-scheduler.ts`. `editor-store.ts` remains the public application entry point: it assembles those collaborators, owns the emitted editor snapshot, and re-exports the public API.
+
 Do not create empty architectural layers solely to match this diagram.
 
 ---

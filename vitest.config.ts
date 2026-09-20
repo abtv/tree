@@ -13,6 +13,7 @@ export default defineConfig({
         functions: 92,
         lines: 93,
         'src/domain/document-operations.ts': { branches: 80 },
+        'src/application/editor-save-scheduler.ts': { branches: 80 },
         'src/application/editor-store.ts': { branches: 80 },
         'src/main/ipc-security.ts': {
           statements: 90,
