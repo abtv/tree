@@ -10,6 +10,7 @@ import {
   node,
   readPersisted,
   test,
+  tryReadPersisted,
   typeInto,
   writeClipboardImage,
 } from './fixtures'
@@ -88,7 +89,9 @@ test.describe('attachment validation and image failures', () => {
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
+      .toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
     const closed = new Promise<void>((resolve) => first.app.once('close', resolve))
     await clickApplicationMenuQuit(first.app)

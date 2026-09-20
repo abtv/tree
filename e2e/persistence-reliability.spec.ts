@@ -14,6 +14,7 @@ import {
   readPersisted,
   seedDocument,
   test,
+  tryReadPersisted,
   typeInto,
   writeClipboardImage,
 } from './fixtures'
@@ -394,7 +395,7 @@ test.describe('persistence reliability regressions', () => {
     await firePaste(node(window, 1))
     await expect(window.getByAltText('Attached image')).toBeVisible()
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id ?? null, { timeout: 10_000 })
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id ?? null, { timeout: 10_000 })
       .not.toBeNull()
     const attachmentId = readPersisted(userDataDir).document.roots[0]?.attachment?.id
     expect(attachmentId).toEqual(expect.any(String))

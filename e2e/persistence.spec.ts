@@ -9,9 +9,12 @@ import {
   launchTree,
   node,
   parent,
+  readMainWindowBounds,
   readPersisted,
   seedDocument,
+  setMainWindowBounds,
   test,
+  tryReadPersisted,
   tryReadWindowBounds,
   typeInto,
   writeClipboardImage,
@@ -79,7 +82,7 @@ test.describe('persistence', () => {
     const text = 'rapid '.repeat(100)
 
     await typeInto(node(window, 1), text)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text, { timeout: 15_000 }).toBe(text)
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, { timeout: 15_000 }).toBe(text)
   })
 
   test('restores the document, current parent, and selected node after restart', async ({ userDataDir }) => {
@@ -109,16 +112,12 @@ test.describe('persistence', () => {
     const first = await launchTree(userDataDir)
     const requestedBounds = { x: 120, y: 140, width: 900, height: 600 }
 
-    await first.app.evaluate(({ BrowserWindow }, bounds) => {
-      BrowserWindow.getFocusedWindow()?.setBounds(bounds)
-    }, requestedBounds)
+    await setMainWindowBounds(first.app, requestedBounds)
     await expect.poll(() => tryReadWindowBounds(userDataDir)).toEqual(requestedBounds)
 
     await closeApp(first.app)
     const second = await launchTree(userDataDir)
-    const restoredBounds = await second.app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getFocusedWindow()?.getBounds(),
-    )
+    const restoredBounds = await readMainWindowBounds(second.app)
 
     expect(restoredBounds).toEqual(expect.objectContaining(requestedBounds))
   })
@@ -130,7 +129,9 @@ test.describe('persistence', () => {
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
+      .toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await closeApp(first.app)
@@ -161,7 +162,9 @@ test.describe('persistence', () => {
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
+      .toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()
@@ -194,7 +197,9 @@ test.describe('persistence', () => {
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
+      .toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()

@@ -11,6 +11,7 @@ import {
   node,
   readPersisted,
   test,
+  tryReadPersisted,
   typeInto,
   writeClipboardImage,
 } from './fixtures'
@@ -52,7 +53,9 @@ test.describe('attachment cleanup', () => {
     await writeClipboardImage(app)
     await firePaste(node(window, 2))
     await expect(window.getByAltText('Attached image')).toHaveCount(1)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[1]?.attachment?.id).toEqual(expect.any(String))
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[1]?.attachment?.id)
+      .toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[1]!.attachment!.id
     expect(existsSync(attachmentPath(userDataDir, attachmentId))).toBe(true)
 
@@ -61,8 +64,8 @@ test.describe('attachment cleanup', () => {
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     const cleanupsBefore = await readCleanupCount(app)
     await typeInto(node(window, 1), ' one two three four five six seven eight nine ten')
-    await expect.poll(() => readPersisted(userDataDir).document.roots.length).toBe(1)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment).toBeUndefined()
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots.length ?? 0).toBe(1)
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment).toBeUndefined()
 
     // The automatic cleanup that follows the save retains the file because the undo history and a
     // recovery generation still reference the attachment.

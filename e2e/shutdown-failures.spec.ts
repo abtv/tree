@@ -5,6 +5,7 @@ import {
   allowRendererError,
   blockSaves,
   clickApplicationMenuQuit,
+  closeMainWindow,
   delaySaveIpc,
   documentPath,
   exactMessage,
@@ -14,6 +15,7 @@ import {
   readPersisted,
   restoreSaves,
   test,
+  tryReadPersisted,
   typeInto,
   waitForDelayedSave,
 } from './fixtures'
@@ -50,7 +52,7 @@ test.describe('shutdown failure handling', () => {
 
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
     await expect
-      .poll(() => (existsSync(documentPath(userDataDir)) ? readPersisted(userDataDir).document.roots[0]?.text : ''), {
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text ?? '', {
         timeout: 15_000,
       })
       .toBe(`${initialText}${recoveryText}`)
@@ -104,7 +106,28 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), text)
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closeMainWindow(app)
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
+  })
+
+  test('flushes pending changes and quits when the window is closed while the application is not frontmost', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    const text = 'hidden window close flush pending'
+
+    await typeInto(node(window, 1), text)
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
+
+    // The application is inactive from here on, so the focused-window selector returns null.
+    await app.evaluate(({ app: electronApp }) => electronApp.hide())
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow() === null)).toBe(true)
+
+    const closed = app.waitForEvent('close', { timeout: 10_000 })
+    await closeMainWindow(app)
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
@@ -169,7 +192,7 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), initialText)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closeMainWindow(app)
     expect(app.process().exitCode).toBeNull()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
@@ -179,7 +202,7 @@ test.describe('shutdown failure handling', () => {
     const recoveryText = ' recovered one two three four five six seven eight nine ten'
     await typeInto(node(window, 1), recoveryText)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closeMainWindow(app)
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${initialText}${recoveryText}`)
@@ -202,7 +225,7 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), text)
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
 
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closeMainWindow(app)
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
 
     await window.getByRole('button', { name: 'Cancel' }).click()
@@ -215,7 +238,7 @@ test.describe('shutdown failure handling', () => {
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
 
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.close())
+    await closeMainWindow(app)
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await window.getByRole('button', { name: 'Quit without saving' }).click()

@@ -73,10 +73,43 @@ export function exactMessage(message: string): RegExp {
 }
 
 export async function clickApplicationMenuQuit(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ BrowserWindow, Menu }) => {
+  await app.evaluate(({ Menu }) => {
     const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items[0]
     if (item?.click === undefined) throw new Error('The application menu quit item is unavailable.')
-    item.click(item, BrowserWindow.getFocusedWindow() ?? undefined, {} as Electron.KeyboardEvent)
+    item.click(item, undefined, {} as Electron.KeyboardEvent)
+  })
+}
+
+// The suite runs on a live desktop, so the application is not necessarily frontmost when a test
+// addresses its window. BrowserWindow.getFocusedWindow() returns null in that case and a close through
+// it would silently do nothing, even though closing the window must flush and quit while inactive
+// (docs/PRODUCT.md §9.2). These helpers address the single application window directly.
+
+export async function closeMainWindow(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ BrowserWindow }) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
+    windows[0]!.close()
+  })
+}
+
+export async function setMainWindowBounds(
+  app: ElectronApplication,
+  bounds: Partial<PersistedWindowBounds>,
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, requested) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
+    const window = windows[0]!
+    window.setBounds({ ...window.getBounds(), ...requested })
+  }, bounds)
+}
+
+export async function readMainWindowBounds(app: ElectronApplication): Promise<PersistedWindowBounds> {
+  return app.evaluate(({ BrowserWindow }) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
+    return windows[0]!.getBounds()
   })
 }
 
@@ -394,6 +427,27 @@ export function seedDocument(userDataDir: string, seed: { document: unknown; loc
 
 export function readPersisted(userDataDir: string): PersistedState {
   return JSON.parse(readFileSync(documentPath(userDataDir), 'utf8')) as PersistedState
+}
+
+/**
+ * Reads the persisted document for polling, treating a transiently absent primary as "not ready".
+ *
+ * A save renames the replaced primary to a generation before renaming the new document into place,
+ * so the primary is briefly missing while a save is in flight. `expect.poll` does not retry a
+ * callback that throws, so pollers must return a value instead of letting the read fail.
+ */
+export function tryReadPersisted(userDataDir: string): PersistedState | null {
+  try {
+    return readPersisted(userDataDir)
+  } catch (error) {
+    if (isFileNotFound(error)) return null
+    throw error
+  }
+}
+
+function isFileNotFound(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false
+  return error.code === 'ENOENT'
 }
 
 export function attachmentFiles(userDataDir: string): string[] {

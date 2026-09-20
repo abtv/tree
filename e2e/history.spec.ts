@@ -10,6 +10,7 @@ import {
   readPersisted,
   setCursor,
   test,
+  tryReadPersisted,
   typeInto,
   writeClipboardImage,
   writeClipboardText,
@@ -45,14 +46,14 @@ test.describe('undo and redo', () => {
     const { window } = await launchTree(userDataDir)
 
     await typeInto(node(window, 1), 'A')
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.id).toBeTruthy()
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBeTruthy()
     const rootId = readPersisted(userDataDir).document.roots[0]!.id
 
     await window.keyboard.press('Enter')
     await window.keyboard.press('Meta+z')
     await window.keyboard.press('Meta+Shift+z')
 
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.id).toBe(rootId)
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBe(rootId)
   })
 
   test('undoes and redoes a split', async ({ userDataDir }) => {
@@ -182,7 +183,9 @@ test.describe('undo and redo', () => {
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
     await expect(window.getByAltText('Attached image')).toHaveCount(1)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
+      .toEqual(expect.any(String))
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await window.keyboard.press('Meta+z')

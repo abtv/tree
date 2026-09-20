@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, launchTree, seedDocument, startRowDrag, test } from './fixtures'
+import { expect, launchTree, seedDocument, setMainWindowBounds, startRowDrag, test } from './fixtures'
 
 function row(window: Page, index: number): ReturnType<Page['getByRole']> {
   return window.getByRole('textbox', { name: `Node ${index}`, exact: true })
@@ -164,11 +164,7 @@ test.describe('windowed node list', () => {
     await expect(row(window, 21)).toBeFocused()
     const heightBeforeResize = await rowHeight(window, 21)
 
-    await app.evaluate(({ BrowserWindow }) => {
-      const target = BrowserWindow.getFocusedWindow()
-      if (target === null) throw new Error('The application window was not available.')
-      target.setBounds({ ...target.getBounds(), width: 640 })
-    })
+    await setMainWindowBounds(app, { width: 640 })
     await expect.poll(() => window.evaluate(() => globalThis.innerWidth)).toBeLessThan(700)
     await expect.poll(() => rowHeight(window, 21)).toBeGreaterThan(heightBeforeResize)
 

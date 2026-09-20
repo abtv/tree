@@ -155,6 +155,8 @@ This command builds the application and runs Playwright against the production b
 
 Drag tests start a gesture through `startRowDrag` in `e2e/fixtures.ts`. Because the suite runs on a live desktop, that helper verifies the active drag survives a short settling window and retries the gesture a bounded number of times, since a window that loses focus releases pointer capture and the application cancels the drag by design.
 
+Window addressing in `e2e/fixtures.ts` is focus-independent for the same reason: closing, resizing, or reading the main window through `closeMainWindow`, `setMainWindowBounds`, and `readMainWindowBounds` addresses the application's window directly instead of relying on the application being frontmost, so the window-close flush and quit path stays testable while the application is inactive.
+
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**`, and Playwright only reads `e2e/`.
 
 ### Defect regression workflow
