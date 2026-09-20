@@ -178,6 +178,8 @@ export function createFileServices(
     await writeDurableFile(temporaryDocumentPath, JSON.stringify(state, null, 2))
     await preserveReplacedDocument()
     await rename(temporaryDocumentPath, documentPath)
+    // One directory flush makes the rotation and replacement renames durable together.
+    await syncFile(dataDirectory)
     await pruneGenerations()
   }
 

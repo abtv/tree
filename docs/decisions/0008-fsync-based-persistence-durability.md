@@ -13,7 +13,7 @@ Node's `fs` API exposes `file.sync()`, which maps to POSIX `fsync()` and flushes
 
 Persistence uses `fsync` as its durability primitive:
 
-* document saves flush the temporary file and the rotated backup before replacement;
+* document saves flush the temporary file before replacement, then flush the data directory so the preserved generation and the new primary are durable together before the save reports success;
 * attachment writes flush the attachment file, then flush the attachments directory, before reporting success;
 * a failed flush rejects the write, so the renderer can never record a reference to storage that was not flushed.
 
@@ -21,8 +21,8 @@ Persistence uses `fsync` as its durability primitive:
 
 ## Consequences
 
-* A completed attachment write cannot be lost to abrupt process termination, and subsequent document saves reference storage that was already flushed. The directory flush prevents a durable document reference from outliving the attachment's name.
+* A completed attachment write cannot be lost to abrupt process termination, and subsequent document saves reference storage that was already flushed. The attachment directory flush prevents a durable document reference from outliving the attachment's name. The document directory flush makes the just-preserved generation and the new primary durable together when the save resolves.
 * The accepted residual power-loss exposure is smaller than the previous behavior and equal to the document path's existing guarantee. If a document save is lost, the previous document plus recovery files remain loadable; startup cleanup removes attachments that are no longer referenced.
 * Durability stays dependency-free and uses the same primitive on the document and attachment paths.
-* Unit tests in `file-services.test.ts` assert the flush sequence and both flush-failure paths; `e2e/persistence-reliability.spec.ts` verifies that a completed paste survives a `SIGKILL` and restart.
+* Unit tests in `file-services.test.ts` assert the flush sequences and the flush-failure paths on the document and attachment paths; `e2e/persistence-reliability.spec.ts` verifies that a completed paste survives a `SIGKILL` and restart.
 * A future requirement for device-level power-loss guarantees must add the native flush dependency, reconsider the document path as well, and supersede this ADR.

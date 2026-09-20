@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, utimes, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFileServices } from './file-services'
@@ -639,6 +639,95 @@ describe('attachment durability', () => {
       'directory flush failed',
     )
     expect(opens).toBe(2)
+  })
+})
+
+describe('document save durability', () => {
+  it('flushes the data directory after both renames before reporting success', async () => {
+    const { services } = await servicesForTest()
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    const events: string[] = []
+    vi.mocked(open).mockImplementation(async (path, flags) => {
+      const handle = await real.open(path, flags)
+      return {
+        async writeFile(contents: string | Uint8Array) {
+          events.push('write')
+          if (typeof contents === 'string') await handle.writeFile(contents, 'utf8')
+          else await handle.writeFile(contents)
+        },
+        async sync() {
+          events.push(flags === 'r' ? 'sync-directory' : 'sync-file')
+          await handle.sync()
+        },
+        async close() {
+          events.push(flags === 'r' ? 'close-directory' : 'close-file')
+          await handle.close()
+        },
+      } as unknown as Awaited<ReturnType<typeof open>>
+    })
+    vi.mocked(rename).mockImplementation(async (from, to) => {
+      await real.rename(from, to)
+      events.push(`rename:${basename(String(from))}->${basename(String(to))}`)
+    })
+
+    await services.save(stateWithoutImage('First'))
+
+    expect(events).toEqual([
+      'write',
+      'sync-file',
+      'close-file',
+      'rename:document.json.tmp->document.json',
+      'sync-directory',
+      'close-directory',
+    ])
+
+    events.length = 0
+    await services.save(stateWithoutImage('Second'))
+
+    expect(events).toEqual([
+      'write',
+      'sync-file',
+      'close-file',
+      'rename:document.json->document.1.json',
+      'rename:document.json.tmp->document.json',
+      'sync-directory',
+      'close-directory',
+    ])
+  })
+
+  it('rejects the save when the data-directory flush fails and retries safely', async () => {
+    const { directory, services } = await servicesForTest()
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    const next = stateWithoutImage('Next')
+    let failDirectoryFlush = true
+    vi.mocked(open).mockImplementation(async (path, flags) => {
+      const handle = await real.open(path, flags)
+      return {
+        async writeFile(contents: string | Uint8Array) {
+          if (typeof contents === 'string') await handle.writeFile(contents, 'utf8')
+          else await handle.writeFile(contents)
+        },
+        async sync() {
+          if (flags === 'r' && failDirectoryFlush) {
+            failDirectoryFlush = false
+            throw new Error('directory flush failed')
+          }
+          await handle.sync()
+        },
+        async close() {
+          await handle.close()
+        },
+      } as unknown as Awaited<ReturnType<typeof open>>
+    })
+
+    await expect(services.save(next)).rejects.toThrow('directory flush failed')
+
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
+
+    const retry = stateWithoutImage('Retry')
+    await expect(services.save(retry)).resolves.toBeUndefined()
+    expect(JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))).toEqual(next)
+    await expect(services.load()).resolves.toEqual(retry)
   })
 })
 
