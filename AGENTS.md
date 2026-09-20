@@ -129,7 +129,7 @@ Domain logic must be unit-testable without launching Electron or a browser envir
 
 ## 8. Plans and Architecture Decisions
 
-For a substantive task, use the configured OpenCode planner in a fresh context after inspecting the relevant implementation and documentation. Present the plan to the Product Owner and do not begin implementation until it is explicitly approved.
+For a substantive task, use the configured planner subagent in a fresh context after inspecting the relevant implementation and documentation. Present the plan to the Product Owner and do not begin implementation until it is explicitly approved.
 
 After approval, keep the task's temporary working plan at `.opencode/plan.md`. The plan is an implementation contract, not permanent project documentation. Keep it current when approved scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
 

@@ -1,0 +1,20 @@
+model = "gpt-5.6-luna"
+model_reasoning_effort = "medium"
+review_model = "gpt-5.6-luna"
+
+[agents]
+enabled = true
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "medium"
+
+[agents.planner]
+description = "Inspects the repository in a fresh context and proposes a focused implementation plan."
+config_file = "agents/planner.toml"
+
+[agents.reviewer]
+description = "Independently reviews an implementation and reports only meaningful findings."
+config_file = "agents/reviewer.toml"
+
+[agents.product_verifier]
+description = "Checks changed behavior as a careful user and reports meaningful product issues."
+config_file = "agents/product-verifier.toml"
