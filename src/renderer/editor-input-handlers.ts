@@ -2,6 +2,27 @@ import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, selectAll } from './editor-dom'
+import type { EditorContextMenuCommand } from '../shared/ipc'
+
+export function executeEditorContextMenuCommand(
+  command: EditorContextMenuCommand,
+  store: EditorStore,
+  node: TreeNode,
+  input: HTMLElement,
+): void {
+  const selection = getSelectionRange(input)
+  if (command === 'selectAll') {
+    selectAll(input)
+    return
+  }
+  if (command === 'copy' && selection.start !== selection.end) {
+    void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
+  } else if (command === 'cut' && selection.start !== selection.end) {
+    void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
+  } else if (command === 'paste') {
+    void store.paste(node.id, getCaret(input)).catch((error: unknown) => store.reportError(error))
+  }
+}
 
 export interface EditorKeyboardHandlerDependencies {
   store: EditorStore

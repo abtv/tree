@@ -21,6 +21,7 @@ export const treeApi: TreeApi = {
   writeAttachment: (id, png) => ipcRenderer.invoke(ipcChannels.writeAttachment, id, png),
   readAttachment: (id) => ipcRenderer.invoke(ipcChannels.readAttachment, id),
   cleanupAttachments: (referencedIds) => ipcRenderer.invoke(ipcChannels.cleanupAttachments, referencedIds),
+  showEditorContextMenu: (request) => ipcRenderer.invoke(ipcChannels.showEditorContextMenu, request),
 }
 
 contextBridge.exposeInMainWorld('treeApi', treeApi)

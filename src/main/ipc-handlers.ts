@@ -4,6 +4,7 @@ import {
   validateAttachmentId,
   validateAttachmentIds,
   validateClipboardWritePayload,
+  validateEditorContextMenuRequest,
   validatePersistedEditorState,
   isTrustedRendererUrl,
   type PngDecoder,
@@ -11,9 +12,12 @@ import {
 import { ipcChannels } from '../shared/ipc'
 import type { FileServices } from '../infrastructure/main/file-services'
 import { readClipboard, writeClipboard, type NativeClipboard } from '../infrastructure/main/clipboard'
+import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../shared/ipc'
+import type { WebContents } from 'electron'
 
 export interface IpcInvokeEvent {
   senderFrame?: { url?: string } | null
+  sender?: WebContents
 }
 
 export interface IpcMain {
@@ -28,6 +32,7 @@ export interface IpcHandlerDependencies {
   quitHandshake: Pick<QuitHandshake, 'request' | 'confirm' | 'force'>
   decodePng: PngDecoder
   onQuitConfirmed: () => void
+  showEditorContextMenu?: (sender: WebContents, request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
 }
 
 export function registerIpcHandlers({
@@ -38,6 +43,7 @@ export function registerIpcHandlers({
   quitHandshake,
   decodePng,
   onQuitConfirmed,
+  showEditorContextMenu,
 }: IpcHandlerDependencies): void {
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
@@ -84,5 +90,10 @@ export function registerIpcHandlers({
   ipcMain.handle(ipcChannels.cleanupAttachments, (event, referencedIds) => {
     requireTrustedRenderer(event)
     return fileServices.cleanupAttachments(validateAttachmentIds(referencedIds))
+  })
+  ipcMain.handle(ipcChannels.showEditorContextMenu, (event, request) => {
+    requireTrustedRenderer(event)
+    if (event.sender === undefined || showEditorContextMenu === undefined) return null
+    return showEditorContextMenu(event.sender, validateEditorContextMenuRequest(request))
   })
 }

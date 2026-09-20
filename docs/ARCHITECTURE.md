@@ -457,7 +457,11 @@ Clipboard-specific platform details must remain outside the domain.
 
 ### Editing commands
 
-The application installs only a minimal application menu, so macOS does not route the standard editing commands (Undo, Redo, Cut, Copy, Paste, Select All) to the renderer, and the native `copy`, `cut`, and `paste` DOM events do not fire. The editor key handler must own these commands: intercept the shortcut, prevent the native default, and perform the operation through the editor store and the clipboard service. The application must not rely on native menu routing or native clipboard DOM events. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
+The application installs only a minimal application menu, so macOS does not route the standard editing commands (Undo, Redo, Cut, Copy, Paste, Select All) to the renderer, and the native `copy`, `cut`, and `paste` DOM events do not fire. The editor key handler must own these commands: intercept the shortcut, prevent the native default, and perform the operation through the editor store and the clipboard service. The application must not rely on native menu roles or native clipboard DOM events. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
+
+Editable node fields also expose a native macOS contextual menu. The renderer captures the node's selection and capabilities, the main process presents the platform menu, and the selected Cut, Copy, Paste, or Select All command returns to the renderer and uses the same editor-store path as the keyboard command. Look Up uses Electron's native definition service and Search with Google opens the selected text externally. The menu is attached only to editable node inputs, so other controls do not acquire editor commands.
+
+Opening the menu performs one constant-size selection inspection and one IPC round trip. It does not write to disk until an editing command changes the document, does not traverse the tree, and does not retain state after the popup closes.
 
 ---
 

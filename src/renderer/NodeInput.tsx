@@ -1,4 +1,12 @@
-import type { ChangeEvent, ClipboardEvent, FocusEvent, FormEvent, KeyboardEvent, SyntheticEvent } from 'react'
+import type {
+  ChangeEvent,
+  ClipboardEvent,
+  FocusEvent,
+  FormEvent,
+  KeyboardEvent,
+  MouseEvent,
+  SyntheticEvent,
+} from 'react'
 import type { TreeNode } from '../domain/document'
 import { richTextHtml } from './editor-dom'
 
@@ -13,6 +21,7 @@ export interface NodeInputBindings {
   onCompositionStart: () => void
   onCompositionEnd: () => void
   onCut: () => void
+  onContextMenu: (event: MouseEvent<HTMLElement>) => void
   onFocus: (event: FocusEvent<HTMLElement>) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
   onMouseDown: () => void
@@ -39,6 +48,7 @@ export function NodeInput({
   onContentChange,
   onCompositionStart,
   onCompositionEnd,
+  onContextMenu,
   onCut,
   onFocus,
   onKeyDown,
@@ -55,6 +65,7 @@ export function NodeInput({
     onBlur,
     onCompositionEnd,
     onCompositionStart,
+    onContextMenu,
     onCut,
     onFocus,
     onKeyDown,

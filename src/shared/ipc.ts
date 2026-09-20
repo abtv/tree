@@ -11,6 +11,7 @@ export const ipcChannels = {
   writeAttachment: 'tree:write-attachment',
   readAttachment: 'tree:read-attachment',
   cleanupAttachments: 'tree:cleanup-attachments',
+  showEditorContextMenu: 'tree:show-editor-context-menu',
 } as const
 
 export type ClipboardPayload =
@@ -20,6 +21,18 @@ export interface ClipboardWritePayload {
   text: string
   html: string
 }
+
+export interface EditorContextMenuRequest {
+  x: number
+  y: number
+  selectionText: string
+  canCut: boolean
+  canCopy: boolean
+  canPaste: boolean
+  canSelectAll: boolean
+}
+
+export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
   quit(requestId?: string): Promise<void>
@@ -33,4 +46,5 @@ export interface TreeApi {
   writeAttachment(id: string, png: Uint8Array): Promise<void>
   readAttachment(id: string): Promise<Uint8Array | null>
   cleanupAttachments(referencedIds: string[]): Promise<void>
+  showEditorContextMenu?: (request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
 }

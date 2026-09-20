@@ -19,6 +19,7 @@ import {
   type WindowBounds,
 } from '../infrastructure/main/window-state'
 import { registerIpcHandlers } from './ipc-handlers'
+import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
 import { createPngDecoder } from './png-decoder'
 import {
@@ -123,6 +124,18 @@ bootstrapApplication({
       onQuitConfirmed: () => {
         appQuitting = true
         onQuitConfirmed()
+      },
+      showEditorContextMenu: (sender, request) => {
+        const window = BrowserWindow.fromWebContents(sender)
+        if (window === null) return Promise.resolve(null)
+        return showEditorContextMenu(
+          Menu,
+          window,
+          sender,
+          (url) => shell.openExternal(url),
+          (error) => reportMainProcessError('Could not open Google search', error),
+          request,
+        )
       },
     })
   },

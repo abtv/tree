@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ClipboardEvent, FocusEvent, FormEvent, SyntheticEvent } from 'react'
+import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
-import { getCaret, isCollapsedSelection, readEditableContent, setCaret, updateSelectedLinks } from './editor-dom'
-import { createEditorKeyDownHandler } from './editor-input-handlers'
+import {
+  getCaret,
+  getSelectionRange,
+  isCollapsedSelection,
+  readEditableContent,
+  setCaret,
+  updateSelectedLinks,
+} from './editor-dom'
+import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
 
 interface UseNodeInputBindingsOptions {
@@ -90,6 +97,30 @@ export function useNodeInputBindings({
       },
       onCompositionStart: () => {
         setComposing(true)
+      },
+      onContextMenu: (event: MouseEvent<HTMLElement>) => {
+        if (persistenceLocked) return
+        event.preventDefault()
+        const input = event.currentTarget
+        const selection = getSelectionRange(input)
+        const request = {
+          x: event.clientX,
+          y: event.clientY,
+          selectionText:
+            input instanceof HTMLTextAreaElement
+              ? input.value.slice(selection.start, selection.end)
+              : (getSelection()?.toString() ?? ''),
+          canCut: selection.start !== selection.end,
+          canCopy: selection.start !== selection.end,
+          canPaste: true,
+          canSelectAll:
+            input.textContent?.length !== 0 || (input instanceof HTMLTextAreaElement && input.value.length !== 0),
+        }
+        if (window.treeApi.showEditorContextMenu === undefined) return
+        void window.treeApi
+          .showEditorContextMenu(request)
+          .then((command) => executeEditorContextMenuCommand(command, store, node, input))
+          .catch((error: unknown) => store.reportError(error))
       },
       onCut: () => store.markNextTextEditStandalone(),
       onFocus: (event: FocusEvent<HTMLElement>) => {

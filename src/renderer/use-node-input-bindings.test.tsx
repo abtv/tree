@@ -11,6 +11,8 @@ afterEach(cleanup)
 
 function createStore(): EditorStore {
   return {
+    copy: vi.fn(async () => true),
+    cut: vi.fn(async () => true),
     editContent: vi.fn(),
     editText: vi.fn(),
     endTextSession: vi.fn(),
@@ -71,6 +73,33 @@ describe('useNodeInputBindings', () => {
     bindings.onSelect({ currentTarget: div } as unknown as SyntheticEvent<HTMLElement>)
     expect(store.endTextSession).toHaveBeenCalledTimes(2)
     collapsed.mockRestore()
+  })
+
+  it('opens the native editor menu with the current selection', async () => {
+    const store = createStore()
+    const showEditorContextMenu = vi.fn(async () => 'copy' as const)
+    window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
+    const { result } = renderBindings({ store, selectedNodeId: 'node' })
+    const bindings = result.current({ id: 'node', text: 'hello', children: [] })
+    const textarea = document.createElement('textarea')
+    textarea.value = 'hello'
+    textarea.setSelectionRange(1, 4)
+    const preventDefault = vi.fn()
+
+    bindings.onContextMenu({ currentTarget: textarea, clientX: 10, clientY: 20, preventDefault } as never)
+    await Promise.resolve()
+
+    expect(preventDefault).toHaveBeenCalledOnce()
+    expect(showEditorContextMenu).toHaveBeenCalledWith({
+      x: 10,
+      y: 20,
+      selectionText: 'ell',
+      canCut: true,
+      canCopy: true,
+      canPaste: true,
+      canSelectAll: true,
+    })
+    expect(store.copy).toHaveBeenCalledWith('node', 1, 4)
   })
 
   it('ignores focus intents for nodes that are not registered', async () => {

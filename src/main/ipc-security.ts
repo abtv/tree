@@ -1,6 +1,6 @@
 import type { PersistedEditorState } from '../domain/document'
 import { validatePersistedState } from '../domain/document'
-import type { ClipboardWritePayload } from '../shared/ipc'
+import type { ClipboardWritePayload, EditorContextMenuRequest } from '../shared/ipc'
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 export const MAX_ATTACHMENT_DIMENSION = 32_767
@@ -32,6 +32,30 @@ export function validateClipboardWritePayload(value: unknown): ClipboardWritePay
     throw new Error('Clipboard payload is invalid.')
   }
   return { text: value.text, html: value.html }
+}
+
+export function validateEditorContextMenuRequest(value: unknown): EditorContextMenuRequest {
+  if (
+    !isRecord(value) ||
+    typeof value.x !== 'number' ||
+    typeof value.y !== 'number' ||
+    typeof value.selectionText !== 'string' ||
+    typeof value.canCut !== 'boolean' ||
+    typeof value.canCopy !== 'boolean' ||
+    typeof value.canPaste !== 'boolean' ||
+    typeof value.canSelectAll !== 'boolean'
+  ) {
+    throw new Error('Editor context menu request is invalid.')
+  }
+  return {
+    x: value.x,
+    y: value.y,
+    selectionText: value.selectionText,
+    canCut: value.canCut,
+    canCopy: value.canCopy,
+    canPaste: value.canPaste,
+    canSelectAll: value.canSelectAll,
+  }
 }
 
 export function validateAttachmentId(value: unknown): string {

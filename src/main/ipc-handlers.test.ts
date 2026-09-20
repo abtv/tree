@@ -30,6 +30,7 @@ function createHarness() {
   }
   const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true), force: vi.fn() }
   const onQuitConfirmed = vi.fn()
+  const showEditorContextMenu = vi.fn(async () => 'copy' as const)
   const decodePng = vi.fn(decodePngWithZlib)
   registerIpcHandlers({
     ipcMain,
@@ -39,8 +40,9 @@ function createHarness() {
     quitHandshake,
     decodePng,
     onQuitConfirmed,
+    showEditorContextMenu,
   })
-  return { handlers, fileServices, nativeClipboard, quitHandshake, onQuitConfirmed, decodePng }
+  return { handlers, fileServices, nativeClipboard, quitHandshake, onQuitConfirmed, decodePng, showEditorContextMenu }
 }
 
 describe('main IPC handlers', () => {
@@ -70,6 +72,24 @@ describe('main IPC handlers', () => {
     const { handlers } = createHarness()
 
     expect([...handlers.keys()]).toEqual(Object.values(ipcChannels))
+  })
+
+  it('validates and forwards editor context-menu requests', async () => {
+    const { handlers, showEditorContextMenu } = createHarness()
+    const sender = { getOwnerBrowserWindow: vi.fn() }
+    const event = { senderFrame: { url: rendererUrl }, sender } as unknown as IpcInvokeEvent
+    const request = {
+      x: 12,
+      y: 34,
+      selectionText: 'Test',
+      canCut: true,
+      canCopy: true,
+      canPaste: true,
+      canSelectAll: true,
+    }
+
+    await expect(handlers.get(ipcChannels.showEditorContextMenu)!(event, request)).resolves.toBe('copy')
+    expect(showEditorContextMenu).toHaveBeenCalledWith(sender, request)
   })
 
   it('rejects every channel from an untrusted renderer', async () => {
