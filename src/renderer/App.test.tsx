@@ -454,6 +454,32 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
   })
 
+  it('marks the node containing the caret and never the current-parent heading', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 1' }), { target: { value: 'Projects' } })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
+
+    expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(0)
+    expect(document.querySelector('.current-parent .node-focus-marker')).toBeNull()
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+    const child = screen.getByRole('textbox', { name: 'Node 1' })
+    expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(1)
+    expect(child.closest('.node-row')?.querySelector('.node-focus-marker')).not.toBeNull()
+    expect(document.querySelector('.current-parent .node-focus-marker')).toBeNull()
+
+    fireEvent.keyDown(child, { key: 'ArrowUp' })
+    expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(0)
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'ArrowDown' })
+    expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(1)
+  })
+
   it('navigates through the location path and selects the child on the previous path', async () => {
     const store = createStore()
     await act(async () => {

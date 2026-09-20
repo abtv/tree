@@ -190,6 +190,18 @@ textarea {
   outline-offset: 1px;
 }
 
+.node-focus-marker {
+  position: absolute;
+  top: 9px;
+  left: -9px;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 7px solid #596267;
+  pointer-events: none;
+}
+
 body.node-drag-active,
 body.node-drag-active .node-row,
 body.node-drag-active .node-row .node-input,
@@ -457,6 +469,9 @@ body.node-drag-active .node-disclosure {
   }
   .node-disclosure::before {
     background: #c3c8cb;
+  }
+  .node-focus-marker {
+    border-left-color: #c3c8cb;
   }
   .node-disclosure-has-children {
     background: #4b5155;

@@ -152,6 +152,34 @@ describe('NodeList', () => {
     fireEvent.click(leafButton)
     expect(onEnter).toHaveBeenLastCalledWith(nodes[0])
   })
+
+  it('marks only the row whose node contains the caret', () => {
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    const list = [parentNode, ...nodes]
+    const element = (focusedNodeId?: string): React.JSX.Element => (
+      <NodeList
+        focusedNodeId={focusedNodeId}
+        nodes={list}
+        onEnter={() => undefined}
+        onMove={() => undefined}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+      />
+    )
+
+    const { container, rerender } = render(element('p'))
+    expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
+    expect(container.querySelector('.node-focus-marker')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.querySelector('[data-node-id="p"] .node-focus-marker')).not.toBeNull()
+    expect(container.querySelector('[data-node-id="a"] .node-focus-marker')).toBeNull()
+
+    rerender(element('b'))
+    expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
+    expect(container.querySelector('[data-node-id="b"] .node-focus-marker')).not.toBeNull()
+    expect(container.querySelector('[data-node-id="p"] .node-focus-marker')).toBeNull()
+
+    rerender(element(undefined))
+    expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(0)
+  })
 })
 
 describe('NodeList drag interaction', () => {
@@ -621,6 +649,19 @@ describe('NodeList windowing', () => {
     expect(rows[mountedCount - 1]).toHaveClass('node-row-drop-after')
     pointerUpAt(rows[1]!, 27 * mountedCount + 10)
     expect(onMove).toHaveBeenLastCalledWith('n1', mountedCount)
+  })
+
+  it('keeps the caret marker on the pinned row while the caret row is outside the window', () => {
+    mockRows(0)
+    const { container } = renderList(600, 'n550')
+    expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
+    expect(container.querySelector('.node-row-pinned .node-focus-marker')).not.toBeNull()
+
+    mockRows(-27 * 540)
+    fireEvent.scroll(window)
+    expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
+    expect(container.querySelector('.node-row-pinned')).toBeNull()
+    expect(container.querySelector('[data-node-id="n550"] .node-focus-marker')).not.toBeNull()
   })
 
   it('targets the pinned focused row without duplicating the marker', () => {

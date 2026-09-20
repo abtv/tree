@@ -69,13 +69,15 @@ Nodes are presented as plain outline rows with a solid 7px circular bullet to th
 
 Nodes with one or more direct children display a muted outer circle surrounding their solid bullet, producing two concentric circles. Nodes without children display only the solid bullet. Clicking the circular indicator enters that node and displays its children; it does not place the text cursor or edit the node.
 
+The node whose text field contains the caret (the selected node) displays a solid right-pointing triangle immediately to the left of its circular indicator, separated by a small gap. The triangle has the same visual weight as the solid bullet, is decorative and not a pointer target, and is shown whether or not the node has children. The editable current-parent heading never displays the triangle; when the caret is in the current-parent heading, no node displays it.
+
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
 Sibling reordering is started by pressing and holding the primary mouse button on a node row for 200 ms. Before the hold threshold, the pointer behaves as a text-editing pointer: a quick press and release places the text cursor at the clicked position, and pressing and dragging selects text. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
 
 Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a sibling (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
 
-Node rows retain the document-surface background when focused or hovered (white in the light appearance); focus and hover must not tint the editing row. A focused node must not display an additional more-options or selection-dot ornament.
+Node rows retain the document-surface background when focused or hovered (white in the light appearance); focus and hover must not tint the editing row. Apart from the selection triangle of the selected node, a focused node must not display an additional more-options or selection-dot ornament.
 
 The current parent is presented above its children as a larger, bold, editable heading without a bullet.
 

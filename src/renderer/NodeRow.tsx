@@ -13,6 +13,7 @@ interface NodeRowProps {
   dragging: boolean
   dropBefore: boolean
   dropAfter: boolean
+  focused: boolean
   pinned?: boolean
   pinnedOffset?: number
 }
@@ -28,6 +29,7 @@ export const NodeRow = memo(function NodeRow({
   dragging,
   dropBefore,
   dropAfter,
+  focused,
   pinned = false,
   pinnedOffset = 0,
 }: NodeRowProps): React.JSX.Element {
@@ -50,6 +52,7 @@ export const NodeRow = memo(function NodeRow({
       ref={(element) => rowRef(node.id, element)}
       style={pinned ? { top: pinnedOffset } : undefined}
     >
+      {focused ? <span aria-hidden="true" className="node-focus-marker" /> : null}
       <button
         aria-label={`Enter node ${index + 1}`}
         className={`node-disclosure${node.children.length > 0 ? ' node-disclosure-has-children' : ''}`}

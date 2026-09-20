@@ -176,6 +176,7 @@ export function NodeList({
       dragging={dragPhase === 'dragging' && dragSource?.nodeId === node.id}
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
+      focused={focusedNodeId !== undefined && node.id === focusedNodeId}
       index={index}
       key={node.id}
       node={node}
