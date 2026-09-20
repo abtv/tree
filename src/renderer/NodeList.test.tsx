@@ -261,6 +261,45 @@ describe('NodeList drag interaction', () => {
     expect(onMove).not.toHaveBeenCalled()
   })
 
+  it('keeps a pending hold when a hover reset reports no pressed buttons', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 10)
+    fireEvent.pointerOut(rows[0]!, {
+      pointerId: 1,
+      clientX: 700,
+      clientY: 200,
+      buttons: 0,
+      relatedTarget: document.body,
+    })
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
+    expect(rows[0]).toHaveClass('node-row-dragging')
+  })
+
+  it('cancels a pending hold when the held pointer leaves the row', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[0]!, 10)
+    fireEvent.pointerOut(rows[0]!, {
+      pointerId: 1,
+      clientX: 700,
+      clientY: 200,
+      buttons: 1,
+      relatedTarget: document.body,
+    })
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+  })
+
   it('collapses an incidental selection when drag mode activates', () => {
     vi.useFakeTimers()
     mockRowRects()

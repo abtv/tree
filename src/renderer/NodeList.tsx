@@ -309,8 +309,13 @@ export function NodeList({
   )
 
   const onRowPointerLeave = useCallback(
-    (nodeId: string): void => {
-      if (dragPhase === 'pending' && dragSource?.nodeId === nodeId) cancelDrag()
+    (nodeId: string, event: ReactPointerEvent<HTMLDivElement>): void => {
+      if (dragPhase !== 'pending' || dragSource?.nodeId !== nodeId) return
+      // Chromium resets the hovered element when the window loses focus and reports the reset
+      // with no buttons pressed. That is not the held pointer leaving the row, so the pending
+      // hold survives; a real leave still cancels while the primary button is held.
+      if (event.buttons === 0) return
+      cancelDrag()
     },
     [cancelDrag, dragPhase, dragSource],
   )
@@ -506,7 +511,7 @@ interface NodeRowProps {
   renderInput: (node: TreeNode, label: string) => ReactNode
   onEnter: (node: TreeNode) => void
   onPointerDown: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
-  onPointerLeave: (nodeId: string) => void
+  onPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
   rowRef: (nodeId: string, element: HTMLDivElement | null) => void
   dragging: boolean
   dropBefore: boolean
@@ -544,7 +549,7 @@ const NodeRow = memo(function NodeRow({
       data-node-id={node.id}
       data-node-index={index}
       onPointerDown={(event) => onPointerDown(node, index, event)}
-      onPointerLeave={() => onPointerLeave(node.id)}
+      onPointerLeave={(event) => onPointerLeave(node.id, event)}
       ref={(element) => rowRef(node.id, element)}
       style={pinned ? { top: pinnedOffset } : undefined}
     >

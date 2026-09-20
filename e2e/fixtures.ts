@@ -472,14 +472,54 @@ export async function typeInto(input: ReturnType<Page['locator']>, text: string)
 }
 
 const DRAG_HOLD_MS = 500
+const DRAG_SETTLE_MS = 250
+const DRAG_ATTEMPTS = 3
+
+export interface DragSourceBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Presses and holds a node row until drag mode is active and stable.
+ *
+ * The suite runs on a live desktop, so the window can lose focus mid-gesture. Chromium then
+ * releases pointer capture and the renderer cancels the drag, which is the intended application
+ * behavior for a lost pointer. Retry the gesture a bounded number of times so an environmental
+ * focus change does not fail a test, and require the active drag to survive a short settling
+ * window before returning.
+ */
+export async function startRowDrag(
+  window: Page,
+  target: ReturnType<Page['locator']>,
+  options: { xOffset?: number; duringHold?: (box: DragSourceBox) => Promise<void> } = {},
+): Promise<void> {
+  const xOffset = options.xOffset ?? 8
+  for (let attempt = 1; attempt <= DRAG_ATTEMPTS; attempt += 1) {
+    const box = await target.boundingBox()
+    if (box === null) throw new Error('The drag source was not rendered.')
+    await window.mouse.move(box.x + xOffset, box.y + box.height / 2)
+    await window.mouse.down()
+    if (options.duringHold !== undefined) await options.duringHold(box)
+    await window.waitForTimeout(DRAG_HOLD_MS)
+    if (await rowDragIsActive(window)) {
+      await window.waitForTimeout(DRAG_SETTLE_MS)
+      if (await rowDragIsActive(window)) return
+    }
+    await window.mouse.up()
+  }
+  throw new Error('The press-and-hold gesture did not start a stable node drag.')
+}
+
+async function rowDragIsActive(window: Page): Promise<boolean> {
+  return (await window.locator('.node-row-dragging').count()) > 0
+}
 
 export async function dragRow(window: Page, fromIndex: number, toIndex: number): Promise<void> {
   const source = window.locator('.node-row').nth(fromIndex)
-  const sourceBox = await source.locator('.node-input').boundingBox()
-  if (sourceBox === null) throw new Error(`Node row ${fromIndex + 1} was not rendered.`)
-  await window.mouse.move(sourceBox.x + 8, sourceBox.y + sourceBox.height / 2)
-  await window.mouse.down()
-  await window.waitForTimeout(DRAG_HOLD_MS)
+  await startRowDrag(window, source.locator('.node-input'))
   const targetBox = await window.locator('.node-row').nth(toIndex).boundingBox()
   if (targetBox === null) throw new Error(`Node row ${toIndex + 1} was not rendered.`)
   await window.mouse.move(targetBox.x + 8, targetBox.y + 4, { steps: 5 })

@@ -1,4 +1,4 @@
-import { expect, launchTree, node, nodeTexts, test, typeInto, type Launched } from './fixtures'
+import { expect, launchTree, node, nodeTexts, startRowDrag, test, typeInto, type Launched } from './fixtures'
 
 const HOLD_MS = 500
 
@@ -10,17 +10,6 @@ async function seedSiblings(window: Launched['window']): Promise<void> {
   await typeInto(node(window, 3), 'C')
   await window.keyboard.press('Enter')
   await typeInto(node(window, 4), 'D')
-}
-
-async function pressAndHold(
-  window: Launched['window'],
-  target: ReturnType<Launched['window']['locator']>,
-): Promise<void> {
-  const box = await target.boundingBox()
-  if (box === null) throw new Error('The drag source was not rendered.')
-  await window.mouse.move(box.x + 8, box.y + box.height / 2)
-  await window.mouse.down()
-  await window.waitForTimeout(HOLD_MS)
 }
 
 async function rowBox(
@@ -54,7 +43,7 @@ test.describe('drag and drop', () => {
     await seedSiblings(window)
 
     const source = window.locator('.node-row').nth(3)
-    await pressAndHold(window, source.locator('.node-input'))
+    await startRowDrag(window, source.locator('.node-input'))
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
     await expect(window.locator('body')).toHaveClass(/node-drag-active/)
@@ -99,7 +88,7 @@ test.describe('drag and drop', () => {
     await seedSiblings(window)
 
     const source = window.locator('.node-row').nth(3).locator('.node-input')
-    await pressAndHold(window, source)
+    await startRowDrag(window, source)
     const target = await rowBox(window, 1)
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
@@ -141,13 +130,12 @@ test.describe('drag and drop', () => {
 
     const rows = window.locator('.node-row')
     const source = rows.nth(2).locator('.node-input')
-    const box = await source.boundingBox()
-    if (box === null) throw new Error('The third row was not rendered.')
-    await window.mouse.move(box.x + 10, box.y + box.height / 2)
-    await window.mouse.down()
-    await window.mouse.move(box.x + 13, box.y + box.height / 2)
-
-    await window.waitForTimeout(HOLD_MS)
+    await startRowDrag(window, source, {
+      xOffset: 10,
+      duringHold: async (box) => {
+        await window.mouse.move(box.x + 13, box.y + box.height / 2)
+      },
+    })
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
 
     const target = await rowBox(window, 0)
@@ -234,9 +222,7 @@ test.describe('drag and drop', () => {
       })
     }
 
-    await window.mouse.move(x, y)
-    await window.mouse.down()
-    await window.waitForTimeout(HOLD_MS)
+    await startRowDrag(window, source, { xOffset: 60 })
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
 
     const frozen = await selectionState()
@@ -273,7 +259,31 @@ test.describe('drag and drop', () => {
     const { window } = await launchTree(userDataDir)
     await seedSiblings(window)
 
-    await pressAndHold(window, window.locator('.node-row').nth(1).locator('.node-input'))
+    await startRowDrag(window, window.locator('.node-row').nth(1).locator('.node-input'))
+    await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+    await window.mouse.up()
+
+    await expect(window.locator('.node-row-dragging')).toHaveCount(0)
+    expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  test('keeps a pending hold through a browser hover reset', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    await seedSiblings(window)
+
+    // Chromium resets the hovered element when the window loses focus and reports the reset with
+    // no buttons pressed. The reset must not cancel the pending hold, so the drag still activates
+    // and releases in place.
+    const source = window.locator('.node-row').nth(1)
+    const target = source.locator('.node-input')
+    const box = await target.boundingBox()
+    if (box === null) throw new Error('The drag source was not rendered.')
+    await window.mouse.move(box.x + 8, box.y + box.height / 2)
+    await window.mouse.down()
+    await source.evaluate((element) => {
+      element.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }))
+    })
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
     await window.mouse.up()
 

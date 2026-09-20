@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, launchTree, seedDocument, test } from './fixtures'
+import { expect, launchTree, seedDocument, startRowDrag, test } from './fixtures'
 
 function row(window: Page, index: number): ReturnType<Page['getByRole']> {
   return window.getByRole('textbox', { name: `Node ${index}`, exact: true })
@@ -130,9 +130,7 @@ test.describe('windowed node list', () => {
     const innerHeight = await window.evaluate(() => globalThis.innerHeight)
     const x = box.x + box.width / 2
 
-    await window.mouse.move(x, box.y + box.height / 2)
-    await window.mouse.down()
-    await window.waitForTimeout(500)
+    await startRowDrag(window, source, { xOffset: box.width / 2 })
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
     await window.mouse.move(x, box.y + box.height, { steps: 5 })
     await window.mouse.move(x, innerHeight - 8, { steps: 10 })

@@ -153,6 +153,8 @@ npm run test:e2e
 
 This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. The suite runs serially with a single worker because of the single-instance application and the global `Cmd+0` shortcut. The suite is macOS-only and requires a display.
 
+Drag tests start a gesture through `startRowDrag` in `e2e/fixtures.ts`. Because the suite runs on a live desktop, that helper verifies the active drag survives a short settling window and retries the gesture a bounded number of times, since a window that loses focus releases pointer capture and the application cancels the drag by design.
+
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**`, and Playwright only reads `e2e/`.
 
 ### Defect regression workflow
