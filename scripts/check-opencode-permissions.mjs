@@ -97,6 +97,13 @@ const developCases = {
     'npm run build 2>&1',
     'npm run check 2>&1',
     'npm run check:full 2>&1',
+    // Canonical scoped formatting check and validation-evidence snapshot from docs/DEVELOPMENT.md §9.
+    'npm run format:check:changed',
+    'npm run format:check:changed 2>&1',
+    'npm run format:check:changed src/renderer/NodeList.tsx',
+    'npm run format:check:changed; git status --short',
+    'npm run validation:snapshot',
+    'npm run validation:snapshot 2>&1',
     'npm audit --omit=dev',
     'rm WORKING_PLAN.md',
     'rm -f WORKING_PLAN.md',
@@ -192,6 +199,11 @@ const developCases = {
     'PROBE_PID=1 pgrep -af "tree-perf-"',
     'npm run unknown',
     'npm run unknown 2>&1',
+    // Workflow allowances stay anchored to the exact script names and documented environment prefixes.
+    'npm run format:check:changed-extra',
+    'npm run validation:snapshot-extra',
+    'FOO=1 npm run validation:snapshot',
+    'TREE_E2E_VISIBLE=1 npm run format:check:changed',
     'unzip archive.zip',
     'unzip -q -o test-results/example/trace.zip -d src',
     // One asking segment makes the whole chain ask.
@@ -319,6 +331,19 @@ for (const { name, rules, cases } of agents) {
       checked += 1
     }
   }
+}
+
+// Every npm workflow named in docs/DEVELOPMENT.md must stay inside the develop approval boundary.
+// A newly documented workflow without a matching rule fails this check instead of prompting later.
+const development = await readFile(new URL('../docs/DEVELOPMENT.md', import.meta.url), 'utf8')
+const documentedWorkflows = [...new Set([...development.matchAll(/npm run [A-Za-z0-9:_-]+/g)].map((match) => match[0]))]
+for (const command of documentedWorkflows) {
+  assert.equal(
+    chainedPermissionFor(config.agent.develop.permission.bash, command),
+    'allow',
+    `develop: documented workflow ${command} should resolve to allow`,
+  )
+  checked += 1
 }
 
 console.log(`Checked ${checked} OpenCode permission expectations.`)
