@@ -5,7 +5,7 @@ Date: 2026-09-20
 
 ## Context
 
-The complete validation command runs the end-to-end suite before every commit. With a single Playwright worker the suite took about 2.3 minutes because each test launches a real Electron application and a few tests intentionally wait on product timing. The unit and performance suites were far smaller, so the end-to-end suite dominated validation time. Hidden windows (`docs/decisions/0011-hidden-e2e-windows.md`) made the suite non-disruptive but not faster.
+When this decision was made, the complete validation command ran the end-to-end suite before every commit. With a single Playwright worker the suite took about 2.3 minutes because each test launches a real Electron application and a few tests intentionally wait on product timing. The unit and performance suites were far smaller, so the end-to-end suite dominated validation time. Hidden windows (`docs/decisions/0011-hidden-e2e-windows.md`) made the suite non-disruptive but not faster.
 
 Three constraints prevented naive parallelization:
 

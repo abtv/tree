@@ -9,6 +9,7 @@ import {
   runChecks,
   validateAdr,
   validateAdrIndex,
+  validateWorkflowOwnership,
 } from './check-docs.mjs'
 
 const temporaryDirectories = []
@@ -102,6 +103,45 @@ describe('findProductQuantityRestatements', () => {
       displayPath: 'docs/ARCHITECTURE.md',
     })
     expect(issues).toHaveLength(1)
+  })
+})
+
+describe('validateWorkflowOwnership', () => {
+  const validAgents =
+    '# Agents\n<!-- workflow-policy-owner -->\n<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->\n'
+  const validDevelopment =
+    '# Development\n<!-- validation-mechanics-owner -->\n<!-- workflow-policy-reference: AGENTS.md -->\n'
+
+  it('accepts one policy owner and one validation-mechanics owner', () => {
+    expect(validateWorkflowOwnership({ agentContent: validAgents, developmentContent: validDevelopment })).toEqual([])
+  })
+
+  it('rejects missing or misplaced ownership markers', () => {
+    const issues = validateWorkflowOwnership({
+      agentContent: `${validAgents}<!-- validation-mechanics-owner -->`,
+      developmentContent: '# Development\n<!-- workflow-policy-owner -->\n',
+    })
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('validation mechanics are owned'),
+        expect.stringContaining('must contain exactly one validation mechanics owner marker'),
+        expect.stringContaining('reference to the workflow policy owner'),
+        expect.stringContaining('workflow policy is owned'),
+      ]),
+    )
+  })
+
+  it('requires reciprocal owner references', () => {
+    const issues = validateWorkflowOwnership({
+      agentContent: '# Agents\n<!-- workflow-policy-owner -->\n',
+      developmentContent: '# Development\n<!-- validation-mechanics-owner -->\n',
+    })
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('reference to the workflow policy owner'),
+        expect.stringContaining('reference to the validation mechanics owner'),
+      ]),
+    )
   })
 })
 

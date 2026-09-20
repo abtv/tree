@@ -17,6 +17,11 @@ export const PRODUCT_QUANTITY_PATTERNS = [
   { pattern: /200\s*[×x]\s*200/i, description: 'the inline image bound' },
 ]
 
+const WORKFLOW_POLICY_MARKER = '<!-- workflow-policy-owner -->'
+const VALIDATION_MECHANICS_MARKER = '<!-- validation-mechanics-owner -->'
+const WORKFLOW_POLICY_REFERENCE = '<!-- workflow-policy-reference: AGENTS.md -->'
+const VALIDATION_MECHANICS_REFERENCE = '<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->'
+
 export function validateAdr({ fileName, content, adrNumbers }) {
   const issues = []
   const match = ADR_FILE_PATTERN.exec(fileName)
@@ -87,6 +92,30 @@ export function findProductQuantityRestatements({ content, displayPath }) {
     if (match) {
       issues.push(`${displayPath}: restates ${description} ("${match[0]}"); the owner is docs/PRODUCT.md`)
     }
+  }
+  return issues
+}
+
+export function validateWorkflowOwnership({ agentContent, developmentContent }) {
+  const issues = []
+  const count = (content, marker) => content.split(marker).length - 1
+  if (count(agentContent, WORKFLOW_POLICY_MARKER) !== 1) {
+    issues.push('AGENTS.md: must contain exactly one workflow policy owner marker')
+  }
+  if (count(developmentContent, VALIDATION_MECHANICS_MARKER) !== 1) {
+    issues.push('docs/DEVELOPMENT.md: must contain exactly one validation mechanics owner marker')
+  }
+  if (count(developmentContent, WORKFLOW_POLICY_REFERENCE) !== 1) {
+    issues.push('docs/DEVELOPMENT.md: must contain exactly one reference to the workflow policy owner')
+  }
+  if (count(agentContent, VALIDATION_MECHANICS_REFERENCE) !== 1) {
+    issues.push('AGENTS.md: must contain exactly one reference to the validation mechanics owner')
+  }
+  if (developmentContent.includes(WORKFLOW_POLICY_MARKER)) {
+    issues.push('docs/DEVELOPMENT.md: workflow policy is owned by AGENTS.md')
+  }
+  if (agentContent.includes(VALIDATION_MECHANICS_MARKER)) {
+    issues.push('AGENTS.md: validation mechanics are owned by docs/DEVELOPMENT.md')
   }
   return issues
 }
@@ -165,6 +194,16 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     if (!displayPath.endsWith('PRODUCT.md')) {
       issues.push(...findProductQuantityRestatements({ content, displayPath }))
     }
+  }
+  const agentPath = join(rootDirectory, 'AGENTS.md')
+  const developmentPath = join(rootDirectory, 'docs', 'DEVELOPMENT.md')
+  if (existsSync(agentPath) && existsSync(developmentPath)) {
+    issues.push(
+      ...validateWorkflowOwnership({
+        agentContent: readFileSync(agentPath, 'utf8'),
+        developmentContent: readFileSync(developmentPath, 'utf8'),
+      }),
+    )
   }
   return { issues, liveDocumentCount: liveDocuments.length }
 }

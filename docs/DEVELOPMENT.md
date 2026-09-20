@@ -1,5 +1,8 @@
 # Development Guide
 
+<!-- validation-mechanics-owner -->
+<!-- workflow-policy-reference: AGENTS.md -->
+
 ## 1. Project Overview
 
 This is a macOS desktop application built with:
@@ -83,7 +86,7 @@ Build the application with:
 npm run build
 ```
 
-The production build must complete successfully before a task is considered complete.
+The validation matrix in §9 determines when a production build is required.
 
 ---
 
@@ -97,7 +100,7 @@ npm run typecheck
 
 The node, renderer, and end-to-end projects compile with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `noUnusedLocals`, `noUnusedParameters`, and `noFallthroughCasesInSwitch`.
 
-Type errors must be fixed before a task is considered complete.
+When type checking is required by §9, type errors must be fixed before the corresponding validation can pass.
 
 ---
 
@@ -206,7 +209,28 @@ The repository must also provide the complete validation command:
 npm run check:full
 ```
 
-This runs `npm run check`, the end-to-end suite, and the performance suite. The requirement to run validation before every commit is defined in `AGENTS.md` §10.
+This runs `npm run check`, the end-to-end suite, and the performance suite. The matrix below defines when complete validation is required; the normative validation policy is in `AGENTS.md` §10.
+
+### Risk-Based Validation
+
+Use the highest applicable tier. Focused checks may be run during implementation, but they do not substitute for a broader required tier.
+
+| Tier | Change risk | Required validation |
+| --- | --- | --- |
+| R0 | Documentation or content only, with no executable configuration change | Check formatting for the changed files and run `npm run check:docs`. Also run `npm run check:opencode` when agent workflow documentation changes. |
+| R1 | Executable tooling or configuration, tests, or an isolated non-runtime refactor | Run affected type, lint, formatting, governance, and focused test checks. Run `npm run check` when executable source, dependency metadata, build configuration, or validation tooling changes. Agent-prompt documentation remains R0 unless executable configuration such as `opencode.json` changes. |
+| R2 | Product, domain, or renderer behavior contained within one process, without a persistence or platform boundary | Run `npm run check`, affected unit or property tests, and focused E2E coverage for every affected user-visible requirement. Broaden E2E coverage when shared interaction or lifecycle infrastructure changes. Perform product verification of the changed flows. Run performance checks when `docs/PRODUCT.md` §22 applies. |
+| R3 | Process, IPC, filesystem, persistence, clipboard, attachment, native shortcut, startup, shutdown, security, dependency, toolchain, shared fixture, or scale-sensitive state changes | Run `npm run check:full`, the unit, contract, real-boundary, and failure-path coverage required by `AGENTS.md` §9, applicable security checks and audit, same-machine performance comparison when performance may change, and visible verification for native behavior automation cannot inspect. |
+
+When categories overlap or the tier is uncertain, use the higher tier. A suite that cannot execute its real boundary is blocked, not passed.
+
+### Validation Evidence and Reuse
+
+For each result, record the exact command and scope, pass/fail/blocked status, tested `HEAD` plus working-tree diff and untracked-file inventory (or an equivalent digest), relevant environment, and generated-build or artifact assumptions.
+
+A result remains reusable only while those inputs remain valid. `npm run check:full` subsumes the `npm run check`, E2E, and performance stages it contains; `npm run check` subsumes its listed stages. A focused result does not establish broader coverage. Documentation-only edits invalidate documentation and formatting checks, plus OpenCode governance when agent workflow files change, but do not invalidate runtime suites. Source changes invalidate affected static checks, tests, and artifact-dependent suites. Test or fixture changes invalidate that suite. Dependency, build, test-runner, and OpenCode-policy changes invalidate every affected stage.
+
+Pass the validation record to review roles. They consume still-valid results and run an automated check again only for an uncovered scenario, stale or incomplete evidence, or a finding that requires it. Read-only review does not invalidate evidence. After a fix, rerun affected checks and their dependencies; repeat complete validation only for a tier that requires it or after a substantial, architectural, high-risk, or materially scope-changing fix.
 
 An E2E suite that cannot launch Electron or execute the relevant boundary is not a passing validation result. Report the exact environment failure and rerun the suite on supported macOS hardware with an available display before claiming full validation.
 
@@ -226,21 +250,7 @@ File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttach
 
 ## 10. Development Workflow
 
-OpenCode uses the project configuration in `opencode.json`. Start a task with the `develop` primary agent. It coordinates one logical task through this lifecycle:
-
-1. Read `AGENTS.md` and the relevant current-state documentation and nested instructions.
-2. Delegate substantive planning to the read-only `planner` subagent in a fresh context.
-3. Present the plan and material open decisions to the Product Owner, then wait for explicit approval.
-4. Record an approved substantive plan temporarily in `.opencode/plan.md`.
-5. Implement the approved scope and add or update the required tests.
-6. Run focused checks during development, including the E2E spec files that cover the changed behavior, and present that verification result to the review passes.
-7. Invoke the read-only `reviewer` and `product-verifier` subagents for independent passes.
-8. Resolve confirmed meaningful findings and rerun the affected checks. Repeat a full review only after substantial or high-risk fixes.
-9. Run the complete `npm run check:full` once per task, after the review findings are resolved and before the commit. Run the complete verification again only when a fix is substantial, architectural, or high-risk.
-10. Extract durable knowledge into current-state documentation or an ADR and delete the temporary plan.
-11. Review the diff and status, then create the final focused commit.
-
-The primary agent handles ordinary engineering decisions autonomously after plan approval. It returns to the Product Owner only for a newly discovered choice that materially affects product behavior, data, persistence, architecture, compatibility, or an expensive-to-reverse direction.
+OpenCode uses the project configuration in `opencode.json`. Start a task with the `develop` primary agent. The normative task lifecycle, approval rules, review requirements, completion criteria, and Git discipline are owned by `AGENTS.md`. The role prompts in `.opencode/agents/` define only the inputs and actions specific to each role. Use the matrix and evidence rules in §9 when executing that lifecycle.
 
 The `develop` agent's shell permissions are consent guardrails for host execution, not an operating-system sandbox. Routine repository and read-only process inspection, the named npm development and validation workflows, append-only Git work, and fixture-owned process cleanup run without approval. Unfamiliar commands require approval, while command categories that are destructive, publish externally, rewrite history, mutate dependencies, escalate privileges, or execute unrestricted interpreters are denied. Named npm workflows keep their ordinary arguments and attached output redirections inside the same approval boundary. Documented environment prefixes on the named workflows are inside the same boundary; ad-hoc diagnostic variables remain unfamiliar commands that require approval and must not be added to the policy. The permitted destructive file operations are deleting the temporary implementation plan (`.opencode/plan.md`) and moving temporary diagnostic specs and probe files (`e2e/_*.spec.ts`, `perf/_*`) into the gitignored `test-results/` scratch directory; copying artifacts within `test-results/` is also permitted. Rules use OpenCode's last-matching-rule semantics, so their order is security-sensitive. OpenCode resolves each command in a pipeline or chain separately and applies the strongest effect across the segments, so a chain runs without approval only when every segment is allowed. Keep the exact patterns in `opencode.json` rather than duplicating them here, and run `npm run check:opencode` after changing either the policy or the OpenCode version. OpenCode loads its configuration at startup, so restart OpenCode before verifying a policy change.
 
@@ -249,23 +259,6 @@ For unattended sessions, OpenCode's auto-approve mode (`opencode --auto`, or the
 Allowed npm scripts and Git hooks execute mutable repository code with the host user's authority. The policy assumes this repository is trusted and reduces accidental or unexpected shell use; it does not protect the host from deliberately malicious repository code. OpenCode-native file tools remain subject to the denied external-directory boundary.
 
 When a task ends at a commit or session boundary, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt for resuming the work. An incomplete validation result must never be presented without a follow-up action.
-
----
-
-## 11. Temporary Implementation Plans
-
-Substantive tasks use `.opencode/plan.md` as a temporary implementation contract. Plans should describe:
-
-* the goal;
-* current relevant behavior;
-* proposed changes;
-* affected modules;
-* data model or persistence changes;
-* testing strategy;
-* documentation changes;
-* important risks or open questions.
-
-Plans should not duplicate the product specification. They are deleted after implementation, review, verification, and durable documentation updates; Git history is sufficient for historical task details. The complete lifecycle and approval rules are in `AGENTS.md` §8.
 
 ---
 
@@ -386,11 +379,9 @@ Electron Vite writes production build output to `out/`. This directory is genera
 
 ---
 
-## 17. Git Workflow
+## 17. Reviewing the Git Change
 
-Git discipline — one logical commit per task, commit messages, preserving user changes, immediate follow-up fixes, and session boundaries — is defined in `AGENTS.md` §12.
-
-Commit messages follow the Conventional Commits format defined in `AGENTS.md` §12. Run `npm run changelog` to regenerate `CHANGELOG.md` from that history.
+Git policy is owned by `AGENTS.md` §12. Run `npm run changelog` to regenerate `CHANGELOG.md` from Conventional Commit history.
 
 Before committing, review the change with:
 
@@ -400,21 +391,3 @@ git diff
 ```
 
 Confirm that only intentional files are modified. Do not use destructive git commands unless explicitly requested.
-
----
-
-## 18. Handling Existing Changes
-
-The rule for handling existing uncommitted changes is in `AGENTS.md` §12: inspect and preserve them, and do not overwrite, reset, or discard them. If existing changes make the task ambiguous or unsafe, ask the Product Owner.
-
----
-
-## 19. Documentation Updates
-
-Documentation responsibilities and the mapping from a change to the document that owns it are defined in `AGENTS.md` §11. Each fact must have one primary source of truth.
-
----
-
-## 20. Definition of Done
-
-The completion criteria for a task are defined in `AGENTS.md` §13. When the task is complete, commit it as a focused logical change.

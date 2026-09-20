@@ -1,5 +1,8 @@
 # AGENTS.md
 
+<!-- workflow-policy-owner -->
+<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->
+
 ## Session Bootstrap
 
 At the start of a session:
@@ -82,9 +85,7 @@ When a requested change modifies product behavior:
 4. Obtain approval for the implementation plan before changing behavior.
 5. Implement the approved change.
 6. Add or update tests.
-7. Complete automated verification, independent review, and product verification.
-8. Resolve confirmed meaningful findings and run final verification.
-9. Update durable documentation and commit the completed logical change.
+7. Complete the validation, independent review, product verification, documentation, and commit requirements in §§10-13.
 
 Do not make product decisions on behalf of the Product Owner.
 
@@ -209,7 +210,13 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 ## 10. Validation
 
-`npm run check:full` is the required validation before every commit; `npm run check` is the fast local loop when a full run is not practical. The pipeline definition and steps are in `docs/DEVELOPMENT.md` §9.
+Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands and when `npm run check` or `npm run check:full` is mandatory. Focused checks remain the preferred development loop.
+
+Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. For an active substantive task, keep this validation record in `.opencode/plan.md`; include a summary in the final handoff.
+
+A passing result may be reused only for the same command and scope while its repository inputs, relevant environment, and generated inputs remain valid. A broader pass subsumes checks it actually contains; a focused pass never implies broader coverage. Agents must consume valid recorded results and must not rerun a check solely because work changed hands or for reassurance.
+
+Edits invalidate only checks whose inputs or exercised behavior may have changed. Documentation-only edits do not invalidate runtime suites. Source edits invalidate affected static checks, tests, builds, and suites using prior build output. Test, fixture, dependency, build-tool, test-runner, or agent-policy changes invalidate their affected stages. Read-only review and verification do not invalidate results. After a fix, rerun the affected checks and their dependencies; repeat full validation only when required by the risk matrix or when a substantial, architectural, high-risk, or materially scope-changing fix invalidated it.
 
 If validation fails, fix the problem before considering the task complete.
 
@@ -249,7 +256,7 @@ Use Git throughout development.
 
 Prefer one logical task per commit.
 
-Commit each completed logical change once validation passes; do not wait for the Product Owner to ask. Before committing, confirm the change is complete and validated, review `git status` and `git diff`, and stage only the intended files.
+Commit each completed logical change once its required validation passes; do not wait for the Product Owner to ask. Before committing, confirm the change is complete and validated at the applicable risk tier, review `git status` and `git diff`, and stage only the intended files.
 
 Git history is append-only. Never amend, rebase, reset, replace commits, force-push, or otherwise rewrite history. Every follow-up fix is a separate commit.
 
@@ -300,14 +307,14 @@ A task is complete only when:
 * every affected `docs/PRODUCT.md` behavior has coverage at the appropriate level (a unit test for the rule, and an end-to-end test for boundary wiring);
 * relevant tests are added or updated;
 * documentation is updated when necessary;
-* `npm run check:full` passes;
+* the highest applicable validation tier in `docs/DEVELOPMENT.md` §9 passes;
 * no required end-to-end test is skipped because of the environment;
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 
 For a substantive task, the approved plan must be satisfied and its durable knowledge extracted before the temporary plan is deleted.
 
-One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Confirmed meaningful findings must be resolved and the affected checks rerun. A second full review pass is required only when fixes are substantial, architectural, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
+One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Both roles receive the validation record and reuse still-valid results. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
 
 ---
 

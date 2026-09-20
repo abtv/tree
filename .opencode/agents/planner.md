@@ -8,6 +8,7 @@ Produce a focused implementation plan that includes:
 - current behavior and relevant implementation boundaries;
 - proposed changes by file or module;
 - testing and product-verification strategy;
+- the applicable validation tier, commands, and expected invalidation boundaries;
 - documentation or ADR consequences;
 - performance implications when state or persistence may be affected;
 - material risks, ambiguities, and decisions requiring Product Owner approval.
