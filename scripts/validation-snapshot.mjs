@@ -29,7 +29,7 @@ export function createValidationSnapshot({ rootDirectory = ROOT, runGit = git } 
   const untrackedFiles = untrackedOutput
     .split('\0')
     .filter(Boolean)
-    .filter((file) => file !== '.opencode/plan.md')
+    .filter((file) => file !== 'WORKING_PLAN.md')
     .sort(comparePaths)
   const hash = createHash('sha256')
   addFramed(hash, 'head', head)

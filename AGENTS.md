@@ -7,7 +7,7 @@
 
 At the start of a session:
 
-1. Read this file and `.opencode/plan.md` when an approved task is in progress.
+1. Read this file and `WORKING_PLAN.md` when an approved task is in progress.
 2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references.
 3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
 
@@ -132,7 +132,7 @@ Domain logic must be unit-testable without launching Electron or a browser envir
 
 For a substantive task, use the configured planner subagent in a fresh context after inspecting the relevant implementation and documentation. Present the plan to the Product Owner and do not begin implementation until it is explicitly approved.
 
-After approval, keep the task's temporary working plan at `.opencode/plan.md`. The plan is an implementation contract, not permanent project documentation. Keep it current when approved scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
+After approval, keep the task's temporary working plan at `WORKING_PLAN.md` in the repository root. The plan is an implementation contract, not permanent project documentation. Keep it current when approved scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
 
 Before completion, extract knowledge that remains useful into its durable owner:
 
@@ -212,7 +212,7 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands and when `npm run check` or `npm run check:full` is mandatory. Focused checks remain the preferred development loop.
 
-Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. For an active substantive task, keep this validation record in `.opencode/plan.md`; include a summary in the final handoff.
+Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. For an active substantive task, keep this validation record in `WORKING_PLAN.md`; include a summary in the final handoff.
 
 Validation records are temporary task evidence, not permanent repository artifacts. Do not create a committed validation-log or plan archive unless the Product Owner explicitly approves a new audit requirement.
 

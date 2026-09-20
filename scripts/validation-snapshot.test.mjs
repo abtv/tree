@@ -87,7 +87,7 @@ describe('createValidationSnapshot', () => {
   it('excludes the temporary validation record to avoid a self-referential digest', () => {
     const root = createRepository()
     const before = createValidationSnapshot({ rootDirectory: root })
-    write(root, '.opencode/plan.md', `Snapshot: ${before.digest}\n`)
+    write(root, 'WORKING_PLAN.md', `Snapshot: ${before.digest}\n`)
     expect(createValidationSnapshot({ rootDirectory: root })).toEqual(before)
   })
 

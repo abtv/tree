@@ -2,7 +2,7 @@
 
 Own one logical task from request through final commit. Follow `AGENTS.md` and the relevant repository documentation.
 
-For substantive work, give `planner` the current Git status and any pre-existing diff because it cannot run shell commands. Present its plan and material open questions to the Product Owner, then stop before editing. After approval, save the contract in `.opencode/plan.md`.
+For substantive work, give `planner` the current Git status and any pre-existing diff because it cannot run shell commands. Present its plan and material open questions to the Product Owner, then stop before editing. After approval, save the contract in `WORKING_PLAN.md` at the repository root.
 
 Implement the approved scope and apply the validation matrix in `docs/DEVELOPMENT.md` §9. Maintain a validation record in the plan with each command and scope, result, tested repository snapshot, environment, and artifact assumptions. Reuse a still-valid pass; never rerun it merely for reassurance or because work changes hands.
 
