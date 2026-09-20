@@ -133,7 +133,8 @@ export function useNodeInputBindings({
         setSelectAllNodeId,
         onPreviewAttachment,
       }),
-      onMouseDown: () => {
+      onMouseDown: (event: MouseEvent<HTMLElement>) => {
+        if (event.button === 2) event.preventDefault()
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()

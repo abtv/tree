@@ -1,4 +1,4 @@
-import { expect, launchTree, node, test, typeInto, writeClipboardText } from './fixtures'
+import { expect, firePaste, launchTree, node, setCursor, test, typeInto, writeClipboardText } from './fixtures'
 import type { ElectronApplication } from '@playwright/test'
 
 async function chooseEditorMenuItem(app: ElectronApplication, label: string): Promise<void> {
@@ -30,6 +30,28 @@ test.describe('editable node context menu', () => {
     await chooseEditorMenuItem(app, 'Paste')
     await editor.click({ button: 'right' })
     await expect(editor).toHaveValue('Context menu textpasted')
+    await app.close()
+  })
+
+  test('does not extend a text selection when the next node is right-clicked', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await writeClipboardText(app, 'https://first.example')
+    await firePaste(first)
+    await expect(window.getByRole('link', { name: 'https://first.example' })).toBeVisible()
+    await setCursor(first, 0)
+    await window.keyboard.press('Enter')
+
+    const second = node(window, 2)
+    await writeClipboardText(app, 'https://second.example')
+    await second.focus()
+    await firePaste(second)
+    await expect(window.getByRole('link', { name: 'https://second.example' })).toBeVisible()
+    await setCursor(first, 0)
+    await chooseEditorMenuItem(app, 'Copy')
+    await second.click({ button: 'right' })
+
+    await expect.poll(() => window.evaluate(() => document.defaultView?.getSelection()?.toString() ?? '')).toBe('')
     await app.close()
   })
 })

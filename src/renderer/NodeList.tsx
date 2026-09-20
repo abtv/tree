@@ -291,6 +291,7 @@ export function NodeList({
   const onRowPointerDown = useCallback(
     (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (locked) return
+      if (event.button === 2) event.preventDefault()
       if (event.target instanceof Element && event.target.closest('.node-disclosure') !== null) return
       clearSelectionGuard()
       suppressClickRef.current = false

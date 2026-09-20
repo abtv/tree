@@ -24,7 +24,7 @@ export interface NodeInputBindings {
   onContextMenu: (event: MouseEvent<HTMLElement>) => void
   onFocus: (event: FocusEvent<HTMLElement>) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
-  onMouseDown: () => void
+  onMouseDown: (event: MouseEvent<HTMLElement>) => void
   onPaste: (event: ClipboardEvent<HTMLElement>) => void
   onSelect: (event: SyntheticEvent<HTMLElement>) => void
 }

@@ -193,6 +193,21 @@ describe('NodeList drag interaction', () => {
     expect(document.body).not.toHaveClass('node-drag-active')
   })
 
+  it('prevents the secondary pointer down from selecting text across rows', () => {
+    const { container } = renderRows()
+    const rows = rowElements(container)
+
+    expect(
+      fireEvent.pointerDown(rows[1]!, {
+        cancelable: true,
+        pointerId: 1,
+        button: 2,
+        isPrimary: true,
+        pointerType: 'mouse',
+      }),
+    ).toBe(false)
+  })
+
   it('ignores a duplicate press while a gesture is already pending', () => {
     vi.useFakeTimers()
     mockRowRects()

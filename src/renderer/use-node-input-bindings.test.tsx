@@ -102,6 +102,28 @@ describe('useNodeInputBindings', () => {
     expect(store.copy).toHaveBeenCalledWith('node', 1, 4)
   })
 
+  it('prevents a secondary-button press from changing the text selection', () => {
+    const store = createStore()
+    const { result } = renderBindings({ store, selectedNodeId: 'node' })
+    const bindings = result.current({ id: 'node', text: 'hello', children: [] })
+    const preventDefault = vi.fn()
+
+    bindings.onMouseDown({ button: 2, preventDefault } as never)
+
+    expect(preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the primary-button press available for normal caret and text selection', () => {
+    const store = createStore()
+    const { result } = renderBindings({ store, selectedNodeId: 'node' })
+    const bindings = result.current({ id: 'node', text: 'hello', children: [] })
+    const preventDefault = vi.fn()
+
+    bindings.onMouseDown({ button: 0, preventDefault } as never)
+
+    expect(preventDefault).not.toHaveBeenCalled()
+  })
+
   it('ignores focus intents for nodes that are not registered', async () => {
     const store = createStore()
     const { result } = renderHook(() =>
