@@ -37,9 +37,13 @@ export function createValidationSnapshot({ rootDirectory = ROOT, runGit = git } 
   for (const file of untrackedFiles) {
     addFramed(hash, 'untracked-path', file)
     const filePath = join(rootDirectory, file)
-    if (lstatSync(filePath).isSymbolicLink()) {
+    const stats = lstatSync(filePath)
+    if (stats.isSymbolicLink()) {
       addFramed(hash, 'untracked-symlink-target', readlinkSync(filePath))
     } else {
+      if (stats.isFile()) {
+        addFramed(hash, 'untracked-mode', (stats.mode & 0o111) === 0 ? '100644' : '100755')
+      }
       addFramed(hash, 'untracked-content', readFileSync(filePath))
     }
   }

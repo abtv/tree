@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -62,6 +62,18 @@ describe('createValidationSnapshot', () => {
     expect(first.untrackedFiles).toEqual(['a binary.bin', 'z $ file.txt'])
     write(root, 'a binary.bin', Buffer.from([0, 1, 3, 255]))
     expect(createValidationSnapshot({ rootDirectory: root }).digest).not.toBe(first.digest)
+  })
+
+  it('tracks executable-mode changes on untracked regular files', () => {
+    const root = createRepository()
+    write(root, 'untracked-tool', '#!/bin/sh\n')
+    chmodSync(join(root, 'untracked-tool'), 0o644)
+    const nonExecutable = createValidationSnapshot({ rootDirectory: root }).digest
+    chmodSync(join(root, 'untracked-tool'), 0o755)
+    const executable = createValidationSnapshot({ rootDirectory: root }).digest
+    chmodSync(join(root, 'untracked-tool'), 0o644)
+    expect(executable).not.toBe(nonExecutable)
+    expect(createValidationSnapshot({ rootDirectory: root }).digest).toBe(nonExecutable)
   })
 
   it('ignores generated files excluded by gitignore', () => {
