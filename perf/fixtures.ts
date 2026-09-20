@@ -26,22 +26,25 @@ export const test = base.extend<{ userDataDir: string }>({
   userDataDir: async ({}, use) => {
     const directory = mkdtempSync(join(tmpdir(), 'tree-perf-'))
     await use(directory)
-    await closeTrackedApps()
-    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
+    // Playwright caches imported helper modules for the lifetime of the worker process, so a hook
+    // declared here would attach only to the first test file's suite and silently stop running for
+    // later files. Fixture teardown runs for every test in every file.
+    try {
+      const observations = [...observedSaveErrors.values()]
+      await Promise.all(observations.map(({ collect }) => collect()))
+      await closeTrackedApps()
+      observations.forEach(({ timer }) => clearInterval(timer))
+      observedSaveErrors.clear()
+      const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
+      retainedSaveErrors.length = 0
+      if (errors.length > 0) {
+        throw new Error(`Renderer reported save errors:\n${errors.join('\n')}`)
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    }
   },
-})
-
-test.afterEach(async () => {
-  const observations = [...observedSaveErrors.values()]
-  await Promise.all(observations.map(({ collect }) => collect()))
-  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
-  observations.forEach(({ timer }) => clearInterval(timer))
-  observedSaveErrors.clear()
-  const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
-  retainedSaveErrors.length = 0
-  if (errors.length > 0) {
-    throw new Error(`Renderer reported save errors:\n${errors.join('\n')}`)
-  }
 })
 
 export { expect }

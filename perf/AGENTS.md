@@ -10,6 +10,7 @@ Rules for the Playwright performance project in `perf/`. The root `AGENTS.md` st
 * Keep the application window visible: the typing scenarios measure paint latency for a presented window, and same-machine baselines are recorded that way. Do not apply the hidden e2e window mode to `perf/`.
 * Each typing scenario focuses an explicit target field, asserts it is focused, and asserts the current-parent heading was not edited.
 * Use two consecutive animation frames for paint timing and print one JSON line per scenario.
+* Put per-test teardown in the `userDataDir` fixture, never in a module-level `test.afterEach`: Playwright caches imported helper modules for the lifetime of a worker, so a module-level hook attaches only to the first test file's suite and silently stops running for later files.
 * Keep process ownership, serial execution, and bounded teardown.
 
 ## Commands
