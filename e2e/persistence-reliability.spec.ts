@@ -6,6 +6,7 @@ import {
   attachmentFiles,
   clickApplicationMenuQuit,
   closeApp,
+  configureHiddenParallelTests,
   documentPath,
   expect,
   firePaste,
@@ -40,6 +41,8 @@ async function holdAttachmentWrite(app: ElectronApplication, rejectFirst = false
 }
 
 test.describe('persistence reliability regressions', () => {
+  configureHiddenParallelTests()
+
   test('rejects a null primary and preserves recovery documents through quit', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'Preserve me', children: [] }] },

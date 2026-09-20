@@ -45,6 +45,13 @@ function ambientWindowMode(): WindowMode {
   return process.env['TREE_E2E_VISIBLE'] === '1' ? 'visible' : 'hidden'
 }
 
+// Selected long-running suites distribute their independent tests across the configured workers
+// during hidden runs. Visible runs remain serial so product verification observes one real window at
+// a time, and the global config stays file-parallel by default for suites that have not opted in.
+export function configureHiddenParallelTests(): void {
+  test.describe.configure({ mode: ambientWindowMode() === 'hidden' ? 'parallel' : 'default' })
+}
+
 // The global `Cmd+0` accelerator is machine-global, so parallel workers must stub it. Serial runs
 // (single worker, including visible product-verification runs) use the real registration.
 function ambientShortcutMode(): ShortcutMode {

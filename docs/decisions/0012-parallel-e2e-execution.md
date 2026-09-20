@@ -20,12 +20,12 @@ While implementing the change, an additional latent defect surfaced: the suite's
 - **Keep the suite serial.** Simple, but leaves the largest validation stage at about 2.3 minutes and leaves the hook defect unaddressed.
 - **Shard the suite into multiple Playwright invocations.** Requires an orchestrator, still conflicts on the global shortcut and cleanup marker, and makes `npx playwright test` semantics ambiguous.
 - **Virtual per-app clipboard through the test entry.** Fast and deterministic, but most clipboard tests would stop exercising the native pasteboard, which `docs/decisions/0002-e2e-testing-with-playwright.md` exists to cover.
-- **`fullyParallel: true`.** Would let tests from one file run on different workers; the shortcut spec must keep its real registration on a single worker.
+- **Repository-wide `fullyParallel: true`.** Would let every file distribute tests across workers, but applies concurrency where it has not been reviewed and would conflict with the shortcut spec's real registration. Selected suites can opt in without changing the safe global default.
 - **Parallelize the performance suite too.** Rejected: `perf/AGENTS.md` requires serial, visible execution and same-machine baselines.
 
 ## Decision
 
-Hidden end-to-end runs execute spec files in parallel across five workers in `playwright.config.ts`; visible runs stay serial because they observe the real desktop UI. `fullyParallel` stays false so a spec file remains on one worker. Playwright's `--workers` option remains the tuning escape hatch for environments, including future CI runners, that need a different concurrency limit.
+Hidden end-to-end runs execute spec files in parallel across five workers in `playwright.config.ts`; visible runs stay serial because they observe the real desktop UI. `fullyParallel` stays false as the safe global default. Reviewed long-running suites whose tests are independent call `configureHiddenParallelTests()` to distribute tests across the same five workers only during hidden runs. Playwright's `--workers` option remains the tuning escape hatch for environments, including future CI runners, that need a different concurrency limit.
 
 Worker isolation:
 
@@ -38,7 +38,8 @@ Per-test teardown — the save-error guard, app cleanup, and clipboard-lock rele
 ## Consequences
 
 - This ADR refines ADR 0002's serial-execution consequence and builds on ADR 0011's hidden-window mode. The rest of both decisions stands.
-- The initial three-worker implementation reduced the hidden suite from about 2.3 minutes to about 1.2 minutes on the development machine. Increasing the configured worker count to five reduced three subsequent runs to 58.0–58.9 seconds; `--workers` remains a tuning escape hatch.
+- The initial three-worker implementation reduced the hidden suite from about 2.3 minutes to about 1.2 minutes on the development machine. Increasing the configured worker count to five reduced three subsequent runs to 58.0–58.9 seconds. Selective test-level parallelism then reduced two complete-suite runs from a directly measured 61.6-second baseline to 54.7–54.9 seconds. Three runs of the 35 opted-in tests completed in 33.5–34.6 seconds. `--workers` remains a tuning escape hatch.
+- Selective test-level parallelism is limited to `persistence-lock.spec.ts`, `shutdown-failures.spec.ts`, `persistence.spec.ts`, `undo-sessions.spec.ts`, and `persistence-reliability.spec.ts`. Their per-test data directories and fixture teardown preserve isolation; visible runs and suites without an explicit opt-in retain their existing serial-within-file behavior.
 - The real global `Cmd+0` registration is covered only by `e2e/shortcut.spec.ts` during parallel runs; every other launch asserts the stub instead. Visible and single-worker runs keep the real registration everywhere.
 - The clipboard lock serializes the clipboard-sharing portion of the suite; it is a correctness boundary, not an optimization target. It is best-effort test tooling that prevents normal cross-worker interference and reclaims locks left by crashed workers; it is not a general-purpose mutual-exclusion primitive.
 - Two concurrent Playwright invocations remain unsupported and would terminate each other's applications.

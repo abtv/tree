@@ -1,6 +1,17 @@
-import { expect, firePaste, launchTree, node, test, typeInto, writeClipboardText } from './fixtures'
+import {
+  configureHiddenParallelTests,
+  expect,
+  firePaste,
+  launchTree,
+  node,
+  test,
+  typeInto,
+  writeClipboardText,
+} from './fixtures'
 
 test.describe('text edit sessions', () => {
+  configureHiddenParallelTests()
+
   test('starts a new undo entry after five seconds without a text change', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

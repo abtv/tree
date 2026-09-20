@@ -6,6 +6,7 @@ import {
   blockSaves,
   clickApplicationMenuQuit,
   closeMainWindow,
+  configureHiddenParallelTests,
   delaySaveIpc,
   documentPath,
   exactMessage,
@@ -21,6 +22,8 @@ import {
 } from './fixtures'
 
 test.describe('shutdown failure handling', () => {
+  configureHiddenParallelTests()
+
   test('keeps the app open after a save failure and quits after a successful retry', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)

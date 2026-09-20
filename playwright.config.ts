@@ -1,9 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
-// Hidden runs execute spec files in parallel across workers. Visible runs stay serial because they
-// share the desktop and exist to observe the real UI. Completely parallel test execution is avoided
-// so each spec file stays on one worker: `e2e/shortcut.spec.ts` needs the real, machine-global
-// `Cmd+0` registration, while every other parallel launch uses the test-owned shortcut stub.
+// Hidden runs execute spec files in parallel across workers, and selected long-running suites opt
+// into test-level parallelism. Visible runs stay serial because they share the desktop and exist to
+// observe the real UI. The global default remains file-parallel so `e2e/shortcut.spec.ts` keeps its
+// real, machine-global `Cmd+0` tests on one worker; other parallel launches use the shortcut stub.
 const hiddenParallelRun = process.env['TREE_E2E_VISIBLE'] !== '1'
 
 export default defineConfig({

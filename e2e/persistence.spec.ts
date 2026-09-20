@@ -2,6 +2,7 @@ import {
   allowRendererError,
   attachmentFiles,
   closeApp,
+  configureHiddenParallelTests,
   documentGenerations,
   documentPath,
   exactMessage,
@@ -56,6 +57,8 @@ function depthSeedWithLeaf(parentDepth: number) {
 }
 
 test.describe('persistence', () => {
+  configureHiddenParallelTests()
+
   test('rejects a child below level 20 without changing the editor or persisted bytes', async ({ userDataDir }) => {
     seedDocument(userDataDir, depthSeed(20))
     const before = readFileSync(`${userDataDir}/data/document.json`)

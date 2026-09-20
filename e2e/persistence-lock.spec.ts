@@ -4,6 +4,7 @@ import {
   allowRendererError,
   blockSaves,
   clickApplicationMenuQuit,
+  configureHiddenParallelTests,
   documentPath,
   exactMessage,
   expect,
@@ -17,6 +18,8 @@ import {
 } from './fixtures'
 
 test.describe('save failure lock', () => {
+  configureHiddenParallelTests()
+
   test('stops after three failed saves and persists on quit once saving works again', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
