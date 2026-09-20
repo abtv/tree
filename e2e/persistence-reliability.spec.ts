@@ -226,6 +226,14 @@ test.describe('persistence reliability regressions', () => {
     const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
     await typeInto(node(window, 1), initialText)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
+    // The startup persistence cycle always runs one attachment cleanup, and the serialized
+    // persistence queue orders it before this save failure. Reset the count once the failure is
+    // visible so the assertion below proves no cleanup runs after the failure becomes visible,
+    // instead of racing the startup cleanup that the wrapper in this test may have installed too
+    // late to see.
+    await app.evaluate(() => {
+      ;(globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount = 0
+    })
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
     await expect(window.getByText(/Operation failed:.*image blocked/)).toBeVisible()
