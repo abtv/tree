@@ -66,10 +66,10 @@ test.describe('compact layout density', () => {
     const bar = await selectorRect(window, '.location-bar')
     const first = await rowRect(window, 0)
     expect(bar.height).toBeCloseTo(30, 0)
-    expect(first.height).toBeCloseTo(24, 0)
+    expect(first.height).toBeCloseTo(25, 0)
     expect(first.top - bar.bottom).toBeCloseTo(48, 0)
 
-    await expect(node(window, 15)).toBeInViewport({ ratio: 1 })
+    await expect(node(window, 14)).toBeInViewport({ ratio: 1 })
     expect(await window.evaluate(() => document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true)
 
     await setMainWindowBounds(app, { width: 1200 })

@@ -147,7 +147,7 @@ textarea {
 .node-row {
   position: relative;
   display: flow-root;
-  min-height: 24px;
+  min-height: 25px;
   margin-left: 28px;
   padding-left: 21px;
 }
@@ -160,7 +160,7 @@ textarea {
 
 .node-disclosure {
   position: absolute;
-  top: 3.5px;
+  top: 4.5px;
   left: 2px;
   display: grid;
   place-items: center;
@@ -198,7 +198,7 @@ textarea {
 
 .node-focus-marker {
   position: absolute;
-  top: 8px;
+  top: 8.5px;
   left: -9px;
   width: 0;
   height: 0;
@@ -236,7 +236,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   min-width: 0;
   border: 0;
   border-radius: 3px;
-  padding: 2px 6px;
+  padding: 0 6px;
   color: inherit;
   background: transparent;
   cursor: text;
@@ -248,7 +248,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   font-size: 16px;
-  line-height: 20px;
+  line-height: 21px;
 }
 
 .node-input a {

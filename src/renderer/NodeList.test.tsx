@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import './test/setup'
 import { NodeList } from './NodeList'
-import { EDGE_SCROLL_STEP, WINDOWING_THRESHOLD } from './list-window'
+import { EDGE_SCROLL_STEP, ROW_HEIGHT_ESTIMATE, WINDOWING_THRESHOLD } from './list-window'
 import { HOLD_ACTIVATION_MS } from './node-drag'
 
 afterEach(() => {
@@ -25,7 +25,7 @@ function buildNodes(count: number): TreeNode[] {
   return Array.from({ length: count }, (_, index) => ({ id: `n${index}`, text: `Text ${index}`, children: [] }))
 }
 
-function rect(top: number, height = 24): DOMRect {
+function rect(top: number, height = ROW_HEIGHT_ESTIMATE): DOMRect {
   return {
     top,
     height,
@@ -39,7 +39,7 @@ function rect(top: number, height = 24): DOMRect {
   } as DOMRect
 }
 
-function mockRowRects(originTop = 0, height = 24): void {
+function mockRowRects(originTop = 0, height = ROW_HEIGHT_ESTIMATE): void {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const index = this.dataset.nodeIndex
     if (index === undefined) return rect(originTop, height)
@@ -613,7 +613,7 @@ describe('NodeList windowing', () => {
     mockRows(0)
     renderList(600)
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
-    mockRows(-24 * 200)
+    mockRows(-ROW_HEIGHT_ESTIMATE * 200)
     fireEvent.scroll(window)
     expect(screen.queryByRole('textbox', { name: 'Node 1' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node 201' })).toBeInTheDocument()
@@ -624,7 +624,7 @@ describe('NodeList windowing', () => {
     renderList(600, 'n550')
     const input = screen.getByRole('textbox', { name: 'Node 551' })
     input.focus()
-    mockRows(-24 * 540)
+    mockRows(-ROW_HEIGHT_ESTIMATE * 540)
     fireEvent.scroll(window)
     const later = screen.getByRole('textbox', { name: 'Node 551' })
     expect(later).toBe(input)
@@ -638,16 +638,16 @@ describe('NodeList windowing', () => {
     const rows = rowElements(container)
     const mountedCount = rows.length
 
-    activate(rows[1]!, 24 + 12)
+    activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, -10)
     expect(rows[0]).toHaveClass('node-row-drop-before')
     pointerUpAt(rows[1]!, -10)
     expect(onMove).toHaveBeenLastCalledWith('n1', 0)
 
-    activate(rows[1]!, 24 + 12)
-    pointerMoveAt(rows[1]!, 24 * mountedCount + 10)
+    activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
+    pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * mountedCount + 10)
     expect(rows[mountedCount - 1]).toHaveClass('node-row-drop-after')
-    pointerUpAt(rows[1]!, 24 * mountedCount + 10)
+    pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * mountedCount + 10)
     expect(onMove).toHaveBeenLastCalledWith('n1', mountedCount)
   })
 
@@ -657,7 +657,7 @@ describe('NodeList windowing', () => {
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(container.querySelector('.node-row-pinned .node-focus-marker')).not.toBeNull()
 
-    mockRows(-24 * 540)
+    mockRows(-ROW_HEIGHT_ESTIMATE * 540)
     fireEvent.scroll(window)
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(container.querySelector('.node-row-pinned')).toBeNull()
@@ -673,13 +673,13 @@ describe('NodeList windowing', () => {
     if (pinned === null) throw new Error('The pinned row was not rendered.')
 
     activate(rows[0]!, 13)
-    pointerMoveAt(rows[0]!, 550 * 24 + 10)
+    pointerMoveAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + 10)
 
     const markers = container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')
     expect(markers).toHaveLength(1)
     expect(pinned).toHaveClass('node-row-drop-before')
 
-    pointerUpAt(rows[0]!, 550 * 24 + 10)
+    pointerUpAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + 10)
     expect(onMove).toHaveBeenCalledWith('n0', 550)
   })
 
@@ -728,7 +728,7 @@ describe('NodeList windowing', () => {
     pointerMoveAt(row, globalThis.innerHeight - 1)
     expect(frames).toHaveLength(1)
 
-    mockRowRects(-24 * 400)
+    mockRowRects(-ROW_HEIGHT_ESTIMATE * 400)
     fireEvent.scroll(window)
 
     const list = container.querySelector('.node-list')
@@ -736,11 +736,11 @@ describe('NodeList windowing', () => {
     const marker = container.querySelector('.node-row-drop-before, .node-row-drop-after')
     expect(marker).not.toBeNull()
     pointerUpAt(list, globalThis.innerHeight - 1)
-    expect(onMove).toHaveBeenCalledWith('n0', 432)
+    expect(onMove).toHaveBeenCalledWith('n0', 431)
   })
 })
 
-function mockRows(rectTop: number, height = 24): void {
+function mockRows(rectTop: number, height = ROW_HEIGHT_ESTIMATE): void {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
     top: rectTop,
     height,
