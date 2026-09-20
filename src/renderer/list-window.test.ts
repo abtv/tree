@@ -51,8 +51,8 @@ describe('computeListWindow', () => {
     const window = computeListWindow({
       count: 100,
       offsets,
-      viewportStart: 27 * 10,
-      viewportEnd: 27 * 12,
+      viewportStart: ROW_HEIGHT_ESTIMATE * 10,
+      viewportEnd: ROW_HEIGHT_ESTIMATE * 12,
       overscan: 0,
       focusedIndex: undefined,
     })
@@ -65,8 +65,8 @@ describe('computeListWindow', () => {
     const window = computeListWindow({
       count: 100,
       offsets,
-      viewportStart: 27 * 20,
-      viewportEnd: 27 * 21,
+      viewportStart: ROW_HEIGHT_ESTIMATE * 20,
+      viewportEnd: ROW_HEIGHT_ESTIMATE * 21,
       overscan: WINDOW_OVERSCAN,
       focusedIndex: undefined,
     })
@@ -90,8 +90,8 @@ describe('computeListWindow', () => {
     const bottom = computeListWindow({
       count: 100,
       offsets,
-      viewportStart: 27 * 98,
-      viewportEnd: 27 * 100,
+      viewportStart: ROW_HEIGHT_ESTIMATE * 98,
+      viewportEnd: ROW_HEIGHT_ESTIMATE * 100,
       overscan: WINDOW_OVERSCAN,
       focusedIndex: undefined,
     })

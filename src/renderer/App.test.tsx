@@ -71,7 +71,7 @@ async function createLockedStore(): Promise<EditorStore> {
   return store
 }
 
-function mockAppRowRects(originTop = 0, height = 27): void {
+function mockAppRowRects(originTop = 0, height = 24): void {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const index = this.dataset.nodeIndex
     const top = index === undefined ? originTop : originTop + Number(index) * height

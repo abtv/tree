@@ -183,6 +183,7 @@ test.describe('windowed node list', () => {
     const { window } = await launchTree(userDataDir)
 
     const listHeightBefore = await window.evaluate(() => document.documentElement.scrollHeight)
+    const baseRowHeight = await rowHeight(window, 1)
     await row(window, 3).fill(wrappedRowText)
     await expect.poll(() => rowHeight(window, 3)).toBeGreaterThan(30)
 
@@ -190,7 +191,7 @@ test.describe('windowed node list', () => {
       .poll(async () => {
         const height = await rowHeight(window, 3)
         const listHeight = await window.evaluate(() => document.documentElement.scrollHeight)
-        return Math.abs(listHeight - listHeightBefore - (height - 27))
+        return Math.abs(listHeight - listHeightBefore - (height - baseRowHeight))
       })
       .toBeLessThan(1)
 
@@ -210,6 +211,7 @@ test.describe('windowed node list', () => {
     const { window } = await launchTree(userDataDir)
 
     const listHeightBefore = await window.evaluate(() => document.documentElement.scrollHeight)
+    const baseRowHeight = await rowHeight(window, 1)
     for (let index = 0; index < 40; index += 1) await window.keyboard.press('ArrowDown')
     await expect(row(window, 41)).toBeFocused()
 
@@ -219,7 +221,7 @@ test.describe('windowed node list', () => {
       .poll(async () => {
         const height = await rowHeight(window, 41)
         const listHeight = await window.evaluate(() => document.documentElement.scrollHeight)
-        return Math.abs(listHeight - listHeightBefore - (height - 27))
+        return Math.abs(listHeight - listHeightBefore - (height - baseRowHeight))
       })
       .toBeLessThan(1)
 

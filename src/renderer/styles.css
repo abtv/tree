@@ -41,7 +41,7 @@ textarea {
 .location-bar {
   display: flex;
   align-items: center;
-  height: 48px;
+  height: 30px;
   padding: 0 18px;
   border-bottom: 1px solid #e9edef;
   color: #778187;
@@ -121,13 +121,13 @@ textarea {
 }
 
 .editor-shell {
-  width: min(100%, 760px);
+  width: min(100%, 960px);
   margin: 0 auto;
-  padding: 45px 18px 96px;
+  padding: 10px 18px 64px;
 }
 
 .current-parent {
-  margin: 0 0 10px 32px;
+  margin: 0 0 6px 24px;
 }
 
 .node-list {
@@ -141,9 +141,9 @@ textarea {
 .node-row {
   position: relative;
   display: flow-root;
-  min-height: 27px;
-  margin-left: 36px;
-  padding-left: 23px;
+  min-height: 24px;
+  margin-left: 28px;
+  padding-left: 21px;
 }
 
 .node-row-pinned {
@@ -154,7 +154,7 @@ textarea {
 
 .node-disclosure {
   position: absolute;
-  top: 5px;
+  top: 3.5px;
   left: 2px;
   display: grid;
   place-items: center;
@@ -192,7 +192,7 @@ textarea {
 
 .node-focus-marker {
   position: absolute;
-  top: 9px;
+  top: 8px;
   left: -9px;
   width: 0;
   height: 0;
@@ -211,20 +211,17 @@ body.node-drag-active .node-disclosure {
 
 .drop-zone {
   position: relative;
-  height: 16px;
+  height: 0;
 }
 
-.drop-zone-edge {
+body.node-drag-active .drop-zone-start.drop-zone-edge {
   height: 40px;
+  margin-top: -40px;
 }
 
-.drop-zone-start.drop-zone-edge {
-  margin-top: -24px;
-}
-
-.drop-zone-end.drop-zone-edge {
+body.node-drag-active .drop-zone-end.drop-zone-edge {
   height: 64px;
-  margin-bottom: -48px;
+  margin-bottom: -64px;
 }
 
 .node-input {
@@ -233,7 +230,7 @@ body.node-drag-active .node-disclosure {
   min-width: 0;
   border: 0;
   border-radius: 3px;
-  padding: 3px 6px;
+  padding: 2px 6px;
   color: inherit;
   background: transparent;
   cursor: text;
@@ -245,7 +242,7 @@ body.node-drag-active .node-disclosure {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   font-size: 16px;
-  line-height: 21px;
+  line-height: 20px;
 }
 
 .node-input a {
@@ -307,10 +304,10 @@ body.node-drag-active .node-disclosure {
 }
 
 .current-parent-input {
-  padding: 0 6px 4px;
-  font-size: 28px;
+  padding: 0 6px 2px;
+  font-size: 24px;
   font-weight: 700;
-  line-height: 34px;
+  line-height: 30px;
   letter-spacing: -0.45px;
 }
 

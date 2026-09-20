@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts'],
+    css: { include: [/styles\.css/] },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
