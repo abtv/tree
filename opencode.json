@@ -209,7 +209,19 @@
           "cp test-results/* test-results/*": "allow",
           "cp -R test-results/* test-results/*": "allow",
           "mv e2e/_* test-results/*": "allow",
-          "mv test-results/* test-results/*": "allow"
+          "mv test-results/* test-results/*": "allow",
+          "TREE_E2E_VISIBLE=1 npm run test:e2e": "allow",
+          "TREE_E2E_VISIBLE=1 npm run test:e2e *": "allow",
+          "TREE_E2E_VISIBLE=1 npx playwright test": "allow",
+          "TREE_E2E_VISIBLE=1 npx playwright test *": "allow",
+          "TREE_PERSISTENCE_DEBUG=1 npm run dev": "allow",
+          "TREE_PERSISTENCE_DEBUG=1 npm run dev *": "allow",
+          "PERF_RESULTS=\"test-results/*\" npm run test:perf": "allow",
+          "PERF_RESULTS=\"test-results/*\" npm run test:perf *": "allow",
+          "PERF_BASELINE=\"*\" npm run test:perf": "allow",
+          "PERF_BASELINE=\"*\" npm run test:perf *": "allow",
+          "PERF_REGRESSION_TOLERANCE=\"*\" npm run test:perf": "allow",
+          "PERF_REGRESSION_TOLERANCE=\"*\" npm run test:perf *": "allow"
         },
         "task": {
           "*": "deny",
@@ -268,7 +280,8 @@
           "npm test": "allow",
           "npm run test:e2e": "allow",
           "npm run test:perf": "allow",
-          "npm run build": "allow"
+          "npm run build": "allow",
+          "TREE_E2E_VISIBLE=1 npm run test:e2e": "allow"
         },
         "task": "deny",
         "external_directory": "deny",

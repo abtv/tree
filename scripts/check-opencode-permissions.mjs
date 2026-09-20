@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const config = JSON.parse(await readFile(new URL('../opencode.json', import.meta.url), 'utf8'))
-const rules = config.agent.develop.permission.bash
 
 function globMatches(pattern, value) {
   let expression = [...pattern]
@@ -19,7 +18,7 @@ function globMatches(pattern, value) {
   return new RegExp(`^${expression}$`, 'us').test(value)
 }
 
-function permissionFor(command) {
+function permissionFor(rules, command) {
   let permission
 
   for (const [pattern, effect] of Object.entries(rules)) {
@@ -30,9 +29,9 @@ function permissionFor(command) {
 }
 
 // OpenCode checks every parsed command in a pipeline or chain and applies the strongest
-// effect across the segments. Split on unquoted &&, ||, ;, and |, so quoted separators such
-// as -E "flake|retry" and awk '$1 == "a" || $2 == "b"' stay inside one segment.
-function chainedPermissionFor(command) {
+// effect across the segments. Split on unquoted &&, ||, ;, |, and newlines, so quoted separators
+// such as -E "flake|retry" and awk '$1 == "a" || $2 == "b"' stay inside one segment.
+function chainedPermissionFor(rules, command) {
   const segments = []
   let current = ''
   let quote
@@ -65,23 +64,24 @@ function chainedPermissionFor(command) {
       if (next === '|') index += 1
       continue
     }
-    if (character === ';') {
+    if (character === ';' || character === '\n') {
       segments.push(current.trim())
       current = ''
       continue
     }
+    if (character === '\r') continue
 
     current += character
   }
   segments.push(current.trim())
 
-  const effects = segments.map((segment) => permissionFor(segment))
+  const effects = segments.filter((segment) => segment !== '').map((segment) => permissionFor(rules, segment))
   if (effects.includes('deny')) return 'deny'
   if (effects.includes('ask')) return 'ask'
   return 'allow'
 }
 
-const cases = {
+const developCases = {
   allow: [
     'git status --short',
     'git diff --check',
@@ -151,6 +151,18 @@ const cases = {
     'git branch --show-current',
     'git stash list',
     'git stash list --oneline',
+    // Documented environment-prefixed workflow commands are inside the approval boundary.
+    'TREE_E2E_VISIBLE=1 npm run test:e2e',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e 2>&1',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e -- window-visibility',
+    'TREE_E2E_VISIBLE=1 npx playwright test',
+    'TREE_E2E_VISIBLE=1 npx playwright test persistence-reliability --workers=1 --reporter=list',
+    'TREE_PERSISTENCE_DEBUG=1 npm run dev',
+    'TREE_PERSISTENCE_DEBUG=1 npm run dev 2>&1',
+    'PERF_RESULTS="test-results/perf-after.json" npm run test:perf',
+    'PERF_BASELINE="perf-baseline.json" npm run test:perf 2>&1',
+    'PERF_REGRESSION_TOLERANCE="2" npm run test:perf',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e; git status --short',
   ],
   ask: [
     'curl https://example.com',
@@ -170,6 +182,24 @@ const cases = {
     // Generic xargs is not allowlisted; only xargs wc * is.
     'xargs rm -rf src',
     'xargs sh -c "git push"',
+    // Unfamiliar or ad-hoc environment prefixes still require approval.
+    'FAKE_ENV=1 npm run test:e2e',
+    'TREE_E2E_VISIBLE=2 npm run test:e2e',
+    'TREE_E2E_VISIBLE=1 npm run unknown',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e-malicious',
+    'TREE_E2E_VISIBLE=1 npx playwright test-malicious',
+    'TREE_PERSISTENCE_DEBUG=1 npm run test:e2e',
+    'PROBE_NO_BT=1 npx playwright test _hidden-probe.spec --workers=1 --reporter=list',
+    'TREE_E2E_FORCE_BYPASS=1 npx playwright test window-visibility --workers=1 --reporter=list',
+    'TREE_E2E_HIDDEN=1 npx playwright test window-visibility',
+    // Perf artifact overrides are allowed only as a single quoted value.
+    'PERF_BASELINE=perf-baseline.json npm run test:perf',
+    'PERF_BASELINE=x rm -rf src npm run test:perf',
+    'PERF_RESULTS="perf-after.json" npm run test:perf',
+    // An env prefix turns an anchored deny into an ask; this pins the pre-existing behavior.
+    'TREE_E2E_VISIBLE=1 rm -rf src',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e && curl https://example.com',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e\ncurl https://example.com',
   ],
   deny: [
     'sudo npm run check',
@@ -228,13 +258,44 @@ const cases = {
     'awk \'BEGIN{system ("id")}\'',
     'awk -f script.awk file.ts',
     "awk '{print}' --file=script.awk",
+    // Allowed environment-prefixed segments still combine with denied segments.
+    'TREE_E2E_VISIBLE=1 npm run test:e2e; rm -rf src',
+    'TREE_PERSISTENCE_DEBUG=1 npm run dev && git push origin main',
+    'PERF_BASELINE="perf-baseline.json" npm run test:perf && sudo rm -rf /',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e | sudo cat /etc/hosts',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e\nrm -rf src',
   ],
 }
 
-for (const [expected, commands] of Object.entries(cases)) {
-  for (const command of commands) {
-    assert.equal(chainedPermissionFor(command), expected, `${command} should resolve to ${expected}`)
+const productVerifierCases = {
+  allow: ['npm test', 'npm run test:e2e', 'npm run test:perf', 'npm run build', 'TREE_E2E_VISIBLE=1 npm run test:e2e'],
+  deny: [
+    'TREE_E2E_VISIBLE=1 npm run test:e2e -- persistence-reliability',
+    'TREE_E2E_VISIBLE=2 npm run test:e2e',
+    'TREE_E2E_VISIBLE=1 npx playwright test',
+    'TREE_E2E_VISIBLE=1 npm run check:full',
+    'TREE_PERSISTENCE_DEBUG=1 npm run dev',
+    'TREE_E2E_VISIBLE=1 npm run test:e2e && curl https://example.com',
+  ],
+}
+
+const agents = [
+  { name: 'develop', rules: config.agent.develop.permission.bash, cases: developCases },
+  {
+    name: 'product-verifier',
+    rules: config.agent['product-verifier'].permission.bash,
+    cases: productVerifierCases,
+  },
+]
+
+let checked = 0
+for (const { name, rules, cases } of agents) {
+  for (const [expected, commands] of Object.entries(cases)) {
+    for (const command of commands) {
+      assert.equal(chainedPermissionFor(rules, command), expected, `${name}: ${command} should resolve to ${expected}`)
+      checked += 1
+    }
   }
 }
 
-console.log(`Checked ${Object.values(cases).flat().length} OpenCode permission expectations.`)
+console.log(`Checked ${checked} OpenCode permission expectations.`)

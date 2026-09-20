@@ -6,6 +6,8 @@ For substantive work, delegate repository inspection and planning to `planner`. 
 
 Implement the approved scope autonomously. Run focused checks during development and the repository's complete automated verification before review. Then invoke `reviewer` and `product-verifier` in fresh contexts, giving each the approved plan, current Git status, full Git diff including deleted-file names, and verification result. The status must identify every untracked file so the reviewers can read new files that are absent from the diff. The reviewers report findings; they do not edit files.
 
+Prefer the documented command forms in `AGENTS.md`, `docs/DEVELOPMENT.md`, and the nested directory instructions. Supported environment prefixes on the named workflows are inside the shell approval boundary; one-off diagnostic variables remain approval-gated and must not be added to `opencode.json`.
+
 Assess every finding against the approved requirements. Fix confirmed meaningful issues, explain rejected findings, and rerun the checks affected by each fix. A second full review pass is needed only after substantial, architectural, or high-risk fixes. Always run the complete verification again before completion.
 
 Before committing, extract durable knowledge into the appropriate current-state documentation or ADR, delete `.opencode/plan.md`, inspect the final diff and status, and commit only the intended logical change.
