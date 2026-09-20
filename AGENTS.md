@@ -214,6 +214,8 @@ Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` Â
 
 Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. For an active substantive task, keep this validation record in `.opencode/plan.md`; include a summary in the final handoff.
 
+Validation records are temporary task evidence, not permanent repository artifacts. Do not create a committed validation-log or plan archive unless the Product Owner explicitly approves a new audit requirement.
+
 A passing result may be reused only for the same command and scope while its repository inputs, relevant environment, and generated inputs remain valid. A broader pass subsumes checks it actually contains; a focused pass never implies broader coverage. Agents must consume valid recorded results and must not rerun a check solely because work changed hands or for reassurance.
 
 Edits invalidate only checks whose inputs or exercised behavior may have changed. Documentation-only edits do not invalidate runtime suites. Source edits invalidate affected static checks, tests, builds, and suites using prior build output. Test, fixture, dependency, build-tool, test-runner, or agent-policy changes invalidate their affected stages. Read-only review and verification do not invalidate results. After a fix, rerun the affected checks and their dependencies; repeat full validation only when required by the risk matrix or when a substantial, architectural, high-risk, or materially scope-changing fix invalidated it.
@@ -314,7 +316,7 @@ A task is complete only when:
 
 For a substantive task, the approved plan must be satisfied and its durable knowledge extracted before the temporary plan is deleted.
 
-One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Both roles receive the validation record and reuse still-valid results. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
+One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Both roles receive the validation record and reuse still-valid results. For R0/R1 internal-workflow changes, code review checks policy ownership, consistency, command safety, tests, and fulfillment of the approved change. Product verification follows the agent workflow through representative relevant states, such as clean and dirty trees, failed stages, evidence reuse, and handoff; application UI exploration is not required when application behavior did not change. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
 
 ---
 

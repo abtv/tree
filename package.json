@@ -22,6 +22,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format:check:changed": "node scripts/check-format-changed.mjs",
+    "validation:snapshot": "node scripts/validation-snapshot.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:opencode": "node scripts/check-opencode-permissions.mjs",
     "changelog": "node scripts/changelog.mjs --write",

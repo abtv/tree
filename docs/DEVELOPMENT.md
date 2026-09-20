@@ -217,18 +217,34 @@ Use the highest applicable tier. Focused checks may be run during implementation
 
 | Tier | Change risk | Required validation |
 | --- | --- | --- |
-| R0 | Documentation or content only, with no executable configuration change | Check formatting for the changed files and run `npm run check:docs`. Also run `npm run check:opencode` when agent workflow documentation changes. |
+| R0 | Documentation or content only, with no executable configuration change | Run `npm run format:check:changed` and `npm run check:docs`. Also run `npm run check:opencode` when agent workflow documentation changes. |
 | R1 | Executable tooling or configuration, tests, or an isolated non-runtime refactor | Run affected type, lint, formatting, governance, and focused test checks. Run `npm run check` when executable source, dependency metadata, build configuration, or validation tooling changes. Agent-prompt documentation remains R0 unless executable configuration such as `opencode.json` changes. |
 | R2 | Product, domain, or renderer behavior contained within one process, without a persistence or platform boundary | Run `npm run check`, affected unit or property tests, and focused E2E coverage for every affected user-visible requirement. Broaden E2E coverage when shared interaction or lifecycle infrastructure changes. Perform product verification of the changed flows. Run performance checks when `docs/PRODUCT.md` §22 applies. |
 | R3 | Process, IPC, filesystem, persistence, clipboard, attachment, native shortcut, startup, shutdown, security, dependency, toolchain, shared fixture, or scale-sensitive state changes | Run `npm run check:full`, the unit, contract, real-boundary, and failure-path coverage required by `AGENTS.md` §9, applicable security checks and audit, same-machine performance comparison when performance may change, and visible verification for native behavior automation cannot inspect. |
 
 When categories overlap or the tier is uncertain, use the higher tier. A suite that cannot execute its real boundary is blocked, not passed.
 
+Classify the complete change, not only its purpose. For example, a workflow-documentation change that also modifies a validation script or its tests is R1 because executable validation tooling changed.
+
+`npm run format:check:changed` is the canonical scoped formatting check. It checks supported staged, unstaged, and non-ignored untracked files relative to `HEAD`, excludes deleted files, safely passes filenames without shell interpolation, and succeeds with an explicit message when there are no eligible files. The full-repository `npm run format:check` remains part of broader validation.
+
 ### Validation Evidence and Reuse
 
-For each result, record the exact command and scope, pass/fail/blocked status, tested `HEAD` plus working-tree diff and untracked-file inventory (or an equivalent digest), relevant environment, and generated-build or artifact assumptions.
+Run `npm run validation:snapshot` to identify the repository inputs to a validation result. It reports `HEAD` and a deterministic digest of the tracked binary diff plus the paths and contents of non-ignored untracked files; paths use locale-independent UTF-8 byte ordering, and untracked symlinks contribute their link target without reading the target. The command accepts tracked diffs up to 100 MiB and fails rather than emitting partial evidence above that guard. The temporary `.opencode/plan.md` is excluded to avoid making its recorded digest self-referential; supply the plan separately to review roles. Staging alone does not change the digest when file contents are unchanged. Ignored generated outputs are excluded; when a later check consumes generated artifacts such as `out/`, record the command and snapshot that produced them.
+
+For each result, use this compact record:
+
+```text
+- Command and scope: <exact command and any narrower scope>
+  Result: pass | fail | blocked
+  Snapshot: <HEAD and digest from npm run validation:snapshot>
+  Environment/artifacts: <relevant environment and generated-input assumptions, or none>
+  Invalidation notes: <stages retained or invalidated by later changes, or none>
+```
 
 A result remains reusable only while those inputs remain valid. `npm run check:full` subsumes the `npm run check`, E2E, and performance stages it contains; `npm run check` subsumes its listed stages. A focused result does not establish broader coverage. Documentation-only edits invalidate documentation and formatting checks, plus OpenCode governance when agent workflow files change, but do not invalidate runtime suites. Source changes invalidate affected static checks, tests, and artifact-dependent suites. Test or fixture changes invalidate that suite. Dependency, build, test-runner, and OpenCode-policy changes invalidate every affected stage.
+
+If an aggregate command fails or is blocked after some stages pass, record the aggregate command's actual result; never relabel it as passed. Its completed successful stages remain reusable when their inputs are still valid. Run every failed, blocked, or not-run required stage separately on the same snapshot. The required tier is then satisfied by composed stage evidence, recorded as the aggregate attempt plus the supplemental commands. A later edit invalidates only the affected evidence under the rules above.
 
 Pass the validation record to review roles. They consume still-valid results and run an automated check again only for an uncovered scenario, stale or incomplete evidence, or a finding that requires it. Read-only review does not invalidate evidence. After a fix, rerun affected checks and their dependencies; repeat complete validation only for a tier that requires it or after a substantial, architectural, high-risk, or materially scope-changing fix.
 
