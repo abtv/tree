@@ -23,6 +23,8 @@ function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
     writeAttachment: async () => undefined,
     readAttachment: async () => attachmentBytes,
     cleanupAttachments: async () => undefined,
+    getAlwaysOnTop: async () => false,
+    setAlwaysOnTop: async () => undefined,
     ...overrides,
   }
 }

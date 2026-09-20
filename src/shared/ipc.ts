@@ -12,6 +12,8 @@ export const ipcChannels = {
   readAttachment: 'tree:read-attachment',
   cleanupAttachments: 'tree:cleanup-attachments',
   showEditorContextMenu: 'tree:show-editor-context-menu',
+  getAlwaysOnTop: 'tree:get-always-on-top',
+  setAlwaysOnTop: 'tree:set-always-on-top',
 } as const
 
 export type ClipboardPayload =
@@ -47,4 +49,6 @@ export interface TreeApi {
   readAttachment(id: string): Promise<Uint8Array | null>
   cleanupAttachments(referencedIds: string[]): Promise<void>
   showEditorContextMenu?: (request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
+  getAlwaysOnTop(): Promise<boolean>
+  setAlwaysOnTop(alwaysOnTop: boolean): Promise<void>
 }

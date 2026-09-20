@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
@@ -16,8 +16,23 @@ interface AppProps {
 export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
+  const [alwaysOnTop, setAlwaysOnTop] = useState(false)
+  useEffect(() => {
+    void window.treeApi
+      .getAlwaysOnTop()
+      .then(setAlwaysOnTop)
+      .catch((error: unknown) => store.reportError(error))
+  }, [store])
   const focus = state.status === 'ready' ? state.focus : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
+  const toggleAlwaysOnTop = useCallback((): void => {
+    const nextValue = !alwaysOnTop
+    setAlwaysOnTop(nextValue)
+    void window.treeApi.setAlwaysOnTop(nextValue).catch((error: unknown) => {
+      setAlwaysOnTop(!nextValue)
+      store.reportError(error)
+    })
+  }, [alwaysOnTop, store])
   const nodeInputBindings = useNodeInputBindings({
     store,
     selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
@@ -90,6 +105,8 @@ export function App({ store }: AppProps): React.JSX.Element {
         path={path}
         currentParentId={state.location.currentParentId}
         onNavigate={(parentId) => store.navigateToAncestor(parentId)}
+        alwaysOnTop={alwaysOnTop}
+        onToggleAlwaysOnTop={toggleAlwaysOnTop}
       />
       <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
         {currentParent === undefined ? null : (

@@ -473,6 +473,7 @@ Electron is responsible for desktop functionality such as:
 
 * creating and managing the application window;
 * persisting and restoring the main window's size and position;
+* persisting the main window's always-on-top preference and applying it through `BrowserWindow.setAlwaysOnTop`;
 * application activation;
 * global or main-process keyboard shortcuts where required;
 * integration with macOS;
@@ -482,6 +483,8 @@ Electron is responsible for desktop functionality such as:
 The domain must not import Electron APIs.
 
 Window geometry is persisted with a short debounce, so moving or resizing the window does not perform a synchronous disk write for every event. The pending geometry is flushed when the window closes.
+
+The always-on-top preference is stored as one validated boolean in the main-process window-state directory. Toggling it performs one small write and one native window update; it adds no work to document editing or navigation paths and retains no growing in-memory structure. Existing installations without the preference default to an unpinned window.
 
 ---
 

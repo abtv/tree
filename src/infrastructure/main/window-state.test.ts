@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
   createDebouncedWindowBoundsSaver,
+  createAlwaysOnTopStore,
   createWindowBoundsStore,
   isValidWindowBounds,
   type WindowBounds,
@@ -48,6 +49,28 @@ describe('createWindowBoundsStore', () => {
     expect(store.load()).toBeNull()
     writeFileSync(path, JSON.stringify({ ...bounds, height: 100 }))
     expect(store.load()).toBeNull()
+  })
+})
+
+describe('createAlwaysOnTopStore', () => {
+  it('saves and loads the setting', () => {
+    const path = createPath().replace('window-bounds.json', 'window-always-on-top.json')
+    const store = createAlwaysOnTopStore(path)
+
+    expect(store.load()).toBe(false)
+    store.save(true)
+    expect(store.load()).toBe(true)
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toBe(true)
+  })
+
+  it('defaults malformed settings to false', () => {
+    const path = createPath().replace('window-bounds.json', 'window-always-on-top.json')
+    const store = createAlwaysOnTopStore(path)
+
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, JSON.stringify('yes'))
+
+    expect(store.load()).toBe(false)
   })
 })
 

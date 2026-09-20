@@ -110,14 +110,47 @@ textarea {
 }
 
 .location-root:hover,
-.location-link:hover {
+.location-link:hover,
+.always-on-top-toggle:hover {
   color: #596267;
 }
 
 .location-root:focus-visible,
-.location-link:focus-visible {
+.location-link:focus-visible,
+.always-on-top-toggle:focus-visible {
   outline: 1px solid #778187;
   outline-offset: 3px;
+}
+
+.always-on-top-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.always-on-top-toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.always-on-top-toggle-active {
+  background: #dce1e3;
+  color: #373f43;
 }
 
 .editor-shell {

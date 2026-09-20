@@ -59,6 +59,8 @@ describe('preload bridge', () => {
     await treeApi.writeAttachment('attachment-1', bytes)
     await treeApi.readAttachment('attachment-1')
     await treeApi.cleanupAttachments(['attachment-1'])
+    await treeApi.getAlwaysOnTop()
+    await treeApi.setAlwaysOnTop(true)
 
     expect(mocks.invoke.mock.calls).toEqual([
       [ipcChannels.load],
@@ -68,6 +70,8 @@ describe('preload bridge', () => {
       [ipcChannels.writeAttachment, 'attachment-1', bytes],
       [ipcChannels.readAttachment, 'attachment-1'],
       [ipcChannels.cleanupAttachments, ['attachment-1']],
+      [ipcChannels.getAlwaysOnTop],
+      [ipcChannels.setAlwaysOnTop, true],
     ])
   })
 

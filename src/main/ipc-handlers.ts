@@ -33,6 +33,8 @@ export interface IpcHandlerDependencies {
   decodePng: PngDecoder
   onQuitConfirmed: () => void
   showEditorContextMenu?: (sender: WebContents, request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
+  getAlwaysOnTop: () => boolean
+  setAlwaysOnTop: (alwaysOnTop: boolean) => void
 }
 
 export function registerIpcHandlers({
@@ -44,6 +46,8 @@ export function registerIpcHandlers({
   decodePng,
   onQuitConfirmed,
   showEditorContextMenu,
+  getAlwaysOnTop,
+  setAlwaysOnTop,
 }: IpcHandlerDependencies): void {
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
@@ -95,5 +99,14 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     if (event.sender === undefined || showEditorContextMenu === undefined) return null
     return showEditorContextMenu(event.sender, validateEditorContextMenuRequest(request))
+  })
+  ipcMain.handle(ipcChannels.getAlwaysOnTop, (event) => {
+    requireTrustedRenderer(event)
+    return getAlwaysOnTop()
+  })
+  ipcMain.handle(ipcChannels.setAlwaysOnTop, (event, value) => {
+    requireTrustedRenderer(event)
+    if (typeof value !== 'boolean') throw new Error('Invalid always-on-top setting.')
+    setAlwaysOnTop(value)
   })
 }

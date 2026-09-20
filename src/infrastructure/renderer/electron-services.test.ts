@@ -17,6 +17,8 @@ describe('renderer Electron services', () => {
     writeAttachment: vi.fn(async () => undefined),
     readAttachment: vi.fn(async () => new Uint8Array([1, 2, 3])),
     cleanupAttachments: vi.fn(async () => undefined),
+    getAlwaysOnTop: vi.fn(async () => false),
+    setAlwaysOnTop: vi.fn(async () => undefined),
   }
 
   beforeEach(() => {

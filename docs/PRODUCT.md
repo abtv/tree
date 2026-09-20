@@ -101,6 +101,8 @@ When navigation moves to an ancestor through the location path, the direct child
 
 The location toolbar is confined to a single line. When space is limited, shorter segments are preserved and longer segments are truncated first. A truncated segment ends with an ellipsis; its full text remains available as a tooltip. The toolbar never causes the window to scroll horizontally, regardless of path depth or segment length.
 
+The toolbar also contains a pin toggle to the right of the location path. When enabled, the application window stays above other application windows, including after another application receives focus. The setting persists across application restarts. The toggle has a tooltip and a visually distinct active state. macOS may still impose limitations for some fullscreen Spaces.
+
 ### 2.3 Maximum Depth
 
 Node depth is counted from the top-level root nodes. A top-level root node is at level 1, its children are at level 2, and so on.

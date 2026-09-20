@@ -15,7 +15,9 @@ import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
 import {
   createDebouncedWindowBoundsSaver,
+  createAlwaysOnTopStore,
   createWindowBoundsStore,
+  type AlwaysOnTopStore,
   type WindowBounds,
 } from '../infrastructure/main/window-state'
 import { registerIpcHandlers } from './ipc-handlers'
@@ -33,6 +35,7 @@ import {
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
+let alwaysOnTopStore: AlwaysOnTopStore | null = null
 
 const nativeClipboard: NativeClipboard = {
   read: () => clipboard.read(),
@@ -52,6 +55,8 @@ const nativeClipboard: NativeClipboard = {
 function createMainWindow(): void {
   if (appQuitting) return
   const windowBoundsStore = createWindowBoundsStore(join(app.getPath('userData'), 'data', 'window-bounds.json'))
+  const windowAlwaysOnTopStore =
+    alwaysOnTopStore ?? createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
   const savedBounds = windowBoundsStore.load()
   const windowBounds = createDebouncedWindowBoundsSaver(windowBoundsStore)
   const window = new BrowserWindow({
@@ -61,6 +66,7 @@ function createMainWindow(): void {
     title: 'Tree',
     webPreferences: createWindowWebPreferences(join(__dirname, '../preload/index.js')),
   })
+  window.setAlwaysOnTop(windowAlwaysOnTopStore.load())
   mainWindow = window
   const saveWindowBounds = (): void => {
     const { x, y, width, height } = window.getBounds()
@@ -114,6 +120,7 @@ bootstrapApplication({
     const rendererUrl =
       process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
+    alwaysOnTopStore = createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     registerIpcHandlers({
       ipcMain,
       rendererUrl,
@@ -136,6 +143,11 @@ bootstrapApplication({
           (error) => reportMainProcessError('Could not open Google search', error),
           request,
         )
+      },
+      getAlwaysOnTop: () => mainWindow?.isAlwaysOnTop() ?? alwaysOnTopStore?.load() ?? false,
+      setAlwaysOnTop: (value) => {
+        mainWindow?.setAlwaysOnTop(value)
+        alwaysOnTopStore?.save(value)
       },
     })
   },

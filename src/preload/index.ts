@@ -22,6 +22,8 @@ export const treeApi: TreeApi = {
   readAttachment: (id) => ipcRenderer.invoke(ipcChannels.readAttachment, id),
   cleanupAttachments: (referencedIds) => ipcRenderer.invoke(ipcChannels.cleanupAttachments, referencedIds),
   showEditorContextMenu: (request) => ipcRenderer.invoke(ipcChannels.showEditorContextMenu, request),
+  getAlwaysOnTop: () => ipcRenderer.invoke(ipcChannels.getAlwaysOnTop),
+  setAlwaysOnTop: (alwaysOnTop) => ipcRenderer.invoke(ipcChannels.setAlwaysOnTop, alwaysOnTop),
 }
 
 contextBridge.exposeInMainWorld('treeApi', treeApi)

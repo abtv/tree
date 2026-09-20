@@ -30,6 +30,8 @@ beforeEach(() => {
     writeAttachment: async () => undefined,
     readAttachment: async () => attachmentBytes,
     cleanupAttachments: async () => undefined,
+    getAlwaysOnTop: async () => false,
+    setAlwaysOnTop: async () => undefined,
   }
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:test' })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined })
@@ -504,6 +506,25 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Top level' }))
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('Root')
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
+  })
+
+  it('toggles the always-on-top setting from the location toolbar', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    const setAlwaysOnTop = vi.spyOn(window.treeApi, 'setAlwaysOnTop')
+    render(<App store={store} />)
+
+    const toggle = await screen.findByRole('button', { name: 'Pin window on top' })
+    expect(toggle).toHaveAttribute('title', 'Pin window on top')
+    fireEvent.click(toggle)
+
+    expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
+    expect(await screen.findByRole('button', { name: 'Unpin window from top' })).toHaveAttribute(
+      'title',
+      'Unpin window from top',
+    )
   })
 
   it('reorders siblings through a press-and-hold drag over the editable surface', async () => {

@@ -16,6 +16,11 @@ export interface WindowBoundsStore {
   save(bounds: WindowBounds): void
 }
 
+export interface AlwaysOnTopStore {
+  load(): boolean
+  save(alwaysOnTop: boolean): void
+}
+
 export interface BoundsTimers {
   setTimeout(callback: () => void, milliseconds: number): unknown
   clearTimeout(handle: unknown): void
@@ -93,6 +98,27 @@ export function createWindowBoundsStore(path: string): WindowBoundsStore {
       try {
         mkdirSync(dirname(path), { recursive: true })
         writeFileSync(path, JSON.stringify(bounds))
+      } catch {
+        // Window-state persistence is opportunistic and must not interrupt window lifecycle events.
+      }
+    },
+  }
+}
+
+export function createAlwaysOnTopStore(path: string): AlwaysOnTopStore {
+  return {
+    load: () => {
+      try {
+        const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
+        return typeof value === 'boolean' ? value : false
+      } catch {
+        return false
+      }
+    },
+    save: (alwaysOnTop) => {
+      try {
+        mkdirSync(dirname(path), { recursive: true })
+        writeFileSync(path, JSON.stringify(alwaysOnTop))
       } catch {
         // Window-state persistence is opportunistic and must not interrupt window lifecycle events.
       }

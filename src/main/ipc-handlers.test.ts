@@ -31,6 +31,8 @@ function createHarness() {
   const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true), force: vi.fn() }
   const onQuitConfirmed = vi.fn()
   const showEditorContextMenu = vi.fn(async () => 'copy' as const)
+  const getAlwaysOnTop = vi.fn(() => false)
+  const setAlwaysOnTop = vi.fn()
   const decodePng = vi.fn(decodePngWithZlib)
   registerIpcHandlers({
     ipcMain,
@@ -41,8 +43,20 @@ function createHarness() {
     decodePng,
     onQuitConfirmed,
     showEditorContextMenu,
+    getAlwaysOnTop,
+    setAlwaysOnTop,
   })
-  return { handlers, fileServices, nativeClipboard, quitHandshake, onQuitConfirmed, decodePng, showEditorContextMenu }
+  return {
+    handlers,
+    fileServices,
+    nativeClipboard,
+    quitHandshake,
+    onQuitConfirmed,
+    decodePng,
+    showEditorContextMenu,
+    getAlwaysOnTop,
+    setAlwaysOnTop,
+  }
 }
 
 describe('main IPC handlers', () => {
@@ -114,6 +128,20 @@ describe('main IPC handlers', () => {
     expect(quitHandshake.request).toHaveBeenCalledOnce()
     expect(quitHandshake.confirm).toHaveBeenCalledWith('request-1')
     expect(onQuitConfirmed).toHaveBeenCalledOnce()
+  })
+
+  it('reads and validates always-on-top changes through the trusted renderer contract', async () => {
+    const { handlers, getAlwaysOnTop, setAlwaysOnTop } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(handlers.get(ipcChannels.getAlwaysOnTop)!(event)).toBe(false)
+    await handlers.get(ipcChannels.setAlwaysOnTop)!(event, true)
+
+    expect(getAlwaysOnTop).toHaveBeenCalledOnce()
+    expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
+    await expect(
+      Promise.resolve().then(() => handlers.get(ipcChannels.setAlwaysOnTop)!(event, 'true')),
+    ).rejects.toThrow('Invalid always-on-top setting.')
   })
 
   it('quits without saving through the handshake', async () => {
