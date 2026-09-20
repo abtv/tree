@@ -1,5 +1,6 @@
 const { ipcMain } = require('electron')
 const { join } = require('node:path')
+const { enableHiddenWindows } = require('./hidden-windows.cjs')
 
 const handlers = new Map()
 const originalHandle = ipcMain.handle.bind(ipcMain)
@@ -26,5 +27,10 @@ globalThis.__treeIpc = {
     ipcMain.handle(channel, (...args) => wrapper(original, ...args))
   },
 }
+
+// Hidden windows are opt-in at the entry level: the e2e fixtures always pass the selected
+// mode explicitly, while the performance fixtures keep the application visible for
+// presented-window measurements. `e2e/fixtures.ts` asserts the selected mode after launch.
+if (process.env['TREE_E2E_HIDDEN'] === '1') enableHiddenWindows()
 
 require(join(__dirname, '..', 'out', 'main', 'index.js'))

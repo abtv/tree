@@ -14,5 +14,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0008](0008-fsync-based-persistence-durability.md) | Fsync-Based Persistence Durability | Accepted | 2026-09-14 |
 | [0009](0009-bounded-loss-document-generations.md) | Bounded-Loss Document Generations | Accepted | 2026-09-14 |
 | [0010](0010-bounded-save-retries-and-failure-lock.md) | Bounded Save Retries and Read-Only Failure Lock | Accepted | 2026-09-14 |
+| [0011](0011-hidden-e2e-windows.md) | Hidden E2E Windows with a Visibility Escape Hatch | Accepted | 2026-09-20 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

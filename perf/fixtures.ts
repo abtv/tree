@@ -62,6 +62,9 @@ export async function launchTree(userDataDir: string, options: { memoryProbe?: b
         join(process.cwd(), 'e2e', 'electron-entry.cjs'),
       ],
       cwd: process.cwd(),
+      // The performance suite measures a presented window (paint latency, typing cost, heap growth),
+      // so it stays visible even though the e2e default is hidden. Baselines are recorded this way.
+      env: { ...process.env, TREE_E2E_HIDDEN: '0' } as Record<string, string>,
     })
   } catch (error) {
     await cleanupStaleElectronProcesses('tree-perf-')

@@ -29,6 +29,21 @@ export interface Launched {
   window: Page
 }
 
+export type WindowMode = 'hidden' | 'visible'
+
+// Hidden windows are the default so the suite does not steal desktop focus. Set
+// `TREE_E2E_VISIBLE=1` to watch the real UI, for example while product-verifying UI behavior.
+function ambientWindowMode(): WindowMode {
+  return process.env['TREE_E2E_VISIBLE'] === '1' ? 'visible' : 'hidden'
+}
+
+// Playwright's Electron `env` option requires defined string values, which `process.env` does not
+// model. Replacing the child environment is required here because Playwright uses the given object
+// as the full child environment instead of merging it with `process.env`.
+function launchEnvironment(mode: WindowMode): Record<string, string> {
+  return { ...process.env, TREE_E2E_HIDDEN: mode === 'hidden' ? '1' : '0' } as Record<string, string>
+}
+
 const launchedApps: ElectronApplication[] = []
 const observedSaveErrors = new Map<
   Page,
@@ -243,14 +258,19 @@ async function waitForProcessExit(
   })
 }
 
-export async function launchTree(userDataDir: string, options: { expectReady?: boolean } = {}): Promise<Launched> {
+export async function launchTree(
+  userDataDir: string,
+  options: { expectReady?: boolean; windows?: WindowMode } = {},
+): Promise<Launched> {
   await closeTrackedApps()
   await cleanupStaleElectronProcesses('tree-e2e-')
+  const windowMode = options.windows ?? ambientWindowMode()
   let app: ElectronApplication
   try {
     app = await electron.launch({
       args: [`--user-data-dir=${userDataDir}`, join(process.cwd(), 'e2e', 'electron-entry.cjs')],
       cwd: process.cwd(),
+      env: launchEnvironment(windowMode),
     })
   } catch (error) {
     await cleanupStaleElectronProcesses('tree-e2e-')
@@ -266,11 +286,33 @@ export async function launchTree(userDataDir: string, options: { expectReady?: b
   try {
     const window = await app.firstWindow()
     await observeSaveErrors(window)
+    await assertWindowMode(app, windowMode)
     if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
     return { app, window }
   } catch (error) {
     await closeApp(app)
     throw error
+  }
+}
+
+// The hidden-window override lives in the test-owned entry (`e2e/hidden-windows.cjs`) and depends
+// on a Node module-load patch that an Electron or Node upgrade could invalidate. Fail the launch
+// immediately when the requested mode did not take effect instead of silently showing windows
+// during a hidden run or hiding windows during a visible one.
+async function assertWindowMode(app: ElectronApplication, mode: WindowMode): Promise<void> {
+  const visibility = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().map((window) => window.isVisible()),
+  )
+  if (visibility.length !== 1) {
+    throw new Error(`Expected exactly one application window, found ${visibility.length}.`)
+  }
+  if (mode === 'hidden' && visibility[0] === true) {
+    throw new Error(
+      'The e2e window mode is hidden, but the application window is visible. The hidden-window override in e2e/hidden-windows.cjs is not applying.',
+    )
+  }
+  if (mode === 'visible' && visibility[0] === false) {
+    throw new Error('The e2e window mode is visible, but the application window is hidden.')
   }
 }
 
@@ -539,7 +581,7 @@ export interface DragSourceBox {
 /**
  * Presses and holds a node row until drag mode is active and stable.
  *
- * The suite runs on a live desktop, so the window can lose focus mid-gesture. Chromium then
+ * A visible run happens on a live desktop, so the window can lose focus mid-gesture. Chromium then
  * releases pointer capture and the renderer cancels the drag, which is the intended application
  * behavior for a lost pointer. Retry the gesture a bounded number of times so an environmental
  * focus change does not fail a test, and require the active drag to survive a short settling

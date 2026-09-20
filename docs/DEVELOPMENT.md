@@ -153,13 +153,21 @@ npm run test:e2e
 
 This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. The suite runs serially with a single worker because of the single-instance application and the global `Cmd+0` shortcut. The suite is macOS-only and requires a display.
 
-Drag tests start a gesture through `startRowDrag` in `e2e/fixtures.ts`. Because the suite runs on a live desktop, that helper verifies the active drag survives a short settling window and retries the gesture a bounded number of times, since a window that loses focus releases pointer capture and the application cancels the drag by design.
+Application windows are created hidden by default so the suite does not steal desktop focus. The test-owned entry `e2e/electron-entry.cjs` applies hidden mode through `e2e/hidden-windows.cjs` before the application bundle loads, and every launch asserts the selected window mode, so an Electron or Node upgrade that invalidates the override fails on the first launch instead of silently showing windows. Run with visible windows when observing the real UI, for example during product verification:
+
+```bash
+TREE_E2E_VISIBLE=1 npm run test:e2e
+```
+
+Hidden mode still requires a macOS GUI session; it does not make the suite headless.
+
+Drag tests start a gesture through `startRowDrag` in `e2e/fixtures.ts`. A visible run happens on a live desktop, so that helper verifies the active drag survives a short settling window and retries the gesture a bounded number of times, since a window that loses focus releases pointer capture and the application cancels the drag by design. The hidden default removes desktop focus changes from the gesture, and the bounded retries remain for visible runs.
 
 Window addressing in `e2e/fixtures.ts` is focus-independent for the same reason: closing, resizing, or reading the main window through `closeMainWindow`, `setMainWindowBounds`, and `readMainWindowBounds` addresses the application's window directly instead of relying on the application being frontmost, so the window-close flush and quit path stays testable while the application is inactive.
 
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**`, and Playwright only reads `e2e/`.
 
-Native editor context-menu behavior is covered by renderer and IPC contract tests. The macOS popup itself must be product-verified on supported macOS hardware with a display because the Playwright Electron driver cannot reliably inspect or select native menu items. The popup only captures a small selection snapshot and does not add persistence work, tree traversal, or retained state; disk writes, interactive CPU, and memory growth remain unchanged outside the selected editing command.
+Native editor context-menu behavior is covered by renderer and IPC contract tests. The macOS popup itself must be product-verified on supported macOS hardware with a display because the Playwright Electron driver cannot reliably inspect or select native menu items; use a visible suite run (`TREE_E2E_VISIBLE=1 npm run test:e2e`) when the popup must be observed. The popup only captures a small selection snapshot and does not add persistence work, tree traversal, or retained state; disk writes, interactive CPU, and memory growth remain unchanged outside the selected editing command.
 
 ### Defect regression workflow
 
@@ -295,7 +303,7 @@ Performance tests live in `perf/`. They run as part of `npm run check:full`, and
 npm run test:perf
 ```
 
-They measure startup, typing, state/persistence work, and sustained renderer-memory growth at several document scales and print one JSON line per scenario. Every scenario also records its metrics through `perf/results.ts` into a JSON artifact (default `test-results/perf-results.json`, overridable with `PERF_RESULTS`). Set `PERF_BASELINE` to a previously recorded artifact to compare against it: the run fails when the baseline lacks a recorded scenario or metric, or when a metric regresses beyond `PERF_REGRESSION_TOLERANCE` (default `1.5`). Re-record the baseline when adding a scenario or metric. The comparison is meaningful on the same machine, so baselines are captured locally and never committed. The recorded budgets, measured baselines, and scenario parameters are owned by the `perf/` suite; they are not restated here.
+They measure startup, typing, state/persistence work, and sustained renderer-memory growth at several document scales and print one JSON line per scenario. Unlike the e2e suite, the performance fixtures keep the application window visible: the typing scenarios measure paint latency for a presented window, and the same-machine baselines are recorded that way, so hidden e2e window mode is intentionally not applied to `perf/`. Every scenario also records its metrics through `perf/results.ts` into a JSON artifact (default `test-results/perf-results.json`, overridable with `PERF_RESULTS`). Set `PERF_BASELINE` to a previously recorded artifact to compare against it: the run fails when the baseline lacks a recorded scenario or metric, or when a metric regresses beyond `PERF_REGRESSION_TOLERANCE` (default `1.5`). Re-record the baseline when adding a scenario or metric. The comparison is meaningful on the same machine, so baselines are captured locally and never committed. The recorded budgets, measured baselines, and scenario parameters are owned by the `perf/` suite; they are not restated here.
 
 Each typing scenario focuses a specific input, asserts the seeded text is present and focused, types, and asserts the field received the typed text while the current-parent heading was not edited. This matters inside a parent, where the first textbox is the current-parent heading rather than the selected child. The scenario measures wall-clock typing time and paint latency; the `inputTurnaround` metric is an observation only, not React commit latency. The supported document-scale target is 100,000 nodes. A 30,000-sibling wide scenario guards that windowed rendering keeps typing cost independent of the displayed sibling count.
 
