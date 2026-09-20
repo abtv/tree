@@ -12,7 +12,7 @@ export default defineConfig({
         branches: 83,
         functions: 92,
         lines: 93,
-        'src/domain/document.ts': { branches: 80 },
+        'src/domain/document-operations.ts': { branches: 80 },
         'src/application/editor-store.ts': { branches: 80 },
         'src/main/ipc-security.ts': {
           statements: 90,

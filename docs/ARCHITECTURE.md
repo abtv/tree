@@ -623,6 +623,8 @@ The actual structure should reflect the codebase as it evolves.
 
 The renderer currently isolates DOM/caret behavior in `editor-dom.ts`, location rendering in `LocationBar.tsx`, and attachment rendering/preview in `AttachmentPreview.tsx`. These modules remain UI adapters and dispatch document changes through the application layer.
 
+The domain currently isolates shared document types, hyperlink normalization, the derived node index, attachment accounting, tree operations, and persisted-state parsing in `document-types.ts`, `document-links.ts`, `document-index.ts`, `document-attachments.ts`, `document-operations.ts`, and `document-serialization.ts`. `document.ts` remains the public domain entry point and re-exports the domain API from those modules.
+
 Do not create empty architectural layers solely to match this diagram.
 
 ---
