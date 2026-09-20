@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../src/domain/product-messages'
 import {
@@ -28,16 +28,16 @@ test.describe('shutdown failure handling', () => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
     allowRendererError(
-      /^Changes could not be saved: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|ENOTDIR): /,
+      /^Changes could not be saved: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|EISDIR|ENOTDIR): /,
     )
     allowRendererError(
-      /^Operation failed: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|ENOTDIR): /,
+      /^Operation failed: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|EISDIR|ENOTDIR): /,
     )
     allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
 
     const dataDirectory = join(userDataDir, 'data')
-    rmSync(dataDirectory, { recursive: true, force: true })
-    writeFileSync(dataDirectory, 'blocks persistence directory creation')
+    const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
+    mkdirSync(temporaryDocumentPath)
 
     const initialText = 'unsaved one two three four five six seven eight nine'
     const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
@@ -51,8 +51,7 @@ test.describe('shutdown failure handling', () => {
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
 
-    rmSync(dataDirectory, { force: true })
-    mkdirSync(dataDirectory, { recursive: true })
+    rmSync(temporaryDocumentPath, { recursive: true, force: true })
     await typeInto(node(window, 1), recoveryText)
 
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
