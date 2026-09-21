@@ -5,6 +5,7 @@ A macOS desktop application for working with a hierarchical tree of text nodes a
 ## Documentation
 
 * [Product Requirements](docs/PRODUCT.md) — user-visible product behavior and requirements.
+* [Product Discovery](docs/PRODUCT_DISCOVERY.md) — non-normative hypotheses, experiments, evidence, and unresolved product questions.
 * [Architecture](docs/ARCHITECTURE.md) — technology stack, technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development environment, commands, testing, validation, and repository conventions.
 * [Security Policy](SECURITY.md) — the security model and the tests that verify it.

@@ -8,7 +8,7 @@
 At the start of a session:
 
 1. Read this file and `WORKING_PLAN.md` when an approved task is in progress.
-2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references.
+2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references. Read `docs/PRODUCT_DISCOVERY.md` only for product-discovery work or when an approved task explicitly references a discovery entry.
 3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
 
 Prefer the narrowest referenced section over reading an entire document.
@@ -30,6 +30,7 @@ The agent is not the Product Owner and must not silently change product requirem
 Before making changes, read the documentation relevant to the task:
 
 * `docs/PRODUCT.md` — product behavior and user-visible requirements.
+* `docs/PRODUCT_DISCOVERY.md` — non-normative product hypotheses, experiments, evidence, and decisions; it is never an implementation requirement.
 * `docs/ARCHITECTURE.md` — technical architecture and architectural boundaries.
 * `docs/DEVELOPMENT.md` — development workflow, tooling, testing, and validation.
 * `AGENTS.md` — rules for working on the repository.
@@ -88,6 +89,22 @@ When a requested change modifies product behavior:
 7. Complete the validation, independent review, product verification, documentation, and commit requirements in §§10-13.
 
 Do not make product decisions on behalf of the Product Owner.
+
+### Product Discovery
+
+`docs/PRODUCT_DISCOVERY.md` is the durable research notebook for uncertain product questions. It is not a backlog, specification, or source of implementation authority.
+
+For product-discovery tasks, agents may:
+
+* record observations and Product Owner statements without changing their meaning;
+* frame hypotheses and counter-hypotheses;
+* distinguish repository facts, Product Owner statements, usage evidence, external evidence, and agent inference;
+* propose the cheapest experiment capable of changing a decision;
+* organize evidence and identify conflicts with established product principles.
+
+Agents must preserve Product Owner disagreement instead of resolving it silently. They must not invent the Product Owner's position, set a discovery entry to `Accepted`, `Rejected`, or `Deferred`, or treat any discovery status as approval to change the product. Only the Product Owner makes discovery decisions.
+
+When the Product Owner accepts a direction, propose the corresponding `docs/PRODUCT.md` change separately. The normal product-change and implementation-plan approval gates still apply before implementation.
 
 ---
 
@@ -245,6 +262,7 @@ Keep each document focused on its responsibility:
 
 * `README.md` — the project identity and documentation index.
 * `PRODUCT.md` — what the product does.
+* `PRODUCT_DISCOVERY.md` — uncertain product questions, experiments, evidence, and Product Owner decisions that are not yet requirements.
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
 * `SECURITY.md` — the security model and how it is verified.

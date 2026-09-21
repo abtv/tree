@@ -9,6 +9,7 @@ import {
   runChecks,
   validateAdr,
   validateAdrIndex,
+  validateProductDiscovery,
   validateWorkflowOwnership,
 } from './check-docs.mjs'
 
@@ -145,6 +146,15 @@ describe('validateWorkflowOwnership', () => {
   })
 })
 
+describe('validateProductDiscovery', () => {
+  it('requires an explicit non-normative declaration', () => {
+    expect(validateProductDiscovery({ content: '> This document is non-normative. Research only.\n' })).toEqual([])
+    expect(validateProductDiscovery({ content: '# Product Discovery\n' })).toEqual([
+      expect.stringContaining('missing the non-normative product-discovery declaration'),
+    ])
+  })
+})
+
 describe('runChecks', () => {
   it('passes on a minimal repository without a plan archive', () => {
     const root = createTemporaryRoot()
@@ -160,5 +170,27 @@ describe('runChecks', () => {
     writeFile(root, 'docs/decisions/0001-first.md', 'Status: Accepted\n')
     const result = runChecks({ rootDirectory: root })
     expect(result.issues.some((issue) => issue.includes('missing an index entry for ADR 0001'))).toBe(true)
+  })
+
+  it('governs the product-discovery document as a live document', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'docs/PRODUCT_DISCOVERY.md', '# Discovery\n[missing](MISSING.md)\nNodes remain at level 20.\n')
+    const result = runChecks({ rootDirectory: root })
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('missing the non-normative product-discovery declaration'),
+        expect.stringContaining('link target not found'),
+        expect.stringContaining('restates the node-depth value'),
+      ]),
+    )
+    expect(result.liveDocumentCount).toBe(1)
+  })
+
+  it('accepts a valid product-discovery document', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'docs/PRODUCT_DISCOVERY.md', '# Discovery\n> This document is non-normative.\n')
+    const result = runChecks({ rootDirectory: root })
+    expect(result.issues).toEqual([])
+    expect(result.liveDocumentCount).toBe(1)
   })
 })
