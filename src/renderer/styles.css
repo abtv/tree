@@ -284,6 +284,31 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   line-height: 21px;
 }
 
+.vim-mode {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  z-index: 20;
+  border-radius: 3px;
+  padding: 3px 7px;
+  color: #fff;
+  background: #59636a;
+  font:
+    600 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  letter-spacing: 0.04em;
+}
+
+.vim-mode-normal {
+  background: #3b6d50;
+}
+
+.vim-mode-visual {
+  background: #725493;
+}
+
 .node-input a {
   color: #1769aa;
   text-decoration: underline;

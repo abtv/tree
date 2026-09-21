@@ -57,6 +57,34 @@ export function insertLinks(
   )
 }
 
+export function replaceLinkedText(
+  text: string,
+  links: readonly LinkRange[],
+  start: number,
+  end: number,
+  insertedText: string,
+): { text: string; links: LinkRange[] } {
+  let from = Math.max(0, Math.min(start, end, text.length))
+  let to = Math.max(from, Math.min(Math.max(start, end), text.length))
+  if (from === to) {
+    const containingLink = links.find((link) => link.start < from && from < link.end)
+    if (containingLink !== undefined) {
+      from = from - containingLink.start <= containingLink.end - from ? containingLink.start : containingLink.end
+      to = from
+    }
+  }
+  const withoutRange = `${text.slice(0, from)}${text.slice(to)}`
+  const retained = links
+    .filter((link) => link.end <= from || link.start >= to)
+    .map((link) => ({
+      ...link,
+      start: link.start >= to ? link.start - (to - from) : link.start,
+      end: link.end >= to ? link.end - (to - from) : link.end,
+    }))
+  const nextText = `${withoutRange.slice(0, from)}${insertedText}${withoutRange.slice(from)}`
+  return { text: nextText, links: insertLinks(retained, from, insertedText) }
+}
+
 export function linksForLine(links: readonly LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {
   if (links === undefined) return []
   let lineStart = 0

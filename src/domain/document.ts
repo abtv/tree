@@ -15,7 +15,7 @@ export type {
 
 export { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 
-export { isHttpUrl, normalizeLinks } from './document-links'
+export { isHttpUrl, normalizeLinks, replaceLinkedText } from './document-links'
 
 export { buildNodeIndex, locateNode, releaseNodeIndex, requireNode } from './document-index'
 

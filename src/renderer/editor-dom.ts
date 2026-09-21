@@ -157,6 +157,22 @@ export function setCaret(element: HTMLElement, position: number): void {
   selection.addRange(range)
 }
 
+export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {
+  if (element instanceof HTMLTextAreaElement) {
+    element.setSelectionRange(Math.min(anchor, focus), Math.max(anchor, focus), anchor > focus ? 'backward' : 'forward')
+    return
+  }
+  setCaret(element, anchor)
+  const selection = globalThis.getSelection()
+  if (selection === null || selection.anchorNode === null) return
+  const anchorNode = selection.anchorNode
+  const anchorOffset = selection.anchorOffset
+  setCaret(element, focus)
+  if (selection.focusNode !== null) {
+    selection.setBaseAndExtent(anchorNode, anchorOffset, selection.focusNode, selection.focusOffset)
+  }
+}
+
 export function isCollapsedSelection(): boolean {
   const selection = globalThis.getSelection()
   return selection === null || selection.isCollapsed

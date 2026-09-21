@@ -7,6 +7,7 @@ import {
   locateNode,
   parsePersistedState,
   releaseNodeIndex,
+  replaceLinkedText,
   removeTextRange,
   requireNode,
   type AttachmentId,
@@ -177,6 +178,17 @@ export class EditorStore {
     this.noteChange(insertedWords, linkInserted)
     this.textSession.scheduleBoundary()
     this.textSession.endIfStandalone()
+  }
+
+  public replaceTextRange(nodeId: NodeId, start: number, end: number, text: string): void {
+    const state = this.ready()
+    if (this.isPersistenceLocked()) return
+    const node = requireNode(state.document, nodeId).node
+    const replacement = replaceLinkedText(node.text, node.links ?? [], start, end, text)
+    this.endTextSession()
+    if (this.history.begin(state.document)) this.queueAttachmentCleanup()
+    this.textSession.markNextEditStandalone()
+    this.editContent(nodeId, replacement.text, replacement.links)
   }
 
   public deleteLink(nodeId: NodeId, cursor: number): boolean {

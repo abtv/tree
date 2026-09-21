@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
+import type { VimKeyboardState } from './editor-input-handlers'
 
 function createStore(): EditorStore {
   return {
@@ -21,6 +22,7 @@ function createStore(): EditorStore {
     moveSelection: vi.fn(),
     paste: vi.fn(async () => {}),
     redo: vi.fn(),
+    replaceTextRange: vi.fn(),
     reportError: vi.fn(),
     undo: vi.fn(),
   } as unknown as EditorStore
@@ -52,7 +54,114 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
   }
 }
 
+function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['mode'] = 'normal') {
+  const vim: VimKeyboardState = {
+    mode,
+    register: { current: '' },
+    pending: { current: undefined },
+    visualAnchor: { current: undefined },
+    visualFocus: { current: undefined },
+    setMode: vi.fn((next) => {
+      vim.mode = next
+    }),
+    scheduleCaret: vi.fn(),
+  }
+  return {
+    vim,
+    handle: createEditorKeyDownHandler({
+      store,
+      node,
+      isComposing: () => false,
+      setSelectAllNodeId: vi.fn(),
+      onPreviewAttachment: vi.fn(),
+      vim,
+    }),
+  }
+}
+
 describe('editor keyboard handler', () => {
+  it('moves and edits in Normal mode without inserting command characters', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(0, 0)
+    const { handle } = vimHandler(store, { id: 'node', text: 'one two', children: [] })
+
+    const word = keyEvent(input, 'w')
+    handle(word)
+    expect(input.selectionStart).toBe(4)
+    expect(word.preventDefault).toHaveBeenCalledOnce()
+
+    const remove = keyEvent(input, 'x')
+    handle(remove)
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 4, 5, '')
+    expect(remove.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('deletes the selected node only after dd', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'd'))
+    expect(store.deleteSelected).not.toHaveBeenCalled()
+    handle(keyEvent(input, 'd'))
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
+  })
+
+  it('blocks unsupported editing keys in Normal mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    const event = keyEvent(input, 'Backspace')
+
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('keeps backward Visual movement inclusive of the anchor character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    input.setSelectionRange(1, 1)
+    const first = vimHandler(store, { id: 'node', text: 'abc', children: [] })
+
+    first.handle(keyEvent(input, 'v'))
+    const second = vimHandler(store, { id: 'node', text: 'abc', children: [] }, 'visual')
+    second.vim.visualAnchor.current = first.vim.visualAnchor.current
+    second.vim.visualFocus.current = first.vim.visualFocus.current
+    second.handle(keyEvent(input, 'h'))
+
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(2)
+  })
+
+  it('moves $ onto the final character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    const { handle } = vimHandler(store, { id: 'node', text: 'abc', children: [] })
+
+    handle(keyEvent(input, '$'))
+
+    expect(input.selectionStart).toBe(2)
+  })
+
+  it('does not move Normal-mode motions past the final character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    input.setSelectionRange(2, 2)
+    const { handle } = vimHandler(store, { id: 'node', text: 'abc', children: [] })
+
+    handle(keyEvent(input, 'l'))
+    handle(keyEvent(input, 'w'))
+
+    expect(input.selectionStart).toBe(2)
+  })
   it('does not dispatch commands while native text composition is active', () => {
     const store = createStore()
     const input = document.createElement('textarea')

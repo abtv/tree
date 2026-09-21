@@ -1,8 +1,19 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
-import { getCaret, getSelectionRange, selectAll } from './editor-dom'
+import { getCaret, getSelectionRange, selectAll, setCaret, setSelectionRange } from './editor-dom'
 import type { EditorContextMenuCommand } from '../shared/ipc'
+import { firstNonWhitespace, moveWordBackward, moveWordForward, type VimMode } from './vim-editing'
+
+export interface VimKeyboardState {
+  mode: VimMode
+  register: { current: string }
+  pending: { current: string | undefined }
+  visualAnchor: { current: number | undefined }
+  visualFocus: { current: number | undefined }
+  setMode: (mode: VimMode) => void
+  scheduleCaret: (input: HTMLElement, cursor: number) => void
+}
 
 export function executeEditorContextMenuCommand(
   command: EditorContextMenuCommand,
@@ -30,6 +41,7 @@ export interface EditorKeyboardHandlerDependencies {
   isComposing: () => boolean
   setSelectAllNodeId: (nodeId: string | undefined) => void
   onPreviewAttachment: (attachmentId: string) => void
+  vim?: VimKeyboardState
 }
 
 export function createEditorKeyDownHandler({
@@ -38,6 +50,7 @@ export function createEditorKeyDownHandler({
   isComposing,
   setSelectAllNodeId,
   onPreviewAttachment,
+  vim,
 }: EditorKeyboardHandlerDependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event): void => {
     if (isComposing()) return
@@ -49,6 +62,23 @@ export function createEditorKeyDownHandler({
       event.currentTarget.classList.remove('select-all')
     }
     const cursor = getCaret(event.currentTarget)
+    if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      if (vim.mode === 'insert' && event.key === 'Escape') {
+        event.preventDefault()
+        vim.pending.current = undefined
+        vim.visualAnchor.current = undefined
+        vim.visualFocus.current = undefined
+        vim.setMode('normal')
+        setCaret(event.currentTarget, Math.max(0, cursor - 1))
+        store.endTextSession()
+        return
+      }
+      if (vim.mode !== 'insert') {
+        if (handleVimKey(event, store, node, vim)) return
+        event.preventDefault()
+        return
+      }
+    }
     if (selectingAll) {
       event.preventDefault()
       const input = event.currentTarget
@@ -125,4 +155,98 @@ export function createEditorKeyDownHandler({
       else store.endTextSession()
     }
   }
+}
+
+function handleVimKey(
+  event: KeyboardEvent<HTMLElement>,
+  store: EditorStore,
+  node: TreeNode,
+  vim: VimKeyboardState,
+): boolean {
+  const input = event.currentTarget
+  const cursor = getCaret(input)
+  const selection = getSelectionRange(input)
+  const visual = vim.mode === 'visual'
+  const motionCursor = visual ? (vim.visualFocus.current ?? cursor) : cursor
+  const move = (target: number): void => {
+    const maximum = node.text.length > 0 ? node.text.length - 1 : 0
+    const clamped = Math.max(0, Math.min(target, maximum))
+    if (visual) {
+      const anchor = vim.visualAnchor.current ?? cursor
+      vim.visualFocus.current = clamped
+      setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
+    } else setCaret(input, clamped)
+  }
+  const handled = (): true => {
+    event.preventDefault()
+    return true
+  }
+
+  if (event.key === 'Escape') {
+    vim.pending.current = undefined
+    vim.visualAnchor.current = undefined
+    vim.visualFocus.current = undefined
+    vim.setMode('normal')
+    setCaret(input, selection.start)
+    return handled()
+  }
+  if (!visual && (event.key === 'i' || event.key === 'a')) {
+    vim.pending.current = undefined
+    vim.setMode('insert')
+    setCaret(input, event.key === 'a' ? Math.min(cursor + 1, node.text.length) : cursor)
+    return handled()
+  }
+  if (!visual && event.key === 'v') {
+    vim.pending.current = undefined
+    vim.visualAnchor.current = cursor
+    vim.visualFocus.current = cursor
+    vim.setMode('visual')
+    setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
+    return handled()
+  }
+  if (event.key === 'h') move(motionCursor - 1)
+  else if (event.key === 'l') move(motionCursor + 1)
+  else if (event.key === 'w') move(moveWordForward(node.text, motionCursor))
+  else if (event.key === 'b') move(moveWordBackward(node.text, motionCursor))
+  else if (event.key === '0') move(0)
+  else if (event.key === '^') move(firstNonWhitespace(node.text))
+  else if (event.key === '$') move(Math.max(0, node.text.length - 1))
+  else if (event.key === 'j' || event.key === 'k') {
+    vim.visualAnchor.current = undefined
+    vim.visualFocus.current = undefined
+    vim.setMode('normal')
+    store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
+  } else if (visual && (event.key === 'd' || event.key === 'y')) {
+    if (selection.start !== selection.end) vim.register.current = node.text.slice(selection.start, selection.end)
+    if (event.key === 'd' && selection.start !== selection.end) {
+      store.replaceTextRange(node.id, selection.start, selection.end, '')
+      vim.scheduleCaret(input, selection.start)
+    } else setCaret(input, selection.start)
+    vim.visualAnchor.current = undefined
+    vim.visualFocus.current = undefined
+    vim.setMode('normal')
+  } else if (!visual && event.key === 'x') {
+    if (cursor < node.text.length) {
+      vim.register.current = node.text.slice(cursor, cursor + 1)
+      store.replaceTextRange(node.id, cursor, cursor + 1, '')
+      vim.scheduleCaret(input, Math.min(cursor, Math.max(0, node.text.length - 2)))
+    }
+  } else if (!visual && (event.key === 'p' || event.key === 'P')) {
+    const value = vim.register.current
+    if (value !== '') {
+      const position = event.key === 'p' ? Math.min(cursor + 1, node.text.length) : cursor
+      store.replaceTextRange(node.id, position, position, value)
+      vim.scheduleCaret(input, position + value.length - 1)
+    }
+  } else if (!visual && event.key === 'd') {
+    if (vim.pending.current === 'd') {
+      vim.pending.current = undefined
+      store.deleteSelected()
+    } else vim.pending.current = 'd'
+  } else {
+    vim.pending.current = undefined
+    return false
+  }
+  if (event.key !== 'd') vim.pending.current = undefined
+  return handled()
 }

@@ -12,6 +12,7 @@ import {
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
+import type { VimMode } from './vim-editing'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -19,6 +20,8 @@ interface UseNodeInputBindingsOptions {
   focus?: FocusIntent | undefined
   onPreviewAttachment: (attachmentId: string) => void
   persistenceLocked?: boolean
+  vimMode?: VimMode
+  setVimMode?: (mode: VimMode) => void
 }
 
 export function useNodeInputBindings({
@@ -27,12 +30,18 @@ export function useNodeInputBindings({
   focus,
   onPreviewAttachment,
   persistenceLocked = false,
+  vimMode = 'insert',
+  setVimMode = () => undefined,
 }: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
   const inputs = useRef(new Map<string, HTMLElement>())
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
+  const vimRegister = useRef('')
+  const vimPending = useRef<string | undefined>(undefined)
+  const vimVisualAnchor = useRef<number | undefined>(undefined)
+  const vimVisualFocus = useRef<number | undefined>(undefined)
 
   useLayoutEffect(() => {
     latestFocus.current = focus
@@ -132,12 +141,27 @@ export function useNodeInputBindings({
         isComposing: () => composing,
         setSelectAllNodeId,
         onPreviewAttachment,
+        vim: {
+          mode: vimMode,
+          register: vimRegister,
+          pending: vimPending,
+          visualAnchor: vimVisualAnchor,
+          visualFocus: vimVisualFocus,
+          setMode: setVimMode,
+          scheduleCaret: (input, cursor) => {
+            pendingCaret.current = { input, cursor }
+          },
+        },
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
         if (event.button === 2) event.preventDefault()
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
+        vimPending.current = undefined
+        vimVisualAnchor.current = undefined
+        vimVisualFocus.current = undefined
+        setVimMode('insert')
       },
       onPaste: (event: ClipboardEvent<HTMLElement>) => {
         setSelectAllNodeId(undefined)
@@ -151,6 +175,6 @@ export function useNodeInputBindings({
         } else if (!isCollapsedSelection()) store.endTextSession()
       },
     }),
-    [composing, onPreviewAttachment, persistenceLocked, selectAllNodeId, selectedNodeId, store],
+    [composing, onPreviewAttachment, persistenceLocked, selectAllNodeId, selectedNodeId, setVimMode, store, vimMode],
   )
 }

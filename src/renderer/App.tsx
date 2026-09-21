@@ -17,6 +17,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
+  const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'visual'>('insert')
   useEffect(() => {
     void window.treeApi
       .getAlwaysOnTop()
@@ -39,6 +40,8 @@ export function App({ store }: AppProps): React.JSX.Element {
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
     persistenceLocked,
+    vimMode,
+    setVimMode,
   })
   const enterNode = useCallback(
     (node: TreeNode): void => {
@@ -109,6 +112,9 @@ export function App({ store }: AppProps): React.JSX.Element {
         onToggleAlwaysOnTop={toggleAlwaysOnTop}
       />
       <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
+        <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
+          {vimMode.toUpperCase()}
+        </div>
         {currentParent === undefined ? null : (
           <section className="current-parent" aria-label="Current parent">
             {input(currentParent, 'Current parent', true)}
