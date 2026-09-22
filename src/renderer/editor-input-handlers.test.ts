@@ -218,6 +218,19 @@ describe('editor keyboard handler', () => {
     expect(vim.moveViewport).toHaveBeenNthCalledWith(5, 'node', 'half-up', 4)
   })
 
+  it('undoes with u and redoes with Ctrl+r in Normal mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'u'))
+    handle(keyEvent(input, 'r', { ctrlKey: true }))
+
+    expect(store.undo).toHaveBeenCalledOnce()
+    expect(store.redo).toHaveBeenCalledOnce()
+  })
+
   it('blocks unsupported editing keys in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

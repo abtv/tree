@@ -69,6 +69,22 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('one Two')
   })
 
+  test('undoes with u and redoes with Ctrl+r in Normal mode', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.press('i')
+    await typeInto(editor, 'abc')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('x')
+    await expect(editor).toHaveValue('ab')
+
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('abc')
+    await window.keyboard.press('Control+r')
+    await expect(editor).toHaveValue('ab')
+  })
+
   test('A enters Insert mode at the end of the node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

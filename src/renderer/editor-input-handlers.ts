@@ -79,6 +79,19 @@ export function createEditorKeyDownHandler({
       vim.moveViewport(node.id, event.key === 'd' ? 'half-down' : 'half-up', cursor)
       return
     }
+    if (
+      vim !== undefined &&
+      !event.metaKey &&
+      !event.altKey &&
+      vim.mode === 'normal' &&
+      event.ctrlKey &&
+      event.key.toLowerCase() === 'r'
+    ) {
+      event.preventDefault()
+      vim.pending.current = undefined
+      store.redo()
+      return
+    }
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
@@ -272,6 +285,9 @@ function handleVimKey(
   } else if (!visual && event.key === 'G') {
     vim.pending.current = undefined
     vim.moveBoundary('last', cursor)
+  } else if (!visual && event.key === 'u') {
+    vim.pending.current = undefined
+    store.undo()
   } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
     vim.pending.current = undefined
     vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor)
