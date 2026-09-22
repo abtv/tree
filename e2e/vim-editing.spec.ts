@@ -51,6 +51,21 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 8)
   })
 
+  test('I enters Insert mode at the first non-whitespace character', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.press('i')
+    await typeInto(editor, '  one')
+    await setCursor(editor, 4)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('I')
+    await window.keyboard.type('X')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await expect(editor).toHaveValue('  Xone')
+  })
+
   test('yanks a Visual selection and puts it from the local register', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

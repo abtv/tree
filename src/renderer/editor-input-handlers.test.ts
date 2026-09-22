@@ -126,6 +126,32 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(0)
   })
 
+  it('enters Insert mode at the first non-whitespace character with I', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = '  one two'
+    input.setSelectionRange(6, 6)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: '  one two', children: [] })
+
+    handle(keyEvent(input, 'I'))
+
+    expect(vim.mode).toBe('insert')
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(2)
+  })
+
+  it('enters Insert mode at zero with I for an all-whitespace node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = '   '
+    const { handle } = vimHandler(store, { id: 'node', text: '   ', children: [] })
+
+    handle(keyEvent(input, 'I'))
+
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(0)
+  })
+
   it('deletes the selected node only after dd', () => {
     const store = createStore()
     const input = document.createElement('textarea')

@@ -891,7 +891,7 @@ Normal mode supports:
 * `j` and `k` to select the next or previous node;
 * `w` and `b` to move between word starts;
 * `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final character;
-* `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, and `A` to enter Insert mode at the end of the current node;
+* `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node;
 * `x` to delete the current character;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
 * `v` to enter character-wise Visual mode;

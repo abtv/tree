@@ -190,12 +190,18 @@ function handleVimKey(
     setNormalCaret(input, selection.start)
     return handled()
   }
-  if (!visual && (event.key === 'i' || event.key === 'a' || event.key === 'A')) {
+  if (!visual && (event.key === 'i' || event.key === 'a' || event.key === 'I' || event.key === 'A')) {
     vim.pending.current = undefined
     vim.setMode('insert')
     setCaret(
       input,
-      event.key === 'A' ? node.text.length : event.key === 'a' ? Math.min(cursor + 1, node.text.length) : cursor,
+      event.key === 'A'
+        ? node.text.length
+        : event.key === 'I'
+          ? firstNonWhitespace(node.text)
+          : event.key === 'a'
+            ? Math.min(cursor + 1, node.text.length)
+            : cursor,
     )
     return handled()
   }
