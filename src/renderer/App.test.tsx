@@ -113,6 +113,7 @@ describe('App', () => {
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     expect(root.selectionStart).toBe(0)
     expect(root.selectionEnd).toBe(0)
+    expect(root).toHaveClass('node-input-empty')
   })
 
   it('renders the initial editable root and splits it with Enter', async () => {

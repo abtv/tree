@@ -6,6 +6,7 @@ test.describe('Vim editing prototype', () => {
     const editor = node(window, 1)
 
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveCSS('caret-color', 'rgb(55, 63, 67)')
     await expect(editor).toHaveJSProperty('selectionStart', 0)
     await expect(editor).toHaveJSProperty('selectionEnd', 0)
   })

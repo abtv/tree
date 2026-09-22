@@ -56,7 +56,12 @@ export function NodeInput({
   onPaste,
   onSelect,
 }: NodeInputProps): React.JSX.Element {
-  const className = ['node-input', parent ? 'current-parent-input' : '', selectedAll ? 'select-all' : '']
+  const className = [
+    'node-input',
+    parent ? 'current-parent-input' : '',
+    node.text.length === 0 ? 'node-input-empty' : '',
+    selectedAll ? 'select-all' : '',
+  ]
     .filter(Boolean)
     .join(' ')
   const commonProps = {
