@@ -247,15 +247,20 @@ function handleVimKey(
       store.replaceTextRange(node.id, position, position, value)
       vim.scheduleCaret(input, position + value.length - 1)
     }
+  } else if (!visual && event.key === 'g') {
+    vim.pending.current = 'g'
   } else if (!visual && event.key === 'd') {
     if (vim.pending.current === 'd') {
       vim.pending.current = undefined
       store.deleteSelected()
+    } else if (vim.pending.current === 'g') {
+      vim.pending.current = undefined
+      store.enter()
     } else vim.pending.current = 'd'
   } else {
     vim.pending.current = undefined
     return false
   }
-  if (event.key !== 'd') vim.pending.current = undefined
+  if (event.key !== 'd' && event.key !== 'g') vim.pending.current = undefined
   return handled()
 }

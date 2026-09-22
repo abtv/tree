@@ -894,6 +894,7 @@ Normal mode supports:
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node;
 * `x` to delete the current character;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
+* `gd` to enter the selected node, with the same behavior as `Cmd+.`;
 * `v` to enter character-wise Visual mode;
 * `p` and `P` to insert the local text register after or before the current character.
 

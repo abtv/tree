@@ -164,6 +164,20 @@ describe('editor keyboard handler', () => {
     expect(store.deleteSelected).toHaveBeenCalledOnce()
   })
 
+  it('enters the selected node after gd', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Parent'
+    const { handle } = vimHandler(store, { id: 'node', text: 'Parent', children: [] })
+
+    handle(keyEvent(input, 'g'))
+    expect(store.enter).not.toHaveBeenCalled()
+    handle(keyEvent(input, 'd'))
+
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(store.deleteSelected).not.toHaveBeenCalled()
+  })
+
   it('blocks unsupported editing keys in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

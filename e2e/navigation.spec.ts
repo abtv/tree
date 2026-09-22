@@ -25,6 +25,18 @@ test.describe('navigation', () => {
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
 
+  test('gd enters the selected node like Cmd+.', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'Parent')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+
+    await expect(parent(window)).toBeVisible()
+    await expect(parent(window)).toBeFocused()
+  })
+
   test('moves the last root caret to the end on ArrowDown', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
