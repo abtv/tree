@@ -887,8 +887,11 @@ The editor starts in Normal mode, with a block caret on the current character. W
 
 Normal mode supports:
 
+* `gg` to select the first displayed node and `G` to select the last displayed node;
 * `h` and `l` to move by character within the current node;
 * `j` and `k` to select the next or previous node;
+* `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport;
+* `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows;
 * `w` and `b` to move between word starts;
 * `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final character;
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node;

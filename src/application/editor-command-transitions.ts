@@ -117,6 +117,18 @@ export function moveSelectionTransition(
   return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 
+export function moveSelectionBoundaryTransition(
+  document: Document,
+  location: Location,
+  boundary: 'first' | 'last',
+  cursor: number,
+): FocusTarget | undefined {
+  const nodes = displayedNodes(document, location.currentParentId)
+  if (nodes.length === 0) return undefined
+  const target = boundary === 'first' ? nodes[0] : nodes[nodes.length - 1]
+  return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
+}
+
 export function moveHorizontalTransition(
   document: Document,
   location: Location,

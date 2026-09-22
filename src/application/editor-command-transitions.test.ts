@@ -10,6 +10,7 @@ import {
   leaveTransition,
   moveHorizontalTransition,
   moveNodeTransition,
+  moveSelectionBoundaryTransition,
   moveSelectionTransition,
 } from './editor-command-transitions'
 
@@ -59,6 +60,19 @@ describe('editor command transitions', () => {
     expect(moveHorizontalTransition(document, childLocation, 'left', 0)).toEqual({ nodeId: 'root', cursor: 4 })
     expect(moveHorizontalTransition(document, childLocation, 'right', 2)).toBeUndefined()
     expect(document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'second'])
+  })
+
+  it('resolves first and last displayed nodes while clamping the cursor', () => {
+    const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
+
+    expect(moveSelectionBoundaryTransition(document, childLocation, 'first', 99)).toEqual({
+      nodeId: 'first',
+      cursor: 5,
+    })
+    expect(moveSelectionBoundaryTransition(document, childLocation, 'last', 99)).toEqual({
+      nodeId: 'second',
+      cursor: 6,
+    })
   })
 
   it('resolves entering, leaving, and ancestor navigation locations with a beginning cursor', () => {

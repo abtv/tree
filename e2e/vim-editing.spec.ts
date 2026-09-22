@@ -12,6 +12,39 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 0)
   })
 
+  test('supports line and viewport motions', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await node(window, 1).press('i')
+    await typeInto(node(window, 1), 'one')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 2), 'two')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 3), 'three')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 4), 'four')
+    await window.keyboard.press('Enter')
+    await typeInto(node(window, 5), 'five')
+    await window.keyboard.press('Escape')
+
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    await expect(node(window, 1)).toBeFocused()
+
+    await window.keyboard.press('G')
+    await expect(node(window, 5)).toBeFocused()
+    await window.keyboard.press('H')
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('M')
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('L')
+    await expect(node(window, 5)).toBeFocused()
+    await window.keyboard.press('Control+u')
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('Control+d')
+    await expect(node(window, 5)).toBeFocused()
+  })
+
   test('switches modes and applies Normal-mode motions and edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

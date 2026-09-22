@@ -12,6 +12,7 @@ import {
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
+import type { VimViewportMotion } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 
@@ -44,6 +45,35 @@ export function useNodeInputBindings({
   const vimPending = useRef<string | undefined>(undefined)
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
+
+  const moveVimViewport = useCallback(
+    (nodeId: string, motion: VimViewportMotion, cursor: number): void => {
+      const visibleRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
+        const bounds = row.getBoundingClientRect()
+        return bounds.top < globalThis.innerHeight && bounds.bottom > 0
+      })
+      if (visibleRows.length === 0) return
+      const currentIndex = visibleRows.findIndex((row) => row.dataset.nodeId === nodeId)
+      const baseIndex = currentIndex < 0 ? (motion === 'half-up' ? visibleRows.length - 1 : 0) : currentIndex
+      const targetIndex =
+        motion === 'top'
+          ? 0
+          : motion === 'middle'
+            ? Math.floor((visibleRows.length - 1) / 2)
+            : motion === 'bottom'
+              ? visibleRows.length - 1
+              : Math.max(
+                  0,
+                  Math.min(
+                    visibleRows.length - 1,
+                    baseIndex + (motion === 'half-down' ? 1 : -1) * Math.max(1, Math.floor(visibleRows.length / 2)),
+                  ),
+                )
+      const targetId = visibleRows[targetIndex]?.dataset.nodeId
+      if (targetId !== undefined) store.selectNode(targetId, cursor)
+    },
+    [store],
+  )
 
   useLayoutEffect(() => {
     latestFocus.current = focus
@@ -172,6 +202,8 @@ export function useNodeInputBindings({
           pending: vimPending,
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
+          moveBoundary: (boundary, cursor) => store.moveSelectionBoundary(boundary, cursor),
+          moveViewport: moveVimViewport,
           setMode: setVimMode,
           scheduleCaret: (input, cursor) => {
             pendingCaret.current = { input, cursor }
@@ -201,7 +233,17 @@ export function useNodeInputBindings({
         } else if (!isCollapsedSelection()) store.endTextSession()
       },
     }),
-    [composing, onPreviewAttachment, persistenceLocked, selectAllNodeId, selectedNodeId, setVimMode, store, vimMode],
+    [
+      composing,
+      moveVimViewport,
+      onPreviewAttachment,
+      persistenceLocked,
+      selectAllNodeId,
+      selectedNodeId,
+      setVimMode,
+      store,
+      vimMode,
+    ],
   )
 }
 

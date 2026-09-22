@@ -29,6 +29,7 @@ import {
   moveHorizontalTransition,
   moveNodeTransition,
   moveSelectionTransition,
+  moveSelectionBoundaryTransition,
 } from './editor-command-transitions'
 import { clipboardIntroducesLink, hasNewLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
@@ -259,6 +260,12 @@ export class EditorStore {
   public moveSelection(direction: 'up' | 'down', cursor: number): void {
     const state = this.ready()
     const target = moveSelectionTransition(state.document, state.location, direction, cursor)
+    if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
+  }
+
+  public moveSelectionBoundary(boundary: 'first' | 'last', cursor: number): void {
+    const state = this.ready()
+    const target = moveSelectionBoundaryTransition(state.document, state.location, boundary, cursor)
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 

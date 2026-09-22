@@ -28,10 +28,15 @@ function createStore(): EditorStore {
   } as unknown as EditorStore
 }
 
-function keyEvent(input: HTMLElement, key: string, options: { metaKey?: boolean; shiftKey?: boolean } = {}) {
+function keyEvent(
+  input: HTMLElement,
+  key: string,
+  options: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {},
+) {
   return {
     currentTarget: input,
     key,
+    ctrlKey: options.ctrlKey ?? false,
     metaKey: options.metaKey ?? false,
     shiftKey: options.shiftKey ?? false,
     preventDefault: vi.fn(),
@@ -61,6 +66,8 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     pending: { current: undefined },
     visualAnchor: { current: undefined },
     visualFocus: { current: undefined },
+    moveBoundary: vi.fn(),
+    moveViewport: vi.fn(),
     setMode: vi.fn((next) => {
       vim.mode = next
     }),
@@ -176,6 +183,39 @@ describe('editor keyboard handler', () => {
 
     expect(store.enter).toHaveBeenCalledOnce()
     expect(store.deleteSelected).not.toHaveBeenCalled()
+  })
+
+  it('moves to the first and last nodes with gg and G', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'g'))
+    handle(keyEvent(input, 'g'))
+    handle(keyEvent(input, 'G'))
+
+    expect(vim.moveBoundary).toHaveBeenNthCalledWith(1, 'first', 4)
+    expect(vim.moveBoundary).toHaveBeenNthCalledWith(2, 'last', 4)
+  })
+
+  it('moves by viewport positions with H, M, L, Ctrl+d, and Ctrl+u', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'H'))
+    handle(keyEvent(input, 'M'))
+    handle(keyEvent(input, 'L'))
+    handle(keyEvent(input, 'd', { ctrlKey: true }))
+    handle(keyEvent(input, 'u', { ctrlKey: true }))
+
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(1, 'node', 'top', 4)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(2, 'node', 'middle', 4)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(3, 'node', 'bottom', 4)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(4, 'node', 'half-down', 4)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(5, 'node', 'half-up', 4)
   })
 
   it('blocks unsupported editing keys in Normal mode', () => {

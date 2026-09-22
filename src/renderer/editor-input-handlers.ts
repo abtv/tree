@@ -11,9 +11,13 @@ export interface VimKeyboardState {
   pending: { current: string | undefined }
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
+  moveBoundary: (boundary: 'first' | 'last', cursor: number) => void
+  moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   setMode: (mode: VimMode) => void
   scheduleCaret: (input: HTMLElement, cursor: number) => void
 }
+
+export type VimViewportMotion = 'top' | 'middle' | 'bottom' | 'half-up' | 'half-down'
 
 export function executeEditorContextMenuCommand(
   command: EditorContextMenuCommand,
@@ -62,6 +66,19 @@ export function createEditorKeyDownHandler({
       event.currentTarget.classList.remove('select-all')
     }
     const cursor = getCaret(event.currentTarget)
+    if (
+      vim !== undefined &&
+      !event.metaKey &&
+      !event.altKey &&
+      vim.mode === 'normal' &&
+      event.ctrlKey &&
+      (event.key === 'd' || event.key === 'u')
+    ) {
+      event.preventDefault()
+      vim.pending.current = undefined
+      vim.moveViewport(node.id, event.key === 'd' ? 'half-down' : 'half-up', cursor)
+      return
+    }
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
@@ -248,7 +265,16 @@ function handleVimKey(
       vim.scheduleCaret(input, position + value.length - 1)
     }
   } else if (!visual && event.key === 'g') {
-    vim.pending.current = 'g'
+    if (vim.pending.current === 'g') {
+      vim.pending.current = undefined
+      vim.moveBoundary('first', cursor)
+    } else vim.pending.current = 'g'
+  } else if (!visual && event.key === 'G') {
+    vim.pending.current = undefined
+    vim.moveBoundary('last', cursor)
+  } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
+    vim.pending.current = undefined
+    vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor)
   } else if (!visual && event.key === 'd') {
     if (vim.pending.current === 'd') {
       vim.pending.current = undefined
