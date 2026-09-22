@@ -1,14 +1,16 @@
 :root {
   color: #373f43;
   background: #fff;
-  font-family:
-    Arial,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: 'JetBrains Mono';
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./assets/fonts/JetBrainsMono[wght].ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
 }
 
 * {
@@ -303,11 +305,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   padding: 3px 7px;
   color: #fff;
   background: #59636a;
-  font:
-    600 11px/1.2 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
+  font: 600 11px/1.2 'JetBrains Mono';
   letter-spacing: 0.04em;
 }
 

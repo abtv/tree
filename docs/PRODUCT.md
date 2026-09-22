@@ -903,6 +903,12 @@ The local Vim register is held only for the running renderer session. It does no
 
 Unsupported unmodified keys do not edit text in Normal or Visual mode. Application shortcuts using modifier keys retain their existing behavior. Vim handling is suspended during native text composition.
 
+### 20.3 Typography
+
+The application uses the bundled JetBrains Mono typeface for all user-interface text. The bundled
+font is distributed under the SIL Open Font License 1.1; the application source remains under the
+project's MIT license.
+
 ---
 
 ## 21. Unexpected Renderer Errors
