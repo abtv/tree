@@ -332,6 +332,8 @@ The application remembers the node from which the user entered so that it can re
 
 This shortcut must remain exactly `Cmd+,`.
 
+In Vim Normal mode, `Ctrl+o` performs the same one-level navigation.
+
 When going back:
 
 * restore the previous current parent;
@@ -899,6 +901,7 @@ Normal mode supports:
 * `x` to delete the current character;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
 * `gd` to enter the selected node, with the same behavior as `Cmd+.`;
+* `Ctrl+o` to go back one parent level, with the same behavior as `Cmd+,`;
 * `v` to enter character-wise Visual mode;
 * `p` and `P` to insert the local text register after or before the current character.
 

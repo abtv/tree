@@ -85,6 +85,19 @@ export function createEditorKeyDownHandler({
       !event.altKey &&
       vim.mode === 'normal' &&
       event.ctrlKey &&
+      event.key.toLowerCase() === 'o'
+    ) {
+      event.preventDefault()
+      vim.pending.current = undefined
+      store.leave()
+      return
+    }
+    if (
+      vim !== undefined &&
+      !event.metaKey &&
+      !event.altKey &&
+      vim.mode === 'normal' &&
+      event.ctrlKey &&
       event.key.toLowerCase() === 'r'
     ) {
       event.preventDefault()

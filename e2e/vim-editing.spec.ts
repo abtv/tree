@@ -1,4 +1,4 @@
-import { expect, launchTree, node, setCursor, test, typeInto } from './fixtures'
+import { expect, launchTree, node, seedDocument, setCursor, test, typeInto } from './fixtures'
 
 test.describe('Vim editing prototype', () => {
   test('starts in Normal mode', async ({ userDataDir }) => {
@@ -10,6 +10,26 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveCSS('caret-animation', 'manual')
     await expect(editor).toHaveJSProperty('selectionStart', 0)
     await expect(editor).toHaveJSProperty('selectionEnd', 0)
+  })
+
+  test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Root')
+    await expect(node(window, 1)).toHaveValue('Child')
+    await node(window, 1).focus()
+
+    await window.keyboard.press('Control+o')
+
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveCount(0)
+    await expect(node(window, 1)).toHaveValue('Root')
+    await expect(node(window, 1)).toBeFocused()
   })
 
   test('supports line and viewport motions', async ({ userDataDir }) => {

@@ -185,6 +185,20 @@ describe('editor keyboard handler', () => {
     expect(store.deleteSelected).not.toHaveBeenCalled()
   })
 
+  it('leaves the current node with Ctrl+o in Normal mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Child'
+    input.setSelectionRange(2, 2)
+    const { handle } = vimHandler(store, { id: 'child', text: 'Child', children: [] })
+
+    const event = keyEvent(input, 'o', { ctrlKey: true })
+    handle(event)
+
+    expect(store.leave).toHaveBeenCalledOnce()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
   it('moves to the first and last nodes with gg and G', () => {
     const store = createStore()
     const input = document.createElement('textarea')
