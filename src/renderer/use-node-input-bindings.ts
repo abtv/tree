@@ -8,6 +8,7 @@ import {
   isCollapsedSelection,
   readEditableContent,
   setCaret,
+  setNormalCaret,
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
@@ -48,6 +49,13 @@ export function useNodeInputBindings({
   }, [focus])
 
   useLayoutEffect(() => {
+    const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
+    if (focusedInput === undefined) return
+    if (vimMode === 'normal') setNormalCaret(focusedInput, getCaret(focusedInput))
+    else if (vimMode === 'insert') setCaret(focusedInput, getCaret(focusedInput))
+  }, [focus, vimMode])
+
+  useLayoutEffect(() => {
     if (focus === undefined) return
     const applyFocus = (): void => {
       const input = inputs.current.get(focus.nodeId)
@@ -65,9 +73,10 @@ export function useNodeInputBindings({
   useLayoutEffect(() => {
     const pending = pendingCaret.current
     if (pending === undefined || !pending.input.isConnected) return
-    setCaret(pending.input, pending.cursor)
+    if (vimMode === 'normal') setNormalCaret(pending.input, pending.cursor)
+    else setCaret(pending.input, pending.cursor)
     pendingCaret.current = undefined
-  })
+  }, [vimMode])
 
   useEffect(() => {
     const update = (): void => {

@@ -1,14 +1,26 @@
 import { expect, launchTree, node, setCursor, test, typeInto } from './fixtures'
 
 test.describe('Vim editing prototype', () => {
+  test('starts in Normal mode', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 0)
+  })
+
   test('switches modes and applies Normal-mode motions and edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
 
+    await editor.press('i')
     await typeInto(editor, 'one two')
     await setCursor(editor, 0)
     await window.keyboard.press('Escape')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
     await window.keyboard.press('Backspace')
     await expect(editor).toHaveValue('one two')
 
@@ -26,6 +38,7 @@ test.describe('Vim editing prototype', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
 
+    await editor.press('i')
     await typeInto(editor, 'abc')
     await setCursor(editor, 0)
     await window.keyboard.press('Escape')
@@ -43,6 +56,7 @@ test.describe('Vim editing prototype', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
 
+    await editor.press('i')
     await typeInto(editor, 'abc')
     await setCursor(editor, 2)
     await window.keyboard.press('Escape')

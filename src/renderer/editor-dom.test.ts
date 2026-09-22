@@ -11,6 +11,7 @@ import {
   richTextHtml,
   selectAll,
   setCaret,
+  setNormalCaret,
   updateSelectedLinks,
 } from './editor-dom'
 
@@ -153,6 +154,17 @@ describe('editor DOM adapters', () => {
     expect(getSelectionRange(element)).toEqual({ start: 0, end: 0 })
     setCaret(element, 99)
     expect(getSelectionRange(element)).toEqual({ start: 5, end: 5 })
+  })
+
+  it('selects the current character for a Normal-mode block caret', () => {
+    const element = document.createElement('textarea')
+    element.value = 'hello'
+
+    setNormalCaret(element, 2)
+
+    expect(getSelectionRange(element)).toEqual({ start: 2, end: 3 })
+    setNormalCaret(element, 99)
+    expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
   it('places a caret before or after a non-editable link at the nearest boundary', () => {

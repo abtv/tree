@@ -157,6 +157,16 @@ export function setCaret(element: HTMLElement, position: number): void {
   selection.addRange(range)
 }
 
+export function setNormalCaret(element: HTMLElement, position: number): void {
+  const length = element instanceof HTMLTextAreaElement ? element.value.length : (element.textContent?.length ?? 0)
+  if (length === 0) {
+    setCaret(element, 0)
+    return
+  }
+  const cursor = Math.min(Math.max(position, 0), length - 1)
+  setSelectionRange(element, cursor, cursor + 1)
+}
+
 export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {
   if (element instanceof HTMLTextAreaElement) {
     element.setSelectionRange(Math.min(anchor, focus), Math.max(anchor, focus), anchor > focus ? 'backward' : 'forward')

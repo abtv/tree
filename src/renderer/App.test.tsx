@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render as renderReact, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
@@ -91,7 +91,27 @@ function mockAppRowRects(originTop = 0, height = 24): void {
   })
 }
 
+function render(ui: Parameters<typeof renderReact>[0]): ReturnType<typeof renderReact> {
+  const result = renderReact(ui)
+  const input = screen.queryByRole('textbox', { name: 'Node 1' })
+  if (input !== null) fireEvent.keyDown(input, { key: 'i' })
+  return result
+}
+
 describe('App', () => {
+  it('starts in Normal mode with an empty caret position', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+
+    expect(screen.getByText('NORMAL')).toBeInTheDocument()
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    expect(root.selectionStart).toBe(0)
+    expect(root.selectionEnd).toBe(0)
+  })
+
   it('renders the initial editable root and splits it with Enter', async () => {
     const store = createStore()
     await act(async () => {

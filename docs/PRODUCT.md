@@ -883,7 +883,7 @@ At or below 500 displayed siblings, the list renders every row and behaves exact
 
 ### 20.2 Vim-Inspired Editing
 
-The editor starts in Insert mode, where text entry and all existing application commands behave normally. Pressing `Escape` enters Normal mode. Clicking or pressing the pointer in an editable node returns to Insert mode. A persistent indicator displays `INSERT`, `NORMAL`, or `VISUAL`.
+The editor starts in Normal mode, with a block caret on the current character. Pressing `i` or `a` enters Insert mode, where text entry and all existing application commands behave normally; Insert mode uses the normal thin text caret. Pressing `Escape` enters Normal mode. Clicking or pressing the pointer in an editable node returns to Insert mode. A persistent indicator displays `INSERT`, `NORMAL`, or `VISUAL`.
 
 Normal mode supports:
 

@@ -284,6 +284,16 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   line-height: 21px;
 }
 
+.vim-state-normal .node-input {
+  caret-color: transparent;
+  caret-shape: block;
+}
+
+.vim-state-normal .node-input::selection {
+  color: #fff;
+  background: #373f43;
+}
+
 .vim-mode {
   position: fixed;
   right: 12px;

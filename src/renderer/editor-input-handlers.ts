@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
-import { getCaret, getSelectionRange, selectAll, setCaret, setSelectionRange } from './editor-dom'
+import { getCaret, getSelectionRange, selectAll, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { firstNonWhitespace, moveWordBackward, moveWordForward, type VimMode } from './vim-editing'
 
@@ -69,7 +69,7 @@ export function createEditorKeyDownHandler({
         vim.visualAnchor.current = undefined
         vim.visualFocus.current = undefined
         vim.setMode('normal')
-        setCaret(event.currentTarget, Math.max(0, cursor - 1))
+        setNormalCaret(event.currentTarget, Math.max(0, cursor - 1))
         store.endTextSession()
         return
       }
@@ -175,7 +175,7 @@ function handleVimKey(
       const anchor = vim.visualAnchor.current ?? cursor
       vim.visualFocus.current = clamped
       setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
-    } else setCaret(input, clamped)
+    } else setNormalCaret(input, clamped)
   }
   const handled = (): true => {
     event.preventDefault()
@@ -187,7 +187,7 @@ function handleVimKey(
     vim.visualAnchor.current = undefined
     vim.visualFocus.current = undefined
     vim.setMode('normal')
-    setCaret(input, selection.start)
+    setNormalCaret(input, selection.start)
     return handled()
   }
   if (!visual && (event.key === 'i' || event.key === 'a')) {
@@ -221,7 +221,7 @@ function handleVimKey(
     if (event.key === 'd' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, '')
       vim.scheduleCaret(input, selection.start)
-    } else setCaret(input, selection.start)
+    } else setNormalCaret(input, selection.start)
     vim.visualAnchor.current = undefined
     vim.visualFocus.current = undefined
     vim.setMode('normal')
