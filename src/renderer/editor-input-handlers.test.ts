@@ -98,6 +98,34 @@ describe('editor keyboard handler', () => {
     expect(remove.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('enters Insert mode at the end of the node with A', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(1, 1)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'one two', children: [] })
+
+    const event = keyEvent(input, 'A')
+    handle(event)
+
+    expect(vim.mode).toBe('insert')
+    expect(input.selectionStart).toBe(7)
+    expect(input.selectionEnd).toBe(7)
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('enters Insert mode at position zero with A on an empty node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: '', children: [] })
+
+    handle(keyEvent(input, 'A'))
+
+    expect(vim.mode).toBe('insert')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(0)
+  })
+
   it('deletes the selected node only after dd', () => {
     const store = createStore()
     const input = document.createElement('textarea')

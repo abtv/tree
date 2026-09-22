@@ -34,6 +34,23 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('one Two')
   })
 
+  test('A enters Insert mode at the end of the node', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.press('i')
+    await typeInto(editor, 'one two')
+    await setCursor(editor, 1)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('A')
+    await window.keyboard.type('!')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await expect(editor).toHaveValue('one two!')
+    await expect(editor).toHaveJSProperty('selectionStart', 8)
+    await expect(editor).toHaveJSProperty('selectionEnd', 8)
+  })
+
   test('yanks a Visual selection and puts it from the local register', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
