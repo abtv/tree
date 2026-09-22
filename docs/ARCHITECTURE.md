@@ -624,7 +624,9 @@ This is a guideline, not a requirement to create every directory immediately.
 
 The actual structure should reflect the codebase as it evolves.
 
-The renderer currently isolates DOM/caret behavior in `editor-dom.ts`, location rendering in `LocationBar.tsx`, attachment rendering/preview in `AttachmentPreview.tsx`, list geometry and measurement in `node-list-layout.ts`, row presentation in `NodeRow.tsx`, and drag interaction in `use-node-list-drag.ts`; `NodeList.tsx` retains windowing, measurement state, and rendering. These modules remain UI adapters and dispatch document changes through the application layer.
+The renderer currently isolates DOM/caret behavior in `editor-dom.ts`, pure Vim motion calculations in `vim-editing.ts`, location rendering in `LocationBar.tsx`, attachment rendering/preview in `AttachmentPreview.tsx`, list geometry and measurement in `node-list-layout.ts`, row presentation in `NodeRow.tsx`, and drag interaction in `use-node-list-drag.ts`; `use-node-input-bindings.ts` owns renderer-local Vim mode, pending-command, Visual-selection, and register state, while `NodeList.tsx` retains windowing, measurement state, and rendering. These modules remain UI adapters and dispatch document changes through the application layer.
+
+Vim text mutations use the same application-layer edit and history path as ordinary text edits. The local Vim register is bounded to one node-sized string and is neither persisted nor sent across IPC. Motions and range edits scan only the active node text, so they add O(active node text length) CPU work, no additional disk operations beyond the existing autosave path, and no memory growth with edit count.
 
 The domain currently isolates shared document types, hyperlink normalization, the derived node index, attachment accounting, tree operations, and persisted-state parsing in `document-types.ts`, `document-links.ts`, `document-index.ts`, `document-attachments.ts`, `document-operations.ts`, and `document-serialization.ts`. `document.ts` remains the public domain entry point and re-exports the domain API from those modules.
 

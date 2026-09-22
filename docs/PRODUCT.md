@@ -18,7 +18,7 @@ The user is always viewing one level: either the top-level root nodes or the imm
 
 The application is keyboard-first. Mouse interaction is primarily used for drag-and-drop reordering.
 
-There is no separate view/edit mode.
+Text remains editable inline. The editor also provides Vim-inspired Insert, Normal, and Visual interaction modes as defined in §20.2.
 
 The application automatically saves changes.
 
@@ -857,7 +857,7 @@ The application is keyboard-first.
 
 Text is always edited inline.
 
-There is no separate view mode and edit mode.
+Text remains inline in every interaction mode; Vim-inspired modes change keyboard interpretation rather than opening a separate editing surface.
 
 The user normally interacts with the application through:
 
@@ -880,6 +880,28 @@ A drag that reaches the top or bottom edge of the window scrolls the page automa
 The page continues to scroll as a single document. The location bar and the current-parent heading scroll with the content.
 
 At or below 500 displayed siblings, the list renders every row and behaves exactly as before, including find-in-page and accessibility.
+
+### 20.2 Vim-Inspired Editing
+
+The editor starts in Insert mode, where text entry and all existing application commands behave normally. Pressing `Escape` enters Normal mode. Clicking or pressing the pointer in an editable node returns to Insert mode. A persistent indicator displays `INSERT`, `NORMAL`, or `VISUAL`.
+
+Normal mode supports:
+
+* `h` and `l` to move by character within the current node;
+* `j` and `k` to select the next or previous node;
+* `w` and `b` to move between word starts;
+* `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final character;
+* `i` to enter Insert mode at the current character and `a` to enter Insert mode after it;
+* `x` to delete the current character;
+* `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
+* `v` to enter character-wise Visual mode;
+* `p` and `P` to insert the local text register after or before the current character.
+
+Visual mode selects characters only within the current node. The Normal-mode character and word motions extend the selection. `y` copies the selection into an application-local plain-text register, and `d` copies and deletes it. Both commands return to Normal mode. `Escape` leaves Insert or Visual mode for Normal mode.
+
+The local Vim register is held only for the running renderer session. It does not replace or modify the system clipboard, preserve hyperlink metadata, store structured nodes, or persist across application restarts. Search, counts, named registers, multi-node Visual selection, operator-motion composition, macros, marks, text objects, dot repeat, and structured node yank/put are not supported.
+
+Unsupported unmodified keys do not edit text in Normal or Visual mode. Application shortcuts using modifier keys retain their existing behavior. Vim handling is suspended during native text composition.
 
 ---
 
