@@ -139,6 +139,20 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(2)
   })
 
+  it('does not move between nodes from Visual mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    input.setSelectionRange(1, 1)
+    const { handle } = vimHandler(store, { id: 'node', text: 'abc', children: [] }, 'visual')
+
+    const event = keyEvent(input, 'j')
+    handle(event)
+
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
   it('moves $ onto the final character', () => {
     const store = createStore()
     const input = document.createElement('textarea')

@@ -94,7 +94,10 @@ function mockAppRowRects(originTop = 0, height = 24): void {
 function render(ui: Parameters<typeof renderReact>[0]): ReturnType<typeof renderReact> {
   const result = renderReact(ui)
   const input = screen.queryByRole('textbox', { name: 'Node 1' })
-  if (input !== null) fireEvent.keyDown(input, { key: 'i' })
+  if (input !== null) {
+    fireEvent.keyDown(input, { key: 'i' })
+    if (input instanceof HTMLTextAreaElement) input.setSelectionRange(input.selectionStart, input.selectionStart)
+  }
   return result
 }
 

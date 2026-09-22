@@ -27,6 +27,7 @@ function renderBindings(options: {
   store: EditorStore
   selectedNodeId?: string
   focus?: { nodeId: string; cursor: number; token: number }
+  vimMode?: 'insert' | 'normal' | 'visual'
 }) {
   const onPreviewAttachment = vi.fn()
   return renderHook(() => useNodeInputBindings({ ...options, onPreviewAttachment }))
@@ -154,5 +155,29 @@ describe('useNodeInputBindings', () => {
     rerender()
 
     expect(textarea.selectionStart).toBe(3)
+  })
+
+  it('keeps a block selection when Normal mode focuses another node', () => {
+    const store = createStore()
+    const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
+    const { result, rerender } = renderHook(() =>
+      useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        focus: holder.focus,
+        onPreviewAttachment: vi.fn(),
+        vimMode: 'normal',
+      }),
+    )
+    const textarea = document.createElement('textarea')
+    textarea.value = 'hello'
+    document.body.append(textarea)
+    result.current({ id: 'node', text: 'hello', children: [] }).inputRef(textarea)
+
+    holder.focus = { nodeId: 'node', cursor: 3, token: 1 }
+    rerender()
+
+    expect(textarea.selectionStart).toBe(3)
+    expect(textarea.selectionEnd).toBe(4)
   })
 })

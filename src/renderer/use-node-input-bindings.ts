@@ -37,6 +37,7 @@ export function useNodeInputBindings({
   const inputs = useRef(new Map<string, HTMLElement>())
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
+  const latestVimMode = useRef(vimMode)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const vimRegister = useRef('')
@@ -49,10 +50,15 @@ export function useNodeInputBindings({
   }, [focus])
 
   useLayoutEffect(() => {
+    latestVimMode.current = vimMode
+  }, [vimMode])
+
+  useLayoutEffect(() => {
     const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
     if (focusedInput === undefined) return
-    if (vimMode === 'normal') setNormalCaret(focusedInput, getCaret(focusedInput))
-    else if (vimMode === 'insert') setCaret(focusedInput, getCaret(focusedInput))
+    if (vimMode === 'normal') {
+      setNormalCaret(focusedInput, getCaret(focusedInput))
+    } else if (vimMode === 'insert') setCaret(focusedInput, getCaret(focusedInput))
   }, [focus, vimMode])
 
   useLayoutEffect(() => {
@@ -61,7 +67,16 @@ export function useNodeInputBindings({
       const input = inputs.current.get(focus.nodeId)
       if (input === undefined) return
       input.focus()
-      if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
+      if (latestVimMode.current === 'normal') {
+        const normalCursor = Math.min(Math.max(focus.cursor, 0), Math.max(0, nodeTextLength(input) - 1))
+        if (
+          !(input instanceof HTMLTextAreaElement) ||
+          input.selectionStart !== normalCursor ||
+          input.selectionEnd !== (input.value.length === 0 ? 0 : normalCursor + 1)
+        ) {
+          setNormalCaret(input, focus.cursor)
+        }
+      } else if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
       else setCaret(input, focus.cursor)
     }
     applyFocus()
@@ -73,8 +88,9 @@ export function useNodeInputBindings({
   useLayoutEffect(() => {
     const pending = pendingCaret.current
     if (pending === undefined || !pending.input.isConnected) return
-    if (vimMode === 'normal') setNormalCaret(pending.input, pending.cursor)
-    else setCaret(pending.input, pending.cursor)
+    if (vimMode === 'normal') {
+      setNormalCaret(pending.input, pending.cursor)
+    } else setCaret(pending.input, pending.cursor)
     pendingCaret.current = undefined
   }, [vimMode])
 
@@ -178,6 +194,7 @@ export function useNodeInputBindings({
         void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
       },
       onSelect: (event: SyntheticEvent<HTMLElement>) => {
+        if (vimMode === 'normal') return
         const target = event.currentTarget
         if (target instanceof HTMLTextAreaElement) {
           if (target.selectionStart !== target.selectionEnd) store.endTextSession()
@@ -186,4 +203,8 @@ export function useNodeInputBindings({
     }),
     [composing, onPreviewAttachment, persistenceLocked, selectAllNodeId, selectedNodeId, setVimMode, store, vimMode],
   )
+}
+
+function nodeTextLength(input: HTMLElement): number {
+  return input instanceof HTMLTextAreaElement ? input.value.length : (input.textContent?.length ?? 0)
 }

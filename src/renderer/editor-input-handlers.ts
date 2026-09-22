@@ -211,7 +211,7 @@ function handleVimKey(
   else if (event.key === '0') move(0)
   else if (event.key === '^') move(firstNonWhitespace(node.text))
   else if (event.key === '$') move(Math.max(0, node.text.length - 1))
-  else if (event.key === 'j' || event.key === 'k') {
+  else if (!visual && (event.key === 'j' || event.key === 'k')) {
     vim.visualAnchor.current = undefined
     vim.visualFocus.current = undefined
     vim.setMode('normal')
