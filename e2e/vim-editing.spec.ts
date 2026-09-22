@@ -122,6 +122,26 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 8)
   })
 
+  test('o and O open empty siblings below and above', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.press('i')
+    await typeInto(editor, 'middle')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('o')
+    await window.keyboard.type('below')
+    await expect(node(window, 1)).toHaveValue('middle')
+    await expect(node(window, 2)).toHaveValue('below')
+
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('O')
+    await window.keyboard.type('above')
+    await expect(node(window, 1)).toHaveValue('middle')
+    await expect(node(window, 2)).toHaveValue('above')
+    await expect(node(window, 3)).toHaveValue('below')
+  })
+
   test('I enters Insert mode at the first non-whitespace character', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

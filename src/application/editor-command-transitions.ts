@@ -3,6 +3,7 @@ import {
   deleteNode,
   displayedNodes,
   ensureRoot,
+  insertSiblingAfter,
   insertSiblingBefore,
   moveSibling,
   nodePath,
@@ -32,6 +33,26 @@ export interface StructuralTransition extends LocationTransition {
 export interface RejectedTransition {
   kind: 'rejected'
   message: string
+}
+
+export type SiblingInsertionPosition = 'before' | 'after'
+
+export function createSiblingTransition(
+  document: Document,
+  location: Location,
+  position: SiblingInsertionPosition,
+  createId: () => NodeId,
+): StructuralTransition {
+  const id = createId()
+  const nextDocument =
+    position === 'before'
+      ? insertSiblingBefore(document, location.selectedNodeId, id)
+      : insertSiblingAfter(document, location.selectedNodeId, id)
+  return {
+    document: nextDocument,
+    location: { ...location, selectedNodeId: id },
+    focus: { nodeId: id, cursor: 0 },
+  }
 }
 
 export function createSiblingOrFirstChildTransition(

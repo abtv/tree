@@ -248,6 +248,12 @@ function handleVimKey(
     )
     return handled()
   }
+  if (!visual && (event.key === 'o' || event.key === 'O')) {
+    vim.pending.current = undefined
+    vim.setMode('insert')
+    store.createSibling(event.key === 'o' ? 'after' : 'before')
+    return handled()
+  }
   if (!visual && event.key === 'v') {
     vim.pending.current = undefined
     vim.visualAnchor.current = cursor

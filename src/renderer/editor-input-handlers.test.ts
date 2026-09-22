@@ -11,6 +11,7 @@ function createStore(): EditorStore {
   return {
     copy: vi.fn(async () => true),
     createSiblingOrFirstChild: vi.fn(),
+    createSibling: vi.fn(),
     cut: vi.fn(async () => true),
     deleteEmptySelected: vi.fn(),
     deleteLink: vi.fn(() => false),
@@ -145,6 +146,27 @@ describe('editor keyboard handler', () => {
     expect(vim.mode).toBe('insert')
     expect(input.selectionStart).toBe(2)
     expect(input.selectionEnd).toBe(2)
+  })
+
+  it('opens an empty sibling below with o and above with O', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(2, 2)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    const below = keyEvent(input, 'o')
+    handle(below)
+    expect(store.createSibling).toHaveBeenNthCalledWith(1, 'after')
+    expect(vim.mode).toBe('insert')
+    expect(below.preventDefault).toHaveBeenCalledOnce()
+
+    vim.mode = 'normal'
+    const above = keyEvent(input, 'O')
+    handle(above)
+    expect(store.createSibling).toHaveBeenNthCalledWith(2, 'before')
+    expect(vim.mode).toBe('insert')
+    expect(above.preventDefault).toHaveBeenCalledOnce()
   })
 
   it('enters Insert mode at zero with I for an all-whitespace node', () => {

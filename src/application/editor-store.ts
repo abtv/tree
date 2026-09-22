@@ -21,6 +21,7 @@ import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-m
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 import {
   ancestorNavigationTransition,
+  createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deleteSelectedTransition,
@@ -333,6 +334,18 @@ export class EditorStore {
       this.reportError(new Error(transition.message))
       return
     }
+    this.endTextSession()
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
+  }
+
+  public createSibling(position: 'before' | 'after'): void {
+    const state = this.ready()
+    if (this.isPersistenceLocked()) return
+    const transition = createSiblingTransition(state.document, state.location, position, this.createId)
     this.endTextSession()
     this.applyStructural(
       transition.document,

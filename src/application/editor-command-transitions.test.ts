@@ -3,6 +3,7 @@ import type { Document, TreeNode } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import {
   ancestorNavigationTransition,
+  createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deleteSelectedTransition,
@@ -190,6 +191,34 @@ describe('editor command transitions', () => {
     if (!('document' in child)) throw new Error('Expected an accepted transition.')
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'first', 'second'])
     expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
+  })
+
+  it('creates an empty sibling before or after without changing the selected node text', () => {
+    const before = createSiblingTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      'before',
+      () => 'before-empty',
+    )
+    expect(before.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
+      ['before-empty', ''],
+      ['first', 'First'],
+      ['second', 'Second'],
+    ])
+    expect(before.focus).toEqual({ nodeId: 'before-empty', cursor: 0 })
+
+    const after = createSiblingTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      'after',
+      () => 'after-empty',
+    )
+    expect(after.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
+      ['first', 'First'],
+      ['after-empty', ''],
+      ['second', 'Second'],
+    ])
+    expect(after.focus).toEqual({ nodeId: 'after-empty', cursor: 0 })
   })
 
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {
