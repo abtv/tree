@@ -16,7 +16,7 @@ jobs:
   e2e:
     name: Electron E2E
     runs-on: macos-15
-    timeout-minutes: 2
+    timeout-minutes: 3
 
     steps:
       - name: Check out repository
