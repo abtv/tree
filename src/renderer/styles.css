@@ -322,6 +322,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: #725493;
 }
 
+.vim-mode-replace {
+  background: #a04b45;
+}
+
 .node-input a {
   color: #1769aa;
   text-decoration: underline;

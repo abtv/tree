@@ -1,6 +1,7 @@
 import type {
   ChangeEvent,
   ClipboardEvent,
+  CompositionEvent,
   FocusEvent,
   FormEvent,
   KeyboardEvent,
@@ -18,8 +19,8 @@ export interface NodeInputBindings {
   onTextChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
   onContentInput: (event: FormEvent<HTMLElement>) => void
   onContentChange: (event: FormEvent<HTMLElement>) => void
-  onCompositionStart: () => void
-  onCompositionEnd: () => void
+  onCompositionStart: (event: CompositionEvent<HTMLElement>) => void
+  onCompositionEnd: (event: CompositionEvent<HTMLElement>) => void
   onCut: () => void
   onContextMenu: (event: MouseEvent<HTMLElement>) => void
   onFocus: (event: FocusEvent<HTMLElement>) => void

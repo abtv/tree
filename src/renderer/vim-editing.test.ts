@@ -3,8 +3,12 @@ import {
   currentWordEnd,
   findCharacter,
   firstNonWhitespace,
+  moveWORDBackward,
+  moveWORDEnd,
+  moveWORDForward,
   moveWordBackward,
   moveWordEnd,
+  moveWordEndBackward,
   moveWordForward,
   vimPastePosition,
 } from './vim-editing'
@@ -37,6 +41,14 @@ describe('Vim text motions', () => {
     expect(findCharacter('a.b.c', 0, '.', 'forward', 2)).toBe(3)
     expect(findCharacter('a.b.c', 4, '.', 'backward', 2)).toBe(1)
     expect(findCharacter('a.b.c', 3, '.', 'forward')).toBeUndefined()
+  })
+
+  it('moves by whitespace-delimited WORDs and backward word ends', () => {
+    expect(moveWORDForward('foo.bar  baz', 0)).toBe(9)
+    expect(moveWORDBackward('foo.bar  baz', 12)).toBe(9)
+    expect(moveWORDEnd('foo.bar  baz', 0)).toBe(6)
+    expect(moveWordEndBackward('one two.three', 13)).toBe(7)
+    expect(moveWordEndBackward('one two', 4)).toBe(2)
   })
 })
 

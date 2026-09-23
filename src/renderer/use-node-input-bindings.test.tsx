@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, renderHook } from '@testing-library/react'
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { useState } from 'react'
 import type { SyntheticEvent } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
@@ -19,6 +20,7 @@ function createStore(): EditorStore {
     endTextSession: vi.fn(),
     markNextTextEditStandalone: vi.fn(),
     paste: vi.fn(async () => {}),
+    replaceTextRange: vi.fn(),
     reportError: vi.fn(),
     selectNode: vi.fn(),
   } as unknown as EditorStore
@@ -28,7 +30,7 @@ function renderBindings(options: {
   store: EditorStore
   selectedNodeId?: string
   focus?: { nodeId: string; cursor: number; token: number }
-  vimMode?: 'insert' | 'normal' | 'visual'
+  vimMode?: 'insert' | 'normal' | 'replace' | 'visual'
 }) {
   const onPreviewAttachment = vi.fn()
   return renderHook(() => useNodeInputBindings({ ...options, onPreviewAttachment }))
@@ -204,8 +206,96 @@ describe('useNodeInputBindings', () => {
     pressD()
     expect(store.deleteSelected).not.toHaveBeenCalled()
 
-    result.current(node).onCompositionStart()
+    result.current(node).onCompositionStart({ currentTarget: input } as never)
     pressD()
     expect(store.deleteSelected).not.toHaveBeenCalled()
+  })
+
+  it('overwrites and appends in Replace mode, then commits one repeatable range edit', () => {
+    const store = createStore()
+    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual'>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        onPreviewAttachment: vi.fn(),
+        vimMode,
+        setVimMode,
+      })(node)
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = node.text
+    input.setSelectionRange(2, 2)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('R')
+    expect(result.current.vimMode).toBe('replace')
+    press('X')
+    press('Y')
+    press('Z')
+    expect(input.value).toBe('abXYZ')
+    press('Backspace')
+    expect(input.value).toBe('abXY')
+    press('Escape')
+
+    expect(result.current.vimMode).toBe('normal')
+    expect(store.replaceTextRange).toHaveBeenCalledOnce()
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 4, 'XY')
+  })
+
+  it('resumes Replace mode after native text composition', () => {
+    const store = createStore()
+    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual'>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        onPreviewAttachment: vi.fn(),
+        vimMode,
+        setVimMode,
+      })(node)
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = node.text
+    input.setSelectionRange(2, 2)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('R')
+    act(() => result.current.bindings.onCompositionStart({ currentTarget: input } as never))
+    input.value = 'abあcd'
+    input.setSelectionRange(3, 3)
+    act(() => result.current.bindings.onCompositionEnd({ currentTarget: input } as never))
+    press('X')
+    press('Escape')
+
+    expect(result.current.vimMode).toBe('normal')
+    expect(store.replaceTextRange).toHaveBeenCalledOnce()
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 3, 4, 'X')
   })
 })

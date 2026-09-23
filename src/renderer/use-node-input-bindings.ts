@@ -12,7 +12,13 @@ import {
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
-import type { VimPendingCommand, VimRegister, VimTextChange, VimViewportMotion } from './editor-input-handlers'
+import type {
+  VimFindCommand,
+  VimPendingCommand,
+  VimRegister,
+  VimTextChange,
+  VimViewportMotion,
+} from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 
@@ -44,9 +50,31 @@ export function useNodeInputBindings({
   const vimRegister = useRef<VimRegister>({ kind: 'empty' })
   const vimPending = useRef<VimPendingCommand | undefined>(undefined)
   const vimLastChange = useRef<VimTextChange | undefined>(undefined)
+  const vimLastFind = useRef<VimFindCommand | undefined>(undefined)
   const vimInsertSession = useRef<{ baseline: string; position: number; change: VimTextChange } | undefined>(undefined)
+  const vimReplaceSession = useRef<{ nodeId: string; baseline: string; position: number; typed: string } | undefined>(
+    undefined,
+  )
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
+
+  const finishVimReplace = useCallback(
+    (input?: HTMLElement): boolean => {
+      const session = vimReplaceSession.current
+      vimReplaceSession.current = undefined
+      if (session === undefined || session.typed === '') return false
+      const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
+      const finalText =
+        session.baseline.slice(0, session.position) +
+        session.typed +
+        session.baseline.slice(session.position + replaced)
+      store.replaceTextRange(session.nodeId, session.position, session.position + replaced, session.typed)
+      vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced }
+      if (input !== undefined) setEditableText(input, finalText)
+      return true
+    },
+    [store],
+  )
 
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number): void => {
@@ -90,7 +118,7 @@ export function useNodeInputBindings({
     if (focusedInput === undefined) return
     if (vimMode === 'normal') {
       setNormalCaret(focusedInput, getCaret(focusedInput))
-    } else if (vimMode === 'insert') setCaret(focusedInput, getCaret(focusedInput))
+    } else if (vimMode === 'insert' || vimMode === 'replace') setCaret(focusedInput, getCaret(focusedInput))
   }, [focus, vimMode])
 
   useLayoutEffect(() => {
@@ -148,6 +176,8 @@ export function useNodeInputBindings({
         setSelectAllNodeId(undefined)
         vimPending.current = undefined
         vimInsertSession.current = undefined
+        finishVimReplace()
+        if (latestVimMode.current === 'replace') setVimMode('normal')
         store.endTextSession()
       },
       onTextChange: (event) => store.editText(node.id, event.currentTarget.value),
@@ -160,11 +190,24 @@ export function useNodeInputBindings({
       onContentChange: (event: FormEvent<HTMLElement>) => {
         store.editContent(node.id, event.currentTarget.textContent ?? '', node.links ?? [])
       },
-      onCompositionEnd: () => {
+      onCompositionEnd: (event) => {
         setComposing(false)
+        if (latestVimMode.current === 'replace') {
+          const baseline =
+            event.currentTarget instanceof HTMLTextAreaElement
+              ? event.currentTarget.value
+              : readEditableContent(event.currentTarget).text
+          vimReplaceSession.current = {
+            nodeId: node.id,
+            baseline,
+            position: getCaret(event.currentTarget),
+            typed: '',
+          }
+        }
       },
       onCompositionStart: () => {
         vimPending.current = undefined
+        finishVimReplace()
         setComposing(true)
       },
       onContextMenu: (event: MouseEvent<HTMLElement>) => {
@@ -206,6 +249,7 @@ export function useNodeInputBindings({
           register: vimRegister,
           pending: vimPending,
           lastChange: vimLastChange,
+          lastFind: vimLastFind,
           beginInsert: (_nodeId, baseline, position, change) => {
             vimInsertSession.current = { baseline, position, change }
           },
@@ -236,6 +280,27 @@ export function useNodeInputBindings({
               }
             }
           },
+          beginReplace: (nodeId, _input, baseline, position) => {
+            vimReplaceSession.current = { nodeId, baseline, position, typed: '' }
+          },
+          handleReplaceKey: (input, key) => {
+            const session = vimReplaceSession.current
+            if (session === undefined) return false
+            if (key === 'Backspace') session.typed = session.typed.slice(0, -1)
+            else if (key.length === 1) session.typed += key
+            else return false
+            const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
+            const working =
+              session.baseline.slice(0, session.position) +
+              session.typed +
+              session.baseline.slice(session.position + replaced)
+            setEditableText(input, working)
+            setCaret(input, session.position + session.typed.length)
+            return true
+          },
+          finishReplace: (input) => {
+            return finishVimReplace(input)
+          },
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
           moveBoundary: (boundary, cursor) => store.moveSelectionBoundary(boundary, cursor),
@@ -253,6 +318,7 @@ export function useNodeInputBindings({
         store.endTextSession()
         vimPending.current = undefined
         vimInsertSession.current = undefined
+        finishVimReplace(event.currentTarget)
         vimVisualAnchor.current = undefined
         vimVisualFocus.current = undefined
         setVimMode('insert')
@@ -272,6 +338,7 @@ export function useNodeInputBindings({
     }),
     [
       composing,
+      finishVimReplace,
       moveVimViewport,
       onPreviewAttachment,
       persistenceLocked,
@@ -286,4 +353,9 @@ export function useNodeInputBindings({
 
 function nodeTextLength(input: HTMLElement): number {
   return input instanceof HTMLTextAreaElement ? input.value.length : (input.textContent?.length ?? 0)
+}
+
+function setEditableText(input: HTMLElement, text: string): void {
+  if (input instanceof HTMLTextAreaElement) input.value = text
+  else input.textContent = text
 }

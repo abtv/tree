@@ -65,6 +65,7 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
   const vim: VimKeyboardState = {
     mode,
     register: { current: { kind: 'empty' } },
+    lastFind: { current: undefined },
     pending: { current: undefined },
     lastChange: { current: undefined },
     beginInsert: vi.fn(),
@@ -532,6 +533,119 @@ describe('editor keyboard handler', () => {
     expect(store.pasteSubtree).not.toHaveBeenCalled()
     expect(after.preventDefault).toHaveBeenCalledOnce()
     expect(before.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the caret in place when Replace mode ends without a change', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(2, 2)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'replace')
+    vim.finishReplace = vi.fn(() => false)
+
+    handle(keyEvent(input, 'Escape'))
+
+    expect(vim.mode).toBe('normal')
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(3)
+  })
+
+  it('supports WORD and backward word-end motions with operators', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'foo.bar  baz qux'
+    input.setSelectionRange(0, 0)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'W'))
+    expect(input.selectionStart).toBe(9)
+    handle(keyEvent(input, 'E'))
+    expect(input.selectionStart).toBe(11)
+    for (const key of ['g', 'e']) handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(6)
+    for (const key of ['d', 'W']) handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 6, 9, '')
+  })
+
+  it('repeats and reverses the latest character find', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'a.b.c'
+    input.setSelectionRange(0, 0)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    for (const key of ['f', '.', ';']) handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(3)
+    handle(keyEvent(input, ','))
+    expect(input.selectionStart).toBe(1)
+    expect(vim.lastFind.current).toEqual({ kind: 'f', character: '.' })
+  })
+
+  it('changes the whole node with cc and S without deleting its subtree', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'parent'
+    const node: TreeNode = { id: 'node', text: 'parent', children: [{ id: 'child', text: 'child', children: [] }] }
+    const first = vimHandler(store, node)
+    for (const key of ['c', 'c']) first.handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 6, '')
+    expect(store.deleteSelected).not.toHaveBeenCalled()
+    expect(first.vim.mode).toBe('insert')
+
+    const second = vimHandler(store, node)
+    second.handle(keyEvent(input, 'S'))
+    expect(second.vim.mode).toBe('insert')
+  })
+
+  it('deletes backward with X, toggles case, and repeats a text register with a count', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'aBcD'
+    input.setSelectionRange(3, 3)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    for (const key of ['2', 'X']) handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 3, '')
+
+    input.setSelectionRange(0, 0)
+    for (const key of ['3', '~']) handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 3, 'AbC')
+
+    vim.register.current = { kind: 'text', value: 'xy' }
+    input.setSelectionRange(1, 1)
+    for (const key of ['3', 'p']) handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 2, 2, 'xyxyxy')
+  })
+
+  it('completes Visual editing, endpoint exchange, case, and text replacement', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'AbCd'
+    input.setSelectionRange(0, 2)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 1
+
+    handle(keyEvent(input, 'o'))
+    expect(vim.visualAnchor.current).toBe(1)
+    expect(vim.visualFocus.current).toBe(0)
+    handle(keyEvent(input, 'u'))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 2, 'ab')
+    expect(vim.mode).toBe('normal')
+
+    const change = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
+    input.setSelectionRange(1, 3)
+    change.handle(keyEvent(input, 'c'))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 3, '')
+    expect(change.vim.mode).toBe('insert')
+
+    const put = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
+    put.vim.register.current = { kind: 'text', value: 'ZZ' }
+    input.setSelectionRange(1, 3)
+    put.handle(keyEvent(input, 'p'))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 3, 'ZZ')
+    expect(put.vim.register.current).toEqual({ kind: 'text', value: 'ZZ' })
+    expect(put.vim.mode).toBe('normal')
   })
 
   it('does not dispatch commands while native text composition is active', () => {

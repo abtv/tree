@@ -1,4 +1,4 @@
-export type VimMode = 'insert' | 'normal' | 'visual'
+export type VimMode = 'insert' | 'normal' | 'replace' | 'visual'
 
 type CharacterClass = 'space' | 'word' | 'punctuation'
 
@@ -35,6 +35,41 @@ export function moveWordEnd(text: string, cursor: number): number {
   const kind = characterClass(text[next] ?? '')
   while (next + 1 < text.length && characterClass(text[next + 1] ?? '') === kind) next += 1
   return next
+}
+
+export function moveWORDForward(text: string, cursor: number): number {
+  let next = Math.max(0, Math.min(cursor, text.length))
+  while (next < text.length && !/\s/u.test(text[next] ?? '')) next += 1
+  while (next < text.length && /\s/u.test(text[next] ?? '')) next += 1
+  return next
+}
+
+export function moveWORDBackward(text: string, cursor: number): number {
+  let next = Math.max(cursor - 1, 0)
+  while (next > 0 && /\s/u.test(text[next] ?? '')) next -= 1
+  while (next > 0 && !/\s/u.test(text[next - 1] ?? '')) next -= 1
+  return next
+}
+
+export function moveWORDEnd(text: string, cursor: number): number {
+  if (text.length === 0) return 0
+  let next = Math.max(0, Math.min(cursor, text.length - 1))
+  if (!/\s/u.test(text[next] ?? '')) next += 1
+  while (next < text.length && /\s/u.test(text[next] ?? '')) next += 1
+  if (next >= text.length) return text.length - 1
+  while (next + 1 < text.length && !/\s/u.test(text[next + 1] ?? '')) next += 1
+  return next
+}
+
+export function moveWordEndBackward(text: string, cursor: number): number {
+  if (text.length === 0 || cursor <= 0) return 0
+  let next = Math.min(cursor - 1, text.length - 1)
+  const currentKind = characterClass(text[Math.min(cursor, text.length - 1)] ?? '')
+  if (currentKind !== 'space' && characterClass(text[next] ?? '') === currentKind) {
+    while (next >= 0 && characterClass(text[next] ?? '') === currentKind) next -= 1
+  }
+  while (next > 0 && /\s/u.test(text[next] ?? '')) next -= 1
+  return Math.max(0, next)
 }
 
 export function currentWordEnd(text: string, cursor: number): number {

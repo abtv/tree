@@ -17,7 +17,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
-  const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'visual'>('normal')
+  const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual'>('normal')
   useEffect(() => {
     void window.treeApi
       .getAlwaysOnTop()
