@@ -4,12 +4,52 @@ import type { TreeNode } from '../domain/document'
 import { cloneNode } from '../domain/document'
 import { getCaret, getSelectionRange, selectAll, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import type { EditorContextMenuCommand } from '../shared/ipc'
-import { firstNonWhitespace, moveWordBackward, moveWordForward, type VimMode, vimPastePosition } from './vim-editing'
+import {
+  currentWordEnd,
+  findCharacter,
+  firstNonWhitespace,
+  moveWordBackward,
+  moveWordEnd,
+  moveWordForward,
+  type VimMode,
+  vimPastePosition,
+} from './vim-editing'
+
+export type VimTextChange =
+  | {
+      kind: 'delete' | 'change' | 'yank'
+      motion: string
+      count: number
+      insertedText?: string
+      insertOffset?: number
+      deleteCount?: number
+    }
+  | { kind: 'replace'; count: number; character: string }
+  | { kind: 'substitute'; count: number; insertedText?: string; insertOffset?: number; deleteCount?: number }
+  | {
+      kind: 'insert'
+      entry: 'i' | 'a' | 'I' | 'A'
+      insertedText?: string
+      insertOffset?: number
+      deleteCount?: number
+    }
+  | { kind: 'paste'; after: boolean; text: string }
+
+export interface VimPendingCommand {
+  count: string
+  operator?: 'd' | 'y' | 'c'
+  motionCount: string
+  awaiting?: 'f' | 'F' | 't' | 'T' | 'r'
+  prefix?: 'g'
+}
 
 export interface VimKeyboardState {
   mode: VimMode
   register: { current: VimRegister }
-  pending: { current: string | undefined }
+  pending: { current: VimPendingCommand | undefined }
+  lastChange?: { current: VimTextChange | undefined }
+  beginInsert?: (nodeId: string, baseline: string, position: number, change: VimTextChange) => void
+  finishInsert?: (input: HTMLElement) => void
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
   moveBoundary: (boundary: 'first' | 'last', cursor: number) => void
@@ -111,6 +151,7 @@ export function createEditorKeyDownHandler({
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
+        vim.finishInsert?.(event.currentTarget)
         vim.pending.current = undefined
         vim.visualAnchor.current = undefined
         vim.visualFocus.current = undefined
@@ -227,55 +268,121 @@ function handleVimKey(
     event.preventDefault()
     return true
   }
+  const clearPending = (): void => {
+    vim.pending.current = undefined
+  }
 
   if (event.key === 'Escape') {
-    vim.pending.current = undefined
+    clearPending()
     vim.visualAnchor.current = undefined
     vim.visualFocus.current = undefined
     vim.setMode('normal')
     setNormalCaret(input, selection.start)
     return handled()
   }
-  if (!visual && (event.key === 'i' || event.key === 'a' || event.key === 'I' || event.key === 'A')) {
-    vim.pending.current = undefined
-    vim.setMode('insert')
-    setCaret(
-      input,
-      event.key === 'A'
-        ? node.text.length
-        : event.key === 'I'
-          ? firstNonWhitespace(node.text)
-          : event.key === 'a'
-            ? Math.min(cursor + 1, node.text.length)
-            : cursor,
-    )
+  const pending = vim.pending.current ?? { count: '', motionCount: '' }
+  const count = parseCount(pending.count)
+  const motionCount = parseCount(pending.motionCount)
+  const totalCount = count * motionCount
+
+  if (pending.awaiting !== undefined) {
+    const awaiting = pending.awaiting
+    clearPending()
+    if (event.key.length !== 1) return handled()
+    if (awaiting === 'r') {
+      if (!visual) applyTextChange(store, node, input, cursor, vim, { kind: 'replace', count, character: event.key })
+      return handled()
+    }
+    const motion = awaiting + event.key
+    if (pending.operator !== undefined && !visual) {
+      applyTextChange(store, node, input, cursor, vim, {
+        kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
+        motion,
+        count: totalCount,
+      })
+    } else {
+      const range = textMotion(node.text, motionCursor, motion, count)
+      if (range !== undefined) move(range.target)
+    }
     return handled()
   }
-  if (!visual && (event.key === 'o' || event.key === 'O')) {
-    vim.pending.current = undefined
+
+  if (pending.prefix === 'g') {
+    clearPending()
+    if (!visual && pending.count === '' && event.key === 'g') vim.moveBoundary('first', cursor)
+    else if (!visual && pending.count === '' && event.key === 'd') store.enter()
+    return handled()
+  }
+
+  if (/^[1-9]$/u.test(event.key) || (event.key === '0' && (pending.count !== '' || pending.motionCount !== ''))) {
+    if (pending.operator !== undefined) pending.motionCount += event.key
+    else pending.count += event.key
+    vim.pending.current = pending
+    return handled()
+  }
+
+  if (pending.operator !== undefined) {
+    if (event.key === pending.operator && pending.motionCount === '' && pending.count === '') {
+      clearPending()
+      if (pending.operator === 'd') {
+        vim.register.current = { kind: 'node', value: cloneNode(node) }
+        store.deleteSelected()
+      } else if (pending.operator === 'y') vim.register.current = { kind: 'node', value: cloneNode(node) }
+      return handled()
+    }
+    if ('fFtT'.includes(event.key)) {
+      pending.awaiting = event.key as 'f' | 'F' | 't' | 'T'
+      vim.pending.current = pending
+      return handled()
+    }
+    clearPending()
+    if (isTextMotion(event.key)) {
+      applyTextChange(store, node, input, cursor, vim, {
+        kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
+        motion: event.key,
+        count: totalCount,
+      })
+    }
+    return handled()
+  }
+
+  if ('fFtT'.includes(event.key)) {
+    pending.awaiting = event.key as 'f' | 'F' | 't' | 'T'
+    vim.pending.current = pending
+    return handled()
+  }
+  if (!visual && event.key === 'r') {
+    pending.awaiting = 'r'
+    vim.pending.current = pending
+    return handled()
+  }
+  if (!visual && (event.key === 'd' || event.key === 'y' || event.key === 'c')) {
+    pending.operator = event.key
+    vim.pending.current = pending
+    return handled()
+  }
+  clearPending()
+
+  if (isTextMotion(event.key)) {
+    const range = textMotion(node.text, motionCursor, event.key, count)
+    if (range !== undefined) move(range.target)
+  } else if (!visual && (event.key === 'i' || event.key === 'a' || event.key === 'I' || event.key === 'A')) {
+    if (pending.count !== '') return handled()
+    const entry = event.key
+    vim.beginInsert?.(node.id, node.text, insertPosition(node.text, cursor, entry), { kind: 'insert', entry })
+    vim.setMode('insert')
+    setCaret(input, insertPosition(node.text, cursor, entry))
+  } else if (!visual && (event.key === 'o' || event.key === 'O')) {
+    if (pending.count !== '') return handled()
     vim.setMode('insert')
     store.createSibling(event.key === 'o' ? 'after' : 'before')
-    return handled()
-  }
-  if (!visual && event.key === 'v') {
-    vim.pending.current = undefined
+  } else if (!visual && event.key === 'v') {
     vim.visualAnchor.current = cursor
     vim.visualFocus.current = cursor
     vim.setMode('visual')
     setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
-    return handled()
-  }
-  if (event.key === 'h') move(motionCursor - 1)
-  else if (event.key === 'l') move(motionCursor + 1)
-  else if (event.key === 'w') move(moveWordForward(node.text, motionCursor))
-  else if (event.key === 'b') move(moveWordBackward(node.text, motionCursor))
-  else if (event.key === '0') move(0)
-  else if (event.key === '^') move(firstNonWhitespace(node.text))
-  else if (event.key === '$') move(Math.max(0, node.text.length - 1))
-  else if (!visual && (event.key === 'j' || event.key === 'k')) {
-    vim.visualAnchor.current = undefined
-    vim.visualFocus.current = undefined
-    vim.setMode('normal')
+  } else if (!visual && (event.key === 'j' || event.key === 'k')) {
+    if (pending.count !== '') return handled()
     store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
   } else if (visual && (event.key === 'd' || event.key === 'y')) {
     if (selection.start !== selection.end) {
@@ -284,57 +391,222 @@ function handleVimKey(
     if (event.key === 'd' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, '')
       vim.scheduleCaret(input, selection.start)
+      if (vim.lastChange !== undefined) {
+        vim.lastChange.current = { kind: 'delete', motion: 'x', count: selection.end - selection.start }
+      }
     } else setNormalCaret(input, selection.start)
     vim.visualAnchor.current = undefined
     vim.visualFocus.current = undefined
     vim.setMode('normal')
   } else if (!visual && event.key === 'x') {
-    if (cursor < node.text.length) {
-      vim.register.current = { kind: 'text', value: node.text.slice(cursor, cursor + 1) }
-      store.replaceTextRange(node.id, cursor, cursor + 1, '')
-      vim.scheduleCaret(input, Math.min(cursor, Math.max(0, node.text.length - 2)))
-    }
+    applyTextChange(store, node, input, cursor, vim, { kind: 'delete', motion: 'x', count })
+  } else if (!visual && event.key === 's') {
+    applyTextChange(store, node, input, cursor, vim, { kind: 'substitute', count })
+  } else if (!visual && (event.key === 'D' || event.key === 'C')) {
+    applyTextChange(store, node, input, cursor, vim, {
+      kind: event.key === 'D' ? 'delete' : 'change',
+      motion: '$',
+      count: 1,
+    })
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
+    if (pending.count !== '') return handled()
     const register = vim.register.current
-    if (register.kind === 'node') {
-      store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value)
-    } else if (register.kind === 'text' && register.value !== '') {
-      const position = vimPastePosition(node.text.length, cursor, event.key === 'p')
-      store.replaceTextRange(node.id, position, position, register.value)
-      vim.scheduleCaret(input, position + register.value.length - 1)
+    if (register.kind === 'node') store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value)
+    else if (register.kind === 'text' && register.value !== '') {
+      applyTextChange(store, node, input, cursor, vim, {
+        kind: 'paste',
+        after: event.key === 'p',
+        text: register.value,
+      })
     }
-  } else if (!visual && event.key === 'y') {
-    if (vim.pending.current === 'y') {
-      vim.pending.current = undefined
-      vim.register.current = { kind: 'node', value: cloneNode(node) }
-    } else vim.pending.current = 'y'
+  } else if (!visual && event.key === '.') {
+    const last = vim.lastChange?.current
+    if (last !== undefined) {
+      let text = node.text
+      let position = cursor
+      for (let index = 0; index < count; index += 1) {
+        const result = applyTextChange(store, { ...node, text }, input, position, vim, last, true)
+        if (result === undefined) break
+        text = result.text
+        position = result.cursor
+      }
+    }
   } else if (!visual && event.key === 'g') {
-    if (vim.pending.current === 'g') {
-      vim.pending.current = undefined
-      vim.moveBoundary('first', cursor)
-    } else vim.pending.current = 'g'
+    if (pending.count !== '') return handled()
+    vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
   } else if (!visual && event.key === 'G') {
-    vim.pending.current = undefined
+    if (pending.count !== '') return handled()
     vim.moveBoundary('last', cursor)
   } else if (!visual && event.key === 'u') {
-    vim.pending.current = undefined
+    if (pending.count !== '') return handled()
     store.undo()
   } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
-    vim.pending.current = undefined
+    if (pending.count !== '') return handled()
     vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor)
-  } else if (!visual && event.key === 'd') {
-    if (vim.pending.current === 'd') {
-      vim.pending.current = undefined
-      vim.register.current = { kind: 'node', value: cloneNode(node) }
-      store.deleteSelected()
-    } else if (vim.pending.current === 'g') {
-      vim.pending.current = undefined
-      store.enter()
-    } else vim.pending.current = 'd'
-  } else {
-    vim.pending.current = undefined
-    return false
-  }
-  if (event.key !== 'd' && event.key !== 'g' && event.key !== 'y') vim.pending.current = undefined
+  } else return false
   return handled()
+}
+
+function parseCount(value: string): number {
+  return value === '' ? 1 : Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Number(value)))
+}
+
+function isTextMotion(key: string): boolean {
+  return 'hlwbe0^$'.includes(key) && key.length === 1
+}
+
+function insertPosition(text: string, cursor: number, entry: 'i' | 'a' | 'I' | 'A'): number {
+  if (entry === 'I') return firstNonWhitespace(text)
+  if (entry === 'A') return text.length
+  if (entry === 'a') return Math.min(cursor + 1, text.length)
+  return cursor
+}
+
+interface TextMotionResult {
+  target: number
+  start: number
+  end: number
+}
+
+function textMotion(
+  text: string,
+  cursor: number,
+  motion: string,
+  count: number,
+  changeWord = false,
+): TextMotionResult | undefined {
+  const length = text.length
+  let target = cursor
+  let start = cursor
+  let end: number
+  if (motion === 'x') end = Math.min(length, cursor + count)
+  else if (motion === '0' || motion === '^') {
+    target = motion === '0' ? 0 : firstNonWhitespace(text)
+    start = Math.min(cursor, target)
+    end = Math.max(cursor, target)
+  } else if (motion === '$') {
+    target = Math.max(0, length - 1)
+    end = length
+  } else if (motion === 'h' || motion === 'l') {
+    target = Math.max(0, Math.min(length, cursor + (motion === 'h' ? -count : count)))
+    start = Math.min(cursor, target)
+    end = Math.max(cursor, target)
+  } else if (motion === 'w' || motion === 'b' || motion === 'e') {
+    for (let index = 0; index < count; index += 1) {
+      const before = target
+      if (motion === 'b') target = moveWordBackward(text, target)
+      else if (motion === 'e') target = moveWordEnd(text, target)
+      else if (motion === 'w' && changeWord && /\S/u.test(text[cursor] ?? '') && index === count - 1)
+        target = currentWordEnd(text, target)
+      else target = moveWordForward(text, target)
+      if (target === before) break
+    }
+    start = Math.min(cursor, target)
+    end = Math.max(cursor, target)
+    if (motion === 'e' || (motion === 'w' && changeWord && /\S/u.test(text[cursor] ?? '')))
+      end = Math.min(length, end + 1)
+  } else if (/^[fFtT]./u.test(motion)) {
+    const kind = motion[0]
+    const found = findCharacter(
+      text,
+      cursor,
+      motion.slice(1),
+      kind === 'f' || kind === 't' ? 'forward' : 'backward',
+      count,
+    )
+    if (found === undefined) return undefined
+    target = kind === 't' ? found - 1 : kind === 'T' ? found + 1 : found
+    start = Math.min(cursor, target)
+    end = Math.max(cursor, target)
+    if (kind === 'f' || kind === 't') end = Math.min(length, end + 1)
+  } else return undefined
+  return { target, start, end }
+}
+
+function applyTextChange(
+  store: EditorStore,
+  node: TreeNode,
+  input: HTMLElement,
+  cursor: number,
+  vim: VimKeyboardState,
+  change: VimTextChange,
+  replay = false,
+): { text: string; cursor: number } | undefined {
+  const text = node.text
+  let start = cursor
+  let end = cursor
+  let inserted = ''
+  let nextCursor = cursor
+  if (change.kind === 'delete' || change.kind === 'change' || change.kind === 'yank') {
+    const range = textMotion(text, cursor, change.motion, change.count, change.kind === 'change')
+    if (range === undefined) return undefined
+    start = range.start
+    end = range.end
+    if (change.kind === 'yank') {
+      if (start !== end) vim.register.current = { kind: 'text', value: text.slice(start, end) }
+      return undefined
+    }
+    inserted = change.insertedText ?? ''
+    nextCursor = start + Math.max(0, inserted.length - 1)
+  } else if (change.kind === 'replace') {
+    end = cursor + change.count
+    if (end > text.length || start === end) return undefined
+    inserted = change.character.repeat(change.count)
+    nextCursor = Math.max(cursor, end - 1)
+  } else if (change.kind === 'substitute') {
+    end = Math.min(text.length, cursor + change.count)
+    inserted = change.insertedText ?? ''
+    nextCursor = start + Math.max(0, inserted.length - 1)
+  } else if (change.kind === 'insert') {
+    start = insertPosition(text, cursor, change.entry)
+    end = start
+    inserted = change.insertedText ?? ''
+    nextCursor = start + Math.max(0, inserted.length - 1)
+  } else if (change.kind === 'paste') {
+    start = vimPastePosition(text.length, cursor, change.after)
+    end = start
+    inserted = change.text
+    nextCursor = start + inserted.length - 1
+  }
+  if (start !== end && (change.kind === 'delete' || change.kind === 'change' || change.kind === 'substitute')) {
+    vim.register.current = { kind: 'text', value: text.slice(start, end) }
+  }
+  if (replay && (change.kind === 'insert' || change.kind === 'change' || change.kind === 'substitute')) {
+    const baseline = text.slice(0, start) + text.slice(end)
+    const position = Math.max(0, Math.min(start + (change.insertOffset ?? 0), baseline.length))
+    const finalText =
+      baseline.slice(0, position) +
+      inserted +
+      baseline.slice(Math.min(baseline.length, position + (change.deleteCount ?? 0)))
+    const edit = textDifference(text, finalText)
+    start = edit.start
+    end = edit.end
+    inserted = edit.inserted
+    nextCursor = position + Math.max(0, (change.insertedText ?? '').length - 1)
+  }
+  const nextText = text.slice(0, start) + inserted + text.slice(end)
+  if (replay && nextText === text) return undefined
+  if (nextText !== text) store.replaceTextRange(node.id, start, end, inserted)
+  if (!replay && (change.kind === 'change' || change.kind === 'substitute')) {
+    vim.beginInsert?.(node.id, nextText, start, change)
+    vim.setMode('insert')
+    vim.scheduleCaret(input, start)
+  } else {
+    vim.scheduleCaret(input, Math.min(nextCursor, Math.max(0, nextText.length - 1)))
+    if (!replay && nextText !== text && vim.lastChange !== undefined) vim.lastChange.current = change
+  }
+  return { text: nextText, cursor: Math.min(nextCursor, Math.max(0, nextText.length - 1)) }
+}
+
+function textDifference(before: string, after: string): { start: number; end: number; inserted: string } {
+  let start = 0
+  while (start < before.length && start < after.length && before[start] === after[start]) start += 1
+  let suffix = 0
+  while (
+    suffix < before.length - start &&
+    suffix < after.length - start &&
+    before[before.length - 1 - suffix] === after[after.length - 1 - suffix]
+  )
+    suffix += 1
+  return { start, end: before.length - suffix, inserted: after.slice(start, after.length - suffix) }
 }

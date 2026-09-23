@@ -1,17 +1,64 @@
 export type VimMode = 'insert' | 'normal' | 'visual'
 
+type CharacterClass = 'space' | 'word' | 'punctuation'
+
+function characterClass(character: string): CharacterClass {
+  if (/\s/u.test(character)) return 'space'
+  if (/[\p{L}\p{N}_]/u.test(character)) return 'word'
+  return 'punctuation'
+}
+
 export function moveWordForward(text: string, cursor: number): number {
-  let next = Math.min(cursor + 1, text.length)
-  while (next < text.length && /\w/u.test(text[next] ?? '')) next += 1
-  while (next < text.length && !/\w/u.test(text[next] ?? '')) next += 1
+  let next = Math.max(0, Math.min(cursor, text.length))
+  if (next < text.length && characterClass(text[next] ?? '') !== 'space') {
+    const kind = characterClass(text[next] ?? '')
+    while (next < text.length && characterClass(text[next] ?? '') === kind) next += 1
+  }
+  while (next < text.length && characterClass(text[next] ?? '') === 'space') next += 1
   return next
 }
 
 export function moveWordBackward(text: string, cursor: number): number {
   let next = Math.max(cursor - 1, 0)
-  while (next > 0 && !/\w/u.test(text[next] ?? '')) next -= 1
-  while (next > 0 && /\w/u.test(text[next - 1] ?? '')) next -= 1
+  while (next > 0 && characterClass(text[next] ?? '') === 'space') next -= 1
+  const kind = characterClass(text[next] ?? '')
+  while (next > 0 && characterClass(text[next - 1] ?? '') === kind) next -= 1
   return next
+}
+
+export function moveWordEnd(text: string, cursor: number): number {
+  if (text.length === 0) return 0
+  let next = Math.max(0, Math.min(cursor, text.length - 1))
+  if (characterClass(text[next] ?? '') !== 'space') next += 1
+  while (next < text.length && characterClass(text[next] ?? '') === 'space') next += 1
+  if (next >= text.length) return text.length - 1
+  const kind = characterClass(text[next] ?? '')
+  while (next + 1 < text.length && characterClass(text[next + 1] ?? '') === kind) next += 1
+  return next
+}
+
+export function currentWordEnd(text: string, cursor: number): number {
+  if (text.length === 0) return 0
+  let next = Math.max(0, Math.min(cursor, text.length - 1))
+  const kind = characterClass(text[next] ?? '')
+  while (next + 1 < text.length && characterClass(text[next + 1] ?? '') === kind) next += 1
+  return next
+}
+
+export function findCharacter(
+  text: string,
+  cursor: number,
+  character: string,
+  direction: 'forward' | 'backward',
+  count = 1,
+): number | undefined {
+  let position = cursor
+  for (let index = 0; index < count; index += 1) {
+    position =
+      direction === 'forward' ? text.indexOf(character, position + 1) : text.lastIndexOf(character, position - 1)
+    if (position < 0) return undefined
+  }
+  return position
 }
 
 export function firstNonWhitespace(text: string): number {

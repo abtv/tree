@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { firstNonWhitespace, moveWordBackward, moveWordForward, vimPastePosition } from './vim-editing'
+import {
+  currentWordEnd,
+  findCharacter,
+  firstNonWhitespace,
+  moveWordBackward,
+  moveWordEnd,
+  moveWordForward,
+  vimPastePosition,
+} from './vim-editing'
 
 describe('Vim text motions', () => {
   it('moves between word starts', () => {
@@ -12,6 +20,23 @@ describe('Vim text motions', () => {
   it('finds the first non-whitespace character', () => {
     expect(firstNonWhitespace('   text')).toBe(3)
     expect(firstNonWhitespace('   ')).toBe(0)
+  })
+
+  it('treats punctuation runs as words and handles accented letters', () => {
+    expect(moveWordForward('foo.bar baz', 0)).toBe(3)
+    expect(moveWordForward('foo.bar baz', 3)).toBe(4)
+    expect(moveWordBackward('foo.bar baz', 4)).toBe(3)
+    expect(moveWordForward('café! next', 0)).toBe(4)
+    expect(moveWordEnd('foo.bar', 0)).toBe(2)
+    expect(moveWordEnd('foo.bar', 2)).toBe(3)
+    expect(moveWordEnd('foo.bar', 3)).toBe(6)
+    expect(currentWordEnd('foo.bar', 3)).toBe(3)
+  })
+
+  it('finds counted characters in both directions without wrapping', () => {
+    expect(findCharacter('a.b.c', 0, '.', 'forward', 2)).toBe(3)
+    expect(findCharacter('a.b.c', 4, '.', 'backward', 2)).toBe(1)
+    expect(findCharacter('a.b.c', 3, '.', 'forward')).toBeUndefined()
   })
 })
 

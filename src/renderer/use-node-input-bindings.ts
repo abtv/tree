@@ -12,7 +12,7 @@ import {
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
-import type { VimRegister, VimViewportMotion } from './editor-input-handlers'
+import type { VimPendingCommand, VimRegister, VimTextChange, VimViewportMotion } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 
@@ -42,7 +42,9 @@ export function useNodeInputBindings({
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const vimRegister = useRef<VimRegister>({ kind: 'empty' })
-  const vimPending = useRef<string | undefined>(undefined)
+  const vimPending = useRef<VimPendingCommand | undefined>(undefined)
+  const vimLastChange = useRef<VimTextChange | undefined>(undefined)
+  const vimInsertSession = useRef<{ baseline: string; position: number; change: VimTextChange } | undefined>(undefined)
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
 
@@ -122,7 +124,7 @@ export function useNodeInputBindings({
       setNormalCaret(pending.input, pending.cursor)
     } else setCaret(pending.input, pending.cursor)
     pendingCaret.current = undefined
-  }, [vimMode])
+  })
 
   useEffect(() => {
     const update = (): void => {
@@ -144,6 +146,8 @@ export function useNodeInputBindings({
       },
       onBlur: () => {
         setSelectAllNodeId(undefined)
+        vimPending.current = undefined
+        vimInsertSession.current = undefined
         store.endTextSession()
       },
       onTextChange: (event) => store.editText(node.id, event.currentTarget.value),
@@ -160,6 +164,7 @@ export function useNodeInputBindings({
         setComposing(false)
       },
       onCompositionStart: () => {
+        vimPending.current = undefined
         setComposing(true)
       },
       onContextMenu: (event: MouseEvent<HTMLElement>) => {
@@ -200,6 +205,37 @@ export function useNodeInputBindings({
           mode: vimMode,
           register: vimRegister,
           pending: vimPending,
+          lastChange: vimLastChange,
+          beginInsert: (_nodeId, baseline, position, change) => {
+            vimInsertSession.current = { baseline, position, change }
+          },
+          finishInsert: (input) => {
+            const session = vimInsertSession.current
+            vimInsertSession.current = undefined
+            if (session === undefined) return
+            const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
+            const { baseline, position, change } = session
+            let prefix = 0
+            while (prefix < baseline.length && prefix < finalText.length && baseline[prefix] === finalText[prefix])
+              prefix += 1
+            let suffix = 0
+            while (
+              suffix < baseline.length - prefix &&
+              suffix < finalText.length - prefix &&
+              baseline[baseline.length - 1 - suffix] === finalText[finalText.length - 1 - suffix]
+            )
+              suffix += 1
+            const insertedText = finalText.slice(prefix, finalText.length - suffix)
+            if (change.kind === 'insert' && finalText === baseline) return
+            if (change.kind === 'insert' || change.kind === 'change' || change.kind === 'substitute') {
+              vimLastChange.current = {
+                ...change,
+                insertedText,
+                insertOffset: prefix - position,
+                deleteCount: baseline.length - prefix - suffix,
+              }
+            }
+          },
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
           moveBoundary: (boundary, cursor) => store.moveSelectionBoundary(boundary, cursor),
@@ -216,6 +252,7 @@ export function useNodeInputBindings({
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
         vimPending.current = undefined
+        vimInsertSession.current = undefined
         vimVisualAnchor.current = undefined
         vimVisualFocus.current = undefined
         setVimMode('insert')

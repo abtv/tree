@@ -896,11 +896,14 @@ Normal mode supports:
 * `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport;
 * `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows;
 * `u` to undo and `Ctrl+r` to redo the most recent undoable change;
-* `w` and `b` to move between word starts;
+* `w` and `b` to move between word starts, and `e` to move to a word end; letters, numbers, and underscores form words, while adjacent punctuation forms separate words;
+* `f{character}` and `F{character}` to find the next or previous occurrence of a character within the current node, and `t{character}` and `T{character}` to stop immediately before or after that occurrence; a failed search leaves the caret in place;
 * `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final character;
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node;
 * `o` to create an empty sibling below the current node and enter Insert mode, and `O` to create one above it;
-* `x` to delete the current character;
+* `x` to delete the current character, `r{character}` to replace it without entering Insert mode, and `s` to delete it and enter Insert mode;
+* `d`, `y`, and `c` followed by an in-node motion (`h`, `l`, `w`, `b`, `e`, `0`, `^`, `$`, `f`, `F`, `t`, or `T`) to delete, copy, or change the covered text; `dw`, `d$`, `cw`, `c$`, and `yw` are supported examples; `c` enters Insert mode after changing text;
+* `D` as `d$` and `C` as `c$`, operating from the caret through the end of the current node's text;
 * `yy` to copy the selected node and its entire subtree into the local Vim register;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
 * `gd` to enter the selected node, with the same behavior as `Cmd+.`;
@@ -908,9 +911,13 @@ Normal mode supports:
 * `v` to enter character-wise Visual mode;
 * `p` and `P` to put the most recent local Vim register after or before the current node.
 
+Numeric prefixes repeat in-node motions and text edits, including operator motions (`3w`, `2dw`, `3x`, and `2r{character}`). `0` remains the beginning-of-text motion when no count is pending. Counts do not extend commands across nodes and do not apply to subtree commands, node navigation, or sibling creation. Word-motion deletion and yanking stop at the next word start, while `cw` changes through the current word end when the caret is on non-whitespace; `$` ranges include the final character. Text operators affect only the current node's text, preserving the node, children, hyperlinks outside the edited range, and attachment. `dd` and `yy` remain whole-subtree commands.
+
+`.` repeats the last completed Vim text change at the current caret, including text typed through `i`, `a`, `I`, `A`, `c`, or `s` and text put through `p` or `P`. A count before `.` repeats that change that many times. Motions and yanks do not replace the saved change. Structural commands such as `dd`, subtree puts, `o`, and `O` are not repeated by `.`.
+
 Visual mode selects characters only within the current node. The Normal-mode character and word motions extend the selection. `y` copies the selection into an application-local plain-text register, and `d` copies and deletes it. In Normal mode, `yy` copies the selected node and its entire subtree, while `dd` copies it before deleting it. If the most recent register action was Visual-mode text yank/delete or a character deletion, `p` and `P` insert that text after or before the current character. If the most recent register action was `yy` or `dd`, `p` and `P` insert a copy of the stored subtree as a sibling after or before the current node. Subtree puts preserve text, hyperlinks, and attachments and assign fresh node IDs to every pasted node. Both yank/delete commands return to Normal mode. `Escape` leaves Insert or Visual mode for Normal mode.
 
-The local Vim register is held only for the running renderer session. It does not replace or modify the system clipboard or persist across application restarts. It holds either one plain-text value or one structured node subtree, with only the most recent register-producing action retained. Search, counts, named registers, multi-node Visual selection, operator-motion composition, macros, marks, text objects, and dot repeat are not supported.
+The local Vim register is held only for the running renderer session. It does not replace or modify the system clipboard or persist across application restarts. It holds either one plain-text value or one structured node subtree, with only the most recent register-producing action retained. Document search, named registers, multi-node Visual selection, macros, marks, text objects, and structural dot repeat are not supported.
 
 Unsupported unmodified keys do not edit text in Normal or Visual mode. Application shortcuts using modifier keys retain their existing behavior. Vim handling is suspended during native text composition.
 

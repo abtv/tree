@@ -66,6 +66,9 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     mode,
     register: { current: { kind: 'empty' } },
     pending: { current: undefined },
+    lastChange: { current: undefined },
+    beginInsert: vi.fn(),
+    finishInsert: vi.fn(),
     visualAnchor: { current: undefined },
     visualFocus: { current: undefined },
     moveBoundary: vi.fn(),
@@ -105,6 +108,137 @@ describe('editor keyboard handler', () => {
     handle(remove)
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 4, 5, '')
     expect(remove.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('uses counts and text operators without deleting the node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two three'
+    input.setSelectionRange(0, 0)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    for (const key of ['2', 'd', 'w']) handle(keyEvent(input, key))
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 0, 8, '')
+    expect(store.deleteSelected).not.toHaveBeenCalled()
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'one two ' })
+    expect(vim.lastChange?.current).toEqual({ kind: 'delete', motion: 'w', count: 2 })
+  })
+
+  it('changes the current word and enters Insert mode with a text baseline', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(0, 0)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    for (const key of ['c', 'w']) handle(keyEvent(input, key))
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 0, 3, '')
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'one' })
+    expect(vim.beginInsert).toHaveBeenCalledWith('node', ' two', 0, { kind: 'change', motion: 'w', count: 1 })
+    expect(vim.mode).toBe('insert')
+  })
+
+  it('supports end-of-node edits and yank without touching the subtree', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(4, 4)
+    const node: TreeNode = { id: 'node', text: input.value, children: [{ id: 'child', text: 'Child', children: [] }] }
+    const first = vimHandler(store, node)
+    for (const key of ['y', 'w']) first.handle(keyEvent(input, key))
+    expect(first.vim.register.current).toEqual({ kind: 'text', value: 'two' })
+    first.handle(keyEvent(input, 'D'))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 4, 7, '')
+    expect(store.deleteSelected).not.toHaveBeenCalled()
+  })
+
+  it('finds characters and replaces a counted run', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'a.b.c'
+    input.setSelectionRange(0, 0)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    for (const key of ['2', 'f', '.']) handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(3)
+    for (const key of ['2', 'r', 'X']) handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 3, 5, 'XX')
+  })
+
+  it('handles backward and until searches and keeps failed searches stationary', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'a.b.c'
+    input.setSelectionRange(0, 0)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+    for (const key of ['t', 'c']) handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(3)
+    for (const key of ['T', 'a']) handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(1)
+    for (const key of ['f', 'z']) handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(1)
+  })
+
+  it('applies backward h operators and inclusive adjacent t ranges', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    input.setSelectionRange(1, 1)
+    const first = vimHandler(store, { id: 'node', text: 'abc', children: [] })
+    for (const key of ['d', 'h']) first.handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 0, 1, '')
+
+    const second = vimHandler(store, { id: 'node', text: 'abc', children: [] })
+    for (const key of ['c', 'h']) second.handle(keyEvent(input, key))
+    expect(second.vim.mode).toBe('insert')
+    expect(second.vim.beginInsert).toHaveBeenCalledWith('node', 'bc', 0, {
+      kind: 'change',
+      motion: 'h',
+      count: 1,
+    })
+
+    input.value = 'aXb'
+    input.setSelectionRange(0, 0)
+    const third = vimHandler(store, { id: 'node', text: 'aXb', children: [] })
+    for (const key of ['d', 't', 'X']) third.handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 0, 1, '')
+  })
+
+  it('applies inclusive end-of-text deletion and leaves a final character available to change', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc def'
+    input.setSelectionRange(4, 4)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+    for (const key of ['d', '$']) handle(keyEvent(input, key))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 4, 7, '')
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'def' })
+  })
+
+  it('bounds a very large motion count by reaching the end of a short node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(0, 0)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+    for (const key of '999999999w') handle(keyEvent(input, key))
+    expect(input.selectionStart).toBe(6)
+  })
+
+  it('repeats the last text edit at the current caret without replacing it on yank', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two three'
+    input.setSelectionRange(0, 0)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+    for (const key of ['d', 'w']) handle(keyEvent(input, key))
+    input.setSelectionRange(4, 4)
+    for (const key of ['y', 'w', '.']) handle(keyEvent(input, key))
+
+    expect(store.replaceTextRange).toHaveBeenNthCalledWith(2, 'node', 4, 8, '')
+    expect(vim.lastChange?.current).toEqual({ kind: 'delete', motion: 'w', count: 1 })
   })
 
   it('enters Insert mode at the end of the node with A', () => {

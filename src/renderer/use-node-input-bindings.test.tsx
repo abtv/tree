@@ -13,6 +13,7 @@ function createStore(): EditorStore {
   return {
     copy: vi.fn(async () => true),
     cut: vi.fn(async () => true),
+    deleteSelected: vi.fn(),
     editContent: vi.fn(),
     editText: vi.fn(),
     endTextSession: vi.fn(),
@@ -179,5 +180,32 @@ describe('useNodeInputBindings', () => {
 
     expect(textarea.selectionStart).toBe(3)
     expect(textarea.selectionEnd).toBe(4)
+  })
+
+  it('clears an unfinished Vim operator on blur and composition start', () => {
+    const store = createStore()
+    const { result } = renderBindings({ store, selectedNodeId: 'node', vimMode: 'normal' })
+    const node: TreeNode = { id: 'node', text: 'text', children: [] }
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const pressD = (): void => {
+      result.current(node).onKeyDown({
+        currentTarget: input,
+        key: 'd',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    }
+
+    pressD()
+    result.current(node).onBlur()
+    pressD()
+    expect(store.deleteSelected).not.toHaveBeenCalled()
+
+    result.current(node).onCompositionStart()
+    pressD()
+    expect(store.deleteSelected).not.toHaveBeenCalled()
   })
 })
