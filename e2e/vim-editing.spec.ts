@@ -175,6 +175,23 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('ababc')
   })
 
+  test('puts the local register after the current character with p', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.press('i')
+    await typeInto(editor, 'abc')
+    await setCursor(editor, 0)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('y')
+    await window.keyboard.press('$')
+    await window.keyboard.press('p')
+
+    await expect(editor).toHaveValue('abcab')
+  })
+
   test('keeps backward Visual selections inclusive and $ on the final character', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

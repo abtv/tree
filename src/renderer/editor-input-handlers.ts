@@ -3,7 +3,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, selectAll, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import type { EditorContextMenuCommand } from '../shared/ipc'
-import { firstNonWhitespace, moveWordBackward, moveWordForward, type VimMode } from './vim-editing'
+import { firstNonWhitespace, moveWordBackward, moveWordForward, type VimMode, vimPastePosition } from './vim-editing'
 
 export interface VimKeyboardState {
   mode: VimMode
@@ -292,7 +292,7 @@ function handleVimKey(
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
     const value = vim.register.current
     if (value !== '') {
-      const position = event.key === 'p' ? Math.min(cursor + 1, node.text.length) : cursor
+      const position = vimPastePosition(node.text.length, cursor, event.key === 'p')
       store.replaceTextRange(node.id, position, position, value)
       vim.scheduleCaret(input, position + value.length - 1)
     }

@@ -17,3 +17,8 @@ export function moveWordBackward(text: string, cursor: number): number {
 export function firstNonWhitespace(text: string): number {
   return text.search(/\S/u) === -1 ? 0 : text.search(/\S/u)
 }
+
+export function vimPastePosition(textLength: number, cursor: number, after: boolean): number {
+  const boundedCursor = Math.max(0, Math.min(cursor, textLength))
+  return after ? Math.min(boundedCursor + 1, textLength) : boundedCursor
+}

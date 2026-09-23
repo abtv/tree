@@ -333,6 +333,45 @@ describe('editor keyboard handler', () => {
 
     expect(input.selectionStart).toBe(2)
   })
+
+  it('puts the local register before or after the current character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(1, 1)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] })
+    vim.register.current = 'XY'
+
+    const after = keyEvent(input, 'p')
+    handle(after)
+    expect(store.replaceTextRange).toHaveBeenNthCalledWith(1, 'node', 2, 2, 'XY')
+    expect(vim.scheduleCaret).toHaveBeenNthCalledWith(1, input, 3)
+    expect(after.preventDefault).toHaveBeenCalledOnce()
+
+    const before = keyEvent(input, 'P')
+    handle(before)
+    expect(store.replaceTextRange).toHaveBeenNthCalledWith(2, 'node', 1, 1, 'XY')
+    expect(vim.scheduleCaret).toHaveBeenNthCalledWith(2, input, 2)
+    expect(before.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('handles p and P without editing when the local register is empty', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    input.setSelectionRange(1, 1)
+    const { handle } = vimHandler(store, { id: 'node', text: 'abc', children: [] })
+
+    const after = keyEvent(input, 'p')
+    handle(after)
+    const before = keyEvent(input, 'P')
+    handle(before)
+
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(after.preventDefault).toHaveBeenCalledOnce()
+    expect(before.preventDefault).toHaveBeenCalledOnce()
+  })
+
   it('does not dispatch commands while native text composition is active', () => {
     const store = createStore()
     const input = document.createElement('textarea')
