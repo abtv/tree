@@ -211,6 +211,10 @@ npm run check:full
 
 This runs `npm run check`, the end-to-end suite, and the performance suite. The matrix below defines when complete validation is required; the normative validation policy is in `AGENTS.md` §10.
 
+### GitHub Actions
+
+GitHub Actions runs `npm run check` on Ubuntu for every pull request and push to `main`. The real Electron end-to-end suite runs on a macOS runner for pushes to `main` and manual dispatches because it requires macOS and a display. The performance suite runs on a scheduled or manual macOS workflow and is intentionally separate from pull-request validation because its measurements are machine-sensitive and macOS minutes are limited for private repositories. Failed E2E and performance runs upload their available reports and result artifacts.
+
 ### Risk-Based Validation
 
 Use the highest applicable tier. Focused checks may be run during implementation, but they do not substitute for a broader required tier.
