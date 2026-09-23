@@ -1,4 +1,4 @@
-export type VimMode = 'insert' | 'normal' | 'replace' | 'visual'
+export type VimMode = 'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'
 
 type CharacterClass = 'space' | 'word' | 'punctuation'
 
@@ -6,6 +6,82 @@ function characterClass(character: string): CharacterClass {
   if (/\s/u.test(character)) return 'space'
   if (/[\p{L}\p{N}_]/u.test(character)) return 'word'
   return 'punctuation'
+}
+
+export interface VimTextObjectRange {
+  start: number
+  end: number
+}
+
+const PAIRS: Record<string, string> = { '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{', '<': '>', '>': '<' }
+
+export function textObjectRange(
+  text: string,
+  cursor: number,
+  modifier: 'i' | 'a',
+  object: string,
+  count = 1,
+): VimTextObjectRange | undefined {
+  if (text.length === 0 || count < 1) return undefined
+  const position = Math.max(0, Math.min(cursor, text.length - 1))
+  if (object === 'w' || object === 'W') {
+    const classify = (character: string): string =>
+      object === 'W' ? (/\s/u.test(character) ? 'space' : 'WORD') : characterClass(character)
+    const kind = classify(text[position] ?? '')
+    let start = position
+    let end = position + 1
+    while (start > 0 && classify(text[start - 1] ?? '') === kind) start -= 1
+    while (end < text.length && classify(text[end] ?? '') === kind) end += 1
+    for (let index = 1; index < count; index += 1) {
+      if (end >= text.length) break
+      const nextKind = classify(text[end] ?? '')
+      while (end < text.length && classify(text[end] ?? '') === nextKind) end += 1
+      if (nextKind === 'space' && end < text.length) {
+        const following = classify(text[end] ?? '')
+        while (end < text.length && classify(text[end] ?? '') === following) end += 1
+      }
+    }
+    if (modifier === 'a' && kind !== 'space') {
+      if (end < text.length && /\s/u.test(text[end] ?? '')) {
+        while (end < text.length && /\s/u.test(text[end] ?? '')) end += 1
+      } else {
+        while (start > 0 && /\s/u.test(text[start - 1] ?? '')) start -= 1
+      }
+    }
+    return { start, end }
+  }
+  if (object === '"' || object === "'" || object === '`') {
+    const delimiters: number[] = []
+    for (let index = 0; index < text.length; index += 1) {
+      if (text[index] !== object) continue
+      let backslashes = 0
+      for (let before = index - 1; before >= 0 && text[before] === '\\'; before -= 1) backslashes += 1
+      if (backslashes % 2 === 0) delimiters.push(index)
+    }
+    for (let index = 0; index + 1 < delimiters.length; index += 2) {
+      const open = delimiters[index]!
+      const close = delimiters[index + 1]!
+      if (open <= position && position <= close && count === 1)
+        return modifier === 'a' ? { start: open, end: close + 1 } : { start: open + 1, end: close }
+    }
+    return undefined
+  }
+  const pair = PAIRS[object]
+  if (pair === undefined) return undefined
+  const openCharacter = '([{<'.includes(object) ? object : pair
+  const closeCharacter = '([{<'.includes(object) ? pair : object
+  const stack: number[] = []
+  const enclosing: VimTextObjectRange[] = []
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === openCharacter) stack.push(index)
+    else if (text[index] === closeCharacter) {
+      const open = stack.pop()
+      if (open !== undefined && open <= position && position <= index) enclosing.push({ start: open, end: index + 1 })
+    }
+  }
+  const match = enclosing[count - 1]
+  if (match === undefined) return undefined
+  return modifier === 'a' ? match : { start: match.start + 1, end: match.end - 1 }
 }
 
 export function moveWordForward(text: string, cursor: number): number {

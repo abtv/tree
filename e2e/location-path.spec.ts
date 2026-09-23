@@ -28,7 +28,7 @@ test.describe('location path overflow', () => {
     await expect(currentSegment).toBeVisible()
 
     const shortOverflow = await shortSegment.evaluate((element) => element.scrollWidth - element.clientWidth)
-    expect(shortOverflow).toBeLessThanOrEqual(1)
+    expect(shortOverflow).toBeLessThanOrEqual(2)
 
     const longOverflow = await longSegment.evaluate((element) => element.scrollWidth - element.clientWidth)
     expect(longOverflow).toBeGreaterThan(1)

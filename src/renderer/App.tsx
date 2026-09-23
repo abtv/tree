@@ -8,6 +8,7 @@ import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import type { VimMode } from './vim-editing'
 
 interface AppProps {
   store: EditorStore
@@ -17,7 +18,8 @@ export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
-  const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual'>('normal')
+  const [vimMode, setVimMode] = useState<VimMode>('normal')
+  const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
   useEffect(() => {
     void window.treeApi
       .getAlwaysOnTop()
@@ -42,6 +44,8 @@ export function App({ store }: AppProps): React.JSX.Element {
     persistenceLocked,
     vimMode,
     setVimMode,
+    nodeVisualSelection,
+    setNodeVisualSelection,
   })
   const enterNode = useCallback(
     (node: TreeNode): void => {
@@ -113,7 +117,7 @@ export function App({ store }: AppProps): React.JSX.Element {
       />
       <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
         <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
-          {vimMode.toUpperCase()}
+          {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
         </div>
         {currentParent === undefined ? null : (
           <section className="current-parent" aria-label="Current parent">
@@ -127,6 +131,7 @@ export function App({ store }: AppProps): React.JSX.Element {
           focusedNodeId={focus?.nodeId}
           locked={persistenceLocked}
           nodes={nodes}
+          visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
           onEnter={enterNode}
           onMove={moveNode}
           renderInput={renderInput}

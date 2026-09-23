@@ -12,10 +12,12 @@ import {
 import {
   addAttachmentId,
   addAttachmentIds,
+  attachmentSummary,
   countAttachmentIdsByTraversal,
   inheritAttachmentIds,
   removeAttachmentIds,
   seedEmptyAttachmentSummary,
+  setAttachmentSummary,
 } from './document-attachments'
 import { locateNode, requireNode, shareIndex } from './document-index'
 import { insertLinks, isHttpUrl, linksForLine, normalizeLinks, splitLinks } from './document-links'
@@ -243,6 +245,35 @@ export function insertSubtreeSibling(
   const next = copyToRoot(document, located, siblings)
   addAttachmentIds(document, next, countAttachmentIdsByTraversal([source]))
   return next
+}
+
+export function replaceSiblingRange(
+  document: Document,
+  nodeId: NodeId,
+  count: number,
+  replacements: readonly TreeNode[],
+): Document {
+  const located = requireNode(document, nodeId)
+  const boundedCount = Math.max(0, Math.min(count, located.siblings.length - located.index))
+  const removed = located.siblings.slice(located.index, located.index + boundedCount)
+  const siblings = located.siblings.slice()
+  siblings.splice(located.index, boundedCount, ...replacements)
+  const next = copyToRoot(document, located, siblings)
+  const counts = new Map(attachmentSummary(document))
+  for (const [id, amount] of countAttachmentIdsByTraversal(removed)) {
+    const remaining = (counts.get(id) ?? 0) - amount
+    if (remaining > 0) counts.set(id, remaining)
+    else counts.delete(id)
+  }
+  for (const [id, amount] of countAttachmentIdsByTraversal(replacements)) {
+    counts.set(id, (counts.get(id) ?? 0) + amount)
+  }
+  setAttachmentSummary(next, counts)
+  return next
+}
+
+export function cloneNodeWithNewIds(source: TreeNode, createId: () => NodeId): TreeNode {
+  return cloneNodeWithFreshIds(source, createId)
 }
 
 function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNode {

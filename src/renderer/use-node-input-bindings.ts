@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
-import type { EditorStore, FocusIntent } from '../application/editor-store'
-import type { TreeNode } from '../domain/document'
+import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
+import { cloneNode, displayedNodes, type TreeNode } from '../domain/document'
 import {
   getCaret,
   getSelectionRange,
@@ -17,6 +17,8 @@ import type {
   VimPendingCommand,
   VimRegister,
   VimTextChange,
+  VimRepeatChange,
+  VimStructuralChange,
   VimViewportMotion,
 } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
@@ -30,6 +32,8 @@ interface UseNodeInputBindingsOptions {
   persistenceLocked?: boolean
   vimMode?: VimMode
   setVimMode?: (mode: VimMode) => void
+  nodeVisualSelection?: { anchorId: string; focusId: string } | undefined
+  setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
 }
 
 export function useNodeInputBindings({
@@ -40,6 +44,8 @@ export function useNodeInputBindings({
   persistenceLocked = false,
   vimMode = 'insert',
   setVimMode = () => undefined,
+  nodeVisualSelection,
+  setNodeVisualSelection = () => undefined,
 }: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
   const inputs = useRef(new Map<string, HTMLElement>())
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
@@ -49,7 +55,7 @@ export function useNodeInputBindings({
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   const vimRegister = useRef<VimRegister>({ kind: 'empty' })
   const vimPending = useRef<VimPendingCommand | undefined>(undefined)
-  const vimLastChange = useRef<VimTextChange | undefined>(undefined)
+  const vimLastChange = useRef<VimRepeatChange | undefined>(undefined)
   const vimLastFind = useRef<VimFindCommand | undefined>(undefined)
   const vimInsertSession = useRef<{ baseline: string; position: number; change: VimTextChange } | undefined>(undefined)
   const vimReplaceSession = useRef<{ nodeId: string; baseline: string; position: number; typed: string } | undefined>(
@@ -57,6 +63,108 @@ export function useNodeInputBindings({
   )
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
+  const structuralInsert = useRef<
+    { kind: 'open'; position: 'before' | 'after' } | { kind: 'visual'; command: 'c' | 's'; span: number } | undefined
+  >(undefined)
+
+  const finishStructuralInsert = useCallback((input: HTMLElement): void => {
+    const session = structuralInsert.current
+    structuralInsert.current = undefined
+    if (session === undefined) return
+    const text = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
+    vimLastChange.current =
+      session.kind === 'open'
+        ? { kind: 'structural-open', position: session.position, text }
+        : { kind: 'structural-visual', command: session.command, span: session.span, text }
+  }, [])
+
+  const moveNodeVisual = useCallback(
+    (direction: 'up' | 'down' | 'first' | 'last'): void => {
+      const state = store.getSnapshot()
+      if (state.status !== 'ready' || nodeVisualSelection === undefined) return
+      const nodes = displayedNodes(state.document, state.location.currentParentId)
+      const index = nodes.findIndex((node) => node.id === nodeVisualSelection.focusId)
+      if (index < 0 || nodes.length === 0) return
+      const targetIndex =
+        direction === 'first'
+          ? 0
+          : direction === 'last'
+            ? nodes.length - 1
+            : Math.max(0, Math.min(nodes.length - 1, index + (direction === 'down' ? 1 : -1)))
+      const target = nodes[targetIndex]
+      if (target === undefined) return
+      setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.id })
+      store.selectNode(target.id, 0)
+    },
+    [store, nodeVisualSelection, setNodeVisualSelection],
+  )
+
+  const commandNodeVisual = useCallback(
+    (command: NodeVisualCommand): void => {
+      if (nodeVisualSelection === undefined) return
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      const nodes = displayedNodes(state.document, state.location.currentParentId)
+      const anchor = nodes.findIndex((node) => node.id === nodeVisualSelection.anchorId)
+      const focus = nodes.findIndex((node) => node.id === nodeVisualSelection.focusId)
+      if (anchor < 0 || focus < 0) return
+      const span = Math.abs(anchor - focus) + 1
+      const register = vimRegister.current
+      const source =
+        register.kind === 'nodes'
+          ? register.value
+          : register.kind === 'node'
+            ? { nodes: [register.value], sourceIds: register.sourceIds ?? [] }
+            : undefined
+      const result = store.applyNodeVisual(command, nodeVisualSelection.anchorId, nodeVisualSelection.focusId, source)
+      if (result === undefined) return
+      if ('ydxcs'.includes(command)) vimRegister.current = { kind: 'nodes', value: result }
+      if (command === 'c' || command === 's') {
+        structuralInsert.current = { kind: 'visual', command, span }
+        setVimMode('insert')
+      } else {
+        if (command !== 'y')
+          vimLastChange.current = {
+            kind: 'structural-visual',
+            command,
+            span,
+            ...(source === undefined ? {} : { source }),
+          }
+        setVimMode('normal')
+      }
+      setNodeVisualSelection(undefined)
+    },
+    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode],
+  )
+
+  const repeatStructural = useCallback(
+    (change: VimStructuralChange): void => {
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      if (change.kind === 'structural-delete') {
+        const selected = displayedNodes(state.document, state.location.currentParentId).find(
+          (node) => node.id === state.location.selectedNodeId,
+        )
+        if (selected !== undefined)
+          vimRegister.current = { kind: 'node', value: cloneNode(selected), sourceIds: [selected.id] }
+        store.deleteSelected()
+      } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
+      else if (change.kind === 'structural-put')
+        store.pasteSubtree(state.location.selectedNodeId, change.position, change.source, change.sourceIds)
+      else if (change.kind === 'structural-forest-put')
+        store.pasteNodeForest(state.location.selectedNodeId, change.position, change.source)
+      else {
+        const nodes = displayedNodes(state.document, state.location.currentParentId)
+        const start = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
+        const end = nodes[start + change.span - 1]
+        if (start < 0 || end === undefined) return
+        const result = store.applyNodeVisual(change.command, nodes[start]!.id, end.id, change.source, change.text)
+        if (result !== undefined && 'dxcs'.includes(change.command))
+          vimRegister.current = { kind: 'nodes', value: result }
+      }
+    },
+    [store],
+  )
 
   const finishVimReplace = useCallback(
     (input?: HTMLElement): boolean => {
@@ -254,6 +362,7 @@ export function useNodeInputBindings({
             vimInsertSession.current = { baseline, position, change }
           },
           finishInsert: (input) => {
+            finishStructuralInsert(input)
             const session = vimInsertSession.current
             vimInsertSession.current = undefined
             if (session === undefined) return
@@ -309,6 +418,25 @@ export function useNodeInputBindings({
           scheduleCaret: (input, cursor) => {
             pendingCaret.current = { input, cursor }
           },
+          nodeVisual: {
+            enter: (nodeId) => {
+              const state = store.getSnapshot()
+              if (state.status !== 'ready' || state.location.currentParentId === nodeId) return false
+              setNodeVisualSelection({ anchorId: nodeId, focusId: nodeId })
+              return true
+            },
+            move: moveNodeVisual,
+            swap: () => {
+              if (nodeVisualSelection !== undefined)
+                setNodeVisualSelection({ anchorId: nodeVisualSelection.focusId, focusId: nodeVisualSelection.anchorId })
+            },
+            exit: () => setNodeVisualSelection(undefined),
+            command: commandNodeVisual,
+          },
+          beginStructuralOpen: (position) => {
+            structuralInsert.current = { kind: 'open', position }
+          },
+          repeatStructural,
         },
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
@@ -338,12 +466,18 @@ export function useNodeInputBindings({
     }),
     [
       composing,
+      commandNodeVisual,
       finishVimReplace,
+      finishStructuralInsert,
       moveVimViewport,
+      moveNodeVisual,
       onPreviewAttachment,
       persistenceLocked,
       selectAllNodeId,
       selectedNodeId,
+      repeatStructural,
+      nodeVisualSelection,
+      setNodeVisualSelection,
       setVimMode,
       store,
       vimMode,

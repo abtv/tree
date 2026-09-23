@@ -5,6 +5,7 @@ import {
   attachImage,
   attachmentSummary,
   cloneNode,
+  cloneNodeWithNewIds,
   collectAttachmentIds,
   createFirstChild,
   deleteLink,
@@ -23,6 +24,7 @@ import {
   pasteMultilineText,
   pasteText,
   removeTextRange,
+  replaceSiblingRange,
   serializeState,
   splitNode,
   validatePersistedState,
@@ -453,6 +455,7 @@ describe('document invariants', () => {
           insertSiblingAfter(document, node.id, 'new-after'),
           insertSiblingBefore(document, node.id, 'new-before'),
           insertSubtreeSibling(document, node.id, 'after', node, () => `copy-${copiedId++}`),
+          replaceSiblingRange(document, node.id, 1, [cloneNodeWithNewIds(node, () => `range-${copiedId++}`)]),
           createFirstChild(document, node.id, 'new-child'),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),
@@ -556,6 +559,28 @@ describe('document invariants', () => {
         }
       }),
       { numRuns: 25 },
+    )
+  })
+
+  it('replaces a sibling interval atomically while preserving unaffected node identity and order', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.nat(), (rawForest, startSeed, countSeed) => {
+        const document = materialize(rawForest)
+        const start = startSeed % document.roots.length
+        const count = 1 + (countSeed % (document.roots.length - start))
+        const replacement: TreeNode = { id: 'replacement', text: 'new', children: [] }
+        const next = replaceSiblingRange(document, document.roots[start]!.id, count, [replacement])
+        expect(next.roots.map((node) => node.id)).toEqual([
+          ...document.roots.slice(0, start).map((node) => node.id),
+          'replacement',
+          ...document.roots.slice(start + count).map((node) => node.id),
+        ])
+        for (const node of document.roots.slice(0, start)) expect(next.roots).toContain(node)
+        for (const node of document.roots.slice(start + count)) expect(next.roots).toContain(node)
+        expect(allIds(next).length).toBe(new Set(allIds(next)).size)
+        assertDocument(next)
+      }),
+      { numRuns: 50 },
     )
   })
 

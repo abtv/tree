@@ -11,18 +11,18 @@ function createStore(): EditorStore {
   return {
     copy: vi.fn(async () => true),
     createSiblingOrFirstChild: vi.fn(),
-    createSibling: vi.fn(),
+    createSibling: vi.fn(() => true),
     cut: vi.fn(async () => true),
     deleteEmptySelected: vi.fn(),
     deleteLink: vi.fn(() => false),
-    deleteSelected: vi.fn(),
+    deleteSelected: vi.fn(() => true),
     endTextSession: vi.fn(),
     enter: vi.fn(),
     leave: vi.fn(),
     moveHorizontal: vi.fn(() => false),
     moveSelection: vi.fn(),
     paste: vi.fn(async () => {}),
-    pasteSubtree: vi.fn(),
+    pasteSubtree: vi.fn(() => true),
     redo: vi.fn(),
     replaceTextRange: vi.fn(),
     reportError: vi.fn(),
@@ -93,6 +93,80 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
 }
 
 describe('editor keyboard handler', () => {
+  it('uses word and bracket text objects with operators and character Visual mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one (two three)'
+    input.setSelectionRange(6, 6)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+    handle(keyEvent(input, 'd'))
+    handle(keyEvent(input, 'i'))
+    handle(keyEvent(input, 'w'))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 5, 8, '')
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'two' })
+
+    input.setSelectionRange(6, 6)
+    handle(keyEvent(input, 'v'))
+    const visualHandle = createEditorKeyDownHandler({
+      store,
+      node: { id: 'node', text: input.value, children: [] },
+      isComposing: () => false,
+      setSelectAllNodeId: vi.fn(),
+      onPreviewAttachment: vi.fn(),
+      vim,
+    })
+    visualHandle(keyEvent(input, 'i'))
+    visualHandle(keyEvent(input, '('))
+    expect(input.selectionStart).toBe(5)
+    expect(input.selectionEnd).toBe(14)
+  })
+
+  it('routes whole-node Visual commands and leaves the parent heading unavailable', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] })
+    const enter = vi.fn(() => true)
+    const move = vi.fn()
+    const command = vi.fn()
+    vim.nodeVisual = { enter, move, command, swap: vi.fn(), exit: vi.fn() }
+    handle(keyEvent(input, 'V'))
+    expect(enter).toHaveBeenCalledWith('node')
+    expect(vim.mode).toBe('visual-node')
+    handle(keyEvent(input, 'j'))
+    handle(keyEvent(input, 'd'))
+    expect(move).toHaveBeenCalledWith('down')
+    expect(command).toHaveBeenCalledWith('d')
+  })
+
+  it('handles whole-node Visual boundaries, endpoint exchange, mutation keys, and exit', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    const move = vi.fn()
+    const swap = vi.fn()
+    const exit = vi.fn()
+    const command = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move, swap, exit, command }
+    handle(keyEvent(input, 'G'))
+    handle(keyEvent(input, 'g'))
+    handle(keyEvent(input, 'g'))
+    handle(keyEvent(input, 'o'))
+    handle(keyEvent(input, 'c'))
+    handle(keyEvent(input, 's'))
+    handle(keyEvent(input, 'u'))
+    handle(keyEvent(input, 'U'))
+    handle(keyEvent(input, 'p'))
+    handle(keyEvent(input, 'P'))
+    expect(move.mock.calls).toEqual([['last'], ['first']])
+    expect(swap).toHaveBeenCalledOnce()
+    expect(command.mock.calls.map(([key]) => key)).toEqual(['c', 's', 'u', 'U', 'p', 'P'])
+    handle(keyEvent(input, 'Escape'))
+    expect(exit).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+  })
+
   it('moves and edits in Normal mode without inserting command characters', () => {
     const store = createStore()
     const input = document.createElement('textarea')
@@ -345,14 +419,14 @@ describe('editor keyboard handler', () => {
     expect(store.pasteSubtree).not.toHaveBeenCalled()
     handle(keyEvent(input, 'y'))
 
-    expect(vim.register.current).toEqual({ kind: 'node', value: node })
+    expect(vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
     expect(vim.register.current).not.toBe(node)
     const subtree = vim.register.current.kind === 'node' ? vim.register.current.value : undefined
 
     handle(keyEvent(input, 'p'))
-    expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'after', subtree)
+    expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'after', subtree, ['node'])
     handle(keyEvent(input, 'P'))
-    expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'before', subtree)
+    expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'before', subtree, ['node'])
   })
 
   it('enters the selected node after gd', () => {

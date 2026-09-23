@@ -291,7 +291,12 @@ async function waitForProcessExit(
 
 export async function launchTree(
   userDataDir: string,
-  options: { expectReady?: boolean; windows?: WindowMode; shortcut?: ShortcutMode } = {},
+  options: {
+    expectReady?: boolean
+    windows?: WindowMode
+    shortcut?: ShortcutMode
+    initialMode?: 'normal' | 'insert'
+  } = {},
 ): Promise<Launched> {
   await closeTrackedApps()
   await cleanupStaleElectronProcesses(userDataMarker)
@@ -321,6 +326,12 @@ export async function launchTree(
     await assertWindowMode(app, windowMode)
     await assertShortcutMode(app, shortcutMode)
     if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
+    // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
+    // Vim tests opt into the real Normal-mode startup state.
+    if (options.expectReady !== false && options.initialMode !== 'normal') {
+      await window.keyboard.press('i')
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    }
     return { app, window }
   } catch (error) {
     await closeApp(app)
@@ -628,6 +639,16 @@ export async function firePaste(input: ReturnType<Page['locator']>): Promise<voi
 
 export async function typeInto(input: ReturnType<Page['locator']>, text: string): Promise<void> {
   await input.focus()
+  const normalMode = await input.evaluate(
+    (element) => element.ownerDocument.querySelector('[aria-label="Vim mode"]')?.textContent?.trim() === 'NORMAL',
+  )
+  if (normalMode) {
+    const position = await input.evaluate((element) =>
+      element instanceof HTMLTextAreaElement ? element.selectionStart : undefined,
+    )
+    await input.press('i')
+    if (position !== undefined) await setCursor(input, position)
+  }
   await input.pressSequentially(text)
 }
 

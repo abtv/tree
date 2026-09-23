@@ -8,6 +8,7 @@ import {
   moveWordEnd,
   moveWordEndBackward,
   moveWordForward,
+  textObjectRange,
 } from './vim-editing'
 
 describe('Vim word-motion invariants', () => {
@@ -37,6 +38,33 @@ describe('Vim word-motion invariants', () => {
         expect(previousEnd).toBeGreaterThanOrEqual(0)
         expect(previousEnd).toBeLessThanOrEqual(cursor)
       }),
+    )
+  })
+})
+
+describe('Vim text-object invariants', () => {
+  it('keeps each selected range inside its node and inner ranges inside around ranges', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        fc.nat(),
+        fc.constantFrom('w', 'W', '"', "'", '`', '(', '[', '{', '<'),
+        fc.integer({ min: 1, max: 3 }),
+        (text, cursor, object, count) => {
+          const inner = textObjectRange(text, cursor, 'i', object, count)
+          const around = textObjectRange(text, cursor, 'a', object, count)
+          for (const range of [inner, around]) {
+            if (range === undefined) continue
+            expect(range.start).toBeGreaterThanOrEqual(0)
+            expect(range.end).toBeGreaterThanOrEqual(range.start)
+            expect(range.end).toBeLessThanOrEqual(text.length)
+          }
+          if (inner !== undefined && around !== undefined) {
+            expect(inner.start).toBeGreaterThanOrEqual(around.start)
+            expect(inner.end).toBeLessThanOrEqual(around.end)
+          }
+        },
+      ),
     )
   })
 })

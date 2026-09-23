@@ -14,6 +14,10 @@ export function seedEmptyAttachmentSummary(document: Document): void {
   attachmentCountCache.set(document, new Map())
 }
 
+export function setAttachmentSummary(document: Document, counts: ReadonlyMap<AttachmentId, number>): void {
+  attachmentCountCache.set(document, counts)
+}
+
 function attachmentCountsFor(document: Document): ReadonlyMap<AttachmentId, number> {
   const cached = attachmentCountCache.get(document)
   if (cached !== undefined) return cached

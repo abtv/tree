@@ -53,7 +53,10 @@ async function closeTrackedApps(): Promise<void> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
 }
 
-export async function launchTree(userDataDir: string, options: { memoryProbe?: boolean } = {}): Promise<Launched> {
+export async function launchTree(
+  userDataDir: string,
+  options: { memoryProbe?: boolean; initialMode?: 'normal' | 'insert' } = {},
+): Promise<Launched> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   await cleanupStaleElectronProcesses('tree-perf-')
   let app: ElectronApplication
@@ -85,6 +88,10 @@ export async function launchTree(userDataDir: string, options: { memoryProbe?: b
     await observeSaveErrors(app, window)
     await expect(window.locator('main.tree-app')).toBeVisible()
     await expect(window.getByRole('textbox').first()).toBeVisible()
+    if (options.initialMode !== 'normal') {
+      await window.keyboard.press('i')
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    }
     return { app, window }
   } catch (error) {
     await closeApp(app)

@@ -22,6 +22,7 @@ interface NodeListProps {
   onMove: (nodeId: string, insertionIndex: number) => void
   focusedNodeId?: string | undefined
   structuralVersion?: number
+  visualNodeSelection?: { anchorId: string; focusId: string } | undefined
   locked?: boolean
 }
 
@@ -32,6 +33,7 @@ export function NodeList({
   onMove,
   focusedNodeId,
   structuralVersion = 0,
+  visualNodeSelection,
   locked = false,
 }: NodeListProps): React.JSX.Element {
   const listRef = useRef<HTMLElement | null>(null)
@@ -165,6 +167,12 @@ export function NodeList({
         focusedIndex: focusedIndex >= 0 ? focusedIndex : undefined,
       })
     : undefined
+  const visualAnchorIndex =
+    visualNodeSelection === undefined ? -1 : nodes.findIndex((node) => node.id === visualNodeSelection.anchorId)
+  const visualFocusIndex =
+    visualNodeSelection === undefined ? -1 : nodes.findIndex((node) => node.id === visualNodeSelection.focusId)
+  const visualStart = Math.min(visualAnchorIndex, visualFocusIndex)
+  const visualEnd = Math.max(visualAnchorIndex, visualFocusIndex)
   const dropMarker = dropMarkerFor(
     dragPhase === 'dragging' ? dropIndex : undefined,
     nodes.length,
@@ -177,6 +185,7 @@ export function NodeList({
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}
+      visualSelected={visualStart >= 0 && index >= visualStart && index <= visualEnd}
       index={index}
       key={node.id}
       node={node}

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import type { VimMode } from './vim-editing'
 
 afterEach(cleanup)
 
@@ -30,13 +31,134 @@ function renderBindings(options: {
   store: EditorStore
   selectedNodeId?: string
   focus?: { nodeId: string; cursor: number; token: number }
-  vimMode?: 'insert' | 'normal' | 'replace' | 'visual'
+  vimMode?: 'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'
 }) {
   const onPreviewAttachment = vi.fn()
   return renderHook(() => useNodeInputBindings({ ...options, onPreviewAttachment }))
 }
 
 describe('useNodeInputBindings', () => {
+  it('tracks whole-node Visual endpoints and routes a sibling-range yank to a later put', () => {
+    const nodes: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      { id: 'b', text: 'B', children: [] },
+    ]
+    let selectedNodeId = 'a'
+    let currentParentId: string | null = null
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: nodes },
+        location: { currentParentId, selectedNodeId },
+      }),
+      selectNode: vi.fn((id: string) => {
+        selectedNodeId = id
+      }),
+      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a', 'b'] })),
+      pasteNodeForest: vi.fn(() => true),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId,
+        vimMode,
+        setVimMode,
+        nodeVisualSelection: selection,
+        setNodeVisualSelection: setSelection,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode, selection }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'A'
+    const press = (node: TreeNode, key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press(nodes[0]!, 'V')
+    expect(result.current.vimMode).toBe('visual-node')
+    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
+    press(nodes[0]!, 'j')
+    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
+    press(nodes[1]!, 'y')
+    expect(store.applyNodeVisual).toHaveBeenCalledWith('y', 'a', 'b', undefined)
+    expect(result.current.vimMode).toBe('normal')
+    press(nodes[1]!, 'p')
+    expect(store.pasteNodeForest).toHaveBeenCalledWith('b', 'after', { nodes, sourceIds: ['a', 'b'] })
+
+    press(nodes[1]!, 'V')
+    press(nodes[1]!, 'k')
+    press(nodes[0]!, 'o')
+    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
+    press(nodes[1]!, 'c')
+    expect(result.current.vimMode).toBe('insert')
+    input.value = 'Changed'
+    press(nodes[1]!, 'Escape')
+    press(nodes[1]!, '.')
+    expect(store.applyNodeVisual).toHaveBeenLastCalledWith('c', 'a', 'b', undefined, 'Changed')
+
+    currentParentId = 'a'
+    selectedNodeId = 'a'
+    press(nodes[0]!, 'V')
+    expect(result.current.vimMode).toBe('normal')
+  })
+
+  it('captures opened sibling text for structural dot repeat', () => {
+    const store = {
+      createSibling: vi.fn(() => true),
+      createSiblingWithText: vi.fn(),
+      endTextSession: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'A', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'A'
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings({ id: 'a', text: input.value, children: [] }).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    press('o')
+    expect(result.current.vimMode).toBe('insert')
+    input.value = 'Opened'
+    press('Escape')
+    press('.')
+    expect(store.createSiblingWithText).toHaveBeenCalledWith('after', 'Opened')
+  })
+
   it('edits content on content change using the node links, defaulting to none', () => {
     const store = createStore()
     const { result } = renderBindings({ store, selectedNodeId: 'node' })
@@ -215,7 +337,7 @@ describe('useNodeInputBindings', () => {
     const store = createStore()
     const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
     const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual'>('normal')
+      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'>('normal')
       const bindings = useNodeInputBindings({
         store,
         selectedNodeId: 'node',
@@ -260,7 +382,7 @@ describe('useNodeInputBindings', () => {
     const store = createStore()
     const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
     const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual'>('normal')
+      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'>('normal')
       const bindings = useNodeInputBindings({
         store,
         selectedNodeId: 'node',

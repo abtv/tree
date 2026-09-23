@@ -14,6 +14,7 @@ interface NodeRowProps {
   dropBefore: boolean
   dropAfter: boolean
   focused: boolean
+  visualSelected?: boolean
   pinned?: boolean
   pinnedOffset?: number
 }
@@ -30,6 +31,7 @@ export const NodeRow = memo(function NodeRow({
   dropBefore,
   dropAfter,
   focused,
+  visualSelected = false,
   pinned = false,
   pinnedOffset = 0,
 }: NodeRowProps): React.JSX.Element {
@@ -38,6 +40,7 @@ export const NodeRow = memo(function NodeRow({
     dragging ? 'node-row-dragging' : '',
     dropBefore ? 'node-row-drop-before' : '',
     dropAfter ? 'node-row-drop-after' : '',
+    visualSelected ? 'node-row-visual-selected' : '',
   ]
     .filter(Boolean)
     .join(' ')

@@ -25,6 +25,7 @@ export {
   attachImage,
   cloneDocument,
   cloneNode,
+  cloneNodeWithNewIds,
   createFirstChild,
   createInitialDocument,
   deleteLink,
@@ -42,6 +43,7 @@ export {
   pasteMultilineText,
   pasteText,
   removeTextRange,
+  replaceSiblingRange,
   splitNode,
 } from './document-operations'
 

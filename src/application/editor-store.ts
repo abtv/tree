@@ -1,13 +1,20 @@
 import {
   collectAttachmentIds,
+  cloneNode,
+  cloneNodeWithNewIds,
   createInitialDocument,
   deleteLink,
   editNodeContent,
   isValidLocation,
+  displayedNodes,
   locateNode,
+  nodePath,
+  normalizeLinks,
   parsePersistedState,
   releaseNodeIndex,
   replaceLinkedText,
+  replaceSiblingRange,
+  ensureRoot,
   removeTextRange,
   requireNode,
   type AttachmentId,
@@ -50,6 +57,13 @@ import type { PersistenceFailureKind } from './persistence-coordinator'
 import { countInsertedWords, countPastedWords } from './save-policy'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
+
+export type NodeVisualCommand = 'y' | 'd' | 'x' | 'c' | 's' | 'u' | 'U' | 'p' | 'P'
+
+export interface NodeForest {
+  nodes: readonly TreeNode[]
+  sourceIds: readonly NodeId[]
+}
 
 export class EditorStore {
   private readonly listeners = new Set<() => void>()
@@ -345,9 +359,9 @@ export class EditorStore {
     )
   }
 
-  public createSibling(position: 'before' | 'after'): void {
+  public createSibling(position: 'before' | 'after'): boolean {
     const state = this.ready()
-    if (this.isPersistenceLocked()) return
+    if (this.isPersistenceLocked()) return false
     const transition = createSiblingTransition(state.document, state.location, position, this.createId)
     this.endTextSession()
     this.applyStructural(
@@ -355,11 +369,23 @@ export class EditorStore {
       transition.location,
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
+    return true
   }
 
-  public deleteSelected(): void {
+  public createSiblingWithText(position: 'before' | 'after', text: string): void {
     const state = this.ready()
     if (this.isPersistenceLocked()) return
+    const transition = createSiblingTransition(state.document, state.location, position, this.createId)
+    const document =
+      text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
+    this.endTextSession()
+    this.applyStructural(document, transition.location, this.newFocus(transition.focus.nodeId, text.length))
+    if (text !== '') this.noteChange(countInsertedWords('', text), false)
+  }
+
+  public deleteSelected(): boolean {
+    const state = this.ready()
+    if (this.isPersistenceLocked()) return false
     this.endTextSession()
     const transition = deleteSelectedTransition(state.document, state.location, this.createId)
     this.applyStructural(
@@ -368,11 +394,21 @@ export class EditorStore {
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.queueAttachmentCleanup()
+    return true
   }
 
-  public pasteSubtree(nodeId: NodeId, position: SiblingInsertionPosition, source: TreeNode): void {
+  public pasteSubtree(
+    nodeId: NodeId,
+    position: SiblingInsertionPosition,
+    source: TreeNode,
+    sourceIds: readonly NodeId[] = [],
+  ): boolean {
     const state = this.ready()
-    if (this.isPersistenceLocked()) return
+    if (this.isPersistenceLocked()) return false
+    if (this.isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
+      this.reportError(new Error('Cannot paste a node into one of its descendants.'))
+      return false
+    }
     const transition = pasteSubtreeTransition(
       state.document,
       { ...state.location, selectedNodeId: nodeId },
@@ -386,6 +422,102 @@ export class EditorStore {
       transition.location,
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
+    return true
+  }
+
+  public pasteNodeForest(nodeId: NodeId, position: SiblingInsertionPosition, source: NodeForest): boolean {
+    const state = this.ready()
+    if (this.isPersistenceLocked() || source.nodes.length === 0) return false
+    if (this.isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)) {
+      this.reportError(new Error('Cannot paste a node into one of its descendants.'))
+      return false
+    }
+    const copies = source.nodes.map((node) => cloneNodeWithNewIds(node, this.createId))
+    const target = requireNode(state.document, nodeId).node
+    const replacements = position === 'before' ? copies : [target, ...copies]
+    const document = replaceSiblingRange(state.document, nodeId, position === 'before' ? 0 : 1, replacements)
+    const selectedId = copies[0]!.id
+    this.endTextSession()
+    this.applyStructural(document, { ...state.location, selectedNodeId: selectedId }, this.newFocus(selectedId, 0))
+    return true
+  }
+
+  public applyNodeVisual(
+    command: NodeVisualCommand,
+    anchorId: NodeId,
+    focusId: NodeId,
+    source?: NodeForest,
+    insertedText = '',
+  ): NodeForest | undefined {
+    const state = this.ready()
+    const siblings = displayedNodes(state.document, state.location.currentParentId)
+    const anchor = siblings.findIndex((node) => node.id === anchorId)
+    const focus = siblings.findIndex((node) => node.id === focusId)
+    if (anchor < 0 || focus < 0) return undefined
+    const start = Math.min(anchor, focus)
+    const end = Math.max(anchor, focus) + 1
+    const selected = siblings.slice(start, end)
+    const first = selected[0]
+    if (first === undefined) return undefined
+    if (command === 'y') return { nodes: selected.map(cloneNode), sourceIds: selected.map((node) => node.id) }
+    if (this.isPersistenceLocked()) return undefined
+    if ((command === 'p' || command === 'P') && (source === undefined || source.nodes.length === 0)) return undefined
+    if (
+      (command === 'p' || command === 'P') &&
+      this.isPasteIntoSourceDescendant(state.document, first.id, source?.sourceIds ?? [])
+    ) {
+      this.reportError(new Error('Cannot paste a node into one of its descendants.'))
+      return undefined
+    }
+    const register = { nodes: selected.map(cloneNode), sourceIds: selected.map((node) => node.id) }
+    let replacements: readonly TreeNode[] = []
+    if (command === 'c' || command === 's') replacements = [{ id: this.createId(), text: insertedText, children: [] }]
+    else if (command === 'p' || command === 'P')
+      replacements = source!.nodes.map((node) => cloneNodeWithNewIds(node, this.createId))
+    else if (command === 'u' || command === 'U') {
+      const changeCase = (value: string): string => (command === 'u' ? value.toLowerCase() : value.toUpperCase())
+      let changed = false
+      const transform = (node: TreeNode): TreeNode => {
+        const text = changeCase(node.text)
+        if (text !== node.text) changed = true
+        let originalOffset = 0
+        let nextOffset = 0
+        const mappedLinks = (node.links ?? []).map((link) => {
+          nextOffset += changeCase(node.text.slice(originalOffset, link.start)).length
+          const start = nextOffset
+          nextOffset += changeCase(node.text.slice(link.start, link.end)).length
+          const end = nextOffset
+          originalOffset = link.end
+          return { start, end, url: text.slice(start, end) }
+        })
+        const links = normalizeLinks(mappedLinks, text)
+        return {
+          id: node.id,
+          text,
+          ...(links.length === 0 ? {} : { links }),
+          ...(node.attachment === undefined ? {} : { attachment: node.attachment }),
+          children: node.children.map(transform),
+        }
+      }
+      replacements = selected.map(transform)
+      if (!changed) return undefined
+    }
+    let document = replaceSiblingRange(state.document, first.id, selected.length, replacements)
+    if (document.roots.length === 0) document = ensureRoot(document, this.createId())
+    const nextSiblings = displayedNodes(document, state.location.currentParentId)
+    const target = replacements[0] ?? nextSiblings[start] ?? nextSiblings[start - 1]
+    const selectedId = target?.id ?? state.location.currentParentId ?? document.roots[0]!.id
+    const location = { ...state.location, selectedNodeId: selectedId }
+    this.endTextSession()
+    this.applyStructural(document, location, this.newFocus(selectedId, 0))
+    if (command === 'd' || command === 'x' || command === 'c' || command === 's' || command === 'p' || command === 'P')
+      this.queueAttachmentCleanup()
+    return register
+  }
+
+  private isPasteIntoSourceDescendant(document: Document, targetId: NodeId, sourceIds: readonly NodeId[]): boolean {
+    const path = nodePath(document, targetId).map((node) => node.id)
+    return sourceIds.some((sourceId) => path.slice(0, -1).includes(sourceId))
   }
 
   public deleteEmptySelected(): void {

@@ -10,6 +10,7 @@ import {
   moveWordEnd,
   moveWordEndBackward,
   moveWordForward,
+  textObjectRange,
   vimPastePosition,
 } from './vim-editing'
 
@@ -49,6 +50,48 @@ describe('Vim text motions', () => {
     expect(moveWORDEnd('foo.bar  baz', 0)).toBe(6)
     expect(moveWordEndBackward('one two.three', 13)).toBe(7)
     expect(moveWordEndBackward('one two', 4)).toBe(2)
+  })
+})
+
+describe('Vim text objects', () => {
+  it('selects words, WORDs, adjacent space, and counts without leaving the node', () => {
+    expect(textObjectRange('one.two  three', 1, 'i', 'w')).toEqual({ start: 0, end: 3 })
+    expect(textObjectRange('one.two  three', 1, 'a', 'w')).toEqual({ start: 0, end: 3 })
+    expect(textObjectRange('one.two  three', 1, 'i', 'W')).toEqual({ start: 0, end: 7 })
+    expect(textObjectRange('one two three', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 7 })
+    expect(textObjectRange('one  two', 6, 'a', 'w')).toEqual({ start: 3, end: 8 })
+    expect(textObjectRange('café next', 2, 'i', 'w')).toEqual({ start: 0, end: 4 })
+    expect(textObjectRange('', 0, 'i', 'w')).toBeUndefined()
+  })
+
+  it('selects quoted text and nested brackets, and ignores unmatched pairs', () => {
+    expect(textObjectRange('say "a \\"b\\" c" now', 9, 'i', '"')).toEqual({ start: 5, end: 14 })
+    expect(textObjectRange('say "abc" now', 5, 'a', '"')).toEqual({ start: 4, end: 9 })
+    expect(textObjectRange('a(b[c]d)e', 4, 'i', '[')).toEqual({ start: 4, end: 5 })
+    expect(textObjectRange('a(b[c]d)e', 4, 'a', '[', 1)).toEqual({ start: 3, end: 6 })
+    expect(textObjectRange('a(b[c]d)e', 4, 'a', '[', 2)).toBeUndefined()
+    expect(textObjectRange('a(b[c]d)e', 4, 'a', '(', 1)).toEqual({ start: 1, end: 8 })
+    expect(textObjectRange('a(b[c]d', 4, 'i', '(')).toBeUndefined()
+  })
+
+  it('accepts either bracket delimiter and all supported quote delimiters', () => {
+    expect(textObjectRange('a{b}', 2, 'i', '}')).toEqual({ start: 2, end: 3 })
+    expect(textObjectRange('a<b>', 2, 'a', '>')).toEqual({ start: 1, end: 4 })
+    expect(textObjectRange("a'b'", 2, 'i', "'")).toEqual({ start: 2, end: 3 })
+    expect(textObjectRange('a`b`', 2, 'a', '`')).toEqual({ start: 1, end: 4 })
+    expect(textObjectRange('a"b', 2, 'i', '"')).toBeUndefined()
+    expect(textObjectRange('one two', 3, 'i', 'w')).toEqual({ start: 3, end: 4 })
+    expect(textObjectRange('one two', 0, 'a', 'w')).toEqual({ start: 0, end: 4 })
+  })
+
+  it('uses outer pairs for counts and leaves incomplete or out-of-range objects untouched', () => {
+    expect(textObjectRange('a(b(c)d)e', 4, 'i', '(', 1)).toEqual({ start: 4, end: 5 })
+    expect(textObjectRange('a(b(c)d)e', 4, 'i', '(', 2)).toEqual({ start: 2, end: 7 })
+    expect(textObjectRange('a(b(c)d)e', 4, 'a', ')', 2)).toEqual({ start: 1, end: 8 })
+    expect(textObjectRange(')orphan(', 0, 'i', ')')).toBeUndefined()
+    expect(textObjectRange('abc', 0, 'i', '?')).toBeUndefined()
+    expect(textObjectRange('abc', 0, 'i', 'w', 0)).toBeUndefined()
+    expect(textObjectRange('abc', 2, 'i', 'w', 3)).toEqual({ start: 0, end: 3 })
   })
 })
 

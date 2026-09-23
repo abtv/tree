@@ -1,6 +1,210 @@
-import { expect, launchTree, node, seedDocument, setCursor, test, typeInto } from './fixtures'
+import {
+  allowRendererError,
+  exactMessage,
+  expect,
+  launchTree as launchTreeBase,
+  node,
+  seedDocument,
+  setCursor,
+  test,
+  typeInto,
+} from './fixtures'
+
+const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
 
 test.describe('Vim editing prototype', () => {
+  test('uses word, quote, and bracket text objects in Normal mode', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'one (two) "three"', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 6)
+    await window.keyboard.press('d')
+    await window.keyboard.press('i')
+    await window.keyboard.press('w')
+    await expect(editor).toHaveValue('one () "three"')
+    await setCursor(editor, 5)
+    await window.keyboard.press('d')
+    await window.keyboard.press('a')
+    await window.keyboard.press('(')
+    await expect(editor).toHaveValue('one  "three"')
+    await setCursor(editor, 7)
+    await window.keyboard.press('c')
+    await window.keyboard.press('i')
+    await window.keyboard.press('"')
+    await typeInto(editor, 'four')
+    await window.keyboard.press('Escape')
+    await expect(editor).toHaveValue('one  "four"')
+  })
+
+  test('selects an inner text object in character Visual mode', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'one (two)', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 6)
+    await window.keyboard.press('v')
+    await window.keyboard.press('i')
+    await window.keyboard.press('(')
+    await expect(editor).toHaveJSProperty('selectionStart', 5)
+    await expect(editor).toHaveJSProperty('selectionEnd', 8)
+    await window.keyboard.press('y')
+    await window.keyboard.press('P')
+    await expect(editor).toHaveValue('one (twotwo)')
+  })
+
+  test('repeats dd and subtree puts with fresh IDs', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [{ id: 'child', text: 'child', children: [] }] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('G')
+    await window.keyboard.press('p')
+    const firstCopyId = await window.locator('.node-row').last().getAttribute('data-node-id')
+    await window.keyboard.press('.')
+    await expect(node(window, 5)).toHaveValue('A')
+    const secondCopyId = await window.locator('.node-row').last().getAttribute('data-node-id')
+    expect(secondCopyId).not.toBe(firstCopyId)
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+    await window.keyboard.press('.')
+    await expect(node(window, 1)).toHaveValue('C')
+  })
+
+  test('selects complete sibling subtrees with V and repeats their deletion', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [{ id: 'a-child', text: 'child', children: [] }] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+          { id: 'd', text: 'D', children: [] },
+          { id: 'e', text: 'E', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('V')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await window.keyboard.press('j')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await window.keyboard.press('d')
+    await expect(node(window, 1)).toHaveValue('C')
+    await window.keyboard.press('.')
+    await expect(node(window, 1)).toHaveValue('E')
+    await window.keyboard.press('u')
+    await expect(node(window, 1)).toHaveValue('C')
+    await expect(node(window, 2)).toHaveValue('D')
+  })
+
+  test('yanks reverse V ranges, puts node forests, and replaces a V range with fresh IDs', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [{ id: 'a-child', text: 'child', children: [] }] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 2).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('k')
+    await window.keyboard.press('y')
+    await window.keyboard.press('G')
+    await window.keyboard.press('P')
+    await expect(node(window, 3)).toHaveValue('A')
+    await expect(node(window, 4)).toHaveValue('B')
+    const firstCopyId = await window.locator('.node-row').nth(2).getAttribute('data-node-id')
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await window.keyboard.press('p')
+    await expect(node(window, 3)).toHaveValue('A')
+    await expect(node(window, 4)).toHaveValue('B')
+    expect(await window.locator('.node-row').nth(2).getAttribute('data-node-id')).not.toBe(firstCopyId)
+    await window.keyboard.press('.')
+    await expect(node(window, 3)).toHaveValue('A')
+    await expect(node(window, 4)).toHaveValue('B')
+  })
+
+  test('changes whole selected subtrees and keeps the current-parent heading out of V', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'one', children: [{ id: 'grandchild', text: 'mixed', children: [] }] },
+              { id: 'b', text: 'two', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await parent.focus()
+    await window.keyboard.press('V')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await node(window, 1).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await window.keyboard.press('U')
+    await expect(node(window, 1)).toHaveValue('ONE')
+    await expect(node(window, 2)).toHaveValue('TWO')
+    await node(window, 1).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    await expect(node(window, 1)).toHaveValue('MIXED')
+  })
+
+  test('repeats open-sibling text and rejects a subtree put into its descendant', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    allowRendererError(exactMessage('Operation failed: Cannot paste a node into one of its descendants.'))
+    await window.keyboard.press('p')
+    await expect(window.getByText('Operation failed: Cannot paste a node into one of its descendants.')).toBeVisible()
+    await expect(node(window, 1)).toHaveValue('Child')
+    await window.keyboard.press('Control+o')
+    await window.keyboard.press('o')
+    await typeInto(node(window, 2), 'New')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('.')
+    await expect(node(window, 2)).toHaveValue('New')
+    await expect(node(window, 3)).toHaveValue('New')
+  })
   test('starts in Normal mode', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

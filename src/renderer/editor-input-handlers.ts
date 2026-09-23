@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import type { EditorStore } from '../application/editor-store'
+import type { EditorStore, NodeForest, NodeVisualCommand } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { cloneNode } from '../domain/document'
 import { getCaret, getSelectionRange, selectAll, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
@@ -15,6 +15,7 @@ import {
   moveWordEnd,
   moveWordEndBackward,
   moveWordForward,
+  textObjectRange,
   type VimMode,
   vimPastePosition,
 } from './vim-editing'
@@ -41,6 +42,21 @@ export type VimTextChange =
   | { kind: 'overwrite'; text: string; replaced: number }
   | { kind: 'case'; mode: 'toggle' | 'lower' | 'upper'; count: number }
 
+export type VimStructuralChange =
+  | { kind: 'structural-delete' }
+  | { kind: 'structural-put'; position: 'before' | 'after'; source: TreeNode; sourceIds: readonly string[] }
+  | { kind: 'structural-forest-put'; position: 'before' | 'after'; source: NodeForest }
+  | { kind: 'structural-open'; position: 'before' | 'after'; text: string }
+  | {
+      kind: 'structural-visual'
+      command: Exclude<NodeVisualCommand, 'y'>
+      span: number
+      source?: NodeForest
+      text?: string
+    }
+
+export type VimRepeatChange = VimTextChange | VimStructuralChange
+
 export interface VimFindCommand {
   kind: 'f' | 'F' | 't' | 'T'
   character: string
@@ -51,14 +67,14 @@ export interface VimPendingCommand {
   operator?: 'd' | 'y' | 'c'
   motionCount: string
   awaiting?: 'f' | 'F' | 't' | 'T' | 'r'
-  prefix?: 'g'
+  prefix?: 'g' | 'i' | 'a'
 }
 
 export interface VimKeyboardState {
   mode: VimMode
   register: { current: VimRegister }
   pending: { current: VimPendingCommand | undefined }
-  lastChange?: { current: VimTextChange | undefined }
+  lastChange?: { current: VimRepeatChange | undefined }
   lastFind: { current: VimFindCommand | undefined }
   beginInsert?: (nodeId: string, baseline: string, position: number, change: VimTextChange) => void
   finishInsert?: (input: HTMLElement) => void
@@ -71,11 +87,24 @@ export interface VimKeyboardState {
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   setMode: (mode: VimMode) => void
   scheduleCaret: (input: HTMLElement, cursor: number) => void
+  nodeVisual?: {
+    enter: (nodeId: string) => boolean
+    move: (direction: 'up' | 'down' | 'first' | 'last') => void
+    swap: () => void
+    exit: () => void
+    command: (command: NodeVisualCommand) => void
+  }
+  beginStructuralOpen?: (position: 'before' | 'after') => void
+  repeatStructural?: (change: VimStructuralChange) => void
 }
 
 export type VimViewportMotion = 'top' | 'middle' | 'bottom' | 'half-up' | 'half-down'
 
-export type VimRegister = { kind: 'empty' } | { kind: 'text'; value: string } | { kind: 'node'; value: TreeNode }
+export type VimRegister =
+  | { kind: 'empty' }
+  | { kind: 'text'; value: string }
+  | { kind: 'node'; value: TreeNode; sourceIds?: readonly string[] }
+  | { kind: 'nodes'; value: NodeForest }
 
 export function executeEditorContextMenuCommand(
   command: EditorContextMenuCommand,
@@ -275,6 +304,27 @@ function handleVimKey(
   node: TreeNode,
   vim: VimKeyboardState,
 ): boolean {
+  if (vim.mode === 'visual-node') {
+    const handled = (): true => {
+      event.preventDefault()
+      return true
+    }
+    if (event.key === 'Escape' || event.key === 'V') {
+      vim.nodeVisual?.exit()
+      vim.setMode('normal')
+    } else if (event.key === 'j' || event.key === 'k') {
+      vim.nodeVisual?.move(event.key === 'j' ? 'down' : 'up')
+    } else if (event.key === 'G') vim.nodeVisual?.move('last')
+    else if (event.key === 'g' && vim.pending.current?.prefix !== 'g') {
+      vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
+    } else if (event.key === 'g' && vim.pending.current?.prefix === 'g') {
+      vim.pending.current = undefined
+      vim.nodeVisual?.move('first')
+    } else if (event.key === 'o') vim.nodeVisual?.swap()
+    else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1)
+      vim.nodeVisual?.command(event.key as NodeVisualCommand)
+    return handled()
+  }
   const input = event.currentTarget
   const cursor = getCaret(input)
   const selection = getSelectionRange(input)
@@ -353,6 +403,28 @@ function handleVimKey(
     return handled()
   }
 
+  if (pending.prefix === 'i' || pending.prefix === 'a') {
+    clearPending()
+    if (isTextObjectKey(event.key)) {
+      const motion = pending.prefix + event.key
+      if (pending.operator !== undefined && !visual) {
+        applyTextChange(store, node, input, cursor, vim, {
+          kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
+          motion,
+          count: totalCount,
+        })
+      } else if (visual) {
+        const range = textMotion(node.text, motionCursor, motion, count)
+        if (range !== undefined) {
+          vim.visualAnchor.current = range.start
+          vim.visualFocus.current = Math.max(range.start, range.end - 1)
+          setSelectionRange(input, range.start, range.end)
+        }
+      }
+    }
+    return handled()
+  }
+
   if (/^[1-9]$/u.test(event.key) || (event.key === '0' && (pending.count !== '' || pending.motionCount !== ''))) {
     if (pending.operator !== undefined) pending.motionCount += event.key
     else pending.count += event.key
@@ -364,9 +436,11 @@ function handleVimKey(
     if (event.key === pending.operator && pending.motionCount === '' && pending.count === '') {
       clearPending()
       if (pending.operator === 'd') {
-        vim.register.current = { kind: 'node', value: cloneNode(node) }
-        store.deleteSelected()
-      } else if (pending.operator === 'y') vim.register.current = { kind: 'node', value: cloneNode(node) }
+        vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
+        if (store.deleteSelected() && vim.lastChange !== undefined)
+          vim.lastChange.current = { kind: 'structural-delete' }
+      } else if (pending.operator === 'y')
+        vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
       else applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
       return handled()
     }
@@ -377,6 +451,11 @@ function handleVimKey(
     }
     if (event.key === 'g') {
       pending.prefix = 'g'
+      vim.pending.current = pending
+      return handled()
+    }
+    if (event.key === 'i' || event.key === 'a') {
+      pending.prefix = event.key
       vim.pending.current = pending
       return handled()
     }
@@ -426,6 +505,11 @@ function handleVimKey(
     vim.pending.current = pending
     return handled()
   }
+  if (visual && (event.key === 'i' || event.key === 'a')) {
+    pending.prefix = event.key
+    vim.pending.current = pending
+    return handled()
+  }
   clearPending()
 
   if (isTextMotion(event.key)) {
@@ -444,13 +528,18 @@ function handleVimKey(
     setCaret(input, cursor)
   } else if (!visual && (event.key === 'o' || event.key === 'O')) {
     if (pending.count !== '') return handled()
-    vim.setMode('insert')
-    store.createSibling(event.key === 'o' ? 'after' : 'before')
+    const position = event.key === 'o' ? 'after' : 'before'
+    if (store.createSibling(position)) {
+      vim.beginStructuralOpen?.(position)
+      vim.setMode('insert')
+    }
   } else if (!visual && event.key === 'v') {
     vim.visualAnchor.current = cursor
     vim.visualFocus.current = cursor
     vim.setMode('visual')
     setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
+  } else if (!visual && event.key === 'V') {
+    if (vim.nodeVisual?.enter(node.id)) vim.setMode('visual-node')
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     if (pending.count !== '') return handled()
     store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
@@ -521,7 +610,28 @@ function handleVimKey(
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
     const register = vim.register.current
     if (register.kind === 'node') {
-      if (pending.count === '') store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value)
+      if (
+        pending.count === '' &&
+        store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value, register.sourceIds)
+      ) {
+        if (vim.lastChange !== undefined)
+          vim.lastChange.current = {
+            kind: 'structural-put',
+            position: event.key === 'p' ? 'after' : 'before',
+            source: cloneNode(register.value),
+            sourceIds: register.sourceIds ?? [],
+          }
+      }
+    } else if (register.kind === 'nodes') {
+      if (pending.count === '' && register.value.nodes.length > 0) {
+        const result = store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value)
+        if (result && vim.lastChange !== undefined)
+          vim.lastChange.current = {
+            kind: 'structural-forest-put',
+            position: event.key === 'p' ? 'after' : 'before',
+            source: register.value,
+          }
+      }
     } else if (register.kind === 'text' && register.value !== '') {
       applyTextChange(store, node, input, cursor, vim, {
         kind: 'paste',
@@ -532,10 +642,14 @@ function handleVimKey(
   } else if (!visual && event.key === '.') {
     const last = vim.lastChange?.current
     if (last !== undefined) {
+      if (last.kind.startsWith('structural-')) {
+        for (let index = 0; index < count; index += 1) vim.repeatStructural?.(last as VimStructuralChange)
+        return handled()
+      }
       let text = node.text
       let position = cursor
       for (let index = 0; index < count; index += 1) {
-        const result = applyTextChange(store, { ...node, text }, input, position, vim, last, true)
+        const result = applyTextChange(store, { ...node, text }, input, position, vim, last as VimTextChange, true)
         if (result === undefined) break
         text = result.text
         position = result.cursor
@@ -564,6 +678,10 @@ function isTextMotion(key: string): boolean {
   return 'hlwWbBeE0^$'.includes(key) && key.length === 1
 }
 
+function isTextObjectKey(key: string): boolean {
+  return key.length === 1 && 'wW"\'`()[]{}<>'.includes(key)
+}
+
 function insertPosition(text: string, cursor: number, entry: 'i' | 'a' | 'I' | 'A'): number {
   if (entry === 'I') return firstNonWhitespace(text)
   if (entry === 'A') return text.length
@@ -588,6 +706,11 @@ function textMotion(
   let target = cursor
   let start = cursor
   let end: number
+  if (motion.length === 2 && (motion[0] === 'i' || motion[0] === 'a') && isTextObjectKey(motion[1]!)) {
+    const range = textObjectRange(text, cursor, motion[0], motion[1]!, count)
+    if (range === undefined) return undefined
+    return { target: range.start, start: range.start, end: range.end }
+  }
   if (motion === 'x') end = Math.min(length, cursor + count)
   else if (motion === 'X') {
     start = Math.max(0, cursor - count)

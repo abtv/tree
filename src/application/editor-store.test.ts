@@ -94,6 +94,152 @@ async function lockEditor(
 }
 
 describe('EditorStore', () => {
+  it('edits a whole-node Visual sibling range in one undo step and rejects paste into a source descendant', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'A', children: [{ id: 'a-child', text: 'child', children: [] }] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('new-node', 'copy-a', 'copy-child', 'copy-b'))
+    await store.initialize()
+    const forest = store.applyNodeVisual('y', 'a', 'b')!
+    expect(forest.nodes.map((node) => node.id)).toEqual(['a', 'b'])
+    expect(forest.nodes[0]?.children[0]?.id).toBe('a-child')
+    store.enter()
+    const before = store.getSnapshot()
+    expect(store.pasteNodeForest('a-child', 'after', forest)).toBe(false)
+    const rejected = store.getSnapshot()
+    expect(rejected.status).toBe('ready')
+    if (rejected.status !== 'ready') throw new Error('Editor did not load')
+    expect(rejected.document).toBe(before.status === 'ready' ? before.document : undefined)
+    expect(rejected.operationError).toMatch(/descendant/u)
+    store.leave()
+    store.applyNodeVisual('d', 'a', 'b')
+    const deleted = store.getSnapshot()
+    expect(deleted.status).toBe('ready')
+    if (deleted.status !== 'ready') throw new Error('Editor did not load')
+    expect(deleted.document.roots.map((node) => node.id)).toEqual(['c'])
+    store.undo()
+    const restored = store.getSnapshot()
+    expect(restored.status).toBe('ready')
+    if (restored.status !== 'ready') throw new Error('Editor did not load')
+    expect(restored.document.roots.map((node) => node.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('pastes a node forest with fresh IDs and changes case through selected descendants', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'Ab', children: [{ id: 'a-child', text: 'Cd', children: [] }] },
+          { id: 'b', text: 'Ef', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('copy-a', 'copy-child'))
+    await store.initialize()
+    const forest = store.applyNodeVisual('y', 'a', 'a')!
+    expect(store.pasteNodeForest('b', 'after', forest)).toBe(true)
+    const pasted = store.getSnapshot()
+    expect(pasted.status).toBe('ready')
+    if (pasted.status !== 'ready') throw new Error('Editor did not load')
+    expect(pasted.document.roots[2]?.id).toBe('copy-a')
+    expect(pasted.document.roots[2]?.children[0]?.id).toBe('copy-child')
+    store.applyNodeVisual('U', 'a', 'b')
+    const upper = store.getSnapshot()
+    expect(upper.status).toBe('ready')
+    if (upper.status !== 'ready') throw new Error('Editor did not load')
+    expect(upper.document.roots[0]?.text).toBe('AB')
+    expect(upper.document.roots[0]?.children[0]?.text).toBe('CD')
+    expect(upper.document.roots[1]?.text).toBe('EF')
+  })
+
+  it('replaces selected node ranges with an empty node or a captured forest and undoes each command', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('empty', 'copy-a', 'copy-b', 'open'))
+    await store.initialize()
+    const forest = store.applyNodeVisual('y', 'a', 'b')!
+    store.applyNodeVisual('c', 'a', 'b')
+    let snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.document.roots.map((node) => node.text)).toEqual(['', 'C'])
+    expect(snapshot.location.selectedNodeId).toBe('empty')
+    store.undo()
+    snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.document.roots.map((node) => node.text)).toEqual(['A', 'B', 'C'])
+    store.applyNodeVisual('P', 'a', 'b', forest)
+    snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.document.roots.map((node) => node.id)).toEqual(['copy-a', 'copy-b', 'c'])
+    store.undo()
+    store.createSiblingWithText('after', 'opened')
+    snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.document.roots.map((node) => node.text)).toEqual(['A', 'opened', 'B', 'C'])
+    store.undo()
+    snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.document.roots.map((node) => node.text)).toEqual(['A', 'B', 'C'])
+  })
+
+  it('keeps invalid or unchanged whole-node Visual operations out of history', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'lower', children: [] },
+          { id: 'b', text: 'also lower', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('replacement'))
+    await store.initialize()
+    const initial = store.getSnapshot()
+    expect(store.applyNodeVisual('d', 'missing', 'b')).toBeUndefined()
+    expect(store.applyNodeVisual('p', 'a', 'b')).toBeUndefined()
+    expect(store.applyNodeVisual('u', 'a', 'b')).toBeUndefined()
+    expect(store.pasteNodeForest('a', 'before', { nodes: [], sourceIds: [] })).toBe(false)
+    expect(store.getSnapshot()).toBe(initial)
+    store.applyNodeVisual('x', 'a', 'b')
+    const deleted = store.getSnapshot()
+    if (deleted.status !== 'ready') throw new Error('Editor did not load')
+    expect(deleted.document.roots).toEqual([{ id: 'replacement', text: '', children: [] }])
+    store.undo()
+    const restored = store.getSnapshot()
+    if (restored.status !== 'ready') throw new Error('Editor did not load')
+    expect(restored.document.roots.map((node) => node.id)).toEqual(['a', 'b'])
+  })
+
+  it('keeps hyperlink offsets valid when subtree case conversion expands Unicode text', async () => {
+    const url = 'https://example.com'
+    const services = loadedState(
+      { roots: [{ id: 'a', text: `ß ${url}`, links: [{ start: 2, end: 2 + url.length, url }], children: [] }] },
+      { currentParentId: null, selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    store.applyNodeVisual('U', 'a', 'a')
+    const snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.document.roots[0]?.text).toBe('SS HTTPS://EXAMPLE.COM')
+    expect(snapshot.document.roots[0]?.links).toEqual([{ start: 3, end: 3 + url.length, url: 'HTTPS://EXAMPLE.COM' }])
+  })
+
   it('reports maximum depth without changing editor state, history, IDs, or persistence', async () => {
     const deepest: TreeNode = {
       id: `n${MAX_DOCUMENT_DEPTH - 1}`,
