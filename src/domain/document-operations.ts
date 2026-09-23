@@ -11,6 +11,7 @@ import {
 } from './document-types'
 import {
   addAttachmentId,
+  addAttachmentIds,
   countAttachmentIdsByTraversal,
   inheritAttachmentIds,
   removeAttachmentIds,
@@ -226,6 +227,48 @@ export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeI
   const next = copyToRoot(document, located, siblings)
   inheritAttachmentIds(document, next)
   return next
+}
+
+export function insertSubtreeSibling(
+  document: Document,
+  nodeId: NodeId,
+  position: 'before' | 'after',
+  source: TreeNode,
+  createId: () => NodeId,
+): Document {
+  const located = requireNode(document, nodeId)
+  const copy = cloneNodeWithFreshIds(source, createId)
+  const siblings = located.siblings.slice()
+  siblings.splice(located.index + (position === 'after' ? 1 : 0), 0, copy)
+  const next = copyToRoot(document, located, siblings)
+  addAttachmentIds(document, next, countAttachmentIdsByTraversal([source]))
+  return next
+}
+
+function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNode {
+  const root: BuildNode = {
+    id: createId(),
+    text: source.text,
+    ...(source.links === undefined ? {} : { links: source.links.map((link) => ({ ...link })) }),
+    ...(source.attachment === undefined ? {} : { attachment: { ...source.attachment } }),
+    children: [],
+  }
+  const stack: Array<{ source: TreeNode; target: BuildNode }> = [{ source, target: root }]
+  while (stack.length > 0) {
+    const { source: sourceNode, target } = stack.pop()!
+    for (const child of sourceNode.children) {
+      const copy: BuildNode = {
+        id: createId(),
+        text: child.text,
+        ...(child.links === undefined ? {} : { links: child.links.map((link) => ({ ...link })) }),
+        ...(child.attachment === undefined ? {} : { attachment: { ...child.attachment } }),
+        children: [],
+      }
+      target.children.push(copy)
+      stack.push({ source: child, target: copy })
+    }
+  }
+  return root
 }
 
 export function createFirstChild(document: Document, parentId: NodeId, childId: NodeId): Document {

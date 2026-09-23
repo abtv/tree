@@ -13,6 +13,7 @@ import {
   moveNodeTransition,
   moveSelectionBoundaryTransition,
   moveSelectionTransition,
+  pasteSubtreeTransition,
 } from './editor-command-transitions'
 
 const document: Document = {
@@ -103,6 +104,37 @@ describe('editor command transitions', () => {
     expect(transition.document.roots[0]!.children.map((node) => node.id)).toEqual(['second'])
     expect(transition.location).toEqual({ currentParentId: 'root', selectedNodeId: 'second' })
     expect(transition.focus).toEqual({ nodeId: 'second', cursor: 0 })
+  })
+
+  it('pastes a copied subtree before or after the selected sibling', () => {
+    const source: TreeNode = {
+      id: 'copied',
+      text: 'Copied',
+      children: [{ id: 'copied-child', text: 'Child', children: [] }],
+    }
+    const afterIds = ['copy', 'copy-child']
+    const beforeIds = ['before-copy', 'before-child']
+    const after = pasteSubtreeTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      'after',
+      source,
+      () => afterIds.shift()!,
+    )
+    const before = pasteSubtreeTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      'before',
+      source,
+      () => beforeIds.shift()!,
+    )
+
+    expect(after.document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'copy', 'second'])
+    expect(after.location.selectedNodeId).toBe('copy')
+    expect(after.document.roots[0]!.children[1]!.children[0]!.id).toBe('copy-child')
+    expect(before.document.roots[0]!.children.map((node) => node.id)).toEqual(['before-copy', 'first', 'second'])
+    expect(before.location.selectedNodeId).toBe('before-copy')
+    expect(before.document.roots[0]!.children[0]!.children[0]!.id).toBe('before-child')
   })
 
   it('moves outward when deleting the current parent and replaces the only root', () => {

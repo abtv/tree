@@ -22,6 +22,7 @@ function createStore(): EditorStore {
     moveHorizontal: vi.fn(() => false),
     moveSelection: vi.fn(),
     paste: vi.fn(async () => {}),
+    pasteSubtree: vi.fn(),
     redo: vi.fn(),
     replaceTextRange: vi.fn(),
     reportError: vi.fn(),
@@ -63,7 +64,7 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
 function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['mode'] = 'normal') {
   const vim: VimKeyboardState = {
     mode,
-    register: { current: '' },
+    register: { current: { kind: 'empty' } },
     pending: { current: undefined },
     visualAnchor: { current: undefined },
     visualFocus: { current: undefined },
@@ -185,12 +186,38 @@ describe('editor keyboard handler', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
-    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
 
     handle(keyEvent(input, 'd'))
     expect(store.deleteSelected).not.toHaveBeenCalled()
     handle(keyEvent(input, 'd'))
     expect(store.deleteSelected).toHaveBeenCalledOnce()
+    expect(vim.register.current).toMatchObject({ kind: 'node', value: { id: 'node', text: 'text' } })
+  })
+
+  it('copies a node subtree with yy and pastes it as a sibling with p or P', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'parent'
+    const node: TreeNode = {
+      id: 'node',
+      text: 'parent',
+      children: [{ id: 'child', text: 'child', children: [] }],
+    }
+    const { handle, vim } = vimHandler(store, node)
+
+    handle(keyEvent(input, 'y'))
+    expect(store.pasteSubtree).not.toHaveBeenCalled()
+    handle(keyEvent(input, 'y'))
+
+    expect(vim.register.current).toEqual({ kind: 'node', value: node })
+    expect(vim.register.current).not.toBe(node)
+    const subtree = vim.register.current.kind === 'node' ? vim.register.current.value : undefined
+
+    handle(keyEvent(input, 'p'))
+    expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'after', subtree)
+    handle(keyEvent(input, 'P'))
+    expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'before', subtree)
   })
 
   it('enters the selected node after gd', () => {
@@ -340,7 +367,7 @@ describe('editor keyboard handler', () => {
     input.value = 'abcd'
     input.setSelectionRange(1, 1)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] })
-    vim.register.current = 'XY'
+    vim.register.current = { kind: 'text', value: 'XY' }
 
     const after = keyEvent(input, 'p')
     handle(after)
@@ -368,6 +395,7 @@ describe('editor keyboard handler', () => {
     handle(before)
 
     expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(store.pasteSubtree).not.toHaveBeenCalled()
     expect(after.preventDefault).toHaveBeenCalledOnce()
     expect(before.preventDefault).toHaveBeenCalledOnce()
   })

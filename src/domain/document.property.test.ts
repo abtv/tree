@@ -14,6 +14,7 @@ import {
   ensureRoot,
   insertSiblingAfter,
   insertSiblingBefore,
+  insertSubtreeSibling,
   isValidLocation,
   locateNode,
   moveSibling,
@@ -440,6 +441,7 @@ describe('document invariants', () => {
       fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, text) => {
         const document = materialize(rawForest)
         const node = pick(document, seed)
+        let copiedId = 0
         const located = locateNode(document, node.id)!
         const path = new Set<string>([...located.ancestors.map((ancestor) => ancestor.id), node.id])
         const before = new Map(allNodes(document).map((entry) => [entry.id, entry]))
@@ -450,6 +452,7 @@ describe('document invariants', () => {
           removeTextRange(document, node.id, cursor, cursor + 1),
           insertSiblingAfter(document, node.id, 'new-after'),
           insertSiblingBefore(document, node.id, 'new-before'),
+          insertSubtreeSibling(document, node.id, 'after', node, () => `copy-${copiedId++}`),
           createFirstChild(document, node.id, 'new-child'),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),
@@ -518,6 +521,7 @@ describe('document invariants', () => {
       fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, text) => {
         const document = materialize(rawForest)
         const node = pick(document, seed)
+        let copiedId = 0
         const reference = (target: Document): [string, number][] =>
           [
             ...allNodes(target).reduce((counts, entry) => {
@@ -537,6 +541,7 @@ describe('document invariants', () => {
             mimeType: 'image/png',
           }),
           insertSiblingBefore(document, node.id, 'new-before'),
+          insertSubtreeSibling(document, node.id, 'after', node, () => `copy-${copiedId++}`),
           createFirstChild(document, node.id, 'new-child'),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),

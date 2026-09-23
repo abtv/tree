@@ -32,6 +32,16 @@ export function addAttachmentId(from: Document, to: Document, id: AttachmentId):
   attachmentCountCache.set(to, counts)
 }
 
+export function addAttachmentIds(from: Document, to: Document, added: ReadonlyMap<AttachmentId, number>): void {
+  if (added.size === 0) {
+    inheritAttachmentIds(from, to)
+    return
+  }
+  const counts = new Map(attachmentCountsFor(from))
+  for (const [id, count] of added) counts.set(id, (counts.get(id) ?? 0) + count)
+  attachmentCountCache.set(to, counts)
+}
+
 export function removeAttachmentIds(from: Document, to: Document, removed: ReadonlyMap<AttachmentId, number>): void {
   if (removed.size === 0) {
     inheritAttachmentIds(from, to)

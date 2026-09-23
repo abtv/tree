@@ -12,7 +12,7 @@ import {
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
-import type { VimViewportMotion } from './editor-input-handlers'
+import type { VimRegister, VimViewportMotion } from './editor-input-handlers'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 
@@ -41,7 +41,7 @@ export function useNodeInputBindings({
   const latestVimMode = useRef(vimMode)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
-  const vimRegister = useRef('')
+  const vimRegister = useRef<VimRegister>({ kind: 'empty' })
   const vimPending = useRef<string | undefined>(undefined)
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)

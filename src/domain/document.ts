@@ -35,6 +35,7 @@ export {
   ensureRoot,
   insertSiblingAfter,
   insertSiblingBefore,
+  insertSubtreeSibling,
   isValidLocation,
   moveSibling,
   nodePath,

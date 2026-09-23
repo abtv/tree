@@ -1,13 +1,14 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
+import { cloneNode } from '../domain/document'
 import { getCaret, getSelectionRange, selectAll, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { firstNonWhitespace, moveWordBackward, moveWordForward, type VimMode, vimPastePosition } from './vim-editing'
 
 export interface VimKeyboardState {
   mode: VimMode
-  register: { current: string }
+  register: { current: VimRegister }
   pending: { current: string | undefined }
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
@@ -18,6 +19,8 @@ export interface VimKeyboardState {
 }
 
 export type VimViewportMotion = 'top' | 'middle' | 'bottom' | 'half-up' | 'half-down'
+
+export type VimRegister = { kind: 'empty' } | { kind: 'text'; value: string } | { kind: 'node'; value: TreeNode }
 
 export function executeEditorContextMenuCommand(
   command: EditorContextMenuCommand,
@@ -275,7 +278,9 @@ function handleVimKey(
     vim.setMode('normal')
     store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
   } else if (visual && (event.key === 'd' || event.key === 'y')) {
-    if (selection.start !== selection.end) vim.register.current = node.text.slice(selection.start, selection.end)
+    if (selection.start !== selection.end) {
+      vim.register.current = { kind: 'text', value: node.text.slice(selection.start, selection.end) }
+    }
     if (event.key === 'd' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, '')
       vim.scheduleCaret(input, selection.start)
@@ -285,17 +290,24 @@ function handleVimKey(
     vim.setMode('normal')
   } else if (!visual && event.key === 'x') {
     if (cursor < node.text.length) {
-      vim.register.current = node.text.slice(cursor, cursor + 1)
+      vim.register.current = { kind: 'text', value: node.text.slice(cursor, cursor + 1) }
       store.replaceTextRange(node.id, cursor, cursor + 1, '')
       vim.scheduleCaret(input, Math.min(cursor, Math.max(0, node.text.length - 2)))
     }
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
-    const value = vim.register.current
-    if (value !== '') {
+    const register = vim.register.current
+    if (register.kind === 'node') {
+      store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value)
+    } else if (register.kind === 'text' && register.value !== '') {
       const position = vimPastePosition(node.text.length, cursor, event.key === 'p')
-      store.replaceTextRange(node.id, position, position, value)
-      vim.scheduleCaret(input, position + value.length - 1)
+      store.replaceTextRange(node.id, position, position, register.value)
+      vim.scheduleCaret(input, position + register.value.length - 1)
     }
+  } else if (!visual && event.key === 'y') {
+    if (vim.pending.current === 'y') {
+      vim.pending.current = undefined
+      vim.register.current = { kind: 'node', value: cloneNode(node) }
+    } else vim.pending.current = 'y'
   } else if (!visual && event.key === 'g') {
     if (vim.pending.current === 'g') {
       vim.pending.current = undefined
@@ -313,6 +325,7 @@ function handleVimKey(
   } else if (!visual && event.key === 'd') {
     if (vim.pending.current === 'd') {
       vim.pending.current = undefined
+      vim.register.current = { kind: 'node', value: cloneNode(node) }
       store.deleteSelected()
     } else if (vim.pending.current === 'g') {
       vim.pending.current = undefined
@@ -322,6 +335,6 @@ function handleVimKey(
     vim.pending.current = undefined
     return false
   }
-  if (event.key !== 'd' && event.key !== 'g') vim.pending.current = undefined
+  if (event.key !== 'd' && event.key !== 'g' && event.key !== 'y') vim.pending.current = undefined
   return handled()
 }

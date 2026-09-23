@@ -475,6 +475,7 @@ Undo/redo must support:
 * node deletion;
 * subtree deletion;
 * sibling reordering;
+* Vim subtree paste;
 * text paste;
 * multiline text paste;
 * image paste;
@@ -900,15 +901,16 @@ Normal mode supports:
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node;
 * `o` to create an empty sibling below the current node and enter Insert mode, and `O` to create one above it;
 * `x` to delete the current character;
+* `yy` to copy the selected node and its entire subtree into the local Vim register;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
 * `gd` to enter the selected node, with the same behavior as `Cmd+.`;
 * `Ctrl+o` to go back one parent level, with the same behavior as `Cmd+,`;
 * `v` to enter character-wise Visual mode;
-* `p` and `P` to insert the local text register after or before the current character.
+* `p` and `P` to put the most recent local Vim register after or before the current node.
 
-Visual mode selects characters only within the current node. The Normal-mode character and word motions extend the selection. `y` copies the selection into an application-local plain-text register, and `d` copies and deletes it. Both commands return to Normal mode. `Escape` leaves Insert or Visual mode for Normal mode.
+Visual mode selects characters only within the current node. The Normal-mode character and word motions extend the selection. `y` copies the selection into an application-local plain-text register, and `d` copies and deletes it. In Normal mode, `yy` copies the selected node and its entire subtree, while `dd` copies it before deleting it. If the most recent register action was Visual-mode text yank/delete or a character deletion, `p` and `P` insert that text after or before the current character. If the most recent register action was `yy` or `dd`, `p` and `P` insert a copy of the stored subtree as a sibling after or before the current node. Subtree puts preserve text, hyperlinks, and attachments and assign fresh node IDs to every pasted node. Both yank/delete commands return to Normal mode. `Escape` leaves Insert or Visual mode for Normal mode.
 
-The local Vim register is held only for the running renderer session. It does not replace or modify the system clipboard, preserve hyperlink metadata, store structured nodes, or persist across application restarts. Search, counts, named registers, multi-node Visual selection, operator-motion composition, macros, marks, text objects, dot repeat, and structured node yank/put are not supported.
+The local Vim register is held only for the running renderer session. It does not replace or modify the system clipboard or persist across application restarts. It holds either one plain-text value or one structured node subtree, with only the most recent register-producing action retained. Search, counts, named registers, multi-node Visual selection, operator-motion composition, macros, marks, text objects, and dot repeat are not supported.
 
 Unsupported unmodified keys do not edit text in Normal or Visual mode. Application shortcuts using modifier keys retain their existing behavior. Vim handling is suspended during native text composition.
 

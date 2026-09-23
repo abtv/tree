@@ -5,6 +5,7 @@ import {
   ensureRoot,
   insertSiblingAfter,
   insertSiblingBefore,
+  insertSubtreeSibling,
   moveSibling,
   nodePath,
   requireNode,
@@ -12,6 +13,7 @@ import {
   type Document,
   type Location,
   type NodeId,
+  type TreeNode,
 } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 
@@ -36,6 +38,27 @@ export interface RejectedTransition {
 }
 
 export type SiblingInsertionPosition = 'before' | 'after'
+
+export function pasteSubtreeTransition(
+  document: Document,
+  location: Location,
+  position: SiblingInsertionPosition,
+  source: TreeNode,
+  createId: () => NodeId,
+): StructuralTransition {
+  let insertedId: NodeId | undefined
+  const nextDocument = insertSubtreeSibling(document, location.selectedNodeId, position, source, () => {
+    const id = createId()
+    if (insertedId === undefined) insertedId = id
+    return id
+  })
+  if (insertedId === undefined) throw new Error('Subtree paste did not create a sibling.')
+  return {
+    document: nextDocument,
+    location: { ...location, selectedNodeId: insertedId },
+    focus: { nodeId: insertedId, cursor: 0 },
+  }
+}
 
 export function createSiblingTransition(
   document: Document,

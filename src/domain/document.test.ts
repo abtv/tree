@@ -10,6 +10,7 @@ import {
   createFirstChild,
   insertSiblingAfter,
   insertSiblingBefore,
+  insertSubtreeSibling,
   deleteLink,
   deleteNode,
   editNodeContent,
@@ -100,6 +101,35 @@ describe('document operations', () => {
       ['before', '', []],
       ['a', 'Current', ['child']],
     ])
+  })
+
+  it('inserts a deep subtree with fresh node IDs and preserved content', () => {
+    const document: Document = {
+      roots: [{ id: 'target', text: 'Target', children: [] }],
+    }
+    const source: TreeNode = {
+      id: 'source',
+      text: 'Source',
+      links: [{ start: 0, end: 6, url: 'https://example.test' }],
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [{ id: 'source-child', text: 'Child', children: [] }],
+    }
+
+    const ids = ['copy', 'copy-child']
+    const inserted = insertSubtreeSibling(document, 'target', 'after', source, () => ids.shift()!)
+    const copy = inserted.roots[1]!
+
+    expect(copy).toEqual({
+      id: 'copy',
+      text: 'Source',
+      links: source.links,
+      attachment: source.attachment,
+      children: [{ id: 'copy-child', text: 'Child', children: [] }],
+    })
+    expect(copy).not.toBe(source)
+    expect(copy.children[0]).not.toBe(source.children[0])
+    expect(collectAttachmentIds(inserted)).toEqual(new Set(['image']))
+    expect(source.id).toBe('source')
   })
 
   it('keeps an image on the first part when splitting a node', () => {

@@ -16,6 +16,7 @@ import {
   type LinkRange,
   type Location,
   type NodeId,
+  type TreeNode,
 } from '../domain/document'
 import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
@@ -31,6 +32,8 @@ import {
   moveNodeTransition,
   moveSelectionTransition,
   moveSelectionBoundaryTransition,
+  pasteSubtreeTransition,
+  type SiblingInsertionPosition,
 } from './editor-command-transitions'
 import { clipboardIntroducesLink, hasNewLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
@@ -365,6 +368,24 @@ export class EditorStore {
       this.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.queueAttachmentCleanup()
+  }
+
+  public pasteSubtree(nodeId: NodeId, position: SiblingInsertionPosition, source: TreeNode): void {
+    const state = this.ready()
+    if (this.isPersistenceLocked()) return
+    const transition = pasteSubtreeTransition(
+      state.document,
+      { ...state.location, selectedNodeId: nodeId },
+      position,
+      source,
+      this.createId,
+    )
+    this.endTextSession()
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
   }
 
   public deleteEmptySelected(): void {

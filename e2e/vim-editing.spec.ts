@@ -175,6 +175,39 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('ababc')
   })
 
+  test('yanks and puts a node subtree with yy, p, and P', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'child', text: 'Child', children: [{ id: 'grandchild', text: 'Grandchild', children: [] }] },
+              { id: 'sibling', text: 'Sibling', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('p')
+    await expect(node(window, 2)).toHaveValue('Child')
+
+    await window.keyboard.press('P')
+    await expect(node(window, 2)).toHaveValue('Child')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Child')
+    await expect(node(window, 1)).toHaveValue('Grandchild')
+  })
+
   test('puts the local register after the current character with p', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
