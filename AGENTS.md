@@ -282,7 +282,7 @@ Git history is append-only. Never amend, rebase, reset, replace commits, force-p
 
 ### Commit messages
 
-Use Conventional Commits: `type(scope): summary`, where `type` is one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood and keep it focused on the implemented change.
+Use exactly this commit-message format for every new commit: `type(scope): summary`. The scope is mandatory; do not use the unscoped form `type: summary` or free-form commit subjects. `type` must be one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood, keep it focused on the implemented change, and do not end it with punctuation.
 
 `npm run changelog` regenerates `CHANGELOG.md` from the Conventional Commit history.
 
