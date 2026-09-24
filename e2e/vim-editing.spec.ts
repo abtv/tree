@@ -277,6 +277,50 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveScreenshot('vim-normal-link-caret-dark.png')
   })
 
+  test('shows the Normal-mode hyperlink caret only on the focused node', async ({ userDataDir }) => {
+    const firstText = 'Start https://first.example end'
+    const secondText = 'Open https://second.example now'
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'first',
+            text: firstText,
+            links: [{ start: 6, end: 27, url: 'https://first.example' }],
+            children: [],
+          },
+          {
+            id: 'second',
+            text: secondText,
+            links: [{ start: 5, end: 27, url: 'https://second.example' }],
+            children: [],
+          },
+          { id: 'third', text: 'A neighboring plain node', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    const second = node(window, 2)
+    const firstLink = first.getByRole('link')
+    const secondLink = second.getByRole('link')
+
+    await expect(firstLink).toHaveClass(/normal-caret-before/)
+    await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(first).toHaveScreenshot('vim-normal-link-caret-multi-node-focused-first.png')
+
+    await second.focus()
+    await expect(secondLink).toHaveClass(/normal-caret-before/)
+    await expect(firstLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(first).toHaveScreenshot('vim-normal-link-caret-multi-node-unfocused-first.png')
+    await expect(second).toHaveScreenshot('vim-normal-link-caret-multi-node-focused-second.png')
+
+    await first.focus()
+    await expect(firstLink).toHaveClass(/normal-caret-before/)
+    await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+  })
+
   test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

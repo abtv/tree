@@ -83,7 +83,7 @@ export function selectAll(element: HTMLElement): void {
     element.select()
     return
   }
-  clearNormalLinkCaret(element)
+  clearNormalCaret(element)
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
@@ -123,7 +123,7 @@ export function setCaret(element: HTMLElement, position: number): void {
     element.setSelectionRange(clamped, clamped)
     return
   }
-  clearNormalLinkCaret(element)
+  clearNormalCaret(element)
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
@@ -177,6 +177,11 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
   setSelectionRange(element, cursor, cursor + 1)
 }
 
+export function clearNormalCaret(element: HTMLElement): void {
+  for (const link of element.querySelectorAll('a.normal-caret-before, a.normal-caret-after'))
+    link.classList.remove('normal-caret-before', 'normal-caret-after')
+}
+
 export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {
   if (element instanceof HTMLTextAreaElement) {
     element.setSelectionRange(Math.min(anchor, focus), Math.max(anchor, focus), anchor > focus ? 'backward' : 'forward')
@@ -196,11 +201,6 @@ export function setSelectionRange(element: HTMLElement, anchor: number, focus: n
 export function isCollapsedSelection(): boolean {
   const selection = globalThis.getSelection()
   return selection === null || selection.isCollapsed
-}
-
-function clearNormalLinkCaret(element: HTMLElement): void {
-  for (const link of element.querySelectorAll('a.normal-caret-before, a.normal-caret-after'))
-    link.classList.remove('normal-caret-before', 'normal-caret-after')
 }
 
 function normalLinkCaret(

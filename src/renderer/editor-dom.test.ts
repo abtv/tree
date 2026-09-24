@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
+  clearNormalCaret,
   collapseSelectionToAnchor,
   getCaret,
   getSelectionRange,
@@ -193,6 +194,19 @@ describe('editor DOM adapters', () => {
     expect(link.classList.contains('normal-caret-after')).toBe(false)
 
     setCaret(element, 0)
+    expect(link.classList.contains('normal-caret-before')).toBe(false)
+    expect(link.classList.contains('normal-caret-after')).toBe(false)
+  })
+
+  it('clears Normal-mode hyperlink caret decorations when an editor loses focus', () => {
+    const element = document.createElement('div')
+    element.innerHTML = '<a class="normal-caret-before" href="https://example.test">link</a>'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    if (link === null) throw new Error('The linked element is missing.')
+
+    clearNormalCaret(element)
+
     expect(link.classList.contains('normal-caret-before')).toBe(false)
     expect(link.classList.contains('normal-caret-after')).toBe(false)
   })

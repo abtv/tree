@@ -3,6 +3,7 @@ import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent 
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { cloneNode, displayedNodes, type TreeNode } from '../domain/document'
 import {
+  clearNormalCaret,
   getCaret,
   getSelectionRange,
   isCollapsedSelection,
@@ -281,6 +282,8 @@ export function useNodeInputBindings({
         else inputs.current.set(node.id, input)
       },
       onBlur: () => {
+        const input = inputs.current.get(node.id)
+        if (input !== undefined) clearNormalCaret(input)
         setSelectAllNodeId(undefined)
         vimPending.current = undefined
         vimInsertSession.current = undefined
