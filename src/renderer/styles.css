@@ -1,6 +1,6 @@
 :root {
   color: #373f43;
-  background: #fff;
+  background: #f7f7f7;
   font-family: 'JetBrains Mono';
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -195,7 +195,7 @@ textarea {
 
 .node-row-visual-selected,
 .node-row-visual-selected .node-input {
-  background: rgba(114, 84, 147, 0.19);
+  background: #fff0b3;
 }
 
 .node-disclosure {
@@ -356,7 +356,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 .node-input:focus {
-  background: #fff;
+  background: #fff0b3;
+}
+
+.node-row-visual-selected .node-input:focus {
+  background: #fff0b3;
 }
 
 .node-row.node-row-dragging .node-input:focus {
