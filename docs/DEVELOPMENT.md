@@ -246,6 +246,18 @@ For each result, use this compact record:
   Invalidation notes: <stages retained or invalidated by later changes, or none>
 ```
 
+For a rendering-sensitive change as defined by `AGENTS.md` §9, add a separate visual-evidence record after the command results:
+
+```text
+- Visual evidence: <affected states inspected>
+  Command and artifact: <exact command and screenshot path>
+  Result: pass | fail | blocked
+  Snapshot: <HEAD and digest from npm run validation:snapshot>
+  Notes: <what was visually confirmed, including relevant interaction states>
+```
+
+The smallest representative state set is preferred. Do not create or inspect screenshot artifacts for non-rendering changes, and do not repeat an inspection while the rendered inputs and states remain unchanged. Automated DOM, CSS-class, computed-style, and screenshot tests complement one another: a passing non-image assertion does not establish visual correctness, and a screenshot baseline must be deliberately inspected when it is created or updated.
+
 A result remains reusable only while those inputs remain valid. `npm run check:full` subsumes the `npm run check`, E2E, and performance stages it contains; `npm run check` subsumes its listed stages. A focused result does not establish broader coverage. Documentation-only edits invalidate documentation and formatting checks, plus OpenCode governance when agent workflow files change, but do not invalidate runtime suites. Source changes invalidate affected static checks, tests, and artifact-dependent suites. Test or fixture changes invalidate that suite. Dependency, build, test-runner, and OpenCode-policy changes invalidate every affected stage.
 
 If an aggregate command fails or is blocked after some stages pass, record the aggregate command's actual result; never relabel it as passed. Its completed successful stages remain reusable when their inputs are still valid. Run every failed, blocked, or not-run required stage separately on the same snapshot. The required tier is then satisfied by composed stage evidence, recorded as the aggregate attempt plus the supplemental commands. A later edit invalidates only the affected evidence under the rules above.

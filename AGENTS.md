@@ -196,6 +196,14 @@ Property-based tests using `fast-check` guard domain invariants. When a change a
 
 Do not remove or weaken tests merely to make an implementation pass.
 
+### Visual-regression workflow
+
+For a change that can alter rendered pixels — including stylesheet, layout, typography, color, caret, selection, focus, drag-feedback, or contenteditable rendering — DOM, CSS-class, and computed-style assertions are not sufficient visual evidence. Select the smallest representative set of affected states, run it in the real Electron renderer, and inspect its screenshot before handoff. Include light and dark appearances only when the change or affected styling differs by appearance.
+
+Add or update a deterministic screenshot regression test when practical. Its baseline must be deliberately inspected; accepting a generated image without inspection is not verification. For interactions such as rich text, test both the rendered state and the relevant behavior matrix (for example mode changes, selection, and pointer interaction) so a visual fix cannot silently break the interaction.
+
+Record the inspected states, command, and artifact location separately from automated validation. Reuse still-valid visual evidence rather than generating images for non-rendering changes or repeating inspection when the rendered inputs and states did not change.
+
 ### Defect-first workflow
 
 When fixing a reported defect:
@@ -230,6 +238,8 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands and when `npm run check` or `npm run check:full` is mandatory. Focused checks remain the preferred development loop.
 
 Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. For an active substantive task, keep this validation record in `WORKING_PLAN.md`; include a summary in the final handoff.
+
+For a visual-regression workflow, record the inspected states, command, screenshot artifact, and outcome as visual evidence; a passing DOM, CSS, or computed-style assertion does not substitute for this record.
 
 Validation records are temporary task evidence, not permanent repository artifacts. Do not create a committed validation-log or plan archive unless the Product Owner explicitly approves a new audit requirement.
 
