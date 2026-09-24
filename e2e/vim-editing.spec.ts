@@ -253,6 +253,30 @@ test.describe('Vim editing prototype', () => {
     await expect(link).not.toHaveClass(/link-selected/)
   })
 
+  test('keeps the Normal-mode hyperlink boundary caret visible in dark appearance', async ({ userDataDir }) => {
+    const text = 'https://example.test'
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text, links: [{ start: 0, end: text.length, url: text }], children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTreeBase(userDataDir, { initialMode: 'normal' })
+    await window.emulateMedia({ colorScheme: 'dark' })
+    const editor = node(window, 1)
+    const link = editor.getByRole('link')
+
+    await expect(link).toHaveClass(/normal-caret-before/)
+    await expect
+      .poll(() =>
+        link.evaluate(
+          (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::before').backgroundColor,
+        ),
+      )
+      .toBe('rgb(255, 255, 255)')
+    await expect(editor).toHaveScreenshot('vim-normal-link-caret-dark.png')
+  })
+
   test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
