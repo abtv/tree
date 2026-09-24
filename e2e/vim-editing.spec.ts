@@ -216,6 +216,43 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 0)
   })
 
+  test('shows the Normal-mode block caret at a hyperlink boundary without selecting the link', async ({
+    userDataDir,
+  }) => {
+    const text = 'https://example.test'
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text,
+            links: [{ start: 0, end: text.length, url: text }],
+            children: [],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const link = editor.getByRole('link')
+
+    await expect(link).toHaveClass(/normal-caret-before/)
+    await expect(link).not.toHaveClass(/link-selected/)
+    expect(
+      await editor.evaluate((field) => {
+        const selection = field.ownerDocument.defaultView?.getSelection()
+        return selection?.isCollapsed
+      }),
+    ).toBe(true)
+
+    await editor.press('$')
+
+    await expect(link).toHaveClass(/normal-caret-after/)
+    await expect(link).not.toHaveClass(/normal-caret-before/)
+    await expect(link).not.toHaveClass(/link-selected/)
+  })
+
   test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

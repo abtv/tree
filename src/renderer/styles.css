@@ -306,6 +306,31 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: #373f43;
 }
 
+.vim-state-normal .node-input a.normal-caret-before,
+.vim-state-normal .node-input a.normal-caret-after {
+  position: relative;
+}
+
+.vim-state-normal .node-input a.normal-caret-before::before,
+.vim-state-normal .node-input a.normal-caret-after::after {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  width: 2px;
+  height: 100%;
+  background: #373f43;
+  content: '';
+  pointer-events: none;
+}
+
+.vim-state-normal .node-input a.normal-caret-before::before {
+  left: -2px;
+}
+
+.vim-state-normal .node-input a.normal-caret-after::after {
+  right: -2px;
+}
+
 .vim-state-visual .node-input::selection {
   color: #fff;
   background: #725493;

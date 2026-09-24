@@ -167,6 +167,36 @@ describe('editor DOM adapters', () => {
     expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
+  it('marks the nearest hyperlink boundary for a Normal-mode block caret without selecting the link', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    if (link === null) throw new Error('The linked element is missing.')
+
+    setNormalCaret(element, 2)
+    expect(window.getSelection()?.isCollapsed).toBe(true)
+    expect(getCaret(element)).toBe(1)
+    expect(link.classList.contains('normal-caret-before')).toBe(true)
+    expect(link.classList.contains('normal-caret-after')).toBe(false)
+    expect(link.classList.contains('link-selected')).toBe(false)
+
+    setNormalCaret(element, 4)
+    expect(window.getSelection()?.isCollapsed).toBe(true)
+    expect(getCaret(element)).toBe(5)
+    expect(link.classList.contains('normal-caret-after')).toBe(true)
+    expect(link.classList.contains('normal-caret-before')).toBe(false)
+
+    setNormalCaret(element, 2)
+    selectAll(element)
+    expect(link.classList.contains('normal-caret-before')).toBe(false)
+    expect(link.classList.contains('normal-caret-after')).toBe(false)
+
+    setCaret(element, 0)
+    expect(link.classList.contains('normal-caret-before')).toBe(false)
+    expect(link.classList.contains('normal-caret-after')).toBe(false)
+  })
+
   it('places a caret before or after a non-editable link at the nearest boundary', () => {
     const element = document.createElement('div')
     element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'

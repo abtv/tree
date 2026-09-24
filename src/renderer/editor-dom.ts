@@ -83,6 +83,7 @@ export function selectAll(element: HTMLElement): void {
     element.select()
     return
   }
+  clearNormalLinkCaret(element)
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
@@ -122,6 +123,7 @@ export function setCaret(element: HTMLElement, position: number): void {
     element.setSelectionRange(clamped, clamped)
     return
   }
+  clearNormalLinkCaret(element)
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
@@ -164,6 +166,14 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
     return
   }
   const cursor = Math.min(Math.max(position, 0), length - 1)
+  if (!(element instanceof HTMLTextAreaElement)) {
+    const linkCaret = normalLinkCaret(element, cursor)
+    if (linkCaret !== undefined) {
+      setCaret(element, cursor)
+      linkCaret.link.classList.add(linkCaret.before ? 'normal-caret-before' : 'normal-caret-after')
+      return
+    }
+  }
   setSelectionRange(element, cursor, cursor + 1)
 }
 
@@ -186,6 +196,28 @@ export function setSelectionRange(element: HTMLElement, anchor: number, focus: n
 export function isCollapsedSelection(): boolean {
   const selection = globalThis.getSelection()
   return selection === null || selection.isCollapsed
+}
+
+function clearNormalLinkCaret(element: HTMLElement): void {
+  for (const link of element.querySelectorAll('a.normal-caret-before, a.normal-caret-after'))
+    link.classList.remove('normal-caret-before', 'normal-caret-after')
+}
+
+function normalLinkCaret(
+  element: HTMLElement,
+  position: number,
+): { link: HTMLAnchorElement; before: boolean } | undefined {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let remaining = position
+  let current: Node | null = walker.nextNode()
+  while (current !== null) {
+    const length = current.textContent?.length ?? 0
+    const link = current.parentElement?.closest('a[contenteditable="false"]')
+    if (link instanceof HTMLAnchorElement && remaining < length) return { link, before: remaining <= length / 2 }
+    remaining -= length
+    current = walker.nextNode()
+  }
+  return undefined
 }
 
 function getCaretPrefix(element: HTMLElement, container: Node): number {
