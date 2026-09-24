@@ -171,8 +171,8 @@ export function NodeList({
     visualNodeSelection === undefined ? -1 : nodes.findIndex((node) => node.id === visualNodeSelection.anchorId)
   const visualFocusIndex =
     visualNodeSelection === undefined ? -1 : nodes.findIndex((node) => node.id === visualNodeSelection.focusId)
-  const visualStart = Math.min(visualAnchorIndex, visualFocusIndex)
-  const visualEnd = Math.max(visualAnchorIndex, visualFocusIndex)
+  const visualStart = visualAnchorIndex < 0 || visualFocusIndex < 0 ? -1 : Math.min(visualAnchorIndex, visualFocusIndex)
+  const visualEnd = visualStart < 0 ? -1 : Math.max(visualAnchorIndex, visualFocusIndex)
   const dropMarker = dropMarkerFor(
     dragPhase === 'dragging' ? dropIndex : undefined,
     nodes.length,

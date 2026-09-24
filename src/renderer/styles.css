@@ -1,6 +1,6 @@
 :root {
   color: #373f43;
-  background: #f7f7f7;
+  background: #fff;
   font-family: 'JetBrains Mono';
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -306,6 +306,15 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: #373f43;
 }
 
+.vim-state-visual .node-input::selection {
+  color: #fff;
+  background: #725493;
+}
+
+.vim-state-visual-node .node-input {
+  caret-color: transparent;
+}
+
 .vim-mode {
   position: fixed;
   right: 12px;
@@ -356,11 +365,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 .node-input:focus {
-  background: #fff0b3;
-}
-
-.node-row-visual-selected .node-input:focus {
-  background: #fff0b3;
+  background: transparent;
 }
 
 .node-row.node-row-dragging .node-input:focus {
@@ -571,7 +576,12 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
     outline-color: #a5adb2;
   }
   .node-input:focus {
-    background: #1e2022;
+    background: transparent;
+  }
+  .node-row-visual-selected,
+  .node-row-visual-selected .node-input {
+    background: #4a4023;
+    color: #f5e9b7;
   }
 
   .node-row.node-row-dragging {

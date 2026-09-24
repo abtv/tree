@@ -539,7 +539,10 @@ function handleVimKey(
     vim.setMode('visual')
     setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
   } else if (!visual && event.key === 'V') {
-    if (vim.nodeVisual?.enter(node.id)) vim.setMode('visual-node')
+    if (vim.nodeVisual?.enter(node.id)) {
+      setSelectionRange(input, cursor, cursor)
+      vim.setMode('visual-node')
+    }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     if (pending.count !== '') return handled()
     store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)

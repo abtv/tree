@@ -52,6 +52,7 @@ interface RenderOptions {
   locked?: boolean
   list?: TreeNode[]
   renderInput?: (node: TreeNode, label: string) => ReactNode
+  visualNodeSelection?: { anchorId: string; focusId: string } | undefined
 }
 
 function renderRows(
@@ -70,6 +71,7 @@ function renderRows(
       }
       onEnter={() => undefined}
       onMove={onMove}
+      visualNodeSelection={options.visualNodeSelection}
     />,
   )
   return { ...view, onMove }
@@ -105,6 +107,12 @@ function rowElements(container: HTMLElement): Element[] {
 }
 
 describe('NodeList', () => {
+  it('does not render a range when a Visual endpoint is no longer displayed', () => {
+    const { container } = renderRows({ visualNodeSelection: { anchorId: 'missing', focusId: 'b' } })
+
+    expect(container.querySelectorAll('.node-row-visual-selected')).toHaveLength(0)
+  })
+
   it('renders edge drop targets at both list edges', () => {
     const { container } = renderRows()
 

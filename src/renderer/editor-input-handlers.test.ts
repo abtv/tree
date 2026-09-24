@@ -125,6 +125,7 @@ describe('editor keyboard handler', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'node'
+    input.setSelectionRange(2, 2)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] })
     const enter = vi.fn(() => true)
     const move = vi.fn()
@@ -133,6 +134,8 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'V'))
     expect(enter).toHaveBeenCalledWith('node')
     expect(vim.mode).toBe('visual-node')
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(2)
     handle(keyEvent(input, 'j'))
     handle(keyEvent(input, 'd'))
     expect(move).toHaveBeenCalledWith('down')
