@@ -314,21 +314,14 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .vim-state-normal .node-input a.normal-caret-before::before,
 .vim-state-normal .node-input a.normal-caret-after::after {
   position: absolute;
-  top: 0;
   z-index: 1;
+  top: var(--normal-caret-top);
+  left: var(--normal-caret-left);
   width: 2px;
-  height: 100%;
+  height: var(--normal-caret-height);
   background: #373f43;
   content: '';
   pointer-events: none;
-}
-
-.vim-state-normal .node-input a.normal-caret-before::before {
-  left: -2px;
-}
-
-.vim-state-normal .node-input a.normal-caret-after::after {
-  right: -2px;
 }
 
 .vim-state-visual .node-input::selection {

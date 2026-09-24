@@ -49,6 +49,7 @@ export function useNodeInputBindings({
   setNodeVisualSelection = () => undefined,
 }: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
   const inputs = useRef(new Map<string, HTMLElement>())
+  const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
   const latestVimMode = useRef(vimMode)
@@ -273,13 +274,36 @@ export function useNodeInputBindings({
     return () => document.removeEventListener('selectionchange', update)
   }, [])
 
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const input = entry.target as HTMLElement
+        if (input.ownerDocument.activeElement !== input || latestVimMode.current !== 'normal') continue
+        setNormalCaret(input, getCaret(input))
+      }
+    })
+    normalCaretResizeObserver.current = observer
+    for (const input of inputs.current.values()) observer.observe(input)
+    return () => {
+      observer.disconnect()
+      normalCaretResizeObserver.current = undefined
+    }
+  }, [])
+
   return useCallback(
     (node: TreeNode): NodeInputBindings => ({
       selectedAll: selectAllNodeId === node.id,
       disabled: persistenceLocked,
       inputRef: (input: HTMLElement | null) => {
-        if (input === null) inputs.current.delete(node.id)
-        else inputs.current.set(node.id, input)
+        if (input === null) {
+          const previous = inputs.current.get(node.id)
+          if (previous !== undefined) normalCaretResizeObserver.current?.unobserve(previous)
+          inputs.current.delete(node.id)
+        } else {
+          inputs.current.set(node.id, input)
+          normalCaretResizeObserver.current?.observe(input)
+        }
       },
       onBlur: () => {
         const input = inputs.current.get(node.id)

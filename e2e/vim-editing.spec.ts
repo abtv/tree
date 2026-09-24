@@ -5,6 +5,7 @@ import {
   launchTree as launchTreeBase,
   node,
   seedDocument,
+  setMainWindowBounds,
   setCursor,
   test,
   typeInto,
@@ -319,6 +320,105 @@ test.describe('Vim editing prototype', () => {
     await first.focus()
     await expect(firstLink).toHaveClass(/normal-caret-before/)
     await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+  })
+
+  test('keeps the Normal-mode caret on one line for wrapped hyperlinks', async ({ userDataDir }) => {
+    const firstUrl = `https://example.test/${'wrapped-segment-'.repeat(10)}`
+    const secondUrl = `https://sample.test/${'neighbor-segment-'.repeat(10)}`
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: firstUrl, links: [{ start: 0, end: firstUrl.length, url: firstUrl }], children: [] },
+          {
+            id: 'second',
+            text: secondUrl,
+            links: [{ start: 0, end: secondUrl.length, url: secondUrl }],
+            children: [],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    const second = node(window, 2)
+    const firstLink = first.getByRole('link')
+    const secondLink = second.getByRole('link')
+
+    await expect(firstLink).toHaveClass(/normal-caret-before/)
+    const beforeGeometry = await firstLink.evaluate((link) => {
+      const view = link.ownerDocument.defaultView
+      const style = view?.getComputedStyle(link, '::before')
+      const bounds = link.getBoundingClientRect()
+      const firstFragment = link.getClientRects()[0]
+      return {
+        fragments: link.getClientRects().length,
+        left: Number.parseFloat(style?.left ?? ''),
+        expectedLeft: firstFragment === undefined ? Number.NaN : firstFragment.left - bounds.left - 2,
+        top: Number.parseFloat(style?.top ?? ''),
+        expectedTop: firstFragment === undefined ? Number.NaN : firstFragment.top - bounds.top,
+        height: Number.parseFloat(style?.height ?? ''),
+        lineHeight: Number.parseFloat(view?.getComputedStyle(link).lineHeight ?? ''),
+      }
+    })
+    expect(beforeGeometry.fragments).toBeGreaterThan(1)
+    expect(beforeGeometry.left).toBeCloseTo(beforeGeometry.expectedLeft, 0)
+    expect(beforeGeometry.top).toBeCloseTo(beforeGeometry.expectedTop, 0)
+    expect(beforeGeometry.height).toBeGreaterThan(0)
+    expect(beforeGeometry.height).toBeLessThanOrEqual(beforeGeometry.lineHeight + 1)
+    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-focused-before.png')
+    await first.press('$')
+    await expect(firstLink).toHaveClass(/normal-caret-after/)
+    const afterGeometry = await firstLink.evaluate((link) => {
+      const view = link.ownerDocument.defaultView
+      const style = view?.getComputedStyle(link, '::after')
+      const bounds = link.getBoundingClientRect()
+      const fragments = link.getClientRects()
+      const lastFragment = fragments[fragments.length - 1]
+      return {
+        left: Number.parseFloat(style?.left ?? ''),
+        expectedLeft: lastFragment === undefined ? Number.NaN : lastFragment.right - bounds.left,
+        top: Number.parseFloat(style?.top ?? ''),
+        expectedTop: lastFragment === undefined ? Number.NaN : lastFragment.top - bounds.top,
+        height: Number.parseFloat(style?.height ?? ''),
+        lineHeight: Number.parseFloat(view?.getComputedStyle(link).lineHeight ?? ''),
+      }
+    })
+    expect(afterGeometry.left).toBeCloseTo(afterGeometry.expectedLeft, 0)
+    expect(afterGeometry.top).toBeCloseTo(afterGeometry.expectedTop, 0)
+    expect(afterGeometry.height).toBeGreaterThan(0)
+    expect(afterGeometry.height).toBeLessThanOrEqual(afterGeometry.lineHeight + 1)
+    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-focused-after.png')
+
+    await first.press('0')
+    await expect(firstLink).toHaveClass(/normal-caret-before/)
+    await second.focus()
+    await expect(firstLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(secondLink).toHaveClass(/normal-caret-before/)
+    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-unfocused.png')
+    await expect(second).toHaveScreenshot('vim-normal-wrapped-link-neighbor-focused.png')
+
+    await first.focus()
+    await expect(firstLink).toHaveClass(/normal-caret-before/)
+    await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-dark-before.png')
+    await first.press('$')
+    await expect(firstLink).toHaveClass(/normal-caret-after/)
+    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-dark-after.png')
+    await setMainWindowBounds(app, { width: 680 })
+    await expect
+      .poll(() =>
+        firstLink.evaluate((link) => {
+          const top = Number.parseFloat(link.ownerDocument.defaultView?.getComputedStyle(link, '::after').top ?? '')
+          const bounds = link.getBoundingClientRect()
+          const fragments = link.getClientRects()
+          const last = fragments[fragments.length - 1]
+          return last === undefined ? Number.POSITIVE_INFINITY : Math.abs(top - (last.top - bounds.top))
+        }),
+      )
+      .toBeLessThan(0.5)
+    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-dark-after-resize.png')
   })
 
   test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {

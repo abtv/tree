@@ -198,9 +198,57 @@ describe('editor DOM adapters', () => {
     expect(link.classList.contains('normal-caret-after')).toBe(false)
   })
 
+  it('positions the hyperlink caret from the first or last wrapped text fragment', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    if (link === null) throw new Error('The linked element is missing.')
+
+    const fragmentRects = [new DOMRect(14, 20, 8, 21), new DOMRect(42, 41, 8, 21)]
+    let fragmentIndex = 0
+    const createRange = document.createRange.bind(document)
+    const rangeFactory = vi.spyOn(document, 'createRange').mockImplementation(() => {
+      const range = createRange()
+      Object.defineProperty(range, 'getBoundingClientRect', {
+        value: () => fragmentRects[Math.min(fragmentIndex++, fragmentRects.length - 1)],
+      })
+      return range
+    })
+    const linkBounds = vi.spyOn(link, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 20, 80, 42))
+
+    try {
+      setNormalCaret(element, 2)
+      expect(link.style.getPropertyValue('--normal-caret-left')).toBe('2px')
+      expect(link.style.getPropertyValue('--normal-caret-top')).toBe('0px')
+      expect(link.style.getPropertyValue('--normal-caret-height')).toBe('21px')
+      expect(getCaret(element)).toBe(1)
+      expect(window.getSelection()?.isCollapsed).toBe(true)
+
+      setNormalCaret(element, 4)
+      expect(link.style.getPropertyValue('--normal-caret-left')).toBe('40px')
+      expect(link.style.getPropertyValue('--normal-caret-top')).toBe('21px')
+      expect(link.style.getPropertyValue('--normal-caret-height')).toBe('21px')
+      expect(getCaret(element)).toBe(5)
+      expect(readEditableContent(element)).toEqual({
+        text: 'alinkz',
+        links: [{ start: 1, end: 5, url: 'https://example.test' }],
+      })
+
+      clearNormalCaret(element)
+      expect(link.style.getPropertyValue('--normal-caret-left')).toBe('')
+      expect(link.style.getPropertyValue('--normal-caret-top')).toBe('')
+      expect(link.style.getPropertyValue('--normal-caret-height')).toBe('')
+    } finally {
+      rangeFactory.mockRestore()
+      linkBounds.mockRestore()
+    }
+  })
+
   it('clears Normal-mode hyperlink caret decorations when an editor loses focus', () => {
     const element = document.createElement('div')
-    element.innerHTML = '<a class="normal-caret-before" href="https://example.test">link</a>'
+    element.innerHTML =
+      '<a class="normal-caret-before" style="--normal-caret-left: -2px; --normal-caret-top: 0px; --normal-caret-height: 21px" href="https://example.test">link</a>'
     document.body.append(element)
     const link = element.querySelector('a')
     if (link === null) throw new Error('The linked element is missing.')
@@ -209,6 +257,9 @@ describe('editor DOM adapters', () => {
 
     expect(link.classList.contains('normal-caret-before')).toBe(false)
     expect(link.classList.contains('normal-caret-after')).toBe(false)
+    expect(link.style.getPropertyValue('--normal-caret-left')).toBe('')
+    expect(link.style.getPropertyValue('--normal-caret-top')).toBe('')
+    expect(link.style.getPropertyValue('--normal-caret-height')).toBe('')
   })
 
   it('places a caret before or after a non-editable link at the nearest boundary', () => {

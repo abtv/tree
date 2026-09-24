@@ -171,6 +171,7 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
     if (linkCaret !== undefined) {
       setCaret(element, cursor)
       linkCaret.link.classList.add(linkCaret.before ? 'normal-caret-before' : 'normal-caret-after')
+      positionNormalLinkCaret(linkCaret.link, linkCaret.before)
       return
     }
   }
@@ -178,8 +179,12 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
 }
 
 export function clearNormalCaret(element: HTMLElement): void {
-  for (const link of element.querySelectorAll('a.normal-caret-before, a.normal-caret-after'))
+  for (const link of element.querySelectorAll<HTMLAnchorElement>('a.normal-caret-before, a.normal-caret-after')) {
     link.classList.remove('normal-caret-before', 'normal-caret-after')
+    link.style.removeProperty('--normal-caret-left')
+    link.style.removeProperty('--normal-caret-top')
+    link.style.removeProperty('--normal-caret-height')
+  }
 }
 
 export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {
@@ -218,6 +223,33 @@ function normalLinkCaret(
     current = walker.nextNode()
   }
   return undefined
+}
+
+function positionNormalLinkCaret(link: HTMLAnchorElement, before: boolean): void {
+  const walker = document.createTreeWalker(link, NodeFilter.SHOW_TEXT)
+  let first: Text | undefined
+  let last: Text | undefined
+  let current = walker.nextNode()
+  while (current !== null) {
+    if (current instanceof Text && (current.textContent?.length ?? 0) > 0) {
+      first ??= current
+      last = current
+    }
+    current = walker.nextNode()
+  }
+  const text = before ? first : last
+  if (text === undefined) return
+
+  const range = document.createRange()
+  const length = text.textContent?.length ?? 0
+  range.setStart(text, before ? 0 : length - 1)
+  range.setEnd(text, before ? 1 : length)
+  if (typeof range.getBoundingClientRect !== 'function') return
+  const character = range.getBoundingClientRect()
+  const bounds = link.getBoundingClientRect()
+  link.style.setProperty('--normal-caret-left', `${(before ? character.left - 2 : character.right) - bounds.left}px`)
+  link.style.setProperty('--normal-caret-top', `${character.top - bounds.top}px`)
+  link.style.setProperty('--normal-caret-height', `${character.height}px`)
 }
 
 function getCaretPrefix(element: HTMLElement, container: Node): number {
