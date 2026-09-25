@@ -1,6 +1,7 @@
 import type { LinkRange } from './document-types'
 
 export function isHttpUrl(value: string): boolean {
+  if (/\s/.test(value)) return false
   try {
     const url = new URL(value)
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.length > 0
@@ -26,6 +27,79 @@ export function normalizeLinks(links: readonly LinkRange[], text: string, requir
     result.push({ ...link })
   }
   return result
+}
+
+/** Keep unaffected links and recognize the URL token changed by a native text edit. */
+export function linksAfterTextEdit(text: string, links: readonly LinkRange[], nextText: string): LinkRange[] {
+  return reconcileLinkTextEdit(text, links, nextText).links
+}
+
+export function reconcileLinkTextEdit(
+  text: string,
+  links: readonly LinkRange[],
+  nextText: string,
+  draft?: LinkRange,
+): { links: LinkRange[]; draft?: LinkRange; createsNewLink: boolean } {
+  if (text === nextText)
+    return { links: normalizeLinks(links, text), createsNewLink: false, ...(draft === undefined ? {} : { draft }) }
+  let start = 0
+  while (start < text.length && start < nextText.length && text[start] === nextText[start]) start += 1
+  let oldEnd = text.length
+  let newEnd = nextText.length
+  while (oldEnd > start && newEnd > start && text[oldEnd - 1] === nextText[newEnd - 1]) {
+    oldEnd -= 1
+    newEnd -= 1
+  }
+  const delta = nextText.length - text.length
+  const isPureAppend = start === oldEnd
+  const insertedIntroducesWhitespace = /\s/.test(nextText.slice(start, newEnd))
+  const editedLink = [...links, ...(draft === undefined ? [] : [draft])].find((link) => {
+    if (!(link.start <= start && oldEnd <= link.end && start <= link.end)) return false
+    // A pure append exactly at a link's end that starts with whitespace begins new, unrelated
+    // text rather than extending the link; leave the link untouched instead of absorbing it.
+    if (isPureAppend && link.end === start && insertedIntroducesWhitespace) return false
+    return true
+  })
+  const retained = links
+    .filter((link) => link !== editedLink && (link.end <= start || link.start >= oldEnd))
+    .map((link) => (link.start >= oldEnd ? { ...link, start: link.start + delta, end: link.end + delta } : { ...link }))
+  if (editedLink !== undefined) {
+    const projected = {
+      start: editedLink.start,
+      end: editedLink.end + delta,
+      url: nextText.slice(editedLink.start, editedLink.end + delta),
+    }
+    if (isHttpUrl(projected.url))
+      return { links: normalizeLinks([...retained, projected], nextText), createsNewLink: false }
+    return {
+      links: normalizeLinks(retained, nextText),
+      createsNewLink: false,
+      ...(projected.end > projected.start ? { draft: projected } : {}),
+    }
+  }
+  let tokenStart = Math.min(start, nextText.length)
+  let tokenEnd = Math.min(newEnd, nextText.length)
+  while (tokenStart > 0 && !/\s/.test(nextText[tokenStart - 1] ?? '')) tokenStart -= 1
+  while (tokenEnd < nextText.length && !/\s/.test(nextText[tokenEnd] ?? '')) tokenEnd += 1
+  const candidate = nextText.slice(tokenStart, tokenEnd)
+  if (isHttpUrl(candidate)) {
+    const untouched = retained.filter((link) => link.end <= tokenStart || link.start >= tokenEnd)
+    return {
+      links: normalizeLinks([...untouched, { start: tokenStart, end: tokenEnd, url: candidate }], nextText),
+      createsNewLink: true,
+    }
+  }
+  const shiftedDraft =
+    draft === undefined || (start < draft.end && draft.start < oldEnd)
+      ? undefined
+      : draft.start >= oldEnd
+        ? { ...draft, start: draft.start + delta, end: draft.end + delta }
+        : draft
+  return {
+    links: normalizeLinks(retained, nextText),
+    createsNewLink: false,
+    ...(shiftedDraft === undefined ? {} : { draft: shiftedDraft }),
+  }
 }
 
 export function insertLinks(
@@ -63,26 +137,12 @@ export function replaceLinkedText(
   start: number,
   end: number,
   insertedText: string,
-): { text: string; links: LinkRange[] } {
-  let from = Math.max(0, Math.min(start, end, text.length))
-  let to = Math.max(from, Math.min(Math.max(start, end), text.length))
-  if (from === to) {
-    const containingLink = links.find((link) => link.start < from && from < link.end)
-    if (containingLink !== undefined) {
-      from = from - containingLink.start <= containingLink.end - from ? containingLink.start : containingLink.end
-      to = from
-    }
-  }
-  const withoutRange = `${text.slice(0, from)}${text.slice(to)}`
-  const retained = links
-    .filter((link) => link.end <= from || link.start >= to)
-    .map((link) => ({
-      ...link,
-      start: link.start >= to ? link.start - (to - from) : link.start,
-      end: link.end >= to ? link.end - (to - from) : link.end,
-    }))
-  const nextText = `${withoutRange.slice(0, from)}${insertedText}${withoutRange.slice(from)}`
-  return { text: nextText, links: insertLinks(retained, from, insertedText) }
+): { text: string; links: LinkRange[]; createsNewLink: boolean } {
+  const from = Math.max(0, Math.min(start, end, text.length))
+  const to = Math.max(from, Math.min(Math.max(start, end), text.length))
+  const nextText = `${text.slice(0, from)}${insertedText}${text.slice(to)}`
+  const reconciled = reconcileLinkTextEdit(text, links, nextText)
+  return { text: nextText, links: reconciled.links, createsNewLink: reconciled.createsNewLink }
 }
 
 export function linksForLine(links: readonly LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {

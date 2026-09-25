@@ -22,10 +22,13 @@ import {
   pasteMultilineText,
   pasteText,
   removeTextRange,
+  reconcileLinkTextEdit,
+  replaceLinkedText,
   releaseNodeIndex,
   serializeState,
   splitNode,
   isHttpUrl,
+  linksAfterTextEdit,
   normalizeLinks,
   validatePersistedState,
   MAX_DOCUMENT_DEPTH,
@@ -307,6 +310,93 @@ describe('document operations', () => {
 
     const plain = pasteText(document, 'a', 0, 'example.com')
     expect(plain.roots[0]!.links).toBeUndefined()
+  })
+
+  it('updates an edited URL and its destination on each valid character edit', () => {
+    const original = 'go https://example.com now'
+    const links = [{ start: 3, end: 22, url: 'https://example.com' }]
+    expect(linksAfterTextEdit(original, links, 'go https://exmple.com now')).toEqual([
+      { start: 3, end: 21, url: 'https://exmple.com' },
+    ])
+    expect(linksAfterTextEdit(original, links, 'go https://example.com/ now')).toEqual([
+      { start: 3, end: 23, url: 'https://example.com/' },
+    ])
+  })
+
+  it('replaces a linked character without snapping to a link boundary', () => {
+    const url = 'https://example.com'
+    expect(replaceLinkedText(url, [{ start: 0, end: url.length, url }], 9, 10, 'A')).toEqual({
+      text: 'https://eAample.com',
+      links: [{ start: 0, end: url.length, url: 'https://eAample.com' }],
+      createsNewLink: false,
+    })
+  })
+
+  it('removes link styling immediately for an invalid edit and restores it once valid', () => {
+    const original = 'https://example.com'
+    const links = [{ start: 0, end: original.length, url: original }]
+    const invalid = 'htps://example.com'
+    expect(linksAfterTextEdit(original, links, invalid)).toEqual([])
+    expect(linksAfterTextEdit(invalid, [], original)).toEqual(links)
+  })
+
+  it('restores an edited link beside ordinary text after an invalid intermediate edit', () => {
+    const url = 'https://example.com'
+    const original = `A${url}B`
+    const links = [{ start: 1, end: 1 + url.length, url }]
+    const invalid = `Ahtps://example.comB`
+    const first = reconcileLinkTextEdit(original, links, invalid)
+    expect(first.links).toEqual([])
+    expect(first.draft).toEqual({ start: 1, end: url.length, url: 'htps://example.com' })
+
+    const restored = reconcileLinkTextEdit(invalid, [], original, first.draft)
+    expect(restored.links).toEqual(links)
+    expect(restored.draft).toBeUndefined()
+  })
+
+  it('does not treat a link revalidated after a brief invalid edit as a new link', () => {
+    const url = 'https://example.com'
+    const first = reconcileLinkTextEdit(url, [{ start: 0, end: url.length, url }], 'htps://example.com')
+    expect(first.createsNewLink).toBe(false)
+
+    const restored = reconcileLinkTextEdit('htps://example.com', [], url, first.draft)
+    expect(restored.links).toEqual([{ start: 0, end: url.length, url }])
+    expect(restored.createsNewLink).toBe(false)
+  })
+
+  it('stops absorbing unrelated typed text into a link once the user keeps typing past it', () => {
+    let text = 'http://a.co'
+    let links = [{ start: 0, end: text.length, url: text }]
+    let draft: { start: number; end: number; url: string } | undefined
+    const type = (nextText: string): void => {
+      const edit = reconcileLinkTextEdit(text, links, nextText, draft)
+      text = nextText
+      links = edit.links
+      draft = edit.draft
+    }
+
+    type('http://a.co/')
+    expect(links).toEqual([{ start: 0, end: 12, url: 'http://a.co/' }])
+
+    for (const char of ' hello this is a great resource for learning') type(text + char)
+
+    expect(text).toBe('http://a.co/ hello this is a great resource for learning')
+    expect(links).toEqual([{ start: 0, end: 12, url: 'http://a.co/' }])
+  })
+
+  it('shifts other links without changing their destinations', () => {
+    const first = 'https://first.test'
+    const second = 'https://second.test'
+    const original = `${first} ${second}`
+    const links = [
+      { start: 0, end: first.length, url: first },
+      { start: first.length + 1, end: original.length, url: second },
+    ]
+    const next = `${first}/a ${second}`
+    expect(linksAfterTextEdit(original, links, next)).toEqual([
+      { start: 0, end: first.length + 2, url: `${first}/a` },
+      { start: first.length + 3, end: next.length, url: second },
+    ])
   })
 
   it('normalizes malformed, overlapping, and non-HTTP link ranges', () => {

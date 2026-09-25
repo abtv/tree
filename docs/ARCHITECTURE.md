@@ -192,7 +192,7 @@ The application layer may use infrastructure interfaces.
 
 The editor command coordinator composes focused collaborators for runtime snapshot history and queued persistence. History owns document snapshots and undo/redo location reconciliation. Persistence owns serialized document-save and attachment-cleanup scheduling, while receiving current state and referenced attachment IDs through narrow application-layer callbacks. This keeps editor commands independent from queue mechanics without moving product rules into infrastructure.
 
-External hyperlink opening is handled by the Electron shell. The renderer renders link anchors, while the main process validates HTTP(S) URLs and delegates approved URLs to the operating system's default hyperlink application.
+External hyperlink opening is handled by the Electron shell. The renderer renders editable link anchors and updates their destination from valid edited text, while the main process validates HTTP(S) URLs and delegates approved URLs to the operating system's default hyperlink application.
 
 The main process treats the preload API as an untrusted boundary: every IPC call must originate from the configured application renderer, and IPC arguments are validated at runtime before filesystem, clipboard, or application operations run. Renderer navigation is restricted to the packaged renderer document (or the configured development renderer URL), while external links open only through the validated shell path.
 

@@ -573,7 +573,7 @@ The application must support:
 * multiline text;
 * images.
 
-When a valid HTTP or HTTPS URL is pasted, the URL is stored as a clickable hyperlink. The displayed link text is the URL itself. Clicking the link opens it in the system's default hyperlink application. Links are underlined and use a distinct color that adapts to the light or dark appearance.
+When a valid HTTP or HTTPS URL is pasted, the URL is stored as a clickable hyperlink. The displayed link text is the URL itself. Plain-clicking a link places the editing caret, while `Cmd+click` opens it in the system's default hyperlink application. Links are underlined and use a distinct color that adapts to the light or dark appearance.
 
 Only `http` and `https` URLs are hyperlinks. Invalid URLs and other schemes are pasted as ordinary text.
 
@@ -585,9 +585,9 @@ Plain text is inserted at the current cursor position.
 
 It does not replace the entire node.
 
-Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range. Existing links cannot be edited. Pressing `Backspace` immediately after a link removes the complete link rather than one character at a time.
+Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range. A hyperlink is editable character by character in Insert mode, including at its first and last characters. The caret and Normal-mode character motions can stop at each character inside a link. `Backspace` and `Delete` remove one character at a time within or next to a link, as they do for ordinary text.
 
-When a caret position falls inside a non-editable hyperlink, the visible caret is placed at the nearer editable boundary of that hyperlink. If the position is exactly halfway between the boundaries, it is placed before the hyperlink.
+When an edit changes linked text into a valid HTTP(S) URL, its clickable destination follows the displayed text, and the link color and underline update immediately. If the edited text is no longer a valid HTTP(S) URL, the link color and underline disappear immediately and the text remains editable. When further editing makes that text a valid HTTP(S) URL again, link behavior and styling return immediately. Editing a link does not turn unrelated text or neighboring links into part of that link.
 
 ### 13.1 Selecting, copying, cutting, and pasting linked text
 
@@ -714,6 +714,8 @@ A save is performed when:
 * a hyperlink is inserted;
 * ten words have been inserted since the last successful save;
 * no document change has occurred for ten seconds while changes are pending.
+
+Editing the characters of an existing hyperlink is a text edit, not a new hyperlink insertion; it follows the word-volume, idle, and quit triggers rather than saving immediately for each changed URL.
 
 Changes that do not insert content — creating, splitting, deleting, reordering, or undoing/redoing nodes — do not by themselves trigger a save. They remain pending and are saved by the next volume, idle, or quit trigger.
 

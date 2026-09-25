@@ -162,17 +162,42 @@ describe('useNodeInputBindings', () => {
   it('edits content on content change using the node links, defaulting to none', () => {
     const store = createStore()
     const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const links = [{ start: 0, end: 1, url: 'https://example.test' }]
-    const linkedNode: TreeNode = { id: 'node', text: 'x', links, children: [] }
+    const text = 'https://example.test'
+    const links = [{ start: 0, end: text.length, url: text }]
+    const linkedNode: TreeNode = { id: 'node', text, links, children: [] }
     const input = document.createElement('div')
-    input.textContent = 'x'
+    input.textContent = text
 
     result.current(linkedNode).onContentChange({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.editContent).toHaveBeenCalledWith('node', 'x', links)
+    expect(store.editContent).toHaveBeenCalledWith('node', text, links, false)
 
+    input.textContent = 'x'
     const plainNode: TreeNode = { id: 'node', text: 'x', children: [] }
     result.current(plainNode).onContentChange({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.editContent).toHaveBeenLastCalledWith('node', 'x', [])
+    expect(store.editContent).toHaveBeenLastCalledWith('node', 'x', [], false)
+  })
+
+  it('uses Cmd+click to request opening the edited link', () => {
+    const store = createStore()
+    const { result } = renderBindings({ store, selectedNodeId: 'node' })
+    const url = 'https://example.test'
+    const node: TreeNode = { id: 'node', text: url, links: [{ start: 0, end: url.length, url }], children: [] }
+    const input = document.createElement('div')
+    input.innerHTML = `<a href="${url}">${url}</a>`
+    const link = input.querySelector('a')!
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const preventDefault = vi.fn()
+    const event = (metaKey: boolean) =>
+      ({ target: link, currentTarget: input, metaKey, preventDefault }) as unknown as Parameters<
+        ReturnType<typeof result.current>['onClick']
+      >[0]
+
+    result.current(node).onClick(event(false))
+    expect(open).not.toHaveBeenCalled()
+    result.current(node).onClick(event(true))
+    expect(open).toHaveBeenCalledWith(url, '_blank')
+    expect(preventDefault).toHaveBeenCalledTimes(2)
+    open.mockRestore()
   })
 
   it('ends the text session only for non-collapsed selections', () => {

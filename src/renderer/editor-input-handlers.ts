@@ -176,8 +176,6 @@ export function createEditorKeyDownHandler({
       if (node.attachment !== undefined) {
         onPreviewAttachment(node.attachment.id)
       }
-    } else if (event.key === 'Backspace' && store.deleteLink(node.id, cursor)) {
-      event.preventDefault()
     } else if (event.key === 'Backspace' && node.text === '') {
       event.preventDefault()
       store.deleteEmptySelected()

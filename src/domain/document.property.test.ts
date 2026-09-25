@@ -16,7 +16,9 @@ import {
   insertSiblingAfter,
   insertSiblingBefore,
   insertSubtreeSibling,
+  isHttpUrl,
   isValidLocation,
+  linksAfterTextEdit,
   locateNode,
   moveSibling,
   nodePath,
@@ -648,6 +650,29 @@ describe('document invariants', () => {
         }
       }),
       { numRuns: 25 },
+    )
+  })
+
+  it('keeps edited hyperlink ranges valid and nonoverlapping', () => {
+    const first = 'https://first.test'
+    const second = 'https://second.test'
+    const text = `${first} ${second}`
+    const links = [
+      { start: 0, end: first.length, url: first },
+      { start: first.length + 1, end: text.length, url: second },
+    ]
+    fc.assert(
+      fc.property(fc.nat(text.length), fc.nat(text.length), fc.string(), (a, b, inserted) => {
+        const start = Math.min(a, b)
+        const end = Math.max(a, b)
+        const nextText = text.slice(0, start) + inserted + text.slice(end)
+        const nextLinks = linksAfterTextEdit(text, links, nextText)
+        for (const [index, link] of nextLinks.entries()) {
+          expect(nextText.slice(link.start, link.end)).toBe(link.url)
+          expect(isHttpUrl(link.url)).toBe(true)
+          expect(link.start).toBeGreaterThanOrEqual(index === 0 ? 0 : nextLinks[index - 1]!.end)
+        }
+      }),
     )
   })
 })

@@ -145,7 +145,7 @@ test.describe('clipboard', () => {
     await expect(editor).toContainText('https://example.comx')
   })
 
-  test('visually marks a hyperlink when node content is selected with the mouse', async ({ userDataDir }) => {
+  test('selects linked characters with the mouse', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const editor = node(window, 1)
 
@@ -174,10 +174,13 @@ test.describe('clipboard', () => {
     await window.mouse.move(points.endX, points.endY, { steps: 10 })
     await window.mouse.up()
 
-    await expect(link).toHaveClass(/link-selected/)
+    expect(await editor.evaluate((element) => element.ownerDocument.defaultView?.getSelection()?.toString())).toContain(
+      'https://example.co',
+    )
+    await expect(link).not.toHaveClass(/link-selected/)
   })
 
-  test('removes the whole hyperlink with Backspace at its end', async ({ userDataDir }) => {
+  test('removes one linked character with Backspace at its end', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
     await writeClipboardText(app, 'https://example.com')
@@ -185,11 +188,11 @@ test.describe('clipboard', () => {
     await firePaste(editor)
     await editor.press('Backspace')
 
-    await expect(editor).toHaveText('')
-    await expect(window.getByRole('link')).toHaveCount(0)
+    await expect(editor).toHaveText('https://example.co')
+    await expect(window.getByRole('link', { name: 'https://example.co' })).toHaveAttribute('href', 'https://example.co')
   })
 
-  test('places the caret before following text after removing a hyperlink', async ({ userDataDir }) => {
+  test('keeps the caret within a hyperlink while editing before following text', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
     const editor = node(window, 1)
@@ -203,7 +206,11 @@ test.describe('clipboard', () => {
     await editor.press('Backspace')
     await editor.press('x')
 
-    await expect(editor).toHaveText('AxB')
+    await expect(editor).toHaveText('Ahttps://example.coxB')
+    await expect(window.getByRole('link', { name: 'https://example.cox' })).toHaveAttribute(
+      'href',
+      'https://example.cox',
+    )
   })
 
   test('pastes multiline text as separate nodes', async ({ userDataDir }) => {

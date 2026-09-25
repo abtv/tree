@@ -7,9 +7,7 @@ export function richTextHtml(node: TreeNode): string {
   for (const link of links) {
     if (link.start > position) parts.push(escapeHtml(node.text.slice(position, link.start)))
     const label = escapeHtml(node.text.slice(link.start, link.end))
-    parts.push(
-      `<a contenteditable="false" href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`,
-    )
+    parts.push(`<a href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`)
     position = link.end
   }
   if (position < node.text.length || parts.length === 0) parts.push(escapeHtml(node.text.slice(position)))
@@ -112,8 +110,15 @@ export function updateSelectedLinks(element: HTMLElement): void {
   const selection = globalThis.getSelection()
   const active = selection !== null && selection.rangeCount > 0 && !selection.isCollapsed
   const range = active && selection !== null ? selection.getRangeAt(0) : null
+  const linkRange = document.createRange()
   for (const link of element.querySelectorAll('a')) {
-    link.classList.toggle('link-selected', range !== null && range.intersectsNode(link))
+    linkRange.selectNodeContents(link)
+    link.classList.toggle(
+      'link-selected',
+      range !== null &&
+        range.compareBoundaryPoints(Range.START_TO_START, linkRange) <= 0 &&
+        range.compareBoundaryPoints(Range.END_TO_END, linkRange) >= 0,
+    )
   }
 }
 
@@ -132,17 +137,6 @@ export function setCaret(element: HTMLElement, position: number): void {
   let current: Node | null = walker.nextNode()
   while (current !== null) {
     const length = current.textContent?.length ?? 0
-    const link = current.parentElement?.closest('a[contenteditable="false"]')
-    if (link !== null && link !== undefined && remaining <= length) {
-      const parent = link.parentNode ?? element
-      const linkIndex = Array.from(parent.childNodes).indexOf(link)
-      const beforeLink = remaining <= length / 2
-      range.setStart(parent, beforeLink ? linkIndex : linkIndex + 1)
-      range.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(range)
-      return
-    }
     if (remaining < length) {
       range.setStart(current, remaining)
       range.collapse(true)
@@ -166,15 +160,6 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
     return
   }
   const cursor = Math.min(Math.max(position, 0), length - 1)
-  if (!(element instanceof HTMLTextAreaElement)) {
-    const linkCaret = normalLinkCaret(element, cursor)
-    if (linkCaret !== undefined) {
-      setCaret(element, cursor)
-      linkCaret.link.classList.add(linkCaret.before ? 'normal-caret-before' : 'normal-caret-after')
-      positionNormalLinkCaret(linkCaret.link, linkCaret.before)
-      return
-    }
-  }
   setSelectionRange(element, cursor, cursor + 1)
 }
 
@@ -206,51 +191,6 @@ export function setSelectionRange(element: HTMLElement, anchor: number, focus: n
 export function isCollapsedSelection(): boolean {
   const selection = globalThis.getSelection()
   return selection === null || selection.isCollapsed
-}
-
-function normalLinkCaret(
-  element: HTMLElement,
-  position: number,
-): { link: HTMLAnchorElement; before: boolean } | undefined {
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let remaining = position
-  let current: Node | null = walker.nextNode()
-  while (current !== null) {
-    const length = current.textContent?.length ?? 0
-    const link = current.parentElement?.closest('a[contenteditable="false"]')
-    if (link instanceof HTMLAnchorElement && remaining >= 0 && remaining < length)
-      return { link, before: remaining <= length / 2 }
-    remaining -= length
-    current = walker.nextNode()
-  }
-  return undefined
-}
-
-function positionNormalLinkCaret(link: HTMLAnchorElement, before: boolean): void {
-  const walker = document.createTreeWalker(link, NodeFilter.SHOW_TEXT)
-  let first: Text | undefined
-  let last: Text | undefined
-  let current = walker.nextNode()
-  while (current !== null) {
-    if (current instanceof Text && (current.textContent?.length ?? 0) > 0) {
-      first ??= current
-      last = current
-    }
-    current = walker.nextNode()
-  }
-  const text = before ? first : last
-  if (text === undefined) return
-
-  const range = document.createRange()
-  const length = text.textContent?.length ?? 0
-  range.setStart(text, before ? 0 : length - 1)
-  range.setEnd(text, before ? 1 : length)
-  if (typeof range.getBoundingClientRect !== 'function') return
-  const character = range.getBoundingClientRect()
-  const bounds = link.getBoundingClientRect()
-  link.style.setProperty('--normal-caret-left', `${(before ? character.left - 2 : character.right) - bounds.left}px`)
-  link.style.setProperty('--normal-caret-top', `${character.top - bounds.top}px`)
-  link.style.setProperty('--normal-caret-height', `${character.height}px`)
 }
 
 function getCaretPrefix(element: HTMLElement, container: Node): number {

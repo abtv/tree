@@ -8,6 +8,7 @@ import type {
   MouseEvent,
   SyntheticEvent,
 } from 'react'
+import { useState } from 'react'
 import type { TreeNode } from '../domain/document'
 import { richTextHtml } from './editor-dom'
 
@@ -23,6 +24,7 @@ export interface NodeInputBindings {
   onCompositionEnd: (event: CompositionEvent<HTMLElement>) => void
   onCut: () => void
   onContextMenu: (event: MouseEvent<HTMLElement>) => void
+  onClick: (event: MouseEvent<HTMLElement>) => void
   onFocus: (event: FocusEvent<HTMLElement>) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
   onMouseDown: (event: MouseEvent<HTMLElement>) => void
@@ -50,6 +52,7 @@ export function NodeInput({
   onCompositionStart,
   onCompositionEnd,
   onContextMenu,
+  onClick,
   onCut,
   onFocus,
   onKeyDown,
@@ -57,6 +60,11 @@ export function NodeInput({
   onPaste,
   onSelect,
 }: NodeInputProps): React.JSX.Element {
+  const hasLinks = (node.links?.length ?? 0) > 0
+  const [richEditor, setRichEditor] = useState<{ nodeId: string; enabled: boolean }>({
+    nodeId: node.id,
+    enabled: hasLinks,
+  })
   const className = [
     'node-input',
     parent ? 'current-parent-input' : '',
@@ -72,8 +80,12 @@ export function NodeInput({
     onCompositionEnd,
     onCompositionStart,
     onContextMenu,
+    onClick,
     onCut,
-    onFocus,
+    onFocus: (event: FocusEvent<HTMLElement>) => {
+      if (hasLinks) setRichEditor({ nodeId: node.id, enabled: true })
+      onFocus(event)
+    },
     onKeyDown,
     onMouseDown,
     onPaste,
@@ -81,7 +93,7 @@ export function NodeInput({
     spellCheck: true,
   }
 
-  if (node.links === undefined || node.links.length === 0) {
+  if (!hasLinks && !(richEditor.nodeId === node.id && richEditor.enabled)) {
     return (
       <textarea
         {...commonProps}
@@ -102,7 +114,10 @@ export function NodeInput({
       aria-multiline="true"
       role="textbox"
       onChange={onContentChange}
-      onInput={onContentInput}
+      onInput={(event: FormEvent<HTMLElement>) => {
+        if (hasLinks) setRichEditor({ nodeId: node.id, enabled: true })
+        onContentInput(event)
+      }}
       suppressContentEditableWarning
       dangerouslySetInnerHTML={{ __html: richTextHtml(node) }}
     />

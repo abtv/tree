@@ -124,12 +124,12 @@ test.describe('navigation', () => {
       await child.evaluate((element) => {
         const selection = element.ownerDocument.defaultView?.getSelection()
         return {
-          anchorNodeIsEditor: selection?.anchorNode === element,
+          anchorNodeIsLinkText: selection?.anchorNode === element.querySelector('a')?.firstChild,
           anchorOffset: selection?.anchorOffset,
           collapsed: selection?.isCollapsed,
         }
       }),
-    ).toEqual({ anchorNodeIsEditor: true, anchorOffset: 0, collapsed: true })
+    ).toEqual({ anchorNodeIsLinkText: true, anchorOffset: 14, collapsed: true })
   })
 
   test('moves left and right across sibling and parent boundaries', async ({ userDataDir }) => {

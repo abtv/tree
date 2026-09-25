@@ -381,7 +381,7 @@ describe('App', () => {
     })
   })
 
-  it('places a linked caret at the nearest editable boundary', async () => {
+  it('places a linked caret at the requested character', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
     await act(async () => {
       await store.initialize()
@@ -393,14 +393,14 @@ describe('App', () => {
     await act(async () => {
       store.selectNode('root', 9)
     })
-    expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor)
-    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(0)
+    expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor.querySelector('a')?.firstChild)
+    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(9)
 
     await act(async () => {
       store.selectNode('root', 10)
     })
-    expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor)
-    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(1)
+    expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor.querySelector('a')?.firstChild)
+    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(10)
   })
 
   it('moves the caret to a new sibling after Enter at the end of linked text', async () => {

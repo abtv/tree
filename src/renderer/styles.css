@@ -301,30 +301,14 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   caret-animation: manual;
 }
 
-.vim-state-normal .node-input::selection {
+.vim-state-normal .node-input::selection,
+.vim-state-normal .node-input a::selection {
   color: #fff;
   background: #373f43;
 }
 
-.vim-state-normal .node-input a.normal-caret-before,
-.vim-state-normal .node-input a.normal-caret-after {
-  position: relative;
-}
-
-.vim-state-normal .node-input a.normal-caret-before::before,
-.vim-state-normal .node-input a.normal-caret-after::after {
-  position: absolute;
-  z-index: 1;
-  top: var(--normal-caret-top);
-  left: var(--normal-caret-left);
-  width: 2px;
-  height: var(--normal-caret-height);
-  background: #373f43;
-  content: '';
-  pointer-events: none;
-}
-
-.vim-state-visual .node-input::selection {
+.vim-state-visual .node-input::selection,
+.vim-state-visual .node-input a::selection {
   color: #fff;
   background: #725493;
 }
@@ -621,10 +605,6 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   }
   .node-input {
     caret-color: #fff;
-  }
-  .vim-state-normal .node-input a.normal-caret-before::before,
-  .vim-state-normal .node-input a.normal-caret-after::after {
-    background: #fff;
   }
   .attachment-button:focus-visible {
     outline-color: #a5adb2;

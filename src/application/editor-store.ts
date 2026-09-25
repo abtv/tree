@@ -34,7 +34,7 @@ import {
   pasteSubtreeTransition,
   type SiblingInsertionPosition,
 } from './editor-command-transitions'
-import { clipboardIntroducesLink, hasNewLink, nodeContent, sameNodeContent } from './editor-content-changes'
+import { clipboardIntroducesLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
 import { EditorRuntimeState } from './editor-runtime-state'
 import {
@@ -157,10 +157,10 @@ export class EditorStore {
   }
 
   public editText(nodeId: NodeId, text: string): void {
-    this.editContent(nodeId, text, [])
+    this.editContent(nodeId, text, [], false)
   }
 
-  public editContent(nodeId: NodeId, text: string, links: readonly LinkRange[]): void {
+  public editContent(nodeId: NodeId, text: string, links: readonly LinkRange[], createsNewLink: boolean): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
@@ -173,10 +173,9 @@ export class EditorStore {
       this.textSession.begin(nodeId)
     }
     const insertedWords = countInsertedWords(node.text, text)
-    const linkInserted = hasNewLink(node.links, links)
     const next = editNodeContent(state.document, nodeId, text, links)
     this.runtime.replaceReady({ ...state, document: next })
-    this.noteChange(insertedWords, linkInserted)
+    this.noteChange(insertedWords, createsNewLink)
     this.textSession.scheduleBoundary()
     this.textSession.endIfStandalone()
   }
@@ -189,7 +188,7 @@ export class EditorStore {
     this.endTextSession()
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.textSession.markNextEditStandalone()
-    this.editContent(nodeId, replacement.text, replacement.links)
+    this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
   }
 
   public deleteLink(nodeId: NodeId, cursor: number): boolean {

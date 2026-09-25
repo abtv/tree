@@ -779,11 +779,10 @@ describe('editor keyboard handler', () => {
     expect(onPreviewAttachment).toHaveBeenCalledWith('image')
   })
 
-  it('selects all linked content and removes link text at its end', async () => {
+  it('selects all linked content and leaves Backspace to native character editing', async () => {
     const store = createStore()
-    vi.mocked(store.deleteLink).mockReturnValue(true)
     const input = document.createElement('div')
-    input.innerHTML = '<a contenteditable="false" href="https://example.test">link</a>'
+    input.innerHTML = '<a href="https://example.test">link</a>'
     document.body.append(input)
     const node = {
       id: 'node',
@@ -807,8 +806,8 @@ describe('editor keyboard handler', () => {
 
     expect(selectAllEvent.preventDefault).toHaveBeenCalledOnce()
     expect(setSelectAllNodeId).toHaveBeenCalledWith('node')
-    expect(store.deleteLink).toHaveBeenCalledWith('node', 4)
-    expect(deleteEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(store.deleteLink).not.toHaveBeenCalled()
+    expect(deleteEvent.preventDefault).not.toHaveBeenCalled()
   })
 
   it('selects all plain text content explicitly', async () => {

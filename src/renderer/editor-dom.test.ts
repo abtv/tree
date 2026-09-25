@@ -31,7 +31,7 @@ function setDomSelection(startNode: Node, start: number, endNode = startNode, en
 }
 
 describe('editor DOM adapters', () => {
-  it('renders escaped text and non-editable links', () => {
+  it('renders escaped text and editable links', () => {
     expect(
       richTextHtml(
         node('A < B & C', [
@@ -40,7 +40,7 @@ describe('editor DOM adapters', () => {
         ]),
       ),
     ).toBe(
-      '<a contenteditable="false" href="https://example.test/?a=1&amp;b=2" rel="noreferrer" target="_blank">A</a> &lt; B <a contenteditable="false" href="https://example.test" rel="noreferrer" target="_blank">&amp;</a> C',
+      '<a href="https://example.test/?a=1&amp;b=2" rel="noreferrer" target="_blank">A</a> &lt; B <a href="https://example.test" rel="noreferrer" target="_blank">&amp;</a> C',
     )
   })
 
@@ -168,34 +168,14 @@ describe('editor DOM adapters', () => {
     expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
-  it('marks the nearest hyperlink boundary for a Normal-mode block caret without selecting the link', () => {
+  it('selects each linked character for a Normal-mode block caret', () => {
     const element = document.createElement('div')
-    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    element.innerHTML = 'a<a href="https://example.test">link</a>z'
     document.body.append(element)
-    const link = element.querySelector('a')
-    if (link === null) throw new Error('The linked element is missing.')
-
     setNormalCaret(element, 2)
-    expect(window.getSelection()?.isCollapsed).toBe(true)
-    expect(getCaret(element)).toBe(1)
-    expect(link.classList.contains('normal-caret-before')).toBe(true)
-    expect(link.classList.contains('normal-caret-after')).toBe(false)
-    expect(link.classList.contains('link-selected')).toBe(false)
-
+    expect(getSelectionRange(element)).toEqual({ start: 2, end: 3 })
     setNormalCaret(element, 4)
-    expect(window.getSelection()?.isCollapsed).toBe(true)
-    expect(getCaret(element)).toBe(5)
-    expect(link.classList.contains('normal-caret-after')).toBe(true)
-    expect(link.classList.contains('normal-caret-before')).toBe(false)
-
-    setNormalCaret(element, 2)
-    selectAll(element)
-    expect(link.classList.contains('normal-caret-before')).toBe(false)
-    expect(link.classList.contains('normal-caret-after')).toBe(false)
-
-    setCaret(element, 0)
-    expect(link.classList.contains('normal-caret-before')).toBe(false)
-    expect(link.classList.contains('normal-caret-after')).toBe(false)
+    expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
   it('does not draw a hyperlink caret while the Normal cursor is in earlier plain text', () => {
@@ -218,53 +198,6 @@ describe('editor DOM adapters', () => {
     expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
   })
 
-  it('positions the hyperlink caret from the first or last wrapped text fragment', () => {
-    const element = document.createElement('div')
-    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
-    document.body.append(element)
-    const link = element.querySelector('a')
-    if (link === null) throw new Error('The linked element is missing.')
-
-    const fragmentRects = [new DOMRect(14, 20, 8, 21), new DOMRect(42, 41, 8, 21)]
-    let fragmentIndex = 0
-    const createRange = document.createRange.bind(document)
-    const rangeFactory = vi.spyOn(document, 'createRange').mockImplementation(() => {
-      const range = createRange()
-      Object.defineProperty(range, 'getBoundingClientRect', {
-        value: () => fragmentRects[Math.min(fragmentIndex++, fragmentRects.length - 1)],
-      })
-      return range
-    })
-    const linkBounds = vi.spyOn(link, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 20, 80, 42))
-
-    try {
-      setNormalCaret(element, 2)
-      expect(link.style.getPropertyValue('--normal-caret-left')).toBe('2px')
-      expect(link.style.getPropertyValue('--normal-caret-top')).toBe('0px')
-      expect(link.style.getPropertyValue('--normal-caret-height')).toBe('21px')
-      expect(getCaret(element)).toBe(1)
-      expect(window.getSelection()?.isCollapsed).toBe(true)
-
-      setNormalCaret(element, 4)
-      expect(link.style.getPropertyValue('--normal-caret-left')).toBe('40px')
-      expect(link.style.getPropertyValue('--normal-caret-top')).toBe('21px')
-      expect(link.style.getPropertyValue('--normal-caret-height')).toBe('21px')
-      expect(getCaret(element)).toBe(5)
-      expect(readEditableContent(element)).toEqual({
-        text: 'alinkz',
-        links: [{ start: 1, end: 5, url: 'https://example.test' }],
-      })
-
-      clearNormalCaret(element)
-      expect(link.style.getPropertyValue('--normal-caret-left')).toBe('')
-      expect(link.style.getPropertyValue('--normal-caret-top')).toBe('')
-      expect(link.style.getPropertyValue('--normal-caret-height')).toBe('')
-    } finally {
-      rangeFactory.mockRestore()
-      linkBounds.mockRestore()
-    }
-  })
-
   it('clears Normal-mode hyperlink caret decorations when an editor loses focus', () => {
     const element = document.createElement('div')
     element.innerHTML =
@@ -282,15 +215,15 @@ describe('editor DOM adapters', () => {
     expect(link.style.getPropertyValue('--normal-caret-height')).toBe('')
   })
 
-  it('places a caret before or after a non-editable link at the nearest boundary', () => {
+  it('places a caret at each position inside an editable link', () => {
     const element = document.createElement('div')
-    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    element.innerHTML = 'a<a href="https://example.test">link</a>z'
     document.body.append(element)
 
     setCaret(element, 3)
-    expect(getCaret(element)).toBe(1)
+    expect(getCaret(element)).toBe(3)
     setCaret(element, 4)
-    expect(getCaret(element)).toBe(5)
+    expect(getCaret(element)).toBe(4)
   })
 
   it('collapses a textarea selection to its anchor without moving a collapsed caret', () => {
@@ -342,9 +275,9 @@ describe('editor DOM adapters', () => {
     getSelection.mockRestore()
   })
 
-  it('marks links that intersect the current selection and clears them when it collapses', () => {
+  it('marks fully selected links and clears the mark when selection collapses', () => {
     const element = document.createElement('div')
-    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    element.innerHTML = 'a<a href="https://example.test">link</a>z'
     document.body.append(element)
     const link = element.querySelector('a')
     if (link === null) throw new Error('The link was not created.')
@@ -360,12 +293,16 @@ describe('editor DOM adapters', () => {
 
   it('does not mark a link that the selection does not cover', () => {
     const element = document.createElement('div')
-    element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'
+    element.innerHTML = 'a<a href="https://example.test">link</a>z'
     document.body.append(element)
     const link = element.querySelector('a')
     if (link === null) throw new Error('The link was not created.')
 
     setDomSelection(element.firstChild!, 0, element.firstChild!, 1)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(false)
+
+    setDomSelection(link.firstChild!, 1, link.firstChild!, 2)
     updateSelectedLinks(element)
     expect(link.classList.contains('link-selected')).toBe(false)
   })

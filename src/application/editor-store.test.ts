@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from './editor-store'
-import { MAX_DOCUMENT_DEPTH, type TreeNode } from '../domain/document'
+import { MAX_DOCUMENT_DEPTH, reconcileLinkTextEdit, type TreeNode } from '../domain/document'
 
 class FakeClock implements Clock {
   private readonly timers = new Map<number, () => void>()
@@ -2058,10 +2058,82 @@ describe('EditorStore', () => {
     await store.flushPersistence()
     services.saves.length = 0
 
-    store.editContent('root', 'xhttps://example.com', [{ start: 1, end: 20, url: 'https://example.com' }])
+    store.editContent('root', 'xhttps://example.com', [{ start: 1, end: 20, url: 'https://example.com' }], false)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(services.saves).toEqual([])
+  })
+
+  it('does not issue an immediate disk save for each character of an edited hyperlink', async () => {
+    const url = 'https://example.com'
+    const services = loadedState(
+      { roots: [{ id: 'root', text: url, links: [{ start: 0, end: url.length, url }], children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    for (let count = 1; count <= 100; count += 1) {
+      const edited = `${url}/${'a'.repeat(count)}`
+      store.editContent('root', edited, [{ start: 0, end: edited.length, url: edited }], false)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(services.saves).toEqual([])
+    await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('does not issue an immediate disk save when a link is restored after a brief invalid edit', async () => {
+    const url = 'https://example.com'
+    const services = loadedState(
+      { roots: [{ id: 'root', text: url, links: [{ start: 0, end: url.length, url }], children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    let text = url
+    let links = [{ start: 0, end: url.length, url }]
+    let draft: { start: number; end: number; url: string } | undefined
+    const type = (nextText: string): void => {
+      const edit = reconcileLinkTextEdit(text, links, nextText, draft)
+      draft = edit.draft
+      links = edit.links
+      text = nextText
+      store.editContent('root', text, links, edit.createsNewLink)
+    }
+
+    type('htps://example.com')
+    type(url)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(services.saves).toEqual([])
+    await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
+  })
+
+  it('replaces one linked character while keeping the link destination aligned', async () => {
+    const url = 'https://example.com'
+    const services = loadedState(
+      { roots: [{ id: 'root', text: url, links: [{ start: 0, end: url.length, url }], children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.replaceTextRange('root', 9, 10, 'A')
+
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: {
+        roots: [{ text: 'https://eAample.com', links: [{ url: 'https://eAample.com' }] }],
+      },
+    })
   })
 
   it('saves immediately when an edit inserts a new hyperlink', async () => {
@@ -2074,7 +2146,7 @@ describe('EditorStore', () => {
     await store.flushPersistence()
     services.saves.length = 0
 
-    store.editContent('root', 'x https://example.com', [{ start: 2, end: 21, url: 'https://example.com' }])
+    store.editContent('root', 'x https://example.com', [{ start: 2, end: 21, url: 'https://example.com' }], true)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(services.saves).toHaveLength(1)

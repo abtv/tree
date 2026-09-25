@@ -217,9 +217,7 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 0)
   })
 
-  test('shows the Normal-mode block caret at a hyperlink boundary without selecting the link', async ({
-    userDataDir,
-  }) => {
+  test('shows the Normal-mode block caret on individual hyperlink characters', async ({ userDataDir }) => {
     const text = 'https://example.test'
     seedDocument(userDataDir, {
       document: {
@@ -238,23 +236,21 @@ test.describe('Vim editing prototype', () => {
     const editor = node(window, 1)
     const link = editor.getByRole('link')
 
-    await expect(link).toHaveClass(/normal-caret-before/)
     await expect(link).not.toHaveClass(/link-selected/)
     expect(
       await editor.evaluate((field) => {
         const selection = field.ownerDocument.defaultView?.getSelection()
-        return selection?.isCollapsed
+        return selection?.toString()
       }),
-    ).toBe(true)
+    ).toBe('h')
 
     await editor.press('$')
 
-    await expect(link).toHaveClass(/normal-caret-after/)
-    await expect(link).not.toHaveClass(/normal-caret-before/)
+    expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.toString())).toBe('t')
     await expect(link).not.toHaveClass(/link-selected/)
   })
 
-  test('crosses a hyperlink in one motion instead of getting stuck at its boundary', async ({ userDataDir }) => {
+  test('crosses a hyperlink one character at a time', async ({ userDataDir }) => {
     const url = 'https://example.test/a/very/long/path/that/does/not/fit/on/one/line'
     const text = `before ${url} after`
     const start = text.indexOf(url)
@@ -267,7 +263,6 @@ test.describe('Vim editing prototype', () => {
     })
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
-    const link = editor.getByRole('link')
     const caret = () =>
       editor.evaluate((field) => {
         const selection = field.ownerDocument.defaultView?.getSelection()
@@ -283,18 +278,17 @@ test.describe('Vim editing prototype', () => {
     await editor.press('0')
     await editor.press(String(start))
     await editor.press('l')
-    await expect(link).toHaveClass(/normal-caret-before/)
-
-    // A single 'l' must clear the whole atomic link, landing just past it, not
-    // stall inside it re-snapping to the same boundary on every keypress.
+    expect(await caret()).toBe(start)
     await editor.press('l')
-    await expect(link).not.toHaveClass(/normal-caret-before/)
-    await expect(link).not.toHaveClass(/normal-caret-after/)
-    expect(await caret()).toBe(end)
+    expect(await caret()).toBe(start + 1)
 
     await editor.press('h')
-    await expect(link).toHaveClass(/normal-caret-before/)
     expect(await caret()).toBe(start)
+    await editor.press('$')
+    expect(await caret()).toBe(text.length - 1)
+    await setCursor(editor, end - 1)
+    await editor.press('l')
+    expect(await caret()).toBe(end)
   })
 
   test('keeps the Normal caret on the selected linked node while h and l traverse it', async ({ userDataDir }) => {
@@ -338,38 +332,34 @@ test.describe('Vim editing prototype', () => {
     await empty.press('j')
     await expect(linked).toBeFocused()
     await expect(window.locator('.node-row').nth(1).locator('.node-focus-marker')).toHaveCount(1)
-    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(0)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-normal-plain-before-link-focused.png')
 
     await linked.press('l')
     expect(await caret()).toBe(1)
     await setCursor(linked, firstStart)
     await linked.press('h')
-    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart - 1)
     await linked.press('l')
-    await expect(links.first()).toHaveClass(/normal-caret-before/)
+    await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-normal-link-boundary-focused.png')
     await linked.press('l')
-    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
-    expect(await caret()).toBe(firstStart + url.length)
+    await expect(links.first()).not.toHaveClass(/link-selected/)
+    expect(await caret()).toBe(firstStart + 1)
     await linked.press('h')
-    await expect(links.first()).toHaveClass(/normal-caret-before/)
+    await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart)
     await expect(empty).not.toBeFocused()
-    await expect(window.locator('.node-input a.normal-caret-before, .node-input a.normal-caret-after')).toHaveCount(1)
     await linked.press('k')
     await expect(empty).toBeFocused()
-    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-normal-empty-neighbor-focused.png')
+    await expect(links.first()).not.toHaveClass(/link-selected/)
     await empty.press('j')
     await expect(linked).toBeFocused()
-    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(links.first()).not.toHaveClass(/link-selected/)
   })
 
-  test('keeps the Normal-mode hyperlink boundary caret visible in dark appearance', async ({ userDataDir }) => {
+  test('keeps the Normal-mode linked character visible in dark appearance', async ({ userDataDir }) => {
     const text = 'https://example.test'
     seedDocument(userDataDir, {
       document: {
@@ -382,15 +372,15 @@ test.describe('Vim editing prototype', () => {
     const editor = node(window, 1)
     const link = editor.getByRole('link')
 
-    await expect(link).toHaveClass(/normal-caret-before/)
+    await expect(link).not.toHaveClass(/link-selected/)
     await expect
       .poll(() =>
         link.evaluate(
-          (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::before').backgroundColor,
+          (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::selection').backgroundColor,
         ),
       )
-      .toBe('rgb(255, 255, 255)')
-    await expect(editor).toHaveScreenshot('vim-normal-link-caret-dark.png')
+      .toBe('rgb(55, 63, 67)')
+    await expect(editor).toHaveScreenshot('vim-normal-link-character-dark.png')
   })
 
   test('matches the Visual-mode selection color across a selected hyperlink', async ({ userDataDir }) => {
@@ -422,7 +412,7 @@ test.describe('Vim editing prototype', () => {
     expect(linkBackground).toBe(textSelectionBackground)
   })
 
-  test('shows the Normal-mode hyperlink caret only on the focused node', async ({ userDataDir }) => {
+  test('keeps the Normal-mode linked selection on the focused node', async ({ userDataDir }) => {
     const firstText = 'Start https://first.example end'
     const secondText = 'Open https://second.example now'
     seedDocument(userDataDir, {
@@ -448,33 +438,34 @@ test.describe('Vim editing prototype', () => {
     const { window } = await launchTree(userDataDir)
     const first = node(window, 1)
     const second = node(window, 2)
-    const firstLink = first.getByRole('link')
-    const secondLink = second.getByRole('link')
+    const hasLinkedSelection = (field: HTMLElement): boolean => {
+      const selection = field.ownerDocument.defaultView?.getSelection()
+      return (
+        selection?.anchorNode !== null && selection?.anchorNode !== undefined && field.contains(selection.anchorNode)
+      )
+    }
 
     await first.press('6')
     await first.press('l')
-    await expect(firstLink).toHaveClass(/normal-caret-before/)
-    await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
-    await expect(first).toHaveScreenshot('vim-normal-link-caret-multi-node-focused-first.png')
+    expect(await first.evaluate(hasLinkedSelection)).toBe(true)
+    expect(await second.evaluate(hasLinkedSelection)).toBe(false)
 
     await second.focus()
     await second.press('0')
     await second.press('5')
     await second.press('l')
-    await expect(secondLink).toHaveClass(/normal-caret-before/)
-    await expect(firstLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
-    await expect(first).toHaveScreenshot('vim-normal-link-caret-multi-node-unfocused-first.png')
-    await expect(second).toHaveScreenshot('vim-normal-link-caret-multi-node-focused-second.png')
+    expect(await first.evaluate(hasLinkedSelection)).toBe(false)
+    expect(await second.evaluate(hasLinkedSelection)).toBe(true)
 
     await first.focus()
     await first.press('0')
     await first.press('6')
     await first.press('l')
-    await expect(firstLink).toHaveClass(/normal-caret-before/)
-    await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    expect(await first.evaluate(hasLinkedSelection)).toBe(true)
+    expect(await second.evaluate(hasLinkedSelection)).toBe(false)
   })
 
-  test('keeps the Normal-mode caret on one line for wrapped hyperlinks', async ({ userDataDir }) => {
+  test('keeps the Normal-mode linked character on one line through wrapping and resize', async ({ userDataDir }) => {
     const firstUrl = `https://example.test/${'wrapped-segment-'.repeat(10)}`
     const secondUrl = `https://sample.test/${'neighbor-segment-'.repeat(10)}`
     seedDocument(userDataDir, {
@@ -495,82 +486,30 @@ test.describe('Vim editing prototype', () => {
     const first = node(window, 1)
     const second = node(window, 2)
     const firstLink = first.getByRole('link')
-    const secondLink = second.getByRole('link')
+    const selectedCharacter = () =>
+      first.evaluate((field) => {
+        const selection = field.ownerDocument.defaultView?.getSelection()
+        if (!selection || selection.rangeCount === 0) return undefined
+        const rects = selection.getRangeAt(0).getClientRects()
+        const rect = rects[0]
+        return { text: selection.toString(), width: rect?.width ?? 0, height: rect?.height ?? 0 }
+      })
 
-    await expect(firstLink).toHaveClass(/normal-caret-before/)
-    const beforeGeometry = await firstLink.evaluate((link) => {
-      const view = link.ownerDocument.defaultView
-      const style = view?.getComputedStyle(link, '::before')
-      const bounds = link.getBoundingClientRect()
-      const firstFragment = link.getClientRects()[0]
-      return {
-        fragments: link.getClientRects().length,
-        left: Number.parseFloat(style?.left ?? ''),
-        expectedLeft: firstFragment === undefined ? Number.NaN : firstFragment.left - bounds.left - 2,
-        top: Number.parseFloat(style?.top ?? ''),
-        expectedTop: firstFragment === undefined ? Number.NaN : firstFragment.top - bounds.top,
-        height: Number.parseFloat(style?.height ?? ''),
-        lineHeight: Number.parseFloat(view?.getComputedStyle(link).lineHeight ?? ''),
-      }
-    })
-    expect(beforeGeometry.fragments).toBeGreaterThan(1)
-    expect(beforeGeometry.left).toBeCloseTo(beforeGeometry.expectedLeft, 0)
-    expect(beforeGeometry.top).toBeCloseTo(beforeGeometry.expectedTop, 0)
-    expect(beforeGeometry.height).toBeGreaterThan(0)
-    expect(beforeGeometry.height).toBeLessThanOrEqual(beforeGeometry.lineHeight + 1)
-    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-focused-before.png')
+    expect(await firstLink.evaluate((link) => link.getClientRects().length)).toBeGreaterThan(1)
+    expect(await selectedCharacter()).toMatchObject({ text: 'h' })
+    expect((await selectedCharacter())?.width).toBeGreaterThan(0)
     await first.press('$')
-    await expect(firstLink).toHaveClass(/normal-caret-after/)
-    const afterGeometry = await firstLink.evaluate((link) => {
-      const view = link.ownerDocument.defaultView
-      const style = view?.getComputedStyle(link, '::after')
-      const bounds = link.getBoundingClientRect()
-      const fragments = link.getClientRects()
-      const lastFragment = fragments[fragments.length - 1]
-      return {
-        left: Number.parseFloat(style?.left ?? ''),
-        expectedLeft: lastFragment === undefined ? Number.NaN : lastFragment.right - bounds.left,
-        top: Number.parseFloat(style?.top ?? ''),
-        expectedTop: lastFragment === undefined ? Number.NaN : lastFragment.top - bounds.top,
-        height: Number.parseFloat(style?.height ?? ''),
-        lineHeight: Number.parseFloat(view?.getComputedStyle(link).lineHeight ?? ''),
-      }
-    })
-    expect(afterGeometry.left).toBeCloseTo(afterGeometry.expectedLeft, 0)
-    expect(afterGeometry.top).toBeCloseTo(afterGeometry.expectedTop, 0)
-    expect(afterGeometry.height).toBeGreaterThan(0)
-    expect(afterGeometry.height).toBeLessThanOrEqual(afterGeometry.lineHeight + 1)
-    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-focused-after.png')
+    expect(await selectedCharacter()).toMatchObject({ text: '-' })
+    expect((await selectedCharacter())?.width).toBeGreaterThan(0)
 
-    await first.press('0')
-    await expect(firstLink).toHaveClass(/normal-caret-before/)
     await second.focus()
-    await expect(firstLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
-    await expect(secondLink).toHaveClass(/normal-caret-before/)
-    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-unfocused.png')
-    await expect(second).toHaveScreenshot('vim-normal-wrapped-link-neighbor-focused.png')
-
+    await expect(second).toBeFocused()
     await first.focus()
-    await expect(firstLink).toHaveClass(/normal-caret-before/)
-    await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
     await window.emulateMedia({ colorScheme: 'dark' })
-    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-dark-before.png')
     await first.press('$')
-    await expect(firstLink).toHaveClass(/normal-caret-after/)
-    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-dark-after.png')
     await setMainWindowBounds(app, { width: 680 })
-    await expect
-      .poll(() =>
-        firstLink.evaluate((link) => {
-          const top = Number.parseFloat(link.ownerDocument.defaultView?.getComputedStyle(link, '::after').top ?? '')
-          const bounds = link.getBoundingClientRect()
-          const fragments = link.getClientRects()
-          const last = fragments[fragments.length - 1]
-          return last === undefined ? Number.POSITIVE_INFINITY : Math.abs(top - (last.top - bounds.top))
-        }),
-      )
-      .toBeLessThan(0.5)
-    await expect(first).toHaveScreenshot('vim-normal-wrapped-link-dark-after-resize.png')
+    await expect.poll(async () => (await selectedCharacter())?.width ?? 0).toBeGreaterThan(0)
+    expect((await selectedCharacter())?.height).toBeLessThanOrEqual(21)
   })
 
   test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {

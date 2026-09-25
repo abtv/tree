@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, displayedNodes, type TreeNode } from '../domain/document'
+import { cloneNode, displayedNodes, reconcileLinkTextEdit, type LinkRange, type TreeNode } from '../domain/document'
 import {
   clearNormalCaret,
   getCaret,
@@ -51,6 +51,7 @@ export function useNodeInputBindings({
   const inputs = useRef(new Map<string, HTMLElement>())
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
+  const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
   const latestVimMode = useRef(vimMode)
   const [composing, setComposing] = useState(false)
@@ -320,10 +321,27 @@ export function useNodeInputBindings({
         const cursor = getCaret(event.currentTarget)
         const content = readEditableContent(event.currentTarget)
         pendingCaret.current = { input: event.currentTarget, cursor }
-        store.editContent(node.id, content.text, content.links)
+        const draft =
+          pendingLinkDraft.current?.nodeId === node.id &&
+          node.text.slice(pendingLinkDraft.current.range.start, pendingLinkDraft.current.range.end) ===
+            pendingLinkDraft.current.range.url
+            ? pendingLinkDraft.current.range
+            : undefined
+        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], content.text, draft)
+        pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }
+        store.editContent(node.id, content.text, edit.links, edit.createsNewLink)
       },
       onContentChange: (event: FormEvent<HTMLElement>) => {
-        store.editContent(node.id, event.currentTarget.textContent ?? '', node.links ?? [])
+        const text = event.currentTarget.textContent ?? ''
+        const draft =
+          pendingLinkDraft.current?.nodeId === node.id &&
+          node.text.slice(pendingLinkDraft.current.range.start, pendingLinkDraft.current.range.end) ===
+            pendingLinkDraft.current.range.url
+            ? pendingLinkDraft.current.range
+            : undefined
+        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text, draft)
+        pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }
+        store.editContent(node.id, text, edit.links, edit.createsNewLink)
       },
       onCompositionEnd: (event) => {
         setComposing(false)
@@ -368,6 +386,13 @@ export function useNodeInputBindings({
           .showEditorContextMenu(request)
           .then((command) => executeEditorContextMenuCommand(command, store, node, input))
           .catch((error: unknown) => store.reportError(error))
+      },
+      onClick: (event: MouseEvent<HTMLElement>) => {
+        const target = event.target
+        const link = target instanceof Element ? target.closest('a[href]') : null
+        if (link === null || !event.currentTarget.contains(link)) return
+        event.preventDefault()
+        if (event.metaKey) window.open(link.getAttribute('href') ?? '', '_blank')
       },
       onCut: () => store.markNextTextEditStandalone(),
       onFocus: (event: FocusEvent<HTMLElement>) => {
