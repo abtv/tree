@@ -1,20 +1,12 @@
 import {
   collectAttachmentIds,
-  cloneNode,
-  cloneNodeWithNewIds,
   createInitialDocument,
   deleteLink,
   editNodeContent,
   isValidLocation,
-  displayedNodes,
   locateNode,
-  nodePath,
-  normalizeLinks,
   parsePersistedState,
-  releaseNodeIndex,
   replaceLinkedText,
-  replaceSiblingRange,
-  ensureRoot,
   removeTextRange,
   requireNode,
   type AttachmentId,
@@ -44,38 +36,31 @@ import {
 } from './editor-command-transitions'
 import { clipboardIntroducesLink, hasNewLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
+import { EditorRuntimeState } from './editor-runtime-state'
+import {
+  isPasteIntoSourceDescendant,
+  nodeVisualTransition,
+  pasteNodeForestTransition,
+  type NodeForest,
+  type NodeVisualCommand,
+} from './editor-node-visual-transitions'
 import { EditorSaveScheduler } from './editor-save-scheduler'
 import { EditorTextSession } from './editor-text-session'
-import {
-  systemClock,
-  type Clock,
-  type EditorServices,
-  type EditorSnapshot,
-  type FocusIntent,
-} from './editor-store-types'
+import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import type { PersistenceFailureKind } from './persistence-coordinator'
 import { countInsertedWords, countPastedWords } from './save-policy'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
-
-export type NodeVisualCommand = 'y' | 'd' | 'x' | 'c' | 's' | 'u' | 'U' | 'p' | 'P'
-
-export interface NodeForest {
-  nodes: readonly TreeNode[]
-  sourceIds: readonly NodeId[]
-}
+export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
 export class EditorStore {
-  private readonly listeners = new Set<() => void>()
+  private readonly runtime = new EditorRuntimeState()
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly textSession: EditorTextSession
   private readonly saveScheduler: EditorSaveScheduler
-  private snapshot: EditorSnapshot = { status: 'loading' }
-  private structuralVersion = 0
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
-  private focusToken = 0
   public constructor(
     private readonly services: EditorServices,
     private readonly createId: () => string,
@@ -83,19 +68,16 @@ export class EditorStore {
   ) {
     this.textSession = new EditorTextSession(clock)
     this.saveScheduler = new EditorSaveScheduler(services, clock, {
-      currentState: () => (this.snapshot.status === 'ready' ? this.snapshot : undefined),
+      currentState: () => (this.runtime.snapshot.status === 'ready' ? this.runtime.snapshot : undefined),
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
       isPersistenceLocked: () => this.isPersistenceLocked(),
       onPersistenceResult: (error, kind) => this.handlePersistenceResult(error, kind),
     })
   }
 
-  public getSnapshot = (): EditorSnapshot => this.snapshot
+  public getSnapshot = this.runtime.getSnapshot
 
-  public subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
-  }
+  public subscribe = this.runtime.subscribe
 
   public async flushPersistence(): Promise<void> {
     do {
@@ -106,24 +88,24 @@ export class EditorStore {
   }
 
   public reportError(error: unknown): void {
-    if (this.snapshot.status !== 'ready') return
-    this.snapshot = { ...this.snapshot, operationError: messageOf(error) }
-    this.emit()
+    if (this.runtime.snapshot.status !== 'ready') return
+    this.runtime.snapshot = { ...this.runtime.snapshot, operationError: messageOf(error) }
+    this.runtime.emit()
   }
 
   public requestQuitWithoutSavingPrompt(): void {
-    if (this.snapshot.status !== 'ready' || this.snapshot.persistenceLocked !== true) return
-    if (this.snapshot.quitWithoutSavingPrompt === true) return
-    this.snapshot = { ...this.snapshot, quitWithoutSavingPrompt: true }
-    this.emit()
+    if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.persistenceLocked !== true) return
+    if (this.runtime.snapshot.quitWithoutSavingPrompt === true) return
+    this.runtime.snapshot = { ...this.runtime.snapshot, quitWithoutSavingPrompt: true }
+    this.runtime.emit()
   }
 
   public dismissQuitWithoutSavingPrompt(): void {
-    if (this.snapshot.status !== 'ready' || this.snapshot.quitWithoutSavingPrompt !== true) return
-    const next = { ...this.snapshot }
+    if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.quitWithoutSavingPrompt !== true) return
+    const next = { ...this.runtime.snapshot }
     delete next.quitWithoutSavingPrompt
-    this.snapshot = next
-    this.emit()
+    this.runtime.snapshot = next
+    this.runtime.emit()
   }
 
   public async initialize(): Promise<void> {
@@ -131,45 +113,45 @@ export class EditorStore {
       const loaded = await this.services.load()
       if (loaded === null) {
         const rootId = this.createId()
-        this.snapshot = {
+        this.runtime.snapshot = {
           status: 'ready',
           document: createInitialDocument(rootId),
           location: { currentParentId: null, selectedNodeId: rootId },
-          focus: this.newFocus(rootId, 0),
-          structuralVersion: this.structuralVersion,
+          focus: this.runtime.newFocus(rootId, 0),
+          structuralVersion: this.runtime.getStructuralVersion(),
         }
-        this.emit()
+        this.runtime.emit()
         this.saveScheduler.requestSave()
         this.queueAttachmentCleanup()
         return
       }
 
       const parsed = parsePersistedState(loaded)
-      this.snapshot = {
+      this.runtime.snapshot = {
         status: 'ready',
         document: parsed.document,
         location: parsed.location,
-        focus: this.newFocus(parsed.location.selectedNodeId, 0),
-        structuralVersion: this.structuralVersion,
+        focus: this.runtime.newFocus(parsed.location.selectedNodeId, 0),
+        structuralVersion: this.runtime.getStructuralVersion(),
       }
-      this.emit()
+      this.runtime.emit()
       this.queueAttachmentCleanup()
     } catch (error) {
-      this.snapshot = { status: 'error', message: messageOf(error) }
-      this.emit()
+      this.runtime.snapshot = { status: 'error', message: messageOf(error) }
+      this.runtime.emit()
     }
   }
 
   public selectNode(nodeId: NodeId, cursor: number): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (!isValidLocation(state.document, { ...state.location, selectedNodeId: nodeId })) {
       return
     }
     this.endTextSession()
-    this.replaceReady({
+    this.runtime.replaceReady({
       ...state,
       location: { ...state.location, selectedNodeId: nodeId },
-      focus: this.newFocus(nodeId, cursor),
+      focus: this.runtime.newFocus(nodeId, cursor),
     })
     this.markPersistedChange()
   }
@@ -179,7 +161,7 @@ export class EditorStore {
   }
 
   public editContent(nodeId: NodeId, text: string, links: readonly LinkRange[]): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
     if (node.text === text) {
@@ -193,14 +175,14 @@ export class EditorStore {
     const insertedWords = countInsertedWords(node.text, text)
     const linkInserted = hasNewLink(node.links, links)
     const next = editNodeContent(state.document, nodeId, text, links)
-    this.replaceReady({ ...state, document: next })
+    this.runtime.replaceReady({ ...state, document: next })
     this.noteChange(insertedWords, linkInserted)
     this.textSession.scheduleBoundary()
     this.textSession.endIfStandalone()
   }
 
   public replaceTextRange(nodeId: NodeId, start: number, end: number, text: string): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
     const replacement = replaceLinkedText(node.text, node.links ?? [], start, end, text)
@@ -211,19 +193,19 @@ export class EditorStore {
   }
 
   public deleteLink(nodeId: NodeId, cursor: number): boolean {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const linkStart = requireNode(state.document, nodeId).node.links?.find((link) => link.end === cursor)?.start
     if (linkStart === undefined) return false
     const next = deleteLink(state.document, nodeId, cursor)
     if (next === undefined) return false
     this.endTextSession()
-    this.applyStructural(next, state.location, this.newFocus(nodeId, linkStart))
+    this.applyStructural(next, state.location, this.runtime.newFocus(nodeId, linkStart))
     return true
   }
 
   public async copy(nodeId: NodeId, start: number, end: number): Promise<boolean> {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
     if (transition === undefined || this.services.writeClipboard === undefined) return false
     const operation = this.services.writeClipboard(transition.payload)
@@ -237,7 +219,7 @@ export class EditorStore {
   }
 
   public async cut(nodeId: NodeId, start: number, end: number): Promise<boolean> {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
     if (transition === undefined || this.services.writeClipboard === undefined) return false
@@ -245,17 +227,17 @@ export class EditorStore {
     const expectedContent = nodeContent(requireNode(state.document, nodeId).node)
     const operation = (async (): Promise<void> => {
       await this.services.writeClipboard!(transition.payload)
-      if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) return
-      const current = locateNode(this.snapshot.document, nodeId)?.node
+      if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) return
+      const current = locateNode(this.runtime.snapshot.document, nodeId)?.node
       if (current === undefined) return
       if (!sameNodeContent(current, expectedContent)) {
         this.reportError(new Error(CUT_CONFLICT_ERROR))
         return
       }
       this.applyStructural(
-        removeTextRange(this.snapshot.document, nodeId, transition.from, transition.to),
-        this.snapshot.location,
-        this.newFocus(nodeId, transition.from),
+        removeTextRange(this.runtime.snapshot.document, nodeId, transition.from, transition.to),
+        this.runtime.snapshot.location,
+        this.runtime.newFocus(nodeId, transition.from),
       )
     })()
     this.pendingClipboardOperation = operation
@@ -276,19 +258,19 @@ export class EditorStore {
   }
 
   public moveSelection(direction: 'up' | 'down', cursor: number): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const target = moveSelectionTransition(state.document, state.location, direction, cursor)
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 
   public moveSelectionBoundary(boundary: 'first' | 'last', cursor: number): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const target = moveSelectionBoundaryTransition(state.document, state.location, boundary, cursor)
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 
   public moveHorizontal(direction: 'left' | 'right', cursor: number): boolean {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const target = moveHorizontalTransition(state.document, state.location, direction, cursor)
     if (target === undefined) return false
     this.selectNode(target.nodeId, target.cursor)
@@ -296,15 +278,15 @@ export class EditorStore {
   }
 
   public enter(): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const transition = enterTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady(
+    this.runtime.replaceReady(
       {
         ...state,
         location: transition.location,
-        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+        focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
       true,
     )
@@ -312,15 +294,15 @@ export class EditorStore {
   }
 
   public leave(): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const transition = leaveTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady(
+    this.runtime.replaceReady(
       {
         ...state,
         location: transition.location,
-        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+        focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
       true,
     )
@@ -328,15 +310,15 @@ export class EditorStore {
   }
 
   public navigateToAncestor(parentId: NodeId | null): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     const transition = ancestorNavigationTransition(state.document, state.location, parentId)
     if (transition === undefined) return
     this.endTextSession()
-    this.replaceReady(
+    this.runtime.replaceReady(
       {
         ...state,
         location: transition.location,
-        focus: this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+        focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
       true,
     )
@@ -344,7 +326,7 @@ export class EditorStore {
   }
 
   public createSiblingOrFirstChild(cursor: number): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const transition = createSiblingOrFirstChildTransition(state.document, state.location, cursor, this.createId)
     if (transition.kind === 'rejected') {
@@ -355,36 +337,36 @@ export class EditorStore {
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
   }
 
   public createSibling(position: 'before' | 'after'): boolean {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const transition = createSiblingTransition(state.document, state.location, position, this.createId)
     this.endTextSession()
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     return true
   }
 
   public createSiblingWithText(position: 'before' | 'after', text: string): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const transition = createSiblingTransition(state.document, state.location, position, this.createId)
     const document =
       text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
     this.endTextSession()
-    this.applyStructural(document, transition.location, this.newFocus(transition.focus.nodeId, text.length))
+    this.applyStructural(document, transition.location, this.runtime.newFocus(transition.focus.nodeId, text.length))
     if (text !== '') this.noteChange(countInsertedWords('', text), false)
   }
 
   public deleteSelected(): boolean {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const transition = deleteSelectedTransition(state.document, state.location, this.createId)
     if (transition === undefined) return false
@@ -392,7 +374,7 @@ export class EditorStore {
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.queueAttachmentCleanup()
     return true
@@ -404,9 +386,9 @@ export class EditorStore {
     source: TreeNode,
     sourceIds: readonly NodeId[] = [],
   ): boolean {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
-    if (this.isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
+    if (isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
     }
@@ -421,25 +403,32 @@ export class EditorStore {
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     return true
   }
 
   public pasteNodeForest(nodeId: NodeId, position: SiblingInsertionPosition, source: NodeForest): boolean {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked() || source.nodes.length === 0) return false
-    if (this.isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)) {
+    if (isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
     }
-    const copies = source.nodes.map((node) => cloneNodeWithNewIds(node, this.createId))
-    const target = requireNode(state.document, nodeId).node
-    const replacements = position === 'before' ? copies : [target, ...copies]
-    const document = replaceSiblingRange(state.document, nodeId, position === 'before' ? 0 : 1, replacements)
-    const selectedId = copies[0]!.id
+    const transition = pasteNodeForestTransition(
+      state.document,
+      state.location,
+      nodeId,
+      position,
+      source,
+      this.createId,
+    )
     this.endTextSession()
-    this.applyStructural(document, { ...state.location, selectedNodeId: selectedId }, this.newFocus(selectedId, 0))
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
     return true
   }
 
@@ -450,79 +439,36 @@ export class EditorStore {
     source?: NodeForest,
     insertedText = '',
   ): NodeForest | undefined {
-    const state = this.ready()
-    const siblings = displayedNodes(state.document, state.location.currentParentId)
-    const anchor = siblings.findIndex((node) => node.id === anchorId)
-    const focus = siblings.findIndex((node) => node.id === focusId)
-    if (anchor < 0 || focus < 0) return undefined
-    const start = Math.min(anchor, focus)
-    const end = Math.max(anchor, focus) + 1
-    const selected = siblings.slice(start, end)
-    const first = selected[0]
-    if (first === undefined) return undefined
-    if (command === 'y') return { nodes: selected.map(cloneNode), sourceIds: selected.map((node) => node.id) }
-    if (this.isPersistenceLocked()) return undefined
-    if ((command === 'p' || command === 'P') && (source === undefined || source.nodes.length === 0)) return undefined
-    if (
-      (command === 'p' || command === 'P') &&
-      this.isPasteIntoSourceDescendant(state.document, first.id, source?.sourceIds ?? [])
-    ) {
-      this.reportError(new Error('Cannot paste a node into one of its descendants.'))
+    const state = this.runtime.ready()
+    const result = nodeVisualTransition(
+      state.document,
+      state.location,
+      command,
+      anchorId,
+      focusId,
+      source,
+      insertedText,
+      !this.isPersistenceLocked(),
+      this.createId,
+    )
+    if (result.kind === 'none') return undefined
+    if (result.kind === 'rejected') {
+      this.reportError(new Error(result.message))
       return undefined
     }
-    const register = { nodes: selected.map(cloneNode), sourceIds: selected.map((node) => node.id) }
-    let replacements: readonly TreeNode[] = []
-    if (command === 'c' || command === 's') replacements = [{ id: this.createId(), text: insertedText, children: [] }]
-    else if (command === 'p' || command === 'P')
-      replacements = source!.nodes.map((node) => cloneNodeWithNewIds(node, this.createId))
-    else if (command === 'u' || command === 'U') {
-      const changeCase = (value: string): string => (command === 'u' ? value.toLowerCase() : value.toUpperCase())
-      let changed = false
-      const transform = (node: TreeNode): TreeNode => {
-        const text = changeCase(node.text)
-        if (text !== node.text) changed = true
-        let originalOffset = 0
-        let nextOffset = 0
-        const mappedLinks = (node.links ?? []).map((link) => {
-          nextOffset += changeCase(node.text.slice(originalOffset, link.start)).length
-          const start = nextOffset
-          nextOffset += changeCase(node.text.slice(link.start, link.end)).length
-          const end = nextOffset
-          originalOffset = link.end
-          return { start, end, url: text.slice(start, end) }
-        })
-        const links = normalizeLinks(mappedLinks, text)
-        return {
-          id: node.id,
-          text,
-          ...(links.length === 0 ? {} : { links }),
-          ...(node.attachment === undefined ? {} : { attachment: node.attachment }),
-          children: node.children.map(transform),
-        }
-      }
-      replacements = selected.map(transform)
-      if (!changed) return undefined
-    }
-    let document = replaceSiblingRange(state.document, first.id, selected.length, replacements)
-    if (document.roots.length === 0) document = ensureRoot(document, this.createId())
-    const nextSiblings = displayedNodes(document, state.location.currentParentId)
-    const target = replacements[0] ?? nextSiblings[start] ?? nextSiblings[start - 1]
-    const selectedId = target?.id ?? state.location.currentParentId ?? document.roots[0]!.id
-    const location = { ...state.location, selectedNodeId: selectedId }
+    if (result.kind === 'yank') return result.register
     this.endTextSession()
-    this.applyStructural(document, location, this.newFocus(selectedId, 0))
-    if (command === 'd' || command === 'x' || command === 'c' || command === 's' || command === 'p' || command === 'P')
-      this.queueAttachmentCleanup()
-    return register
-  }
-
-  private isPasteIntoSourceDescendant(document: Document, targetId: NodeId, sourceIds: readonly NodeId[]): boolean {
-    const path = nodePath(document, targetId).map((node) => node.id)
-    return sourceIds.some((sourceId) => path.slice(0, -1).includes(sourceId))
+    this.applyStructural(
+      result.transition.document,
+      result.transition.location,
+      this.runtime.newFocus(result.transition.focus.nodeId, result.transition.focus.cursor),
+    )
+    if (result.cleanup) this.queueAttachmentCleanup()
+    return result.register
   }
 
   public deleteEmptySelected(): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const transition = deleteEmptySelectedTransition(state.document, state.location)
     if (transition === undefined) return
@@ -530,18 +476,18 @@ export class EditorStore {
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.queueAttachmentCleanup()
   }
 
   public moveSelectedTo(insertionIndex: number): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     this.moveNodeTo(state.location.selectedNodeId, insertionIndex)
   }
 
   public moveNodeTo(nodeId: NodeId, insertionIndex: number): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const cursor = state.focus.nodeId === nodeId ? state.focus.cursor : 0
     const transition = moveNodeTransition(state.document, state.location, nodeId, insertionIndex, cursor)
@@ -550,7 +496,7 @@ export class EditorStore {
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
   }
 
@@ -569,25 +515,25 @@ export class EditorStore {
   }
 
   private async pasteFromClipboard(nodeId: NodeId, cursor: number): Promise<void> {
-    this.ready()
+    this.runtime.ready()
     this.endTextSession()
     await this.pendingClipboardOperation
     const clipboard = await this.services.readClipboard()
-    if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) {
+    if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) {
       return
     }
-    const current = this.ready()
+    const current = this.runtime.ready()
     if (clipboard.kind === 'image') {
       const attachment: AttachmentReference = { id: this.createId(), mimeType: 'image/png' }
       this.pendingAttachmentIds.add(attachment.id)
       try {
         await this.services.writeAttachment(attachment.id, clipboard.png)
-        if (this.snapshot.status !== 'ready' || this.snapshot.location.selectedNodeId !== nodeId) {
+        if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) {
           return
         }
         const transition = imagePasteTransition(
-          this.snapshot.document,
-          this.snapshot.location,
+          this.runtime.snapshot.document,
+          this.runtime.snapshot.location,
           nodeId,
           attachment,
           this.createId,
@@ -595,7 +541,7 @@ export class EditorStore {
         this.applyStructural(
           transition.document,
           transition.location,
-          this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+          this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
         )
         this.requestImmediateSave()
       } finally {
@@ -614,23 +560,23 @@ export class EditorStore {
     this.applyStructural(
       transition.document,
       transition.location,
-      this.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.noteChange(insertedWords, clipboardIntroducesLink(clipboard))
   }
 
   public undo(): void {
     this.endTextSession()
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const previous = this.history.undo(state.document, state.location)
     if (previous === undefined) return
-    this.replaceReady(
+    this.runtime.replaceReady(
       {
         ...state,
         document: previous.document,
         location: previous.location,
-        focus: this.newFocus(previous.location.selectedNodeId, 0),
+        focus: this.runtime.newFocus(previous.location.selectedNodeId, 0),
       },
       true,
     )
@@ -640,16 +586,16 @@ export class EditorStore {
 
   public redo(): void {
     this.endTextSession()
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const next = this.history.redo(state.document, state.location)
     if (next === undefined) return
-    this.replaceReady(
+    this.runtime.replaceReady(
       {
         ...state,
         document: next.document,
         location: next.location,
-        focus: this.newFocus(next.location.selectedNodeId, 0),
+        focus: this.runtime.newFocus(next.location.selectedNodeId, 0),
       },
       true,
     )
@@ -658,27 +604,11 @@ export class EditorStore {
   }
 
   private applyStructural(document: Document, location: Location, focus: FocusIntent): void {
-    const state = this.ready()
+    const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-    this.replaceReady({ ...state, document, location, focus }, true)
+    this.runtime.replaceReady({ ...state, document, location, focus }, true)
     this.markPersistedChange()
-  }
-
-  private replaceReady(state: Extract<EditorSnapshot, { status: 'ready' }>, changedStructure = false): void {
-    const previous = this.snapshot
-    if (changedStructure) this.structuralVersion += 1
-    const next = { ...state, structuralVersion: this.structuralVersion }
-    if (next.operationError === undefined) {
-      this.snapshot = next
-    } else {
-      delete next.operationError
-      this.snapshot = next
-    }
-    if (previous.status === 'ready' && previous.document !== this.snapshot.document) {
-      releaseNodeIndex(previous.document)
-    }
-    this.emit()
   }
 
   private markPersistedChange(): void {
@@ -699,8 +629,8 @@ export class EditorStore {
 
   private referencedAttachmentIds(): Set<AttachmentId> {
     const ids = new Set<AttachmentId>()
-    if (this.snapshot.status === 'ready') {
-      collectAttachmentIds(this.snapshot.document).forEach((id) => ids.add(id))
+    if (this.runtime.snapshot.status === 'ready') {
+      collectAttachmentIds(this.runtime.snapshot.document).forEach((id) => ids.add(id))
     }
     for (const id of this.history.attachmentIds()) ids.add(id)
     this.pendingAttachmentIds.forEach((id) => ids.add(id))
@@ -708,58 +638,42 @@ export class EditorStore {
   }
 
   private handlePersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void {
-    if (this.snapshot.status !== 'ready') return
+    if (this.runtime.snapshot.status !== 'ready') return
     if (error === undefined) {
       this.saveScheduler.resetFailures()
       const changed =
-        this.snapshot.saveError !== undefined ||
-        this.snapshot.persistenceLocked === true ||
-        this.snapshot.quitWithoutSavingPrompt === true
-      const next = { ...this.snapshot }
+        this.runtime.snapshot.saveError !== undefined ||
+        this.runtime.snapshot.persistenceLocked === true ||
+        this.runtime.snapshot.quitWithoutSavingPrompt === true
+      const next = { ...this.runtime.snapshot }
       delete next.saveError
       delete next.persistenceLocked
       delete next.quitWithoutSavingPrompt
-      this.snapshot = next
-      if (changed) this.emit()
+      this.runtime.snapshot = next
+      if (changed) this.runtime.emit()
       return
     }
     if (kind === 'cleanup') {
       const retry = this.saveScheduler.registerCleanupFailure()
-      this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
+      this.runtime.snapshot = { ...this.runtime.snapshot, saveError: messageOf(error) }
       if (retry) this.saveScheduler.scheduleCleanupRetry()
-      this.emit()
+      this.runtime.emit()
       return
     }
     const retry = this.saveScheduler.registerSaveFailure(kind)
-    this.snapshot = { ...this.snapshot, saveError: messageOf(error) }
+    this.runtime.snapshot = { ...this.runtime.snapshot, saveError: messageOf(error) }
     if (retry) {
       this.saveScheduler.scheduleIdleSave()
     } else {
       this.saveScheduler.cancelSaveTimer()
-      this.snapshot = { ...this.snapshot, persistenceLocked: true }
+      this.runtime.snapshot = { ...this.runtime.snapshot, persistenceLocked: true }
       this.saveScheduler.discardPendingSaves()
     }
-    this.emit()
+    this.runtime.emit()
   }
 
   private isPersistenceLocked(): boolean {
-    return this.snapshot.status === 'ready' && this.snapshot.persistenceLocked === true
-  }
-
-  private newFocus(nodeId: NodeId, cursor: number): FocusIntent {
-    this.focusToken += 1
-    return { nodeId, cursor, token: this.focusToken }
-  }
-
-  private ready(): Extract<EditorSnapshot, { status: 'ready' }> {
-    if (this.snapshot.status !== 'ready') {
-      throw new Error('The editor is not ready.')
-    }
-    return this.snapshot
-  }
-
-  private emit(): void {
-    this.listeners.forEach((listener) => listener())
+    return this.runtime.snapshot.status === 'ready' && this.runtime.snapshot.persistenceLocked === true
   }
 }
 

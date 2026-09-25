@@ -113,6 +113,7 @@ describe('EditorStore', () => {
     store.enter()
     const before = store.getSnapshot()
     expect(store.pasteNodeForest('a-child', 'after', forest)).toBe(false)
+    expect(store.applyNodeVisual('p', 'a-child', 'a-child', forest)).toBeUndefined()
     const rejected = store.getSnapshot()
     expect(rejected.status).toBe('ready')
     if (rejected.status !== 'ready') throw new Error('Editor did not load')

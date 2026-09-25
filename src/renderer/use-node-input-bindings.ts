@@ -21,7 +21,7 @@ import type {
   VimRepeatChange,
   VimStructuralChange,
   VimViewportMotion,
-} from './editor-input-handlers'
+} from './vim-keyboard-types'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 
