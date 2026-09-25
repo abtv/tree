@@ -13,6 +13,16 @@ A macOS desktop application for working with a hierarchical tree of text nodes a
 * [Agent Instructions](AGENTS.md) — instructions for AI coding agents working on the repository.
 * [License](LICENSE) — MIT License.
 
+## Working with Product Ideas
+
+Use [Product Requirements](docs/PRODUCT.md) for behavior you have decided the application should have. If you know what you want, describe it to the coding agent. The agent can update the requirements, implement the change, and test it. If an important detail is unclear, decide it together before implementation.
+
+Use [Product Discovery](docs/PRODUCT_DISCOVERY.md) when you are unsure whether a problem needs solving or which solution would help. Write down a real example from using the app, possible explanations, and a small way to learn more. You do not need a discovery entry for every fix or clear request.
+
+After trying an idea, decide whether to pursue it. A discovery note is not permission to build it. When you want the change, ask the agent for the specific behavior; it will then update Product Requirements and follow the normal development workflow. After using the result, note whether it solved the original problem.
+
+For example, you could say: “I had trouble finding a note today. Record what happened in Product Discovery and suggest a simple way to check whether this keeps happening.” If you later decide you want search, describe how search should work and ask the agent to implement it.
+
 ## Getting Started
 
 Prerequisites, dependency installation, the development command, and the full command list are defined in the [Development Guide](docs/DEVELOPMENT.md).

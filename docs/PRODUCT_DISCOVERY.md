@@ -25,7 +25,7 @@ Every claim should be labeled by its basis when that basis is not self-evident:
 - `Rejected` — the Product Owner has decided not to pursue the direction based on current evidence.
 - `Deferred` — no current decision or experiment is warranted.
 
-Only the Product Owner may set `Accepted`, `Rejected`, or `Deferred`. An accepted direction must still be specified in `docs/PRODUCT.md`, receive an approved implementation plan, and follow the normal development workflow before implementation begins.
+Only the Product Owner may set `Accepted`, `Rejected`, or `Deferred`. Accepting a direction does not authorize implementation. When the Product Owner requests a specific behavior, update `docs/PRODUCT.md` and follow the planning and development workflow in `AGENTS.md`. Ordinary implementation plans do not need separate approval; ask the Product Owner about material choices that remain unresolved.
 
 ## 3. Discovery Lifecycle
 
@@ -38,7 +38,7 @@ Only the Product Owner may set `Accepted`, `Rejected`, or `Deferred`. An accepte
 7. Ask the Product Owner to decide, defer, or request more evidence.
 8. If a direction is accepted, propose the corresponding `docs/PRODUCT.md` change separately.
 
-Experiments should prefer ordinary use and reversible prototypes over production implementation. Product code must not be changed merely to investigate an idea unless the Product Owner separately approves that experiment and its plan.
+Experiments should prefer ordinary use and reversible prototypes over production implementation. Changing product code for an experiment requires a separate Product Owner request and the planning and development workflow in `AGENTS.md`.
 
 ## 4. Entry Template
 
