@@ -386,8 +386,9 @@ export class EditorStore {
   public deleteSelected(): boolean {
     const state = this.ready()
     if (this.isPersistenceLocked()) return false
-    this.endTextSession()
     const transition = deleteSelectedTransition(state.document, state.location, this.createId)
+    if (transition === undefined) return false
+    this.endTextSession()
     this.applyStructural(
       transition.document,
       transition.location,

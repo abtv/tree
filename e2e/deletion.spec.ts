@@ -30,7 +30,7 @@ test.describe('deleting nodes', () => {
     await expect(node(window, 1)).toBeFocused()
   })
 
-  test('deleting the current parent returns to the parent level', async ({ userDataDir }) => {
+  test('does not delete the current parent when its heading is focused', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
     await typeInto(node(window, 1), 'Projects')
@@ -42,7 +42,7 @@ test.describe('deleting nodes', () => {
     await window.keyboard.press('Meta+Backspace')
 
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
-    await expect(node(window, 1)).toHaveValue('')
-    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveCount(0)
+    await expect(node(window, 1)).toHaveValue('Work')
+    await expect(parent(window)).toHaveValue('Projects')
   })
 })

@@ -237,24 +237,16 @@ export function deleteSelectedTransition(
   document: Document,
   location: Location,
   createId: () => string,
-): StructuralTransition {
+): StructuralTransition | undefined {
   const selected = requireNode(document, location.selectedNodeId)
   const parentIsSelected = location.currentParentId === selected.node.id
+  if (parentIsSelected) return undefined
   const nextSibling = selected.siblings[selected.index + 1]
   const previousSibling = selected.siblings[selected.index - 1]
   let nextDocument = deleteNode(document, selected.node.id)
   let nextLocation: Location
 
-  if (parentIsSelected) {
-    if (selected.parent !== null) {
-      nextLocation = { currentParentId: selected.parent.id, selectedNodeId: selected.parent.id }
-    } else {
-      nextDocument = ensureRoot(nextDocument, createId())
-      const destination = nextSibling ?? previousSibling ?? nextDocument.roots[0]
-      if (destination === undefined) throw new Error('A root replacement was not created.')
-      nextLocation = { currentParentId: null, selectedNodeId: destination.id }
-    }
-  } else if (nextSibling !== undefined || previousSibling !== undefined) {
+  if (nextSibling !== undefined || previousSibling !== undefined) {
     const destination = nextSibling ?? previousSibling
     if (destination === undefined) throw new Error('A sibling destination was not found.')
     nextLocation = { ...location, selectedNodeId: destination.id }

@@ -383,7 +383,7 @@ At the root level:
 
 ### 8.1 Cmd+Backspace
 
-`Cmd+Backspace` deletes the current node and its entire subtree.
+`Cmd+Backspace` deletes the selected displayed node and its entire subtree.
 
 This is different from normal `Backspace`, which remains ordinary text editing except when the node is empty (see 8.2).
 
@@ -396,11 +396,7 @@ After deleting a node from the currently displayed level:
 
 When inside a parent, `Cmd+Backspace` deletes the currently selected child.
 
-When the editable current parent is focused, `Cmd+Backspace` deletes that parent and its entire subtree, then navigates one level outward to the deleted node's parent.
-
-If the deleted current parent was not a top-level root node, its parent becomes the new current parent and receives the text cursor.
-
-If the deleted current parent was a top-level root node, navigate to the root level and apply the root-node selection and replacement rules above.
+When the editable current parent is focused, `Cmd+Backspace` does nothing. The current parent and its subtree can only be removed by explicitly deleting that node from its displayed parent level.
 
 ### 8.2 Backspace on an Empty Node
 

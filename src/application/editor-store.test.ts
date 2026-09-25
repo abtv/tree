@@ -1149,7 +1149,7 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('three')
   })
 
-  it('navigates to the parent when deleting a non-root current parent', async () => {
+  it('does not delete the current parent when it is focused', async () => {
     const services = loadedState(
       {
         roots: [
@@ -1165,14 +1165,14 @@ describe('EditorStore', () => {
     const store = new EditorStore(services, ids('unused'))
     await store.initialize()
 
-    store.deleteSelected()
+    expect(store.deleteSelected()).toBe(false)
 
     const state = store.getSnapshot()
-    expect(state.status === 'ready' && state.document.roots[0]!.children).toEqual([])
-    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
+    expect(state.status === 'ready' && state.document.roots[0]!.children[0]!.id).toBe('parent')
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
   })
 
-  it('selects the next root when deleting a root current parent', async () => {
+  it('does not delete a top-level root when it is the current parent', async () => {
     const services = loadedState(
       {
         roots: [
@@ -1185,11 +1185,11 @@ describe('EditorStore', () => {
     const store = new EditorStore(services, ids('unused'))
     await store.initialize()
 
-    store.deleteSelected()
+    expect(store.deleteSelected()).toBe(false)
 
     const state = store.getSnapshot()
-    expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['r2'])
-    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'r2' })
+    expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['r1', 'r2'])
+    expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'r1', selectedNodeId: 'r1' })
   })
 
   it('selects the next sibling when deleting a middle sibling', async () => {
@@ -1244,10 +1244,10 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
   })
 
-  it('replaces the only root when it is deleted as the current parent', async () => {
+  it('replaces the only top-level root when it is deleted', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'Root', children: [] }] },
-      { currentParentId: 'root', selectedNodeId: 'root' },
+      { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('replacement'))
     await store.initialize()

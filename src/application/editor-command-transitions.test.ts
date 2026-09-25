@@ -100,6 +100,7 @@ describe('editor command transitions', () => {
       { currentParentId: 'root', selectedNodeId: 'first' },
       () => 'new',
     )
+    if (transition === undefined) throw new Error('Expected a deletion transition.')
 
     expect(transition.document.roots[0]!.children.map((node) => node.id)).toEqual(['second'])
     expect(transition.location).toEqual({ currentParentId: 'root', selectedNodeId: 'second' })
@@ -137,16 +138,16 @@ describe('editor command transitions', () => {
     expect(before.document.roots[0]!.children[0]!.children[0]!.id).toBe('before-child')
   })
 
-  it('moves outward when deleting the current parent and replaces the only root', () => {
+  it('does not delete the current parent', () => {
     const nested = {
       roots: [{ id: 'outer', text: 'Outer', children: [{ id: 'parent', text: 'Parent', children: [] }] }],
     }
     expect(
       deleteSelectedTransition(nested, { currentParentId: 'parent', selectedNodeId: 'parent' }, () => 'new'),
-    ).toMatchObject({
-      location: { currentParentId: 'outer', selectedNodeId: 'outer' },
-      focus: { nodeId: 'outer', cursor: 0 },
-    })
+    ).toBeUndefined()
+  })
+
+  it('still replaces the only top-level root when it is deleted', () => {
     expect(
       deleteSelectedTransition(
         { roots: [{ id: 'root', text: '', children: [] }] },
