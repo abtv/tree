@@ -297,6 +297,8 @@ Git history is append-only. Never amend, rebase, reset, replace commits, force-p
 
 Use exactly this commit-message format for every new commit: `type(scope): summary`. The scope is mandatory; do not use the unscoped form `type: summary` or free-form commit subjects. `type` must be one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood, keep it focused on the implemented change, and do not end it with punctuation.
 
+Do not add agent co-authorship or attribution lines (for example `Co-Authored-By: <agent>`) to commit messages or pull request descriptions.
+
 `npm run changelog` regenerates `CHANGELOG.md` from the Conventional Commit history.
 
 Do not mix unrelated refactoring with a feature unless the refactoring is required for that feature.
