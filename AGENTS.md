@@ -33,6 +33,7 @@ Before making changes, read the documentation relevant to the task:
 * `docs/PRODUCT_DISCOVERY.md` — non-normative product hypotheses, experiments, evidence, and decisions; it is never an implementation requirement.
 * `docs/ARCHITECTURE.md` — technical architecture and architectural boundaries.
 * `docs/DEVELOPMENT.md` — development workflow, tooling, testing, and validation.
+* `docs/AGENT_ROLES.md` — the formal, tool-agnostic definition of each agent role (planner, reviewer, product verifier, product researcher) and their security posture; every coding-agent tool's config implements it.
 * `AGENTS.md` — rules for working on the repository.
 
 If documentation conflicts with existing code, do not silently choose one. Determine whether the discrepancy is an implementation bug or a documentation change, and ask the Product Owner when the intended behavior is unclear.
@@ -277,6 +278,7 @@ Keep each document focused on its responsibility:
 * `PRODUCT_DISCOVERY.md` — uncertain product questions, experiments, evidence, and Product Owner decisions that are not yet requirements.
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
+* `AGENT_ROLES.md` — the formal definition of each agent role, shared by every coding-agent tool's config.
 * `SECURITY.md` — the security model and how it is verified.
 * `AGENTS.md` — how the coding agent should work.
 

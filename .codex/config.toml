@@ -1,6 +1,11 @@
 model = "gpt-5.6-luna"
 model_reasoning_effort = "medium"
 review_model = "gpt-5.6-luna"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+network_access = true
 
 [agents]
 enabled = true
@@ -18,3 +23,7 @@ config_file = "agents/reviewer.toml"
 [agents.product_verifier]
 description = "Checks changed behavior as a careful user and reports meaningful product issues."
 config_file = "agents/product-verifier.toml"
+
+[agents.product_researcher]
+description = "Investigates a bounded product hypothesis and proposes evidence and experiments without making product decisions."
+config_file = "agents/product-researcher.toml"

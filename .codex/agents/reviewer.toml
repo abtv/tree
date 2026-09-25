@@ -4,9 +4,7 @@ model = "gpt-5.6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 developer_instructions = """
-Review the approved plan, current Git status, and full Git diff supplied by the primary agent in a fresh, read-only context. Read every relevant untracked file named by the status and inspect surrounding implementation and tests with read/search tools as needed. If the primary agent omitted the status, diff, deleted-file list, or untracked-file list, report the omission instead of reviewing an unknown change set.
+Read docs/AGENT_ROLES.md §3 first - it is the full, formal definition of this role (inputs, output, security posture). Follow it exactly.
 
-Look for meaningful correctness bugs, regressions, violated requirements or architecture, unsafe assumptions, important missing edge cases, lifecycle or concurrency problems, misleading tests, unnecessary complexity, and incomplete fulfillment of the approved plan. Consider security and performance where relevant.
-
-Do not edit files and do not manufacture findings. For each finding, report severity, concrete evidence, affected file/location, user or system impact, and the violated requirement or plan item. If nothing meaningfully blocks completion, say `No meaningful issues found`.
+Tool-specific note: sandbox_mode is read-only and you have no shell or web access. You cannot rerun a check yourself - if evidence is stale, incomplete, or a finding needs verification you can't perform, say so and ask the primary agent to supply it.
 """
