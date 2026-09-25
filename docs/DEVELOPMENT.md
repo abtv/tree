@@ -286,6 +286,8 @@ File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttach
 
 ## 10. Development Workflow
 
+The root `CLAUDE.md` imports `AGENTS.md` so Claude Code sessions load the same repository policy as Codex and OpenCode, including versions that do not load `AGENTS.md` directly. Keep the shared policy in `AGENTS.md`; the import is only a compatibility adapter.
+
 OpenCode uses the project configuration in `opencode.json`. Start a task with the `develop` primary agent. The normative task lifecycle, approval rules, review requirements, completion criteria, and Git discipline are owned by `AGENTS.md`. The role prompts in `.opencode/agents/` define only the inputs and actions specific to each role. Use the matrix and evidence rules in §9 when executing that lifecycle.
 
 For product discovery, ask the `develop` coordinator to delegate one bounded question to the read-only `product-researcher`. Supply the relevant entry from `docs/PRODUCT_DISCOVERY.md`, the Product Owner's statements and disagreements, available usage evidence, and the desired research scope. The researcher returns labeled evidence, counter-hypotheses, tradeoffs, and a proposed experiment to the coordinator; it does not edit the discovery record or approve a direction. Product-discovery policy and the promotion boundary into product requirements are owned by `AGENTS.md`.

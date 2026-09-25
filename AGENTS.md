@@ -71,7 +71,7 @@ The Product Owner may communicate with the agent in any language.
 * Do not silently change the data model, persistence model, technology stack, or major architectural boundaries.
 * Treat performance as a first-class requirement for state and persistence changes. Every such change must include the performance assessment required by `docs/PRODUCT.md` §22 (disk writes and syncs, CPU on interactive paths, and memory growth), and must add or update an automated performance guard when the change can affect behavior at scale.
 * Make small implementation decisions autonomously when they do not affect product behavior or architecture.
-* Ask the Product Owner when an ambiguity can materially affect UX, product behavior, data, persistence, or architecture.
+* Resolve ordinary engineering decisions autonomously within the authorized outcome. Ask the Product Owner when an unresolved choice can materially affect UX, product behavior, data, persistence, compatibility, or architecture.
 
 ---
 
@@ -82,12 +82,11 @@ The Product Owner may communicate with the agent in any language.
 When a requested change modifies product behavior:
 
 1. Identify the affected product requirements.
-2. If the requirement is ambiguous, ask the Product Owner.
-3. Update `docs/PRODUCT.md` when the new behavior is approved.
-4. Obtain approval for the implementation plan before changing behavior.
-5. Implement the approved change.
-6. Add or update tests.
-7. Complete the validation, independent review, product verification, documentation, and commit requirements in §§10-13.
+2. Treat a clear Product Owner request as authorization for the behavior it describes. Ask when material behavior or its boundaries remain ambiguous; do not infer authorization for additional behavior.
+3. Update `docs/PRODUCT.md` to describe the authorized behavior.
+4. Plan and implement within the authorized scope under §8. A separate implementation-plan approval is not required for ordinary engineering decisions.
+5. Add or update tests.
+6. Complete the validation, independent review, product verification, documentation, and commit requirements in §§10-13.
 
 Do not make product decisions on behalf of the Product Owner.
 
@@ -105,7 +104,7 @@ For product-discovery tasks, agents may:
 
 Agents must preserve Product Owner disagreement instead of resolving it silently. They must not invent the Product Owner's position, set a discovery entry to `Accepted`, `Rejected`, or `Deferred`, or treat any discovery status as approval to change the product. Only the Product Owner makes discovery decisions.
 
-When the Product Owner accepts a direction, propose the corresponding `docs/PRODUCT.md` change separately. The normal product-change and implementation-plan approval gates still apply before implementation.
+When the Product Owner accepts a direction, propose the corresponding `docs/PRODUCT.md` change separately. Acceptance of a discovery direction alone does not authorize implementation; follow the product-change rules above once the Product Owner requests the change.
 
 ---
 
@@ -148,9 +147,9 @@ Domain logic must be unit-testable without launching Electron or a browser envir
 
 ## 8. Plans and Architecture Decisions
 
-For a substantive task, use the configured planner subagent in a fresh context after inspecting the relevant implementation and documentation. Present the plan to the Product Owner and do not begin implementation until it is explicitly approved.
+For a substantive task, use the configured planner subagent in a fresh context after inspecting the relevant implementation and documentation. Review its plan against the Product Owner's request and the repository requirements, resolve ordinary engineering details, and share a concise plan or progress update with the Product Owner. Continue without a separate approval pause when the plan stays within the authorized outcome. Ask for a decision before implementing a material unresolved choice or expanding the authorized product behavior or major architecture.
 
-After approval, keep the task's temporary working plan at `WORKING_PLAN.md` in the repository root. The plan is an implementation contract, not permanent project documentation. Keep it current when approved scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
+Keep a substantive task's temporary working plan at `WORKING_PLAN.md` in the repository root. The plan is an implementation contract, not permanent project documentation. Keep it current when authorized scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
 
 Before completion, extract knowledge that remains useful into its durable owner:
 
@@ -346,9 +345,9 @@ A task is complete only when:
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 
-For a substantive task, the approved plan must be satisfied and its durable knowledge extracted before the temporary plan is deleted.
+For a substantive task, the working plan must be satisfied and its durable knowledge extracted before the temporary plan is deleted.
 
-One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Both roles receive the validation record and reuse still-valid results. For R0/R1 internal-workflow changes, code review checks policy ownership, consistency, command safety, tests, and fulfillment of the approved change. Product verification follows the agent workflow through representative relevant states, such as clean and dirty trees, failed stages, evidence reuse, and handoff; application UI exploration is not required when application behavior did not change. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
+One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Both roles receive the validation record and reuse still-valid results. For R0/R1 internal-workflow changes, code review checks policy ownership, consistency, command safety, tests, and fulfillment of the authorized change. Product verification follows the agent workflow through representative relevant states, such as clean and dirty trees, failed stages, evidence reuse, and handoff; application UI exploration is not required when application behavior did not change. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
 
 ---
 
@@ -358,9 +357,9 @@ Ask the Product Owner instead of guessing when:
 
 * two reasonable interpretations would produce different user experiences;
 * a requirement is missing or contradictory;
-* a change would alter the product's behavior;
-* a change would alter the data or persistence model;
-* a change would require a major architectural decision;
+* a proposed behavior change extends beyond what the Product Owner requested or authorized;
+* a proposed data or persistence-model change extends beyond what the Product Owner requested or authorized;
+* a major architectural decision has not been explicitly authorized;
 * backward compatibility or migration behavior is unclear;
 * destructive behavior is not explicitly defined;
 * an implementation choice could significantly constrain future product development.
