@@ -254,6 +254,47 @@ test.describe('Vim editing prototype', () => {
     await expect(link).not.toHaveClass(/link-selected/)
   })
 
+  test('crosses a hyperlink in one motion instead of getting stuck at its boundary', async ({ userDataDir }) => {
+    const url = 'https://example.test/a/very/long/path/that/does/not/fit/on/one/line'
+    const text = `before ${url} after`
+    const start = text.indexOf(url)
+    const end = start + url.length
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text, links: [{ start, end, url }], children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const link = editor.getByRole('link')
+    const caret = () =>
+      editor.evaluate((field) => {
+        const selection = field.ownerDocument.defaultView?.getSelection()
+        if (!selection || selection.rangeCount === 0) return -1
+        const range = selection.getRangeAt(0)
+        const before = field.ownerDocument.createRange()
+        before.selectNodeContents(field)
+        before.setEnd(range.startContainer, range.startOffset)
+        return before.toString().length
+      })
+
+    await editor.focus()
+    await setCursor(editor, start)
+    await expect(link).toHaveClass(/normal-caret-before/)
+
+    // A single 'l' must clear the whole atomic link, landing just past it, not
+    // stall inside it re-snapping to the same boundary on every keypress.
+    await editor.press('l')
+    await expect(link).not.toHaveClass(/normal-caret-before/)
+    await expect(link).not.toHaveClass(/normal-caret-after/)
+    expect(await caret()).toBe(end)
+
+    await editor.press('h')
+    await expect(link).toHaveClass(/normal-caret-before/)
+    expect(await caret()).toBe(start)
+  })
+
   test('keeps the Normal-mode hyperlink boundary caret visible in dark appearance', async ({ userDataDir }) => {
     const text = 'https://example.test'
     seedDocument(userDataDir, {

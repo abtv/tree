@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, type TreeNode } from '../domain/document'
+import { cloneNode, type LinkRange, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
   calculateTextChange,
@@ -48,7 +48,8 @@ export function handleVimKey(
   const motionCursor = visual ? (vim.visualFocus.current ?? cursor) : cursor
   const move = (target: number): void => {
     const maximum = node.text.length > 0 ? node.text.length - 1 : 0
-    const clamped = Math.max(0, Math.min(target, maximum))
+    const resolved = resolveLinkCrossing(node.links, motionCursor, target)
+    const clamped = Math.max(0, Math.min(resolved, maximum))
     if (visual) {
       const anchor = vim.visualAnchor.current ?? cursor
       vim.visualFocus.current = clamped
@@ -413,6 +414,14 @@ function applyTextChange(
     if (!replay && result.nextText !== node.text && vim.lastChange !== undefined) vim.lastChange.current = change
   }
   return { text: result.nextText, cursor: Math.min(result.nextCursor, Math.max(0, result.nextText.length - 1)) }
+}
+
+export function resolveLinkCrossing(links: readonly LinkRange[] | undefined, from: number, to: number): number {
+  if (links === undefined || to === from) return to
+  for (const link of links) {
+    if (to > link.start && to < link.end) return to > from ? link.end : link.start
+  }
+  return to
 }
 
 function leaveVisual(vim: VimKeyboardState, input: HTMLElement, cursor: number): void {
