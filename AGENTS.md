@@ -278,7 +278,7 @@ Keep each document focused on its responsibility:
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
 * `AGENT_ROLES.md` — the formal definition of each agent role, shared by every coding-agent tool's config.
-* `SECURITY.md` — the security model and how it is verified.
+* `docs/SECURITY.md` — the security model and how it is verified.
 * `AGENTS.md` — how the coding agent should work.
 
 ---
