@@ -278,6 +278,35 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveScreenshot('vim-normal-link-caret-dark.png')
   })
 
+  test('matches the Visual-mode selection color across a selected hyperlink', async ({ userDataDir }) => {
+    const url = 'https://example.test'
+    const text = `go to ${url} now`
+    const start = text.indexOf(url)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text, links: [{ start, end: start + url.length, url }], children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const link = editor.getByRole('link')
+
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('$')
+
+    await expect(link).toHaveClass(/link-selected/)
+    const linkBackground = await link.evaluate(
+      (element) => element.ownerDocument.defaultView?.getComputedStyle(element).backgroundColor,
+    )
+    const textSelectionBackground = await editor.evaluate(
+      (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::selection').backgroundColor,
+    )
+    expect(linkBackground).toBe(textSelectionBackground)
+  })
+
   test('shows the Normal-mode hyperlink caret only on the focused node', async ({ userDataDir }) => {
     const firstText = 'Start https://first.example end'
     const secondText = 'Open https://second.example now'

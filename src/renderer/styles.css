@@ -329,6 +329,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: #725493;
 }
 
+.vim-state-visual .node-input a.link-selected {
+  color: #fff;
+  background: #725493;
+}
+
 .vim-state-visual-node .node-input {
   caret-color: transparent;
 }
