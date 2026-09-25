@@ -25,7 +25,7 @@ While implementing the change, an additional latent defect surfaced: the suite's
 
 ## Decision
 
-Hidden end-to-end runs execute spec files in parallel across five workers in `playwright.config.ts`; visible runs stay serial because they observe the real desktop UI. `fullyParallel` stays false as the safe global default. Reviewed long-running suites whose tests are independent call `configureHiddenParallelTests()` to distribute tests across the same five workers only during hidden runs. Playwright's `--workers` option remains the tuning escape hatch for environments, including future CI runners, that need a different concurrency limit.
+At adoption, hidden end-to-end runs executed spec files in parallel across five workers in `playwright.config.ts`; the current configuration uses six locally and four in CI. Visible runs stay serial because they observe the real desktop UI. `fullyParallel` stays false as the safe global default. Reviewed long-running suites whose tests are independent call `configureHiddenParallelTests()` to distribute tests across the configured workers only during hidden runs. Playwright's `--workers` option remains the tuning escape hatch for environments that need a different concurrency limit.
 
 Worker isolation:
 
