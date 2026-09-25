@@ -1,7 +1,7 @@
 import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
 import { recordPerfResult } from './results'
 
-test.describe('Vim selection at scale', () => {
+test.describe('Vim interactions at scale', () => {
   test('wide-1000 node Visual selection stays windowed', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(1_000))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
@@ -27,4 +27,112 @@ test.describe('Vim selection at scale', () => {
     expect(highlightedRows).toBeGreaterThan(0)
     expect(highlightedRows).toBeLessThanOrEqual(41)
   })
+
+  for (const siblingCount of [1_000, 30_000]) {
+    test(`wide-${siblingCount} Normal navigation stays windowed`, async ({ userDataDir }) => {
+      const middle = Math.floor(siblingCount / 2)
+      const seed = wideSeed(siblingCount)
+      seed.location = { currentParentId: 'root', selectedNodeId: `c${middle}` }
+      seedDocument(userDataDir, seed)
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const middleInput = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
+      await middleInput.focus()
+      await expect(middleInput).toBeFocused()
+
+      await window.evaluate(() => {
+        const samples: number[] = []
+        ;(window as unknown as { vimNavigationPaints: number[] }).vimNavigationPaints = samples
+        document.addEventListener(
+          'keydown',
+          (event) => {
+            if (event.key !== 'j' && event.key !== 'k') return
+            const start = event.timeStamp
+            requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - start)))
+          },
+          { capture: true },
+        )
+      })
+
+      const start = performance.now()
+      for (let index = 0; index < 40; index += 1) await window.keyboard.press('j')
+      for (let index = 0; index < 40; index += 1) await window.keyboard.press('k')
+      const navigationMs = performance.now() - start
+      await window.waitForFunction(
+        () => (window as unknown as { vimNavigationPaints: number[] }).vimNavigationPaints.length === 80,
+      )
+      const paints = await window.evaluate(() =>
+        (window as unknown as { vimNavigationPaints: number[] }).vimNavigationPaints.slice().sort((a, b) => a - b),
+      )
+      const paintP95Ms = paints[Math.floor(paints.length * 0.95)]!
+      const paintMaxMs = paints[paints.length - 1]!
+      const mountedRows = await window.locator('.node-row').count()
+
+      await expect(middleInput).toBeFocused()
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      recordPerfResult({
+        kind: 'state',
+        scenario: `vim-normal-wide-${siblingCount}`,
+        metrics: {
+          navigationMs: round(navigationMs),
+          paintP95Ms: round(paintP95Ms),
+          paintMaxMs: round(paintMaxMs),
+          mountedRows,
+        },
+      })
+
+      expect(navigationMs).toBeLessThan(2_000)
+      expect(paintP95Ms).toBeLessThan(100)
+      expect(paintMaxMs).toBeLessThan(250)
+      expect(mountedRows).toBeLessThan(100)
+
+      if (siblingCount !== 30_000) return
+
+      await window.keyboard.press('i')
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      await window.keyboard.press('Escape')
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      const modeStart = performance.now()
+      for (let index = 0; index < 20; index += 1) {
+        await window.keyboard.press('i')
+        await window.keyboard.press('Escape')
+      }
+      const modeSwitchMs = performance.now() - modeStart
+      await expect(middleInput).toBeFocused()
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      recordPerfResult({
+        kind: 'state',
+        scenario: 'vim-mode-wide-30000',
+        metrics: { modeSwitchMs: round(modeSwitchMs) },
+      })
+      expect(modeSwitchMs).toBeLessThan(1_000)
+
+      await window.keyboard.press('x')
+      await expect(middleInput).toHaveValue(`hild ${middle}`)
+      const repeatStart = performance.now()
+      for (let index = 1; index <= 20; index += 1) {
+        await window.keyboard.press('j')
+        await window.keyboard.press('.')
+      }
+      const repeatMs = performance.now() - repeatStart
+      const finalInput = window.getByRole('textbox', { name: `Node ${middle + 21}`, exact: true })
+      await expect(finalInput).toBeFocused()
+      await expect(finalInput).toHaveValue(`hild ${middle + 20}`)
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      const repeatMountedRows = await window.locator('.node-row').count()
+      recordPerfResult({
+        kind: 'state',
+        scenario: 'vim-repeat-wide-30000',
+        metrics: { repeatMs: round(repeatMs), mountedRows: repeatMountedRows },
+      })
+      expect(repeatMs).toBeLessThan(1_000)
+      expect(repeatMountedRows).toBeLessThan(100)
+
+      for (let index = 0; index < 10; index += 1) await window.keyboard.press('k')
+      await expect(window.getByRole('textbox', { name: `Node ${middle + 11}`, exact: true })).toHaveValue(
+        `hild ${middle + 10}`,
+      )
+      for (let index = 0; index < 10; index += 1) await window.keyboard.press('k')
+      await expect(middleInput).toHaveValue(`hild ${middle}`)
+    })
+  }
 })
