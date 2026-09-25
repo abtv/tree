@@ -1,7 +1,62 @@
-import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
+import { expect, largeSeed, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
 import { recordPerfResult } from './results'
 
 test.describe('Vim interactions at scale', () => {
+  test('large-10000 cross-parent subtree relocation with dd and P', async ({ userDataDir }) => {
+    seedDocument(userDataDir, largeSeed(100, 100))
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const source = window.locator('.node-row[data-node-id="r0"]').getByRole('textbox')
+    await source.focus()
+    await expect(source).toBeFocused()
+
+    await window.evaluate(() => {
+      const probe = window as unknown as { subtreePastePaintMs?: number }
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'P') return
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              probe.subtreePastePaintMs = performance.now() - event.timeStamp
+            })
+          })
+        },
+        { capture: true },
+      )
+    })
+
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    await window.keyboard.press('P')
+    await window.waitForFunction(
+      () => (window as unknown as { subtreePastePaintMs?: number }).subtreePastePaintMs !== undefined,
+    )
+    const pastePaintMs = await window.evaluate(
+      () => (window as unknown as { subtreePastePaintMs: number }).subtreePastePaintMs,
+    )
+
+    const destinationChildren = window.locator('.node-row')
+    await expect(destinationChildren).toHaveCount(101)
+    await expect(destinationChildren.first().getByRole('textbox')).toHaveValue('Root 0')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    await expect(window.locator('.node-row').first().getByRole('textbox')).toHaveValue('Node 0.0')
+    await expect(window.locator('.node-row').first().getByRole('textbox')).toBeFocused()
+    await expect(window.locator('.node-row')).toHaveCount(100)
+    await window.keyboard.press('Control+o')
+    await window.keyboard.press('Control+o')
+    await expect(window.locator('.node-row')).toHaveCount(99)
+    await expect(source).toHaveCount(0)
+
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-cross-parent-subtree-relocation-10000',
+      metrics: { pastePaintMs: round(pastePaintMs) },
+    })
+  })
+
   test('wide-1000 node Visual selection stays windowed', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(1_000))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
