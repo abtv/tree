@@ -280,7 +280,9 @@ test.describe('Vim editing prototype', () => {
       })
 
     await editor.focus()
-    await setCursor(editor, start)
+    await editor.press('0')
+    await editor.press(String(start))
+    await editor.press('l')
     await expect(link).toHaveClass(/normal-caret-before/)
 
     // A single 'l' must clear the whole atomic link, landing just past it, not
@@ -293,6 +295,78 @@ test.describe('Vim editing prototype', () => {
     await editor.press('h')
     await expect(link).toHaveClass(/normal-caret-before/)
     expect(await caret()).toBe(start)
+  })
+
+  test('keeps the Normal caret on the selected linked node while h and l traverse it', async ({ userDataDir }) => {
+    const url = 'https://example.test/usage'
+    const text = `test ${url}\n${url} after`
+    const firstStart = text.indexOf(url)
+    const secondStart = text.indexOf(url, firstStart + url.length)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'empty', text: '', children: [] },
+          {
+            id: 'linked',
+            text,
+            links: [
+              { start: firstStart, end: firstStart + url.length, url },
+              { start: secondStart, end: secondStart + url.length, url },
+            ],
+            children: [],
+          },
+          { id: 'next', text: 'next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'empty' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const empty = node(window, 1)
+    const linked = node(window, 2)
+    const links = linked.getByRole('link')
+    const caret = () =>
+      linked.evaluate((field) => {
+        const selection = field.ownerDocument.defaultView?.getSelection()
+        if (!selection || selection.rangeCount === 0) return -1
+        const range = selection.getRangeAt(0)
+        const before = field.ownerDocument.createRange()
+        before.selectNodeContents(field)
+        before.setEnd(range.startContainer, range.startOffset)
+        return before.toString().length
+      })
+    await expect(empty).toBeFocused()
+    await empty.press('j')
+    await expect(linked).toBeFocused()
+    await expect(window.locator('.node-row').nth(1).locator('.node-focus-marker')).toHaveCount(1)
+    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    expect(await caret()).toBe(0)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-normal-plain-before-link-focused.png')
+
+    await linked.press('l')
+    expect(await caret()).toBe(1)
+    await setCursor(linked, firstStart)
+    await linked.press('h')
+    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    expect(await caret()).toBe(firstStart - 1)
+    await linked.press('l')
+    await expect(links.first()).toHaveClass(/normal-caret-before/)
+    expect(await caret()).toBe(firstStart)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-normal-link-boundary-focused.png')
+    await linked.press('l')
+    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    expect(await caret()).toBe(firstStart + url.length)
+    await linked.press('h')
+    await expect(links.first()).toHaveClass(/normal-caret-before/)
+    expect(await caret()).toBe(firstStart)
+    await expect(empty).not.toBeFocused()
+    await expect(window.locator('.node-input a.normal-caret-before, .node-input a.normal-caret-after')).toHaveCount(1)
+    await linked.press('k')
+    await expect(empty).toBeFocused()
+    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-normal-empty-neighbor-focused.png')
+    await empty.press('j')
+    await expect(linked).toBeFocused()
+    await expect(links.first()).not.toHaveClass(/normal-caret-before|normal-caret-after/)
   })
 
   test('keeps the Normal-mode hyperlink boundary caret visible in dark appearance', async ({ userDataDir }) => {
@@ -377,17 +451,25 @@ test.describe('Vim editing prototype', () => {
     const firstLink = first.getByRole('link')
     const secondLink = second.getByRole('link')
 
+    await first.press('6')
+    await first.press('l')
     await expect(firstLink).toHaveClass(/normal-caret-before/)
     await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
     await expect(first).toHaveScreenshot('vim-normal-link-caret-multi-node-focused-first.png')
 
     await second.focus()
+    await second.press('0')
+    await second.press('5')
+    await second.press('l')
     await expect(secondLink).toHaveClass(/normal-caret-before/)
     await expect(firstLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
     await expect(first).toHaveScreenshot('vim-normal-link-caret-multi-node-unfocused-first.png')
     await expect(second).toHaveScreenshot('vim-normal-link-caret-multi-node-focused-second.png')
 
     await first.focus()
+    await first.press('0')
+    await first.press('6')
+    await first.press('l')
     await expect(firstLink).toHaveClass(/normal-caret-before/)
     await expect(secondLink).not.toHaveClass(/normal-caret-before|normal-caret-after/)
   })

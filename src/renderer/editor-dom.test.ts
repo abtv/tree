@@ -198,6 +198,26 @@ describe('editor DOM adapters', () => {
     expect(link.classList.contains('normal-caret-after')).toBe(false)
   })
 
+  it('does not draw a hyperlink caret while the Normal cursor is in earlier plain text', () => {
+    const element = document.createElement('div')
+    element.innerHTML =
+      'test <a contenteditable="false" href="https://example.test">link</a>\n<a contenteditable="false" href="https://example.test">link</a> after'
+    document.body.append(element)
+    const links = Array.from(element.querySelectorAll('a'))
+
+    setNormalCaret(element, 0)
+    expect(getSelectionRange(element)).toEqual({ start: 0, end: 1 })
+    expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
+
+    setNormalCaret(element, 1)
+    expect(getSelectionRange(element)).toEqual({ start: 1, end: 2 })
+    expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
+
+    setNormalCaret(element, 9)
+    expect(getSelectionRange(element)).toEqual({ start: 9, end: 10 })
+    expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
+  })
+
   it('positions the hyperlink caret from the first or last wrapped text fragment', () => {
     const element = document.createElement('div')
     element.innerHTML = 'a<a contenteditable="false" href="https://example.test">link</a>z'

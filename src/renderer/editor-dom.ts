@@ -218,7 +218,8 @@ function normalLinkCaret(
   while (current !== null) {
     const length = current.textContent?.length ?? 0
     const link = current.parentElement?.closest('a[contenteditable="false"]')
-    if (link instanceof HTMLAnchorElement && remaining < length) return { link, before: remaining <= length / 2 }
+    if (link instanceof HTMLAnchorElement && remaining >= 0 && remaining < length)
+      return { link, before: remaining <= length / 2 }
     remaining -= length
     current = walker.nextNode()
   }
