@@ -20,6 +20,25 @@ The main controls are:
 
 Transient security considerations, such as the attachment byte limit and the PNG chunk rules, are owned by the implementing modules and `docs/ARCHITECTURE.md`, not restated here.
 
+## Agent execution threat model
+
+This section covers the development agents that modify or validate the repository. It is separate from the application's runtime security model above. Agents can execute repository-controlled scripts, so the repository and its dependencies are treated as trusted inputs for normal development. A malicious repository change could otherwise use an allowed build or test command to act with the agent process's host privileges.
+
+Autonomous runs should use a dedicated workspace with the least credentials possible. Do not expose production credentials, personal documents, SSH keys, signing keys, or other unrelated sensitive data to an agent session. Keep network access disabled for roles that do not need it, and treat a network-enabled agent or package-install command as a privileged operation requiring explicit review.
+
+The protections differ by tool:
+
+| Tool and role | Mechanically enforced boundary | Prompt-only boundary |
+| --- | --- | --- |
+| Codex primary | `workspace-write`, approval-on-request, and configured network access; the sandbox limits filesystem scope but does not restrict individual shell commands | repository workflow, command safety, and role behavior |
+| Codex planner/reviewer | read-only sandbox; no shell access | role behavior and no-web policy |
+| Codex product verifier | project-scoped `workspace-write` with network disabled; the sandbox does not restrict which command runs | documented test/build/lint command list and no-edits rule |
+| Claude Code primary and subagents | project permission settings allow only the listed routine commands without an approval prompt; there is no OS sandbox or command allowlist for the granted `Bash` tool | shared role behavior, no-edits rules for read-only roles, and restrictions beyond the configured permission patterns |
+| OpenCode primary | per-command allow/deny rules, denied external directories, and denied task types in `opencode.json`; these are consent guardrails, not an OS sandbox | shared role behavior and the trusted-repository assumption |
+| OpenCode reviewer | edit, shell, web, and external-directory access denied by configuration | none for those denied capabilities; shared role behavior still applies |
+
+These boundaries reduce accidental access and unsafe tool use; they do not make execution of malicious repository code safe. The primary agent remains responsible for reviewing the repository, validation commands, and generated changes before commit.
+
 ## Verification
 
 Every control above has an automated check. The verification map:
