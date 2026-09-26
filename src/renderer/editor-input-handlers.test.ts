@@ -1344,6 +1344,24 @@ describe('editor keyboard handler', () => {
     expect(vim.setImageCaret).toHaveBeenCalled()
   })
 
+  it('starts the next node at its text caret when j leaves an active image', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Root'
+    input.setSelectionRange(3, 3)
+    input.classList.add('node-input-image-caret')
+    const { handle } = vimHandler(store, {
+      id: 'root-image',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'j'))
+
+    expect(store.moveSelection).toHaveBeenCalledWith('down', 0)
+  })
+
   it('opens an image-only node from its sole Normal-mode character', () => {
     const store = createStore()
     const input = document.createElement('textarea')

@@ -443,6 +443,7 @@ export function handleVimKey(
         }
       }
       if (direction === 'down' && imageCaretActive) {
+        navigationCursor = 0
         if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
         vim.setImageCaret?.(node.id, false)
       }
