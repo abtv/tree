@@ -29,6 +29,7 @@ export type VimStructuralChange =
   | { kind: 'structural-put'; position: 'before' | 'after'; source: TreeNode; sourceIds: readonly string[] }
   | { kind: 'structural-forest-put'; position: 'before' | 'after'; source: NodeForest }
   | { kind: 'structural-open'; position: 'before' | 'after'; text: string }
+  | { kind: 'structural-child-open'; text: string }
   | {
       kind: 'structural-visual'
       command: Exclude<NodeVisualCommand, 'y'>
@@ -77,6 +78,7 @@ export interface VimKeyboardState {
     command: (command: NodeVisualCommand) => void
   }
   beginStructuralOpen?: (position: 'before' | 'after') => void
+  beginStructuralChildOpen?: () => void
   repeatStructural?: (change: VimStructuralChange) => void
 }
 

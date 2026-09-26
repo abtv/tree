@@ -9,6 +9,8 @@ import type { VimKeyboardState } from './editor-input-handlers'
 
 function createStore(): EditorStore {
   return {
+    createChild: vi.fn(() => true),
+    createChildWithText: vi.fn(),
     copy: vi.fn(async () => true),
     createSiblingOrFirstChild: vi.fn(),
     createSibling: vi.fn(() => true),
@@ -188,6 +190,22 @@ describe('editor keyboard handler', () => {
     expect(remove.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('opens a new child with Normal-mode o and enters Insert mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Parent'
+    input.setSelectionRange(2, 2)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    const event = keyEvent(input, 'o')
+    handle(event)
+
+    expect(store.createChild).toHaveBeenCalledOnce()
+    expect(store.createSibling).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('insert')
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
   it('uses counts and text operators without deleting the node', () => {
     const store = createStore()
     const input = document.createElement('textarea')
@@ -361,7 +379,7 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(2)
   })
 
-  it('opens an empty sibling below with o and above with O', () => {
+  it('opens a child with o and a sibling above with O', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
@@ -370,14 +388,14 @@ describe('editor keyboard handler', () => {
 
     const below = keyEvent(input, 'o')
     handle(below)
-    expect(store.createSibling).toHaveBeenNthCalledWith(1, 'after')
+    expect(store.createChild).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('insert')
     expect(below.preventDefault).toHaveBeenCalledOnce()
 
     vim.mode = 'normal'
     const above = keyEvent(input, 'O')
     handle(above)
-    expect(store.createSibling).toHaveBeenNthCalledWith(2, 'before')
+    expect(store.createSibling).toHaveBeenCalledWith('before')
     expect(vim.mode).toBe('insert')
     expect(above.preventDefault).toHaveBeenCalledOnce()
   })

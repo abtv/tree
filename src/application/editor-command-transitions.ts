@@ -78,6 +78,21 @@ export function createSiblingTransition(
   }
 }
 
+export function createFirstChildTransition(
+  document: Document,
+  location: Location,
+  createId: () => NodeId,
+): StructuralTransition | RejectedTransition {
+  const parent = requireNode(document, location.selectedNodeId)
+  if (parent.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+  const id = createId()
+  return {
+    document: createFirstChild(document, location.selectedNodeId, id),
+    location: { currentParentId: location.selectedNodeId, selectedNodeId: id },
+    focus: { nodeId: id, cursor: 0 },
+  }
+}
+
 export function createSiblingOrFirstChildTransition(
   document: Document,
   location: Location,

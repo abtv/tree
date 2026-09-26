@@ -67,7 +67,10 @@ export function useNodeInputBindings({
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
   const structuralInsert = useRef<
-    { kind: 'open'; position: 'before' | 'after' } | { kind: 'visual'; command: 'c' | 's'; span: number } | undefined
+    | { kind: 'open'; position: 'before' | 'after' }
+    | { kind: 'child-open' }
+    | { kind: 'visual'; command: 'c' | 's'; span: number }
+    | undefined
   >(undefined)
 
   const finishStructuralInsert = useCallback((input: HTMLElement): void => {
@@ -78,7 +81,9 @@ export function useNodeInputBindings({
     vimLastChange.current =
       session.kind === 'open'
         ? { kind: 'structural-open', position: session.position, text }
-        : { kind: 'structural-visual', command: session.command, span: session.span, text }
+        : session.kind === 'child-open'
+          ? { kind: 'structural-child-open', text }
+          : { kind: 'structural-visual', command: session.command, span: session.span, text }
   }, [])
 
   const moveNodeVisual = useCallback(
@@ -152,6 +157,7 @@ export function useNodeInputBindings({
           vimRegister.current = { kind: 'node', value: cloneNode(selected), sourceIds: [selected.id] }
         store.deleteSelected()
       } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
+      else if (change.kind === 'structural-child-open') store.createChildWithText(change.text)
       else if (change.kind === 'structural-put')
         store.pasteSubtree(state.location.selectedNodeId, change.position, change.source, change.sourceIds)
       else if (change.kind === 'structural-forest-put')
@@ -487,6 +493,9 @@ export function useNodeInputBindings({
           },
           beginStructuralOpen: (position) => {
             structuralInsert.current = { kind: 'open', position }
+          },
+          beginStructuralChildOpen: () => {
+            structuralInsert.current = { kind: 'child-open' }
           },
           repeatStructural,
         },

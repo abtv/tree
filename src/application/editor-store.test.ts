@@ -259,6 +259,7 @@ describe('EditorStore', () => {
     if (before.status !== 'ready') throw new Error('Expected a ready editor.')
 
     store.createSiblingOrFirstChild(0)
+    expect(store.createChild()).toBe(false)
 
     const after = store.getSnapshot()
     expect(after).toMatchObject({
@@ -383,6 +384,32 @@ describe('EditorStore', () => {
       expect(state.document.roots[0]!.children[0]!.id).toBe('child')
       expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
     }
+  })
+
+  it('creates and focuses a child with Vim structural insertion', async () => {
+    const store = new EditorStore(createServices(), ids('root', 'child', 'empty-grandchild', 'grandchild'))
+    await store.initialize()
+
+    expect(store.createChild()).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'root', children: [{ id: 'child', text: '' }] }] },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+
+    store.createChildWithText('')
+    store.createChildWithText('Grandchild')
+    expect(store.getSnapshot()).toMatchObject({
+      document: {
+        roots: [
+          {
+            children: [
+              { children: [{ id: 'empty-grandchild', children: [{ id: 'grandchild', text: 'Grandchild' }] }] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'empty-grandchild', selectedNodeId: 'grandchild' },
+    })
   })
 
   it('returns to the current parent after deleting its only child', async () => {

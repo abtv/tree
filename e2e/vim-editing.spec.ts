@@ -14,6 +14,22 @@ import {
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
 
 test.describe('Vim editing prototype', () => {
+  test('uses o to create and focus a child node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Parent', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const parent = node(window, 1)
+    await parent.focus()
+    await window.keyboard.press('o')
+    await typeInto(node(window, 1), 'Child')
+    await window.keyboard.press('Escape')
+
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Parent')
+    await expect(node(window, 1)).toHaveValue('Child')
+  })
+
   test('focuses the current parent with gg from a nested level', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

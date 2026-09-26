@@ -115,8 +115,10 @@ describe('useNodeInputBindings', () => {
     expect(result.current.vimMode).toBe('normal')
   })
 
-  it('captures opened sibling text for structural dot repeat', () => {
+  it('captures opened child text for structural dot repeat', () => {
     const store = {
+      createChild: vi.fn(() => true),
+      createChildWithText: vi.fn(),
       createSibling: vi.fn(() => true),
       createSiblingWithText: vi.fn(),
       endTextSession: vi.fn(),
@@ -156,7 +158,7 @@ describe('useNodeInputBindings', () => {
     input.value = 'Opened'
     press('Escape')
     press('.')
-    expect(store.createSiblingWithText).toHaveBeenCalledWith('after', 'Opened')
+    expect(store.createChildWithText).toHaveBeenCalledWith('Opened')
   })
 
   it('edits content on content change using the node links, defaulting to none', () => {

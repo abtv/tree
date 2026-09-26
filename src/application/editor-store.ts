@@ -21,6 +21,7 @@ import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-m
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 import {
   ancestorNavigationTransition,
+  createFirstChildTransition,
   createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
@@ -353,10 +354,42 @@ export class EditorStore {
     return true
   }
 
+  public createChild(): boolean {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return false
+    const transition = createFirstChildTransition(state.document, state.location, this.createId)
+    if (transition.kind === 'rejected') {
+      this.reportError(new Error(transition.message))
+      return false
+    }
+    this.endTextSession()
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
+    return true
+  }
+
   public createSiblingWithText(position: 'before' | 'after', text: string): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const transition = createSiblingTransition(state.document, state.location, position, this.createId)
+    const document =
+      text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
+    this.endTextSession()
+    this.applyStructural(document, transition.location, this.runtime.newFocus(transition.focus.nodeId, text.length))
+    if (text !== '') this.noteChange(countInsertedWords('', text), false)
+  }
+
+  public createChildWithText(text: string): void {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return
+    const transition = createFirstChildTransition(state.document, state.location, this.createId)
+    if (transition.kind === 'rejected') {
+      this.reportError(new Error(transition.message))
+      return
+    }
     const document =
       text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
     this.endTextSession()

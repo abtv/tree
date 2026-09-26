@@ -3,6 +3,7 @@ import type { Document, TreeNode } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import {
   ancestorNavigationTransition,
+  createFirstChildTransition,
   createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
@@ -259,6 +260,19 @@ describe('editor command transitions', () => {
       ['second', 'Second'],
     ])
     expect(after.focus).toEqual({ nodeId: 'after-empty', cursor: 0 })
+  })
+
+  it('creates a first child of the selected node', () => {
+    const child = createFirstChildTransition(
+      document,
+      { currentParentId: null, selectedNodeId: 'root' },
+      () => 'new-child',
+    )
+
+    if (!('document' in child)) throw new Error('Expected an accepted transition.')
+    expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['new-child', 'first', 'second'])
+    expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'new-child' })
+    expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
   })
 
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {

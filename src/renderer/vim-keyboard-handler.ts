@@ -244,9 +244,13 @@ export function handleVimKey(
     setCaret(input, cursor)
   } else if (!visual && (event.key === 'o' || event.key === 'O')) {
     if (pending.count !== '') return handled()
-    const position = event.key === 'o' ? 'after' : 'before'
-    if (store.createSibling(position)) {
-      vim.beginStructuralOpen?.(position)
+    if (event.key === 'o') {
+      if (store.createChild()) {
+        vim.beginStructuralChildOpen?.()
+        vim.setMode('insert')
+      }
+    } else if (store.createSibling('before')) {
+      vim.beginStructuralOpen?.('before')
       vim.setMode('insert')
     }
   } else if (!visual && event.key === 'v') {
