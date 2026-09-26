@@ -219,6 +219,11 @@ describe('App', () => {
     expect(input).toHaveClass('node-input-empty', 'node-input-image-only')
     expect(input.closest('.node-row')).toHaveClass('node-row-image-only')
 
+    fireEvent.click(input.closest('.node-row')!)
+    expect(input).toHaveFocus()
+    fireEvent.keyDown(input, { key: 'i' })
+    expect(screen.getByText('INSERT')).toBeInTheDocument()
+
     fireEvent.change(input, { target: { value: 'caption' } })
 
     expect(input).toHaveValue('caption')

@@ -56,6 +56,12 @@ export function App({ store }: AppProps): React.JSX.Element {
     },
     [store],
   )
+  const activateNode = useCallback(
+    (node: TreeNode): void => {
+      store.selectNode(node.id, 0)
+    },
+    [store],
+  )
   const moveNode = useCallback(
     (nodeId: string, insertionIndex: number): void => {
       store.moveNodeTo(nodeId, insertionIndex)
@@ -123,7 +129,17 @@ export function App({ store }: AppProps): React.JSX.Element {
           {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
         </div>
         {currentParent === undefined ? null : (
-          <section className="current-parent" aria-label="Current parent">
+          <section
+            aria-label="Current parent"
+            className="current-parent"
+            onClick={(event) => {
+              if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
+              const target = event.target
+              if (target instanceof Element && target.closest('.node-input, .attachment-button, a, button') !== null)
+                return
+              activateNode(currentParent)
+            }}
+          >
             <NodeInput
               imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
               node={currentParent}
@@ -140,6 +156,7 @@ export function App({ store }: AppProps): React.JSX.Element {
           focusedNodeId={focus?.nodeId}
           locked={persistenceLocked}
           nodes={nodes}
+          onActivate={activateNode}
           visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
           onEnter={enterNode}
           onMove={moveNode}

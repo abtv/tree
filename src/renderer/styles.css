@@ -306,6 +306,17 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   field-sizing: fixed;
 }
 
+.vim-state-normal .node-input.node-input-empty.node-input-image-only:focus {
+  caret-color: transparent;
+}
+
+.vim-state-insert .node-input-image-only:focus {
+  height: 20px;
+  min-height: 20px;
+  padding: 0 6px;
+  line-height: 20px;
+}
+
 .vim-state-normal .node-input {
   caret-color: transparent;
   caret-shape: block;
@@ -444,6 +455,13 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   min-height: 1px;
   padding: 0;
   line-height: 1px;
+}
+
+.vim-state-insert .current-parent-input.node-input-image-only:focus {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 6px 2px;
+  line-height: 30px;
 }
 
 .current-parent-input:focus {

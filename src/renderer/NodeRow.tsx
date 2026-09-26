@@ -6,6 +6,7 @@ interface NodeRowProps {
   node: TreeNode
   index: number
   renderInput: (node: TreeNode, label: string) => ReactNode
+  onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
   onPointerDown: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
   onPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
@@ -23,6 +24,7 @@ export const NodeRow = memo(function NodeRow({
   node,
   index,
   renderInput,
+  onActivate,
   onEnter,
   onPointerDown,
   onPointerLeave,
@@ -51,6 +53,13 @@ export const NodeRow = memo(function NodeRow({
       className={className}
       data-node-id={node.id}
       data-node-index={index}
+      onClick={(event) => {
+        if (node.text.length !== 0 || node.attachment === undefined) return
+        const target = event.target
+        if (target instanceof Element && target.closest('.node-input, .node-disclosure, .attachment-button, a, button'))
+          return
+        onActivate?.(node)
+      }}
       onPointerDown={(event) => onPointerDown(node, index, event)}
       onPointerLeave={(event) => onPointerLeave(node.id, event)}
       ref={(element) => rowRef(node.id, element)}

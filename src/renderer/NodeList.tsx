@@ -18,6 +18,7 @@ import { useNodeListDrag } from './use-node-list-drag'
 interface NodeListProps {
   nodes: readonly TreeNode[]
   renderInput: (node: TreeNode, label: string) => ReactNode
+  onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
   onMove: (nodeId: string, insertionIndex: number) => void
   focusedNodeId?: string | undefined
@@ -29,6 +30,7 @@ interface NodeListProps {
 export function NodeList({
   nodes,
   renderInput,
+  onActivate,
   onEnter,
   onMove,
   focusedNodeId,
@@ -189,6 +191,7 @@ export function NodeList({
       index={index}
       key={node.id}
       node={node}
+      {...(onActivate === undefined ? {} : { onActivate })}
       onEnter={onEnter}
       onPointerDown={onRowPointerDown}
       onPointerLeave={onRowPointerLeave}

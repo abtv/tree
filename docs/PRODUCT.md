@@ -86,7 +86,7 @@ The first child is separated from the current-parent heading by the same compact
 At the root level, the first root node is positioned at the same height as the first child below a single-line current parent, so both levels share the same vertical rhythm.
 
 An attached image is displayed beneath its node's text and aligned with that node's text column.
-When a node has an image but no text, its empty text editor remains keyboard-editable but occupies no visible row; the image begins at the node's text column. The same presentation applies when the node is shown as the current parent.
+When a node has an image but no text, its empty text editor remains keyboard-editable but occupies no visible row in Normal mode; the image begins at the node's text column. Clicking the blank portion of the node row focuses its text editor. In Insert mode, the focused empty editor displays a normal-height insertion line and caret until text is entered or Insert mode ends. The same presentation applies when the node is shown as the current parent.
 
 ### 2.2 Location Path
 
@@ -693,7 +693,7 @@ After image paste:
 * place the cursor at the end of the text portion of the affected node;
 * for an image-only node, the text portion is empty.
 
-An image-only node does not display an empty text row before its image. Its empty text editor remains available to keyboard editing; when text is added, it appears above the image.
+An image-only node does not display an empty text row before its image in Normal mode. In Insert mode, its focused empty text editor expands to a normal-height line so the insertion caret is visible; if Insert mode ends before text is added, the line collapses again. When text is added, it appears above the image.
 
 Images are attachments, not independently draggable objects.
 
