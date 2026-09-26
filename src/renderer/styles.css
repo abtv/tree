@@ -185,6 +185,7 @@ textarea {
   min-height: 25px;
   margin-left: 28px;
   padding-left: 21px;
+  cursor: pointer;
 }
 
 .node-row-pinned {
@@ -251,6 +252,7 @@ textarea {
 body.node-drag-active,
 body.node-drag-active .node-row,
 body.node-drag-active .node-row .node-input,
+body.node-drag-active .node-row .node-input a,
 body.node-drag-active .node-disclosure {
   cursor: grabbing;
 }
@@ -279,7 +281,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   padding: 0 6px;
   color: inherit;
   background: transparent;
-  cursor: text;
+  cursor: pointer;
   caret-color: #373f43;
   outline: none;
   resize: none;
@@ -351,6 +353,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .node-input a {
   color: #1769aa;
   text-decoration: underline;
+  cursor: text;
+}
+
+.left-command-down .node-input a {
   cursor: pointer;
 }
 

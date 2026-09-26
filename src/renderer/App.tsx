@@ -8,6 +8,7 @@ import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import { useLeftCommandKey } from './use-left-command-key'
 import type { VimMode } from './vim-editing'
 
 interface AppProps {
@@ -20,6 +21,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimMode, setVimMode] = useState<VimMode>('normal')
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
+  const leftCommandKeyPressed = useLeftCommandKey()
   useEffect(() => {
     void window.treeApi
       .getAlwaysOnTop()
@@ -107,7 +109,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const topLevel = state.location.currentParentId === null
 
   return (
-    <main className={`tree-app vim-state-${vimMode}`}>
+    <main className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}>
       <LocationBar
         path={path}
         currentParentId={state.location.currentParentId}
