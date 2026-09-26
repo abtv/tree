@@ -62,6 +62,7 @@ export function useNodeInputBindings({
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
+  const syncedImageFocusToken = useRef<number | undefined>(focus?.token)
   const latestVimMode = useRef(vimMode)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
@@ -99,6 +100,8 @@ export function useNodeInputBindings({
   const syncImageCaretToFocus = useCallback((): void => {
     const state = store.getSnapshot()
     if (state.status !== 'ready') return
+    if (state.focus?.token === syncedImageFocusToken.current) return
+    syncedImageFocusToken.current = state.focus?.token
     vimImageTextCursor.current = undefined
     const target = requireNode(state.document, state.location.selectedNodeId).node
     setImageCaretNodeId(
@@ -253,6 +256,10 @@ export function useNodeInputBindings({
   useLayoutEffect(() => {
     latestFocus.current = focus
   }, [focus])
+
+  useLayoutEffect(() => {
+    if (focus !== undefined && focus.token !== syncedImageFocusToken.current) syncImageCaretToFocus()
+  }, [focus, syncImageCaretToFocus])
 
   useLayoutEffect(() => {
     latestVimMode.current = vimMode
@@ -513,7 +520,14 @@ export function useNodeInputBindings({
           syncImageCaretToFocus,
           setMode: setVimMode,
           openAttachment: onPreviewAttachment,
-          setImageCaret: (nodeId, active) => setImageCaretNodeId(active ? nodeId : undefined),
+          setImageCaret: (nodeId, active, fromFocus) => {
+            if (fromFocus === true) {
+              const state = store.getSnapshot()
+              if (state.status === 'ready' && state.focus !== undefined)
+                syncedImageFocusToken.current = state.focus.token
+            }
+            setImageCaretNodeId(active ? nodeId : undefined)
+          },
           scheduleCaret: (input, cursor) => {
             pendingCaret.current = { input, cursor }
           },

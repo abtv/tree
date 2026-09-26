@@ -331,7 +331,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'k'))
 
     expect(store.moveSelection).toHaveBeenCalledWith('up', 4)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true, true)
   })
 
   it('moves from an active parent image to its text with k', () => {
@@ -562,7 +562,7 @@ describe('editor keyboard handler', () => {
 
     handle(keyEvent(input, 'k'))
 
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false, true)
   })
 
   it('opens a new child with Normal-mode o and enters Insert mode', () => {

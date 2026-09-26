@@ -492,7 +492,7 @@ export function handleVimKey(
               state.focus?.cursor ?? navigationCursor,
               Math.max(0, target.text.length - 1),
             )
-          vim.setImageCaret?.(target.id, target.id !== node.id && target.attachment !== undefined)
+          vim.setImageCaret?.(target.id, target.id !== node.id && target.attachment !== undefined, true)
         }
       }
     }

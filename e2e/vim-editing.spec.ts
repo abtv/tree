@@ -1402,6 +1402,43 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
   })
 
+  test('retains the image return position when focus-changing commands do nothing', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+          { id: 'peer', text: 'peer', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await editor.press('u')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await editor.press('Control+r')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await editor.press('Control+o')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(node(window, 2)).not.toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-noop-image-caret-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-noop-image-caret-dark.png')
+
+    await editor.press('V')
+    await editor.press('Escape')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await editor.press('k')
+    await expect(editor).toHaveJSProperty('selectionStart', 1)
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+  })
+
   test('clears a stale image caret after entering a childless attached node with gd', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

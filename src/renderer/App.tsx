@@ -9,7 +9,7 @@ import { NodeList } from './NodeList'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
 import { useLeftCommandKey } from './use-left-command-key'
-import { isImageCaretCursor, type VimMode } from './vim-editing'
+import type { VimMode } from './vim-editing'
 
 interface AppProps {
   store: EditorStore
@@ -60,24 +60,12 @@ export function App({ store }: AppProps): React.JSX.Element {
     nodeVisualSelection,
     setNodeVisualSelection,
   })
-  const resyncImageCaretToFocus = useCallback((): void => {
-    const nextState = store.getSnapshot()
-    if (nextState.status !== 'ready') return
-    const target = requireNode(nextState.document, nextState.location.selectedNodeId).node
-    setImageCaretNodeId(
-      nextState.focus !== undefined &&
-        isImageCaretCursor(target.attachment !== undefined, target.text.length, nextState.focus.cursor)
-        ? target.id
-        : undefined,
-    )
-  }, [store])
   const enterNode = useCallback(
     (node: TreeNode): void => {
       store.selectNode(node.id, 0)
       store.enter()
-      resyncImageCaretToFocus()
     },
-    [store, resyncImageCaretToFocus],
+    [store],
   )
   const activateNode = useCallback(
     (node: TreeNode): void => {
@@ -94,9 +82,8 @@ export function App({ store }: AppProps): React.JSX.Element {
   const navigateToAncestor = useCallback(
     (parentId: string | null): void => {
       store.navigateToAncestor(parentId)
-      resyncImageCaretToFocus()
     },
-    [store, resyncImageCaretToFocus],
+    [store],
   )
   const dismissQuitWithoutSaving = useCallback((): void => {
     store.dismissQuitWithoutSavingPrompt()

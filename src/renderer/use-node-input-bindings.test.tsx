@@ -19,6 +19,12 @@ function createStore(): EditorStore {
     editContent: vi.fn(),
     editText: vi.fn(),
     endTextSession: vi.fn(),
+    getSnapshot: vi.fn(() => ({
+      status: 'ready',
+      document: { roots: [{ id: 'node', text: 'hello', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'node' },
+      focus: { nodeId: 'node', cursor: 3, token: 1 },
+    })),
     markNextTextEditStandalone: vi.fn(),
     paste: vi.fn(async () => {}),
     replaceTextRange: vi.fn(),
@@ -250,6 +256,153 @@ describe('useNodeInputBindings', () => {
 
     expect(store.selectNode).toHaveBeenCalledWith('root', 0)
     expect(result.current.imageCaretNodeId).toBeUndefined()
+  })
+
+  it('keeps a non-final image return position across commands without a new focus intent', () => {
+    const node: TreeNode = {
+      id: 'root',
+      text: 'abcd',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    }
+    let focus = { nodeId: 'root', cursor: 0, token: 1 }
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [node] },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+        focus,
+      }),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      leave: vi.fn(),
+      endTextSession: vi.fn(),
+      selectNode: vi.fn((_id: string, cursor: number) => {
+        focus = { nodeId: 'root', cursor, token: focus.token + 1 }
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+      return {
+        bindings: useNodeInputBindings({
+          store,
+          selectedNodeId: 'root',
+          focus,
+          vimMode,
+          setVimMode,
+          setImageCaretNodeId,
+          nodeVisualSelection: selection,
+          setNodeVisualSelection: setSelection,
+          onPreviewAttachment: vi.fn(),
+        }),
+        vimMode,
+        imageCaretNodeId,
+      }
+    })
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    const input = document.createElement('textarea')
+    input.value = node.text
+    input.setSelectionRange(1, 1)
+    row.append(input)
+    const press = (key: string, ctrlKey = false): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+      input.classList.toggle('node-input-image-caret', result.current.imageCaretNodeId === node.id)
+    }
+
+    press('j')
+    expect(result.current.imageCaretNodeId).toBe('root')
+    press('u')
+    press('r', true)
+    press('o', true)
+    press('V')
+    press('Escape')
+    expect(result.current.vimMode).toBe('normal')
+    expect(result.current.imageCaretNodeId).toBe('root')
+    press('k')
+    expect(input.selectionStart).toBe(1)
+    expect(result.current.imageCaretNodeId).toBeUndefined()
+
+    press('j')
+    act(() => {
+      store.selectNode('root', 0)
+      result.current.bindings(node).onKeyDown({
+        currentTarget: input,
+        key: 'u',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    })
+    expect(result.current.imageCaretNodeId).toBeUndefined()
+  })
+
+  it('keeps an explicit image destination when a child-to-parent motion creates a focus intent', () => {
+    const child: TreeNode = { id: 'child', text: 'child', children: [] }
+    const parent: TreeNode = {
+      id: 'parent',
+      text: 'Parent',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [child],
+    }
+    let selectedNodeId = child.id
+    let focus = { nodeId: child.id, cursor: 0, token: 1 }
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [parent] },
+        location: { currentParentId: parent.id, selectedNodeId },
+        focus,
+      }),
+      moveSelection: vi.fn(() => {
+        selectedNodeId = parent.id
+        focus = { nodeId: parent.id, cursor: parent.text.length, token: 2 }
+      }),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result, rerender } = renderHook(() => {
+      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+      return {
+        bindings: useNodeInputBindings({
+          store,
+          selectedNodeId,
+          focus,
+          vimMode: 'normal',
+          setImageCaretNodeId,
+          onPreviewAttachment: vi.fn(),
+        }),
+        imageCaretNodeId,
+      }
+    })
+    const input = document.createElement('textarea')
+    input.value = child.text
+    act(() => {
+      result.current.bindings(child).onKeyDown({
+        currentTarget: input,
+        key: 'k',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    })
+    rerender()
+
+    expect(store.moveSelection).toHaveBeenCalledWith('up', child.text.length)
+    expect(result.current.imageCaretNodeId).toBe(parent.id)
   })
 
   it('captures opened child text for structural dot repeat', () => {

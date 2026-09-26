@@ -84,7 +84,7 @@ export interface VimKeyboardState {
   syncImageCaretToFocus: () => void
   setMode: (mode: VimMode) => void
   openAttachment?: (attachmentId: string) => void
-  setImageCaret?: (nodeId: string, active: boolean) => void
+  setImageCaret?: (nodeId: string, active: boolean, fromFocus?: boolean) => void
   scheduleCaret: (input: HTMLElement, cursor: number) => void
   nodeVisual?: {
     enter: (nodeId: string) => boolean
