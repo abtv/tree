@@ -511,7 +511,7 @@ describe('editor keyboard handler', () => {
   it('opens a sibling below with o and above with O', () => {
     const store = createStore()
     const input = document.createElement('textarea')
-    input.value = 'text'
+    input.value = 'texted'
     input.setSelectionRange(2, 2)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
 
@@ -1029,7 +1029,7 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     const node: TreeNode = {
       id: 'node',
-      text: 'text',
+      text: 'texted',
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     }
@@ -1220,8 +1220,8 @@ describe('editor keyboard handler', () => {
   it('moves onto an attached image with l, back to text with h, and opens it with Enter', () => {
     const store = createStore()
     const input = document.createElement('textarea')
-    input.value = 'text'
-    input.setSelectionRange(3, 4)
+    input.value = 'texted'
+    input.setSelectionRange(1, 2)
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
@@ -1229,15 +1229,18 @@ describe('editor keyboard handler', () => {
     document.body.append(row)
     const node = {
       id: 'node',
-      text: 'text',
+      text: 'texted',
       attachment: { id: 'image', mimeType: 'image/png' as const },
       children: [],
     }
     const { handle, onPreviewAttachment, vim } = vimHandler(store, node)
 
+    handle(keyEvent(input, '3'))
     handle(keyEvent(input, 'l'))
-    expect(input.selectionStart).toBe(4)
-    expect(input.selectionEnd).toBe(4)
+    handle(keyEvent(input, 'l'))
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(6)
+    expect(input.selectionEnd).toBe(6)
     expect(vim.setImageCaret).toHaveBeenCalledWith('node', true)
 
     const enter = keyEvent(input, 'Enter')
@@ -1248,7 +1251,36 @@ describe('editor keyboard handler', () => {
     expect(enter.preventDefault).toHaveBeenCalledOnce()
 
     handle(keyEvent(input, 'h'))
-    expect(input.selectionStart).toBe(3)
+    expect(input.selectionStart).toBe(5)
+    expect(input.selectionEnd).toBe(6)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    row.remove()
+  })
+
+  it('restores the saved text position when h exits an image entered with j', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(1, 2)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input)
+    document.body.append(row)
+    const node = {
+      id: 'node',
+      text: 'text',
+      attachment: { id: 'image', mimeType: 'image/png' as const },
+      children: [],
+    }
+    const { handle, vim } = vimHandler(store, node)
+
+    handle(keyEvent(input, 'j'))
+    input.classList.add('node-input-image-caret')
+    handle(keyEvent(input, 'h'))
+
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(2)
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
     row.remove()
   })

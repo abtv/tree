@@ -330,13 +330,23 @@ export function handleVimKey(
   clearPending()
 
   if (!visual && (event.key === 'h' || event.key === 'l')) {
-    const next = moveCharacterCursor(
-      cursor,
-      event.key === 'h' ? 'left' : 'right',
-      node.text.length,
-      node.attachment !== undefined,
-      count,
-    )
+    const imageCaretActive = input.classList.contains('node-input-image-caret')
+    let next: number
+    if (event.key === 'h' && imageCaretActive && node.attachment !== undefined && node.text.length > 0) {
+      next = vim.imageTextCursor?.current ?? node.text.length - 1
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
+    } else {
+      next = moveCharacterCursor(
+        cursor,
+        event.key === 'h' ? 'left' : 'right',
+        node.text.length,
+        node.attachment !== undefined,
+        count,
+      )
+      if (event.key === 'l' && !imageCaretActive && node.attachment !== undefined && next === node.text.length) {
+        if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = cursor + count - 1
+      }
+    }
     vim.setImageCaret?.(node.id, node.attachment !== undefined && next === node.text.length)
     move(next, true)
   } else if (isTextMotion(event.key)) {
@@ -442,7 +452,10 @@ export function handleVimKey(
         if (state.status === 'ready' && state.document !== undefined) {
           const target = requireNode(state.document, state.location.selectedNodeId).node
           if (target.id !== node.id && target.attachment !== undefined && vim.imageTextCursor !== undefined)
-            vim.imageTextCursor.current = Math.min(state.focus?.cursor ?? navigationCursor, Math.max(0, target.text.length - 1))
+            vim.imageTextCursor.current = Math.min(
+              state.focus?.cursor ?? navigationCursor,
+              Math.max(0, target.text.length - 1),
+            )
           vim.setImageCaret?.(target.id, target.id !== node.id && target.attachment !== undefined)
         }
       }

@@ -88,7 +88,7 @@ test.describe('Vim editing prototype', () => {
     seedDocument(userDataDir, {
       document: {
         roots: [
-          { id: 'with-image', text: 'Text', attachment: { id: 'attachment', mimeType: 'image/png' }, children: [] },
+          { id: 'with-image', text: 'Texted', attachment: { id: 'attachment', mimeType: 'image/png' }, children: [] },
           { id: 'next', text: 'Next', children: [] },
           {
             id: 'image-only',
@@ -108,12 +108,24 @@ test.describe('Vim editing prototype', () => {
     await setCursor(withImage, 1)
 
     await withImage.press('j')
-    await expect(withImage).toHaveJSProperty('selectionStart', 4)
+    await expect(withImage).toHaveJSProperty('selectionStart', 6)
+    await withImage.press('h')
+    await expect(withImage).toHaveJSProperty('selectionStart', 1)
+    await withImage.press('j')
+    await expect(withImage).toHaveJSProperty('selectionStart', 6)
     await withImage.press('k')
     await expect(withImage).toHaveJSProperty('selectionStart', 1)
 
+    await setCursor(withImage, 3)
+    await withImage.press('l')
+    await withImage.press('l')
+    await withImage.press('l')
+    await expect(withImage).toHaveJSProperty('selectionStart', 6)
+    await withImage.press('h')
+    await expect(withImage).toHaveJSProperty('selectionStart', 5)
+
     await withImage.press('j')
-    await expect(withImage).toHaveJSProperty('selectionStart', 4)
+    await expect(withImage).toHaveJSProperty('selectionStart', 6)
     await withImage.press('j')
     await expect(node(window, 2)).toBeFocused()
 
