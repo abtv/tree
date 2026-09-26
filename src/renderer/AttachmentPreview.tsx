@@ -65,9 +65,11 @@ function ImageErrorMessage(): React.JSX.Element {
 export function AttachmentImage({
   attachmentId,
   onOpen,
+  imageCaretActive = false,
 }: {
   attachmentId: string
   onOpen: (attachmentId: string) => void
+  imageCaretActive?: boolean
 }): React.JSX.Element | null {
   const { state, onImageError } = useAttachmentImage(attachmentId)
   if (state.status === 'loading') return null
@@ -75,7 +77,7 @@ export function AttachmentImage({
   return (
     <button
       aria-label="Open image preview"
-      className="attachment-button"
+      className={imageCaretActive ? 'attachment-button attachment-image-caret' : 'attachment-button'}
       onClick={() => onOpen(attachmentId)}
       type="button"
     >

@@ -69,6 +69,8 @@ export interface VimKeyboardState {
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   setMode: (mode: VimMode) => void
+  openAttachment?: (attachmentId: string) => void
+  setImageCaret?: (nodeId: string, active: boolean) => void
   scheduleCaret: (input: HTMLElement, cursor: number) => void
   nodeVisual?: {
     enter: (nodeId: string) => boolean

@@ -168,6 +168,19 @@ describe('editor DOM adapters', () => {
     expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
+  it('keeps the DOM caret after text when the image is the active Normal-mode character', () => {
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    const element = document.createElement('textarea')
+    element.value = 'hello'
+    row.append(element, document.createElement('button'))
+
+    setNormalCaret(element, 5)
+
+    expect(getSelectionRange(element)).toEqual({ start: 5, end: 5 })
+  })
+
   it('selects each linked character for a Normal-mode block caret', () => {
     const element = document.createElement('div')
     element.innerHTML = 'a<a href="https://example.test">link</a>z'

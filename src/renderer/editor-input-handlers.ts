@@ -122,6 +122,7 @@ export function createEditorKeyDownHandler({
         vim.visualFocus.current = undefined
         vim.setMode('normal')
         setNormalCaret(event.currentTarget, Math.max(0, cursor - 1))
+        vim.setImageCaret?.(node.id, node.attachment !== undefined && Math.max(0, cursor - 1) === node.text.length)
         store.endTextSession()
         return
       }

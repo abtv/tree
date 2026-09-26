@@ -1,5 +1,16 @@
 export type VimMode = 'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'
 
+export function moveCharacterCursor(
+  cursor: number,
+  direction: 'left' | 'right',
+  textLength: number,
+  hasAttachment: boolean,
+  count = 1,
+): number {
+  const lastCharacter = hasAttachment ? textLength : Math.max(0, textLength - 1)
+  return Math.max(0, Math.min(lastCharacter, cursor + (direction === 'left' ? -count : count)))
+}
+
 type CharacterClass = 'space' | 'word' | 'punctuation'
 
 function characterClass(character: string): CharacterClass {

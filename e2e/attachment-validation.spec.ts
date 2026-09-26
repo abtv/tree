@@ -127,8 +127,15 @@ test.describe('attachment validation and image failures', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await editor.focus()
     await expect(editor).toBeFocused()
+    await expect(row.getByRole('button', { name: 'Open image preview' })).toHaveClass(/attachment-image-caret/)
     await expect(editor).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)')
     await expect(row).toHaveScreenshot('image-only-normal-focused.png', { caret: 'initial' })
+
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+    await window.getByRole('button', { name: 'Close image preview' }).click()
+    await expect(editor).toBeFocused()
+    await expect(row.getByRole('button', { name: 'Open image preview' })).toHaveClass(/attachment-image-caret/)
 
     await window.getByRole('button', { name: 'Enter node 1' }).click()
     const parentEditor = window.getByRole('textbox', { name: 'Current parent' })
@@ -158,6 +165,32 @@ test.describe('attachment validation and image failures', () => {
     await expect(row).toHaveScreenshot('image-only-insert-empty.png', { caret: 'initial' })
     await typeInto(editor, 'typed after row click')
     await expect(editor).toHaveValue('typed after row click')
+  })
+
+  test('moves the Normal-mode caret onto an image with l and opens it with Enter', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = node(window, 1)
+    await typeInto(editor, 'text before image')
+    await editor.press('Escape')
+    await writeClipboardImageSized(app, 80, 80)
+    await firePaste(editor)
+
+    const row = window.locator('.node-row').first()
+    await expect(row.getByAltText('Attached image')).toBeVisible()
+    await expect(editor).toHaveValue('text before image')
+    await window.keyboard.press('l')
+
+    await expect(editor).toBeFocused()
+    const imageButton = row.getByRole('button', { name: 'Open image preview' })
+    await expect(imageButton).toHaveClass(/attachment-image-caret/)
+    await expect(row).toHaveScreenshot('text-and-image-image-caret.png', { caret: 'initial' })
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+    await expect(window.getByRole('img', { name: 'Attached image preview' })).toBeVisible()
+    await window.getByRole('button', { name: 'Close image preview' }).click()
+    await expect(imageButton).toHaveClass(/attachment-image-caret/)
+    await window.keyboard.press('h')
+    await expect(imageButton).not.toHaveClass(/attachment-image-caret/)
   })
 
   test('opens a document whose stored attachment file is missing', async ({ userDataDir }) => {

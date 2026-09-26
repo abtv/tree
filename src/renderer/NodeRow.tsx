@@ -51,6 +51,7 @@ export const NodeRow = memo(function NodeRow({
   return (
     <div
       className={className}
+      data-has-attachment={node.attachment !== undefined}
       data-node-id={node.id}
       data-node-index={index}
       onClick={(event) => {

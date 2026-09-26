@@ -13,6 +13,7 @@ import {
   transformCase,
 } from './vim-text-commands'
 import type { VimFindCommand, VimKeyboardState, VimStructuralChange, VimTextChange } from './vim-keyboard-types'
+import { moveCharacterCursor } from './vim-editing'
 
 export function handleVimKey(
   event: KeyboardEvent<HTMLElement>,
@@ -45,9 +46,15 @@ export function handleVimKey(
   const cursor = getCaret(input)
   const selection = getSelectionRange(input)
   const visual = vim.mode === 'visual'
+  if (!visual) vim.setImageCaret?.(node.id, node.attachment !== undefined && cursor === node.text.length)
   const motionCursor = visual ? (vim.visualFocus.current ?? cursor) : cursor
-  const move = (target: number): void => {
-    const maximum = node.text.length > 0 ? node.text.length - 1 : 0
+  const move = (target: number, allowAttachment = false): void => {
+    const maximum =
+      allowAttachment && !visual && node.attachment !== undefined
+        ? node.text.length
+        : node.text.length > 0
+          ? node.text.length - 1
+          : 0
     const clamped = Math.max(0, Math.min(target, maximum))
     if (visual) {
       const anchor = vim.visualAnchor.current ?? cursor
@@ -188,6 +195,7 @@ export function handleVimKey(
     }
     clearPending()
     if (isTextMotion(event.key)) {
+      if (node.attachment !== undefined && cursor === node.text.length) return handled()
       applyTextChange(store, node, input, cursor, vim, {
         kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
         motion: event.key,
@@ -228,7 +236,17 @@ export function handleVimKey(
   }
   clearPending()
 
-  if (isTextMotion(event.key)) {
+  if (!visual && (event.key === 'h' || event.key === 'l')) {
+    const next = moveCharacterCursor(
+      cursor,
+      event.key === 'h' ? 'left' : 'right',
+      node.text.length,
+      node.attachment !== undefined,
+      count,
+    )
+    vim.setImageCaret?.(node.id, node.attachment !== undefined && next === node.text.length)
+    move(next, true)
+  } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
     if (range !== undefined) move(range.target)
   } else if (!visual && (event.key === 'i' || event.key === 'a' || event.key === 'I' || event.key === 'A')) {
@@ -428,8 +446,13 @@ export function handleVimKey(
       clearPending()
       return handled()
     }
-    const link = linkAtPosition(node.links, cursor)
-    if (link !== undefined) window.open(link.url, '_blank')
+    if (node.attachment !== undefined && cursor === node.text.length) {
+      vim.setImageCaret?.(node.id, true)
+      vim.openAttachment?.(node.attachment.id)
+    } else {
+      const link = linkAtPosition(node.links, cursor)
+      if (link !== undefined) window.open(link.url, '_blank')
+    }
   } else return false
   return handled()
 }

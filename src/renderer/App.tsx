@@ -18,6 +18,7 @@ interface AppProps {
 export function App({ store }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
+  const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimMode, setVimMode] = useState<VimMode>('normal')
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -29,6 +30,7 @@ export function App({ store }: AppProps): React.JSX.Element {
       .catch((error: unknown) => store.reportError(error))
   }, [store])
   const focus = state.status === 'ready' ? state.focus : undefined
+  const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
   const toggleAlwaysOnTop = useCallback((): void => {
     const nextValue = !alwaysOnTop
@@ -46,6 +48,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     persistenceLocked,
     vimMode,
     setVimMode,
+    setImageCaretNodeId,
     nodeVisualSelection,
     setNodeVisualSelection,
   })
@@ -84,11 +87,19 @@ export function App({ store }: AppProps): React.JSX.Element {
           {...nodeInputBindings(node)}
         />
         {node.attachment === undefined ? null : (
-          <AttachmentImage attachmentId={node.attachment.id} onOpen={setPreviewAttachmentId} />
+          <AttachmentImage
+            attachmentId={node.attachment.id}
+            imageCaretActive={
+              vimMode === 'normal' &&
+              selectedNodeId === node.id &&
+              (imageCaretNodeId === node.id || node.text.length === 0)
+            }
+            onOpen={setPreviewAttachmentId}
+          />
         )}
       </>
     ),
-    [nodeInputBindings],
+    [imageCaretNodeId, nodeInputBindings, selectedNodeId, vimMode],
   )
 
   if (state.status === 'loading')
@@ -132,6 +143,7 @@ export function App({ store }: AppProps): React.JSX.Element {
           <section
             aria-label="Current parent"
             className="current-parent"
+            data-has-attachment={currentParent.attachment !== undefined}
             onClick={(event) => {
               if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
               const target = event.target
@@ -148,7 +160,15 @@ export function App({ store }: AppProps): React.JSX.Element {
               {...nodeInputBindings(currentParent)}
             />
             {currentParent.attachment === undefined ? null : (
-              <AttachmentImage attachmentId={currentParent.attachment.id} onOpen={setPreviewAttachmentId} />
+              <AttachmentImage
+                attachmentId={currentParent.attachment.id}
+                imageCaretActive={
+                  vimMode === 'normal' &&
+                  selectedNodeId === currentParent.id &&
+                  (imageCaretNodeId === currentParent.id || currentParent.text.length === 0)
+                }
+                onOpen={setPreviewAttachmentId}
+              />
             )}
           </section>
         )}

@@ -68,6 +68,7 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
 }
 
 function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['mode'] = 'normal') {
+  const onPreviewAttachment = vi.fn()
   const vim: VimKeyboardState = {
     mode,
     register: { current: { kind: 'empty' } },
@@ -83,6 +84,8 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     setMode: vi.fn((next) => {
       vim.mode = next
     }),
+    openAttachment: onPreviewAttachment,
+    setImageCaret: vi.fn(),
     scheduleCaret: vi.fn(),
   }
   return {
@@ -92,9 +95,10 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
       node,
       isComposing: () => false,
       setSelectAllNodeId: vi.fn(),
-      onPreviewAttachment: vi.fn(),
+      onPreviewAttachment,
       vim,
     }),
+    onPreviewAttachment,
   }
 }
 
@@ -1005,6 +1009,64 @@ describe('editor keyboard handler', () => {
     expect(left.preventDefault).toHaveBeenCalledOnce()
     expect(right.preventDefault).toHaveBeenCalledOnce()
     expect(store.endTextSession).not.toHaveBeenCalled()
+  })
+
+  it('moves onto an attached image with l, back to text with h, and opens it with Enter', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(3, 4)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input, document.createElement('button'))
+    document.body.append(row)
+    const node = {
+      id: 'node',
+      text: 'text',
+      attachment: { id: 'image', mimeType: 'image/png' as const },
+      children: [],
+    }
+    const { handle, onPreviewAttachment, vim } = vimHandler(store, node)
+
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(4)
+    expect(input.selectionEnd).toBe(4)
+    expect(vim.setImageCaret).toHaveBeenCalledWith('node', true)
+
+    const enter = keyEvent(input, 'Enter')
+    handle(enter)
+    expect(onPreviewAttachment).toHaveBeenCalledOnce()
+    expect(onPreviewAttachment).toHaveBeenCalledWith('image')
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    expect(enter.preventDefault).toHaveBeenCalledOnce()
+
+    handle(keyEvent(input, 'h'))
+    expect(input.selectionStart).toBe(3)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    row.remove()
+  })
+
+  it('opens an image-only node from its sole Normal-mode character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input, document.createElement('button'))
+    document.body.append(row)
+    const { handle, onPreviewAttachment } = vimHandler(store, {
+      id: 'empty-image',
+      text: '',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'Enter'))
+
+    expect(onPreviewAttachment).toHaveBeenCalledWith('image')
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    row.remove()
   })
 
   it('opens the hyperlink under the Normal-mode caret with Enter', () => {

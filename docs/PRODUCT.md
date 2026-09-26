@@ -87,6 +87,7 @@ At the root level, the first root node is positioned at the same height as the f
 
 An attached image is displayed beneath its node's text and aligned with that node's text column.
 When a node has an image but no text, its empty text editor remains keyboard-editable but occupies no visible row in Normal mode; the image begins at the node's text column. Clicking the blank portion of the node row focuses its text editor. In Insert mode, the focused empty editor displays a normal-height insertion line and caret until text is entered or Insert mode ends. The same presentation applies when the node is shown as the current parent.
+In Normal mode, the image can be the active character after the node's text; the image is visibly marked while active. For an image-only node, the image is its sole character.
 
 ### 2.2 Location Path
 
@@ -174,6 +175,8 @@ For sibling movements, cursor-position behavior is the same as for `↑`.
 
 `←` and `→` move between adjacent nodes when the caret is at the corresponding text boundary.
 
+In Normal mode, `h` and `l` move across the node's text characters and its optional image character, which follows the text. An image-only node has the image as its sole character.
+
 When the caret is at the beginning of a node and the user presses `←`:
 
 * if a previous sibling exists, select it and place the caret at the end of its text;
@@ -195,7 +198,7 @@ At any other caret position, `←` and `→` retain their ordinary text-editing 
 
 ### 5.1 Enter
 
-When focus is on a node in the currently displayed level, `Enter` always creates a new sibling on the same level.
+When focus is on a node in the currently displayed level, `Enter` creates a new sibling on the same level, except when the Normal-mode caret is on an attached image, where it opens that image's preview (see §20.2).
 
 In that context, it never creates a child.
 
@@ -892,7 +895,7 @@ The editor starts in Normal mode, with a block caret on the current character. W
 Normal mode supports:
 
 * `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last displayed node;
-* `h` and `l` to move by character within the current node;
+* `h` and `l` to move by character within the current node; when the node has an image, it acts as a final character after the text, and an image-only node's sole character is its image;
 * `j` and `k` to select the next or previous node;
 * `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport;
 * `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows;
@@ -912,7 +915,7 @@ Normal mode supports:
 * `yy` to copy the selected node and its entire subtree into the local Vim register;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
 * `gd` to enter the selected node, with the same behavior as `Cmd+.`;
-* `Enter` to open the hyperlink at the caret in the system's default hyperlink application, with the same behavior as `Cmd+click`; it does nothing when the caret is not on a hyperlink;
+* `Enter` to open the image preview when the caret is on the node's image, or open the hyperlink at a text caret in the system's default hyperlink application, with the same behavior as `Cmd+click`; it does nothing when neither applies;
 * `Ctrl+o` to go back one parent level, with the same behavior as `Cmd+,`;
 * `v` to enter character-wise Visual mode;
 * `V` to enter whole-node Visual mode when a displayed sibling is selected; the editable current-parent heading cannot be selected with `V`;

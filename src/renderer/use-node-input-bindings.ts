@@ -33,6 +33,7 @@ interface UseNodeInputBindingsOptions {
   persistenceLocked?: boolean
   vimMode?: VimMode
   setVimMode?: (mode: VimMode) => void
+  setImageCaretNodeId?: (nodeId: string | undefined) => void
   nodeVisualSelection?: { anchorId: string; focusId: string } | undefined
   setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
 }
@@ -45,6 +46,7 @@ export function useNodeInputBindings({
   persistenceLocked = false,
   vimMode = 'insert',
   setVimMode = () => undefined,
+  setImageCaretNodeId = () => undefined,
   nodeVisualSelection,
   setNodeVisualSelection = () => undefined,
 }: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
@@ -403,6 +405,12 @@ export function useNodeInputBindings({
       onCut: () => store.markNextTextEditStandalone(),
       onFocus: (event: FocusEvent<HTMLElement>) => {
         if (selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
+        else if (
+          latestVimMode.current === 'normal' &&
+          node.attachment !== undefined &&
+          getCaret(event.currentTarget) === node.text.length
+        )
+          setNormalCaret(event.currentTarget, node.text.length)
       },
       onKeyDown: createEditorKeyDownHandler({
         store,
@@ -473,6 +481,8 @@ export function useNodeInputBindings({
           moveBoundary: (boundary, cursor) => store.moveSelectionBoundary(boundary, cursor),
           moveViewport: moveVimViewport,
           setMode: setVimMode,
+          openAttachment: onPreviewAttachment,
+          setImageCaret: (nodeId, active) => setImageCaretNodeId(active ? nodeId : undefined),
           scheduleCaret: (input, cursor) => {
             pendingCaret.current = { input, cursor }
           },
@@ -501,6 +511,7 @@ export function useNodeInputBindings({
         },
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
+        setImageCaretNodeId(undefined)
         if (event.button === 2) event.preventDefault()
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
@@ -539,6 +550,7 @@ export function useNodeInputBindings({
       nodeVisualSelection,
       setNodeVisualSelection,
       setVimMode,
+      setImageCaretNodeId,
       store,
       vimMode,
     ],

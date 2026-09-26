@@ -10,6 +10,36 @@ import {
   moveWordForward,
   textObjectRange,
 } from './vim-editing'
+import { moveCharacterCursor } from './vim-editing'
+
+describe('Vim character-cursor invariants with attachments', () => {
+  it('keeps horizontal movement within text and the optional terminal image character', () => {
+    fc.assert(
+      fc.property(
+        fc.nat(256),
+        fc.nat(256),
+        fc.boolean(),
+        fc.integer({ min: 1, max: 300 }),
+        (length, cursor, hasImage, count) => {
+          const maximum = hasImage ? length : Math.max(0, length - 1)
+          const start = Math.min(cursor, maximum)
+          const right = moveCharacterCursor(start, 'right', length, hasImage, count)
+          const left = moveCharacterCursor(start, 'left', length, hasImage, count)
+          expect(right).toBeGreaterThanOrEqual(0)
+          expect(right).toBeLessThanOrEqual(maximum)
+          expect(left).toBeGreaterThanOrEqual(0)
+          expect(left).toBeLessThanOrEqual(maximum)
+          expect(moveCharacterCursor(maximum, 'right', length, hasImage)).toBe(maximum)
+          expect(moveCharacterCursor(0, 'left', length, hasImage)).toBe(0)
+          if (hasImage && length > 0) {
+            expect(moveCharacterCursor(length - 1, 'right', length, true)).toBe(length)
+            expect(moveCharacterCursor(length, 'left', length, true)).toBe(length - 1)
+          }
+        },
+      ),
+    )
+  })
+})
 
 describe('Vim word-motion invariants', () => {
   it('keeps every cursor within the node and moves in the requested direction', () => {

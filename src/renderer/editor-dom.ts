@@ -155,6 +155,12 @@ export function setCaret(element: HTMLElement, position: number): void {
 
 export function setNormalCaret(element: HTMLElement, position: number): void {
   const length = element instanceof HTMLTextAreaElement ? element.value.length : (element.textContent?.length ?? 0)
+  const imageCaret =
+    element.closest<HTMLElement>('.node-row, .current-parent')?.dataset.hasAttachment === 'true' && position === length
+  if (imageCaret) {
+    setCaret(element, length)
+    return
+  }
   if (length === 0) {
     setCaret(element, 0)
     return

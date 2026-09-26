@@ -484,6 +484,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   outline-offset: 2px;
 }
 
+.vim-state-normal .attachment-button.attachment-image-caret {
+  outline: 2px solid #778187;
+  outline-offset: 2px;
+}
+
 .attachment-image {
   display: block;
   max-width: 200px;
@@ -674,6 +679,9 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
     caret-color: #fff;
   }
   .attachment-button:focus-visible {
+    outline-color: #a5adb2;
+  }
+  .vim-state-normal .attachment-button.attachment-image-caret {
     outline-color: #a5adb2;
   }
 }
