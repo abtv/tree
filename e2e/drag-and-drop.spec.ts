@@ -1,4 +1,14 @@
-import { expect, launchTree, node, nodeTexts, startRowDrag, test, typeInto, type Launched } from './fixtures'
+import {
+  expect,
+  launchTree,
+  node,
+  nodeTexts,
+  seedDocument,
+  startRowDrag,
+  test,
+  typeInto,
+  type Launched,
+} from './fixtures'
 
 const HOLD_MS = 500
 
@@ -61,6 +71,30 @@ test.describe('drag and drop', () => {
     const moved = window.locator('.node-row').nth(1).locator('.node-input')
     await expect(moved).toBeFocused()
     await expect(moved).toHaveValue('D')
+  })
+
+  test('keeps Normal mode after moving a node with the mouse', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+          { id: 'd', text: 'D', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'd' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    const source = window.locator('.node-row').nth(3)
+    await startRowDrag(window, source.locator('.node-input'))
+    const target = await rowBox(window, 1)
+    await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
+    await window.mouse.up()
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
   test('does not start a drag when the pointer moves before the hold threshold', async ({ userDataDir }) => {

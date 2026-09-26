@@ -24,6 +24,7 @@ interface NodeListProps {
   structuralVersion?: number
   visualNodeSelection?: { anchorId: string; focusId: string } | undefined
   locked?: boolean
+  onDragStart?: () => void
 }
 
 export function NodeList({
@@ -35,6 +36,7 @@ export function NodeList({
   structuralVersion = 0,
   visualNodeSelection,
   locked = false,
+  onDragStart = () => undefined,
 }: NodeListProps): React.JSX.Element {
   const listRef = useRef<HTMLElement | null>(null)
   const heightsRef = useRef(new Map<string, number>())
@@ -148,7 +150,7 @@ export function NodeList({
     onLostPointerCapture,
     onListClick,
     recomputeDropIndex,
-  } = useNodeListDrag({ nodes, locked, windowed, listRef, observedElementsRef, onMove })
+  } = useNodeListDrag({ nodes, locked, windowed, listRef, observedElementsRef, onMove, onDragStart })
 
   useLayoutEffect(() => {
     recomputeDropIndex()

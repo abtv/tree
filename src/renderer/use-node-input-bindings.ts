@@ -35,6 +35,7 @@ interface UseNodeInputBindingsOptions {
   setVimMode?: (mode: VimMode) => void
   nodeVisualSelection?: { anchorId: string; focusId: string } | undefined
   setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
+  onPointerDown?: () => void
 }
 
 export function useNodeInputBindings({
@@ -47,6 +48,7 @@ export function useNodeInputBindings({
   setVimMode = () => undefined,
   nodeVisualSelection,
   setNodeVisualSelection = () => undefined,
+  onPointerDown = () => undefined,
 }: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
   const inputs = useRef(new Map<string, HTMLElement>())
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
@@ -492,6 +494,7 @@ export function useNodeInputBindings({
         },
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
+        onPointerDown()
         if (event.button === 2) event.preventDefault()
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
@@ -529,6 +532,7 @@ export function useNodeInputBindings({
       selectedNodeId,
       repeatStructural,
       nodeVisualSelection,
+      onPointerDown,
       setNodeVisualSelection,
       setVimMode,
       store,

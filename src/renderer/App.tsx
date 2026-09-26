@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
@@ -20,6 +20,7 @@ export function App({ store }: AppProps): React.JSX.Element {
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimMode, setVimMode] = useState<VimMode>('normal')
+  const vimModeBeforePointer = useRef<VimMode>('normal')
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
   const leftCommandKeyPressed = useLeftCommandKey()
   useEffect(() => {
@@ -30,6 +31,12 @@ export function App({ store }: AppProps): React.JSX.Element {
   }, [store])
   const focus = state.status === 'ready' ? state.focus : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
+  const rememberPointerMode = useCallback((): void => {
+    vimModeBeforePointer.current = vimMode
+  }, [vimMode])
+  const restoreNormalModeAfterDrag = useCallback((): void => {
+    if (vimModeBeforePointer.current === 'normal') setVimMode('normal')
+  }, [])
   const toggleAlwaysOnTop = useCallback((): void => {
     const nextValue = !alwaysOnTop
     setAlwaysOnTop(nextValue)
@@ -46,6 +53,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     persistenceLocked,
     vimMode,
     setVimMode,
+    onPointerDown: rememberPointerMode,
     nodeVisualSelection,
     setNodeVisualSelection,
   })
@@ -138,6 +146,7 @@ export function App({ store }: AppProps): React.JSX.Element {
           onMove={moveNode}
           renderInput={renderInput}
           structuralVersion={state.structuralVersion}
+          onDragStart={restoreNormalModeAfterDrag}
         />
         {state.saveError === undefined ? null : (
           <p className="save-error" role="status">

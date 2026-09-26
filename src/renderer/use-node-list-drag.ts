@@ -22,6 +22,7 @@ interface UseNodeListDragOptions {
   listRef: RefObject<HTMLElement | null>
   observedElementsRef: RefObject<Map<string, HTMLElement>>
   onMove: (nodeId: string, insertionIndex: number) => void
+  onDragStart: () => void
 }
 
 interface NodeListDrag {
@@ -45,6 +46,7 @@ export function useNodeListDrag({
   listRef,
   observedElementsRef,
   onMove,
+  onDragStart,
 }: UseNodeListDragOptions): NodeListDrag {
   const [autoScrollDirection, setAutoScrollDirection] = useState(0)
   const [drag, dispatch] = useReducer(nodeDragReducer, IDLE_NODE_DRAG)
@@ -128,6 +130,7 @@ export function useNodeListDrag({
 
   useEffect(() => {
     if (dragPhase !== 'dragging' || dragSource === undefined) return undefined
+    onDragStart()
     const pointerId = dragSource.pointerId
     const list = listRef.current
     if (list !== null) setCapture(list, pointerId)
@@ -142,7 +145,7 @@ export function useNodeListDrag({
       document.body.classList.remove('node-drag-active')
       if (list !== null) releaseCapture(list, pointerId)
     }
-  }, [dragPhase, dragSource, listRef, observedElementsRef])
+  }, [dragPhase, dragSource, listRef, observedElementsRef, onDragStart])
 
   useEffect(() => {
     if (drag.phase === 'idle') return undefined
