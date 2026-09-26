@@ -315,13 +315,13 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .vim-state-visual .node-input::selection,
 .vim-state-visual .node-input a::selection {
-  color: #fff;
-  background: #725493;
+  color: #373f43;
+  background: #fff0b3;
 }
 
 .vim-state-visual .node-input a.link-selected {
-  color: #fff;
-  background: #725493;
+  color: #373f43;
+  background: #fff0b3;
 }
 
 .vim-state-visual-node .node-input {
@@ -600,6 +600,17 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   .node-row-visual-selected .node-input {
     background: #4a4023;
     color: #f5e9b7;
+  }
+
+  .vim-state-visual .node-input::selection,
+  .vim-state-visual .node-input a::selection {
+    color: #f5e9b7;
+    background: #4a4023;
+  }
+
+  .vim-state-visual .node-input a.link-selected {
+    color: #f5e9b7;
+    background: #4a4023;
   }
 
   .node-row.node-row-dragging {
