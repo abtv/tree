@@ -97,6 +97,19 @@ describe('editor command transitions', () => {
     })
   })
 
+  it('moves a last-node boundary to its image character when the target has an image', () => {
+    const imageDocument: Document = {
+      roots: [
+        { id: 'first', text: 'First', children: [] },
+        { id: 'last', text: 'Last', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+      ],
+    }
+
+    expect(
+      moveSelectionBoundaryTransition(imageDocument, { currentParentId: null, selectedNodeId: 'first' }, 'last', 0),
+    ).toEqual({ nodeId: 'last', cursor: 4 })
+  })
+
   it('resolves entering, leaving, and ancestor navigation locations with a beginning cursor', () => {
     expect(enterTransition(document, { currentParentId: null, selectedNodeId: 'root' })).toEqual({
       location: { currentParentId: 'root', selectedNodeId: 'first' },

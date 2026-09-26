@@ -183,6 +183,7 @@ test.describe('attachment validation and image failures', () => {
     await expect(editor).toBeFocused()
     const imageButton = row.getByRole('button', { name: 'Open image preview' })
     await expect(imageButton).toHaveClass(/attachment-image-caret/)
+    await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(row).toHaveScreenshot('text-and-image-image-caret.png', { caret: 'initial' })
     await window.keyboard.press('Enter')
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()

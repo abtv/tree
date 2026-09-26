@@ -474,6 +474,23 @@ describe('editor keyboard handler', () => {
 
   it('applies counts to node motions and G', () => {
     const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'parent',
+            children: Array.from({ length: 12 }, (_, index) => ({
+              id: index === 0 ? 'node' : `node-${index}`,
+              text: 'text',
+              children: [],
+            })),
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'node' },
+    } as never)
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
@@ -597,6 +614,23 @@ describe('editor keyboard handler', () => {
 
   it('moves to the first and last nodes with gg and G', () => {
     const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'parent',
+            children: Array.from({ length: 12 }, (_, index) => ({
+              id: index === 0 ? 'node' : `node-${index}`,
+              text: 'text',
+              children: [],
+            })),
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'node' },
+    } as never)
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })

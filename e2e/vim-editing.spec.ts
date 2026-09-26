@@ -122,6 +122,28 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 2)).toBeFocused()
   })
 
+  test('moves G to the image on the last node when it has one', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First', children: [] },
+          { id: 'last', text: 'Last', attachment: { id: 'last-image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    seedAttachmentImage(userDataDir, 'last-image')
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('G')
+
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 4)
+    await expect(node(window, 2)).toHaveJSProperty('selectionEnd', 4)
+    await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="last"] .attachment-image-caret')).toHaveCount(1)
+  })
+
   test('applies counts to node motions and subtree puts', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

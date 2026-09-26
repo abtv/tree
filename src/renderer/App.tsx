@@ -32,6 +32,14 @@ export function App({ store }: AppProps): React.JSX.Element {
   const focus = state.status === 'ready' ? state.focus : undefined
   const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
+  const isImageCaretActive = useCallback(
+    (node: TreeNode): boolean =>
+      vimMode === 'normal' &&
+      node.attachment !== undefined &&
+      selectedNodeId === node.id &&
+      (imageCaretNodeId === node.id || node.text.length === 0),
+    [imageCaretNodeId, selectedNodeId, vimMode],
+  )
   const toggleAlwaysOnTop = useCallback((): void => {
     const nextValue = !alwaysOnTop
     setAlwaysOnTop(nextValue)
@@ -81,6 +89,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     (node: TreeNode, label: string): React.JSX.Element => (
       <>
         <NodeInput
+          imageCaretActive={isImageCaretActive(node)}
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           node={node}
           label={label}
@@ -89,17 +98,13 @@ export function App({ store }: AppProps): React.JSX.Element {
         {node.attachment === undefined ? null : (
           <AttachmentImage
             attachmentId={node.attachment.id}
-            imageCaretActive={
-              vimMode === 'normal' &&
-              selectedNodeId === node.id &&
-              (imageCaretNodeId === node.id || node.text.length === 0)
-            }
+            imageCaretActive={isImageCaretActive(node)}
             onOpen={setPreviewAttachmentId}
           />
         )}
       </>
     ),
-    [imageCaretNodeId, nodeInputBindings, selectedNodeId, vimMode],
+    [isImageCaretActive, nodeInputBindings],
   )
 
   if (state.status === 'loading')
@@ -153,6 +158,7 @@ export function App({ store }: AppProps): React.JSX.Element {
             }}
           >
             <NodeInput
+              imageCaretActive={isImageCaretActive(currentParent)}
               imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
               node={currentParent}
               label="Current parent"
@@ -162,11 +168,7 @@ export function App({ store }: AppProps): React.JSX.Element {
             {currentParent.attachment === undefined ? null : (
               <AttachmentImage
                 attachmentId={currentParent.attachment.id}
-                imageCaretActive={
-                  vimMode === 'normal' &&
-                  selectedNodeId === currentParent.id &&
-                  (imageCaretNodeId === currentParent.id || currentParent.text.length === 0)
-                }
+                imageCaretActive={isImageCaretActive(currentParent)}
                 onOpen={setPreviewAttachmentId}
               />
             )}

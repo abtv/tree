@@ -567,6 +567,13 @@ export function handleVimKey(
   } else if (!visual && event.key === 'g') {
     vim.pending.current = { count: pending.count, motionCount: '', prefix: 'g' }
   } else if (!visual && event.key === 'G') {
+    const state = store.getSnapshot()
+    if (state.status === 'ready') {
+      const nodes = displayedNodes(state.document, state.location.currentParentId)
+      const targetIndex = pending.count === '' ? nodes.length - 1 : Math.min(nodes.length - 1, Math.max(0, count - 1))
+      const target = nodes[targetIndex]
+      if (target !== undefined) vim.setImageCaret?.(target.id, target.attachment !== undefined)
+    }
     if (pending.count === '') vim.moveBoundary('last', cursor)
     else vim.moveBoundary('last', cursor, count)
   } else if (!visual && event.key === 'u') {

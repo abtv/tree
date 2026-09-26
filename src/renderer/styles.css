@@ -322,6 +322,12 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   caret-shape: block;
 }
 
+.vim-state-normal .node-input.node-input-image-caret::selection,
+.vim-state-normal .node-input.node-input-image-caret a::selection {
+  color: inherit;
+  background: transparent;
+}
+
 .vim-state-normal .node-input:focus {
   cursor: default;
 }

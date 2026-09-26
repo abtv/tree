@@ -191,7 +191,9 @@ export function moveSelectionBoundaryTransition(
   if (nodes.length === 0) return undefined
   const target =
     boundary === 'last' ? nodes[Math.min(nodes.length - 1, Math.max(0, (count ?? nodes.length) - 1))] : nodes[0]
-  return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
+  if (target === undefined) return undefined
+  const targetCursor = boundary === 'last' && target.attachment !== undefined ? target.text.length : cursor
+  return { nodeId: target.id, cursor: Math.min(targetCursor, target.text.length) }
 }
 
 export function moveHorizontalTransition(

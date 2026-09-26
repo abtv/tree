@@ -894,9 +894,9 @@ The editor starts in Normal mode, with a block caret on the current character. W
 
 Normal mode supports:
 
-* `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last displayed node;
+* `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last displayed node (or the counted node) and its image when it has one;
 * `h` and `l` to move by character within the current node; when the node has an image, it acts as a final character after the text, and an image-only node's sole character is its image;
-* `j` and `k` to select the next or previous node; when the current node has an image, `j` moves from its text to the image, and `k` moves from its image to its text when text exists; pressing `j` on the image moves to the next node, while pressing `k` on an image-only node moves to the previous node;
+* `j` and `k` to move between rows: for a node with text and an image, the text and image are separate rows, so `j` moves from text to image and `k` returns to text; `j` on the image moves to the next node, while `k` on an image-only node moves to the previous node. Only one caret is visible at a time: the text caret is hidden while the image caret is active;
 * `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport;
 * `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows;
 * `u` to undo and `Ctrl+r` to redo the most recent undoable change;
@@ -904,7 +904,7 @@ Normal mode supports:
 * `W` and `B` to move between whitespace-delimited WORD starts, `E` to move to a WORD end, and `ge` to move backward to a word end;
 * `f{character}` and `F{character}` to find the next or previous occurrence of a character within the current node, and `t{character}` and `T{character}` to stop immediately before or after that occurrence; a failed search leaves the caret in place;
 * `;` to repeat the most recently issued `f`, `F`, `t`, or `T` motion and `,` to repeat it in the opposite direction; repeated finds support counts and never wrap or cross a node;
-* `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final character;
+* `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final text character; `$` stops at the end of the text row even when an image occupies a second row;
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node;
 * `o` to create an empty first child of the current parent when its heading is selected, or an empty sibling below the selected node, and enter Insert mode; `O` creates an empty sibling above the selected node, but does nothing when the editable current-parent heading is selected;
 * `x` to delete the current character, `X` to delete the character before it, `r{character}` to replace it without entering Insert mode, and `s` to delete it and enter Insert mode;
