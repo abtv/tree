@@ -114,7 +114,7 @@ export function handleVimKey(
         if (range !== undefined) move(range.target)
       }
     } else if (!visual && pending.operator === undefined && pending.count === '' && event.key === 'g')
-      vim.moveBoundary('first', cursor)
+      vim.moveBoundary('parent', cursor)
     else if (!visual && pending.count === '' && event.key === 'd') store.enter()
     return handled()
   }

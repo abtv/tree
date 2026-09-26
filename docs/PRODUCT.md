@@ -888,7 +888,7 @@ The editor starts in Normal mode, with a block caret on the current character. W
 
 Normal mode supports:
 
-* `gg` to select the first displayed node and `G` to select the last displayed node;
+* `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last displayed node;
 * `h` and `l` to move by character within the current node;
 * `j` and `k` to select the next or previous node;
 * `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport;

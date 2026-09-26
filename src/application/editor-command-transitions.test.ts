@@ -67,6 +67,13 @@ describe('editor command transitions', () => {
   it('resolves first and last displayed nodes while clamping the cursor', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
 
+    expect(moveSelectionBoundaryTransition(document, childLocation, 'parent', 99)).toEqual({
+      nodeId: 'root',
+      cursor: 4,
+    })
+    expect(
+      moveSelectionBoundaryTransition(document, { currentParentId: null, selectedNodeId: 'other-root' }, 'parent', 99),
+    ).toEqual({ nodeId: 'root', cursor: 4 })
     expect(moveSelectionBoundaryTransition(document, childLocation, 'first', 99)).toEqual({
       nodeId: 'first',
       cursor: 5,

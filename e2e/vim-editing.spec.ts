@@ -14,6 +14,31 @@ import {
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
 
 test.describe('Vim editing prototype', () => {
+  test('focuses the current parent with gg from a nested level', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'first', text: 'First child', children: [] },
+              { id: 'second', text: 'Second child', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'second' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 2).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Parent')
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toBeFocused()
+  })
+
   test('uses word, quote, and bracket text objects in Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one (two) "three"', children: [] }] },

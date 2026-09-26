@@ -164,12 +164,16 @@ export function moveSelectionTransition(
 export function moveSelectionBoundaryTransition(
   document: Document,
   location: Location,
-  boundary: 'first' | 'last',
+  boundary: 'first' | 'last' | 'parent',
   cursor: number,
 ): FocusTarget | undefined {
+  if (boundary === 'parent' && location.currentParentId !== null) {
+    const parent = requireNode(document, location.currentParentId).node
+    return { nodeId: parent.id, cursor: Math.min(cursor, parent.text.length) }
+  }
   const nodes = displayedNodes(document, location.currentParentId)
   if (nodes.length === 0) return undefined
-  const target = boundary === 'first' ? nodes[0] : nodes[nodes.length - 1]
+  const target = boundary === 'last' ? nodes[nodes.length - 1] : nodes[0]
   return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 

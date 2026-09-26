@@ -470,7 +470,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'g'))
     handle(keyEvent(input, 'G'))
 
-    expect(vim.moveBoundary).toHaveBeenNthCalledWith(1, 'first', 4)
+    expect(vim.moveBoundary).toHaveBeenNthCalledWith(1, 'parent', 4)
     expect(vim.moveBoundary).toHaveBeenNthCalledWith(2, 'last', 4)
   })
 
