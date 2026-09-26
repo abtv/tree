@@ -73,7 +73,7 @@ test.describe('drag and drop', () => {
     await expect(moved).toHaveValue('D')
   })
 
-  test('keeps Normal mode after moving a node with the mouse', async ({ userDataDir }) => {
+  test('keeps Normal mode after clicking or moving a node with the mouse', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -89,6 +89,11 @@ test.describe('drag and drop', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     const source = window.locator('.node-row').nth(3)
+    const sourceBox = await source.locator('.node-input').boundingBox()
+    if (sourceBox === null) throw new Error('The fourth row was not rendered.')
+    await window.mouse.click(sourceBox.x + 8, sourceBox.y + sourceBox.height / 2)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await startRowDrag(window, source.locator('.node-input'))
     const target = await rowBox(window, 1)
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
