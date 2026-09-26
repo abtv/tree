@@ -83,6 +83,7 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     imageTextCursor: { current: undefined },
     moveBoundary: vi.fn(),
     moveViewport: vi.fn(),
+    syncImageCaretToFocus: vi.fn(),
     setMode: vi.fn((next) => {
       vim.mode = next
     }),
@@ -886,12 +887,13 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Child'
     input.setSelectionRange(2, 2)
-    const { handle } = vimHandler(store, { id: 'child', text: 'Child', children: [] })
+    const { handle, vim } = vimHandler(store, { id: 'child', text: 'Child', children: [] })
 
     const event = keyEvent(input, 'o', { ctrlKey: true })
     handle(event)
 
     expect(store.leave).toHaveBeenCalledOnce()
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
     expect(event.preventDefault).toHaveBeenCalledOnce()
   })
 
@@ -949,13 +951,30 @@ describe('editor keyboard handler', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
-    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
 
     handle(keyEvent(input, 'u'))
     handle(keyEvent(input, 'r', { ctrlKey: true }))
 
     expect(store.undo).toHaveBeenCalledOnce()
     expect(store.redo).toHaveBeenCalledOnce()
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledTimes(2)
+  })
+
+  it('resyncs the image caret after Cmd+Z, Cmd+Shift+Z, and Cmd+, in Normal mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'z', { metaKey: true }))
+    handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
+    handle(keyEvent(input, ',', { metaKey: true }))
+
+    expect(store.undo).toHaveBeenCalledOnce()
+    expect(store.redo).toHaveBeenCalledOnce()
+    expect(store.leave).toHaveBeenCalledOnce()
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledTimes(3)
   })
 
   it('blocks unsupported editing keys in Normal mode', () => {

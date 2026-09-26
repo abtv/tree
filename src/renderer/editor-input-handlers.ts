@@ -98,6 +98,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       vim.pending.current = undefined
       store.leave()
+      vim.syncImageCaretToFocus()
       return
     }
     if (
@@ -111,6 +112,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       vim.pending.current = undefined
       store.redo()
+      vim.syncImageCaretToFocus()
       return
     }
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -161,6 +163,7 @@ export function createEditorKeyDownHandler({
     } else if (event.metaKey && event.key === ',') {
       event.preventDefault()
       store.leave()
+      vim?.syncImageCaretToFocus()
     } else if (event.metaKey && event.key === 'Backspace') {
       event.preventDefault()
       store.deleteSelected()
@@ -168,6 +171,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       if (event.shiftKey) store.redo()
       else store.undo()
+      vim?.syncImageCaretToFocus()
     } else if (event.metaKey && event.key.toLowerCase() === 'q') {
       event.preventDefault()
       void window.treeApi.quit().catch((error: unknown) => store.reportError(error))

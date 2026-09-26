@@ -639,6 +639,7 @@ export function handleVimKey(
       return handled()
     }
     store.undo()
+    vim.syncImageCaretToFocus()
   } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
     if (pending.count !== '') {
       clearPending()

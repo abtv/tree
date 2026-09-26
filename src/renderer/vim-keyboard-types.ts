@@ -81,6 +81,7 @@ export interface VimKeyboardState {
   imageTextCursor?: { current: number | undefined }
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
+  syncImageCaretToFocus: () => void
   setMode: (mode: VimMode) => void
   openAttachment?: (attachmentId: string) => void
   setImageCaret?: (nodeId: string, active: boolean) => void

@@ -1190,6 +1190,36 @@ test.describe('Vim editing prototype', () => {
     await expect(parent).toHaveJSProperty('selectionEnd', 1)
   })
 
+  test('clears a stale image caret after leaving an attached current parent with Ctrl+o', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            attachment: { id: 'parent-image', mimeType: 'image/png' },
+            children: [{ id: 'child', text: 'Child', children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'child' },
+    })
+    seedAttachmentImage(userDataDir, 'parent-image')
+    const { window } = await launchTree(userDataDir)
+
+    await node(window, 1).focus()
+    await window.keyboard.press('k')
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveClass(/node-input-image-caret/)
+
+    await parent.press('Control+o')
+
+    const root = node(window, 1)
+    await expect(root).toHaveValue('Parent')
+    await expect(root).toBeFocused()
+    await expect(root).not.toHaveClass(/node-input-image-caret/)
+  })
+
   test('supports line and viewport motions', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -1261,6 +1291,32 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('abc')
     await window.keyboard.press('Control+r')
     await expect(editor).toHaveValue('ab')
+  })
+
+  test('clears a stale image caret after undo and redo', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+
+    await editor.press('x')
+    await expect(editor).toHaveValue('a')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await editor.press('u')
+    await expect(editor).toHaveValue('ab')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+
+    await editor.press('Control+r')
+    await expect(editor).toHaveValue('a')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
   })
 
   test('A enters Insert mode at the end of the node', async ({ userDataDir }) => {

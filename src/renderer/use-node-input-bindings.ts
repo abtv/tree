@@ -507,6 +507,7 @@ export function useNodeInputBindings({
             syncImageCaretToFocus()
           },
           moveViewport: moveVimViewport,
+          syncImageCaretToFocus,
           setMode: setVimMode,
           openAttachment: onPreviewAttachment,
           setImageCaret: (nodeId, active) => setImageCaretNodeId(active ? nodeId : undefined),
