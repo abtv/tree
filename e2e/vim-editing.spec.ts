@@ -155,17 +155,28 @@ test.describe('Vim editing prototype', () => {
     const wholeNodeBackground = await window
       .locator('.node-row-visual-selected')
       .evaluate((element) => element.ownerDocument.defaultView?.getComputedStyle(element).backgroundColor)
+    const wholeNodeColors = await window.locator('.node-row-visual-selected').evaluate((element) => {
+      const style = element.ownerDocument.defaultView?.getComputedStyle(element)
+      return { background: style?.backgroundColor, color: style?.color }
+    })
     await window.keyboard.press('Escape')
     await window.keyboard.press('v')
     const characterSelectionBackground = await editor.evaluate(
       (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::selection').backgroundColor,
     )
-
+    const visualLabel = window.getByLabel('Vim mode')
+    const visualLabelColors = await visualLabel.evaluate((element) => {
+      const style = element.ownerDocument.defaultView?.getComputedStyle(element)
+      return { background: style?.backgroundColor, color: style?.color }
+    })
     expect(characterSelectionBackground).toBe(wholeNodeBackground)
+    expect(visualLabelColors).toEqual(wholeNodeColors)
     await expect(editor).toHaveScreenshot('vim-visual-selection-yellow-light.png')
+    await expect(visualLabel).toHaveScreenshot('vim-visual-label-yellow-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
     await expect(editor).toHaveScreenshot('vim-visual-selection-yellow-dark.png')
+    await expect(visualLabel).toHaveScreenshot('vim-visual-label-yellow-dark.png')
   })
 
   test('yanks reverse V ranges, puts node forests, and replaces a V range with fresh IDs', async ({ userDataDir }) => {
