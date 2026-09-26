@@ -38,6 +38,7 @@ export function handleVimKey(
     if (event.key === 'Escape' || event.key === 'V') {
       vim.nodeVisual?.exit()
       vim.setMode('normal')
+      vim.syncImageCaretToFocus()
     } else if (event.key === 'j' || event.key === 'k') {
       vim.nodeVisual?.move(event.key === 'j' ? 'down' : 'up')
     } else if (event.key === 'G') vim.nodeVisual?.move('last')
@@ -188,7 +189,10 @@ export function handleVimKey(
       }
     } else if (!visual && pending.operator === undefined && pending.count === '' && event.key === 'g')
       vim.moveBoundary('parent', cursor)
-    else if (!visual && pending.count === '' && event.key === 'd') store.enter()
+    else if (!visual && pending.count === '' && event.key === 'd') {
+      store.enter()
+      vim.syncImageCaretToFocus()
+    }
     return handled()
   }
 

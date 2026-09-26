@@ -30,7 +30,7 @@ import type {
   VimViewportMotion,
 } from './vim-keyboard-types'
 import type { NodeInputBindings } from './NodeInput'
-import type { VimMode } from './vim-editing'
+import { isImageCaretCursor, type VimMode } from './vim-editing'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -96,6 +96,19 @@ export function useNodeInputBindings({
           : { kind: 'structural-visual', command: session.command, span: session.span, text }
   }, [])
 
+  const syncImageCaretToFocus = useCallback((): void => {
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') return
+    vimImageTextCursor.current = undefined
+    const target = requireNode(state.document, state.location.selectedNodeId).node
+    setImageCaretNodeId(
+      state.focus !== undefined &&
+        isImageCaretCursor(target.attachment !== undefined, target.text.length, state.focus.cursor)
+        ? target.id
+        : undefined,
+    )
+  }, [store, setImageCaretNodeId])
+
   const moveNodeVisual = useCallback(
     (direction: 'up' | 'down' | 'first' | 'last'): void => {
       const state = store.getSnapshot()
@@ -113,8 +126,9 @@ export function useNodeInputBindings({
       if (target === undefined) return
       setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.id })
       store.selectNode(target.id, 0)
+      syncImageCaretToFocus()
     },
-    [store, nodeVisualSelection, setNodeVisualSelection],
+    [store, nodeVisualSelection, setNodeVisualSelection, syncImageCaretToFocus],
   )
 
   const commandNodeVisual = useCallback(
@@ -149,10 +163,11 @@ export function useNodeInputBindings({
             ...(source === undefined ? {} : { source }),
           }
         setVimMode('normal')
+        syncImageCaretToFocus()
       }
       setNodeVisualSelection(undefined)
     },
-    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode],
+    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode, syncImageCaretToFocus],
   )
 
   const repeatStructural = useCallback(
@@ -202,18 +217,6 @@ export function useNodeInputBindings({
     },
     [store],
   )
-
-  const syncImageCaretToFocus = useCallback((): void => {
-    const state = store.getSnapshot()
-    if (state.status !== 'ready') return
-    vimImageTextCursor.current = undefined
-    const target = requireNode(state.document, state.location.selectedNodeId).node
-    setImageCaretNodeId(
-      target.attachment !== undefined && state.focus !== undefined && state.focus.cursor >= target.text.length
-        ? target.id
-        : undefined,
-    )
-  }, [store, setImageCaretNodeId])
 
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number): void => {

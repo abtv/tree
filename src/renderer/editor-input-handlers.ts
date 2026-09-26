@@ -160,6 +160,7 @@ export function createEditorKeyDownHandler({
     } else if (event.metaKey && event.key === '.') {
       event.preventDefault()
       store.enter()
+      vim?.syncImageCaretToFocus()
     } else if (event.metaKey && event.key === ',') {
       event.preventDefault()
       store.leave()

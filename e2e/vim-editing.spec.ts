@@ -1319,6 +1319,136 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
   })
 
+  test('clears a stale image caret after entering a childless attached node with gd', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('ab')
+    await expect(parent).not.toHaveClass(/node-input-image-caret/)
+  })
+
+  test('clears a stale image caret after entering a childless attached node with Cmd+.', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await window.keyboard.press('Meta+.')
+
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('ab')
+    await expect(parent).not.toHaveClass(/node-input-image-caret/)
+  })
+
+  test('clears a stale image caret after entering a childless attached node by clicking its enter control', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('ab')
+    await expect(parent).not.toHaveClass(/node-input-image-caret/)
+  })
+
+  test('clears a stale image caret after navigating to an ancestor from the location breadcrumb', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'grandparent',
+            text: 'Grandparent',
+            children: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: 'grandparent', selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('ab')
+    await setCursor(parent, 1)
+    await parent.press('l')
+    await expect(parent).toHaveClass(/node-input-image-caret/)
+
+    await window.getByRole('button', { name: 'Grandparent' }).click()
+
+    const newParent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(newParent).toHaveValue('Grandparent')
+    const rootRow = node(window, 1)
+    await expect(rootRow).toHaveValue('ab')
+    await expect(rootRow).not.toHaveClass(/node-input-image-caret/)
+  })
+
+  test('clears a stale image caret after a whole-node Visual command keeps the same node selected', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await window.keyboard.press('V')
+    await window.keyboard.press('U')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveValue('AB')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+  })
+
   test('A enters Insert mode at the end of the node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

@@ -181,6 +181,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'Escape'))
     expect(exit).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('normal')
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
 
   it('moves and edits in Normal mode without inserting command characters', () => {
@@ -868,11 +869,11 @@ describe('editor keyboard handler', () => {
     expect(store.pasteSubtree).toHaveBeenCalledWith('node', 'before', subtree, ['node'])
   })
 
-  it('enters the selected node after gd', () => {
+  it('enters the selected node after gd and resyncs the image caret', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'Parent'
-    const { handle } = vimHandler(store, { id: 'node', text: 'Parent', children: [] })
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'Parent', children: [] })
 
     handle(keyEvent(input, 'g'))
     expect(store.enter).not.toHaveBeenCalled()
@@ -880,6 +881,7 @@ describe('editor keyboard handler', () => {
 
     expect(store.enter).toHaveBeenCalledOnce()
     expect(store.deleteSelected).not.toHaveBeenCalled()
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
 
   it('leaves the current node with Ctrl+o in Normal mode', () => {
@@ -1248,6 +1250,18 @@ describe('editor keyboard handler', () => {
     expect(store.undo).toHaveBeenCalledOnce()
     expect(store.redo).toHaveBeenCalledOnce()
     expect(onPreviewAttachment).toHaveBeenCalledWith('image')
+  })
+
+  it('resyncs the image caret after entering a node with Cmd+.', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, '.', { metaKey: true }))
+
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
 
   it('selects all linked content and leaves Backspace to native character editing', async () => {

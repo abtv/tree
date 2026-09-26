@@ -10,6 +10,7 @@ import {
   moveWordEnd,
   moveWordEndBackward,
   moveWordForward,
+  isImageCaretCursor,
   moveCharacterCursor,
   textObjectRange,
   vimPastePosition,
@@ -198,5 +199,16 @@ describe('Vim paste positions', () => {
     expect(vimPastePosition(0, 0, true)).toBe(0)
     expect(vimPastePosition(3, 99, false)).toBe(3)
     expect(vimPastePosition(3, -1, false)).toBe(0)
+  })
+})
+
+describe('Vim image caret cursor rule', () => {
+  it('is active only once the cursor reaches the terminal image position of an attached node', () => {
+    expect(isImageCaretCursor(true, 2, 1)).toBe(false)
+    expect(isImageCaretCursor(true, 2, 2)).toBe(true)
+  })
+
+  it('is never active without an attachment, regardless of cursor', () => {
+    expect(isImageCaretCursor(false, 2, 2)).toBe(false)
   })
 })

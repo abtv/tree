@@ -115,6 +115,143 @@ describe('useNodeInputBindings', () => {
     expect(result.current.vimMode).toBe('normal')
   })
 
+  it('resyncs the image caret after a whole-node Visual command keeps the same node selected', () => {
+    const node: TreeNode = { id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
+    let selectedNodeId = 'root'
+    let focus: { nodeId: string; cursor: number; token: number } = { nodeId: 'root', cursor: 0, token: 0 }
+    let focusToken = 0
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [node] },
+        location: { currentParentId: null, selectedNodeId },
+        focus,
+      }),
+      selectNode: vi.fn((id: string, cursor: number) => {
+        selectedNodeId = id
+        focusToken += 1
+        focus = { nodeId: id, cursor, token: focusToken }
+      }),
+      applyNodeVisual: vi.fn(() => {
+        focusToken += 1
+        focus = { nodeId: 'root', cursor: 0, token: focusToken }
+        return { nodes: [node], sourceIds: ['root'] }
+      }),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId,
+        focus,
+        vimMode,
+        setVimMode,
+        setImageCaretNodeId,
+        nodeVisualSelection: selection,
+        setNodeVisualSelection: setSelection,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode, imageCaretNodeId }
+    })
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(1, 1)
+    row.append(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('l')
+    expect(result.current.imageCaretNodeId).toBe('root')
+
+    press('V')
+    press('u')
+
+    expect(store.applyNodeVisual).toHaveBeenCalledWith('u', 'root', 'root', undefined)
+    expect(result.current.vimMode).toBe('normal')
+    expect(result.current.imageCaretNodeId).toBeUndefined()
+  })
+
+  it('resyncs the image caret after a Visual Node move clamps at the same node', () => {
+    const node: TreeNode = { id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
+    let selectedNodeId = 'root'
+    let focus: { nodeId: string; cursor: number; token: number } = { nodeId: 'root', cursor: 0, token: 0 }
+    let focusToken = 0
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [node] },
+        location: { currentParentId: null, selectedNodeId },
+        focus,
+      }),
+      selectNode: vi.fn((id: string, cursor: number) => {
+        selectedNodeId = id
+        focusToken += 1
+        focus = { nodeId: id, cursor, token: focusToken }
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId,
+        focus,
+        vimMode,
+        setVimMode,
+        setImageCaretNodeId,
+        nodeVisualSelection: selection,
+        setNodeVisualSelection: setSelection,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode, imageCaretNodeId }
+    })
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(1, 1)
+    row.append(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('l')
+    expect(result.current.imageCaretNodeId).toBe('root')
+
+    press('V')
+    press('j')
+
+    expect(store.selectNode).toHaveBeenCalledWith('root', 0)
+    expect(result.current.imageCaretNodeId).toBeUndefined()
+  })
+
   it('captures opened child text for structural dot repeat', () => {
     const store = {
       createChild: vi.fn(() => true),

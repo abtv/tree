@@ -191,3 +191,7 @@ export function vimPastePosition(textLength: number, cursor: number, after: bool
   const boundedCursor = Math.max(0, Math.min(cursor, textLength))
   return after ? Math.min(boundedCursor + 1, textLength) : boundedCursor
 }
+
+export function isImageCaretCursor(hasAttachment: boolean, textLength: number, cursor: number): boolean {
+  return hasAttachment && cursor >= textLength
+}
