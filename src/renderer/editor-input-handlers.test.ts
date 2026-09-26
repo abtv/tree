@@ -29,6 +29,10 @@ function createStore(): EditorStore {
     replaceTextRange: vi.fn(),
     reportError: vi.fn(),
     undo: vi.fn(),
+    getSnapshot: vi.fn(() => ({
+      status: 'ready',
+      location: { currentParentId: null, selectedNodeId: 'node' },
+    })),
   } as unknown as EditorStore
 }
 
@@ -190,8 +194,27 @@ describe('editor keyboard handler', () => {
     expect(remove.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('clears an ignored navigation count before the next command', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(0, 0)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, '2'))
+    handle(keyEvent(input, 'j'))
+    handle(keyEvent(input, 'l'))
+
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(input.selectionStart).toBe(1)
+  })
+
   it('opens a new child with Normal-mode o and enters Insert mode', () => {
     const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      location: { currentParentId: 'node', selectedNodeId: 'node' },
+    } as never)
     const input = document.createElement('textarea')
     input.value = 'Parent'
     input.setSelectionRange(2, 2)
@@ -379,7 +402,7 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(2)
   })
 
-  it('opens a child with o and a sibling above with O', () => {
+  it('opens a sibling below with o and above with O', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
@@ -388,7 +411,8 @@ describe('editor keyboard handler', () => {
 
     const below = keyEvent(input, 'o')
     handle(below)
-    expect(store.createChild).toHaveBeenCalledOnce()
+    expect(store.createChild).not.toHaveBeenCalled()
+    expect(store.createSibling).toHaveBeenNthCalledWith(1, 'after')
     expect(vim.mode).toBe('insert')
     expect(below.preventDefault).toHaveBeenCalledOnce()
 
@@ -398,6 +422,23 @@ describe('editor keyboard handler', () => {
     expect(store.createSibling).toHaveBeenCalledWith('before')
     expect(vim.mode).toBe('insert')
     expect(above.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('does nothing when O is pressed on the current-parent heading', () => {
+    const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    } as never)
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'parent', text: 'Parent', children: [] })
+
+    const event = keyEvent(input, 'O')
+    handle(event)
+
+    expect(store.createSibling).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('normal')
+    expect(event.preventDefault).toHaveBeenCalledOnce()
   })
 
   it('enters Insert mode at zero with I for an all-whitespace node', () => {

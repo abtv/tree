@@ -16,11 +16,13 @@ const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initia
 test.describe('Vim editing prototype', () => {
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
-      document: { roots: [{ id: 'root', text: 'Parent', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'root' },
+      document: {
+        roots: [{ id: 'ancestor', text: 'Ancestor', children: [{ id: 'parent', text: 'Parent', children: [] }] }],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
     })
     const { window } = await launchTree(userDataDir)
-    const parent = node(window, 1)
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
     await parent.focus()
     await window.keyboard.press('o')
     await typeInto(node(window, 1), 'Child')
@@ -28,6 +30,58 @@ test.describe('Vim editing prototype', () => {
 
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Parent')
     await expect(node(window, 1)).toHaveValue('Child')
+  })
+
+  test('uses o to create a sibling below a selected child node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'first', text: 'First', children: [] }] }],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('o')
+    await typeInto(node(window, 2), 'Second')
+    await window.keyboard.press('Escape')
+
+    await expect(node(window, 1)).toHaveValue('First')
+    await expect(node(window, 2)).toHaveValue('Second')
+  })
+
+  test('discards ignored Normal-mode counts before the next command', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First', children: [] },
+          { id: 'second', text: 'Second', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await window.keyboard.press('2')
+    await window.keyboard.press('j')
+    await window.keyboard.press('l')
+
+    await expect(editor).toHaveJSProperty('selectionStart', 1)
+  })
+
+  test('does nothing when O is pressed on the current-parent heading', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] },
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const heading = window.getByRole('textbox', { name: 'Current parent' })
+    await heading.focus()
+    await window.keyboard.press('O')
+
+    await expect(heading).toHaveValue('Parent')
+    await expect(window.locator('.node-row')).toHaveCount(1)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
   test('focuses the current parent with gg from a nested level', async ({ userDataDir }) => {

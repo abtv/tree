@@ -232,26 +232,45 @@ export function handleVimKey(
     const range = textMotion(node.text, motionCursor, event.key, count)
     if (range !== undefined) move(range.target)
   } else if (!visual && (event.key === 'i' || event.key === 'a' || event.key === 'I' || event.key === 'A')) {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     const entry = event.key
     vim.beginInsert?.(node.id, node.text, insertPosition(node.text, cursor, entry), { kind: 'insert', entry })
     vim.setMode('insert')
     setCaret(input, insertPosition(node.text, cursor, entry))
   } else if (!visual && event.key === 'R') {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     vim.beginReplace?.(node.id, input, node.text, cursor)
     vim.setMode('replace')
     setCaret(input, cursor)
   } else if (!visual && (event.key === 'o' || event.key === 'O')) {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
+    const state = store.getSnapshot()
+    const headingSelected =
+      state.status === 'ready' &&
+      state.location.currentParentId === node.id &&
+      state.location.selectedNodeId === node.id
     if (event.key === 'o') {
-      if (store.createChild()) {
-        vim.beginStructuralChildOpen?.()
+      const created = headingSelected ? store.createChild() : store.createSibling('after')
+      if (created) {
+        if (headingSelected) vim.beginStructuralChildOpen?.()
+        else vim.beginStructuralOpen?.('after')
         vim.setMode('insert')
       }
-    } else if (store.createSibling('before')) {
-      vim.beginStructuralOpen?.('before')
-      vim.setMode('insert')
+    } else {
+      if (headingSelected) return handled()
+      if (store.createSibling('before')) {
+        vim.beginStructuralOpen?.('before')
+        vim.setMode('insert')
+      }
     }
   } else if (!visual && event.key === 'v') {
     vim.visualAnchor.current = cursor
@@ -264,7 +283,10 @@ export function handleVimKey(
       vim.setMode('visual-node')
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, input, selection.start)
@@ -326,7 +348,10 @@ export function handleVimKey(
       count: 1,
     })
   } else if (!visual && event.key === 'S') {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
   } else if (!visual && event.key === '~') {
     applyTextChange(store, node, input, cursor, vim, { kind: 'case', mode: 'toggle', count })
@@ -381,16 +406,28 @@ export function handleVimKey(
   } else if (!visual && event.key === 'g') {
     vim.pending.current = { count: pending.count, motionCount: '', prefix: 'g' }
   } else if (!visual && event.key === 'G') {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     vim.moveBoundary('last', cursor)
   } else if (!visual && event.key === 'u') {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     store.undo()
   } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor)
   } else if (!visual && event.key === 'Enter') {
-    if (pending.count !== '') return handled()
+    if (pending.count !== '') {
+      clearPending()
+      return handled()
+    }
     const link = linkAtPosition(node.links, cursor)
     if (link !== undefined) window.open(link.url, '_blank')
   } else return false

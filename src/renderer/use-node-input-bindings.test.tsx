@@ -125,7 +125,7 @@ describe('useNodeInputBindings', () => {
       getSnapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'A', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
+        location: { currentParentId: 'a', selectedNodeId: 'a' },
       }),
     } as unknown as EditorStore
     const { result } = renderHook(() => {
