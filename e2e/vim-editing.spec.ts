@@ -1,5 +1,8 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   allowRendererError,
+  attachmentPath,
   exactMessage,
   expect,
   launchTree as launchTreeBase,
@@ -12,6 +15,17 @@ import {
 } from './fixtures'
 
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
+
+const attachmentImageBytes = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAMgAAACWCAYAAACb3McZAAABmklEQVR4nO3TMRHAIADAQOSgqYpxBQZ6WWH44fcsGfNbG/g3bgfAywwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAMAsEgEAwCwSAQDALBIBAOQJHaVsxH0sYAAAAASUVORK5CYII=',
+  'base64',
+)
+
+function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
+  const directory = join(userDataDir, 'data', 'attachments')
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(attachmentPath(userDataDir, attachmentId), attachmentImageBytes)
+}
 
 test.describe('Vim editing prototype', () => {
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
@@ -68,6 +82,44 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('l')
 
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 1)
+  })
+
+  test('navigates between text and its image before moving between nodes', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'with-image', text: 'Text', attachment: { id: 'attachment', mimeType: 'image/png' }, children: [] },
+          { id: 'next', text: 'Next', children: [] },
+          {
+            id: 'image-only',
+            text: '',
+            attachment: { id: 'image-only-attachment', mimeType: 'image/png' },
+            children: [],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'with-image' },
+    })
+    seedAttachmentImage(userDataDir, 'attachment')
+    seedAttachmentImage(userDataDir, 'image-only-attachment')
+    const { window } = await launchTree(userDataDir)
+    const withImage = node(window, 1)
+    await withImage.focus()
+    await setCursor(withImage, 1)
+
+    await withImage.press('j')
+    await expect(withImage).toHaveJSProperty('selectionStart', 4)
+    await withImage.press('k')
+    await expect(withImage).toHaveJSProperty('selectionStart', 3)
+
+    await withImage.press('j')
+    await expect(withImage).toHaveJSProperty('selectionStart', 4)
+    await withImage.press('j')
+    await expect(node(window, 2)).toBeFocused()
+
+    await node(window, 3).focus()
+    await node(window, 3).press('k')
+    await expect(node(window, 2)).toBeFocused()
   })
 
   test('applies counts to node motions and subtree puts', async ({ userDataDir }) => {

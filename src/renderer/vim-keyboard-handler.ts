@@ -395,7 +395,25 @@ export function handleVimKey(
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     const direction = event.key === 'j' ? 'down' : 'up'
-    for (let index = 0; index < count; index += 1) {
+    let navigationCursor = cursor
+    let remainingCount = count
+    if (event.key === 'j' && node.attachment !== undefined && cursor < node.text.length) {
+      navigationCursor = node.text.length
+      setNormalCaret(input, navigationCursor)
+      vim.setImageCaret?.(node.id, true)
+      remainingCount -= 1
+    } else if (
+      event.key === 'k' &&
+      node.attachment !== undefined &&
+      cursor === node.text.length &&
+      node.text.length > 0
+    ) {
+      navigationCursor = node.text.length - 1
+      setNormalCaret(input, navigationCursor)
+      vim.setImageCaret?.(node.id, false)
+      remainingCount -= 1
+    }
+    for (let index = 0; index < remainingCount; index += 1) {
       if (count > 1) {
         const state = store.getSnapshot()
         if (
@@ -411,7 +429,7 @@ export function handleVimKey(
           if (atBoundary) break
         }
       }
-      store.moveSelection(direction, cursor)
+      store.moveSelection(direction, navigationCursor)
     }
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, input, selection.start)

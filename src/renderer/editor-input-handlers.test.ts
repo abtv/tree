@@ -1119,6 +1119,64 @@ describe('editor keyboard handler', () => {
     row.remove()
   })
 
+  it('uses j and k to move between text and an attached image before changing nodes', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(1, 1)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input)
+    document.body.append(row)
+    const node = {
+      id: 'node',
+      text: 'text',
+      attachment: { id: 'image', mimeType: 'image/png' as const },
+      children: [],
+    }
+    const { handle, vim } = vimHandler(store, node)
+
+    handle(keyEvent(input, 'j'))
+    expect(input.selectionStart).toBe(4)
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+
+    handle(keyEvent(input, 'k'))
+    expect(input.selectionStart).toBe(3)
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    row.remove()
+  })
+
+  it('keeps j on an image at the default next-node motion and uses k for an image-only previous node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(4, 4)
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: 'text',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'j'))
+    expect(store.moveSelection).toHaveBeenCalledWith('down', 4)
+
+    const imageOnly = {
+      id: 'image-only',
+      text: '',
+      attachment: { id: 'image', mimeType: 'image/png' as const },
+      children: [],
+    }
+    const imageOnlyInput = document.createElement('textarea')
+    const imageOnlyHandler = vimHandler(store, imageOnly)
+    imageOnlyHandler.handle(keyEvent(imageOnlyInput, 'k'))
+    expect(store.moveSelection).toHaveBeenLastCalledWith('up', 0)
+    expect(vim.setImageCaret).toHaveBeenCalled()
+  })
+
   it('opens an image-only node from its sole Normal-mode character', () => {
     const store = createStore()
     const input = document.createElement('textarea')

@@ -896,7 +896,7 @@ Normal mode supports:
 
 * `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last displayed node;
 * `h` and `l` to move by character within the current node; when the node has an image, it acts as a final character after the text, and an image-only node's sole character is its image;
-* `j` and `k` to select the next or previous node;
+* `j` and `k` to select the next or previous node; when the current node has an image, `j` moves from its text to the image, and `k` moves from its image to its text when text exists; pressing `j` on the image moves to the next node, while pressing `k` on an image-only node moves to the previous node;
 * `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport;
 * `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows;
 * `u` to undo and `Ctrl+r` to redo the most recent undoable change;
