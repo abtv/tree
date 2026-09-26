@@ -187,6 +187,86 @@ test.describe('Vim editing prototype', () => {
     await expect(next).toHaveJSProperty('selectionEnd', 1)
   })
 
+  test('keeps the image caret at the last-node boundary and applies counted h on exit', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'last', text: 'Last', attachment: { id: 'last-image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'last' },
+    })
+    seedAttachmentImage(userDataDir, 'last-image')
+    const { window } = await launchTree(userDataDir)
+    const last = node(window, 1)
+    await last.focus()
+    await setCursor(last, 1)
+    await last.press('j')
+    await last.press('j')
+    await expect(last).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="last"] .attachment-image-caret')).toHaveCount(1)
+    await expect(window.locator('.node-row[data-node-id="last"]')).toHaveScreenshot('vim-last-image-boundary-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-row[data-node-id="last"]')).toHaveScreenshot('vim-last-image-boundary-dark.png')
+
+    await last.press('2')
+    await last.press('h')
+    await expect(last).toHaveJSProperty('selectionStart', 0)
+    await expect(last).toHaveJSProperty('selectionEnd', 1)
+  })
+
+  test('synchronizes image caret destinations after gg and viewport motions', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'A', attachment: { id: 'first-image', mimeType: 'image/png' }, children: [] },
+          { id: 'last', text: 'Longer', attachment: { id: 'last-image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    seedAttachmentImage(userDataDir, 'first-image')
+    seedAttachmentImage(userDataDir, 'last-image')
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    const last = node(window, 2)
+    await first.focus()
+    await first.press('G')
+    await last.press('g')
+    await last.press('g')
+    await expect(first).toBeFocused()
+    await expect(first).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="first"] .attachment-image-caret')).toHaveCount(1)
+
+    await first.press('G')
+    await last.press('H')
+    await expect(first).toBeFocused()
+    await expect(first).toHaveClass(/node-input-image-caret/)
+  })
+
+  test('does not restore a different image’s saved text position after G', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'ABCD', attachment: { id: 'first-image', mimeType: 'image/png' }, children: [] },
+          { id: 'last', text: 'Longer', attachment: { id: 'last-image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    seedAttachmentImage(userDataDir, 'first-image')
+    seedAttachmentImage(userDataDir, 'last-image')
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    const last = node(window, 2)
+    await first.focus()
+    await setCursor(first, 1)
+    await first.press('j')
+    await first.press('G')
+    await expect(last).toHaveClass(/node-input-image-caret/)
+    await last.press('k')
+    await expect(last).toHaveJSProperty('selectionStart', 5)
+    await expect(last).toHaveJSProperty('selectionEnd', 6)
+  })
+
   test('applies counts to node motions and subtree puts', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

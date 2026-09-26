@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, displayedNodes, reconcileLinkTextEdit, type LinkRange, type TreeNode } from '../domain/document'
+import {
+  cloneNode,
+  displayedNodes,
+  reconcileLinkTextEdit,
+  requireNode,
+  type LinkRange,
+  type TreeNode,
+} from '../domain/document'
 import {
   clearNormalCaret,
   getCaret,
@@ -196,6 +203,18 @@ export function useNodeInputBindings({
     [store],
   )
 
+  const syncImageCaretToFocus = useCallback((): void => {
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') return
+    vimImageTextCursor.current = undefined
+    const target = requireNode(state.document, state.location.selectedNodeId).node
+    setImageCaretNodeId(
+      target.attachment !== undefined && state.focus !== undefined && state.focus.cursor >= target.text.length
+        ? target.id
+        : undefined,
+    )
+  }, [store, setImageCaretNodeId])
+
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number): void => {
       const visibleRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
@@ -220,9 +239,12 @@ export function useNodeInputBindings({
                   ),
                 )
       const targetId = visibleRows[targetIndex]?.dataset.nodeId
-      if (targetId !== undefined) store.selectNode(targetId, cursor)
+      if (targetId !== undefined) {
+        store.selectNode(targetId, cursor)
+        syncImageCaretToFocus()
+      }
     },
-    [store],
+    [store, syncImageCaretToFocus],
   )
 
   useLayoutEffect(() => {
@@ -480,7 +502,10 @@ export function useNodeInputBindings({
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
           imageTextCursor: vimImageTextCursor,
-          moveBoundary: (boundary, cursor, count) => store.moveSelectionBoundary(boundary, cursor, count),
+          moveBoundary: (boundary, cursor, count) => {
+            store.moveSelectionBoundary(boundary, cursor, count)
+            syncImageCaretToFocus()
+          },
           moveViewport: moveVimViewport,
           setMode: setVimMode,
           openAttachment: onPreviewAttachment,
@@ -554,6 +579,7 @@ export function useNodeInputBindings({
       setNodeVisualSelection,
       setVimMode,
       setImageCaretNodeId,
+      syncImageCaretToFocus,
       store,
       vimMode,
     ],

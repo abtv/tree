@@ -284,6 +284,81 @@ describe('editor keyboard handler', () => {
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
   })
 
+  it('applies the remaining h count after restoring the text position from an image', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(4, 4)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.imageTextCursor!.current = 1
+
+    handle(keyEvent(input, '2'))
+    handle(keyEvent(input, 'h'))
+
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(1)
+  })
+
+  it('does not leave the last node image when j reaches the boundary', () => {
+    const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: {
+        roots: [{ id: 'node', text: 'Last', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'node' },
+    } as never)
+    const input = document.createElement('textarea')
+    input.value = 'Last'
+    input.setSelectionRange(4, 4)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.imageTextCursor!.current = 1
+
+    handle(keyEvent(input, 'j'))
+
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(vim.imageTextCursor!.current).toBe(1)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+  })
+
+  it('keeps an image caret on a current-parent heading with no child', () => {
+    const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: {
+        roots: [{ id: 'parent', text: 'Parent', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    } as never)
+    const input = document.createElement('textarea')
+    input.value = 'Parent'
+    input.setSelectionRange(6, 6)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'parent',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'j'))
+
+    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true)
+  })
+
   it('does not reactivate the image when k reaches the current-parent text boundary', () => {
     const store = createStore()
     vi.mocked(store.getSnapshot).mockReturnValue({

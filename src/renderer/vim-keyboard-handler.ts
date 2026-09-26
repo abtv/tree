@@ -333,7 +333,7 @@ export function handleVimKey(
     const imageCaretActive = input.classList.contains('node-input-image-caret')
     let next: number
     if (event.key === 'h' && imageCaretActive && node.attachment !== undefined && node.text.length > 0) {
-      next = vim.imageTextCursor?.current ?? node.text.length - 1
+      next = Math.max(0, (vim.imageTextCursor?.current ?? node.text.length - 1) - (count - 1))
       if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
     } else {
       next = moveCharacterCursor(
@@ -406,6 +406,16 @@ export function handleVimKey(
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     const direction = event.key === 'j' ? 'down' : 'up'
     const imageCaretActive = input.classList.contains('node-input-image-caret')
+    if (direction === 'down' && imageCaretActive) {
+      const state = store.getSnapshot()
+      if (state.status === 'ready' && state.document !== undefined) {
+        const noNextNode =
+          state.location.selectedNodeId === state.location.currentParentId
+            ? requireNode(state.document, node.id).node.children.length === 0
+            : displayedNodes(state.document, state.location.currentParentId).at(-1)?.id === node.id
+        if (noNextNode) return handled()
+      }
+    }
     let navigationCursor = cursor
     let remainingCount = count
     if (event.key === 'j' && !imageCaretActive && node.attachment !== undefined && cursor < node.text.length) {
@@ -448,6 +458,11 @@ export function handleVimKey(
         vim.setImageCaret?.(node.id, false)
       }
       store.moveSelection(direction, navigationCursor)
+      if (direction === 'down' && vim.imageTextCursor !== undefined) {
+        const state = store.getSnapshot()
+        if (state.status === 'ready' && state.location.selectedNodeId !== node.id)
+          vim.imageTextCursor.current = undefined
+      }
       if (direction === 'up') {
         const state = store.getSnapshot()
         if (state.status === 'ready' && state.document !== undefined) {

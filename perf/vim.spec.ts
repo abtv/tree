@@ -192,6 +192,22 @@ test.describe('Vim interactions at scale', () => {
       )
       for (let index = 0; index < 10; index += 1) await window.keyboard.press('k')
       await expect(middleInput).toHaveValue(`hild ${middle}`)
+
+      const boundaryStart = performance.now()
+      await window.keyboard.press('G')
+      await expect(window.getByRole('textbox', { name: `Node ${siblingCount}`, exact: true })).toBeFocused()
+      await window.keyboard.press('g')
+      await window.keyboard.press('g')
+      await expect(window.getByRole('textbox', { name: 'Current parent' })).toBeFocused()
+      const boundaryMs = performance.now() - boundaryStart
+      const boundaryMountedRows = await window.locator('.node-row').count()
+      recordPerfResult({
+        kind: 'state',
+        scenario: 'vim-boundary-wide-30000',
+        metrics: { boundaryMs: round(boundaryMs), mountedRows: boundaryMountedRows },
+      })
+      expect(boundaryMs).toBeLessThan(1_000)
+      expect(boundaryMountedRows).toBeLessThan(100)
     })
   }
 })
