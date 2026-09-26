@@ -24,6 +24,17 @@ import type {
 import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
 import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
 
+function syncImageCaretAtCursor(
+  vim: VimKeyboardState,
+  node: TreeNode,
+  cursor: number,
+  textLength = node.text.length,
+): void {
+  const imageCaretActive = node.attachment !== undefined && cursor === textLength
+  vim.setImageCaret?.(node.id, imageCaretActive)
+  if (!imageCaretActive && vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
+}
+
 export function handleVimKey(
   event: KeyboardEvent<HTMLElement>,
   store: EditorStore,
@@ -70,7 +81,10 @@ export function handleVimKey(
       const anchor = vim.visualAnchor.current ?? cursor
       vim.visualFocus.current = clamped
       setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
-    } else setNormalCaret(input, clamped)
+    } else {
+      setNormalCaret(input, clamped)
+      syncImageCaretAtCursor(vim, node, clamped)
+    }
   }
   const handled = (): true => {
     event.preventDefault()
@@ -106,6 +120,7 @@ export function handleVimKey(
     vim.visualFocus.current = undefined
     vim.setMode('normal')
     setNormalCaret(input, selection.start)
+    syncImageCaretAtCursor(vim, node, selection.start)
     return handled()
   }
   const pending = vim.pending.current ?? { count: '', motionCount: '' }
@@ -353,7 +368,6 @@ export function handleVimKey(
           vim.imageTextCursor.current = imageTextReturnCursor(cursor, count, node.text.length)
       }
     }
-    vim.setImageCaret?.(node.id, node.attachment !== undefined && next === node.text.length)
     move(next, true)
   } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
@@ -746,7 +760,7 @@ function leaveVisual(
   vim.visualFocus.current = undefined
   vim.setMode('normal')
   const nextCursor = normalEditCursor(cursor, textLength, node.attachment !== undefined)
-  vim.setImageCaret?.(node.id, node.attachment !== undefined && nextCursor === textLength)
+  syncImageCaretAtCursor(vim, node, nextCursor, textLength)
   vim.scheduleCaret(input, nextCursor)
 }
 

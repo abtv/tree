@@ -396,6 +396,71 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(1)
   })
 
+  it.each([
+    { motion: '0', destination: 0, afterH: 0 },
+    { motion: '$', destination: 3, afterH: 2 },
+  ])('clears image state when $motion moves from image to text', ({ motion, destination, afterH }) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(1, 1)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input)
+    document.body.append(row)
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.setImageCaret = vi.fn((_nodeId, active) => input.classList.toggle('node-input-image-caret', active))
+
+    handle(keyEvent(input, 'j'))
+    expect(input.classList.contains('node-input-image-caret')).toBe(true)
+    expect(vim.imageTextCursor?.current).toBe(1)
+
+    handle(keyEvent(input, motion))
+    expect(input.selectionStart).toBe(destination)
+    expect(input.classList.contains('node-input-image-caret')).toBe(false)
+    expect(vim.imageTextCursor?.current).toBeUndefined()
+
+    handle(keyEvent(input, 'h'))
+    expect(input.selectionStart).toBe(afterH)
+    row.remove()
+  })
+
+  it.each(['Escape', 'v'])('clears image state when Visual %s returns to text', (exitKey) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(1, 1)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input)
+    document.body.append(row)
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.setImageCaret = vi.fn((_nodeId, active) => input.classList.toggle('node-input-image-caret', active))
+
+    handle(keyEvent(input, 'j'))
+    handle(keyEvent(input, 'v'))
+    handle(keyEvent(input, '0'))
+    handle(keyEvent(input, exitKey))
+
+    expect(vim.mode).toBe('normal')
+    expect(input.selectionStart).toBe(0)
+    expect(input.classList.contains('node-input-image-caret')).toBe(false)
+    expect(vim.imageTextCursor?.current).toBeUndefined()
+    row.remove()
+  })
+
   it('does not leave the last node image when j reaches the boundary', () => {
     const store = createStore()
     vi.mocked(store.getSnapshot).mockReturnValue({

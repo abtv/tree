@@ -134,6 +134,56 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 2)).toBeFocused()
   })
 
+  test('clears the image caret when a text motion leaves an attached image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'with-image', text: 'Abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'with-image' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-image-before-text-motion.png')
+    await editor.press('0')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-text-motion-from-image.png')
+    await editor.press('h')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+
+    await editor.press('j')
+    await editor.press('$')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 3)
+    await editor.press('h')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+
+    await editor.press('j')
+    await editor.press('v')
+    await editor.press('0')
+    await editor.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+
+    await editor.press('j')
+    await editor.press('v')
+    await editor.press('0')
+    await editor.press('v')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+  })
+
   test('treats an image-only node as one character and crosses its row in both directions', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
