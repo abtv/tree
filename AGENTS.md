@@ -200,6 +200,20 @@ Property-based tests using `fast-check` guard domain invariants. When a change a
 
 Do not remove or weaken tests merely to make an implementation pass.
 
+### Navigation and caret changes
+
+Navigation and caret behavior must be designed and reviewed as a state-transition matrix, not as isolated key fixes. Before implementation, a substantive task's `WORKING_PLAN.md` must record the affected combinations of:
+
+* entry motions (`h`, `j`, `k`, `l`, boundary motions, counted motions, and pointer/focus restoration when applicable);
+* exit motions and repeated-key behavior;
+* text-caret positions (beginning, middle, final character, and empty text);
+* node context (root, current parent, sibling, child, attached image, and image-only node); and
+* expected destination caret state, including whether an image caret is active and which text position must be restored.
+
+The invariant for an attached image is explicit: the image is a separate character; entering it records the originating text caret; leaving it either restores that recorded caret or, when crossing to another node, applies the documented destination position. Every entry path and every exit path must be covered by a focused unit test and by an end-to-end test for the representative process boundary. Tests must include at least one non-final text position, a same-node round trip, a cross-node transition, and a repeated motion at the boundary.
+
+Before handoff, the implementation review must compare the code and tests against the complete matrix and explicitly report any intentionally unsupported combination. A screenshot or a single happy-path test is not sufficient evidence for navigation or caret work.
+
 ### Visual-regression workflow
 
 For a change that can alter rendered pixels — including stylesheet, layout, typography, color, caret, selection, focus, drag-feedback, or contenteditable rendering — DOM, CSS-class, and computed-style assertions are not sufficient visual evidence. Select the smallest representative set of affected states, run it in the real Electron renderer, and inspect its screenshot before handoff. Include light and dark appearances only when the change or affected styling differs by appearance.
