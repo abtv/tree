@@ -178,6 +178,20 @@ Native editor context-menu behavior is covered by renderer and IPC contract test
 
 The defect-first and boundary-testing rules are defined in `AGENTS.md` §9. Boundary contract tests live next to the implementation; end-to-end tests live in `e2e/`. Use unit tests for deterministic state-machine branches and E2E tests for the real Electron wiring.
 
+### Navigation and caret changes
+
+Navigation and caret behavior must be designed and reviewed as a state-transition matrix, not as isolated key fixes. The matrix must cover:
+
+* entry motions (`h`, `j`, `k`, `l`, boundary motions, counted motions, and pointer/focus restoration when applicable);
+* exit motions and repeated-key behavior;
+* text-caret positions (beginning, middle, final character, and empty text);
+* node context (root, current parent, sibling, child, attached image, and image-only node); and
+* expected destination caret state, including whether an image caret is active and which text position must be restored.
+
+The invariant for an attached image is explicit: the image is a separate character; entering it records the originating text caret; leaving it either restores that recorded caret or, when crossing to another node, applies the documented destination position. Every entry path and every exit path must have focused unit coverage and end-to-end coverage for the representative process boundary. Tests must include at least one non-final text position, a same-node round trip, a cross-node transition, and a repeated motion at the boundary.
+
+A screenshot or a single happy-path test is not sufficient evidence for navigation or caret work. The implementation review must compare the code and tests against the complete matrix and explicitly report any intentionally unsupported combination.
+
 ---
 
 ## 9. Full Validation
