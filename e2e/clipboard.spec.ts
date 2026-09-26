@@ -55,12 +55,16 @@ test.describe('clipboard', () => {
     const link = window.getByRole('link', { name: 'https://example.com' })
     await expect(link).toHaveAttribute('href', 'https://example.com')
     await expect(link).toHaveAttribute('target', '_blank')
-    await expect(node(window, 1)).toHaveCSS('cursor', 'pointer')
-    await expect(link).toHaveCSS('cursor', 'text')
+    await expect(node(window, 1)).toHaveCSS('cursor', 'text')
+    await expect(link).toHaveCSS('cursor', 'default')
     await window.keyboard.down('Meta')
     await expect(link).toHaveCSS('cursor', 'pointer')
     await window.keyboard.up('Meta')
-    await expect(link).toHaveCSS('cursor', 'text')
+    await expect(link).toHaveCSS('cursor', 'default')
+    await window.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    })
+    await expect(node(window, 1)).toHaveCSS('cursor', 'default')
   })
 
   test('keeps adjacent pasted URLs as separate links', async ({ userDataDir }) => {

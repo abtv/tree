@@ -97,6 +97,7 @@ test.describe('external hyperlinks', () => {
       }
     })
     const editor = node(window, 1)
+    await expect(editor).toHaveCSS('cursor', 'default')
     const openedUrls = () => app.evaluate(() => (globalThis as { __openedUrls?: string[] }).__openedUrls ?? [])
 
     // Adjacent-before ("A", index 0): no link there, Enter does nothing.

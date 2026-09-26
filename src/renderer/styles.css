@@ -185,7 +185,7 @@ textarea {
   min-height: 25px;
   margin-left: 28px;
   padding-left: 21px;
-  cursor: pointer;
+  cursor: default;
 }
 
 .node-row-pinned {
@@ -281,7 +281,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   padding: 0 6px;
   color: inherit;
   background: transparent;
-  cursor: pointer;
+  cursor: default;
   caret-color: #373f43;
   outline: none;
   resize: none;
@@ -296,6 +296,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .vim-state-normal .node-input {
   caret-color: transparent;
   caret-shape: block;
+}
+
+.vim-state-normal .node-input:focus {
+  cursor: default;
 }
 
 .vim-state-normal .node-input.node-input-empty:focus {
@@ -353,7 +357,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .node-input a {
   color: #1769aa;
   text-decoration: underline;
-  cursor: text;
+  cursor: default;
 }
 
 .left-command-down .node-input a {
@@ -379,6 +383,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .node-input:focus {
   background: transparent;
+  cursor: text;
 }
 
 .node-row.node-row-dragging .node-input:focus {
