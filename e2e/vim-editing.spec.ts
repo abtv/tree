@@ -801,6 +801,33 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 1)).toBeFocused()
   })
 
+  test('moves k onto an attached current-parent image from its first child', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            attachment: { id: 'parent-image', mimeType: 'image/png' },
+            children: [{ id: 'child', text: 'Child', children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'child' },
+    })
+    seedAttachmentImage(userDataDir, 'parent-image')
+    const { window } = await launchTree(userDataDir)
+
+    await node(window, 1).focus()
+    await window.keyboard.press('k')
+
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toBeFocused()
+    await expect(parent).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.current-parent .attachment-image-caret')).toHaveCount(1)
+    await expect(window.locator('.current-parent')).toHaveScreenshot('vim-current-parent-image-caret-light.png')
+  })
+
   test('supports line and viewport motions', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, displayedNodes, linkAtPosition, type TreeNode } from '../domain/document'
+import { cloneNode, displayedNodes, linkAtPosition, requireNode, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
@@ -430,6 +430,13 @@ export function handleVimKey(
         }
       }
       store.moveSelection(direction, navigationCursor)
+      if (direction === 'up') {
+        const state = store.getSnapshot()
+        if (state.status === 'ready' && state.document !== undefined) {
+          const target = requireNode(state.document, state.location.selectedNodeId).node
+          vim.setImageCaret?.(target.id, target.attachment !== undefined)
+        }
+      }
     }
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, input, selection.start)

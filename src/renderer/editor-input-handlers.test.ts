@@ -215,6 +215,33 @@ describe('editor keyboard handler', () => {
     expect(input.selectionStart).toBe(1)
   })
 
+  it('activates an attached parent image when k moves up from the first child', () => {
+    const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            attachment: { id: 'image', mimeType: 'image/png' },
+            children: [{ id: 'child', text: 'Child', children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    } as never)
+    const input = document.createElement('textarea')
+    input.value = 'Child'
+    input.setSelectionRange(4, 5)
+    const { handle, vim } = vimHandler(store, { id: 'child', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'k'))
+
+    expect(store.moveSelection).toHaveBeenCalledWith('up', 4)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true)
+  })
+
   it('opens a new child with Normal-mode o and enters Insert mode', () => {
     const store = createStore()
     vi.mocked(store.getSnapshot).mockReturnValue({
