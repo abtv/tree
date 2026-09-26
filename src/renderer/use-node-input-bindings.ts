@@ -68,6 +68,7 @@ export function useNodeInputBindings({
   )
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
+  const vimImageTextCursor = useRef<number | undefined>(undefined)
   const structuralInsert = useRef<
     | { kind: 'open'; position: 'before' | 'after' }
     | { kind: 'child-open' }
@@ -478,6 +479,7 @@ export function useNodeInputBindings({
           },
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
+          imageTextCursor: vimImageTextCursor,
           moveBoundary: (boundary, cursor, count) => store.moveSelectionBoundary(boundary, cursor, count),
           moveViewport: moveVimViewport,
           setMode: setVimMode,
@@ -512,6 +514,7 @@ export function useNodeInputBindings({
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
         setImageCaretNodeId(undefined)
+        vimImageTextCursor.current = undefined
         if (event.button === 2) event.preventDefault()
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')

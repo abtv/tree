@@ -78,6 +78,7 @@ export interface VimKeyboardState {
   finishReplace?: (input: HTMLElement) => boolean
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
+  imageTextCursor?: { current: number | undefined }
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   setMode: (mode: VimMode) => void

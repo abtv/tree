@@ -80,6 +80,7 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     finishInsert: vi.fn(),
     visualAnchor: { current: undefined },
     visualFocus: { current: undefined },
+    imageTextCursor: { current: undefined },
     moveBoundary: vi.fn(),
     moveViewport: vi.fn(),
     setMode: vi.fn((next) => {
@@ -240,6 +241,78 @@ describe('editor keyboard handler', () => {
 
     expect(store.moveSelection).toHaveBeenCalledWith('up', 4)
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true)
+  })
+
+  it('moves from an active parent image to its text with k', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Parent'
+    input.setSelectionRange(4, 5)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'parent',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'k'))
+
+    expect(input.selectionStart).toBe(5)
+    expect(input.selectionEnd).toBe(6)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
+  })
+
+  it('restores the text position after moving from text to an image and back', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Parent'
+    input.setSelectionRange(2, 3)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'parent',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.imageTextCursor!.current = 2
+
+    handle(keyEvent(input, 'k'))
+
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(3)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
+  })
+
+  it('does not reactivate the image when k reaches the current-parent text boundary', () => {
+    const store = createStore()
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            attachment: { id: 'image', mimeType: 'image/png' },
+            children: [],
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    } as never)
+    const input = document.createElement('textarea')
+    input.value = 'Parent'
+    input.setSelectionRange(5, 6)
+    const { handle, vim } = vimHandler(store, {
+      id: 'parent',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'k'))
+
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
   })
 
   it('opens a new child with Normal-mode o and enters Insert mode', () => {
@@ -1204,7 +1277,8 @@ describe('editor keyboard handler', () => {
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
 
     handle(keyEvent(input, 'k'))
-    expect(input.selectionStart).toBe(3)
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(2)
     expect(store.moveSelection).not.toHaveBeenCalled()
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
     row.remove()

@@ -110,7 +110,7 @@ test.describe('Vim editing prototype', () => {
     await withImage.press('j')
     await expect(withImage).toHaveJSProperty('selectionStart', 4)
     await withImage.press('k')
-    await expect(withImage).toHaveJSProperty('selectionStart', 3)
+    await expect(withImage).toHaveJSProperty('selectionStart', 1)
 
     await withImage.press('j')
     await expect(withImage).toHaveJSProperty('selectionStart', 4)
@@ -826,6 +826,18 @@ test.describe('Vim editing prototype', () => {
     await expect(parent).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.current-parent .attachment-image-caret')).toHaveCount(1)
     await expect(window.locator('.current-parent')).toHaveScreenshot('vim-current-parent-image-caret-light.png')
+
+    await parent.press('k')
+
+    await expect(parent).not.toHaveClass(/node-input-image-caret/)
+    await expect(parent).toHaveJSProperty('selectionStart', 0)
+    await expect(parent).toHaveJSProperty('selectionEnd', 1)
+
+    await parent.press('k')
+
+    await expect(parent).not.toHaveClass(/node-input-image-caret/)
+    await expect(parent).toHaveJSProperty('selectionStart', 0)
+    await expect(parent).toHaveJSProperty('selectionEnd', 1)
   })
 
   test('supports line and viewport motions', async ({ userDataDir }) => {

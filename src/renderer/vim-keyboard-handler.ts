@@ -395,9 +395,11 @@ export function handleVimKey(
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     const direction = event.key === 'j' ? 'down' : 'up'
+    const imageCaretActive = input.classList.contains('node-input-image-caret')
     let navigationCursor = cursor
     let remainingCount = count
-    if (event.key === 'j' && node.attachment !== undefined && cursor < node.text.length) {
+    if (event.key === 'j' && !imageCaretActive && node.attachment !== undefined && cursor < node.text.length) {
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = cursor
       navigationCursor = node.text.length
       setNormalCaret(input, navigationCursor)
       vim.setImageCaret?.(node.id, true)
@@ -405,12 +407,13 @@ export function handleVimKey(
     } else if (
       event.key === 'k' &&
       node.attachment !== undefined &&
-      cursor === node.text.length &&
+      (imageCaretActive || cursor === node.text.length) &&
       node.text.length > 0
     ) {
-      navigationCursor = node.text.length - 1
+      navigationCursor = vim.imageTextCursor?.current ?? node.text.length - 1
       setNormalCaret(input, navigationCursor)
       vim.setImageCaret?.(node.id, false)
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
       remainingCount -= 1
     }
     for (let index = 0; index < remainingCount; index += 1) {
@@ -429,12 +432,18 @@ export function handleVimKey(
           if (atBoundary) break
         }
       }
+      if (direction === 'down' && imageCaretActive) {
+        if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
+        vim.setImageCaret?.(node.id, false)
+      }
       store.moveSelection(direction, navigationCursor)
       if (direction === 'up') {
         const state = store.getSnapshot()
         if (state.status === 'ready' && state.document !== undefined) {
           const target = requireNode(state.document, state.location.selectedNodeId).node
-          vim.setImageCaret?.(target.id, target.attachment !== undefined)
+          if (target.id !== node.id && target.attachment !== undefined && vim.imageTextCursor !== undefined)
+            vim.imageTextCursor.current = Math.min(state.focus?.cursor ?? navigationCursor, Math.max(0, target.text.length - 1))
+          vim.setImageCaret?.(target.id, target.id !== node.id && target.attachment !== undefined)
         }
       }
     }
