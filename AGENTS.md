@@ -202,7 +202,7 @@ Do not remove or weaken tests merely to make an implementation pass.
 
 ### Navigation and caret changes
 
-Follow the project-wide navigation and caret matrix and invariant in `docs/DEVELOPMENT.md` §8. For substantive tasks, record that matrix in `WORKING_PLAN.md`; before handoff, compare the implementation and tests against the complete matrix and explicitly report any intentionally unsupported combination.
+Follow the project-wide navigation and caret matrix and invariant in `docs/DEVELOPMENT.md` §8. Before changing implementation, inventory the affected caret and selection state and every command or interaction path that can change it, including paths that keep the selected node unchanged. Record the affected transitions and their expected states; for substantive tasks, keep the inventory and matrix in `WORKING_PLAN.md`. Update them when implementation reveals another path. Before handoff, compare the implementation and tests against the complete affected inventory and matrix, and explicitly report any intentionally unsupported combination. Independent review must trace the affected state-changing paths in the code against that inventory, rather than infer completeness from passing tests alone.
 
 ### Visual-regression workflow
 

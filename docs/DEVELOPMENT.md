@@ -188,11 +188,13 @@ Navigation and caret behavior must be designed and reviewed as a state-transitio
 * node context (root, current parent, sibling, child, attached image, and image-only node); and
 * expected destination caret state, including whether an image caret is active and which text position must be restored.
 
+Build the affected-path inventory before editing code. Start from the state being changed (selected node, text cursor, saved image-entry position, image-caret indicator, selection, or mode) and trace every relevant writer and caller, not only the command that exposed the defect. Include keyboard commands, counted and repeated commands, pointer/focus changes, node entry and exit, edits, undo/redo, and mode changes when they can affect that state. Include transitions where the selected node ID stays the same or a motion clamps at a boundary. For each affected path, record the starting state, action, expected selected node, text cursor, active caret, restored position when applicable, and mode. Mark its focused test and representative Electron test, or explain why a path is inapplicable. Update the inventory when a newly discovered path changes the affected state; avoid expanding it to unrelated commands.
+
 The current Vim requirement-to-test inventory is in [VIM_CONFORMANCE.md](VIM_CONFORMANCE.md).
 
 The invariant for an attached image is explicit: the image is a separate character; entering it records the originating text caret; leaving it either restores that recorded caret or, when crossing to another node, applies the documented destination position. Every entry path and every exit path must have focused unit coverage and end-to-end coverage for the representative process boundary. Tests must include at least one non-final text position, a same-node round trip, a cross-node transition, and a repeated motion at the boundary.
 
-A screenshot or a single happy-path test is not sufficient evidence for navigation or caret work. The implementation review must compare the code and tests against the complete matrix and explicitly report any intentionally unsupported combination.
+A screenshot or a single happy-path test is not sufficient evidence for navigation or caret work. The implementation review must trace each affected state-changing path in the code, compare its resulting state and tests against the inventory and matrix, and explicitly report any intentionally unsupported combination. When several defects involve the same state, review whether multiple owners or scattered resynchronization calls are causing omissions; record the conclusion and address a confirmed design cause within the authorized scope.
 
 ---
 
