@@ -359,6 +359,25 @@ describe('editor keyboard handler', () => {
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true)
   })
 
+  it('keeps image-only horizontal motions on its sole image character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = ''
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'image-only',
+      text: '',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    for (const key of ['h', 'l', '2', 'h', '2', 'l']) {
+      handle(keyEvent(input, key))
+      expect(input.selectionStart).toBe(0)
+      expect(vim.setImageCaret).toHaveBeenLastCalledWith('image-only', true)
+    }
+  })
+
   it('does not reactivate the image when k reaches the current-parent text boundary', () => {
     const store = createStore()
     vi.mocked(store.getSnapshot).mockReturnValue({

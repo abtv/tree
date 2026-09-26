@@ -1,0 +1,39 @@
+# Vim conformance matrix
+
+This is a test inventory for the behavior specified in [PRODUCT.md](PRODUCT.md) §4.3 and §20.2. It does not define additional Vim behavior. “Covered” means that the named automated tests exercise the stated case; it does not claim that every possible key sequence is tested. The navigation dimensions follow [DEVELOPMENT.md](DEVELOPMENT.md) §8.
+
+## Mode and command families
+
+| Product behavior | Representative automated evidence |
+| --- | --- |
+| Normal startup, block caret, `i`/`a`/`I`/`A`, `R`, Escape, mode indicator | `e2e/vim-editing.spec.ts`: “starts in Normal mode”, “switches modes and applies Normal-mode motions and edits”, “I enters Insert mode”, “A enters Insert mode”, “replaces text in Replace mode”; `src/renderer/editor-input-handlers.test.ts`: “moves and edits in Normal mode” |
+| `h`/`l`, image as terminal character, `j`/`k` image row, `gg`/`G`, viewport/half-page and line motions | Navigation matrix below; `e2e/vim-editing.spec.ts`: “supports line and viewport motions” |
+| Word, WORD, character-find, repeat-find, and counted text motions | `src/renderer/vim-editing.test.ts`: “Vim text motions”; `e2e/vim-editing.spec.ts`: “uses WORD, ge, and repeated character-find motions”, “changes words, finds characters” |
+| `d`/`y`/`c` operators, text objects, surround, case, single-character edits, and counted edits | `src/renderer/vim-text-commands.test.ts`, `src/renderer/vim-surround.test.ts`, `src/renderer/vim-editing.test.ts`; `e2e/vim-editing.spec.ts`: “uses word, quote, and bracket text objects”, “adds, changes, and deletes surrounding pairs”, “replaces, substitutes, and changes through the end” |
+| `o`/`O`, `dd`/`yy`, node counts, subtree registers, and puts | `e2e/vim-editing.spec.ts`: “uses o to create”, “applies counts to node motions and subtree puts”, “deletes a counted forward sibling range”, “yanks and puts a node subtree” |
+| Character Visual selection, operators, case, surround, and put | `e2e/vim-editing.spec.ts`: “keeps backward Visual selections inclusive”, “changes, replaces, swaps, and cases a Visual selection”, “surrounds a Visual selection with S” |
+| Whole-node Visual range, subtree operations, and current-parent exclusion | `e2e/vim-editing.spec.ts`: “selects complete sibling subtrees with V”, “yanks reverse V ranges”, “changes whole selected subtrees” |
+| Undo/redo and dot repeat, including structural changes | `e2e/vim-editing.spec.ts`: “undoes with u and redoes with Ctrl+r”, “repeats dd and subtree puts”, “repeats inserted text and honors a count before dot” |
+| Navigation commands and Enter on image/link | `e2e/vim-editing.spec.ts`: “focuses the current parent with gg”, “leaves the current node with Ctrl+o”, “moves k onto an attached current-parent image”; `src/renderer/editor-input-handlers.test.ts`: “routes command navigation, history, and image preview actions” |
+| Unsupported unmodified keys, modifier shortcuts, and composition | `src/renderer/editor-input-handlers.test.ts`: “blocks unsupported editing keys in Normal mode”, “does not dispatch commands while native text composition is active”; `src/renderer/App.test.tsx`: “ignores keys during composition”; application shortcut tests |
+
+## Image and caret transitions
+
+The image is character index `text.length`. For image-only text, index `0` is the image. The recorded text position belongs to the active node; a cross-node move uses the destination position determined by navigation. These are the states required by DEVELOPMENT §8, with directly relevant evidence.
+
+| Source and entry | Expected destination or exit | Automated evidence |
+| --- | --- | --- |
+| Text beginning/middle/final, `l` or counted `l` | Advance to the terminal image, clamped at it | `src/renderer/vim-editing.test.ts`: “Vim image character positions”; `e2e/vim-editing.spec.ts`: “navigates between text and its image” |
+| Image, `h` or counted `h` | Return to text, then advance left without passing the beginning | `src/renderer/vim-editing.test.ts`: “Vim image character positions”; `src/renderer/editor-input-handlers.test.ts`: “applies the remaining h count”; `e2e/vim-editing.spec.ts`: “keeps the image caret at the last-node boundary” |
+| Non-final text, `j`, then `k` or `h` | Enter image row, then restore the originating text position | `src/renderer/editor-input-handlers.test.ts`: “restores the text position”, “restores the saved text position”; `e2e/vim-editing.spec.ts`: “navigates between text and its image” |
+| Image, `j` to next sibling or `k` from next sibling | Cross the node boundary; the destination has its own caret state | `e2e/vim-editing.spec.ts`: “moves from a root image to the next node text caret”, “counts the image row when moving from text to the next sibling” |
+| First child, `k` to attached current parent; parent image, `k` to text | Parent image is active on entry; its text becomes active on exit | `src/renderer/editor-input-handlers.test.ts`: “activates an attached parent image”; `e2e/vim-editing.spec.ts`: “moves k onto an attached current-parent image” |
+| Image-only node, `h`/`l`/`0`/`$`, `j`/`k` | Horizontal motions remain on the sole character; vertical motions reach adjacent nodes | `src/renderer/vim-editing.test.ts`: “Vim image character positions”; `e2e/vim-editing.spec.ts`: “treats an image-only node as one character and crosses its row in both directions” |
+| Last image or parent without children, repeated `j`; image-only repeated horizontal motions | Stay at the boundary with the image caret active | `src/renderer/editor-input-handlers.test.ts`: “does not leave the last node image”, “keeps an image caret on a current-parent heading”; `e2e/vim-editing.spec.ts`: “keeps the image caret at the last-node boundary”, “treats an image-only node as one character” |
+| Image-bearing destination via `G`, `gg`, or viewport motion | Activate the destination image and do not reuse another node's saved text position | `e2e/vim-editing.spec.ts`: “moves G to the image”, “synchronizes image caret destinations”, “does not restore a different image’s saved text position” |
+| Attached text, `$` | Stop on the final text character, before the image row | `src/renderer/editor-input-handlers.test.ts`: “moves $ onto the final character”; `e2e/vim-editing.spec.ts`: “keeps backward Visual selections inclusive and $ on the final character” |
+| Normal-mode focus moves between nodes or pointer places a text selection | Keep the current Vim mode and put the caret on the focused character | `src/renderer/use-node-input-bindings.test.tsx`: “keeps a block selection when Normal mode focuses another node”; `e2e/vim-editing.spec.ts`: “keeps the Normal-mode linked selection on the focused node”, “leaves an image through a pointer focus change without leaving Normal mode” |
+
+The newly identified gaps were the image-only horizontal/boundary and two-way vertical transitions, a counted move that crosses an image row before changing siblings, and pointer exit from an image state. The named unit and Electron cases above close those gaps. Search, named registers, macros, and marks are explicitly unsupported by PRODUCT §20.2 and have no conformance rows.
+
+The following matrix combinations are intentionally inapplicable under the specified behavior: `h` does not enter an image from text; `l` does not leave an image for another node; an image-only node has no text position to restore; and text operators/character Visual selection do not extend across the image or into another node. No broader Vim compatibility is inferred from the command names.

@@ -188,6 +188,8 @@ Navigation and caret behavior must be designed and reviewed as a state-transitio
 * node context (root, current parent, sibling, child, attached image, and image-only node); and
 * expected destination caret state, including whether an image caret is active and which text position must be restored.
 
+The current Vim requirement-to-test inventory is in [VIM_CONFORMANCE.md](VIM_CONFORMANCE.md).
+
 The invariant for an attached image is explicit: the image is a separate character; entering it records the originating text caret; leaving it either restores that recorded caret or, when crossing to another node, applies the documented destination position. Every entry path and every exit path must have focused unit coverage and end-to-end coverage for the representative process boundary. Tests must include at least one non-final text position, a same-node round trip, a cross-node transition, and a repeated motion at the boundary.
 
 A screenshot or a single happy-path test is not sufficient evidence for navigation or caret work. The implementation review must compare the code and tests against the complete matrix and explicitly report any intentionally unsupported combination.

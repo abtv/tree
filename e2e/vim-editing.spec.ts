@@ -134,6 +134,99 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 2)).toBeFocused()
   })
 
+  test('treats an image-only node as one character and crosses its row in both directions', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'previous', text: 'Previous', children: [] },
+          {
+            id: 'image-only',
+            text: '',
+            attachment: { id: 'image-only-attachment', mimeType: 'image/png' },
+            children: [],
+          },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'image-only' },
+    })
+    seedAttachmentImage(userDataDir, 'image-only-attachment')
+    const { window } = await launchTree(userDataDir)
+    const imageOnly = node(window, 2)
+    await imageOnly.focus()
+    await expect(imageOnly).toHaveClass(/node-input-image-caret/)
+
+    for (const key of ['h', 'l', '0', '$']) {
+      await imageOnly.press(key)
+      await expect(imageOnly).toBeFocused()
+      await expect(imageOnly).toHaveClass(/node-input-image-caret/)
+      await expect(imageOnly).toHaveJSProperty('selectionStart', 0)
+    }
+
+    await imageOnly.press('j')
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+
+    await imageOnly.focus()
+    await imageOnly.press('k')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).not.toHaveClass(/node-input-image-caret/)
+  })
+
+  test('counts the image row when moving from text to the next sibling', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'with-image', text: 'Abcd', attachment: { id: 'attachment', mimeType: 'image/png' }, children: [] },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'with-image' },
+    })
+    seedAttachmentImage(userDataDir, 'attachment')
+    const { window } = await launchTree(userDataDir)
+    const withImage = node(window, 1)
+    await withImage.focus()
+    await setCursor(withImage, 1)
+    await withImage.press('2')
+    await withImage.press('j')
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 3)
+
+    await node(window, 2).press('k')
+    await expect(withImage).toHaveClass(/node-input-image-caret/)
+    await withImage.press('k')
+    await expect(withImage).not.toHaveClass(/node-input-image-caret/)
+    await expect(withImage).toHaveJSProperty('selectionStart', 3)
+  })
+
+  test('leaves an image through a pointer focus change without leaving Normal mode', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'with-image', text: 'Abcd', attachment: { id: 'attachment', mimeType: 'image/png' }, children: [] },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'with-image' },
+    })
+    seedAttachmentImage(userDataDir, 'attachment')
+    const { window } = await launchTree(userDataDir)
+    const withImage = node(window, 1)
+    await withImage.focus()
+    await setCursor(withImage, 1)
+    await withImage.press('j')
+    await expect(withImage).toHaveClass(/node-input-image-caret/)
+
+    const next = node(window, 2)
+    await next.click()
+    await expect(next).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(withImage).not.toHaveClass(/node-input-image-caret/)
+    await next.press('x')
+    await expect.poll(async () => (await next.inputValue()).length).toBe(3)
+  })
+
   test('moves G to the image on the last node when it has one', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

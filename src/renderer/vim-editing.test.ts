@@ -10,9 +10,98 @@ import {
   moveWordEnd,
   moveWordEndBackward,
   moveWordForward,
+  moveCharacterCursor,
   textObjectRange,
   vimPastePosition,
 } from './vim-editing'
+
+describe('Vim image character positions (PRODUCT §4.3 and §20.2)', () => {
+  it.each([
+    {
+      name: 'plain text ends on its final character',
+      cursor: 2,
+      direction: 'right' as const,
+      length: 3,
+      image: false,
+      count: 1,
+      expected: 2,
+    },
+    {
+      name: 'the image follows the final text character',
+      cursor: 2,
+      direction: 'right' as const,
+      length: 3,
+      image: true,
+      count: 1,
+      expected: 3,
+    },
+    {
+      name: 'a count reaches the image from a middle character',
+      cursor: 1,
+      direction: 'right' as const,
+      length: 3,
+      image: true,
+      count: 2,
+      expected: 3,
+    },
+    {
+      name: 'repeating right on the image stays there',
+      cursor: 3,
+      direction: 'right' as const,
+      length: 3,
+      image: true,
+      count: 2,
+      expected: 3,
+    },
+    {
+      name: 'left leaves the image for the final text character',
+      cursor: 3,
+      direction: 'left' as const,
+      length: 3,
+      image: true,
+      count: 1,
+      expected: 2,
+    },
+    {
+      name: 'counted left clamps at the first text character',
+      cursor: 3,
+      direction: 'left' as const,
+      length: 3,
+      image: true,
+      count: 9,
+      expected: 0,
+    },
+    {
+      name: 'an image-only node has one character',
+      cursor: 0,
+      direction: 'right' as const,
+      length: 0,
+      image: true,
+      count: 3,
+      expected: 0,
+    },
+    {
+      name: 'left stays on an image-only character',
+      cursor: 0,
+      direction: 'left' as const,
+      length: 0,
+      image: true,
+      count: 3,
+      expected: 0,
+    },
+    {
+      name: 'empty text has one insertion position',
+      cursor: 0,
+      direction: 'right' as const,
+      length: 0,
+      image: false,
+      count: 3,
+      expected: 0,
+    },
+  ])('$name', ({ cursor, direction, length, image, count, expected }) => {
+    expect(moveCharacterCursor(cursor, direction, length, image, count)).toBe(expected)
+  })
+})
 
 describe('Vim text motions', () => {
   it('moves between word starts', () => {
