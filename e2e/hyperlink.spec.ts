@@ -77,4 +77,46 @@ test.describe('external hyperlinks', () => {
       .toEqual(['https://example.com/'])
     expect(window.url()).toBe(initialUrl)
   })
+
+  test('opens the hyperlink under the Normal-mode caret with Enter', async ({ userDataDir }) => {
+    const url = 'https://example.com/page'
+    const text = `A${url}B`
+    const link = { start: 1, end: 1 + url.length, url }
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text, links: [link], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    // Normal mode is the editor's real startup state; most other E2E tests opt into an
+    // Insert-mode session instead, so this test asks for the default explicitly.
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await app.evaluate(({ shell }) => {
+      const control = globalThis as typeof globalThis & { __openedUrls?: string[] }
+      control.__openedUrls = []
+      shell.openExternal = async (openedUrl: string): Promise<void> => {
+        control.__openedUrls!.push(openedUrl)
+      }
+    })
+    const editor = node(window, 1)
+    const openedUrls = () => app.evaluate(() => (globalThis as { __openedUrls?: string[] }).__openedUrls ?? [])
+
+    // Adjacent-before ("A", index 0): no link there, Enter does nothing.
+    await setCursor(editor, 0)
+    await window.keyboard.press('Enter')
+    await expect.poll(openedUrls).toEqual([])
+
+    // First character of the link.
+    await setCursor(editor, link.start)
+    await window.keyboard.press('Enter')
+    await expect.poll(openedUrls).toEqual([url])
+
+    // Last character of the link.
+    await setCursor(editor, link.end - 1)
+    await window.keyboard.press('Enter')
+    await expect.poll(openedUrls).toEqual([url, url])
+
+    // Adjacent-after ("B", index link.end): no link there, Enter does nothing.
+    await setCursor(editor, link.end)
+    await window.keyboard.press('Enter')
+    await expect.poll(openedUrls).toEqual([url, url])
+  })
 })

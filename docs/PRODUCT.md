@@ -909,6 +909,7 @@ Normal mode supports:
 * `yy` to copy the selected node and its entire subtree into the local Vim register;
 * `dd` to delete the selected node and its subtree using the normal node-deletion behavior;
 * `gd` to enter the selected node, with the same behavior as `Cmd+.`;
+* `Enter` to open the hyperlink at the caret in the system's default hyperlink application, with the same behavior as `Cmd+click`; it does nothing when the caret is not on a hyperlink;
 * `Ctrl+o` to go back one parent level, with the same behavior as `Cmd+,`;
 * `v` to enter character-wise Visual mode;
 * `V` to enter whole-node Visual mode when a displayed sibling is selected; the editable current-parent heading cannot be selected with `V`;

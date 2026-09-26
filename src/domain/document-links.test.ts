@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { replaceLinkedText } from './document-links'
+import { linkAtPosition, replaceLinkedText } from './document-links'
 
 describe('replaceLinkedText', () => {
   it('preserves unaffected links and shifts them around an edit', () => {
@@ -26,5 +26,31 @@ describe('replaceLinkedText', () => {
 
     const valid = replaceLinkedText(url, [{ start: 0, end: url.length, url }], url.length, url.length, '/a')
     expect(valid.links).toEqual([{ start: 0, end: url.length + 2, url: `${url}/a` }])
+  })
+})
+
+describe('linkAtPosition', () => {
+  const url = 'https://example.com'
+  const link = { start: 1, end: 1 + url.length, url }
+
+  it('matches the link at its first and last character', () => {
+    expect(linkAtPosition([link], link.start)).toEqual(link)
+    expect(linkAtPosition([link], link.end - 1)).toEqual(link)
+  })
+
+  it('does not match the characters immediately before or after the link', () => {
+    expect(linkAtPosition([link], link.start - 1)).toBeUndefined()
+    expect(linkAtPosition([link], link.end)).toBeUndefined()
+  })
+
+  it('returns undefined when there are no links', () => {
+    expect(linkAtPosition(undefined, 0)).toBeUndefined()
+    expect(linkAtPosition([], 0)).toBeUndefined()
+  })
+
+  it('picks the link that actually covers the position among several', () => {
+    const other = { start: link.end + 5, end: link.end + 10, url: 'https://example.org' }
+    expect(linkAtPosition([link, other], other.start)).toEqual(other)
+    expect(linkAtPosition([link, other], link.start)).toEqual(link)
   })
 })

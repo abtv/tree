@@ -948,6 +948,97 @@ describe('editor keyboard handler', () => {
     expect(store.endTextSession).not.toHaveBeenCalled()
   })
 
+  it('opens the hyperlink under the Normal-mode caret with Enter', () => {
+    const store = createStore()
+    const url = 'https://example.test'
+    const text = `A${url}B`
+    const links = [{ start: 1, end: 1 + url.length, url }]
+    const input = document.createElement('textarea')
+    input.value = text
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+    const firstChar = keyEvent(input, 'Enter')
+    input.setSelectionRange(1, 1)
+    vimHandler(store, { id: 'node', text, links, children: [] }).handle(firstChar)
+    expect(open).toHaveBeenCalledWith(url, '_blank')
+    expect(firstChar.preventDefault).toHaveBeenCalledOnce()
+
+    open.mockClear()
+    const lastChar = keyEvent(input, 'Enter')
+    input.setSelectionRange(url.length, url.length)
+    vimHandler(store, { id: 'node', text, links, children: [] }).handle(lastChar)
+    expect(open).toHaveBeenCalledWith(url, '_blank')
+
+    open.mockRestore()
+  })
+
+  it('does nothing on Enter when the Normal-mode caret is adjacent to but outside a hyperlink', () => {
+    const store = createStore()
+    const url = 'https://example.test'
+    const text = `A${url}B`
+    const links = [{ start: 1, end: 1 + url.length, url }]
+    const input = document.createElement('textarea')
+    input.value = text
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+    input.setSelectionRange(0, 0)
+    vimHandler(store, { id: 'node', text, links, children: [] }).handle(keyEvent(input, 'Enter'))
+    input.setSelectionRange(1 + url.length, 1 + url.length)
+    vimHandler(store, { id: 'node', text, links, children: [] }).handle(keyEvent(input, 'Enter'))
+
+    expect(open).not.toHaveBeenCalled()
+    open.mockRestore()
+  })
+
+  it('does nothing on Enter when the node has no links', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'plain text'
+    input.setSelectionRange(2, 2)
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'Enter'))
+
+    expect(open).not.toHaveBeenCalled()
+    open.mockRestore()
+  })
+
+  it('discards a pending count and does not open the link on Enter', () => {
+    const store = createStore()
+    const url = 'https://example.test'
+    const text = `A${url}B`
+    const links = [{ start: 1, end: 1 + url.length, url }]
+    const input = document.createElement('textarea')
+    input.value = text
+    input.setSelectionRange(1, 1)
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const { handle, vim } = vimHandler(store, { id: 'node', text, links, children: [] })
+    vim.pending.current = { count: '3', motionCount: '' }
+
+    handle(keyEvent(input, 'Enter'))
+
+    expect(open).not.toHaveBeenCalled()
+    open.mockRestore()
+  })
+
+  it('leaves Enter as a no-op over a hyperlink in character Visual mode', () => {
+    const store = createStore()
+    const url = 'https://example.test'
+    const text = `A${url}B`
+    const links = [{ start: 1, end: 1 + url.length, url }]
+    const input = document.createElement('textarea')
+    input.value = text
+    input.setSelectionRange(1, 2)
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const { handle } = vimHandler(store, { id: 'node', text, links, children: [] }, 'visual')
+
+    handle(keyEvent(input, 'Enter'))
+
+    expect(open).not.toHaveBeenCalled()
+    open.mockRestore()
+  })
+
   it('ends the text session instead of moving when text is selected', () => {
     const store = createStore()
     vi.mocked(store.moveHorizontal).mockReturnValue(true)

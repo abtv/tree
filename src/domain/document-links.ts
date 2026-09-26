@@ -155,6 +155,10 @@ export function linksForLine(links: readonly LinkRange[] | undefined, lines: str
     .map((link) => ({ ...link, start: link.start - lineStart, end: link.end - lineStart }))
 }
 
+export function linkAtPosition(links: readonly LinkRange[] | undefined, position: number): LinkRange | undefined {
+  return links?.find((link) => link.start <= position && position < link.end)
+}
+
 export function splitLinks(links: readonly LinkRange[], position: number): { before: LinkRange[]; after: LinkRange[] } {
   return {
     before: links.filter((link) => link.end <= position).map((link) => ({ ...link })),

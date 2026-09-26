@@ -17,6 +17,7 @@ export { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 
 export {
   isHttpUrl,
+  linkAtPosition,
   linksAfterTextEdit,
   normalizeLinks,
   reconcileLinkTextEdit,

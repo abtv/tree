@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, type TreeNode } from '../domain/document'
+import { cloneNode, linkAtPosition, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
   calculateTextChange,
@@ -385,6 +385,10 @@ export function handleVimKey(
   } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
     if (pending.count !== '') return handled()
     vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor)
+  } else if (!visual && event.key === 'Enter') {
+    if (pending.count !== '') return handled()
+    const link = linkAtPosition(node.links, cursor)
+    if (link !== undefined) window.open(link.url, '_blank')
   } else return false
   return handled()
 }
