@@ -49,7 +49,7 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 2)).toHaveValue('Second')
   })
 
-  test('discards ignored Normal-mode counts before the next command', async ({ userDataDir }) => {
+  test('applies a counted Normal-mode node motion before the next command', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -64,9 +64,68 @@ test.describe('Vim editing prototype', () => {
     await editor.focus()
     await window.keyboard.press('2')
     await window.keyboard.press('j')
+    await expect(node(window, 2)).toBeFocused()
     await window.keyboard.press('l')
 
-    await expect(editor).toHaveJSProperty('selectionStart', 1)
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 1)
+  })
+
+  test('applies counts to node motions and subtree puts', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 12 }, (_, index) => ({
+          id: `node-${index + 1}`,
+          text: `Node ${index + 1}`,
+          children: [],
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'node-1' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const countedNode = (index: number) => window.getByRole('textbox', { name: `Node ${index}`, exact: true })
+    await countedNode(1).focus()
+
+    await window.keyboard.press('3')
+    await window.keyboard.press('j')
+    await expect(countedNode(4)).toBeFocused()
+    await window.keyboard.press('5')
+    await window.keyboard.press('k')
+    await expect(countedNode(1)).toBeFocused()
+    await window.keyboard.press('1')
+    await window.keyboard.press('0')
+    await window.keyboard.press('G')
+    await expect(countedNode(10)).toBeFocused()
+
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    await window.keyboard.press('2')
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('3')
+    await window.keyboard.press('p')
+    await expect(window.locator('.node-row')).toHaveCount(18)
+  })
+
+  test('deletes a counted forward sibling range with dd', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First', children: [] },
+          { id: 'second', text: 'Second', children: [] },
+          { id: 'third', text: 'Third', children: [] },
+          { id: 'fourth', text: 'Fourth', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('3')
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+
+    await expect(window.locator('.node-row')).toHaveCount(1)
+    await expect(node(window, 1)).toHaveValue('Fourth')
   })
 
   test('does nothing when O is pressed on the current-parent heading', async ({ userDataDir }) => {

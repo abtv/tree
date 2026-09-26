@@ -25,6 +25,7 @@ function createStore(): EditorStore {
     moveSelection: vi.fn(),
     paste: vi.fn(async () => {}),
     pasteSubtree: vi.fn(() => true),
+    pasteNodeForest: vi.fn(() => true),
     redo: vi.fn(),
     replaceTextRange: vi.fn(),
     reportError: vi.fn(),
@@ -198,7 +199,7 @@ describe('editor keyboard handler', () => {
     expect(remove.preventDefault).toHaveBeenCalledOnce()
   })
 
-  it('clears an ignored navigation count before the next command', () => {
+  it('applies a navigation count before the next command', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'abcd'
@@ -209,7 +210,8 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'j'))
     handle(keyEvent(input, 'l'))
 
-    expect(store.moveSelection).not.toHaveBeenCalled()
+    expect(store.moveSelection).toHaveBeenNthCalledWith(1, 'down', 0)
+    expect(store.moveSelection).toHaveBeenNthCalledWith(2, 'down', 0)
     expect(input.selectionStart).toBe(1)
   })
 
@@ -468,6 +470,76 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'd'))
     expect(store.deleteSelected).toHaveBeenCalledOnce()
     expect(vim.register.current).toMatchObject({ kind: 'node', value: { id: 'node', text: 'text' } })
+  })
+
+  it('applies counts to node motions and G', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, '3'))
+    handle(keyEvent(input, 'j'))
+    expect(store.moveSelection).toHaveBeenCalledTimes(3)
+    handle(keyEvent(input, '5'))
+    handle(keyEvent(input, 'k'))
+    expect(store.moveSelection).toHaveBeenCalledTimes(8)
+    handle(keyEvent(input, '1'))
+    handle(keyEvent(input, '0'))
+    handle(keyEvent(input, 'G'))
+    expect(vim.moveBoundary).toHaveBeenLastCalledWith('last', 4, 10)
+  })
+
+  it('yanks, deletes, and puts counted sibling subtrees', () => {
+    const store = createStore()
+    const treeDocument = {
+      roots: [
+        {
+          id: 'root',
+          text: 'Root',
+          children: [
+            { id: 'first', text: 'First', children: [] },
+            { id: 'second', text: 'Second', children: [] },
+          ],
+        },
+      ],
+    }
+    vi.mocked(store.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: treeDocument,
+      location: { currentParentId: 'root', selectedNodeId: 'first' },
+    } as never)
+    const input = document.createElement('textarea')
+    input.value = 'First'
+    const node: TreeNode = treeDocument.roots[0]!.children[0]!
+    const { handle, vim } = vimHandler(store, node)
+
+    handle(keyEvent(input, '2'))
+    handle(keyEvent(input, 'y'))
+    handle(keyEvent(input, 'y'))
+    expect(vim.register.current).toEqual({
+      kind: 'nodes',
+      value: { nodes: [node, treeDocument.roots[0]!.children[1]], sourceIds: ['first', 'second'] },
+    })
+
+    handle(keyEvent(input, '3'))
+    handle(keyEvent(input, 'p'))
+    expect(store.pasteNodeForest).toHaveBeenCalledTimes(3)
+
+    const deleteStore = createStore()
+    vi.mocked(deleteStore.getSnapshot).mockReturnValue({
+      status: 'ready',
+      document: treeDocument,
+      location: { currentParentId: 'root', selectedNodeId: 'first' },
+    } as never)
+    const deleteInput = document.createElement('textarea')
+    deleteInput.value = 'First'
+    const deleteHandler = vimHandler(deleteStore, node)
+    deleteHandler.handle(keyEvent(deleteInput, '3'))
+    deleteHandler.handle(keyEvent(deleteInput, 'd'))
+    deleteHandler.handle(keyEvent(deleteInput, 'd'))
+    expect(deleteStore.deleteSelected).toHaveBeenCalledTimes(2)
+    expect(deleteHandler.vim.register.current.kind).toBe('nodes')
   })
 
   it('copies a node subtree with yy and pastes it as a sibling with p or P', () => {

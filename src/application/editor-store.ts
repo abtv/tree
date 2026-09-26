@@ -278,9 +278,9 @@ export class EditorStore {
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 
-  public moveSelectionBoundary(boundary: 'first' | 'last' | 'parent', cursor: number): void {
+  public moveSelectionBoundary(boundary: 'first' | 'last' | 'parent', cursor: number, count?: number): void {
     const state = this.runtime.ready()
-    const target = moveSelectionBoundaryTransition(state.document, state.location, boundary, cursor)
+    const target = moveSelectionBoundaryTransition(state.document, state.location, boundary, cursor, count)
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 

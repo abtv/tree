@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, linkAtPosition, type TreeNode } from '../domain/document'
+import { cloneNode, displayedNodes, linkAtPosition, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
@@ -217,20 +217,31 @@ export function handleVimKey(
   }
 
   if (pending.operator !== undefined) {
-    if (
-      pending.operator !== 's' &&
-      event.key === pending.operator &&
-      pending.motionCount === '' &&
-      pending.count === ''
-    ) {
+    if (pending.operator !== 's' && event.key === pending.operator && pending.motionCount === '') {
       clearPending()
       if (pending.operator === 'd') {
-        vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
-        if (store.deleteSelected() && vim.lastChange !== undefined)
-          vim.lastChange.current = { kind: 'structural-delete' }
-      } else if (pending.operator === 'y')
-        vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
-      else applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
+        const count = parseCount(pending.count)
+        if (count === 1) {
+          vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
+          if (store.deleteSelected() && vim.lastChange !== undefined)
+            vim.lastChange.current = { kind: 'structural-delete' }
+        } else {
+          const source = selectedSiblingForest(store, node.id, count)
+          if (source !== undefined) {
+            vim.register.current = { kind: 'nodes', value: source }
+            let deleted = 0
+            while (deleted < source.nodes.length && store.deleteSelected()) deleted += 1
+            if (deleted > 0 && vim.lastChange !== undefined) vim.lastChange.current = { kind: 'structural-delete' }
+          }
+        }
+      } else if (pending.operator === 'y') {
+        const count = parseCount(pending.count)
+        if (count === 1) vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
+        else {
+          const source = selectedSiblingForest(store, node.id, count)
+          if (source !== undefined) vim.register.current = { kind: 'nodes', value: source }
+        }
+      } else applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
       return handled()
     }
     if (event.key === 's' && pending.operator !== 's') {
@@ -383,11 +394,7 @@ export function handleVimKey(
       vim.setMode('visual-node')
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
-    if (pending.count !== '') {
-      clearPending()
-      return handled()
-    }
-    store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
+    for (let index = 0; index < count; index += 1) store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, input, selection.start)
   } else if (visual && event.key === 'o') {
@@ -465,28 +472,28 @@ export function handleVimKey(
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
     const register = vim.register.current
     if (register.kind === 'node') {
-      if (
-        pending.count === '' &&
-        store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value, register.sourceIds)
-      ) {
-        if (vim.lastChange !== undefined)
-          vim.lastChange.current = {
-            kind: 'structural-put',
-            position: event.key === 'p' ? 'after' : 'before',
-            source: cloneNode(register.value),
-            sourceIds: register.sourceIds ?? [],
-          }
-      }
+      let pasted = false
+      for (let index = 0; index < count; index += 1)
+        pasted =
+          store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value, register.sourceIds) ||
+          pasted
+      if (pasted && vim.lastChange !== undefined)
+        vim.lastChange.current = {
+          kind: 'structural-put',
+          position: event.key === 'p' ? 'after' : 'before',
+          source: cloneNode(register.value),
+          sourceIds: register.sourceIds ?? [],
+        }
     } else if (register.kind === 'nodes') {
-      if (pending.count === '' && register.value.nodes.length > 0) {
-        const result = store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value)
-        if (result && vim.lastChange !== undefined)
-          vim.lastChange.current = {
-            kind: 'structural-forest-put',
-            position: event.key === 'p' ? 'after' : 'before',
-            source: register.value,
-          }
-      }
+      let pasted = false
+      for (let index = 0; index < count; index += 1)
+        pasted = store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value) || pasted
+      if (pasted && vim.lastChange !== undefined)
+        vim.lastChange.current = {
+          kind: 'structural-forest-put',
+          position: event.key === 'p' ? 'after' : 'before',
+          source: register.value,
+        }
     } else if (register.kind === 'text' && register.value !== '') {
       applyTextChange(store, node, input, cursor, vim, {
         kind: 'paste',
@@ -524,11 +531,8 @@ export function handleVimKey(
   } else if (!visual && event.key === 'g') {
     vim.pending.current = { count: pending.count, motionCount: '', prefix: 'g' }
   } else if (!visual && event.key === 'G') {
-    if (pending.count !== '') {
-      clearPending()
-      return handled()
-    }
-    vim.moveBoundary('last', cursor)
+    if (pending.count === '') vim.moveBoundary('last', cursor)
+    else vim.moveBoundary('last', cursor, count)
   } else if (!visual && event.key === 'u') {
     if (pending.count !== '') {
       clearPending()
@@ -576,6 +580,21 @@ function applySurround(
   vim.scheduleCaret(input, result.cursor)
   if (vim.lastChange !== undefined) vim.lastChange.current = change
   return { text: result.nextText, cursor: result.cursor }
+}
+
+function selectedSiblingForest(
+  store: EditorStore,
+  nodeId: string,
+  count: number,
+): { nodes: TreeNode[]; sourceIds: string[] } | undefined {
+  const state = store.getSnapshot()
+  if (state.status !== 'ready') return undefined
+  const nodes = displayedNodes(state.document, state.location.currentParentId)
+  const index = nodes.findIndex((candidate) => candidate.id === nodeId)
+  if (index < 0) return undefined
+  const selected = nodes.slice(index, index + count)
+  if (selected.length === 0) return undefined
+  return { nodes: selected.map(cloneNode), sourceIds: selected.map((candidate) => candidate.id) }
 }
 
 function applyTextChange(

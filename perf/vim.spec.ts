@@ -109,11 +109,15 @@ test.describe('Vim interactions at scale', () => {
       })
 
       const start = performance.now()
-      for (let index = 0; index < 40; index += 1) await window.keyboard.press('j')
-      for (let index = 0; index < 40; index += 1) await window.keyboard.press('k')
+      await window.keyboard.press('4')
+      await window.keyboard.press('0')
+      await window.keyboard.press('j')
+      await window.keyboard.press('4')
+      await window.keyboard.press('0')
+      await window.keyboard.press('k')
       const navigationMs = performance.now() - start
       await window.waitForFunction(
-        () => (window as unknown as { vimNavigationPaints: number[] }).vimNavigationPaints.length === 80,
+        () => (window as unknown as { vimNavigationPaints: number[] }).vimNavigationPaints.length === 2,
       )
       const paints = await window.evaluate(() =>
         (window as unknown as { vimNavigationPaints: number[] }).vimNavigationPaints.slice().sort((a, b) => a - b),

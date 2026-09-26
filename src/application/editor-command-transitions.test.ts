@@ -83,6 +83,18 @@ describe('editor command transitions', () => {
       nodeId: 'second',
       cursor: 6,
     })
+    expect(
+      moveSelectionBoundaryTransition(document, { currentParentId: null, selectedNodeId: 'root' }, 'last', 99, 1),
+    ).toEqual({
+      nodeId: 'root',
+      cursor: 4,
+    })
+    expect(
+      moveSelectionBoundaryTransition(document, { currentParentId: null, selectedNodeId: 'root' }, 'last', 99, 2),
+    ).toEqual({
+      nodeId: 'other-root',
+      cursor: 10,
+    })
   })
 
   it('resolves entering, leaving, and ancestor navigation locations with a beginning cursor', () => {

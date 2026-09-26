@@ -181,6 +181,7 @@ export function moveSelectionBoundaryTransition(
   location: Location,
   boundary: 'first' | 'last' | 'parent',
   cursor: number,
+  count?: number,
 ): FocusTarget | undefined {
   if (boundary === 'parent' && location.currentParentId !== null) {
     const parent = requireNode(document, location.currentParentId).node
@@ -188,7 +189,8 @@ export function moveSelectionBoundaryTransition(
   }
   const nodes = displayedNodes(document, location.currentParentId)
   if (nodes.length === 0) return undefined
-  const target = boundary === 'last' ? nodes[nodes.length - 1] : nodes[0]
+  const target =
+    boundary === 'last' ? nodes[Math.min(nodes.length - 1, Math.max(0, (count ?? nodes.length) - 1))] : nodes[0]
   return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 

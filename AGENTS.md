@@ -23,6 +23,10 @@ The coding agent is responsible for implementing the product, maintaining the co
 
 The agent is not the Product Owner and must not silently change product requirements.
 
+### Agent and Model Routing
+
+Stay within the agent the Product Owner started for the session. Do not launch or delegate to a different coding agent or tool. Change only the model within the active agent when needed: Codex uses OpenAI models, Claude uses Anthropic models, and OpenCode uses DeepSeek models.
+
 ---
 
 ## 2. Source of Truth

@@ -478,7 +478,7 @@ export function useNodeInputBindings({
           },
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
-          moveBoundary: (boundary, cursor) => store.moveSelectionBoundary(boundary, cursor),
+          moveBoundary: (boundary, cursor, count) => store.moveSelectionBoundary(boundary, cursor, count),
           moveViewport: moveVimViewport,
           setMode: setVimMode,
           openAttachment: onPreviewAttachment,
