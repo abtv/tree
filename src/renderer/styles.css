@@ -345,13 +345,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: #3b6d50;
 }
 
-.vim-mode-visual {
+.vim-mode-visual,
+.vim-mode-visual-node {
   color: #373f43;
   background: #fff0b3;
-}
-
-.vim-mode-visual-node {
-  background: #725493;
 }
 
 .vim-mode-replace {
@@ -606,7 +603,8 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
     color: #f5e9b7;
   }
 
-  .vim-mode-visual {
+  .vim-mode-visual,
+  .vim-mode-visual-node {
     color: #f5e9b7;
     background: #4a4023;
   }

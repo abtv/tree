@@ -159,6 +159,11 @@ test.describe('Vim editing prototype', () => {
       const style = element.ownerDocument.defaultView?.getComputedStyle(element)
       return { background: style?.backgroundColor, color: style?.color }
     })
+    const visualNodeLabelColors = await window.getByLabel('Vim mode').evaluate((element) => {
+      const style = element.ownerDocument.defaultView?.getComputedStyle(element)
+      return { background: style?.backgroundColor, color: style?.color }
+    })
+    expect(visualNodeLabelColors).toEqual(wholeNodeColors)
     await window.keyboard.press('Escape')
     await window.keyboard.press('v')
     const characterSelectionBackground = await editor.evaluate(
