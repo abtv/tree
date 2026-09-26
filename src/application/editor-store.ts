@@ -7,11 +7,13 @@ import {
   locateNode,
   parsePersistedState,
   replaceLinkedText,
+  replaceLinkedTextRanges,
   removeTextRange,
   requireNode,
   type AttachmentId,
   type AttachmentReference,
   type Document,
+  type LinkedTextEdit,
   type LinkRange,
   type Location,
   type NodeId,
@@ -186,6 +188,19 @@ export class EditorStore {
     if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
     const replacement = replaceLinkedText(node.text, node.links ?? [], start, end, text)
+    this.endTextSession()
+    if (this.history.begin(state.document)) this.queueAttachmentCleanup()
+    this.textSession.markNextEditStandalone()
+    this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
+  }
+
+  /** Apply disjoint edits to one node's text as a single undoable change. */
+  public replaceTextRanges(nodeId: NodeId, edits: readonly LinkedTextEdit[]): void {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return
+    const node = requireNode(state.document, nodeId).node
+    const replacement = replaceLinkedTextRanges(node.text, node.links ?? [], edits)
+    if (replacement.text === node.text) return
     this.endTextSession()
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.textSession.markNextEditStandalone()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { linkAtPosition, replaceLinkedText } from './document-links'
+import { linkAtPosition, replaceLinkedText, replaceLinkedTextRanges } from './document-links'
 
 describe('replaceLinkedText', () => {
   it('preserves unaffected links and shifts them around an edit', () => {
@@ -52,5 +52,78 @@ describe('linkAtPosition', () => {
     const other = { start: link.end + 5, end: link.end + 10, url: 'https://example.org' }
     expect(linkAtPosition([link, other], other.start)).toEqual(other)
     expect(linkAtPosition([link, other], link.start)).toEqual(link)
+  })
+})
+
+describe('replaceLinkedTextRanges', () => {
+  const url = 'https://example.com'
+
+  it('keeps a link wrapped by two insertions and shifts it behind the opening delimiter', () => {
+    const result = replaceLinkedTextRanges(
+      url,
+      [{ start: 0, end: url.length, url }],
+      [
+        { start: 0, end: 0, inserted: '(' },
+        { start: url.length, end: url.length, inserted: ')' },
+      ],
+    )
+    expect(result.text).toBe(`(${url})`)
+    expect(result.links).toEqual([{ start: 1, end: url.length + 1, url }])
+    expect(result.createsNewLink).toBe(false)
+  })
+
+  it('shifts a link that follows the wrapped range by both delimiters', () => {
+    const text = `ab ${url}`
+    const result = replaceLinkedTextRanges(
+      text,
+      [{ start: 3, end: text.length, url }],
+      [
+        { start: 0, end: 0, inserted: '"' },
+        { start: 2, end: 2, inserted: '"' },
+      ],
+    )
+    expect(result.text).toBe(`"ab" ${url}`)
+    expect(result.links).toEqual([{ start: 5, end: text.length + 2, url }])
+  })
+
+  it('creates a link when removing delimiters exposes a bare URL', () => {
+    const text = `"${url}"`
+    const result = replaceLinkedTextRanges(
+      text,
+      [],
+      [
+        { start: 0, end: 1, inserted: '' },
+        { start: text.length - 1, end: text.length, inserted: '' },
+      ],
+    )
+    expect(result.text).toBe(url)
+    expect(result.links).toEqual([{ start: 0, end: url.length, url }])
+    expect(result.createsNewLink).toBe(true)
+  })
+
+  it('drops a link that an edit splits', () => {
+    const result = replaceLinkedTextRanges(
+      url,
+      [{ start: 0, end: url.length, url }],
+      [{ start: 4, end: 4, inserted: 'X' }],
+    )
+    expect(result.links).toEqual([])
+  })
+
+  it('leaves the text unchanged when two edits overlap', () => {
+    const result = replaceLinkedTextRanges(
+      'abcdef',
+      [],
+      [
+        { start: 0, end: 4, inserted: 'X' },
+        { start: 2, end: 5, inserted: 'Y' },
+      ],
+    )
+    expect(result.text).toBe('abcdef')
+  })
+
+  it('clamps edit bounds to the text', () => {
+    const result = replaceLinkedTextRanges('ab', [], [{ start: 5, end: 9, inserted: '!' }])
+    expect(result.text).toBe('ab!')
   })
 })

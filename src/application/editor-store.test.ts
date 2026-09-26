@@ -2163,6 +2163,48 @@ describe('EditorStore', () => {
     })
   })
 
+  it('wraps linked text with disjoint edits as one undoable change', async () => {
+    const url = 'https://example.com'
+    const text = `see ${url} now`
+    const start = text.indexOf(url)
+    const services = loadedState(
+      { roots: [{ id: 'root', text, links: [{ start, end: start + url.length, url }], children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.replaceTextRanges('root', [
+      { start, end: start, inserted: '(' },
+      { start: start + url.length, end: start + url.length, inserted: ')' },
+    ])
+
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: {
+        roots: [{ text: `see (${url}) now`, links: [{ start: start + 1, end: start + url.length + 1, url }] }],
+      },
+    })
+
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text }] } })
+  })
+
+  it('ignores a multi-edit text change that leaves the text unchanged', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'plain', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.replaceTextRanges('root', [{ start: 2, end: 2, inserted: '' }])
+
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'plain' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'plain' }] } })
+  })
+
   it('saves immediately when an edit inserts a new hyperlink', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'x', children: [] }] },

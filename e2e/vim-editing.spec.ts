@@ -1092,4 +1092,134 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 1)).toHaveValue('one')
     await expect(node(window, 2)).toHaveValue('two')
   })
+  test('adds, changes, and deletes surrounding pairs in Normal mode', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'one two three', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await setCursor(editor, 4)
+    await window.keyboard.press('y')
+    await window.keyboard.press('s')
+    await window.keyboard.press('i')
+    await window.keyboard.press('w')
+    await window.keyboard.press('"')
+    await expect(editor).toHaveValue('one "two" three')
+
+    await setCursor(editor, 5)
+    await window.keyboard.press('c')
+    await window.keyboard.press('s')
+    await window.keyboard.press('"')
+    await window.keyboard.press(')')
+    await expect(editor).toHaveValue('one (two) three')
+
+    await setCursor(editor, 5)
+    await window.keyboard.press('d')
+    await window.keyboard.press('s')
+    await window.keyboard.press(')')
+    await expect(editor).toHaveValue('one two three')
+
+    // The opening bracket pads the inside; its closing counterpart does not.
+    await setCursor(editor, 4)
+    await window.keyboard.press('y')
+    await window.keyboard.press('s')
+    await window.keyboard.press('i')
+    await window.keyboard.press('w')
+    await window.keyboard.press('{')
+    await expect(editor).toHaveValue('one { two } three')
+
+    // Deleting with the opening key strips that padding again.
+    await setCursor(editor, 6)
+    await window.keyboard.press('d')
+    await window.keyboard.press('s')
+    await window.keyboard.press('{')
+    await expect(editor).toHaveValue('one two three')
+  })
+
+  test('surrounds the whole node with yss and repeats a surround with dot', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'alpha beta', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await setCursor(editor, 3)
+    await window.keyboard.press('y')
+    await window.keyboard.press('s')
+    await window.keyboard.press('s')
+    await window.keyboard.press(')')
+    await expect(editor).toHaveValue('(alpha beta)')
+
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('alpha beta')
+
+    await setCursor(editor, 0)
+    await window.keyboard.press('y')
+    await window.keyboard.press('s')
+    await window.keyboard.press('i')
+    await window.keyboard.press('w')
+    await window.keyboard.press(']')
+    await expect(editor).toHaveValue('[alpha] beta')
+
+    // The repeat re-derives the word at the new caret instead of replaying fixed offsets.
+    await setCursor(editor, 8)
+    await window.keyboard.press('.')
+    await expect(editor).toHaveValue('[alpha] [beta]')
+
+    // One surround is one undoable change.
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('[alpha] beta')
+  })
+
+  test('surrounds a Visual selection with S', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'see it now', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await setCursor(editor, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('S')
+    await window.keyboard.press('"')
+    await expect(editor).toHaveValue('"see" it now')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('keeps a hyperlink intact when a surround wraps it', async ({ userDataDir }) => {
+    const url = 'https://example.test/page'
+    const text = `see ${url} now`
+    const start = text.indexOf(url)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'linked', text, links: [{ start, end: start + url.length, url }], children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'linked' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await expect(editor.getByRole('link')).toHaveCount(1)
+
+    await setCursor(editor, start + 2)
+    await window.keyboard.press('y')
+    await window.keyboard.press('s')
+    await window.keyboard.press('i')
+    await window.keyboard.press('W')
+    await window.keyboard.press(')')
+
+    await expect(editor).toHaveText(`see (${url}) now`)
+    const link = editor.getByRole('link')
+    await expect(link).toHaveCount(1)
+    await expect(link).toHaveAttribute('href', url)
+    await expect(link).toHaveText(url)
+  })
 })

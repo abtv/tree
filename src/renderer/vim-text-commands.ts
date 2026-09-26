@@ -11,8 +11,16 @@ import {
   moveWordForward,
   textObjectRange,
 } from './vim-editing'
+import {
+  applySurroundEdits,
+  surroundChangeEdits,
+  surroundDeleteEdits,
+  surroundLineRange,
+  surroundWrapEdits,
+  type VimSurroundEdits,
+} from './vim-surround'
 import type { VimFindCommand } from './vim-keyboard-types'
-import type { VimTextChange } from './vim-keyboard-types'
+import type { VimSurroundChange, VimTextChange } from './vim-keyboard-types'
 import { vimPastePosition } from './vim-editing'
 
 export function parseCount(value: string): number {
@@ -234,4 +242,27 @@ export function calculateTextChange(
     nextCursor,
     ...(registerText === undefined ? {} : { registerText }),
   }
+}
+
+export type CalculatedSurround = VimSurroundEdits & { nextText: string }
+
+/** Resolve a surround command into the disjoint edits that apply it and the resulting text. */
+export function calculateSurround(
+  text: string,
+  cursor: number,
+  change: VimSurroundChange,
+): CalculatedSurround | undefined {
+  const resolved = resolveSurroundEdits(text, cursor, change)
+  if (resolved === undefined) return undefined
+  return { ...resolved, nextText: applySurroundEdits(text, resolved.edits) }
+}
+
+function resolveSurroundEdits(text: string, cursor: number, change: VimSurroundChange): VimSurroundEdits | undefined {
+  if (change.kind === 'surround-delete') return surroundDeleteEdits(text, cursor, change.target, change.count)
+  if (change.kind === 'surround-change')
+    return surroundChangeEdits(text, cursor, change.target, change.delimiter, change.count)
+  const range =
+    change.motion === 'line' ? surroundLineRange(text) : textMotion(text, cursor, change.motion, change.count)
+  if (range === undefined) return undefined
+  return surroundWrapEdits(range.start, range.end, change.delimiter)
 }

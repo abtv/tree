@@ -16,5 +16,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0010](0010-bounded-save-retries-and-failure-lock.md) | Bounded Save Retries and Read-Only Failure Lock | Accepted | 2026-09-14 |
 | [0011](0011-hidden-e2e-windows.md) | Hidden E2E Windows with a Visibility Escape Hatch | Accepted | 2026-09-20 |
 | [0012](0012-parallel-e2e-execution.md) | Parallel E2E Execution with Test-Owned Shortcut and Clipboard Isolation | Accepted | 2026-09-20 |
+| [0013](0013-position-based-multi-edit-text-changes.md) | Position-Based Multi-Edit Text Changes | Accepted | 2026-09-26 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

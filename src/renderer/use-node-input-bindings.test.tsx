@@ -447,4 +447,237 @@ describe('useNodeInputBindings', () => {
     expect(store.replaceTextRange).toHaveBeenCalledOnce()
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 3, 4, 'X')
   })
+  it('applies surround commands as one edit and repeats them with dot', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRanges: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    const press = (key: string, cursor?: number): void => {
+      if (cursor !== undefined) input.setSelectionRange(cursor, cursor)
+      act(() => {
+        result.current.bindings({ id: 'a', text: input.value, children: [] }).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    input.value = 'foo bar'
+    press('y', 0)
+    press('s')
+    press('i')
+    press('w')
+    press('"')
+    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
+      { start: 0, end: 0, inserted: '"' },
+      { start: 3, end: 3, inserted: '"' },
+    ])
+
+    input.value = 'say "hi" now'
+    press('d', 5)
+    press('s')
+    press('"')
+    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
+      { start: 4, end: 5, inserted: '' },
+      { start: 7, end: 8, inserted: '' },
+    ])
+
+    press('c', 5)
+    press('s')
+    press('"')
+    press(')')
+    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
+      { start: 4, end: 5, inserted: '(' },
+      { start: 7, end: 8, inserted: ')' },
+    ])
+
+    input.value = '  foo'
+    press('y', 3)
+    press('s')
+    press('s')
+    press(')')
+    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
+      { start: 2, end: 2, inserted: '(' },
+      { start: 5, end: 5, inserted: ')' },
+    ])
+
+    // A repeat re-derives the range at the caret rather than replaying fixed offsets.
+    input.value = 'one two'
+    press('y', 0)
+    press('s')
+    press('i')
+    press('w')
+    press(']')
+    press('.', 4)
+    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
+      { start: 4, end: 4, inserted: '[' },
+      { start: 7, end: 7, inserted: ']' },
+    ])
+
+    // yss takes no count, following the cc and S whole-node precedent.
+    const before = (store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length
+    press('2', 0)
+    press('y')
+    press('s')
+    press('s')
+    press(')')
+    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
+
+    // An unsupported delimiter key makes no change.
+    press('y', 0)
+    press('s')
+    press('i')
+    press('w')
+    press('z')
+    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
+
+    // A target with no enclosing pair makes no change.
+    press('d', 0)
+    press('s')
+    press('"')
+    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
+
+    // `dsw` must not be read as "delete surrounding word".
+    press('d', 0)
+    press('s')
+    press('w')
+    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
+    input.remove()
+  })
+
+  it('leaves an image-only node untouched by every surround command', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRanges: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: '', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const imageOnly: TreeNode = {
+      id: 'a',
+      text: '',
+      attachment: { id: 'attachment-1', mimeType: 'image/png' },
+      children: [],
+    }
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    input.value = ''
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(imageOnly).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    for (const sequence of [
+      ['y', 's', 'i', 'w', ')'],
+      ['y', 's', 's', ')'],
+      ['d', 's', ')'],
+      ['c', 's', ')', '"'],
+    ]) {
+      for (const key of sequence) press(key)
+      expect(store.replaceTextRanges).not.toHaveBeenCalled()
+    }
+    expect(result.current.vimMode).toBe('normal')
+    input.remove()
+  })
+
+  it('surrounds a character-wise Visual selection with S and returns to Normal mode', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRanges: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    input.value = 'foo bar'
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings({ id: 'a', text: input.value, children: [] }).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    input.setSelectionRange(0, 0)
+    press('v')
+    press('l')
+    press('l')
+    expect(result.current.vimMode).toBe('visual')
+
+    // An unsupported delimiter changes nothing and keeps the selection so it can be retyped.
+    press('S')
+    press('z')
+    expect(store.replaceTextRanges).not.toHaveBeenCalled()
+    expect(result.current.vimMode).toBe('visual')
+
+    press('S')
+    press('}')
+    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
+      { start: 0, end: 0, inserted: '{' },
+      { start: 3, end: 3, inserted: '}' },
+    ])
+    expect(result.current.vimMode).toBe('normal')
+    input.remove()
+  })
 })

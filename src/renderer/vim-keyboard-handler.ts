@@ -3,6 +3,7 @@ import type { EditorStore, NodeVisualCommand } from '../application/editor-store
 import { cloneNode, linkAtPosition, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
+  calculateSurround,
   calculateTextChange,
   insertPosition,
   isTextMotion,
@@ -12,7 +13,14 @@ import {
   textMotion,
   transformCase,
 } from './vim-text-commands'
-import type { VimFindCommand, VimKeyboardState, VimStructuralChange, VimTextChange } from './vim-keyboard-types'
+import type {
+  VimFindCommand,
+  VimKeyboardState,
+  VimStructuralChange,
+  VimSurroundChange,
+  VimTextChange,
+} from './vim-keyboard-types'
+import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
 import { moveCharacterCursor } from './vim-editing'
 
 export function handleVimKey(
@@ -69,6 +77,26 @@ export function handleVimKey(
   const clearPending = (): void => {
     vim.pending.current = undefined
   }
+  const operatorChangeKind = (operator: 'd' | 'y' | 'c'): 'delete' | 'yank' | 'change' =>
+    operator === 'd' ? 'delete' : operator === 'c' ? 'change' : 'yank'
+  /** Finish a `d`, `y`, `c`, or `ys` operator once its motion is known. */
+  const applyOperatorMotion = (operator: 'd' | 'y' | 'c' | 's', motion: string, motionTotal: number): void => {
+    if (operator !== 's') {
+      applyTextChange(store, node, input, cursor, vim, {
+        kind: operatorChangeKind(operator),
+        motion,
+        count: motionTotal,
+      })
+      return
+    }
+    const range = textMotion(node.text, cursor, motion, motionTotal)
+    if (range === undefined) return
+    vim.pending.current = {
+      count: '',
+      motionCount: '',
+      surround: { stage: 'delimiter', start: range.start, end: range.end },
+    }
+  }
 
   if (event.key === 'Escape') {
     clearPending()
@@ -83,6 +111,51 @@ export function handleVimKey(
   const motionCount = parseCount(pending.motionCount)
   const totalCount = count * motionCount
 
+  const surround = pending.surround
+  if (surround !== undefined) {
+    clearPending()
+    if (event.key.length !== 1) return handled()
+    if (surround.stage === 'target') {
+      if (surroundDelimiterKey(event.key) === undefined) return handled()
+      if (surround.operation === 'delete')
+        applySurround(store, node, input, node.text, cursor, vim, {
+          kind: 'surround-delete',
+          target: event.key,
+          count: surround.count,
+        })
+      else
+        vim.pending.current = {
+          count: '',
+          motionCount: '',
+          surround: { stage: 'replacement', target: event.key, count: surround.count },
+        }
+      return handled()
+    }
+    if (surround.stage === 'replacement') {
+      applySurround(store, node, input, node.text, cursor, vim, {
+        kind: 'surround-change',
+        target: surround.target,
+        delimiter: event.key,
+        count: surround.count,
+      })
+      return handled()
+    }
+    const applied = applySurround(store, node, input, node.text, surround.start, vim, {
+      kind: 'surround-add',
+      motion: 'x',
+      count: surround.end - surround.start,
+      delimiter: event.key,
+    })
+    // A failed Visual surround keeps the selection so the delimiter can be retyped, matching how
+    // a failed Visual put remains in Visual mode.
+    if (surround.fromVisual === true && applied !== undefined) {
+      vim.visualAnchor.current = undefined
+      vim.visualFocus.current = undefined
+      vim.setMode('normal')
+    }
+    return handled()
+  }
+
   if (pending.awaiting !== undefined) {
     const awaiting = pending.awaiting
     clearPending()
@@ -95,11 +168,7 @@ export function handleVimKey(
     vim.lastFind.current = find
     const motion = awaiting + event.key
     if (pending.operator !== undefined && !visual) {
-      applyTextChange(store, node, input, cursor, vim, {
-        kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
-        motion,
-        count: totalCount,
-      })
+      applyOperatorMotion(pending.operator, motion, totalCount)
     } else {
       const range = textMotion(node.text, motionCursor, motion, count)
       if (range !== undefined) move(range.target)
@@ -111,11 +180,7 @@ export function handleVimKey(
     clearPending()
     if (event.key === 'e') {
       if (pending.operator !== undefined && !visual) {
-        applyTextChange(store, node, input, cursor, vim, {
-          kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
-          motion: 'ge',
-          count: totalCount,
-        })
+        applyOperatorMotion(pending.operator, 'ge', totalCount)
       } else {
         const range = textMotion(node.text, motionCursor, 'ge', count)
         if (range !== undefined) move(range.target)
@@ -131,11 +196,7 @@ export function handleVimKey(
     if (isTextObjectKey(event.key)) {
       const motion = pending.prefix + event.key
       if (pending.operator !== undefined && !visual) {
-        applyTextChange(store, node, input, cursor, vim, {
-          kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
-          motion,
-          count: totalCount,
-        })
+        applyOperatorMotion(pending.operator, motion, totalCount)
       } else if (visual) {
         const range = textMotion(node.text, motionCursor, motion, count)
         if (range !== undefined) {
@@ -156,7 +217,12 @@ export function handleVimKey(
   }
 
   if (pending.operator !== undefined) {
-    if (event.key === pending.operator && pending.motionCount === '' && pending.count === '') {
+    if (
+      pending.operator !== 's' &&
+      event.key === pending.operator &&
+      pending.motionCount === '' &&
+      pending.count === ''
+    ) {
       clearPending()
       if (pending.operator === 'd') {
         vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
@@ -165,6 +231,31 @@ export function handleVimKey(
       } else if (pending.operator === 'y')
         vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
       else applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
+      return handled()
+    }
+    if (event.key === 's' && pending.operator !== 's') {
+      if (pending.operator === 'y') {
+        pending.operator = 's'
+        vim.pending.current = pending
+      } else
+        vim.pending.current = {
+          count: '',
+          motionCount: '',
+          surround: { stage: 'target', operation: pending.operator === 'd' ? 'delete' : 'change', count },
+        }
+      return handled()
+    }
+    if (event.key === 's' && pending.operator === 's') {
+      if (pending.count !== '' || pending.motionCount !== '') {
+        clearPending()
+        return handled()
+      }
+      const range = surroundLineRange(node.text)
+      vim.pending.current = {
+        count: '',
+        motionCount: '',
+        surround: { stage: 'delimiter', start: range.start, end: range.end },
+      }
       return handled()
     }
     if ('fFtT'.includes(event.key)) {
@@ -185,22 +276,13 @@ export function handleVimKey(
     if (event.key === ';' || event.key === ',') {
       const motion = repeatedFindMotion(vim.lastFind.current, event.key === ',')
       clearPending()
-      if (motion !== undefined)
-        applyTextChange(store, node, input, cursor, vim, {
-          kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
-          motion,
-          count: totalCount,
-        })
+      if (motion !== undefined) applyOperatorMotion(pending.operator, motion, totalCount)
       return handled()
     }
     clearPending()
     if (isTextMotion(event.key)) {
       if (node.attachment !== undefined && cursor === node.text.length) return handled()
-      applyTextChange(store, node, input, cursor, vim, {
-        kind: pending.operator === 'd' ? 'delete' : pending.operator === 'c' ? 'change' : 'yank',
-        motion: event.key,
-        count: totalCount,
-      })
+      applyOperatorMotion(pending.operator, event.key, totalCount)
     }
     return handled()
   }
@@ -343,6 +425,13 @@ export function handleVimKey(
     vim.visualAnchor.current = undefined
     vim.visualFocus.current = undefined
     vim.setMode('insert')
+  } else if (visual && event.key === 'S') {
+    if (selection.start !== selection.end)
+      vim.pending.current = {
+        count: '',
+        motionCount: '',
+        surround: { stage: 'delimiter', start: selection.start, end: selection.end, fromVisual: true },
+      }
   } else if (visual && (event.key === 'u' || event.key === 'U')) {
     applyVisualCase(store, node, input, vim, selection, event.key === 'u' ? 'lower' : 'upper')
   } else if (visual && (event.key === 'p' || event.key === 'P')) {
@@ -412,6 +501,17 @@ export function handleVimKey(
         for (let index = 0; index < count; index += 1) vim.repeatStructural?.(last as VimStructuralChange)
         return handled()
       }
+      if (last.kind.startsWith('surround-')) {
+        let text = node.text
+        let position = cursor
+        for (let index = 0; index < count; index += 1) {
+          const result = applySurround(store, node, input, text, position, vim, last as VimSurroundChange)
+          if (result === undefined) break
+          text = result.text
+          position = result.cursor
+        }
+        return handled()
+      }
       let text = node.text
       let position = cursor
       for (let index = 0; index < count; index += 1) {
@@ -455,6 +555,27 @@ export function handleVimKey(
     }
   } else return false
   return handled()
+}
+
+/**
+ * Apply a surround command as one edit so it is a single undoable change and links inside the
+ * surrounded range keep their offsets. Returns false when the command matched nothing.
+ */
+function applySurround(
+  store: EditorStore,
+  node: TreeNode,
+  input: HTMLElement,
+  text: string,
+  cursor: number,
+  vim: VimKeyboardState,
+  change: VimSurroundChange,
+): { text: string; cursor: number } | undefined {
+  const result = calculateSurround(text, cursor, change)
+  if (result === undefined) return undefined
+  store.replaceTextRanges(node.id, result.edits)
+  vim.scheduleCaret(input, result.cursor)
+  if (vim.lastChange !== undefined) vim.lastChange.current = change
+  return { text: result.nextText, cursor: result.cursor }
 }
 
 function applyTextChange(

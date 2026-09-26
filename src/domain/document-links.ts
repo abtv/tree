@@ -145,6 +145,84 @@ export function replaceLinkedText(
   return { text: nextText, links: reconciled.links, createsNewLink: reconciled.createsNewLink }
 }
 
+export interface LinkedTextEdit {
+  start: number
+  end: number
+  inserted: string
+}
+
+/**
+ * Apply several disjoint edits as one change, remapping link offsets instead of diffing text.
+ * A single before/after diff cannot express an edit that touches two places at once, such as
+ * wrapping a range in delimiters, so it would discard every link between the touched positions.
+ */
+export function replaceLinkedTextRanges(
+  text: string,
+  links: readonly LinkRange[],
+  edits: readonly LinkedTextEdit[],
+): { text: string; links: LinkRange[]; createsNewLink: boolean } {
+  const ordered = edits
+    .map((edit) => {
+      const from = Math.max(0, Math.min(edit.start, edit.end, text.length))
+      return {
+        start: from,
+        end: Math.max(from, Math.min(Math.max(edit.start, edit.end), text.length)),
+        inserted: edit.inserted,
+      }
+    })
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+  const placements: { start: number; end: number }[] = []
+  let nextText = ''
+  let consumed = 0
+  for (const edit of ordered) {
+    if (edit.start < consumed) return { text, links: normalizeLinks(links, text), createsNewLink: false }
+    nextText += text.slice(consumed, edit.start)
+    placements.push({ start: nextText.length, end: nextText.length + edit.inserted.length })
+    nextText += edit.inserted
+    consumed = edit.end
+  }
+  nextText += text.slice(consumed)
+
+  // A link ending exactly where text is inserted must not absorb the insertion, while a link
+  // starting there moves behind it, so the two ends of a link shift by different amounts.
+  const shift = (offset: number, isEnd: boolean): number => {
+    let delta = 0
+    for (const edit of ordered) {
+      if (edit.end > offset) break
+      if (isEnd && edit.start === offset && edit.end === offset) continue
+      delta += edit.inserted.length - (edit.end - edit.start)
+    }
+    return offset + delta
+  }
+  const splitsLink = (link: LinkRange, edit: { start: number; end: number }): boolean =>
+    edit.start === edit.end
+      ? link.start < edit.start && edit.start < link.end
+      : edit.start < link.end && edit.end > link.start
+  const retained = links
+    .filter((link) => !ordered.some((edit) => splitsLink(link, edit)))
+    .map((link) => ({ ...link, start: shift(link.start, false), end: shift(link.end, true) }))
+
+  const created: LinkRange[] = []
+  for (const placement of placements) {
+    let tokenStart = placement.start
+    let tokenEnd = placement.end
+    while (tokenStart > 0 && !/\s/.test(nextText[tokenStart - 1] ?? '')) tokenStart -= 1
+    while (tokenEnd < nextText.length && !/\s/.test(nextText[tokenEnd] ?? '')) tokenEnd += 1
+    const candidate = nextText.slice(tokenStart, tokenEnd)
+    if (!isHttpUrl(candidate)) continue
+    if (retained.some((link) => link.start === tokenStart && link.end === tokenEnd)) continue
+    created.push({ start: tokenStart, end: tokenEnd, url: candidate })
+  }
+  const untouched = retained.filter((link) =>
+    created.every((candidate) => link.end <= candidate.start || link.start >= candidate.end),
+  )
+  return {
+    text: nextText,
+    links: normalizeLinks([...untouched, ...created], nextText),
+    createsNewLink: created.length > 0,
+  }
+}
+
 export function linksForLine(links: readonly LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {
   if (links === undefined) return []
   let lineStart = 0

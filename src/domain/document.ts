@@ -22,7 +22,10 @@ export {
   normalizeLinks,
   reconcileLinkTextEdit,
   replaceLinkedText,
+  replaceLinkedTextRanges,
 } from './document-links'
+
+export type { LinkedTextEdit } from './document-links'
 
 export { buildNodeIndex, locateNode, releaseNodeIndex, requireNode } from './document-index'
 

@@ -24,6 +24,11 @@ export type VimTextChange =
   | { kind: 'overwrite'; text: string; replaced: number }
   | { kind: 'case'; mode: 'toggle' | 'lower' | 'upper'; count: number }
 
+export type VimSurroundChange =
+  | { kind: 'surround-add'; motion: string; count: number; delimiter: string }
+  | { kind: 'surround-delete'; target: string; count: number }
+  | { kind: 'surround-change'; target: string; delimiter: string; count: number }
+
 export type VimStructuralChange =
   | { kind: 'structural-delete' }
   | { kind: 'structural-put'; position: 'before' | 'after'; source: TreeNode; sourceIds: readonly string[] }
@@ -38,19 +43,26 @@ export type VimStructuralChange =
       text?: string
     }
 
-export type VimRepeatChange = VimTextChange | VimStructuralChange
+export type VimRepeatChange = VimTextChange | VimSurroundChange | VimStructuralChange
 
 export interface VimFindCommand {
   kind: 'f' | 'F' | 't' | 'T'
   character: string
 }
 
+/** The keystrokes a surround command still needs after `ys`, `ds`, or `cs`. */
+export type VimSurroundStage =
+  | { stage: 'delimiter'; start: number; end: number; fromVisual?: boolean }
+  | { stage: 'target'; operation: 'delete' | 'change'; count: number }
+  | { stage: 'replacement'; target: string; count: number }
+
 export interface VimPendingCommand {
   count: string
-  operator?: 'd' | 'y' | 'c'
+  operator?: 'd' | 'y' | 'c' | 's'
   motionCount: string
   awaiting?: 'f' | 'F' | 't' | 'T' | 'r'
   prefix?: 'g' | 'i' | 'a'
+  surround?: VimSurroundStage
 }
 
 export interface VimKeyboardState {
