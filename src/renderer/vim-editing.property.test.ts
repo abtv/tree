@@ -11,6 +11,7 @@ import {
   textObjectRange,
 } from './vim-editing'
 import { moveCharacterCursor } from './vim-editing'
+import { calculateTextChange, normalEditCursor } from './vim-text-commands'
 
 describe('Vim character-cursor invariants with attachments', () => {
   it('keeps horizontal movement within text and the optional terminal image character', () => {
@@ -35,6 +36,46 @@ describe('Vim character-cursor invariants with attachments', () => {
             expect(moveCharacterCursor(length - 1, 'right', length, true)).toBe(length)
             expect(moveCharacterCursor(length, 'left', length, true)).toBe(length - 1)
           }
+        },
+      ),
+    )
+  })
+
+  it('keeps edited cursors on a text character or the terminal image', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom('a', 'B', 'c'), { minLength: 1, maxLength: 80 }).map((parts) => parts.join('')),
+        fc.boolean(),
+        (text, hasImage) => {
+          const cursor = text.length - 1
+          const deleted = calculateTextChange(text, cursor, { kind: 'delete', motion: 'x', count: 1 })
+          const toggled = calculateTextChange(text, cursor, { kind: 'case', mode: 'toggle', count: 1 })
+          if (deleted === undefined || deleted.kind !== 'edit' || toggled === undefined || toggled.kind !== 'edit')
+            throw new Error('The final text character must be editable')
+          const deletionCursor = normalEditCursor(deleted.nextCursor, deleted.nextText.length, hasImage)
+          const caseCursor = normalEditCursor(toggled.nextCursor, toggled.nextText.length, hasImage)
+          expect(deletionCursor).toBe(hasImage ? deleted.nextText.length : Math.max(0, deleted.nextText.length - 1))
+          expect(caseCursor).toBe(hasImage ? toggled.nextText.length : toggled.nextText.length - 1)
+        },
+      ),
+    )
+  })
+
+  it('replays deletion-only Insert edits at the Escape-relative caret', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom('a', 'b', 'c'), { minLength: 2, maxLength: 80 }).map((parts) => parts.join('')),
+        fc.nat(),
+        (text, arbitraryCursor) => {
+          const cursor = 1 + (arbitraryCursor % (text.length - 1))
+          const replayed = calculateTextChange(
+            text,
+            cursor,
+            { kind: 'insert', entry: 'i', insertedText: '', insertOffset: 0, deleteCount: 1 },
+            true,
+          )
+          if (replayed === undefined || replayed.kind !== 'edit') throw new Error('The replay must edit text')
+          expect(normalEditCursor(replayed.nextCursor, replayed.nextText.length, false)).toBe(cursor - 1)
         },
       ),
     )

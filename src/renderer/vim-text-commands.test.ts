@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { calculateTextChange, parseCount, repeatedFindMotion, textMotion, transformCase } from './vim-text-commands'
+import {
+  calculateTextChange,
+  normalEditCursor,
+  parseCount,
+  repeatedFindMotion,
+  textMotion,
+  transformCase,
+} from './vim-text-commands'
 
 describe('Vim text command calculations', () => {
   it('bounds counts and returns inclusive word-end ranges', () => {
@@ -37,6 +44,38 @@ describe('Vim text command calculations', () => {
     ).toEqual({ kind: 'edit', start: 2, end: 3, inserted: 'XY', nextText: 'abXY', nextCursor: 3 })
   })
 
+  it('replays a deletion-only Insert edit at the caret left by Escape', () => {
+    expect(
+      calculateTextChange(
+        'acd',
+        1,
+        { kind: 'insert', entry: 'i', insertedText: '', insertOffset: 0, deleteCount: 1 },
+        true,
+      ),
+    ).toMatchObject({ nextText: 'ad', nextCursor: 0 })
+    expect(
+      calculateTextChange(
+        'abc',
+        0,
+        { kind: 'insert', entry: 'i', insertedText: '', insertOffset: 0, deleteCount: 1 },
+        true,
+      ),
+    ).toMatchObject({ nextText: 'bc', nextCursor: 0 })
+  })
+
+  it('advances a case toggle past the final text character for an attached image', () => {
+    expect(calculateTextChange('ab', 1, { kind: 'case', mode: 'toggle', count: 1 })).toMatchObject({
+      nextText: 'aB',
+      nextCursor: 2,
+    })
+    expect(calculateTextChange('ab', 0, { kind: 'case', mode: 'toggle', count: 2 })).toMatchObject({
+      nextText: 'AB',
+      nextCursor: 2,
+    })
+    expect(normalEditCursor(2, 2, true)).toBe(2)
+    expect(normalEditCursor(2, 2, false)).toBe(1)
+  })
+
   it('keeps Unicode case expansion in the calculated edit', () => {
     expect(transformCase('İ', 'lower')).toBe('i̇')
     expect(calculateTextChange('İA', 0, { kind: 'case', mode: 'lower', count: 1 })).toMatchObject({
@@ -44,6 +83,7 @@ describe('Vim text command calculations', () => {
       end: 1,
       inserted: 'i̇',
       nextText: 'i̇A',
+      nextCursor: 2,
     })
   })
 })

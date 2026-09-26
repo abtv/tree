@@ -200,6 +200,95 @@ describe('editor keyboard handler', () => {
     expect(remove.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('moves onto an attached image after deleting the final text character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(1, 1)
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: 'ab',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'x'))
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 1, 2, '')
+    expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 1)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+  })
+
+  it('keeps the sole image as the caret after deleting its only text character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'a'
+    input.setSelectionRange(0, 0)
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: 'a',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'x'))
+
+    expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 0)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+  })
+
+  it('keeps a text-only deletion on the preceding character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(1, 1)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'ab', children: [] })
+
+    handle(keyEvent(input, 'x'))
+
+    expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 0)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+  })
+
+  it('activates the terminal image after a Visual deletion of final text', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(1, 2)
+    const { handle, vim } = vimHandler(
+      store,
+      { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+      'visual',
+    )
+
+    handle(keyEvent(input, 'd'))
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 1, 2, '')
+    expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 1)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+  })
+
+  it('clears the image caret when putting plain text from an attached image', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(2, 2)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: 'ab',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.register.current = { kind: 'text', value: 'Z' }
+
+    handle(keyEvent(input, 'P'))
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, 'Z')
+    expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 2)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+  })
+
   it('applies a navigation count before the next command', () => {
     const store = createStore()
     const input = document.createElement('textarea')

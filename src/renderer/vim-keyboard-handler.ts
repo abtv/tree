@@ -8,6 +8,7 @@ import {
   insertPosition,
   isTextMotion,
   isTextObjectKey,
+  normalEditCursor,
   parseCount,
   repeatedFindMotion,
   textMotion,
@@ -477,7 +478,7 @@ export function handleVimKey(
       }
     }
   } else if (visual && event.key === 'v') {
-    leaveVisual(vim, input, selection.start)
+    leaveVisual(vim, node, input, selection.start, node.text.length)
   } else if (visual && event.key === 'o') {
     const anchor = vim.visualAnchor.current ?? selection.start
     const focus = vim.visualFocus.current ?? selection.end - 1
@@ -490,14 +491,18 @@ export function handleVimKey(
     }
     if (event.key !== 'y' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, '')
-      vim.scheduleCaret(input, selection.start)
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
       if (vim.lastChange !== undefined) {
         vim.lastChange.current = { kind: 'delete', motion: 'x', count: selection.end - selection.start }
       }
     } else setNormalCaret(input, selection.start)
-    vim.visualAnchor.current = undefined
-    vim.visualFocus.current = undefined
-    vim.setMode('normal')
+    leaveVisual(
+      vim,
+      node,
+      input,
+      selection.start,
+      node.text.length - (event.key === 'y' ? 0 : selection.end - selection.start),
+    )
   } else if (visual && (event.key === 'c' || event.key === 's')) {
     if (selection.start !== selection.end) {
       vim.register.current = { kind: 'text', value: node.text.slice(selection.start, selection.end) }
@@ -526,9 +531,16 @@ export function handleVimKey(
     const register = vim.register.current
     if (register.kind === 'text' && register.value !== '' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, register.value)
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
       if (vim.lastChange !== undefined)
         vim.lastChange.current = { kind: 'overwrite', text: register.value, replaced: selection.end - selection.start }
-      leaveVisual(vim, input, selection.start + Math.max(0, register.value.length - 1))
+      leaveVisual(
+        vim,
+        node,
+        input,
+        selection.start + Math.max(0, register.value.length - 1),
+        node.text.length - (selection.end - selection.start) + register.value.length,
+      )
     }
   } else if (!visual && event.key === 'x') {
     applyTextChange(store, node, input, cursor, vim, { kind: 'delete', motion: 'x', count })
@@ -700,22 +712,36 @@ function applyTextChange(
   if (result.kind === 'yank') return undefined
   if (replay && result.nextText === node.text) return undefined
   if (result.nextText !== node.text) store.replaceTextRange(node.id, result.start, result.end, result.inserted)
+  if (result.nextText !== node.text && vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
   if (!replay && (change.kind === 'change' || change.kind === 'substitute')) {
     vim.beginInsert?.(node.id, result.nextText, result.start, change)
     vim.setMode('insert')
     vim.scheduleCaret(input, result.start)
   } else {
-    vim.scheduleCaret(input, Math.min(result.nextCursor, Math.max(0, result.nextText.length - 1)))
+    const nextCursor = normalEditCursor(result.nextCursor, result.nextText.length, node.attachment !== undefined)
+    vim.setImageCaret?.(node.id, node.attachment !== undefined && nextCursor === result.nextText.length)
+    vim.scheduleCaret(input, nextCursor)
     if (!replay && result.nextText !== node.text && vim.lastChange !== undefined) vim.lastChange.current = change
   }
-  return { text: result.nextText, cursor: Math.min(result.nextCursor, Math.max(0, result.nextText.length - 1)) }
+  return {
+    text: result.nextText,
+    cursor: normalEditCursor(result.nextCursor, result.nextText.length, node.attachment !== undefined),
+  }
 }
 
-function leaveVisual(vim: VimKeyboardState, input: HTMLElement, cursor: number): void {
+function leaveVisual(
+  vim: VimKeyboardState,
+  node: TreeNode,
+  input: HTMLElement,
+  cursor: number,
+  textLength: number,
+): void {
   vim.visualAnchor.current = undefined
   vim.visualFocus.current = undefined
   vim.setMode('normal')
-  vim.scheduleCaret(input, cursor)
+  const nextCursor = normalEditCursor(cursor, textLength, node.attachment !== undefined)
+  vim.setImageCaret?.(node.id, node.attachment !== undefined && nextCursor === textLength)
+  vim.scheduleCaret(input, nextCursor)
 }
 
 function applyVisualCase(
@@ -729,7 +755,14 @@ function applyVisualCase(
   if (selection.start === selection.end) return
   const replacement = transformCase(node.text.slice(selection.start, selection.end), mode)
   store.replaceTextRange(node.id, selection.start, selection.end, replacement)
+  if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
   if (vim.lastChange !== undefined)
     vim.lastChange.current = { kind: 'case', mode, count: selection.end - selection.start }
-  leaveVisual(vim, input, selection.start + Math.max(0, replacement.length - 1))
+  leaveVisual(
+    vim,
+    node,
+    input,
+    selection.start + Math.max(0, replacement.length - 1),
+    node.text.length - (selection.end - selection.start) + replacement.length,
+  )
 }

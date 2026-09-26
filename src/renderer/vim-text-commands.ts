@@ -42,6 +42,11 @@ export function insertPosition(text: string, cursor: number, entry: 'i' | 'a' | 
   return cursor
 }
 
+/** Clamp a completed Normal-mode edit to text, or to its terminal image character. */
+export function normalEditCursor(cursor: number, textLength: number, hasAttachment: boolean): number {
+  return Math.max(0, Math.min(cursor, hasAttachment ? textLength : Math.max(0, textLength - 1)))
+}
+
 interface TextMotionResult {
   target: number
   start: number
@@ -214,7 +219,7 @@ export function calculateTextChange(
     end = Math.min(text.length, cursor + change.count)
     if (start === end) return undefined
     inserted = transformCase(text.slice(start, end), change.mode)
-    nextCursor = Math.min(text.length - 1, cursor + change.count)
+    nextCursor = start + inserted.length
   }
   const registerText =
     start !== end && (change.kind === 'delete' || change.kind === 'change' || change.kind === 'substitute')
@@ -231,7 +236,7 @@ export function calculateTextChange(
     start = edit.start
     end = edit.end
     inserted = edit.inserted
-    nextCursor = position + Math.max(0, (change.insertedText ?? '').length - 1)
+    nextCursor = Math.max(0, position + (change.insertedText ?? '').length - 1)
   }
   return {
     kind: 'edit',

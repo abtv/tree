@@ -306,6 +306,140 @@ test.describe('Vim editing prototype', () => {
     await expect(last).toHaveJSProperty('selectionEnd', 1)
   })
 
+  test('moves onto the image after deleting the final text character', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+          { id: 'peer', text: 'a', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+
+    await editor.press('x')
+
+    await expect(editor).toHaveValue('a')
+    await expect(editor).toHaveJSProperty('selectionStart', 1)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="root"] .attachment-image-caret')).toHaveCount(1)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-focused-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-focused-dark.png')
+
+    await editor.press('G')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-peer-dark.png')
+    await window.emulateMedia({ colorScheme: 'light' })
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-peer-light.png')
+  })
+
+  test('advances onto the image after toggling the final text character', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+
+    await editor.press('~')
+
+    await expect(editor).toHaveValue('aB')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+  })
+
+  test('keeps the image as the sole character after deleting its only text', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'a', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await editor.press('x')
+
+    await expect(editor).toHaveValue('')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="root"] .attachment-image-caret')).toHaveCount(1)
+    await editor.press('h')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+  })
+
+  test('moves a Visual deletion onto the remaining image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('v')
+    await editor.press('d')
+
+    await expect(editor).toHaveValue('a')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveJSProperty('selectionStart', 1)
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+  })
+
+  test('returns to a text caret after putting plain text from an image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await editor.press('v')
+    await editor.press('y')
+    await editor.press('2')
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await editor.press('P')
+
+    await expect(editor).toHaveValue('aba')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveJSProperty('selectionEnd', 3)
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="root"] .attachment-image-caret')).toHaveCount(0)
+    await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-put-from-image-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-put-from-image-dark.png')
+
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await editor.press('p')
+    await expect(editor).toHaveValue('abaa')
+    await expect(editor).toHaveJSProperty('selectionStart', 3)
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+  })
+
   test('synchronizes image caret destinations after gg and viewport motions', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -1349,6 +1483,28 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('.')
     await expect(editor).toHaveValue('QQdef')
+  })
+
+  test('repeats a deletion-only Insert edit at the same relative caret', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('i')
+    await editor.press('Delete')
+    await editor.press('Escape')
+    await expect(editor).toHaveValue('acd')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+
+    await editor.press('l')
+    await editor.press('.')
+    await expect(editor).toHaveValue('ad')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
   })
 
   test('changes whole-node text, deletes backward, and repeats counted text puts', async ({ userDataDir }) => {
