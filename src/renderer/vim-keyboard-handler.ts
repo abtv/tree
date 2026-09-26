@@ -394,7 +394,25 @@ export function handleVimKey(
       vim.setMode('visual-node')
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
-    for (let index = 0; index < count; index += 1) store.moveSelection(event.key === 'j' ? 'down' : 'up', cursor)
+    const direction = event.key === 'j' ? 'down' : 'up'
+    for (let index = 0; index < count; index += 1) {
+      if (count > 1) {
+        const state = store.getSnapshot()
+        if (
+          state.status === 'ready' &&
+          state.document !== undefined &&
+          state.location.selectedNodeId !== state.location.currentParentId
+        ) {
+          const visibleNodes = displayedNodes(state.document, state.location.currentParentId)
+          const selectedIndex = visibleNodes.findIndex((candidate) => candidate.id === state.location.selectedNodeId)
+          const atBoundary =
+            (direction === 'down' && selectedIndex === visibleNodes.length - 1) ||
+            (direction === 'up' && selectedIndex === 0 && state.location.currentParentId === null)
+          if (atBoundary) break
+        }
+      }
+      store.moveSelection(direction, cursor)
+    }
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, input, selection.start)
   } else if (visual && event.key === 'o') {

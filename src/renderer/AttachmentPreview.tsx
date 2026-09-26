@@ -79,6 +79,11 @@ export function AttachmentImage({
       aria-label="Open image preview"
       className={imageCaretActive ? 'attachment-button attachment-image-caret' : 'attachment-button'}
       onClick={() => onOpen(attachmentId)}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        event.currentTarget.focus()
+        onOpen(attachmentId)
+      }}
       type="button"
     >
       <img className="attachment-image" src={state.url} alt="Attached image" onError={onImageError} />
