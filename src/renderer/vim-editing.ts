@@ -11,6 +11,12 @@ export function moveCharacterCursor(
   return Math.max(0, Math.min(lastCharacter, cursor + (direction === 'left' ? -count : count)))
 }
 
+/** The final text character reached before a counted right motion clamps on the image. */
+export function imageTextReturnCursor(cursor: number, count: number, textLength: number): number | undefined {
+  if (textLength === 0) return undefined
+  return Math.min(textLength - 1, cursor + count - 1)
+}
+
 type CharacterClass = 'space' | 'word' | 'punctuation'
 
 function characterClass(character: string): CharacterClass {

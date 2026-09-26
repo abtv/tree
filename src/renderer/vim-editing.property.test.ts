@@ -10,10 +10,36 @@ import {
   moveWordForward,
   textObjectRange,
 } from './vim-editing'
-import { moveCharacterCursor } from './vim-editing'
+import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
 import { calculateTextChange, normalEditCursor } from './vim-text-commands'
 
 describe('Vim character-cursor invariants with attachments', () => {
+  it('never records a text return position for an image-only node', () => {
+    fc.assert(
+      fc.property(fc.nat(1000), (count) => {
+        expect(imageTextReturnCursor(0, count + 1, 0)).toBeUndefined()
+      }),
+    )
+  })
+
+  it('records a valid final text position when a counted motion reaches the image', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 256 }),
+        fc.nat(1000),
+        fc.integer({ min: 1, max: 1000 }),
+        (length, arbitraryCursor, count) => {
+          const cursor = arbitraryCursor % length
+          if (moveCharacterCursor(cursor, 'right', length, true, count) !== length) return
+          const restored = imageTextReturnCursor(cursor, count, length)
+          expect(restored).toBeGreaterThanOrEqual(cursor)
+          expect(restored).toBeLessThan(length)
+          expect(restored).toBe(length - 1)
+        },
+      ),
+    )
+  })
+
   it('keeps horizontal movement within text and the optional terminal image character', () => {
     fc.assert(
       fc.property(

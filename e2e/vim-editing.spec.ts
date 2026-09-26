@@ -306,6 +306,39 @@ test.describe('Vim editing prototype', () => {
     await expect(last).toHaveJSProperty('selectionEnd', 1)
   })
 
+  test('returns to text after an oversized counted l enters the image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'Abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+
+    await editor.press('9')
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 4)
+    await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-counted-l-image-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-counted-l-image-dark.png')
+    await editor.press('h')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 3)
+    await expect(editor).toHaveJSProperty('selectionEnd', 4)
+    await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot(
+      'vim-counted-l-return-text-dark.png',
+    )
+    await window.emulateMedia({ colorScheme: 'light' })
+    await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot(
+      'vim-counted-l-return-text-light.png',
+    )
+  })
+
   test('moves onto the image after deleting the final text character', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

@@ -22,7 +22,7 @@ import type {
   VimTextChange,
 } from './vim-keyboard-types'
 import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
-import { moveCharacterCursor } from './vim-editing'
+import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
 
 export function handleVimKey(
   event: KeyboardEvent<HTMLElement>,
@@ -349,7 +349,8 @@ export function handleVimKey(
         count,
       )
       if (event.key === 'l' && !imageCaretActive && node.attachment !== undefined && next === node.text.length) {
-        if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = cursor + count - 1
+        if (vim.imageTextCursor !== undefined)
+          vim.imageTextCursor.current = imageTextReturnCursor(cursor, count, node.text.length)
       }
     }
     vim.setImageCaret?.(node.id, node.attachment !== undefined && next === node.text.length)

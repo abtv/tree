@@ -1560,6 +1560,51 @@ describe('editor keyboard handler', () => {
     expect(vim.setImageCaret).toHaveBeenCalled()
   })
 
+  it('restores a valid text character after an oversized counted l enters an image', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(1, 2)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(input)
+    document.body.append(row)
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: input.value,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, '9'))
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(4)
+    expect(vim.imageTextCursor?.current).toBe(3)
+    input.classList.add('node-input-image-caret')
+    handle(keyEvent(input, 'h'))
+    expect(input.selectionStart).toBe(3)
+    expect(input.selectionEnd).toBe(4)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    row.remove()
+  })
+
+  it('does not save a text return position for an image-only node before its caret class settles', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: '',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+
+    handle(keyEvent(input, 'l'))
+    expect(vim.imageTextCursor?.current).toBeUndefined()
+    expect(input.selectionStart).toBe(0)
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+  })
+
   it('starts the next node at its text caret when j leaves an active image', () => {
     const store = createStore()
     const input = document.createElement('textarea')
