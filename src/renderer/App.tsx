@@ -71,7 +71,12 @@ export function App({ store }: AppProps): React.JSX.Element {
   const renderInput = useCallback(
     (node: TreeNode, label: string): React.JSX.Element => (
       <>
-        <NodeInput node={node} label={label} {...nodeInputBindings(node)} />
+        <NodeInput
+          imageOnly={node.text.length === 0 && node.attachment !== undefined}
+          node={node}
+          label={label}
+          {...nodeInputBindings(node)}
+        />
         {node.attachment === undefined ? null : (
           <AttachmentImage attachmentId={node.attachment.id} onOpen={setPreviewAttachmentId} />
         )}
@@ -101,10 +106,6 @@ export function App({ store }: AppProps): React.JSX.Element {
       ? undefined
       : requireNode(state.document, state.location.currentParentId).node
   const nodes = displayedNodes(state.document, state.location.currentParentId)
-  const input = (node: (typeof nodes)[number], label: string, parent = false): React.JSX.Element => (
-    <NodeInput node={node} label={label} parent={parent} {...nodeInputBindings(node)} />
-  )
-
   const path = state.location.currentParentId === null ? [] : nodePath(state.document, state.location.currentParentId)
   const topLevel = state.location.currentParentId === null
 
@@ -123,7 +124,13 @@ export function App({ store }: AppProps): React.JSX.Element {
         </div>
         {currentParent === undefined ? null : (
           <section className="current-parent" aria-label="Current parent">
-            {input(currentParent, 'Current parent', true)}
+            <NodeInput
+              imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
+              node={currentParent}
+              label="Current parent"
+              parent
+              {...nodeInputBindings(currentParent)}
+            />
             {currentParent.attachment === undefined ? null : (
               <AttachmentImage attachmentId={currentParent.attachment.id} onOpen={setPreviewAttachmentId} />
             )}

@@ -188,6 +188,10 @@ textarea {
   cursor: default;
 }
 
+.node-row-image-only {
+  min-height: 1px;
+}
+
 .node-row-pinned {
   position: absolute;
   right: 0;
@@ -291,6 +295,15 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   white-space: pre-wrap;
   font-size: 15px;
   line-height: 20px;
+}
+
+.node-input-image-only {
+  height: 1px;
+  min-height: 1px;
+  margin: 0;
+  padding: 0;
+  line-height: 1px;
+  field-sizing: fixed;
 }
 
 .vim-state-normal .node-input {
@@ -424,6 +437,13 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   font-weight: 700;
   line-height: 30px;
   letter-spacing: -0.45px;
+}
+
+.current-parent-input.node-input-image-only {
+  height: 1px;
+  min-height: 1px;
+  padding: 0;
+  line-height: 1px;
 }
 
 .current-parent-input:focus {

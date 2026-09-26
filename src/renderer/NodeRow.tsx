@@ -37,6 +37,7 @@ export const NodeRow = memo(function NodeRow({
 }: NodeRowProps): React.JSX.Element {
   const className = [
     pinned ? 'node-row node-row-pinned' : 'node-row',
+    node.text.length === 0 && node.attachment !== undefined ? 'node-row-image-only' : '',
     dragging ? 'node-row-dragging' : '',
     dropBefore ? 'node-row-drop-before' : '',
     dropAfter ? 'node-row-drop-after' : '',

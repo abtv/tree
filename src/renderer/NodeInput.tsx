@@ -36,12 +36,14 @@ interface NodeInputProps extends NodeInputBindings {
   node: TreeNode
   label: string
   parent?: boolean
+  imageOnly?: boolean
 }
 
 export function NodeInput({
   node,
   label,
   parent = false,
+  imageOnly = false,
   selectedAll,
   disabled,
   inputRef,
@@ -69,6 +71,7 @@ export function NodeInput({
     'node-input',
     parent ? 'current-parent-input' : '',
     node.text.length === 0 ? 'node-input-empty' : '',
+    imageOnly ? 'node-input-image-only' : '',
     selectedAll ? 'select-all' : '',
   ]
     .filter(Boolean)

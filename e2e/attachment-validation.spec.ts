@@ -13,6 +13,7 @@ import {
   tryReadPersisted,
   typeInto,
   writeClipboardImage,
+  writeClipboardImageSized,
 } from './fixtures'
 
 const invalidPng = [
@@ -82,6 +83,36 @@ test.describe('attachment validation and image failures', () => {
 
     const restarted = await launchTree(userDataDir)
     await expect(restarted.window.getByAltText('Attached image')).toBeVisible()
+  })
+
+  test('shows an image-only node without a blank text row and keeps it editable', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await writeClipboardImageSized(app, 80, 80)
+    await firePaste(editor)
+
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+    await expect(editor).toHaveClass(/node-input-image-only/)
+    const row = window.locator('.node-row').first()
+    await expect(row).toHaveClass(/node-row-image-only/)
+    await expect(row).toHaveScreenshot('image-only-node.png')
+
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+    const parentEditor = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parentEditor).toHaveClass(/node-input-image-only/)
+    await expect(window.getByRole('region', { name: 'Current parent' })).toHaveScreenshot('image-only-parent.png')
+
+    await typeInto(parentEditor, 'parent caption')
+    await expect(parentEditor).toHaveValue('parent caption')
+    await expect(parentEditor).not.toHaveClass(/node-input-image-only/)
+    await expect(window.getByAltText('Attached image')).toHaveCount(1)
+
+    await window.getByRole('button', { name: 'Top level' }).click()
+    await expect(editor).toHaveValue('parent caption')
+    await expect(editor).not.toHaveClass(/node-input-image-only/)
+    await expect(row).not.toHaveClass(/node-row-image-only/)
+    await expect(row.getByAltText('Attached image')).toBeVisible()
+    await expect(row.getByAltText('Attached image')).toHaveCount(1)
   })
 
   test('opens a document whose stored attachment file is missing', async ({ userDataDir }) => {

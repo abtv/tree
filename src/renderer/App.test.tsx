@@ -207,6 +207,28 @@ describe('App', () => {
     expect(node).toHaveFocus()
   })
 
+  it('collapses the empty text row for an image node while keeping it editable', async () => {
+    const store = createStore({ kind: 'image', png: attachmentBytes })
+    await act(async () => {
+      await store.initialize()
+      await store.paste('root', 0)
+    })
+    render(<App store={store} />)
+
+    const input = screen.getByRole('textbox', { name: 'Node 1' })
+    expect(input).toHaveClass('node-input-empty', 'node-input-image-only')
+    expect(input.closest('.node-row')).toHaveClass('node-row-image-only')
+
+    fireEvent.change(input, { target: { value: 'caption' } })
+
+    expect(input).toHaveValue('caption')
+    expect(input).not.toHaveClass('node-input-image-only')
+    expect(input.closest('.node-row')).not.toHaveClass('node-row-image-only')
+    const snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+    expect(snapshot.document.roots[0]?.attachment?.mimeType).toBe('image/png')
+  })
+
   it('opens the image preview by clicking the image and closes it with the close button', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
     await act(async () => {
