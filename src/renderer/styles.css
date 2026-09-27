@@ -1,6 +1,38 @@
 :root {
-  color: #373f43;
-  background: #fff;
+  /* Every color is defined once here or in the single dark override. The selection highlight is
+     one background/foreground pair per appearance, shared by the Visual row, Visual text
+     selection, selected hyperlinks, and the Vim mode badge. */
+  --color-text: #373f43;
+  --color-background: #fff;
+  --color-shell-text: #737b80;
+  --color-secondary: #778187;
+  --color-location-separator: #b1b8bc;
+  --color-location-border: #e9edef;
+  --color-hover-text: #596267;
+  --color-toggle-hover-text: #596267;
+  --color-toggle-focus-outline: #778187;
+  --color-toggle-active-background: #dce1e3;
+  --color-ink: #373f43;
+  --color-link: #1769aa;
+  --color-caret: #373f43;
+  --color-white: #fff;
+  --color-scrim: rgba(18, 20, 22, 0.72);
+  --color-overlay-button-background: rgba(255, 255, 255, 0.9);
+  --color-overlay-button-focus-outline: #d9e9f7;
+  --color-attachment-error-on-overlay: #f3d6d3;
+  --color-attachment-error: #9c3b34;
+  --color-save-error: #b42318;
+  --color-mode-background: #59636a;
+  --color-mode-normal-background: #3b6d50;
+  --color-mode-replace-background: #a04b45;
+  --color-gutter-mark: #596267;
+  --color-disclosure-hover-background: #cfd6d9;
+  --color-drag-highlight: #eef0f1;
+  --color-disclosure-background: #dce1e3;
+  --highlight-background: #fff0b3;
+  --highlight-foreground: #373f43;
+  color: var(--color-text);
+  background: var(--color-background);
   font-family: 'JetBrains Mono';
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -37,7 +69,7 @@ textarea {
 .app-shell {
   display: grid;
   place-items: center;
-  color: #737b80;
+  color: var(--color-shell-text);
 }
 
 .location-bar {
@@ -45,8 +77,8 @@ textarea {
   align-items: center;
   height: 30px;
   padding: 0 18px;
-  border-bottom: 1px solid #e9edef;
-  color: #778187;
+  border-bottom: 1px solid var(--color-location-border);
+  color: var(--color-secondary);
   font-size: 14px;
   line-height: 1;
   overflow: hidden;
@@ -86,7 +118,7 @@ textarea {
 .location-separator {
   flex: 0 0 auto;
   margin: 0 9px;
-  color: #b1b8bc;
+  color: var(--color-location-separator);
   font-size: 20px;
   font-weight: 300;
 }
@@ -112,15 +144,22 @@ textarea {
 }
 
 .location-root:hover,
-.location-link:hover,
+.location-link:hover {
+  color: var(--color-hover-text);
+}
+
 .always-on-top-toggle:hover {
-  color: #596267;
+  color: var(--color-toggle-hover-text);
 }
 
 .location-root:focus-visible,
-.location-link:focus-visible,
+.location-link:focus-visible {
+  outline: 1px solid var(--color-secondary);
+  outline-offset: 3px;
+}
+
 .always-on-top-toggle:focus-visible {
-  outline: 1px solid #778187;
+  outline: 1px solid var(--color-toggle-focus-outline);
   outline-offset: 3px;
 }
 
@@ -151,8 +190,8 @@ textarea {
 }
 
 .always-on-top-toggle-active {
-  background: #dce1e3;
-  color: #373f43;
+  background: var(--color-toggle-active-background);
+  color: var(--color-ink);
 }
 
 .editor-shell {
@@ -200,7 +239,8 @@ textarea {
 
 .node-row-visual-selected,
 .node-row-visual-selected .node-input {
-  background: #fff0b3;
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
 }
 
 .node-disclosure {
@@ -224,20 +264,20 @@ textarea {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #596267;
+  background: var(--color-gutter-mark);
   content: '';
 }
 
 .node-disclosure-has-children {
-  background: #dce1e3;
+  background: var(--color-disclosure-background);
 }
 
 .node-disclosure-has-children:hover {
-  background: #cfd6d9;
+  background: var(--color-disclosure-hover-background);
 }
 
 .node-disclosure:focus-visible {
-  outline: 1px solid #778187;
+  outline: 1px solid var(--color-secondary);
   outline-offset: 1px;
 }
 
@@ -249,7 +289,7 @@ textarea {
   height: 0;
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
-  border-left: 7px solid #596267;
+  border-left: 7px solid var(--color-gutter-mark);
   pointer-events: none;
 }
 
@@ -286,7 +326,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   color: inherit;
   background: transparent;
   cursor: default;
-  caret-color: #373f43;
+  caret-color: var(--color-caret);
   outline: none;
   resize: none;
   overflow: hidden;
@@ -333,25 +373,25 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 .vim-state-normal .node-input.node-input-empty:focus {
-  caret-color: #373f43;
+  caret-color: var(--color-ink);
   caret-animation: manual;
 }
 
 .vim-state-normal .node-input::selection,
 .vim-state-normal .node-input a::selection {
-  color: #fff;
-  background: #373f43;
+  color: var(--color-white);
+  background: var(--color-ink);
 }
 
 .vim-state-visual .node-input::selection,
 .vim-state-visual .node-input a::selection {
-  color: #373f43;
-  background: #fff0b3;
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
 }
 
 .vim-state-visual .node-input a.link-selected {
-  color: #373f43;
-  background: #fff0b3;
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
 }
 
 .vim-state-visual-node .node-input {
@@ -365,28 +405,28 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   z-index: 20;
   border-radius: 3px;
   padding: 3px 7px;
-  color: #fff;
-  background: #59636a;
+  color: var(--color-white);
+  background: var(--color-mode-background);
   font: 600 11px/1.2 'JetBrains Mono';
   letter-spacing: 0.04em;
 }
 
 .vim-mode-normal {
-  background: #3b6d50;
+  background: var(--color-mode-normal-background);
 }
 
 .vim-mode-visual,
 .vim-mode-visual-node {
-  color: #373f43;
-  background: #fff0b3;
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
 }
 
 .vim-mode-replace {
-  background: #a04b45;
+  background: var(--color-mode-replace-background);
 }
 
 .node-input a {
-  color: #1769aa;
+  color: var(--color-link);
   text-decoration: underline;
   cursor: default;
 }
@@ -399,17 +439,6 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .node-input a.link-selected {
   color: HighlightText;
   background: Highlight;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #e5e7e9;
-    background: #202326;
-  }
-
-  .node-input a {
-    color: #73b7ff;
-  }
 }
 
 .node-input:focus {
@@ -426,7 +455,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 .node-row.node-row-dragging {
-  background: #eef0f1;
+  background: var(--color-drag-highlight);
 }
 
 .node-row-drop-before::before,
@@ -436,7 +465,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   left: 0;
   height: 2px;
   border-radius: 2px;
-  background: #eef0f1;
+  background: var(--color-drag-highlight);
   content: '';
 }
 
@@ -486,12 +515,12 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 .attachment-button:focus-visible {
-  outline: 1px solid #778187;
+  outline: 1px solid var(--color-secondary);
   outline-offset: 2px;
 }
 
 .vim-state-normal .attachment-button.attachment-image-caret {
-  outline: 2px solid #778187;
+  outline: 2px solid var(--color-secondary);
   outline-offset: 2px;
 }
 
@@ -505,7 +534,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .attachment-error {
   width: fit-content;
   margin: 6px;
-  color: #9c3b34;
+  color: var(--color-attachment-error);
   font-size: 0.85rem;
 }
 
@@ -516,7 +545,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: rgba(18, 20, 22, 0.72);
+  background: var(--color-scrim);
 }
 
 .image-preview {
@@ -529,11 +558,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   max-width: calc(100vw - 64px);
   max-height: calc(100vh - 64px);
   border-radius: 4px;
-  background: #fff;
+  background: var(--color-white);
 }
 
 .image-preview .attachment-error {
-  color: #f3d6d3;
+  color: var(--color-attachment-error-on-overlay);
 }
 
 .image-preview-close {
@@ -547,19 +576,19 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: #373f43;
+  background: var(--color-overlay-button-background);
+  color: var(--color-ink);
   cursor: pointer;
   font-size: 20px;
   line-height: 1;
 }
 
 .image-preview-close:hover {
-  background: #fff;
+  background: var(--color-white);
 }
 
 .image-preview-close:focus-visible {
-  outline: 2px solid #d9e9f7;
+  outline: 2px solid var(--color-overlay-button-focus-outline);
   outline-offset: 2px;
 }
 
@@ -572,7 +601,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .save-error {
   margin: 24px 0 0 32px;
-  color: #b42318;
+  color: var(--color-save-error);
   font-size: 0.875rem;
 }
 
@@ -588,15 +617,15 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: rgba(18, 20, 22, 0.72);
+  background: var(--color-scrim);
 }
 
 .quit-without-saving {
   max-width: 420px;
   padding: 24px;
   border-radius: 6px;
-  background: #fff;
-  color: #373f43;
+  background: var(--color-white);
+  color: var(--color-ink);
 }
 
 .quit-without-saving-actions {
@@ -607,87 +636,28 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: #e5e7e8;
-    background: #1e2022;
+    --color-text: #e5e7e8;
+    --color-background: #1e2022;
+    --color-shell-text: #a5adb2;
+    --color-secondary: #a5adb2;
+    --color-location-separator: #687177;
+    --color-location-border: #303438;
+    --color-hover-text: #e5e7e8;
+    --color-link: #73b7ff;
+    --color-caret: #fff;
+    --color-gutter-mark: #c3c8cb;
+    --color-disclosure-background: #4b5155;
+    --color-disclosure-hover-background: #5b6368;
+    --color-drag-highlight: #303438;
+    --highlight-background: #4a4023;
+    --highlight-foreground: #f5e9b7;
   }
-  .app-shell {
-    color: #a5adb2;
-  }
-  .location-bar {
-    border-color: #303438;
-    color: #a5adb2;
-  }
-  .location-separator {
-    color: #687177;
-  }
-  .location-root:hover,
-  .location-link:hover {
-    color: #e5e7e8;
-  }
-  .location-root:focus-visible,
-  .location-link:focus-visible {
-    outline-color: #a5adb2;
-  }
-  .node-disclosure::before {
-    background: #c3c8cb;
-  }
-  .node-focus-marker {
-    border-left-color: #c3c8cb;
-  }
-  .node-disclosure-has-children {
-    background: #4b5155;
-  }
-  .node-disclosure-has-children:hover {
-    background: #5b6368;
-  }
-  .node-disclosure:focus-visible {
-    outline-color: #a5adb2;
-  }
+
   .node-input:focus {
     background: transparent;
-  }
-  .node-row-visual-selected,
-  .node-row-visual-selected .node-input {
-    background: #4a4023;
-    color: #f5e9b7;
-  }
-
-  .vim-mode-visual,
-  .vim-mode-visual-node {
-    color: #f5e9b7;
-    background: #4a4023;
-  }
-
-  .vim-state-visual .node-input::selection,
-  .vim-state-visual .node-input a::selection {
-    color: #f5e9b7;
-    background: #4a4023;
-  }
-
-  .vim-state-visual .node-input a.link-selected {
-    color: #f5e9b7;
-    background: #4a4023;
-  }
-
-  .node-row.node-row-dragging {
-    background: #303438;
-  }
-
-  .node-row-drop-before::before,
-  .node-row-drop-after::after {
-    background: #303438;
   }
 
   .current-parent-input:focus {
     background: transparent;
-  }
-  .node-input {
-    caret-color: #fff;
-  }
-  .attachment-button:focus-visible {
-    outline-color: #a5adb2;
-  }
-  .vim-state-normal .attachment-button.attachment-image-caret {
-    outline-color: #a5adb2;
   }
 }
