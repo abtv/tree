@@ -223,6 +223,41 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 1)).not.toHaveClass(/node-input-image-caret/)
   })
 
+  test('keeps the image-only caret when k is clamped at the first root', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'first-image-only',
+            text: '',
+            attachment: { id: 'first-image', mimeType: 'image/png' },
+            children: [],
+          },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first-image-only' },
+    })
+    seedAttachmentImage(userDataDir, 'first-image')
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+    await expect(first).toHaveClass(/node-input-image-caret/)
+
+    await first.press('k')
+
+    await expect(first).toBeFocused()
+    await expect(first).toHaveClass(/node-input-image-caret/)
+    await expect(first).toHaveJSProperty('selectionStart', 0)
+    await expect(window.locator('.node-row[data-node-id="first-image-only"]')).toHaveScreenshot(
+      'vim-image-only-first-root-boundary-light.png',
+    )
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-row[data-node-id="first-image-only"]')).toHaveScreenshot(
+      'vim-image-only-first-root-boundary-dark.png',
+    )
+  })
+
   test('counts the image row when moving from text to the next sibling', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -328,6 +363,38 @@ test.describe('Vim editing prototype', () => {
     await expect(next).toBeFocused()
     await expect(next).toHaveJSProperty('selectionStart', 0)
     await expect(next).toHaveJSProperty('selectionEnd', 1)
+  })
+
+  test('moves focus across an image-bearing sibling with counted k', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First', children: [] },
+          { id: 'middle', text: 'Middle', attachment: { id: 'middle-image', mimeType: 'image/png' }, children: [] },
+          { id: 'last', text: 'Last', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'last' },
+    })
+    seedAttachmentImage(userDataDir, 'middle-image')
+    const { window } = await launchTree(userDataDir)
+    const last = node(window, 3)
+    await last.focus()
+    await setCursor(last, 2)
+    await last.press('2')
+    await last.press('k')
+
+    const first = node(window, 1)
+    await expect(first).toBeFocused()
+    await expect(first).toHaveJSProperty('selectionStart', 2)
+    await expect(first).not.toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="first"]')).toHaveScreenshot(
+      'vim-counted-k-past-image-light.png',
+    )
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-row[data-node-id="first"]')).toHaveScreenshot(
+      'vim-counted-k-past-image-dark.png',
+    )
   })
 
   test('keeps the image caret at the last-node boundary and applies counted h on exit', async ({ userDataDir }) => {

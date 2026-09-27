@@ -487,12 +487,17 @@ export function handleVimKey(
         const state = store.getSnapshot()
         if (state.status === 'ready' && state.document !== undefined) {
           const target = requireNode(state.document, state.location.selectedNodeId).node
-          if (target.id !== node.id && target.attachment !== undefined && vim.imageTextCursor !== undefined)
-            vim.imageTextCursor.current = Math.min(
-              state.focus?.cursor ?? navigationCursor,
-              Math.max(0, target.text.length - 1),
-            )
-          vim.setImageCaret?.(target.id, target.id !== node.id && target.attachment !== undefined, true)
+          if (target.id !== node.id && vim.imageTextCursor !== undefined) {
+            vim.imageTextCursor.current =
+              target.attachment !== undefined && target.text.length > 0
+                ? Math.min(state.focus?.cursor ?? navigationCursor, target.text.length - 1)
+                : undefined
+          }
+          const targetImageCaretActive =
+            target.id !== node.id
+              ? target.attachment !== undefined
+              : imageCaretActive && node.text.length === 0 && node.attachment !== undefined
+          vim.setImageCaret?.(target.id, targetImageCaretActive, true)
         }
       }
     }
