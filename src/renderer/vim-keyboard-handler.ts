@@ -22,17 +22,32 @@ import type {
   VimTextChange,
 } from './vim-keyboard-types'
 import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
-import { focusCaretTransition, horizontalCaretTransition, verticalCaretTransition } from './vim-caret-transition'
+import {
+  editCaretTransition,
+  focusCaretTransition,
+  horizontalCaretTransition,
+  verticalCaretTransition,
+} from './vim-caret-transition'
 
 function syncImageCaretAtCursor(
   vim: VimKeyboardState,
   node: TreeNode,
+  input: HTMLElement,
   cursor: number,
   textLength = node.text.length,
 ): void {
-  const imageCaretActive = node.attachment !== undefined && cursor === textLength
-  vim.setImageCaret?.(node.id, imageCaretActive)
-  if (!imageCaretActive && vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
+  const prior = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
+    cursor,
+    imageActive:
+      input.classList.contains('node-input-image-caret') || (node.attachment !== undefined && cursor === textLength),
+    imageTextReturnCursor: vim.imageTextCursor?.current,
+  }
+  const next = editCaretTransition(prior, cursor, textLength, node.attachment !== undefined)
+  if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
+  else {
+    if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
+    vim.setImageCaret?.(node.id, next.imageActive)
+  }
 }
 
 export function handleVimKey(
@@ -84,7 +99,7 @@ export function handleVimKey(
       setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
     } else {
       setNormalCaret(input, clamped)
-      syncImageCaretAtCursor(vim, node, clamped)
+      syncImageCaretAtCursor(vim, node, input, clamped)
     }
   }
   const handled = (): true => {
@@ -121,7 +136,7 @@ export function handleVimKey(
     vim.visualFocus.current = undefined
     vim.setMode('normal')
     setNormalCaret(input, selection.start)
-    syncImageCaretAtCursor(vim, node, selection.start)
+    syncImageCaretAtCursor(vim, node, input, selection.start)
     return handled()
   }
   const pending = vim.pending.current ?? { count: '', motionCount: '' }
@@ -751,9 +766,20 @@ function applyTextChange(
     vim.setMode('insert')
     vim.scheduleCaret(input, result.start)
   } else {
-    const nextCursor = normalEditCursor(result.nextCursor, result.nextText.length, node.attachment !== undefined)
-    vim.setImageCaret?.(node.id, node.attachment !== undefined && nextCursor === result.nextText.length)
-    vim.scheduleCaret(input, nextCursor)
+    const prior = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
+      cursor,
+      imageActive:
+        input.classList.contains('node-input-image-caret') ||
+        (node.attachment !== undefined && cursor === node.text.length),
+      imageTextReturnCursor: vim.imageTextCursor?.current,
+    }
+    const next = editCaretTransition(prior, result.nextCursor, result.nextText.length, node.attachment !== undefined)
+    vim.scheduleCaret(input, next.cursor)
+    if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
+    else {
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
+      vim.setImageCaret?.(node.id, next.imageActive)
+    }
     if (!replay && result.nextText !== node.text && vim.lastChange !== undefined) vim.lastChange.current = change
   }
   return {
@@ -773,7 +799,7 @@ function leaveVisual(
   vim.visualFocus.current = undefined
   vim.setMode('normal')
   const nextCursor = normalEditCursor(cursor, textLength, node.attachment !== undefined)
-  syncImageCaretAtCursor(vim, node, nextCursor, textLength)
+  syncImageCaretAtCursor(vim, node, input, nextCursor, textLength)
   vim.scheduleCaret(input, nextCursor)
 }
 

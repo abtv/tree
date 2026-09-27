@@ -31,7 +31,12 @@ import type {
 } from './vim-keyboard-types'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
-import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
+import {
+  editCaretTransition,
+  focusCaretTransition,
+  pointerCaretTransition,
+  type VimCaretState,
+} from './vim-caret-transition'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -220,7 +225,7 @@ export function useNodeInputBindings({
   )
 
   const finishVimReplace = useCallback(
-    (input?: HTMLElement): boolean => {
+    (input?: HTMLElement, retreatCursor = false): boolean => {
       const session = vimReplaceSession.current
       vimReplaceSession.current = undefined
       if (session === undefined || session.typed === '') return false
@@ -231,10 +236,29 @@ export function useNodeInputBindings({
         session.baseline.slice(session.position + replaced)
       store.replaceTextRange(session.nodeId, session.position, session.position + replaced, session.typed)
       vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced }
-      applyCaretState(session.nodeId, { cursor: session.position + session.typed.length, imageActive: false })
+      const rawCursor = session.position + session.typed.length
+      const state = store.getSnapshot()
+      const hasAttachment =
+        state.status === 'ready' && requireNode(state.document, session.nodeId).node.attachment !== undefined
+      const prior =
+        caretAuthority.current.nodeId === session.nodeId
+          ? caretAuthority.current.caret
+          : { cursor: rawCursor, imageActive: false }
+      // Escape and Cmd+Z/Cmd+Shift+Z retreat the DOM caret by one after calling this (see
+      // editor-input-handlers.ts); every other caller (blur, a same-node pointer click) leaves the
+      // caret at the raw typed end. The image-caret decision must match whichever position the
+      // caller actually leaves the caret at, so callers say so explicitly rather than this
+      // function inferring it from whether `input` was passed.
+      const committedCursor = retreatCursor ? Math.max(0, rawCursor - 1) : rawCursor
+      const next = editCaretTransition(prior, committedCursor, finalText.length, hasAttachment)
+      applyCaretState(session.nodeId, {
+        cursor: rawCursor,
+        imageActive: next.imageActive,
+        imageTextReturnCursor: next.imageTextReturnCursor,
+      })
       if (input !== undefined) {
         setEditableText(input, finalText)
-        setCaret(input, session.position + session.typed.length)
+        setCaret(input, rawCursor)
       }
       return true
     },
@@ -526,8 +550,8 @@ export function useNodeInputBindings({
             setCaret(input, session.position + session.typed.length)
             return true
           },
-          finishReplace: (input) => {
-            return finishVimReplace(input)
+          finishReplace: (input, retreatCursor) => {
+            return finishVimReplace(input, retreatCursor)
           },
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,

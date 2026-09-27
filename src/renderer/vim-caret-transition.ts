@@ -1,4 +1,5 @@
 import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
+import { normalEditCursor } from './vim-text-commands'
 
 export interface VimCaretState {
   cursor: number
@@ -82,6 +83,26 @@ export function sameNodeImageTransition(
     cursor: Math.max(0, Math.min(state.imageTextReturnCursor ?? textLength - 1, textLength - 1)),
     imageActive: false,
   }
+}
+
+/**
+ * The caret an edit, replace, or insert-session commit leaves behind. A true no-op (the clamped
+ * result matches the prior state exactly) preserves a saved return position rather than
+ * recomputing it, so a bare key pressed while already on the image does not discard where a later
+ * exit should land; any other result, including a shortening edit that still ends on the image,
+ * is treated as a fresh entry.
+ */
+export function editCaretTransition(
+  state: VimCaretState,
+  rawCursor: number,
+  textLength: number,
+  hasAttachment: boolean,
+): VimCaretState {
+  const cursor = normalEditCursor(rawCursor, textLength, hasAttachment)
+  const imageActive = hasAttachment && cursor === textLength
+  if (cursor === state.cursor && imageActive === state.imageActive) return state
+  if (!imageActive) return { cursor, imageActive: false }
+  return sameNodeImageTransition(state, 'enter', textLength, rawCursor)
 }
 
 /** A same-node Normal-mode transition; no DOM or store state is read here. */

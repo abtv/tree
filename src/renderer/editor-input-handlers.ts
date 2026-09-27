@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
+import { editCaretTransition } from './vim-caret-transition'
 import { getCaret, getSelectionRange, selectAll, setNormalCaret } from './editor-dom'
 import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
@@ -67,7 +68,7 @@ export function createEditorKeyDownHandler({
     if (vim !== undefined && vim.mode === 'replace' && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault()
       if (event.key === 'Escape') {
-        const changed = vim.finishReplace?.(event.currentTarget) ?? false
+        const changed = vim.finishReplace?.(event.currentTarget, true) ?? false
         vim.setMode('normal')
         setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - (changed ? 1 : 0)))
         store.endTextSession()
@@ -123,8 +124,26 @@ export function createEditorKeyDownHandler({
         vim.visualAnchor.current = undefined
         vim.visualFocus.current = undefined
         vim.setMode('normal')
-        setNormalCaret(event.currentTarget, Math.max(0, cursor - 1))
-        vim.setImageCaret?.(node.id, node.attachment !== undefined && Math.max(0, cursor - 1) === node.text.length)
+        const input = event.currentTarget
+        const prior = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
+          cursor,
+          imageActive:
+            input.classList.contains('node-input-image-caret') ||
+            (node.attachment !== undefined && cursor === node.text.length),
+          imageTextReturnCursor: vim.imageTextCursor?.current,
+        }
+        const next = editCaretTransition(
+          prior,
+          Math.max(0, cursor - 1),
+          node.text.length,
+          node.attachment !== undefined,
+        )
+        setNormalCaret(input, next.cursor)
+        if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
+        else {
+          if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
+          vim.setImageCaret?.(node.id, next.imageActive)
+        }
         store.endTextSession()
         return
       }
@@ -171,7 +190,7 @@ export function createEditorKeyDownHandler({
     } else if (event.metaKey && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       if (vim?.mode === 'replace') {
-        const changed = vim.finishReplace?.(event.currentTarget) ?? false
+        const changed = vim.finishReplace?.(event.currentTarget, true) ?? false
         vim.setMode('normal')
         if (changed) setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - 1))
       }

@@ -258,6 +258,41 @@ test.describe('Vim editing prototype', () => {
     )
   })
 
+  test('keeps the image-only caret after an empty Insert session ends with Escape', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'image-only',
+            text: '',
+            attachment: { id: 'image-only-attachment', mimeType: 'image/png' },
+            children: [],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'image-only' },
+    })
+    seedAttachmentImage(userDataDir, 'image-only-attachment')
+    const { window } = await launchTree(userDataDir)
+    const imageOnly = node(window, 1)
+    await imageOnly.focus()
+    await expect(imageOnly).toHaveClass(/node-input-image-caret/)
+
+    await imageOnly.press('i')
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await window.keyboard.press('Escape')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(imageOnly).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="image-only"]')).toHaveScreenshot(
+      'vim-insert-escape-image-only-light.png',
+    )
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-row[data-node-id="image-only"]')).toHaveScreenshot(
+      'vim-insert-escape-image-only-dark.png',
+    )
+  })
+
   test('counts the image row when moving from text to the next sibling', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -2010,6 +2045,65 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('activates the image caret when a Replace session commits on blur to a non-node target', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await window.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    })
+
+    await expect(editor).toHaveValue('abcdX')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-blur-image-caret-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-blur-image-caret-dark.png')
+  })
+
+  test('activates the image caret when a same-node pointer click commits a Replace session', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await editor.click()
+    await window.keyboard.press('Escape')
+
+    await expect(editor).toHaveValue('abcdX')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-click-image-caret-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-click-image-caret-dark.png')
   })
 
   test('undoes a pending Replace-mode edit and focuses the restored text', async ({ userDataDir }) => {

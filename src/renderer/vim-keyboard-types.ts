@@ -76,7 +76,7 @@ export interface VimKeyboardState {
   finishInsert?: (input: HTMLElement) => void
   beginReplace?: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
   handleReplaceKey?: (input: HTMLElement, key: string) => boolean
-  finishReplace?: (input: HTMLElement) => boolean
+  finishReplace?: (input: HTMLElement, retreatCursor?: boolean) => boolean
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
   imageTextCursor?: { current: number | undefined }

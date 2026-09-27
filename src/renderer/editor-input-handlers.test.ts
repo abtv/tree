@@ -291,6 +291,27 @@ describe('editor keyboard handler', () => {
     expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
   })
 
+  it('preserves the saved return position when a no-op edit is pressed while already on the image', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(4, 4)
+    input.classList.add('node-input-image-caret')
+    const { handle, vim } = vimHandler(store, {
+      id: 'node',
+      text: 'abcd',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    vim.imageTextCursor!.current = 1
+
+    handle(keyEvent(input, 'x'))
+
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expect(vim.imageTextCursor?.current).toBe(1)
+  })
+
   it('applies a navigation count before the next command', () => {
     const store = createStore()
     const input = document.createElement('textarea')
@@ -1037,7 +1058,7 @@ describe('editor keyboard handler', () => {
 
     handle(keyEvent(input, 'z', { metaKey: true }))
 
-    expect(finishReplace).toHaveBeenCalledWith(input)
+    expect(finishReplace).toHaveBeenCalledWith(input, true)
     expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
       (store.undo as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
     )
@@ -1055,7 +1076,7 @@ describe('editor keyboard handler', () => {
 
     handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
 
-    expect(finishReplace).toHaveBeenCalledWith(input)
+    expect(finishReplace).toHaveBeenCalledWith(input, true)
     expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
       (store.redo as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
     )

@@ -737,6 +737,110 @@ describe('useNodeInputBindings', () => {
     expect(store.replaceTextRange).toHaveBeenCalledOnce()
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 3, 4, 'X')
   })
+
+  it('activates the image caret when a Replace session commits on blur at the terminal position', () => {
+    const node: TreeNode = { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [node] },
+        location: { currentParentId: null, selectedNodeId: 'node' },
+      }),
+      replaceTextRange: vi.fn(),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        onPreviewAttachment: vi.fn(),
+        vimMode,
+        setVimMode,
+        setImageCaretNodeId,
+      })(node)
+      return { bindings, vimMode, imageCaretNodeId }
+    })
+    const input = document.createElement('textarea')
+    input.value = node.text
+    input.setSelectionRange(2, 2)
+    result.current.bindings.inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('R')
+    expect(result.current.vimMode).toBe('replace')
+    press('X')
+    expect(input.value).toBe('abX')
+
+    act(() => result.current.bindings.onBlur())
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, 'X')
+    expect(result.current.imageCaretNodeId).toBe('node')
+  })
+
+  it('activates the image caret when a same-node pointer click commits a Replace session at the terminal position', () => {
+    const node: TreeNode = { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [node] },
+        location: { currentParentId: null, selectedNodeId: 'node' },
+      }),
+      replaceTextRange: vi.fn(),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        onPreviewAttachment: vi.fn(),
+        vimMode,
+        setVimMode,
+        setImageCaretNodeId,
+      })(node)
+      return { bindings, vimMode, imageCaretNodeId }
+    })
+    const input = document.createElement('textarea')
+    input.value = node.text
+    input.setSelectionRange(2, 2)
+    result.current.bindings.inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('R')
+    press('X')
+    expect(input.value).toBe('abX')
+
+    act(() => result.current.bindings.onMouseDown({ currentTarget: input, button: 0 } as never))
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, 'X')
+    expect(result.current.imageCaretNodeId).toBe('node')
+  })
+
   it('applies surround commands as one edit and repeats them with dot', () => {
     const store = {
       endTextSession: vi.fn(),

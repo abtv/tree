@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  editCaretTransition,
   focusCaretTransition,
   horizontalCaretTransition,
   pointerCaretTransition,
@@ -91,6 +92,42 @@ describe('Vim caret transitions', () => {
       cursor: 4,
       imageActive: true,
       imageTextReturnCursor: undefined,
+    })
+  })
+
+  describe('editCaretTransition', () => {
+    it('lands on text after an edit that leaves the caret on text', () => {
+      expect(editCaretTransition({ cursor: 3, imageActive: false }, 1, 3, true)).toEqual({
+        cursor: 1,
+        imageActive: false,
+      })
+    })
+
+    it('records a fresh return position when an edit first lands the caret on the image', () => {
+      expect(editCaretTransition({ cursor: 2, imageActive: false }, 3, 3, true)).toEqual({
+        cursor: 3,
+        imageActive: true,
+        imageTextReturnCursor: 2,
+      })
+    })
+
+    it('drops the return position when an edit moves the caret from the image back onto text', () => {
+      const onImage = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
+      expect(editCaretTransition(onImage, 0, 3, true)).toEqual({ cursor: 0, imageActive: false })
+    })
+
+    it('preserves a saved return position across a true no-op while already on the image', () => {
+      const onImage = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
+      expect(editCaretTransition(onImage, 3, 3, true)).toBe(onImage)
+    })
+
+    it('recomputes a fresh return position when a mutation still leaves the caret on the image', () => {
+      const onImage = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+      expect(editCaretTransition(onImage, 2, 2, true)).toEqual({
+        cursor: 2,
+        imageActive: true,
+        imageTextReturnCursor: 1,
+      })
     })
   })
 })
