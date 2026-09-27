@@ -1477,6 +1477,37 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('')
   })
 
+  it('distinguishes unavailable transitions from same-node focus requests', async () => {
+    const store = new EditorStore(
+      loadedState(
+        { roots: [{ id: 'root', text: 'abc', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      ),
+      ids('unused'),
+    )
+    await store.initialize()
+    const initial = store.getSnapshot()
+    expect(initial.status).toBe('ready')
+    if (initial.status !== 'ready') return
+
+    store.undo()
+    store.redo()
+    store.leave()
+    expect(store.getSnapshot()).toBe(initial)
+
+    store.selectNode('root', 2)
+    const reselection = store.getSnapshot()
+    expect(reselection).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { nodeId: 'root', cursor: 2 } })
+    if (reselection.status !== 'ready') return
+    expect(reselection.focus.token).not.toBe(initial.focus.token)
+
+    store.moveSelection('up', 2)
+    const clamped = store.getSnapshot()
+    expect(clamped).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { nodeId: 'root', cursor: 0 } })
+    if (clamped.status !== 'ready') return
+    expect(clamped.focus.token).not.toBe(reselection.focus.token)
+  })
+
   it('ends the editing session after a standalone text edit', async () => {
     const store = new EditorStore(createServices(), ids('root'))
     await store.initialize()
