@@ -172,6 +172,15 @@ describe('runChecks', () => {
     expect(result.issues.some((issue) => issue.includes('missing an index entry for ADR 0001'))).toBe(true)
   })
 
+  it('checks links in active initiative plans and their index', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'plans/README.md', '[Active](active.md)\n')
+    writeFile(root, 'plans/active.md', '[Missing](../docs/MISSING.md)\n')
+    const result = runChecks({ rootDirectory: root })
+    expect(result.issues).toEqual([expect.stringContaining('plans/active.md: link target not found')])
+    expect(result.liveDocumentCount).toBe(2)
+  })
+
   it('governs the product-discovery document as a live document', () => {
     const root = createTemporaryRoot()
     writeFile(root, 'docs/PRODUCT_DISCOVERY.md', '# Discovery\n[missing](MISSING.md)\nNodes remain at level 20.\n')

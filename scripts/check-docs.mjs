@@ -151,6 +151,12 @@ function collectLiveDocuments(rootDirectory) {
       if (entry.isFile() && entry.name.endsWith('.md')) documents.add(join(decisions, entry.name))
     }
   }
+  const plans = join(rootDirectory, 'plans')
+  if (existsSync(plans)) {
+    for (const entry of readdirSync(plans, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.md')) documents.add(join(plans, entry.name))
+    }
+  }
   const walk = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) {

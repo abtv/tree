@@ -11,6 +11,7 @@ A macOS desktop application for working with a hierarchical tree of text nodes a
 * [Agent Roles](docs/AGENT_ROLES.md) — the formal definition of each agent role, shared by every coding-agent tool's config.
 * [Security Policy](docs/SECURITY.md) — the security model and the tests that verify it.
 * [Agent Instructions](AGENTS.md) — instructions for AI coding agents working on the repository.
+* [Active Plans](plans/README.md) — multi-session initiatives and their next tasks.
 * [License](LICENSE) — MIT License.
 
 ## Working with Product Ideas

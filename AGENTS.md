@@ -7,7 +7,7 @@
 
 At the start of a session:
 
-1. Read this file and `WORKING_PLAN.md` when an approved task is in progress.
+1. Read this file and `WORKING_PLAN.md` when an approved task is in progress. For a multi-session initiative, read `plans/README.md` and its linked active plan before selecting the next task.
 2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references. Read `docs/PRODUCT_DISCOVERY.md` only for product-discovery work or when an approved task explicitly references a discovery entry.
 3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
 
@@ -155,6 +155,8 @@ For a substantive task, use the configured planner subagent in a fresh context a
 
 Keep a substantive task's temporary working plan at `WORKING_PLAN.md` in the repository root. The plan is an implementation contract, not permanent project documentation. Keep it current when authorized scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
 
+For work spanning multiple sessions, keep a durable initiative plan under `plans/` and link it from `plans/README.md`. The initiative plan records the authorized objective, boundaries, ordered logical tasks, acceptance criteria, current status, decisions, and exact next task. It is a coordination record, not a product requirement or authorization to implement unrequested behavior. A request to continue an identified initiative authorizes the next ready task within its existing scope; ask the Product Owner about material choices or scope expansion. Each session still owns one logical task and uses `WORKING_PLAN.md` for its temporary implementation and validation evidence. Update the initiative plan as part of that task's commit so the next session can resume from repository state. See `docs/DEVELOPMENT.md` §11 for the format and resume procedure.
+
 Before completion, extract knowledge that remains useful into its durable owner:
 
 * current product behavior into `docs/PRODUCT.md`;
@@ -162,7 +164,7 @@ Before completion, extract knowledge that remains useful into its durable owner:
 * development and verification practices into `docs/DEVELOPMENT.md`;
 * significant architectural choices and rationale into an ADR.
 
-Git history is sufficient for completed implementation plans. Do not create or maintain a plan archive.
+Git history is sufficient for completed implementation plans. Do not create or maintain a plan archive. Remove a completed initiative plan and its index entry in the final initiative commit after moving lasting knowledge to its durable owner.
 
 Use Architecture Decision Records (ADRs) for important technical or architectural decisions that are worth preserving for future development.
 
@@ -324,6 +326,8 @@ When the Product Owner reports that the most recently committed fix still does n
 A session should cover a single logical task.
 
 After a commit completes a logical task, stop working and tell the Product Owner to start a new session before beginning the next task. Do not continue with a new, unrelated task in the same session.
+
+For a multi-session initiative, commit the updated task status and next task with the completed change. The next session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 
 Before stopping after a commit, provide an explicit handoff that states:
 
