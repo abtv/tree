@@ -118,6 +118,9 @@ const developCases = {
     'rg permission opencode.json',
     'rg TODO src',
     'sed -n 1,80p opencode.json',
+    // Read-only wrapping for inspecting a line longer than the file reader returns.
+    'fold -w 190 plans/interaction-state-ownership.md',
+    'fold',
     'pkill -f tree-e2e-example',
     // Read-only process inspection used to answer fixture and cleanup questions.
     'ps',

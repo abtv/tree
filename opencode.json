@@ -183,6 +183,8 @@
           "sort *": "allow",
           "xargs wc *": "allow",
           "cut *": "allow",
+          "fold": "allow",
+          "fold *": "allow",
           "tr *": "allow",
           "uniq": "allow",
           "uniq *": "allow",
