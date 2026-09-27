@@ -34,6 +34,32 @@ export default defineConfig({
           functions: 95,
           lines: 95,
         },
+        // Renderer interaction-state owners: regression guards measured when the ownership refactor
+        // completed, set just below measurement; restore coverage rather than lower a floor.
+        'src/renderer/link-caret.ts': {
+          statements: 99,
+          branches: 99,
+          functions: 99,
+          lines: 99,
+        },
+        'src/renderer/vim-edit-session.ts': {
+          statements: 99,
+          branches: 99,
+          functions: 99,
+          lines: 99,
+        },
+        'src/renderer/vim-command-state.ts': {
+          statements: 99,
+          branches: 99,
+          functions: 99,
+          lines: 99,
+        },
+        'src/renderer/use-node-input-bindings.ts': {
+          statements: 83.5,
+          branches: 71.4,
+          functions: 81.3,
+          lines: 87.8,
+        },
       },
       include: ['src/**/*.{ts,tsx}'],
       exclude: [

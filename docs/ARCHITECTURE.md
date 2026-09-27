@@ -271,6 +271,8 @@ Only the state explicitly required by the product specification should be persis
 
 Exact cursor position, focus state, navigation stack, undo/redo history, and the windowed list's mounted range and height table are runtime state unless the product specification changes.
 
+Renderer-local interaction state follows a single-owner pattern. State that spans commands or events — the Normal-mode caret target and pending hyperlink-draft check, the Vim register and pending Insert or Replace session, the pending command with the last repeatable change, character find, and character Visual endpoints, the structural Insert session, and the drag caret-freeze record — lives in one pure owner module that stays free of React, DOM, Electron, filesystem, and store dependencies. `use-node-input-bindings.ts` holds one instance of each owner and is the single place that projects that state into React, the DOM, and the store, alongside the hook-local facts (its caret authority and the pending hyperlink draft) that each have one writer. Handlers and components act through owner transitions — including owner-backed access-time handles where a handler needs direct field access — and must not keep a parallel copy of a fact or resynchronize it at each call site. When defects cluster around one state, multiple owners or scattered resynchronization calls are the design cause to check first. The pattern, its defect evidence, and its boundaries are recorded in [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md).
+
 ---
 
 ## 10. Navigation

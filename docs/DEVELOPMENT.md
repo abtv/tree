@@ -376,6 +376,8 @@ Platform-routed shortcuts need boundary-faithful end-to-end tests. Playwright in
 
 Coverage policy is defined in `AGENTS.md` §9. The enforced global and per-file floors are configured in `vitest.config.ts`, and `npm run check` runs the coverage-enabled unit suite that fails when a floor is not met.
 
+Per-file floors for the renderer interaction-state owners and their projection point are configured in `vitest.config.ts` and enforced by this coverage run. They were set just below the coverage measured when the ownership refactor completed, so losing a guarded module's focused coverage fails `npm run check`. Treat them as regression guards, not coverage targets: add behavior in its owner module with focused or property tests and restore coverage rather than lowering a floor. The single-owner pattern they guard is recorded in [ARCHITECTURE.md](ARCHITECTURE.md) §9 and [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md).
+
 Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files. The rules for when to add one are in `AGENTS.md` §9.
 
 Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
