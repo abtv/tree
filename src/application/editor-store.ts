@@ -62,6 +62,7 @@ export class EditorStore {
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly textSession: EditorTextSession
   private readonly saveScheduler: EditorSaveScheduler
+  private readonly pendingEditFinishers = new Set<() => boolean>()
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
   public constructor(
@@ -82,12 +83,40 @@ export class EditorStore {
 
   public subscribe = this.runtime.subscribe
 
+  /**
+   * Registers a renderer-local pending-edit finisher. `flushPersistence` invokes registered
+   * finishers immediately before it captures state for each save and again after the save
+   * completes. A pending edit that lives outside the store — the Vim Replace buffer — is thereby
+   * committed into the document and captured by the same flush, and an edit completed while a save
+   * is in flight is saved before the flush resolves. A finisher returns true only on the call that
+   * committed a change, must be idempotent, and must no-op (returning false) when nothing is
+   * pending; the returned flag makes the flush run one more pass so a commit that requested an
+   * immediate save is awaited rather than left in flight. Finishers are invoked only while the
+   * store is ready and not in the locked save-failure state, because a locked store rejects
+   * document changes; a finisher that would be rejected is left pending instead of consuming its
+   * edit.
+   */
+  public registerPendingEditFinisher(finish: () => boolean): () => void {
+    this.pendingEditFinishers.add(finish)
+    return () => this.pendingEditFinishers.delete(finish)
+  }
+
   public async flushPersistence(): Promise<void> {
+    let committed: boolean
     do {
+      this.finishPendingEdits()
       await Promise.all(this.pendingEdits)
       if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave()
       await this.saveScheduler.flush()
-    } while (this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
+      committed = this.finishPendingEdits()
+    } while (committed || this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
+  }
+
+  private finishPendingEdits(): boolean {
+    if (this.runtime.snapshot.status !== 'ready' || this.isPersistenceLocked()) return false
+    let committed = false
+    for (const finish of [...this.pendingEditFinishers]) committed = finish() || committed
+    return committed
   }
 
   public reportError(error: unknown): void {

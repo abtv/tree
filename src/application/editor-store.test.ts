@@ -1385,6 +1385,170 @@ describe('EditorStore', () => {
     })
   })
 
+  it('commits a registered pending edit before the flush captures a save', async () => {
+    const services = createServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+    const order: string[] = []
+    let committed = false
+    store.registerPendingEditFinisher(() => {
+      order.push('finish')
+      if (committed) return false
+      committed = true
+      store.editText('root', 'typed')
+      return true
+    })
+    services.save = async (state) => {
+      order.push('save')
+      services.saves.push(state)
+    }
+
+    await store.flushPersistence()
+
+    expect(order).toEqual(['finish', 'save', 'finish'])
+    expect(services.saves).toHaveLength(1)
+    expect(services.saves[0]).toMatchObject({ document: { roots: [{ text: 'typed' }] } })
+  })
+
+  it('retains a pending-edit commit after a failed flush and saves it on retry', async () => {
+    const services = createServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+    let commits = 0
+    store.registerPendingEditFinisher(() => {
+      if (commits > 0) return false
+      commits += 1
+      store.editText('root', 'typed')
+      return true
+    })
+    services.save = async () => {
+      throw new Error('disk full')
+    }
+
+    await expect(store.flushPersistence()).rejects.toThrow('disk full')
+
+    expect(commits).toBe(1)
+    const failed = store.getSnapshot()
+    expect(failed.status === 'ready' && failed.document.roots[0]!.text).toBe('typed')
+
+    services.save = async (state) => {
+      services.saves.push(state)
+    }
+    await store.flushPersistence()
+
+    expect(commits).toBe(1)
+    expect(services.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'typed' }] } })
+  })
+
+  it('defers a pending-edit finisher while locked and commits it after a successful flush unlocks the store', async () => {
+    const clock = new FakeClock()
+    const { store, services } = await lockEditor(clock)
+    let commits = 0
+    store.registerPendingEditFinisher(() => {
+      if (commits > 0) return false
+      commits += 1
+      store.editText('root', 'replace commit')
+      return true
+    })
+
+    await expect(store.flushPersistence()).rejects.toThrow('disk full')
+    expect(commits).toBe(0)
+
+    services.save = async (state) => {
+      services.saves.push(state)
+    }
+    await store.flushPersistence()
+
+    expect(commits).toBe(1)
+    expect(services.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'replace commit' }] } })
+    const recovered = store.getSnapshot()
+    expect(recovered.status === 'ready' && recovered.persistenceLocked).toBeUndefined()
+  })
+
+  it('captures a pending edit completed while the flush save is in flight', async () => {
+    const { services, pending } = deferredSaveServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+    pending.length = 0
+    store.editText('root', 'before quit')
+    let armed = false
+    let committed = false
+    store.registerPendingEditFinisher(() => {
+      if (!armed || committed) return false
+      committed = true
+      store.editText('root', 'completed while pending')
+      return true
+    })
+
+    const flush = store.flushPersistence()
+    await vi.waitFor(() => expect(pending).toHaveLength(1))
+    armed = true
+    pending[0]!.resolve()
+    await vi.waitFor(() => expect(pending).toHaveLength(2))
+    pending[1]!.resolve()
+    await flush
+
+    expect(committed).toBe(true)
+    expect(services.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'completed while pending' }] } })
+  })
+
+  it('waits for the immediate save a post-save pending-edit commit requests', async () => {
+    const { services, pending } = deferredSaveServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+    pending.length = 0
+    store.editText('root', 'before')
+    let armed = false
+    let committed = false
+    store.registerPendingEditFinisher(() => {
+      if (!armed || committed) return false
+      committed = true
+      store.editText('root', 'one two three four five six seven eight nine ten')
+      return true
+    })
+
+    const flush = store.flushPersistence()
+    await vi.waitFor(() => expect(pending).toHaveLength(1))
+    armed = true
+    pending[0]!.resolve()
+    await vi.waitFor(() => expect(pending).toHaveLength(2))
+
+    let flushed = false
+    void flush.then(() => {
+      flushed = true
+    })
+    await tick()
+    expect(flushed).toBe(false)
+
+    pending[1]!.resolve()
+    await flush
+    expect(services.saves.at(-1)).toMatchObject({
+      document: { roots: [{ text: 'one two three four five six seven eight nine ten' }] },
+    })
+  })
+
+  it('stops invoking a pending-edit finisher after it unregisters', async () => {
+    const services = createServices()
+    const store = new EditorStore(services, ids('root'))
+    await store.initialize()
+    await store.flushPersistence()
+    const finish = vi.fn(() => false)
+    const unregister = store.registerPendingEditFinisher(finish)
+
+    unregister()
+    await store.flushPersistence()
+
+    expect(finish).not.toHaveBeenCalled()
+  })
+
   it.each(['clipboard read', 'attachment write', 'cut'] as const)(
     'waits for a pending %s and its resulting save during flush',
     async (stage) => {

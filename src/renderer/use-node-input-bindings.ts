@@ -363,6 +363,21 @@ export function useNodeInputBindings({
     [store, applyCaretState, vimSession, vimCommandState],
   )
 
+  // The store invokes this before it captures a quit save and again after that save completes, so
+  // a pending Replace buffer is committed into the document and persisted by the quit flush rather
+  // than dying with the renderer. The commit path is the same one blur uses: no DOM rewrite (the
+  // visible text already equals the committed text), no Escape-style caret retreat, and a return to
+  // Normal mode so a failed quit leaves the editor in a consistent state. The session is consumed
+  // before the commit, so repeated invocations are no-ops; the returned flag tells the flush to run
+  // another pass when this call committed an edit.
+  const finishPendingEdits = useCallback((): boolean => {
+    const committed = finishVimReplace()
+    if (latestVimMode.current === 'replace') setVimMode('normal')
+    return committed
+  }, [finishVimReplace, setVimMode])
+
+  useEffect(() => store.registerPendingEditFinisher(finishPendingEdits), [store, finishPendingEdits])
+
   const finishVimInsert = useCallback(
     // Always captures: a diff-based session can span a node change (e.g. Enter while still in
     // Insert mode) with no reliable way to detect that at finish time across every trigger

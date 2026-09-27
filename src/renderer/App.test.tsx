@@ -1176,6 +1176,39 @@ describe('App', () => {
     expect(first).toHaveValue('A')
   })
 
+  it('commits a pending Replace edit when the store flushes persistence for quit', async () => {
+    const save = vi.fn(async () => undefined)
+    const services: EditorServices = {
+      load: async () => null,
+      save,
+      readClipboard: async () => ({ kind: 'text', text: '' }),
+      writeAttachment: async () => undefined,
+      cleanupAttachments: async () => undefined,
+    }
+    const store = new EditorStore(services, () => 'root')
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(root, { target: { value: 'abcd' } })
+    root.setSelectionRange(2, 2)
+    fireEvent.keyDown(root, { key: 'R' })
+    fireEvent.keyDown(root, { key: 'X' })
+    expect(root).toHaveValue('abXd')
+
+    await act(async () => {
+      await store.flushPersistence()
+    })
+
+    const state = store.getSnapshot()
+    expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('abXd')
+    expect(save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ document: { roots: [{ id: 'root', text: 'abXd', children: [] }] } }),
+    )
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+  })
+
   it('quits the application when Cmd+Q is pressed in an editable node', async () => {
     const store = createStore()
     await act(async () => {

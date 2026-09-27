@@ -15,6 +15,7 @@ import {
   node,
   readPersisted,
   restoreSaves,
+  setCursor,
   test,
   tryReadPersisted,
   typeInto,
@@ -177,6 +178,132 @@ test.describe('shutdown failure handling', () => {
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${beforeQuit}${typedWhilePending}`)
+  })
+
+  test('persists a pending Replace edit when the application menu quits', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'abcd')
+    await setCursor(editor, 2)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('R')
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.keyboard.type('XY')
+    await expect(editor).toHaveValue('aXYd')
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('aXYd')
+  })
+
+  test('persists a pending Replace edit when Cmd+Q is pressed in the editor', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    const editor = node(window, 1)
+
+    await typeInto(editor, 'abcd')
+    await setCursor(editor, 2)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('R')
+    await window.keyboard.type('XY')
+    await expect(editor).toHaveValue('aXYd')
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await editor.press('Meta+q').catch(() => undefined)
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('aXYd')
+  })
+
+  test('retains a pending Replace edit across a failed window-close save and persists it after a retry', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    allowRendererError(
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+    )
+    allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
+    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
+    await blockSaves(app)
+
+    const editor = node(window, 1)
+    await typeInto(editor, 'abcd')
+    await setCursor(editor, 2)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('R')
+    await window.keyboard.type('XY')
+    await expect(editor).toHaveValue('aXYd')
+
+    await closeMainWindow(app)
+    expect(app.process().exitCode).toBeNull()
+    await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toBeVisible({ timeout: 7_000 })
+    expect(app.process().exitCode).toBeNull()
+
+    await restoreSaves(app)
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await closeMainWindow(app)
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('aXYd')
+  })
+
+  test('persists a Replace edit completed while the quit save is in flight', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & {
+        saveCalls?: number
+        firstSaveStarted?: boolean
+        releaseFirstSave?: () => void
+      }
+      control.saveCalls = 0
+      const gate = new Promise<void>((resolve) => {
+        control.releaseFirstSave = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        control.saveCalls = (control.saveCalls ?? 0) + 1
+        if (control.saveCalls === 1) {
+          control.firstSaveStarted = true
+          await gate
+        }
+        return original(...args)
+      })
+    })
+
+    const editor = node(window, 1)
+    await typeInto(editor, 'abcd')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await expect(editor).toHaveValue('abcX')
+
+    await clickApplicationMenuQuit(app)
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as typeof globalThis & { firstSaveStarted?: boolean }).firstSaveStarted),
+      )
+      .toBe(true)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    await window.keyboard.press('R')
+    await window.keyboard.type('Y')
+    // The committed replacement returned the editor to Normal mode, whose block caret sits on the
+    // final character ('X'), so the in-flight replacement overwrites it.
+    await expect(editor).toHaveValue('abcY')
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseFirstSave?: () => void }).releaseFirstSave?.())
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('abcY')
   })
 
   test('keeps the app open after a window-close save failure, reports the timeout, and quits after a retry', async ({
