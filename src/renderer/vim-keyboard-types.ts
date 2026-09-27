@@ -92,7 +92,13 @@ export interface VimKeyboardState {
   finishInsert?: (input: HTMLElement) => void
   beginReplace?: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
   handleReplaceKey?: (input: HTMLElement, key: string) => boolean
-  finishReplace?: (input: HTMLElement, retreatCursor?: boolean) => boolean
+  /**
+   * Commit and consume a pending Replace session. `retreatCursor` mirrors the Escape/undo retreat;
+   * `preserveDomSelection` commits only to the store and leaves the DOM text, selection, and caret
+   * untouched, because a text-editing command that interrupts the session (paste/cut) must act on
+   * what the user still sees selected.
+   */
+  finishReplace?: (input: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
   imageTextCursor?: { current: number | undefined }

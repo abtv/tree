@@ -37,13 +37,17 @@ beforeEach(() => {
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined })
 })
 
-function createStore(clipboard: ClipboardValue = { kind: 'text', text: '' }): EditorStore {
+function createStore(
+  clipboard: ClipboardValue = { kind: 'text', text: '' },
+  writeClipboard?: EditorServices['writeClipboard'],
+): EditorStore {
   const services: EditorServices = {
     load: async () => null,
     save: async () => undefined,
     readClipboard: async () => clipboard,
     writeAttachment: async () => undefined,
     cleanupAttachments: async () => undefined,
+    ...(writeClipboard === undefined ? {} : { writeClipboard }),
   }
   let id = 0
   return new EditorStore(services, () => ['root', 'child', 'sibling'][id++] ?? `node-${id}`)
@@ -576,6 +580,122 @@ describe('App', () => {
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(input.value.length)
+  })
+
+  it('commits a pending Replace edit before Cmd+V pastes at the typed end', async () => {
+    const store = createStore({ kind: 'text', text: 'PASTED' })
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'abcd' } })
+    input.setSelectionRange(2, 2)
+    fireEvent.keyDown(input, { key: 'R' })
+    fireEvent.keyDown(input, { key: 'X' })
+    expect(input).toHaveValue('abXd')
+
+    fireEvent.keyDown(input, { key: 'v', metaKey: true })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(input).toHaveValue('abXPASTEDd')
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+  })
+
+  it('commits a pending Replace edit before Cmd+A and Cmd+X cut the visible selection', async () => {
+    const writeClipboard = vi.fn(async () => undefined)
+    const store = createStore({ kind: 'text', text: '' }, writeClipboard)
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'abcd' } })
+    input.setSelectionRange(2, 2)
+    fireEvent.keyDown(input, { key: 'R' })
+    fireEvent.keyDown(input, { key: 'X' })
+    fireEvent.keyDown(input, { key: 'a', metaKey: true })
+
+    fireEvent.keyDown(input, { key: 'x', metaKey: true })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(writeClipboard).toHaveBeenCalledWith({ text: 'abXd', html: 'abXd' })
+    expect(input).toHaveValue('')
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+  })
+
+  it('commits a pending Replace edit before the native paste fallback', async () => {
+    const store = createStore({ kind: 'text', text: 'PASTED' })
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'abcd' } })
+    input.setSelectionRange(2, 2)
+    fireEvent.keyDown(input, { key: 'R' })
+    fireEvent.keyDown(input, { key: 'X' })
+
+    fireEvent.paste(input)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(input).toHaveValue('abXPASTEDd')
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+  })
+
+  it('keeps character Visual mode and re-anchors the next motion after Cmd+V', async () => {
+    const store = createStore({ kind: 'text', text: 'PASTED' })
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'abcd' } })
+    input.setSelectionRange(0, 0)
+    fireEvent.keyDown(input, { key: 'v' })
+    fireEvent.keyDown(input, { key: 'l' })
+    fireEvent.keyDown(input, { key: 'l' })
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(3)
+
+    fireEvent.keyDown(input, { key: 'v', metaKey: true })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(input).toHaveValue('PASTEDabcd')
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL')
+
+    fireEvent.keyDown(input, { key: 'l' })
+    expect(input.selectionStart).toBe(6)
+  })
+
+  it('keeps whole-node Visual mode and its range after Cmd+V', async () => {
+    const store = createStore({ kind: 'text', text: 'X' })
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(root, { target: { value: 'A' } })
+    root.focus()
+    fireEvent.keyDown(root, { key: 'V' })
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
+    expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
+
+    fireEvent.keyDown(root, { key: 'v', metaKey: true })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
+    expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
+    expect(root).toHaveValue('AX')
   })
 
   it('exits whole-node Visual mode when the enter control enters the node', async () => {

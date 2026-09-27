@@ -3,12 +3,15 @@ import { join } from 'node:path'
 import {
   attachmentPath,
   expect,
+  firePaste,
   launchTree as launchTreeBase,
+  lockSystemClipboard,
   node,
   seedDocument,
   setCursor,
   test,
   typeInto,
+  writeClipboardText,
 } from './fixtures'
 
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
@@ -539,6 +542,102 @@ test.describe('Vim editing prototype', () => {
 
     await window.keyboard.press('Meta+z')
     await expect(node(window, 1)).toHaveValue('Xb')
+  })
+
+  test('commits a pending Replace session before Cmd+V pastes at the typed end', async ({ userDataDir }) => {
+    await lockSystemClipboard()
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await expect(editor).toHaveValue('abXd')
+    await writeClipboardText(app, 'PASTED')
+    // Suppress Chromium's native paste so only the application's command can change the text.
+    await window.evaluate(() => {
+      document.addEventListener('paste', (event) => event.preventDefault(), true)
+    })
+
+    await window.keyboard.press('Meta+v')
+
+    await expect(editor).toHaveValue('abXPASTEDd')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('commits a pending Replace session before the native paste fallback', async ({ userDataDir }) => {
+    await lockSystemClipboard()
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await expect(editor).toHaveValue('abXd')
+    await writeClipboardText(app, 'PASTED')
+
+    await firePaste(editor)
+
+    await expect(editor).toHaveValue('abXPASTEDd')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('commits a pending Replace session before Cmd+A selects all', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await expect(editor).toHaveValue('abXd')
+
+    await window.keyboard.press('Meta+a')
+
+    // The select-all feedback render must not rewind the committed replacement to the stored text.
+    await expect(editor).toHaveValue('abXd')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 4)
+  })
+
+  test('commits a pending Replace session before Cmd+A and Cmd+X cut the visible selection', async ({
+    userDataDir,
+  }) => {
+    await lockSystemClipboard()
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await expect(editor).toHaveValue('abXd')
+    await window.keyboard.press('Meta+a')
+    // Suppress Chromium's native cut so the clipboard payload can only come from the application.
+    await window.evaluate(() => {
+      document.addEventListener('cut', (event) => event.preventDefault(), true)
+    })
+
+    await window.keyboard.press('Meta+x')
+
+    await expect(editor).toHaveValue('')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('abXd')
   })
 
   test('repeats a deletion made inside an Insert session', async ({ userDataDir }) => {

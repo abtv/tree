@@ -18,6 +18,12 @@ export type {
   VimViewportMotion,
 } from './vim-keyboard-types'
 
+function clearCommandAssemblySlots(vim: VimTextCommandState): void {
+  vim.pending.current = undefined
+  vim.visualAnchor.current = undefined
+  vim.visualFocus.current = undefined
+}
+
 /**
  * Drops the command state that belongs to the node or level being left — the pending command and
  * both character-wise Visual endpoints — and leaves whole-node Visual for Normal mode, because its
@@ -29,12 +35,51 @@ export type {
  */
 function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): void {
   if (vim === undefined) return
-  vim.pending.current = undefined
-  vim.visualAnchor.current = undefined
-  vim.visualFocus.current = undefined
+  clearCommandAssemblySlots(vim)
   if (vim.mode !== 'visual-node') return
   vim.nodeVisual?.exit()
   vim.setMode('normal')
+}
+
+/**
+ * The renderer-local state a text-editing application command must resolve before it runs. The
+ * full `VimKeyboardState` satisfies it structurally; the narrowed shape lets the context-menu
+ * command path resolve the same state without receiving the whole keyboard surface.
+ */
+export interface VimTextCommandState {
+  mode: VimKeyboardState['mode']
+  pending: VimKeyboardState['pending']
+  visualAnchor: VimKeyboardState['visualAnchor']
+  visualFocus: VimKeyboardState['visualFocus']
+  finishReplace?: VimKeyboardState['finishReplace']
+  setMode: VimKeyboardState['setMode']
+}
+
+/**
+ * Commit a pending Replace edit as one edit without rewriting the DOM, then return to Normal. The
+ * visible text already equals the committed text, so callers that keep acting on the selection
+ * (cut/paste/select-all) must preserve it. No-op outside Replace mode.
+ */
+function commitPendingReplace(vim: VimTextCommandState | undefined, input: HTMLElement): void {
+  if (vim === undefined || vim.mode !== 'replace') return
+  vim.finishReplace?.(input, false, true)
+  vim.setMode('normal')
+}
+
+/**
+ * Resolve renderer-local session state before an application command that edits the focused node's
+ * text through the store (`Cmd+V`/`Cmd+X`, context-menu Paste/Cut, and the native paste fallback).
+ * A pending Replace edit commits as one edit first and returns to Normal without rewriting the DOM,
+ * so a following Cut or Paste acts on what the user still sees selected. Insert sessions and
+ * whole-node Visual mode and its range are untouched; otherwise the unfinished command and both
+ * character Visual endpoints clear while character Visual mode stays active.
+ */
+export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefined, input: HTMLElement): void {
+  if (vim === undefined) return
+  if (vim.mode === 'replace') {
+    commitPendingReplace(vim, input)
+  } else if (vim.mode === 'insert' || vim.mode === 'visual-node') return
+  clearCommandAssemblySlots(vim)
 }
 
 /**
@@ -59,6 +104,7 @@ export function executeEditorContextMenuCommand(
   store: EditorStore,
   node: TreeNode,
   input: HTMLElement,
+  vim?: VimTextCommandState,
 ): void {
   const selection = getSelectionRange(input)
   if (command === 'selectAll') {
@@ -68,8 +114,10 @@ export function executeEditorContextMenuCommand(
   if (command === 'copy' && selection.start !== selection.end) {
     void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
   } else if (command === 'cut' && selection.start !== selection.end) {
+    finishVimSessionBeforeTextEdit(vim, input)
     void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
   } else if (command === 'paste') {
+    finishVimSessionBeforeTextEdit(vim, input)
     void store.paste(node.id, getCaret(input)).catch((error: unknown) => store.reportError(error))
   }
 }
@@ -191,8 +239,11 @@ export function createEditorKeyDownHandler({
     }
     if (selectingAll) {
       event.preventDefault()
-      // Select-all replaces the selection, so a pending command or character Visual endpoints must
-      // not survive it; whole-node Visual ends because its range no longer describes the selection.
+      // Select-all replaces the selection, so it ends whole-node Visual and clears a pending command
+      // or character Visual endpoints. A pending Replace edit commits first without rewriting the
+      // DOM, because the select-all feedback render would otherwise rewind the visible replacement
+      // to the stored text.
+      commitPendingReplace(vim, event.currentTarget)
       clearCommandAssemblyBeforeCommand(vim)
       const input = event.currentTarget
       selectAll(input)
@@ -208,11 +259,17 @@ export function createEditorKeyDownHandler({
       }
     } else if (event.metaKey && event.key.toLowerCase() === 'v') {
       event.preventDefault()
+      // A paste edits this node's text, so any session or command assembly describing the old text
+      // must resolve before the store changes.
+      finishVimSessionBeforeTextEdit(vim, event.currentTarget)
       void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
     } else if (event.metaKey && event.key.toLowerCase() === 'x') {
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {
         event.preventDefault()
+        // A cut edits this node's text; resolve the session first and preserve the visible selection
+        // so the cut removes exactly what the user selected.
+        finishVimSessionBeforeTextEdit(vim, event.currentTarget)
         void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
       }
     } else if (event.metaKey && event.key === '.') {

@@ -13,7 +13,12 @@ import {
   setNormalCaret,
   updateSelectedLinks,
 } from './editor-dom'
-import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
+import {
+  createEditorKeyDownHandler,
+  executeEditorContextMenuCommand,
+  finishVimSessionBeforeTextEdit,
+  type VimTextCommandState,
+} from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
 import type { VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
@@ -316,7 +321,7 @@ export function useNodeInputBindings({
   )
 
   const finishVimReplace = useCallback(
-    (input?: HTMLElement, retreatCursor = false): boolean => {
+    (input?: HTMLElement, retreatCursor = false, preserveDomSelection = false): boolean => {
       const session = takeReplaceSession(vimSession.current)
       if (session === undefined) return false
       const commit = resolveReplaceCommit(session)
@@ -347,7 +352,9 @@ export function useNodeInputBindings({
         imageActive: next.imageActive,
         imageTextReturnCursor: next.imageTextReturnCursor,
       })
-      if (input !== undefined) {
+      // A command-driven commit must not rewrite the DOM: the visible text already equals the
+      // committed text, and the user's selection is what the command is about to act on.
+      if (input !== undefined && !preserveDomSelection) {
         setEditableText(input, finalText)
         setCaret(input, rawCursor)
       }
@@ -370,6 +377,24 @@ export function useNodeInputBindings({
       if (change !== undefined) recordRepeatChange(vimCommandState.current, change)
     },
     [finishStructuralInsert, vimSession, vimCommandState],
+  )
+
+  // The context-menu and native-paste paths resolve the same renderer-local session state as the
+  // keyboard handler, but they run from bindings that do not hold the full `VimKeyboardState`.
+  // Getters keep the mode current across the async menu round trip.
+  const vimTextCommandState = useMemo<VimTextCommandState>(
+    () => ({
+      get mode() {
+        return latestVimMode.current
+      },
+      pending: vimCommandHandles.pending,
+      visualAnchor: vimCommandHandles.visualAnchor,
+      visualFocus: vimCommandHandles.visualFocus,
+      finishReplace: (input, retreatCursor, preserveDomSelection) =>
+        finishVimReplace(input, retreatCursor, preserveDomSelection),
+      setMode: setVimMode,
+    }),
+    [finishVimReplace, setVimMode, vimCommandHandles],
   )
 
   const moveVimViewport = useCallback(
@@ -582,7 +607,7 @@ export function useNodeInputBindings({
         if (window.treeApi.showEditorContextMenu === undefined) return
         void window.treeApi
           .showEditorContextMenu(request)
-          .then((command) => executeEditorContextMenuCommand(command, store, node, input))
+          .then((command) => executeEditorContextMenuCommand(command, store, node, input, vimTextCommandState))
           .catch((error: unknown) => store.reportError(error))
       },
       onClick: (event: MouseEvent<HTMLElement>) => {
@@ -628,8 +653,8 @@ export function useNodeInputBindings({
             setCaret(input, result.cursor)
             return true
           },
-          finishReplace: (input, retreatCursor) => {
-            return finishVimReplace(input, retreatCursor)
+          finishReplace: (input, retreatCursor, preserveDomSelection) => {
+            return finishVimReplace(input, retreatCursor, preserveDomSelection)
           },
           visualAnchor: vimCommandHandles.visualAnchor,
           visualFocus: vimCommandHandles.visualFocus,
@@ -707,7 +732,10 @@ export function useNodeInputBindings({
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
         finishVimInsert(event.currentTarget)
-        finishVimReplace(event.currentTarget)
+        // A right-click opens the context menu, which will run Cut or Paste against the visible
+        // selection, so this commit must not rewrite the DOM; a left click keeps the existing
+        // reset-to-typed-end behavior.
+        finishVimReplace(event.currentTarget, false, event.button === 2)
         clearCommandAssembly(vimCommandState.current)
       },
       onMouseUp: (event: MouseEvent<HTMLElement>) => {
@@ -725,6 +753,7 @@ export function useNodeInputBindings({
       onPaste: (event: ClipboardEvent<HTMLElement>) => {
         setSelectAllNodeId(undefined)
         event.preventDefault()
+        finishVimSessionBeforeTextEdit(vimTextCommandState, event.currentTarget)
         void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
       },
       onSelect: (event: SyntheticEvent<HTMLElement>) => {
@@ -758,6 +787,7 @@ export function useNodeInputBindings({
       vimSession,
       vimCommandState,
       vimCommandHandles,
+      vimTextCommandState,
     ],
   )
 

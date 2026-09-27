@@ -851,6 +851,163 @@ describe('useNodeInputBindings', () => {
     expect(store.copy).toHaveBeenCalledWith('node', 1, 4)
   })
 
+  it('commits a pending Replace session before the native onPaste fallback', () => {
+    const store = createStore()
+    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      }).bindings(node)
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(2, 2)
+    result.current.bindings.inputRef(input)
+    const press = (key: string, options: { metaKey?: boolean } = {}): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: options.metaKey ?? false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    press('R')
+    press('X')
+    expect(result.current.vimMode).toBe('replace')
+
+    act(() => {
+      result.current.bindings.onPaste({ currentTarget: input, preventDefault: vi.fn() } as never)
+    })
+
+    expect(result.current.vimMode).toBe('normal')
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
+    expect(vi.mocked(store.replaceTextRange).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(store.paste).mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('commits a pending Replace session before the context-menu Paste', async () => {
+    const store = createStore()
+    const showEditorContextMenu = vi.fn(async () => 'paste' as const)
+    window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
+    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      }).bindings(node)
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(2, 2)
+    result.current.bindings.inputRef(input)
+    const press = (key: string, options: { metaKey?: boolean } = {}): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: options.metaKey ?? false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    press('R')
+    press('X')
+    expect(result.current.vimMode).toBe('replace')
+
+    await act(async () => {
+      result.current.bindings.onContextMenu({
+        currentTarget: input,
+        clientX: 1,
+        clientY: 2,
+        preventDefault: vi.fn(),
+      } as never)
+      await Promise.resolve()
+    })
+
+    expect(result.current.vimMode).toBe('normal')
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
+    expect(vi.mocked(store.replaceTextRange).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(store.paste).mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('keeps the selection through a right-click commit so the context-menu Cut removes it', async () => {
+    const store = createStore()
+    const showEditorContextMenu = vi.fn(async () => 'cut' as const)
+    window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
+    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      }).bindings(node)
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(2, 2)
+    result.current.bindings.inputRef(input)
+    const press = (key: string, options: { metaKey?: boolean } = {}): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: options.metaKey ?? false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    press('R')
+    press('X')
+    press('a', { metaKey: true })
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(4)
+
+    act(() => {
+      result.current.bindings.onMouseDown({ currentTarget: input, button: 2, preventDefault: vi.fn() } as never)
+    })
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(4)
+
+    await act(async () => {
+      result.current.bindings.onContextMenu({
+        currentTarget: input,
+        clientX: 1,
+        clientY: 2,
+        preventDefault: vi.fn(),
+      } as never)
+      await Promise.resolve()
+    })
+
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
+    expect(store.cut).toHaveBeenCalledWith('node', 0, 4)
+    expect(result.current.vimMode).toBe('normal')
+  })
+
   it('commits a pending Replace session exactly once when the store re-enters the finish path', () => {
     const node: TreeNode = { id: 'a', text: 'ab', children: [] }
     const store = {

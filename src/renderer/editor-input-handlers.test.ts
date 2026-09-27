@@ -4,8 +4,8 @@ import type { KeyboardEvent } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
-import { createEditorKeyDownHandler } from './editor-input-handlers'
-import type { VimKeyboardState } from './editor-input-handlers'
+import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
+import type { VimKeyboardState, VimTextCommandState } from './editor-input-handlers'
 
 function createStore(): EditorStore {
   return {
@@ -1382,6 +1382,221 @@ describe('editor keyboard handler', () => {
     expect(vim.pending.current).toBeUndefined()
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(input.value.length)
+  })
+
+  it('commits and ends a pending Replace session before Cmd+V pastes at the typed end', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abXd'
+    input.setSelectionRange(3, 3)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'v', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false, true)
+    expect(vim.mode).toBe('normal')
+    expect(store.paste).toHaveBeenCalledWith('node', 3)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(store.paste).mock.invocationCallOrder[0]!)
+  })
+
+  it('commits and ends a pending Replace session before Cmd+X cuts the visible selection', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abXd'
+    input.setSelectionRange(0, 4)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'x', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false, true)
+    expect(vim.mode).toBe('normal')
+    expect(store.cut).toHaveBeenCalledWith('node', 0, 4)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(store.cut).mock.invocationCallOrder[0]!)
+  })
+
+  it('commits and ends a pending Replace session before Cmd+A selects all', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abXd'
+    input.setSelectionRange(3, 3)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'a', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false, true)
+    expect(vim.mode).toBe('normal')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
+  })
+
+  it('does not commit a pending Replace session for a Cmd+X with no selection', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abXd'
+    input.setSelectionRange(3, 3)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'x', { metaKey: true }))
+
+    expect(finishReplace).not.toHaveBeenCalled()
+    expect(store.cut).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('replace')
+  })
+
+  it.each([
+    { name: 'Cmd+V', key: 'v' },
+    { name: 'Cmd+X', key: 'x' },
+  ])('clears a Normal-mode pending command before $name', ({ key }) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 1)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    handle(keyEvent(input, 'd'))
+    expect(vim.pending.current).toBeDefined()
+
+    handle(keyEvent(input, key, { metaKey: true }))
+
+    expect(vim.pending.current).toBeUndefined()
+    expect(vim.mode).toBe('normal')
+    if (key === 'v') expect(store.paste).toHaveBeenCalledOnce()
+    else expect(store.cut).toHaveBeenCalledWith('node', 0, 1)
+  })
+
+  it('keeps character Visual mode but clears its command assembly before Cmd+V', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 2)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 2
+    vim.pending.current = { count: '', motionCount: '', prefix: 'i' }
+
+    handle(keyEvent(input, 'v', { metaKey: true }))
+
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.pending.current).toBeUndefined()
+    expect(store.paste).toHaveBeenCalledWith('node', 0)
+  })
+
+  it('keeps whole-node Visual mode and its range before Cmd+V', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
+    const exit = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
+    const pending = { count: '', motionCount: '', prefix: 'g' as const }
+    vim.pending.current = pending
+
+    handle(keyEvent(input, 'v', { metaKey: true }))
+
+    expect(exit).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('visual-node')
+    expect(vim.pending.current).toBe(pending)
+    expect(store.paste).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an Insert session and mode before Cmd+V', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+
+    handle(keyEvent(input, 'v', { metaKey: true }))
+
+    expect(vim.finishInsert).not.toHaveBeenCalled()
+    expect(vim.setMode).not.toHaveBeenCalled()
+    expect(store.paste).toHaveBeenCalledOnce()
+  })
+
+  function textCommandState(vim: VimKeyboardState): VimTextCommandState {
+    return {
+      get mode() {
+        return vim.mode
+      },
+      pending: vim.pending,
+      visualAnchor: vim.visualAnchor,
+      visualFocus: vim.visualFocus,
+      finishReplace: vim.finishReplace,
+      setMode: vim.setMode,
+    }
+  }
+
+  it('commits and ends a pending Replace session before the context-menu Paste', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abXd'
+    input.setSelectionRange(3, 3)
+    const { vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    executeEditorContextMenuCommand(
+      'paste',
+      store,
+      { id: 'node', text: 'abcd', children: [] },
+      input,
+      textCommandState(vim),
+    )
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false, true)
+    expect(vim.mode).toBe('normal')
+    expect(store.paste).toHaveBeenCalledWith('node', 3)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(store.paste).mock.invocationCallOrder[0]!)
+  })
+
+  it('commits and ends a pending Replace session before the context-menu Cut', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abXd'
+    input.setSelectionRange(0, 4)
+    const { vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    executeEditorContextMenuCommand(
+      'cut',
+      store,
+      { id: 'node', text: 'abcd', children: [] },
+      input,
+      textCommandState(vim),
+    )
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false, true)
+    expect(vim.mode).toBe('normal')
+    expect(store.cut).toHaveBeenCalledWith('node', 0, 4)
+  })
+
+  it('clears a Normal-mode pending command before the context-menu Paste', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 0)
+    const { vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
+
+    executeEditorContextMenuCommand(
+      'paste',
+      store,
+      { id: 'node', text: 'text', children: [] },
+      input,
+      textCommandState(vim),
+    )
+
+    expect(vim.pending.current).toBeUndefined()
+    expect(store.paste).toHaveBeenCalledOnce()
   })
 
   it('blocks unsupported editing keys in Normal mode', () => {

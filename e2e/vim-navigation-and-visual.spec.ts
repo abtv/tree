@@ -3,12 +3,14 @@ import {
   exactMessage,
   expect,
   launchTree as launchTreeBase,
+  lockSystemClipboard,
   node,
   seedDocument,
   setCursor,
   setMainWindowBounds,
   test,
   typeInto,
+  writeClipboardText,
 } from './fixtures'
 
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
@@ -1172,5 +1174,68 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('l')
     await expect(entered).toHaveJSProperty('selectionStart', 0)
     await expect(entered).toHaveJSProperty('selectionEnd', 2)
+  })
+
+  test('re-anchors character Visual after a paste at the resulting caret', async ({ userDataDir }) => {
+    await lockSystemClipboard()
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'alpha', text: 'Alpha', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 3)
+    await writeClipboardText(app, 'PASTED')
+    await window.evaluate(() => {
+      document.addEventListener('paste', (event) => event.preventDefault(), true)
+    })
+
+    await window.keyboard.press('Meta+v')
+
+    await expect(editor).toHaveValue('PASTEDAlpha')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    // The paste drops the stale endpoints, so the next motion anchors at the paste end rather than
+    // re-selecting from the pre-paste anchor.
+    await window.keyboard.press('l')
+    await expect(editor).toHaveJSProperty('selectionStart', 6)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-visual-paste-anchor-light.png')
+  })
+
+  test('keeps whole-node Visual mode and its range across a paste', async ({ userDataDir }) => {
+    await lockSystemClipboard()
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const alpha = node(window, 1)
+    await alpha.focus()
+    await setCursor(alpha, 0)
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await writeClipboardText(app, 'X')
+
+    await window.keyboard.press('Meta+v')
+
+    // A paste is not a focus-changing command, so the whole-node range survives and the paste lands
+    // in the focused node's text.
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await expect(node(window, 2)).toHaveValue('XBravo')
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 })
