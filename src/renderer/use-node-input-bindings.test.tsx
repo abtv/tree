@@ -744,6 +744,37 @@ describe('useNodeInputBindings', () => {
     expect(store.editContent).toHaveBeenLastCalledWith('node', 'x', [], false)
   })
 
+  it('reuses a pending link draft while its text still matches the edited node', () => {
+    const store = createStore()
+    const original = 'see https://example.test'
+    const edited = 'see https//example.test'
+    const linked: TreeNode = {
+      id: 'node',
+      text: original,
+      links: [{ start: 4, end: original.length, url: original.slice(4) }],
+      children: [],
+    }
+    let node: TreeNode = linked
+    const { result, rerender } = renderHook(() =>
+      useNodeInputBindings({ store, selectedNodeId: 'node', onPreviewAttachment: vi.fn() }),
+    )
+    const input = document.createElement('div')
+    input.textContent = edited
+    result.current(node).onContentInput({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
+    expect(store.editContent).toHaveBeenLastCalledWith('node', edited, [], false)
+
+    node = { id: 'node', text: edited, links: [], children: [] }
+    rerender()
+    input.textContent = original
+    result.current(node).onContentInput({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
+    expect(store.editContent).toHaveBeenLastCalledWith(
+      'node',
+      original,
+      [{ start: 4, end: original.length, url: original.slice(4) }],
+      false,
+    )
+  })
+
   it('uses Cmd+click to request opening the edited link', () => {
     const store = createStore()
     const { result } = renderBindings({ store, selectedNodeId: 'node' })
@@ -896,6 +927,34 @@ describe('useNodeInputBindings', () => {
 
     expect(textarea.selectionStart).toBe(3)
     expect(textarea.selectionEnd).toBe(4)
+  })
+
+  it('collapses the Normal caret on an attached node at its terminal image position', () => {
+    const store = createStore()
+    const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
+    const { result, rerender } = renderHook(() =>
+      useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        focus: holder.focus,
+        onPreviewAttachment: vi.fn(),
+        vimMode: 'normal',
+      }),
+    )
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    const textarea = document.createElement('textarea')
+    textarea.value = 'hello'
+    row.append(textarea)
+    document.body.append(row)
+    result.current({ id: 'node', text: 'hello', children: [] }).inputRef(textarea)
+
+    holder.focus = { nodeId: 'node', cursor: 5, token: 1 }
+    rerender()
+
+    expect(textarea.selectionStart).toBe(5)
+    expect(textarea.selectionEnd).toBe(5)
   })
 
   it('clears an unfinished Vim operator on blur and composition start', () => {

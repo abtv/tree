@@ -1,4 +1,5 @@
 import type { LinkRange, TreeNode } from '../domain/document'
+import { normalCaretTarget } from './link-caret'
 
 export function richTextHtml(node: TreeNode): string {
   const links = node.links ?? []
@@ -153,18 +154,17 @@ export function setCaret(element: HTMLElement, position: number): void {
 
 export function setNormalCaret(element: HTMLElement, position: number): void {
   const length = element instanceof HTMLTextAreaElement ? element.value.length : (element.textContent?.length ?? 0)
-  const imageCaret =
-    element.closest<HTMLElement>('.node-row, .current-parent')?.dataset.hasAttachment === 'true' && position === length
-  if (imageCaret) {
-    setCaret(element, length)
+  const target = normalCaretTarget(length, position, hasAttachmentCharacter(element))
+  if (target.kind === 'collapsed') {
+    setCaret(element, target.position)
     return
   }
-  if (length === 0) {
-    setCaret(element, 0)
-    return
-  }
-  const cursor = Math.min(Math.max(position, 0), length - 1)
-  setSelectionRange(element, cursor, cursor + 1)
+  setSelectionRange(element, target.start, target.end)
+}
+
+/** Whether the element's row owns a terminal image character after its text. */
+export function hasAttachmentCharacter(element: HTMLElement): boolean {
+  return element.closest<HTMLElement>('.node-row, .current-parent')?.dataset.hasAttachment === 'true'
 }
 
 export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {

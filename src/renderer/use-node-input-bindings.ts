@@ -12,6 +12,7 @@ import {
 import {
   getCaret,
   getSelectionRange,
+  hasAttachmentCharacter,
   isCollapsedSelection,
   readEditableContent,
   setCaret,
@@ -19,6 +20,7 @@ import {
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
+import { currentLinkDraft, normalCaretTarget } from './link-caret'
 import type {
   VimFindCommand,
   VimPendingCommand,
@@ -344,14 +346,13 @@ export function useNodeInputBindings({
       if (input === undefined) return
       input.focus()
       if (latestVimMode.current === 'normal') {
-        const normalCursor = Math.min(Math.max(focus.cursor, 0), Math.max(0, nodeTextLength(input) - 1))
-        if (
-          !(input instanceof HTMLTextAreaElement) ||
-          input.selectionStart !== normalCursor ||
-          input.selectionEnd !== (input.value.length === 0 ? 0 : normalCursor + 1)
-        ) {
-          setNormalCaret(input, focus.cursor)
-        }
+        const target = normalCaretTarget(nodeTextLength(input), focus.cursor, hasAttachmentCharacter(input))
+        const matches =
+          input instanceof HTMLTextAreaElement &&
+          (target.kind === 'block'
+            ? input.selectionStart === target.start && input.selectionEnd === target.end
+            : input.selectionStart === target.position && input.selectionEnd === target.position)
+        if (!matches) setNormalCaret(input, focus.cursor)
       } else if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
       else setCaret(input, focus.cursor)
     }
@@ -431,10 +432,8 @@ export function useNodeInputBindings({
         const content = readEditableContent(event.currentTarget)
         pendingCaret.current = { input: event.currentTarget, cursor }
         const draft =
-          pendingLinkDraft.current?.nodeId === node.id &&
-          node.text.slice(pendingLinkDraft.current.range.start, pendingLinkDraft.current.range.end) ===
-            pendingLinkDraft.current.range.url
-            ? pendingLinkDraft.current.range
+          pendingLinkDraft.current?.nodeId === node.id
+            ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
             : undefined
         const edit = reconcileLinkTextEdit(node.text, node.links ?? [], content.text, draft)
         pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }
@@ -443,10 +442,8 @@ export function useNodeInputBindings({
       onContentChange: (event: FormEvent<HTMLElement>) => {
         const text = event.currentTarget.textContent ?? ''
         const draft =
-          pendingLinkDraft.current?.nodeId === node.id &&
-          node.text.slice(pendingLinkDraft.current.range.start, pendingLinkDraft.current.range.end) ===
-            pendingLinkDraft.current.range.url
-            ? pendingLinkDraft.current.range
+          pendingLinkDraft.current?.nodeId === node.id
+            ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
             : undefined
         const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text, draft)
         pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }

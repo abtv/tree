@@ -298,6 +298,38 @@ describe('editor DOM adapters', () => {
     expect(link.classList.contains('link-selected')).toBe(false)
   })
 
+  it('does not mark a link missing its final character from the selection', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'a<a href="https://example.test">link</a>z'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    if (link === null) throw new Error('The link was not created.')
+
+    setDomSelection(element.firstChild!, 0, link.firstChild!, 3)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(false)
+  })
+
+  it('marks a link only when the selection boundary passes the anchor element, not merely its text', () => {
+    const element = document.createElement('div')
+    element.innerHTML = 'see <a href="https://example.test">link</a>'
+    document.body.append(element)
+    const link = element.querySelector('a')
+    const label = link?.firstChild
+    if (link === null || label === undefined || label === null) throw new Error('The link was not created.')
+
+    // A mouse selection can end inside the anchor at its final text offset while the rendered
+    // selection appears to include the whole label; the boundary-point rule does not count that
+    // as covering the anchor. See e2e/clipboard.spec.ts "selects linked characters with the mouse".
+    setDomSelection(element.firstChild!, 0, label, label.textContent?.length ?? 0)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(false)
+
+    setDomSelection(element.firstChild!, 0, element, element.childNodes.length)
+    updateSelectedLinks(element)
+    expect(link.classList.contains('link-selected')).toBe(true)
+  })
+
   it('reads text nested inside inline elements and anchors without an href attribute', () => {
     const element = document.createElement('div')
     element.innerHTML = 'before<span>inner <em>deep</em></span><a>linked</a>'

@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions. Read the linked plan before 
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Renderer interaction state ownership](interaction-state-ownership.md) | In progress | OWN-6: give hyperlink caret and selection one owner (resolve D2 first) |
+| [Renderer interaction state ownership](interaction-state-ownership.md) | In progress | OWN-7: extract the Vim register and session state from the input bindings hook |
 
 Remove a plan and its row when the initiative is complete. Git history retains the completed record.
