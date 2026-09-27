@@ -1478,6 +1478,32 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('ab')
   })
 
+  test('undoes two separate Vim character replacements without an empty history step', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'ab', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+
+    await editor.press('r')
+    await editor.press('q')
+    await expect(editor).toHaveValue('qb')
+    await editor.press('l')
+    await editor.press('r')
+    await editor.press('Z')
+    await expect(editor).toHaveValue('qZ')
+
+    await editor.press('u')
+    await expect(editor).toHaveValue('qb')
+    await editor.press('u')
+    await expect(editor).toHaveValue('ab')
+    await editor.press('Control+r')
+    await expect(editor).toHaveValue('qb')
+  })
+
   test('clears a stale image caret after undo and redo', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

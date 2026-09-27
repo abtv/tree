@@ -189,7 +189,6 @@ export class EditorStore {
     const node = requireNode(state.document, nodeId).node
     const replacement = replaceLinkedText(node.text, node.links ?? [], start, end, text)
     this.endTextSession()
-    if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.textSession.markNextEditStandalone()
     this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
   }
@@ -202,7 +201,6 @@ export class EditorStore {
     const replacement = replaceLinkedTextRanges(node.text, node.links ?? [], edits)
     if (replacement.text === node.text) return
     this.endTextSession()
-    if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.textSession.markNextEditStandalone()
     this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
   }

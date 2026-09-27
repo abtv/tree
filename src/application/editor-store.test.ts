@@ -2221,6 +2221,21 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text }] } })
   })
 
+  it('retains one undo step per standalone text replacement near the history limit', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    for (let length = 0; length < 120; length += 1) store.replaceTextRange('root', length, length, 'x')
+    for (let length = 119; length >= 0; length -= 1) {
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'x'.repeat(length) }] } })
+    }
+  })
+
   it('ignores a multi-edit text change that leaves the text unchanged', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'plain', children: [] }] },
