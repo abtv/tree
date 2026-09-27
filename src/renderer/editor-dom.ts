@@ -81,7 +81,6 @@ export function selectAll(element: HTMLElement): void {
     element.select()
     return
   }
-  clearNormalCaret(element)
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
@@ -128,7 +127,6 @@ export function setCaret(element: HTMLElement, position: number): void {
     element.setSelectionRange(clamped, clamped)
     return
   }
-  clearNormalCaret(element)
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
@@ -167,15 +165,6 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
   }
   const cursor = Math.min(Math.max(position, 0), length - 1)
   setSelectionRange(element, cursor, cursor + 1)
-}
-
-export function clearNormalCaret(element: HTMLElement): void {
-  for (const link of element.querySelectorAll<HTMLAnchorElement>('a.normal-caret-before, a.normal-caret-after')) {
-    link.classList.remove('normal-caret-before', 'normal-caret-after')
-    link.style.removeProperty('--normal-caret-left')
-    link.style.removeProperty('--normal-caret-top')
-    link.style.removeProperty('--normal-caret-height')
-  }
 }
 
 export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {

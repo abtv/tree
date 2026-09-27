@@ -10,7 +10,6 @@ import {
   type TreeNode,
 } from '../domain/document'
 import {
-  clearNormalCaret,
   getCaret,
   getSelectionRange,
   isCollapsedSelection,
@@ -414,7 +413,6 @@ export function useNodeInputBindings({
       },
       onBlur: () => {
         const input = inputs.current.get(node.id)
-        if (input !== undefined) clearNormalCaret(input)
         setSelectAllNodeId(undefined)
         vimPending.current = undefined
         // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and

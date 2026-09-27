@@ -3,7 +3,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
-  clearNormalCaret,
   collapseSelectionToAnchor,
   getCaret,
   getSelectionRange,
@@ -191,41 +190,20 @@ describe('editor DOM adapters', () => {
     expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
-  it('does not draw a hyperlink caret while the Normal cursor is in earlier plain text', () => {
+  it('selects the Normal-mode block caret in plain text around links', () => {
     const element = document.createElement('div')
     element.innerHTML =
       'test <a contenteditable="false" href="https://example.test">link</a>\n<a contenteditable="false" href="https://example.test">link</a> after'
     document.body.append(element)
-    const links = Array.from(element.querySelectorAll('a'))
 
     setNormalCaret(element, 0)
     expect(getSelectionRange(element)).toEqual({ start: 0, end: 1 })
-    expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
 
     setNormalCaret(element, 1)
     expect(getSelectionRange(element)).toEqual({ start: 1, end: 2 })
-    expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
 
     setNormalCaret(element, 9)
     expect(getSelectionRange(element)).toEqual({ start: 9, end: 10 })
-    expect(links.every((link) => !link.classList.contains('normal-caret-before'))).toBe(true)
-  })
-
-  it('clears Normal-mode hyperlink caret decorations when an editor loses focus', () => {
-    const element = document.createElement('div')
-    element.innerHTML =
-      '<a class="normal-caret-before" style="--normal-caret-left: -2px; --normal-caret-top: 0px; --normal-caret-height: 21px" href="https://example.test">link</a>'
-    document.body.append(element)
-    const link = element.querySelector('a')
-    if (link === null) throw new Error('The linked element is missing.')
-
-    clearNormalCaret(element)
-
-    expect(link.classList.contains('normal-caret-before')).toBe(false)
-    expect(link.classList.contains('normal-caret-after')).toBe(false)
-    expect(link.style.getPropertyValue('--normal-caret-left')).toBe('')
-    expect(link.style.getPropertyValue('--normal-caret-top')).toBe('')
-    expect(link.style.getPropertyValue('--normal-caret-height')).toBe('')
   })
 
   it('places a caret at each position inside an editable link', () => {
