@@ -985,6 +985,38 @@ describe('editor keyboard handler', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('blocks an unhandled Ctrl-modified key in every non-Insert Vim mode instead of letting it reach native editing', () => {
+    for (const mode of ['normal', 'replace', 'visual', 'visual-node'] as const) {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = 'text'
+      const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, mode)
+      vim.pending.current = { count: '', motionCount: '', operator: 'd' }
+
+      const event = keyEvent(input, 'w', { ctrlKey: true })
+      handle(event)
+
+      expect(event.preventDefault, mode).toHaveBeenCalledOnce()
+      expect(vim.pending.current, mode).toBeUndefined()
+      expect(store.leave, mode).not.toHaveBeenCalled()
+      expect(store.enter, mode).not.toHaveBeenCalled()
+      expect(store.undo, mode).not.toHaveBeenCalled()
+      expect(store.redo, mode).not.toHaveBeenCalled()
+    }
+  })
+
+  it('leaves Ctrl-modified keys unblocked in Insert mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+
+    const event = keyEvent(input, 'w', { ctrlKey: true })
+    handle(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
   it('moves to the first and last nodes with gg and G', () => {
     const store = createStore()
     vi.mocked(store.getSnapshot).mockReturnValue({

@@ -95,6 +95,25 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('ab')
   })
 
+  test('blocks an unhandled Ctrl-modified key from reaching native text editing in Normal mode', async ({
+    userDataDir,
+  }) => {
+    // The node stays a genuinely editable textarea in Normal mode, and macOS Chromium binds Ctrl+H to
+    // its native "delete backward" text-editing command. Only Ctrl+d/u/o/r have an explicit Normal-mode
+    // meaning, so an unblocked Ctrl+H would let that native command mutate the textarea directly,
+    // deleting a character the application never asked to delete.
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+
+    await editor.press('i')
+    await typeInto(editor, 'abc')
+    await window.keyboard.press('Escape')
+    await expect(editor).toHaveValue('abc')
+
+    await window.keyboard.press('Control+h')
+    await expect(editor).toHaveValue('abc')
+  })
+
   test('drops an unfinished command before u and Ctrl+r instead of undoing or redoing', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },

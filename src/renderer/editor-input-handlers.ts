@@ -215,6 +215,29 @@ export function createEditorKeyDownHandler({
       vim.syncImageCaretToFocus()
       return
     }
+    /**
+     * Any other Ctrl-modified key in a non-Insert Vim mode reaches here unhandled. It must not fall
+     * through to native Chromium editing: the node stays contentEditable (or a non-readOnly textarea)
+     * across every Vim mode, so an unblocked Ctrl combo can still trigger the browser's own undo/redo,
+     * select-all, or macOS's Emacs-style caret and deletion bindings, bypassing the app's own command
+     * and document model. Discards a pending command for the same reason the explicit Ctrl+d/u/o/r
+     * commands above do: a Ctrl-modified key can never be the awaited character. Excludes the bare
+     * `Control` keydown itself — pressing the modifier alone fires that event with `ctrlKey` already
+     * true, before the combined key arrives, and it must not discard a command a following Ctrl+d/u/o/r
+     * press still needs to see pending.
+     */
+    if (
+      vim !== undefined &&
+      !event.metaKey &&
+      !event.altKey &&
+      event.ctrlKey &&
+      event.key !== 'Control' &&
+      vim.mode !== 'insert'
+    ) {
+      event.preventDefault()
+      discardsUnfinishedCommand(vim)
+      return
+    }
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
