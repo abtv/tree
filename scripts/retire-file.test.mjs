@@ -66,6 +66,17 @@ describe('resolveRetirement', () => {
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'link.ts' })).toMatchObject({ ok: false })
   })
 
+  it('refuses a path whose real location escapes through a directory symlink', () => {
+    const root = createRepository()
+    const outside = mkdtempSync(join(tmpdir(), 'tree-retire-outside-'))
+    temporaryDirectories.push(outside)
+    writeFileSync(join(outside, 'tracked.ts'), 'export const value = 3\n')
+    symlinkSync(outside, join(root, 'escaped'))
+    expect(resolveRetirement({ rootDirectory: root, requestedPath: 'escaped/tracked.ts' })).toMatchObject({
+      ok: false,
+    })
+  })
+
   it('refuses a missing or untracked file', () => {
     const root = createRepository()
     writeFileSync(join(root, 'untracked.ts'), 'export const value = 2\n')

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { lstatSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -43,6 +43,22 @@ export function resolveRetirement({ rootDirectory = ROOT, requestedPath, runGit 
   }
   if (!stats.isFile()) {
     return { ok: false, reason: `Refusing a path that is not a regular file: ${relativePath}` }
+  }
+
+  // The textual containment check above does not follow an intermediate directory symlink, so
+  // verify the canonical location as well. A directory replaced by a symlink that leaves the
+  // repository must not make a file outside it look tracked and retireable.
+  let realRoot
+  let realPath
+  try {
+    realRoot = realpathSync(rootDirectory)
+    realPath = realpathSync(absolutePath)
+  } catch {
+    return { ok: false, reason: `Refusing a path that does not exist: ${relativePath}` }
+  }
+  const realRelativePath = relative(realRoot, realPath)
+  if (realRelativePath.startsWith('..') || isAbsolute(realRelativePath)) {
+    return { ok: false, reason: `Refusing a path whose real location is outside the repository: ${relativePath}` }
   }
 
   try {
