@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions. Read the linked plan before 
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim interaction quality](vim-interaction-quality.md) | VIM-2 transition contract recorded | VIM-3: horizontal and same-node caret transition model |
+| [Vim interaction quality](vim-interaction-quality.md) | VIM-3 caret transition model integrated | VIM-4: vertical, focus, and no-op transitions |
 
 Remove a plan and its row when the initiative is complete. Git history retains the completed record.

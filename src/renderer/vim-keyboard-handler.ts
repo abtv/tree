@@ -22,7 +22,7 @@ import type {
   VimTextChange,
 } from './vim-keyboard-types'
 import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
-import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
+import { horizontalCaretTransition, sameNodeImageTransition } from './vim-caret-transition'
 
 function syncImageCaretAtCursor(
   vim: VimKeyboardState,
@@ -350,25 +350,20 @@ export function handleVimKey(
   clearPending()
 
   if (!visual && (event.key === 'h' || event.key === 'l')) {
-    const imageCaretActive = input.classList.contains('node-input-image-caret')
-    let next: number
-    if (event.key === 'h' && imageCaretActive && node.attachment !== undefined && node.text.length > 0) {
-      next = Math.max(0, (vim.imageTextCursor?.current ?? node.text.length - 1) - (count - 1))
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
-    } else {
-      next = moveCharacterCursor(
+    const next = horizontalCaretTransition(
+      {
         cursor,
-        event.key === 'h' ? 'left' : 'right',
-        node.text.length,
-        node.attachment !== undefined,
-        count,
-      )
-      if (event.key === 'l' && !imageCaretActive && node.attachment !== undefined && next === node.text.length) {
-        if (vim.imageTextCursor !== undefined)
-          vim.imageTextCursor.current = imageTextReturnCursor(cursor, count, node.text.length)
-      }
-    }
-    move(next, true)
+        imageActive: input.classList.contains('node-input-image-caret'),
+        imageTextReturnCursor: vim.imageTextCursor?.current,
+      },
+      event.key === 'h' ? 'left' : 'right',
+      count,
+      node.text.length,
+      node.attachment !== undefined,
+    )
+    if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
+    setNormalCaret(input, next.cursor)
+    vim.setImageCaret?.(node.id, next.imageActive)
   } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
     if (range !== undefined) move(range.target)
@@ -439,10 +434,11 @@ export function handleVimKey(
     let navigationCursor = cursor
     let remainingCount = count
     if (event.key === 'j' && !imageCaretActive && node.attachment !== undefined && cursor < node.text.length) {
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = cursor
-      navigationCursor = node.text.length
+      const next = sameNodeImageTransition({ cursor, imageActive: false }, 'enter', node.text.length)
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
+      navigationCursor = next.cursor
       setNormalCaret(input, navigationCursor)
-      vim.setImageCaret?.(node.id, true)
+      vim.setImageCaret?.(node.id, next.imageActive)
       remainingCount -= 1
     } else if (
       event.key === 'k' &&
@@ -450,10 +446,15 @@ export function handleVimKey(
       (imageCaretActive || cursor === node.text.length) &&
       node.text.length > 0
     ) {
-      navigationCursor = vim.imageTextCursor?.current ?? node.text.length - 1
+      const next = sameNodeImageTransition(
+        { cursor, imageActive: true, imageTextReturnCursor: vim.imageTextCursor?.current },
+        'exit',
+        node.text.length,
+      )
+      navigationCursor = next.cursor
       setNormalCaret(input, navigationCursor)
-      vim.setImageCaret?.(node.id, false)
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
+      vim.setImageCaret?.(node.id, next.imageActive)
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
       remainingCount -= 1
     }
     for (let index = 0; index < remainingCount; index += 1) {
