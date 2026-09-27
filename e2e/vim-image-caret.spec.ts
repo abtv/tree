@@ -1,6 +1,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { attachmentPath, expect, launchTree as launchTreeBase, node, seedDocument, setCursor, test } from './fixtures'
+import {
+  attachmentPath,
+  expect,
+  launchTree as launchTreeBase,
+  node,
+  seedDocument,
+  setCursor,
+  startRowDrag,
+  test,
+} from './fixtures'
 
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
 
@@ -114,6 +123,44 @@ test.describe('Vim editing prototype', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 0)
+  })
+
+  test('keeps the attached image caret and indicator through a cancelled drag', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'image-only', text: '', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'image-only' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+
+    await startRowDrag(window, editor)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+    const frozen = await editor.evaluate((element) => {
+      const input = element as HTMLTextAreaElement
+      return [input.selectionStart, input.selectionEnd]
+    })
+    expect(await editor.evaluate((element) => document.activeElement === element)).toBe(false)
+
+    await window.keyboard.press('Escape')
+    await window.mouse.up()
+
+    await expect(editor).toBeFocused()
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    expect(
+      await editor.evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return [input.selectionStart, input.selectionEnd]
+      }),
+    ).toEqual(frozen)
   })
 
   test('treats an image-only node as one character and crosses its row in both directions', async ({ userDataDir }) => {

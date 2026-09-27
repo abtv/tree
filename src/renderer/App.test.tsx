@@ -643,6 +643,148 @@ describe('App', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', persistenceLocked: true })
   })
 
+  it('keeps the caret and mode through a cancelled drag', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(first, { target: { value: 'Alpha' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    const second = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+    fireEvent.change(second, { target: { value: 'Bravo' } })
+    fireEvent.keyDown(second, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 3' }), { target: { value: 'Charlie' } })
+
+    mockAppRowRects()
+    vi.useFakeTimers()
+    const rows = document.querySelectorAll('.node-row')
+    const source = rows[2]
+    if (source === undefined) throw new Error('The third row was not rendered.')
+    const input = source.querySelector('textarea')
+    if (input === null) throw new Error('The third input was not rendered.')
+    act(() => {
+      input.focus()
+      input.setSelectionRange(2, 2)
+    })
+
+    fireEvent.pointerDown(source, {
+      pointerId: 1,
+      button: 0,
+      isPrimary: true,
+      pointerType: 'mouse',
+      clientX: 100,
+      clientY: 60,
+    })
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    expect(source).toHaveClass('node-row-dragging')
+    const frozen = [input.selectionStart, input.selectionEnd]
+    expect(document.activeElement).not.toBe(input)
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.activeElement).not.toBe(input)
+
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 100, clientY: 60 })
+
+    expect(document.activeElement).toBe(input)
+    expect([input.selectionStart, input.selectionEnd]).toEqual(frozen)
+    expect(screen.getByText('INSERT')).toBeInTheDocument()
+    expect(source).not.toHaveClass('node-row-dragging')
+  })
+
+  it('keeps the source input blurred after a cancelled drag until the pointer is released', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(first, { target: { value: 'Alpha' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'Bravo' } })
+
+    mockAppRowRects()
+    vi.useFakeTimers()
+    const rows = document.querySelectorAll('.node-row')
+    const source = rows[0]
+    if (source === undefined) throw new Error('The first row was not rendered.')
+    const input = source.querySelector('textarea')
+    if (input === null) throw new Error('The first input was not rendered.')
+    act(() => input.focus())
+    act(() => input.setSelectionRange(2, 2))
+
+    fireEvent.pointerDown(source, {
+      pointerId: 1,
+      button: 0,
+      isPrimary: true,
+      pointerType: 'mouse',
+      clientX: 100,
+      clientY: 13,
+    })
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.activeElement).not.toBe(input)
+
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 100, clientY: 13 })
+
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(2)
+  })
+
+  it('keeps the mode and restores the caret when a drag starts on an unfocused row', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(first, { target: { value: 'Alpha' } })
+    fireEvent.keyDown(first, { key: 'Enter' })
+    const second = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+    fireEvent.change(second, { target: { value: 'Bravo' } })
+    fireEvent.keyDown(second, { key: 'Enter' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Node 3' }), { target: { value: 'Charlie' } })
+    const firstInput = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    act(() => firstInput.focus())
+
+    mockAppRowRects()
+    vi.useFakeTimers()
+    const rows = document.querySelectorAll('.node-row')
+    const source = rows[2]
+    if (source === undefined) throw new Error('The third row was not rendered.')
+    const input = source.querySelector('textarea')
+    if (input === null) throw new Error('The third input was not rendered.')
+    expect(document.activeElement).not.toBe(input)
+
+    // A real press first arms the pending hold, then the browser's default mousedown focuses the
+    // input; jsdom does not synthesize that default focus, so the test performs it explicitly.
+    fireEvent.pointerDown(source, {
+      pointerId: 1,
+      button: 0,
+      isPrimary: true,
+      pointerType: 'mouse',
+      clientX: 100,
+      clientY: 60,
+    })
+    fireEvent.mouseDown(input, { button: 0 })
+    act(() => input.focus())
+    act(() => input.setSelectionRange(4, 4))
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
+    expect(source).toHaveClass('node-row-dragging')
+    expect(document.activeElement).not.toBe(input)
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 100, clientY: 60 })
+
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(4)
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'sibling' } })
+    expect(screen.getByText('INSERT')).toBeInTheDocument()
+  })
+
   it('shows a loading state before the document is ready', () => {
     render(<App store={createStore()} />)
     expect(screen.getByText('Loading document…')).toBeInTheDocument()

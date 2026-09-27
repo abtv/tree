@@ -48,7 +48,7 @@ export function App({ store }: AppProps): React.JSX.Element {
       store.reportError(error)
     })
   }, [alwaysOnTop, store])
-  const nodeInputBindings = useNodeInputBindings({
+  const { bindings: nodeInputBindings, dragFreeze } = useNodeInputBindings({
     store,
     selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
     focus,
@@ -185,6 +185,7 @@ export function App({ store }: AppProps): React.JSX.Element {
           </section>
         )}
         <NodeList
+          dragFreeze={dragFreeze}
           focusedNodeId={focus?.nodeId}
           locked={persistenceLocked}
           nodes={nodes}

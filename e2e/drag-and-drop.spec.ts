@@ -102,6 +102,87 @@ test.describe('drag and drop', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
+  test('keeps the caret and mode when a drag is cancelled', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    await seedSiblings(window)
+
+    const source = window.locator('.node-row').nth(2).locator('.node-input')
+    const box = await source.boundingBox()
+    if (box === null) throw new Error('The third row was not rendered.')
+    await window.mouse.click(box.x + box.width - 6, box.y + box.height / 2)
+    await expect(source).toBeFocused()
+    await expect(source).toHaveJSProperty('selectionStart', 1)
+
+    await startRowDrag(window, source)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+    const frozen = await source.evaluate((element) => {
+      const input = element as HTMLTextAreaElement
+      return [input.selectionStart, input.selectionEnd]
+    })
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
+
+    await window.keyboard.press('Escape')
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
+
+    await window.mouse.up()
+
+    await expect(source).toBeFocused()
+    expect(
+      await source.evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return [input.selectionStart, input.selectionEnd]
+      }),
+    ).toEqual(frozen)
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  test('keeps the mode and restores the caret when a drag starts on an unfocused row', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
+          { id: 'd', text: 'D', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'd' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    const first = window.locator('.node-row').nth(0).locator('.node-input')
+    await first.click()
+    await expect(first).toBeFocused()
+
+    const source = window.locator('.node-row').nth(2).locator('.node-input')
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
+    await startRowDrag(window, source)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
+    const frozen = await source.evaluate((element) => {
+      const input = element as HTMLTextAreaElement
+      return [input.selectionStart, input.selectionEnd]
+    })
+    expect(frozen[0]).toBe(frozen[1])
+    expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
+
+    await window.keyboard.press('Escape')
+    await window.mouse.up()
+
+    await expect(source).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    expect(
+      await source.evaluate((element) => {
+        const input = element as HTMLTextAreaElement
+        return [input.selectionStart, input.selectionEnd]
+      }),
+    ).toEqual(frozen)
+    await expect(first).not.toBeFocused()
+    expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
+  })
+
   test('does not start a drag when the pointer moves before the hold threshold', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     await seedSiblings(window)

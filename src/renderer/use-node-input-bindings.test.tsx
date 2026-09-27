@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act, cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { useState } from 'react'
 import type { SyntheticEvent } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -40,7 +40,7 @@ function renderBindings(options: {
   vimMode?: 'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'
 }) {
   const onPreviewAttachment = vi.fn()
-  return renderHook(() => useNodeInputBindings({ ...options, onPreviewAttachment }))
+  return renderHook(() => useNodeInputBindings({ ...options, onPreviewAttachment }).bindings)
 }
 
 describe('useNodeInputBindings', () => {
@@ -67,7 +67,7 @@ describe('useNodeInputBindings', () => {
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId,
         vimMode,
@@ -149,7 +149,7 @@ describe('useNodeInputBindings', () => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
       const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId,
         focus,
@@ -215,7 +215,7 @@ describe('useNodeInputBindings', () => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
       const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId,
         focus,
@@ -296,7 +296,7 @@ describe('useNodeInputBindings', () => {
           nodeVisualSelection: selection,
           setNodeVisualSelection: setSelection,
           onPreviewAttachment: vi.fn(),
-        }),
+        }).bindings,
         vimMode,
         imageCaretNodeId,
       }
@@ -383,7 +383,7 @@ describe('useNodeInputBindings', () => {
           vimMode: 'normal',
           setImageCaretNodeId,
           onPreviewAttachment: vi.fn(),
-        }),
+        }).bindings,
         imageCaretNodeId,
       }
     })
@@ -420,7 +420,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -463,7 +463,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -510,7 +510,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -564,7 +564,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -617,7 +617,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -669,7 +669,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -755,8 +755,8 @@ describe('useNodeInputBindings', () => {
       children: [],
     }
     let node: TreeNode = linked
-    const { result, rerender } = renderHook(() =>
-      useNodeInputBindings({ store, selectedNodeId: 'node', onPreviewAttachment: vi.fn() }),
+    const { result, rerender } = renderHook(
+      () => useNodeInputBindings({ store, selectedNodeId: 'node', onPreviewAttachment: vi.fn() }).bindings,
     )
     const input = document.createElement('div')
     input.textContent = edited
@@ -874,7 +874,7 @@ describe('useNodeInputBindings', () => {
         vimMode,
         setVimMode,
         onPreviewAttachment: vi.fn(),
-      })(node)
+      }).bindings(node)
       return { bindings, vimMode }
     })
     const input = document.createElement('textarea')
@@ -933,7 +933,7 @@ describe('useNodeInputBindings', () => {
           nodeVisualSelection: selection,
           setNodeVisualSelection: setSelection,
           onPreviewAttachment: vi.fn(),
-        }),
+        }).bindings,
       }
     })
     const input = document.createElement('textarea')
@@ -987,13 +987,14 @@ describe('useNodeInputBindings', () => {
 
   it('ignores focus intents for nodes that are not registered', async () => {
     const store = createStore()
-    const { result } = renderHook(() =>
-      useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        focus: { nodeId: 'missing', cursor: 0, token: 1 },
-        onPreviewAttachment: vi.fn(),
-      }),
+    const { result } = renderHook(
+      () =>
+        useNodeInputBindings({
+          store,
+          selectedNodeId: 'node',
+          focus: { nodeId: 'missing', cursor: 0, token: 1 },
+          onPreviewAttachment: vi.fn(),
+        }).bindings,
     )
     await Promise.resolve()
 
@@ -1003,8 +1004,10 @@ describe('useNodeInputBindings', () => {
   it('focuses the registered input and positions the caret for the requested node', () => {
     const store = createStore()
     const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
-    const { result, rerender } = renderHook(() =>
-      useNodeInputBindings({ store, selectedNodeId: 'node', focus: holder.focus, onPreviewAttachment: vi.fn() }),
+    const { result, rerender } = renderHook(
+      () =>
+        useNodeInputBindings({ store, selectedNodeId: 'node', focus: holder.focus, onPreviewAttachment: vi.fn() })
+          .bindings,
     )
     const textarea = document.createElement('textarea')
     textarea.value = 'hello'
@@ -1020,14 +1023,15 @@ describe('useNodeInputBindings', () => {
   it('keeps a block selection when Normal mode focuses another node', () => {
     const store = createStore()
     const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
-    const { result, rerender } = renderHook(() =>
-      useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        focus: holder.focus,
-        onPreviewAttachment: vi.fn(),
-        vimMode: 'normal',
-      }),
+    const { result, rerender } = renderHook(
+      () =>
+        useNodeInputBindings({
+          store,
+          selectedNodeId: 'node',
+          focus: holder.focus,
+          onPreviewAttachment: vi.fn(),
+          vimMode: 'normal',
+        }).bindings,
     )
     const textarea = document.createElement('textarea')
     textarea.value = 'hello'
@@ -1044,14 +1048,15 @@ describe('useNodeInputBindings', () => {
   it('collapses the Normal caret on an attached node at its terminal image position', () => {
     const store = createStore()
     const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
-    const { result, rerender } = renderHook(() =>
-      useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        focus: holder.focus,
-        onPreviewAttachment: vi.fn(),
-        vimMode: 'normal',
-      }),
+    const { result, rerender } = renderHook(
+      () =>
+        useNodeInputBindings({
+          store,
+          selectedNodeId: 'node',
+          focus: holder.focus,
+          onPreviewAttachment: vi.fn(),
+          vimMode: 'normal',
+        }).bindings,
     )
     const row = document.createElement('div')
     row.className = 'node-row'
@@ -1107,7 +1112,7 @@ describe('useNodeInputBindings', () => {
         onPreviewAttachment: vi.fn(),
         vimMode,
         setVimMode,
-      })(node)
+      }).bindings(node)
       return { bindings, vimMode }
     })
     const input = document.createElement('textarea')
@@ -1152,7 +1157,7 @@ describe('useNodeInputBindings', () => {
         onPreviewAttachment: vi.fn(),
         vimMode,
         setVimMode,
-      })(node)
+      }).bindings(node)
       return { bindings, vimMode }
     })
     const input = document.createElement('textarea')
@@ -1205,7 +1210,7 @@ describe('useNodeInputBindings', () => {
         vimMode,
         setVimMode,
         setImageCaretNodeId,
-      })(node)
+      }).bindings(node)
       return { bindings, vimMode, imageCaretNodeId }
     })
     const input = document.createElement('textarea')
@@ -1257,7 +1262,7 @@ describe('useNodeInputBindings', () => {
         vimMode,
         setVimMode,
         setImageCaretNodeId,
-      })(node)
+      }).bindings(node)
       return { bindings, vimMode, imageCaretNodeId }
     })
     const input = document.createElement('textarea')
@@ -1299,7 +1304,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -1419,7 +1424,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -1475,7 +1480,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -1533,7 +1538,7 @@ describe('useNodeInputBindings', () => {
     } as unknown as EditorStore
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
+      const { bindings } = useNodeInputBindings({
         store,
         selectedNodeId: 'a',
         vimMode,
@@ -1576,5 +1581,242 @@ describe('useNodeInputBindings', () => {
     expect(input.selectionStart).toBe(3)
     expect(input.selectionEnd).toBe(5)
     input.remove()
+  })
+})
+
+describe('drag caret freeze', () => {
+  const node: TreeNode = { id: 'node', text: 'hello', children: [] }
+
+  function renderFreeze(options: { vimMode?: VimMode; setVimMode?: (mode: VimMode) => void } = {}) {
+    const store = createStore()
+    return renderHook(() =>
+      useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        vimMode: options.vimMode ?? 'normal',
+        setVimMode: options.setVimMode ?? vi.fn(),
+        onPreviewAttachment: vi.fn(),
+      }),
+    )
+  }
+
+  function focusedInput(result: {
+    current: { bindings: (node: TreeNode) => { inputRef: (input: HTMLElement | null) => void } }
+  }) {
+    const input = document.createElement('textarea')
+    input.value = node.text
+    document.body.append(input)
+    result.current.bindings(node).inputRef(input)
+    input.focus()
+    return input
+  }
+
+  it('collapses a transient selection and blurs the source input when the freeze begins', () => {
+    const { result } = renderFreeze()
+    const input = focusedInput(result)
+    input.setSelectionRange(1, 3)
+
+    act(() => result.current.dragFreeze.begin('node', 7))
+
+    expect(document.activeElement).not.toBe(input)
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(1)
+    input.remove()
+  })
+
+  it('restores focus and the captured caret when the frozen pointer is released', () => {
+    const { result } = renderFreeze()
+    const input = focusedInput(result)
+    input.setSelectionRange(1, 3)
+    act(() => result.current.dragFreeze.begin('node', 7))
+
+    act(() => result.current.dragFreeze.end(7))
+
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(1)
+    input.remove()
+  })
+
+  it('ignores a release for a different pointer and restores exactly once for its own pointer', () => {
+    const { result } = renderFreeze()
+    const input = focusedInput(result)
+    input.setSelectionRange(2, 2)
+    act(() => result.current.dragFreeze.begin('node', 7))
+
+    act(() => result.current.dragFreeze.end(8))
+    expect(document.activeElement).not.toBe(input)
+
+    act(() => result.current.dragFreeze.end(7))
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(2)
+
+    act(() => result.current.dragFreeze.end(7))
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(2)
+    input.remove()
+  })
+
+  it('releases any freeze when no pointer is given', () => {
+    const { result } = renderFreeze()
+    const input = focusedInput(result)
+    act(() => result.current.dragFreeze.begin('node', 7))
+
+    act(() => result.current.dragFreeze.end())
+
+    expect(document.activeElement).toBe(input)
+    input.remove()
+  })
+
+  it('restores the caret when the frozen pointer is cancelled', () => {
+    const { result } = renderFreeze()
+    const input = focusedInput(result)
+    input.setSelectionRange(2, 2)
+    act(() => result.current.dragFreeze.begin('node', 7))
+
+    act(() => fireEvent.pointerCancel(window, { pointerId: 7 }))
+
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(2)
+    input.remove()
+  })
+
+  it('leaves a frozen caret unrestored on unmount', () => {
+    const { result, unmount } = renderFreeze()
+    const input = focusedInput(result)
+    act(() => result.current.dragFreeze.begin('node', 7))
+
+    unmount()
+
+    expect(document.activeElement).not.toBe(input)
+    input.remove()
+  })
+
+  it('does not touch the caret when the source input is not the active element', () => {
+    const { result } = renderFreeze()
+    const input = document.createElement('textarea')
+    input.value = node.text
+    document.body.append(input)
+    result.current.bindings(node).inputRef(input)
+    input.setSelectionRange(1, 3)
+
+    act(() => result.current.dragFreeze.begin('node', 7))
+    act(() => result.current.dragFreeze.end(7))
+
+    expect(document.activeElement).not.toBe(input)
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(3)
+    input.remove()
+  })
+
+  it('writes no mode or image-caret state of its own', () => {
+    const setVimMode = vi.fn()
+    const { result } = renderFreeze({ setVimMode })
+    const input = focusedInput(result)
+
+    act(() => result.current.dragFreeze.begin('node', 7))
+    act(() => result.current.dragFreeze.end(7))
+
+    expect(setVimMode).not.toHaveBeenCalled()
+    input.remove()
+  })
+
+  it('keeps the existing Replace-to-Normal blur transition exactly once', () => {
+    const setVimMode = vi.fn()
+    const { result } = renderFreeze({ vimMode: 'replace', setVimMode })
+    const input = focusedInput(result)
+
+    act(() => result.current.dragFreeze.begin('node', 7))
+    // In production the input's React onBlur runs when begin blurs it; this harness has no React
+    // input, so it invokes the same binding the existing tests use.
+    act(() => result.current.bindings(node).onBlur())
+    act(() => result.current.dragFreeze.end(7))
+
+    expect(setVimMode).toHaveBeenCalledTimes(1)
+    expect(setVimMode).toHaveBeenCalledWith('normal')
+    expect(document.activeElement).toBe(input)
+    input.remove()
+  })
+
+  it('restores a collapsed caret in a contenteditable input', () => {
+    const { result } = renderFreeze()
+    const input = document.createElement('div')
+    input.className = 'node-input'
+    input.contentEditable = 'true'
+    input.tabIndex = 0
+    input.textContent = node.text
+    document.body.append(input)
+    result.current.bindings(node).inputRef(input)
+    input.focus()
+
+    const selection = globalThis.getSelection()
+    const text = input.firstChild
+    if (selection === null || text === null) throw new Error('The editable text was not rendered.')
+    const range = document.createRange()
+    range.setStart(text, 1)
+    range.setEnd(text, 3)
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    act(() => result.current.dragFreeze.begin('node', 7))
+    expect(document.activeElement).not.toBe(input)
+
+    act(() => result.current.dragFreeze.end(7))
+    expect(document.activeElement).toBe(input)
+    expect(selection.isCollapsed).toBe(true)
+    expect(selection.anchorOffset).toBe(1)
+    input.remove()
+  })
+
+  it('restores the caret across an attached image without rewriting the image indicator', () => {
+    const imageNode: TreeNode = {
+      id: 'node',
+      text: 'hello',
+      attachment: { id: 'a', mimeType: 'image/png' },
+      children: [],
+    }
+    let focus = { nodeId: 'node', cursor: 5, token: 1 }
+    const store = {
+      endTextSession: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [imageNode] },
+        location: { currentParentId: null, selectedNodeId: 'node' },
+        focus,
+      }),
+      selectNode: vi.fn(),
+    } as unknown as EditorStore
+    const setImageCaretNodeId = vi.fn()
+    const { result, rerender } = renderHook(() =>
+      useNodeInputBindings({
+        store,
+        selectedNodeId: 'node',
+        focus,
+        vimMode: 'normal',
+        setImageCaretNodeId,
+        onPreviewAttachment: vi.fn(),
+      }),
+    )
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    const input = document.createElement('textarea')
+    input.value = imageNode.text
+    row.append(input)
+    document.body.append(row)
+    result.current.bindings(imageNode).inputRef(input)
+
+    focus = { nodeId: 'node', cursor: 5, token: 2 }
+    rerender()
+    expect(setImageCaretNodeId).toHaveBeenCalledWith('node')
+    setImageCaretNodeId.mockClear()
+
+    act(() => result.current.dragFreeze.begin('node', 7))
+    act(() => result.current.dragFreeze.end(7))
+
+    expect(setImageCaretNodeId).not.toHaveBeenCalled()
+    expect(input.selectionStart).toBe(5)
+    expect(input.selectionEnd).toBe(5)
+    row.remove()
   })
 })

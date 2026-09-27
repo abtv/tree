@@ -45,6 +45,20 @@ export function nodeDragReducer(state: NodeDragState, action: NodeDragAction): N
   }
 }
 
+export interface NodeDragGate {
+  locked: boolean
+  sourceAvailable: boolean
+}
+
+/**
+ * Fold the persistence lock and source-row availability into the gesture state so every caller
+ * reads exactly one drag phase and the freeze cannot be expressed through diverging values.
+ */
+export function resolveNodeDrag(state: NodeDragState, gate: NodeDragGate): NodeDragState {
+  if (state.phase === 'idle' || (!gate.locked && gate.sourceAvailable)) return state
+  return IDLE_NODE_DRAG
+}
+
 export interface NodeDropRegion {
   index: number
   top: number

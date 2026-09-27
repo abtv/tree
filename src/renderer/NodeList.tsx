@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import { NodeRow } from './NodeRow'
+import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { computeListWindow, shouldWindow, WINDOW_OVERSCAN, type ListWindow } from './list-window'
 import {
   buildLayout,
@@ -21,6 +22,7 @@ interface NodeListProps {
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
   onMove: (nodeId: string, insertionIndex: number) => void
+  dragFreeze: NodeDragCaretFreeze
   focusedNodeId?: string | undefined
   structuralVersion?: number
   visualNodeSelection?: { anchorId: string; focusId: string } | undefined
@@ -33,6 +35,7 @@ export function NodeList({
   onActivate,
   onEnter,
   onMove,
+  dragFreeze,
   focusedNodeId,
   structuralVersion = 0,
   visualNodeSelection,
@@ -139,8 +142,7 @@ export function NodeList({
   }, [updateViewport, windowed])
 
   const {
-    dragPhase,
-    dragSource,
+    freeze,
     dropIndex,
     onRowPointerDown,
     onRowPointerLeave,
@@ -150,7 +152,7 @@ export function NodeList({
     onLostPointerCapture,
     onListClick,
     recomputeDropIndex,
-  } = useNodeListDrag({ nodes, locked, windowed, listRef, observedElementsRef, onMove })
+  } = useNodeListDrag({ nodes, locked, windowed, listRef, observedElementsRef, onMove, dragFreeze })
 
   useLayoutEffect(() => {
     recomputeDropIndex()
@@ -176,14 +178,14 @@ export function NodeList({
   const visualStart = visualAnchorIndex < 0 || visualFocusIndex < 0 ? -1 : Math.min(visualAnchorIndex, visualFocusIndex)
   const visualEnd = visualStart < 0 ? -1 : Math.max(visualAnchorIndex, visualFocusIndex)
   const dropMarker = dropMarkerFor(
-    dragPhase === 'dragging' ? dropIndex : undefined,
+    freeze === undefined ? undefined : dropIndex,
     nodes.length,
     listWindow === undefined ? undefined : collectWindowIndices(listWindow),
   )
 
   const renderRow = (node: TreeNode, index: number, pinned = false, pinnedOffset = 0): React.JSX.Element => (
     <NodeRow
-      dragging={dragPhase === 'dragging' && dragSource?.nodeId === node.id}
+      dragging={freeze?.nodeId === node.id}
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}

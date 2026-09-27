@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import type { TreeNode } from '../domain/document'
-import { collapseSelectionToAnchor, getCaret, setCaret } from './editor-dom'
+import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { autoScrollStep } from './list-window'
 import {
   HOLD_ACTIVATION_MS,
@@ -9,8 +9,8 @@ import {
   exceedsHoldTolerance,
   insertionIndexAtPoint,
   nodeDragReducer,
+  resolveNodeDrag,
   shouldCommitMove,
-  type NodeDragPhase,
   type NodeDragSource,
   type NodeDropRegion,
 } from './node-drag'
@@ -22,11 +22,11 @@ interface UseNodeListDragOptions {
   listRef: RefObject<HTMLElement | null>
   observedElementsRef: RefObject<Map<string, HTMLElement>>
   onMove: (nodeId: string, insertionIndex: number) => void
+  dragFreeze: NodeDragCaretFreeze
 }
 
 interface NodeListDrag {
-  dragPhase: NodeDragPhase
-  dragSource: NodeDragSource | undefined
+  freeze: NodeDragSource | undefined
   dropIndex: number | undefined
   onRowPointerDown: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
   onRowPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
@@ -45,35 +45,31 @@ export function useNodeListDrag({
   listRef,
   observedElementsRef,
   onMove,
+  dragFreeze,
 }: UseNodeListDragOptions): NodeListDrag {
   const [autoScrollDirection, setAutoScrollDirection] = useState(0)
   const [drag, dispatch] = useReducer(nodeDragReducer, IDLE_NODE_DRAG)
   const [dropIndex, setDropIndex] = useState<number>()
   const pointerYRef = useRef<number | undefined>(undefined)
   const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
-  const selectionGuardRef = useRef<{ nodeId: string; pointerId: number; caret: number } | undefined>(undefined)
   const suppressClickRef = useRef(false)
-  const dragSourceCandidate = drag.source
-  const sourceAvailable =
-    dragSourceCandidate === undefined || nodes.some((node) => node.id === dragSourceCandidate.nodeId)
-  const dragPhase = locked || !sourceAvailable ? 'idle' : drag.phase
-  const dragSource = dragPhase === 'idle' ? undefined : dragSourceCandidate
-
-  const clearSelectionGuard = useCallback((): void => {
-    const guard = selectionGuardRef.current
-    if (guard === undefined) return
-    selectionGuardRef.current = undefined
-    const input = findRowInput(guard.nodeId, observedElementsRef.current)
-    if (input === null) return
-    input.focus({ preventScroll: true })
-    setCaret(input, guard.caret)
-  }, [observedElementsRef])
+  const sourceCandidate = drag.source
+  const sourceAvailable = sourceCandidate === undefined || nodes.some((node) => node.id === sourceCandidate.nodeId)
+  // One resolved state owns the freeze; every projection below reads it rather than the raw reducer
+  // state, so the body class, row marker, drop marker, pointer capture, and caret suspension cannot
+  // describe different gestures.
+  const resolved = resolveNodeDrag(drag, { locked, sourceAvailable })
+  const freeze = resolved.phase === 'dragging' ? resolved.source : undefined
 
   const cancelDrag = useCallback((): void => {
     dispatch({ type: 'cancel' })
     setDropIndex(undefined)
     setAutoScrollDirection(0)
   }, [])
+
+  useEffect(() => {
+    if (drag.phase !== 'idle' && resolved.phase === 'idle') dispatch({ type: 'cancel' })
+  }, [drag.phase, resolved.phase])
 
   const computeInsertionIndex = useCallback(
     (clientY: number): number | undefined => {
@@ -100,53 +96,35 @@ export function useNodeListDrag({
     }
     frame = globalThis.requestAnimationFrame(step)
     return () => globalThis.cancelAnimationFrame(frame)
-  }, [autoScrollDirection, dragPhase])
+  }, [autoScrollDirection, resolved.phase])
 
   useEffect(() => {
-    if (dragPhase !== 'pending' || dragSource === undefined) return undefined
-    const pointerId = dragSource.pointerId
-    const nodeId = dragSource.nodeId
+    if (resolved.phase !== 'pending' || resolved.source === undefined) return undefined
+    const pointerId = resolved.source.pointerId
+    const nodeId = resolved.source.nodeId
     const timeout = globalThis.setTimeout(() => {
       if (!observedElementsRef.current.has(nodeId)) return
       dispatch({ type: 'hold', pointerId })
     }, HOLD_ACTIVATION_MS)
     return () => globalThis.clearTimeout(timeout)
-  }, [dragPhase, dragSource, observedElementsRef])
+  }, [resolved.phase, resolved.source, observedElementsRef])
 
   useEffect(() => {
-    const onPointerEnd = (event: PointerEvent): void => {
-      if (event.pointerId === selectionGuardRef.current?.pointerId) clearSelectionGuard()
-    }
-    globalThis.addEventListener('pointerup', onPointerEnd)
-    globalThis.addEventListener('pointercancel', onPointerEnd)
-    return () => {
-      globalThis.removeEventListener('pointerup', onPointerEnd)
-      globalThis.removeEventListener('pointercancel', onPointerEnd)
-      selectionGuardRef.current = undefined
-    }
-  }, [clearSelectionGuard])
-
-  useEffect(() => {
-    if (dragPhase !== 'dragging' || dragSource === undefined) return undefined
-    const pointerId = dragSource.pointerId
+    if (freeze === undefined) return undefined
+    const pointerId = freeze.pointerId
     const list = listRef.current
     if (list !== null) setCapture(list, pointerId)
     document.body.classList.add('node-drag-active')
-    const input = findRowInput(dragSource.nodeId, observedElementsRef.current)
-    if (input !== null && document.activeElement === input) {
-      collapseSelectionToAnchor(input)
-      selectionGuardRef.current = { nodeId: dragSource.nodeId, pointerId, caret: getCaret(input) }
-      input.blur()
-    }
+    dragFreeze.begin(freeze.nodeId, pointerId)
     return () => {
       document.body.classList.remove('node-drag-active')
       if (list !== null) releaseCapture(list, pointerId)
     }
-  }, [dragPhase, dragSource, listRef, observedElementsRef])
+  }, [dragFreeze, freeze, listRef])
 
   useEffect(() => {
-    if (drag.phase === 'idle') return undefined
-    const pointerId = drag.source?.pointerId
+    if (resolved.phase === 'idle') return undefined
+    const pointerId = resolved.source?.pointerId
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       event.preventDefault()
@@ -167,14 +145,14 @@ export function useNodeListDrag({
       globalThis.removeEventListener('blur', onBlur)
       globalThis.removeEventListener('pointerup', onPointerUp)
     }
-  }, [cancelDrag, drag.phase, drag.source])
+  }, [cancelDrag, resolved.phase, resolved.source])
 
   const onRowPointerDown = useCallback(
     (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (locked) return
       if (event.button === 2) event.preventDefault()
       if (event.target instanceof Element && event.target.closest('.node-disclosure') !== null) return
-      clearSelectionGuard()
+      dragFreeze.end()
       suppressClickRef.current = false
       pressPointRef.current = { x: event.clientX, y: event.clientY }
       pointerYRef.current = undefined
@@ -187,30 +165,30 @@ export function useNodeListDrag({
         pointerType: event.pointerType,
       })
     },
-    [clearSelectionGuard, locked],
+    [dragFreeze, locked],
   )
 
   const onRowPointerLeave = useCallback(
     (nodeId: string, event: ReactPointerEvent<HTMLDivElement>): void => {
-      if (dragPhase !== 'pending' || dragSource?.nodeId !== nodeId) return
+      if (resolved.phase !== 'pending' || resolved.source?.nodeId !== nodeId) return
       // Chromium resets the hovered element when the window loses focus and reports the reset
       // with no buttons pressed. That is not the held pointer leaving the row, so the pending
       // hold survives; a real leave still cancels while the primary button is held.
       if (event.buttons === 0) return
       cancelDrag()
     },
-    [cancelDrag, dragPhase, dragSource],
+    [cancelDrag, resolved.phase, resolved.source],
   )
 
   const onListPointerMove = (event: ReactPointerEvent<HTMLElement>): void => {
-    if (dragPhase === 'idle' || dragSource === undefined) return
-    if (dragPhase === 'pending') {
+    if (resolved.phase === 'idle' || resolved.source === undefined) return
+    if (resolved.phase === 'pending') {
       const origin = pressPointRef.current
       if (origin !== undefined && exceedsHoldTolerance(origin.x, origin.y, event.clientX, event.clientY)) {
         cancelDrag()
         return
       }
-      const row = observedElementsRef.current.get(dragSource.nodeId)
+      const row = observedElementsRef.current.get(resolved.source.nodeId)
       if (row === undefined) {
         cancelDrag()
         return
@@ -230,14 +208,14 @@ export function useNodeListDrag({
   }
 
   const onListPointerUp = (event: ReactPointerEvent<HTMLElement>): void => {
-    if (dragPhase === 'dragging' && dragSource !== undefined && dragSource.pointerId === event.pointerId) {
+    if (freeze !== undefined && freeze.pointerId === event.pointerId) {
       suppressClickRef.current = true
       const insertionIndex = computeInsertionIndex(event.clientY)
-      if (insertionIndex !== undefined && shouldCommitMove(insertionIndex, dragSource.index)) {
-        onMove(dragSource.nodeId, insertionIndex)
+      if (insertionIndex !== undefined && shouldCommitMove(insertionIndex, freeze.index)) {
+        onMove(freeze.nodeId, insertionIndex)
       }
     }
-    clearSelectionGuard()
+    dragFreeze.end(event.pointerId)
     dispatch({ type: 'release', pointerId: event.pointerId })
     setDropIndex(undefined)
     setAutoScrollDirection(0)
@@ -246,7 +224,7 @@ export function useNodeListDrag({
   const onListPointerCancel = (): void => cancelDrag()
 
   const onLostPointerCapture = (event: ReactPointerEvent<HTMLElement>): void => {
-    if (event.pointerId === dragSource?.pointerId) cancelDrag()
+    if (event.pointerId === freeze?.pointerId) cancelDrag()
   }
 
   const onListClick = useCallback((event: ReactMouseEvent<HTMLElement>): void => {
@@ -257,15 +235,14 @@ export function useNodeListDrag({
   }, [])
 
   const recomputeDropIndex = useCallback((): void => {
-    if (dragPhase !== 'dragging') return
+    if (freeze === undefined) return
     const pointerY = pointerYRef.current
     if (pointerY === undefined) return
     setDropIndex(computeInsertionIndex(pointerY))
-  }, [computeInsertionIndex, dragPhase])
+  }, [computeInsertionIndex, freeze])
 
   return {
-    dragPhase,
-    dragSource,
+    freeze,
     dropIndex,
     onRowPointerDown,
     onRowPointerLeave,
@@ -294,9 +271,4 @@ function releaseCapture(element: HTMLElement, pointerId: number): void {
   } catch {
     return
   }
-}
-
-function findRowInput(nodeId: string, rows: Map<string, HTMLElement>): HTMLElement | null {
-  const row = rows.get(nodeId)
-  return row?.querySelector<HTMLElement>('.node-input') ?? null
 }

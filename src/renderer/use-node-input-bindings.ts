@@ -3,6 +3,7 @@ import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent 
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { displayedNodes, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import {
+  collapseSelectionToAnchor,
   getCaret,
   getSelectionRange,
   hasAttachmentCharacter,
@@ -13,6 +14,7 @@ import {
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
+import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
 import type { VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
@@ -63,6 +65,11 @@ interface UseNodeInputBindingsOptions {
   setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
 }
 
+export interface NodeInputBindingsResult {
+  bindings: (node: TreeNode) => NodeInputBindings
+  dragFreeze: NodeDragCaretFreeze
+}
+
 export function useNodeInputBindings({
   store,
   selectedNodeId,
@@ -74,7 +81,7 @@ export function useNodeInputBindings({
   setImageCaretNodeId = () => undefined,
   nodeVisualSelection,
   setNodeVisualSelection = () => undefined,
-}: UseNodeInputBindingsOptions): (node: TreeNode) => NodeInputBindings {
+}: UseNodeInputBindingsOptions): NodeInputBindingsResult {
   const inputs = useRef(new Map<string, HTMLElement>())
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const pendingCaret = useRef<{ input: HTMLElement; cursor: number } | undefined>(undefined)
@@ -117,6 +124,64 @@ export function useNodeInputBindings({
   const caretAuthority = useRef<{ nodeId?: string; caret: VimCaretState }>({
     caret: { cursor: focus?.cursor ?? 0, imageActive: false },
   })
+  const frozenCaret = useRef<CaretFreeze | undefined>(undefined)
+  const frozenPointerListener = useRef<((event: PointerEvent) => void) | undefined>(undefined)
+
+  const clearFrozenPointerListener = useCallback((): void => {
+    const listener = frozenPointerListener.current
+    if (listener === undefined) return
+    globalThis.removeEventListener('pointerup', listener)
+    globalThis.removeEventListener('pointercancel', listener)
+    frozenPointerListener.current = undefined
+  }, [])
+
+  const releaseFrozenCaret = useCallback(
+    (pointerId?: number): void => {
+      const freeze = releaseCaret(frozenCaret.current, pointerId)
+      if (freeze === undefined) return
+      frozenCaret.current = undefined
+      clearFrozenPointerListener()
+      const input = inputs.current.get(freeze.nodeId)
+      if (input === undefined) return
+      input.focus({ preventScroll: true })
+      setCaret(input, freeze.caret.cursor)
+    },
+    [clearFrozenPointerListener],
+  )
+
+  // The caret authority suspends the captured caret while a node drag freezes the text surface and
+  // restores it when the frozen pointer is released, even if the release lands outside the list
+  // (for example after Escape already ended the visual freeze).
+  const beginFrozenCaret = useCallback(
+    (nodeId: string, pointerId: number): void => {
+      const existing = frozenCaret.current
+      if (existing !== undefined && existing.pointerId === pointerId) return
+      if (existing !== undefined) {
+        clearFrozenPointerListener()
+        frozenCaret.current = undefined
+      }
+      const input = inputs.current.get(nodeId)
+      if (input === undefined || document.activeElement !== input) return
+      collapseSelectionToAnchor(input)
+      frozenCaret.current = freezeCaret(nodeId, pointerId, { ...caretAuthority.current.caret, cursor: getCaret(input) })
+      const listener = (event: PointerEvent): void => {
+        if (event.pointerId === pointerId) releaseFrozenCaret(pointerId)
+      }
+      frozenPointerListener.current = listener
+      globalThis.addEventListener('pointerup', listener)
+      globalThis.addEventListener('pointercancel', listener)
+      input.blur()
+    },
+    [clearFrozenPointerListener, releaseFrozenCaret],
+  )
+
+  useEffect(
+    () => () => {
+      frozenCaret.current = undefined
+      clearFrozenPointerListener()
+    },
+    [clearFrozenPointerListener],
+  )
 
   const applyCaretState = useCallback(
     (nodeId: string, caret: VimCaretState, fromFocus = false): void => {
@@ -415,7 +480,7 @@ export function useNodeInputBindings({
     }
   }, [])
 
-  return useCallback(
+  const bindings = useCallback(
     (node: TreeNode): NodeInputBindings => ({
       selectedAll: selectAllNodeId === node.id,
       disabled: persistenceLocked,
@@ -685,6 +750,13 @@ export function useNodeInputBindings({
       vimCommandHandles,
     ],
   )
+
+  const dragFreeze = useMemo<NodeDragCaretFreeze>(
+    () => ({ begin: beginFrozenCaret, end: releaseFrozenCaret }),
+    [beginFrozenCaret, releaseFrozenCaret],
+  )
+
+  return { bindings, dragFreeze }
 }
 
 function nodeTextLength(input: HTMLElement): number {

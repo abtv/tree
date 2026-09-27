@@ -5,6 +5,7 @@ import {
   exceedsHoldTolerance,
   insertionIndexAtPoint,
   nodeDragReducer,
+  resolveNodeDrag,
   shouldCommitMove,
   type NodeDragAction,
   type NodeDragState,
@@ -64,6 +65,29 @@ describe('nodeDragReducer', () => {
     expect(nodeDragReducer(pending, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(dragging, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(IDLE_NODE_DRAG, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
+  })
+})
+
+describe('resolveNodeDrag', () => {
+  const openGate = { locked: false, sourceAvailable: true }
+  const pending: NodeDragState = { phase: 'pending', source }
+  const dragging: NodeDragState = { phase: 'dragging', source }
+
+  it('keeps the gesture state identity while the gate is open', () => {
+    expect(resolveNodeDrag(pending, openGate)).toBe(pending)
+    expect(resolveNodeDrag(dragging, openGate)).toBe(dragging)
+    expect(resolveNodeDrag(IDLE_NODE_DRAG, openGate)).toBe(IDLE_NODE_DRAG)
+  })
+
+  it('resolves a locked editor or a missing source row to idle', () => {
+    expect(resolveNodeDrag(pending, { locked: true, sourceAvailable: true })).toBe(IDLE_NODE_DRAG)
+    expect(resolveNodeDrag(dragging, { locked: true, sourceAvailable: true })).toBe(IDLE_NODE_DRAG)
+    expect(resolveNodeDrag(pending, { locked: false, sourceAvailable: false })).toBe(IDLE_NODE_DRAG)
+    expect(resolveNodeDrag(dragging, { locked: false, sourceAvailable: false })).toBe(IDLE_NODE_DRAG)
+  })
+
+  it('always resolves idle to idle', () => {
+    expect(resolveNodeDrag(IDLE_NODE_DRAG, { locked: true, sourceAvailable: false })).toBe(IDLE_NODE_DRAG)
   })
 })
 

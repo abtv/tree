@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import './test/setup'
@@ -55,13 +55,27 @@ interface RenderOptions {
   visualNodeSelection?: { anchorId: string; focusId: string } | undefined
 }
 
+type StubDragFreeze = {
+  begin: Mock<(nodeId: string, pointerId: number) => void>
+  end: Mock<(pointerId?: number) => void>
+}
+
+function stubDragFreeze(): StubDragFreeze {
+  return {
+    begin: vi.fn<(nodeId: string, pointerId: number) => void>(),
+    end: vi.fn<(pointerId?: number) => void>(),
+  }
+}
+
 function renderRows(
   options: RenderOptions = {},
   onMove = vi.fn(),
-): ReturnType<typeof render> & { onMove: typeof onMove } {
+): ReturnType<typeof render> & { onMove: typeof onMove; dragFreeze: StubDragFreeze } {
   const list = options.list ?? nodes
+  const dragFreeze = stubDragFreeze()
   const view = render(
     <NodeList
+      dragFreeze={dragFreeze}
       focusedNodeId={options.focusedNodeId}
       locked={options.locked === true}
       nodes={list}
@@ -74,7 +88,7 @@ function renderRows(
       visualNodeSelection={options.visualNodeSelection}
     />,
   )
-  return { ...view, onMove }
+  return { ...view, onMove, dragFreeze }
 }
 
 function pointerDownAt(target: Element, clientY: number, init: Partial<PointerEventInit> = {}): void {
@@ -124,6 +138,7 @@ describe('NodeList', () => {
     const onEnter = vi.fn()
     const { getByRole } = render(
       <NodeList
+        dragFreeze={stubDragFreeze()}
         nodes={nodes}
         renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
         onEnter={onEnter}
@@ -141,6 +156,7 @@ describe('NodeList', () => {
     const onEnter = vi.fn()
     const { getByRole } = render(
       <NodeList
+        dragFreeze={stubDragFreeze()}
         nodes={[parentNode, ...nodes]}
         renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
         onEnter={onEnter}
@@ -166,6 +182,7 @@ describe('NodeList', () => {
     const list = [parentNode, ...nodes]
     const element = (focusedNodeId?: string): React.JSX.Element => (
       <NodeList
+        dragFreeze={stubDragFreeze()}
         focusedNodeId={focusedNodeId}
         nodes={list}
         onEnter={() => undefined}
@@ -351,71 +368,61 @@ describe('NodeList drag interaction', () => {
     expect(document.body).not.toHaveClass('node-drag-active')
   })
 
-  it('collapses an incidental selection when drag mode activates', () => {
+  it('hands the caret freeze to its owner when drag mode activates and releases it with the pointer', () => {
     vi.useFakeTimers()
     mockRowRects()
-    const { container } = renderRows()
+    const { container, dragFreeze } = renderRows()
     const rows = rowElements(container)
-    const input = rows[0]!.querySelector('textarea')
-    if (input === null) throw new Error('The first input was not rendered.')
-    input.focus()
-    input.setSelectionRange(0, 1)
 
-    activate(rows[0]!, 13)
-
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(0)
-  })
-
-  it('blurs the source input while dragging and restores its caret on release', () => {
-    vi.useFakeTimers()
-    mockRowRects()
-    const { container } = renderRows({
-      list: [
-        { id: 'a', text: 'Alpha', children: [] },
-        { id: 'b', text: 'Bravo', children: [] },
-      ],
-    })
-    const rows = rowElements(container)
-    const input = rows[0]!.querySelector('textarea')
-    if (input === null) throw new Error('The first input was not rendered.')
-    input.focus()
-    input.setSelectionRange(1, 3)
-
-    activate(rows[0]!, 13)
-    expect(document.activeElement).not.toBe(input)
-    expect(input.selectionStart).toBe(1)
-    expect(input.selectionEnd).toBe(1)
+    pointerDownAt(rows[0]!, 13)
+    expect(dragFreeze.end).toHaveBeenCalledWith()
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS - 1))
+    expect(dragFreeze.begin).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(dragFreeze.begin).toHaveBeenCalledWith('a', 1)
 
     pointerUpAt(rows[0]!, 13)
-    expect(document.activeElement).toBe(input)
-    expect(input.selectionStart).toBe(1)
-    expect(input.selectionEnd).toBe(1)
+    expect(dragFreeze.end).toHaveBeenCalledWith(1)
   })
 
-  it('keeps the source input blurred after a cancelled drag until the pointer is released', () => {
+  it('keeps the caret freeze until the pointer is released after a cancelled drag', () => {
     vi.useFakeTimers()
     mockRowRects()
-    const { container } = renderRows({
-      list: [
-        { id: 'a', text: 'Alpha', children: [] },
-        { id: 'b', text: 'Bravo', children: [] },
-      ],
-    })
+    const { container, dragFreeze } = renderRows()
     const rows = rowElements(container)
-    const input = rows[0]!.querySelector('textarea')
-    if (input === null) throw new Error('The first input was not rendered.')
-    input.focus()
-    input.setSelectionRange(2, 2)
 
     activate(rows[0]!, 13)
+    const releasesBeforeCancel = dragFreeze.end.mock.calls.length
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(document.activeElement).not.toBe(input)
+
+    expect(dragFreeze.end).toHaveBeenCalledTimes(releasesBeforeCancel)
 
     pointerUpAt(rows[0]!, 40)
-    expect(document.activeElement).toBe(input)
-    expect(input.selectionStart).toBe(2)
-    expect(input.selectionEnd).toBe(2)
+    expect(dragFreeze.end).toHaveBeenLastCalledWith(1)
+  })
+
+  it('ends the visual freeze without releasing the caret when the source row disappears', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const view = renderRows({ list: buildNodes(2) })
+    const row = rowElements(view.container)[0]!
+    activate(row, 13)
+    expect(document.body).toHaveClass('node-drag-active')
+
+    view.rerender(
+      <NodeList
+        dragFreeze={view.dragFreeze}
+        nodes={buildNodes(2).slice(1)}
+        renderInput={(node, label) => <textarea aria-label={label} className="node-input" readOnly value={node.text} />}
+        onEnter={() => undefined}
+        onMove={view.onMove}
+      />,
+    )
+
+    expect(view.container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(view.dragFreeze.end).toHaveBeenCalledTimes(1)
+    expect(view.dragFreeze.begin).toHaveBeenCalledTimes(1)
   })
 
   it('commits a move to the boundary chosen by the release position', () => {
@@ -535,6 +542,7 @@ describe('NodeList drag interaction', () => {
     pointerDownAt(row, 13)
     first.rerender(
       <NodeList
+        dragFreeze={stubDragFreeze()}
         locked
         nodes={nodes}
         renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
@@ -551,6 +559,7 @@ describe('NodeList drag interaction', () => {
     pointerDownAt(secondRow, 13)
     second.rerender(
       <NodeList
+        dragFreeze={stubDragFreeze()}
         nodes={buildNodes(4).slice(1)}
         renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
         onEnter={() => undefined}
