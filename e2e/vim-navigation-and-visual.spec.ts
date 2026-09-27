@@ -13,6 +13,12 @@ import {
 
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
 
+const selectionColors = (field: ReturnType<typeof node>) =>
+  field.evaluate((element) => {
+    const style = element.ownerDocument.defaultView?.getComputedStyle(element, '::selection')
+    return { background: style?.backgroundColor, color: style?.color }
+  })
+
 test.describe('Vim editing prototype', () => {
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -411,6 +417,9 @@ test.describe('Vim editing prototype', () => {
         return selection?.toString()
       }),
     ).toBe('h')
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+    await expect(editor).toHaveScreenshot('vim-normal-link-character-light.png')
 
     await editor.press('$')
 
@@ -548,6 +557,8 @@ test.describe('Vim editing prototype', () => {
         ),
       )
       .toBe('rgb(55, 63, 67)')
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
     await expect(editor).toHaveScreenshot('vim-normal-link-character-dark.png')
   })
 
@@ -578,6 +589,81 @@ test.describe('Vim editing prototype', () => {
       (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::selection').backgroundColor,
     )
     expect(linkBackground).toBe(textSelectionBackground)
+  })
+
+  test('keeps a character Visual selection inside a hyperlink on the highlight pair', async ({ userDataDir }) => {
+    const url = 'https://example.test'
+    const text = `go to ${url} now`
+    const start = text.indexOf(url)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text, links: [{ start, end: start + url.length, url }], children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const link = editor.getByRole('link')
+
+    await editor.focus()
+    await setCursor(editor, start)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+
+    expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.toString())).toBe('http')
+    expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.isCollapsed)).toBe(false)
+    await expect(link).not.toHaveClass(/link-selected/)
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    await expect(editor).toHaveScreenshot('vim-visual-link-selection-light.png')
+
+    await window.emulateMedia({ colorScheme: 'dark' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    await expect(editor).toHaveScreenshot('vim-visual-link-selection-dark.png')
+  })
+
+  test('keeps a spanning character Visual selection on the highlight pair', async ({ userDataDir }) => {
+    const url = 'https://example.test'
+    const text = `go to ${url} now`
+    const start = text.indexOf(url)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text, links: [{ start, end: start + url.length, url }], children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const link = editor.getByRole('link')
+
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+
+    expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.toString())).toBe(
+      'go to htt',
+    )
+    expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.isCollapsed)).toBe(false)
+    await expect(link).not.toHaveClass(/link-selected/)
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-light.png')
+
+    await window.emulateMedia({ colorScheme: 'dark' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-dark.png')
   })
 
   test('keeps the Normal-mode linked selection on the focused node', async ({ userDataDir }) => {
