@@ -18,6 +18,20 @@ export type {
   VimViewportMotion,
 } from './vim-keyboard-types'
 
+/**
+ * Finishes a pending Insert or Replace session before a command that moves focus off the current
+ * node (`Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo). A pending Insert session's text is already
+ * live in the store, so this only captures its dot-repeat bookkeeping (`.` later checks whether the
+ * captured node still matches before replaying it); a pending Replace session commits its buffered
+ * text and returns to Normal mode, matching the documented undo/redo rule.
+ */
+function finishVimSessionBeforeNavigation(vim: VimKeyboardState | undefined, input: HTMLElement): void {
+  vim?.finishInsert?.(input)
+  if (vim?.mode !== 'replace') return
+  vim.finishReplace?.(input, false)
+  vim.setMode('normal')
+}
+
 export function executeEditorContextMenuCommand(
   command: EditorContextMenuCommand,
   store: EditorStore,
@@ -178,14 +192,17 @@ export function createEditorKeyDownHandler({
       }
     } else if (event.metaKey && event.key === '.') {
       event.preventDefault()
+      finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.enter()
       vim?.syncImageCaretToFocus()
     } else if (event.metaKey && event.key === ',') {
       event.preventDefault()
+      finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.leave()
       vim?.syncImageCaretToFocus()
     } else if (event.metaKey && event.key === 'Backspace') {
       event.preventDefault()
+      finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.deleteSelected()
     } else if (event.metaKey && event.key.toLowerCase() === 'z') {
       event.preventDefault()
@@ -193,6 +210,8 @@ export function createEditorKeyDownHandler({
         const changed = vim.finishReplace?.(event.currentTarget, true) ?? false
         vim.setMode('normal')
         if (changed) setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - 1))
+      } else if (vim?.mode === 'insert') {
+        vim.finishInsert?.(event.currentTarget)
       }
       if (event.shiftKey) store.redo()
       else store.undo()

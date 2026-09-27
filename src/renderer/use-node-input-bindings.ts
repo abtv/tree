@@ -37,6 +37,7 @@ import {
   pointerCaretTransition,
   type VimCaretState,
 } from './vim-caret-transition'
+import { diffTypedText, resolveReplaceCommit } from './vim-edit-session'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -76,7 +77,9 @@ export function useNodeInputBindings({
   const vimPending = useRef<VimPendingCommand | undefined>(undefined)
   const vimLastChange = useRef<VimRepeatChange | undefined>(undefined)
   const vimLastFind = useRef<VimFindCommand | undefined>(undefined)
-  const vimInsertSession = useRef<{ baseline: string; position: number; change: VimTextChange } | undefined>(undefined)
+  const vimInsertSession = useRef<
+    { nodeId: string; baseline: string; position: number; change: VimTextChange } | undefined
+  >(undefined)
   const vimReplaceSession = useRef<{ nodeId: string; baseline: string; position: number; typed: string } | undefined>(
     undefined,
   )
@@ -98,9 +101,9 @@ export function useNodeInputBindings({
     [store, setImageCaretNodeId],
   )
   const structuralInsert = useRef<
-    | { kind: 'open'; position: 'before' | 'after' }
-    | { kind: 'child-open' }
-    | { kind: 'visual'; command: 'c' | 's'; span: number }
+    | { kind: 'open'; originNodeId: string; position: 'before' | 'after' }
+    | { kind: 'child-open'; originNodeId: string }
+    | { kind: 'visual'; originNodeId: string; command: 'c' | 's'; span: number }
     | undefined
   >(undefined)
 
@@ -176,7 +179,7 @@ export function useNodeInputBindings({
       if (result === undefined) return
       if ('ydxcs'.includes(command)) vimRegister.current = { kind: 'nodes', value: result }
       if (command === 'c' || command === 's') {
-        structuralInsert.current = { kind: 'visual', command, span }
+        structuralInsert.current = { kind: 'visual', originNodeId: nodeVisualSelection.focusId, command, span }
         setVimMode('insert')
       } else {
         if (command !== 'y')
@@ -228,15 +231,12 @@ export function useNodeInputBindings({
     (input?: HTMLElement, retreatCursor = false): boolean => {
       const session = vimReplaceSession.current
       vimReplaceSession.current = undefined
-      if (session === undefined || session.typed === '') return false
-      const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
-      const finalText =
-        session.baseline.slice(0, session.position) +
-        session.typed +
-        session.baseline.slice(session.position + replaced)
-      store.replaceTextRange(session.nodeId, session.position, session.position + replaced, session.typed)
-      vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced }
-      const rawCursor = session.position + session.typed.length
+      if (session === undefined) return false
+      const commit = resolveReplaceCommit(session)
+      if (commit === undefined) return false
+      const { finalText, replacedStart, replacedEnd, rawCursor } = commit
+      store.replaceTextRange(session.nodeId, replacedStart, replacedEnd, session.typed)
+      vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced: replacedEnd - replacedStart }
       const state = store.getSnapshot()
       const hasAttachment =
         state.status === 'ready' && requireNode(state.document, session.nodeId).node.attachment !== undefined
@@ -245,10 +245,10 @@ export function useNodeInputBindings({
           ? caretAuthority.current.caret
           : { cursor: rawCursor, imageActive: false }
       // Escape and Cmd+Z/Cmd+Shift+Z retreat the DOM caret by one after calling this (see
-      // editor-input-handlers.ts); every other caller (blur, a same-node pointer click) leaves the
-      // caret at the raw typed end. The image-caret decision must match whichever position the
-      // caller actually leaves the caret at, so callers say so explicitly rather than this
-      // function inferring it from whether `input` was passed.
+      // editor-input-handlers.ts); every other caller (blur, a same-node pointer click, Cmd+.,
+      // Cmd+,, Cmd+Backspace) leaves the caret at the raw typed end. The image-caret decision must
+      // match whichever position the caller actually leaves the caret at, so callers say so
+      // explicitly rather than this function inferring it from whether `input` was passed.
       const committedCursor = retreatCursor ? Math.max(0, rawCursor - 1) : rawCursor
       const next = editCaretTransition(prior, committedCursor, finalText.length, hasAttachment)
       applyCaretState(session.nodeId, {
@@ -263,6 +263,27 @@ export function useNodeInputBindings({
       return true
     },
     [store, applyCaretState],
+  )
+
+  const finishVimInsert = useCallback(
+    // Always captures: a diff-based session can span a node change (e.g. Enter while still in
+    // Insert mode) with no reliable way to detect that at finish time across every trigger
+    // (keyboard, blur, and mouse-driven navigation that never fires a distinguishing blur target).
+    // Safety instead lives at dot-repeat replay time, which checks the stamped `nodeId`.
+    (input: HTMLElement): void => {
+      finishStructuralInsert(input)
+      const session = vimInsertSession.current
+      vimInsertSession.current = undefined
+      if (session === undefined) return
+      const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
+      const { nodeId, baseline, position, change } = session
+      if (change.kind === 'insert' && finalText === baseline) return
+      if (change.kind === 'insert' || change.kind === 'change' || change.kind === 'substitute') {
+        const diff = diffTypedText(baseline, finalText, position)
+        vimLastChange.current = { ...change, ...diff, nodeId }
+      }
+    },
+    [finishStructuralInsert],
   )
 
   const moveVimViewport = useCallback(
@@ -396,7 +417,12 @@ export function useNodeInputBindings({
         if (input !== undefined) clearNormalCaret(input)
         setSelectAllNodeId(undefined)
         vimPending.current = undefined
-        vimInsertSession.current = undefined
+        // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and
+        // immediately moving focus onto it, which blurs *this* node as an incidental side effect
+        // before the user has typed anything into the new one. Only finish a structural session
+        // from blur once it is a different node's own blur — the one it actually began on.
+        const structuralBeganHere = structuralInsert.current?.originNodeId === node.id
+        if (input !== undefined && !structuralBeganHere) finishVimInsert(input)
         finishVimReplace()
         if (latestVimMode.current === 'replace') setVimMode('normal')
         store.endTextSession()
@@ -501,37 +527,10 @@ export function useNodeInputBindings({
           pending: vimPending,
           lastChange: vimLastChange,
           lastFind: vimLastFind,
-          beginInsert: (_nodeId, baseline, position, change) => {
-            vimInsertSession.current = { baseline, position, change }
+          beginInsert: (nodeId, baseline, position, change) => {
+            vimInsertSession.current = { nodeId, baseline, position, change }
           },
-          finishInsert: (input) => {
-            finishStructuralInsert(input)
-            const session = vimInsertSession.current
-            vimInsertSession.current = undefined
-            if (session === undefined) return
-            const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-            const { baseline, position, change } = session
-            let prefix = 0
-            while (prefix < baseline.length && prefix < finalText.length && baseline[prefix] === finalText[prefix])
-              prefix += 1
-            let suffix = 0
-            while (
-              suffix < baseline.length - prefix &&
-              suffix < finalText.length - prefix &&
-              baseline[baseline.length - 1 - suffix] === finalText[finalText.length - 1 - suffix]
-            )
-              suffix += 1
-            const insertedText = finalText.slice(prefix, finalText.length - suffix)
-            if (change.kind === 'insert' && finalText === baseline) return
-            if (change.kind === 'insert' || change.kind === 'change' || change.kind === 'substitute') {
-              vimLastChange.current = {
-                ...change,
-                insertedText,
-                insertOffset: prefix - position,
-                deleteCount: baseline.length - prefix - suffix,
-              }
-            }
-          },
+          finishInsert: finishVimInsert,
           beginReplace: (nodeId, _input, baseline, position) => {
             vimReplaceSession.current = { nodeId, baseline, position, typed: '' }
           },
@@ -606,10 +605,10 @@ export function useNodeInputBindings({
             command: commandNodeVisual,
           },
           beginStructuralOpen: (position) => {
-            structuralInsert.current = { kind: 'open', position }
+            structuralInsert.current = { kind: 'open', originNodeId: node.id, position }
           },
           beginStructuralChildOpen: () => {
-            structuralInsert.current = { kind: 'child-open' }
+            structuralInsert.current = { kind: 'child-open', originNodeId: node.id }
           },
           repeatStructural,
         },
@@ -629,7 +628,7 @@ export function useNodeInputBindings({
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
         vimPending.current = undefined
-        vimInsertSession.current = undefined
+        finishVimInsert(event.currentTarget)
         finishVimReplace(event.currentTarget)
         vimVisualAnchor.current = undefined
         vimVisualFocus.current = undefined
@@ -664,7 +663,7 @@ export function useNodeInputBindings({
       applyCaretState,
       commandNodeVisual,
       finishVimReplace,
-      finishStructuralInsert,
+      finishVimInsert,
       moveVimViewport,
       moveNodeVisual,
       onPreviewAttachment,

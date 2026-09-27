@@ -11,15 +11,31 @@ export type VimTextChange =
       insertedText?: string
       insertOffset?: number
       deleteCount?: number
+      /** Set only when enriched via a finished Insert session (`change`); see `nodeId` below. */
+      nodeId?: string
     }
   | { kind: 'replace'; count: number; character: string }
-  | { kind: 'substitute'; count: number; insertedText?: string; insertOffset?: number; deleteCount?: number }
+  | {
+      kind: 'substitute'
+      count: number
+      insertedText?: string
+      insertOffset?: number
+      deleteCount?: number
+      nodeId?: string
+    }
   | {
       kind: 'insert'
       entry: 'i' | 'a' | 'I' | 'A'
       insertedText?: string
       insertOffset?: number
       deleteCount?: number
+      /**
+       * The node an Insert session's diff was captured against. A session can span a node change
+       * (e.g. `Enter` while still in Insert mode) with no intervening Escape to finish it in place,
+       * so `.` must only replay this diff when the node it was captured on is still the current one
+       * — reapplying it elsewhere would misattribute text typed into one node to another.
+       */
+      nodeId?: string
     }
   | { kind: 'paste'; after: boolean; text: string }
   | { kind: 'overwrite'; text: string; replaced: number }

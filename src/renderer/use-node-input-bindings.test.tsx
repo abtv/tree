@@ -451,6 +451,281 @@ describe('useNodeInputBindings', () => {
     expect(store.createChildWithText).toHaveBeenCalledWith('Opened')
   })
 
+  it('captures a plain Insert session when blur leaves the node selected', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRange: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const node: TreeNode = { id: 'a', text: 'a', children: [] }
+    const input = document.createElement('textarea')
+    input.value = 'a'
+    result.current.bindings(node).inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    press('i')
+    expect(result.current.vimMode).toBe('insert')
+    input.value = 'aX'
+    act(() => result.current.bindings(node).onBlur())
+    expect(result.current.vimMode).toBe('insert')
+    press('Escape')
+    press('.')
+    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
+  })
+
+  it('captures a plain Insert session across a node change but does not replay it on a different node', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRange: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const nodeA: TreeNode = { id: 'a', text: 'a', children: [] }
+    const nodeB: TreeNode = { id: 'b', text: 'b', children: [] }
+    const inputA = document.createElement('textarea')
+    inputA.value = 'a'
+    const inputB = document.createElement('textarea')
+    inputB.value = 'b'
+    result.current.bindings(nodeA).inputRef(inputA)
+    result.current.bindings(nodeB).inputRef(inputB)
+    const pressOn = (node: TreeNode, input: HTMLElement, key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    pressOn(nodeA, inputA, 'i')
+    expect(result.current.vimMode).toBe('insert')
+    inputA.value = 'aX'
+    // Focus moves to a different node's own input with no intervening Escape (mirroring Enter
+    // while still in Insert mode, or clicking directly into another row). The dot-repeat diff is
+    // still captured (against node A), but must not later replay onto node B.
+    act(() => result.current.bindings(nodeA).onBlur())
+    expect(result.current.vimMode).toBe('insert')
+    pressOn(nodeB, inputB, 'Escape')
+    pressOn(nodeB, inputB, '.')
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+  })
+
+  it('replays a plain Insert session once the user returns to the node it was captured on', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRange: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const nodeA: TreeNode = { id: 'a', text: 'a', children: [] }
+    const nodeB: TreeNode = { id: 'b', text: 'b', children: [] }
+    const inputA = document.createElement('textarea')
+    inputA.value = 'a'
+    const inputB = document.createElement('textarea')
+    inputB.value = 'b'
+    result.current.bindings(nodeA).inputRef(inputA)
+    result.current.bindings(nodeB).inputRef(inputB)
+    const pressOn = (node: TreeNode, input: HTMLElement, key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    pressOn(nodeA, inputA, 'i')
+    inputA.value = 'aX'
+    // Focus crosses to node B with no intervening Escape, same as the discard case above, but the
+    // user then returns to node A (e.g. navigates back) without starting a fresh Insert session
+    // there. The captured diff's node ID still matches, so `.` must replay it.
+    act(() => result.current.bindings(nodeA).onBlur())
+    pressOn(nodeB, inputB, 'Escape')
+    pressOn(nodeA, inputA, '.')
+    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
+    expect((store.replaceTextRange as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe('a')
+  })
+
+  it('captures a plain Insert session when a same-node pointer click commits it', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRange: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const node: TreeNode = { id: 'a', text: 'a', children: [] }
+    const input = document.createElement('textarea')
+    input.value = 'a'
+    result.current.bindings(node).inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+    press('i')
+    input.value = 'aX'
+    act(() => result.current.bindings(node).onMouseDown({ currentTarget: input, button: 0 } as never))
+    press('Escape')
+    press('.')
+    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
+  })
+
+  it('captures opened child text for structural dot repeat after blur ends the session', () => {
+    // 'o' creates a new sibling and immediately moves focus onto it, which blurs the originating
+    // node as an incidental side effect before any text is typed. Model that with two distinct
+    // tracked nodes (as real node creation always produces a new id) so the structural session is
+    // only finished by a later blur on the node it actually ends up focused on.
+    const store = {
+      createChild: vi.fn(() => true),
+      createChildWithText: vi.fn(),
+      createSibling: vi.fn(() => true),
+      createSiblingWithText: vi.fn(),
+      endTextSession: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'A', children: [] }] },
+        location: { currentParentId: 'a', selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const nodeA: TreeNode = { id: 'a', text: 'A', children: [] }
+    const nodeB: TreeNode = { id: 'b', text: '', children: [] }
+    const inputA = document.createElement('textarea')
+    inputA.value = 'A'
+    const inputB = document.createElement('textarea')
+    result.current.bindings(nodeA).inputRef(inputA)
+    result.current.bindings(nodeB).inputRef(inputB)
+
+    act(() => {
+      result.current.bindings(nodeA).onKeyDown({
+        currentTarget: inputA,
+        key: 'o',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    })
+    expect(result.current.vimMode).toBe('insert')
+    act(() => result.current.bindings(nodeA).onBlur())
+    expect(result.current.vimMode).toBe('insert')
+
+    inputB.value = 'Opened'
+    act(() => result.current.bindings(nodeB).onBlur())
+
+    act(() => {
+      result.current.bindings(nodeB).onKeyDown({
+        currentTarget: inputB,
+        key: 'Escape',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    })
+    act(() => {
+      result.current.bindings(nodeB).onKeyDown({
+        currentTarget: inputB,
+        key: '.',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    })
+    expect(store.createChildWithText).toHaveBeenCalledWith('Opened')
+  })
+
   it('edits content on content change using the node links, defaulting to none', () => {
     const store = createStore()
     const { result } = renderBindings({ store, selectedNodeId: 'node' })

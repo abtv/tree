@@ -2172,6 +2172,72 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 6)
   })
 
+  test('commits a pending Replace session before Cmd+. enters the selected node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', children: [{ id: 'child', text: 'child', children: [] }] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+
+    await window.keyboard.press('Meta+.')
+
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('Xb')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('commits a pending Replace session before entering the node with its enter control', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', children: [{ id: 'child', text: 'child', children: [] }] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('Xb')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('commits a pending Replace session before Cmd+Backspace deletes the node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'ab', children: [] },
+          { id: 'peer', text: 'peer', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+
+    await window.keyboard.press('Meta+Backspace')
+    await expect(node(window, 1)).toHaveValue('peer')
+
+    await window.keyboard.press('Meta+z')
+    await expect(node(window, 1)).toHaveValue('Xb')
+  })
+
   test('changes, replaces, swaps, and cases a Visual selection', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -2232,6 +2298,58 @@ test.describe('Vim editing prototype', () => {
     await expect(node(window, 1)).toHaveValue('one')
     await expect(node(window, 2)).toHaveValue('two')
   })
+  test('does not record a plain Insert session as repeatable after entering the node with its enter control', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'ab', children: [{ id: 'child', text: 'child', children: [] }] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await editor.press('i')
+    await window.keyboard.type('X')
+
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+
+    const childEditor = node(window, 1)
+    await expect(childEditor).toHaveValue('child')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('.')
+    await expect(childEditor).toHaveValue('child')
+    const parent = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(parent).toHaveValue('Xab')
+  })
+
+  test('does not record a plain Insert session as repeatable after a breadcrumb navigates to an ancestor', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'ab', children: [] }] }],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await editor.press('i')
+    await window.keyboard.type('X')
+
+    await window.getByRole('button', { name: 'Top level' }).click()
+
+    const rootEditor = node(window, 1)
+    await expect(rootEditor).toHaveValue('Root')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('.')
+    await expect(rootEditor).toHaveValue('Root')
+  })
+
   test('adds, changes, and deletes surrounding pairs in Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one two three', children: [] }] },

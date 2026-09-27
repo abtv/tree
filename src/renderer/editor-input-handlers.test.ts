@@ -1085,6 +1085,91 @@ describe('editor keyboard handler', () => {
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
 
+  it('finishes a pending Insert session before Cmd+Z undoes it, staying in Insert mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+    const finishInsert = vi.fn()
+    vim.finishInsert = finishInsert
+
+    handle(keyEvent(input, 'z', { metaKey: true }))
+
+    expect(finishInsert).toHaveBeenCalledWith(input)
+    expect(finishInsert.mock.invocationCallOrder[0]).toBeLessThan(
+      (store.undo as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    )
+    expect(store.undo).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('insert')
+  })
+
+  it('commits and ends a pending Replace session before Cmd+. enters the selected node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, '.', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
+      (store.enter as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    )
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+  })
+
+  it('commits and ends a pending Replace session before Cmd+, leaves the current parent', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, ',', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
+      (store.leave as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    )
+    expect(store.leave).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+  })
+
+  it('commits and ends a pending Replace session before Cmd+Backspace deletes the node', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'Backspace', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input, false)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
+      (store.deleteSelected as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    )
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+  })
+
+  it('finishes a pending Insert session before Cmd+. and Cmd+Backspace, staying in Insert mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+    const finishInsert = vi.fn()
+    vim.finishInsert = finishInsert
+
+    handle(keyEvent(input, '.', { metaKey: true }))
+    handle(keyEvent(input, 'Backspace', { metaKey: true }))
+
+    expect(finishInsert).toHaveBeenNthCalledWith(1, input)
+    expect(finishInsert).toHaveBeenNthCalledWith(2, input)
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('insert')
+  })
+
   it('resyncs the image caret after Cmd+Z, Cmd+Shift+Z, and Cmd+, in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

@@ -62,6 +62,10 @@ export function App({ store }: AppProps): React.JSX.Element {
   })
   const enterNode = useCallback(
     (node: TreeNode): void => {
+      // The disclosure control's own mousedown handler calls preventDefault to avoid stealing
+      // focus while dragging, which also suppresses the browser's default blur on click. Blur the
+      // active input explicitly so a pending Insert or Replace session finishes before navigating.
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
       store.selectNode(node.id, 0)
       store.enter()
     },
