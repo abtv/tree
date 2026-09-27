@@ -14,14 +14,20 @@ import {
 } from './editor-dom'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
-import type {
-  VimFindCommand,
-  VimPendingCommand,
-  VimRegister,
-  VimRepeatChange,
-  VimStructuralChange,
-  VimViewportMotion,
-} from './vim-keyboard-types'
+import type { VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
+import {
+  beginStructuralChildOpen,
+  beginStructuralOpen,
+  beginStructuralVisual,
+  clearPending,
+  clearVisualRange,
+  createVimCommandHandles,
+  createVimCommandState,
+  recordRepeatChange,
+  structuralRepeatChange,
+  takeStructuralInsert,
+  type VimCommandState,
+} from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 import {
@@ -94,11 +100,20 @@ export function useNodeInputBindings({
     }),
     [vimSession],
   )
-  const vimPending = useRef<VimPendingCommand | undefined>(undefined)
-  const vimLastChange = useRef<VimRepeatChange | undefined>(undefined)
-  const vimLastFind = useRef<VimFindCommand | undefined>(undefined)
-  const vimVisualAnchor = useRef<number | undefined>(undefined)
-  const vimVisualFocus = useRef<number | undefined>(undefined)
+  // The pending command, dot-repeat, find, Visual endpoints, and structural insert live in one
+  // pure owner; the handles below keep the keyboard handler's direct `{ current }` reads and
+  // writes landing in that owner without re-creating the bindings callback. The getter holder
+  // reads the ref only when the handler accesses a slot, not during render.
+  const vimCommandState = useRef(createVimCommandState())
+  const vimCommandHandles = useMemo(
+    () =>
+      createVimCommandHandles({
+        get current(): VimCommandState {
+          return vimCommandState.current
+        },
+      }),
+    [vimCommandState],
+  )
   const caretAuthority = useRef<{ nodeId?: string; caret: VimCaretState }>({
     caret: { cursor: focus?.cursor ?? 0, imageActive: false },
   })
@@ -114,24 +129,11 @@ export function useNodeInputBindings({
     },
     [store, setImageCaretNodeId],
   )
-  const structuralInsert = useRef<
-    | { kind: 'open'; originNodeId: string; position: 'before' | 'after' }
-    | { kind: 'child-open'; originNodeId: string }
-    | { kind: 'visual'; originNodeId: string; command: 'c' | 's'; span: number }
-    | undefined
-  >(undefined)
-
   const finishStructuralInsert = useCallback((input: HTMLElement): void => {
-    const session = structuralInsert.current
-    structuralInsert.current = undefined
+    const session = takeStructuralInsert(vimCommandState.current)
     if (session === undefined) return
     const text = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-    vimLastChange.current =
-      session.kind === 'open'
-        ? { kind: 'structural-open', position: session.position, text }
-        : session.kind === 'child-open'
-          ? { kind: 'structural-child-open', text }
-          : { kind: 'structural-visual', command: session.command, span: session.span, text }
+    recordRepeatChange(vimCommandState.current, structuralRepeatChange(session, text))
   }, [])
 
   const syncImageCaretToFocus = useCallback((): void => {
@@ -188,22 +190,30 @@ export function useNodeInputBindings({
       const nextRegister = visualCommandRegister(command, result)
       if (nextRegister !== undefined) vimSession.current.register = nextRegister
       if (command === 'c' || command === 's') {
-        structuralInsert.current = { kind: 'visual', originNodeId: nodeVisualSelection.focusId, command, span }
+        beginStructuralVisual(vimCommandState.current, nodeVisualSelection.focusId, command, span)
         setVimMode('insert')
       } else {
         if (command !== 'y')
-          vimLastChange.current = {
+          recordRepeatChange(vimCommandState.current, {
             kind: 'structural-visual',
             command,
             span,
             ...(source === undefined ? {} : { source }),
-          }
+          })
         setVimMode('normal')
         syncImageCaretToFocus()
       }
       setNodeVisualSelection(undefined)
     },
-    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode, syncImageCaretToFocus, vimSession],
+    [
+      store,
+      nodeVisualSelection,
+      setNodeVisualSelection,
+      setVimMode,
+      syncImageCaretToFocus,
+      vimSession,
+      vimCommandState,
+    ],
   )
 
   const repeatStructural = useCallback(
@@ -245,7 +255,11 @@ export function useNodeInputBindings({
       if (commit === undefined) return false
       const { finalText, replacedStart, replacedEnd, rawCursor } = commit
       store.replaceTextRange(session.nodeId, replacedStart, replacedEnd, session.typed)
-      vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced: replacedEnd - replacedStart }
+      recordRepeatChange(vimCommandState.current, {
+        kind: 'overwrite',
+        text: session.typed,
+        replaced: replacedEnd - replacedStart,
+      })
       const state = store.getSnapshot()
       const hasAttachment =
         state.status === 'ready' && requireNode(state.document, session.nodeId).node.attachment !== undefined
@@ -271,7 +285,7 @@ export function useNodeInputBindings({
       }
       return true
     },
-    [store, applyCaretState, vimSession],
+    [store, applyCaretState, vimSession, vimCommandState],
   )
 
   const finishVimInsert = useCallback(
@@ -285,9 +299,9 @@ export function useNodeInputBindings({
       if (session === undefined) return
       const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
       const change = insertRepeatChange(session, finalText)
-      if (change !== undefined) vimLastChange.current = change
+      if (change !== undefined) recordRepeatChange(vimCommandState.current, change)
     },
-    [finishStructuralInsert, vimSession],
+    [finishStructuralInsert, vimSession, vimCommandState],
   )
 
   const moveVimViewport = useCallback(
@@ -418,12 +432,12 @@ export function useNodeInputBindings({
       onBlur: () => {
         const input = inputs.current.get(node.id)
         setSelectAllNodeId(undefined)
-        vimPending.current = undefined
+        clearPending(vimCommandState.current)
         // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and
         // immediately moving focus onto it, which blurs *this* node as an incidental side effect
         // before the user has typed anything into the new one. Only finish a structural session
         // from blur once it is a different node's own blur — the one it actually began on.
-        const structuralBeganHere = structuralInsert.current?.originNodeId === node.id
+        const structuralBeganHere = vimCommandState.current.structuralInsert?.originNodeId === node.id
         if (input !== undefined && !structuralBeganHere) finishVimInsert(input)
         finishVimReplace()
         if (latestVimMode.current === 'replace') setVimMode('normal')
@@ -467,7 +481,7 @@ export function useNodeInputBindings({
         }
       },
       onCompositionStart: () => {
-        vimPending.current = undefined
+        clearPending(vimCommandState.current)
         finishVimReplace()
         setComposing(true)
       },
@@ -521,9 +535,9 @@ export function useNodeInputBindings({
         vim: {
           mode: vimMode,
           register: registerHandle,
-          pending: vimPending,
-          lastChange: vimLastChange,
-          lastFind: vimLastFind,
+          pending: vimCommandHandles.pending,
+          lastChange: vimCommandHandles.lastChange,
+          lastFind: vimCommandHandles.lastFind,
           beginInsert: (nodeId, baseline, position, change) => {
             beginInsertSession(vimSession.current, { nodeId, baseline, position, change })
           },
@@ -541,8 +555,8 @@ export function useNodeInputBindings({
           finishReplace: (input, retreatCursor) => {
             return finishVimReplace(input, retreatCursor)
           },
-          visualAnchor: vimVisualAnchor,
-          visualFocus: vimVisualFocus,
+          visualAnchor: vimCommandHandles.visualAnchor,
+          visualFocus: vimCommandHandles.visualFocus,
           imageTextCursor: {
             get current() {
               return caretAuthority.current.caret.imageTextReturnCursor
@@ -594,10 +608,10 @@ export function useNodeInputBindings({
             command: commandNodeVisual,
           },
           beginStructuralOpen: (position) => {
-            structuralInsert.current = { kind: 'open', originNodeId: node.id, position }
+            beginStructuralOpen(vimCommandState.current, node.id, position)
           },
           beginStructuralChildOpen: () => {
-            structuralInsert.current = { kind: 'child-open', originNodeId: node.id }
+            beginStructuralChildOpen(vimCommandState.current, node.id)
           },
           repeatStructural,
         },
@@ -616,11 +630,10 @@ export function useNodeInputBindings({
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
-        vimPending.current = undefined
+        clearPending(vimCommandState.current)
         finishVimInsert(event.currentTarget)
         finishVimReplace(event.currentTarget)
-        vimVisualAnchor.current = undefined
-        vimVisualFocus.current = undefined
+        clearVisualRange(vimCommandState.current)
       },
       onMouseUp: (event: MouseEvent<HTMLElement>) => {
         if (latestVimMode.current !== 'normal') return
@@ -668,6 +681,8 @@ export function useNodeInputBindings({
       store,
       vimMode,
       vimSession,
+      vimCommandState,
+      vimCommandHandles,
     ],
   )
 }

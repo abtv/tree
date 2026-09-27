@@ -1520,4 +1520,61 @@ describe('useNodeInputBindings', () => {
     expect(result.current.vimMode).toBe('normal')
     input.remove()
   })
+
+  it('clears a character Visual selection on a pointer press and re-anchors at the pointer', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRanges: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const node: TreeNode = { id: 'a', text: 'foo bar', children: [] }
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    input.value = 'foo bar'
+    result.current.bindings(node).inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    input.setSelectionRange(0, 0)
+    press('v')
+    expect(result.current.vimMode).toBe('visual')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(1)
+
+    // A pointer press clears the Visual endpoints while character Visual mode stays active, so
+    // the next motion must anchor at the pointer position rather than a stale anchor.
+    input.setSelectionRange(3, 3)
+    act(() => result.current.bindings(node).onMouseDown({ currentTarget: input, button: 0 } as never))
+
+    press('l')
+    expect(result.current.vimMode).toBe('visual')
+    expect(input.selectionStart).toBe(3)
+    expect(input.selectionEnd).toBe(5)
+    input.remove()
+  })
 })
