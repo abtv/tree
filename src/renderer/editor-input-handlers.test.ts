@@ -1186,6 +1186,118 @@ describe('editor keyboard handler', () => {
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledTimes(3)
   })
 
+  it('clears a whole-node Visual g prefix on Escape so a following d does not run gd', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    const exit = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
+
+    handle(keyEvent(input, 'g'))
+    expect(vim.pending.current).toEqual({ count: '', motionCount: '', prefix: 'g' })
+    handle(keyEvent(input, 'Escape'))
+    expect(exit).toHaveBeenCalledOnce()
+    expect(vim.pending.current).toBeUndefined()
+    handle(keyEvent(input, 'd'))
+    expect(store.enter).not.toHaveBeenCalled()
+  })
+
+  it('clears a whole-node Visual g prefix on V exit', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    const exit = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
+
+    handle(keyEvent(input, 'g'))
+    handle(keyEvent(input, 'V'))
+
+    expect(exit).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+    expect(vim.pending.current).toBeUndefined()
+    handle(keyEvent(input, 'd'))
+    expect(store.enter).not.toHaveBeenCalled()
+  })
+
+  it('keeps character Visual mode but clears its command assembly before Cmd+.', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 1
+    vim.pending.current = { count: '', motionCount: '', prefix: 'i' }
+
+    handle(keyEvent(input, '.', { metaKey: true }))
+
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.pending.current).toBeUndefined()
+  })
+
+  it('keeps character Visual mode but clears its command assembly before Cmd+,', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 1
+
+    handle(keyEvent(input, ',', { metaKey: true }))
+
+    expect(store.leave).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+  })
+
+  it('keeps character Visual mode but clears its command assembly before Cmd+Backspace', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 1
+
+    handle(keyEvent(input, 'Backspace', { metaKey: true }))
+
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+  })
+
+  it('keeps character Visual mode but clears its command assembly before Cmd+Z and Cmd+Shift+Z', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 1
+    vim.pending.current = { count: '', motionCount: '', prefix: 'a' }
+
+    handle(keyEvent(input, 'z', { metaKey: true }))
+
+    expect(store.undo).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.pending.current).toBeUndefined()
+
+    vim.visualAnchor.current = 2
+    vim.visualFocus.current = 3
+    handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
+
+    expect(store.redo).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+  })
+
   it('blocks unsupported editing keys in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

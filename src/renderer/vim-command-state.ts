@@ -43,6 +43,18 @@ export function clearVisualRange(state: VimCommandState): void {
   state.visualFocus = undefined
 }
 
+/**
+ * Drop the unfinished command together with both character-wise Visual endpoints. Every path that
+ * abandons the command assembly for the current node — a Visual mode exit or an application command
+ * that moves focus — must clear the pending command and the Visual range as one unit; leaving either
+ * behind makes the next motion reinterpret state that belongs to an earlier node. Repeat changes,
+ * the last character find, and the structural insert session survive.
+ */
+export function clearCommandAssembly(state: VimCommandState): void {
+  clearPending(state)
+  clearVisualRange(state)
+}
+
 export function beginStructuralOpen(state: VimCommandState, originNodeId: string, position: 'before' | 'after'): void {
   state.structuralInsert = { kind: 'open', originNodeId, position }
 }

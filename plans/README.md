@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions. Read the linked plan before 
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Renderer interaction state ownership](interaction-state-ownership.md) | In progress | OWN-10: fix the Visual-state exit defects reported by OWN-8 (F1, F5) |
+| [Renderer interaction state ownership](interaction-state-ownership.md) | In progress | OWN-11: guard the result and close the initiative |
 
 Remove a plan and its row when the initiative is complete. Git history retains the completed record.

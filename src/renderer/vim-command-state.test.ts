@@ -4,6 +4,7 @@ import {
   beginStructuralChildOpen,
   beginStructuralOpen,
   beginStructuralVisual,
+  clearCommandAssembly,
   clearPending,
   clearVisualRange,
   createVimCommandHandles,
@@ -75,6 +76,19 @@ describe('clearVisualRange', () => {
     expect(state.visualFocus).toBeUndefined()
     expect(state.lastChange).toBe(change)
     expect(state.lastFind).toBe(find)
+  })
+})
+
+describe('clearCommandAssembly', () => {
+  it('clears the pending command and both Visual endpoints together and leaves repeat and insert state alone', () => {
+    const state = populatedState()
+    clearCommandAssembly(state)
+    expect(state.pending).toBeUndefined()
+    expect(state.visualAnchor).toBeUndefined()
+    expect(state.visualFocus).toBeUndefined()
+    expect(state.lastChange).toBe(change)
+    expect(state.lastFind).toBe(find)
+    expect(state.structuralInsert).toEqual({ kind: 'open', originNodeId: 'a', position: 'after' })
   })
 })
 

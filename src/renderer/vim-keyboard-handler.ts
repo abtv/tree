@@ -63,6 +63,12 @@ export function handleVimKey(
     }
     if (event.key === 'Escape' || event.key === 'V') {
       vim.nodeVisual?.exit()
+      // Whole-node Visual mode can hold only the pending `g` prefix; a prefix that survived the
+      // exit would be read as a Normal-mode continuation (`d` would run `gd`). The local
+      // clearPending helper below is declared after this branch, so write the owner slots directly.
+      vim.pending.current = undefined
+      vim.visualAnchor.current = undefined
+      vim.visualFocus.current = undefined
       vim.setMode('normal')
       vim.syncImageCaretToFocus()
     } else if (event.key === 'j' || event.key === 'k') {

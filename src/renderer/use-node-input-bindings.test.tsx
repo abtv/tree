@@ -1582,6 +1582,120 @@ describe('useNodeInputBindings', () => {
     expect(input.selectionEnd).toBe(5)
     input.remove()
   })
+
+  it('clears the whole-node Visual g prefix when a whole-node command exits', () => {
+    const nodes: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      { id: 'b', text: 'B', children: [] },
+    ]
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: nodes },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+      selectNode: vi.fn(),
+      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
+      deleteSelected: vi.fn(() => false),
+      enter: vi.fn(),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      const { bindings } = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        nodeVisualSelection: selection,
+        setNodeVisualSelection: setSelection,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode, selection }
+    })
+    const node = nodes[0]!
+    const input = document.createElement('textarea')
+    input.value = 'A'
+    result.current.bindings(node).inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('V')
+    press('g')
+    press('y')
+    expect(result.current.vimMode).toBe('normal')
+    expect(result.current.selection).toBeUndefined()
+    press('d')
+    press('d')
+    expect(store.enter).not.toHaveBeenCalled()
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
+  })
+
+  it('anchors the next character Visual motion at the reached caret after Cmd+.', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      enter: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const { bindings } = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const node: TreeNode = { id: 'a', text: 'Alpha', children: [] }
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    input.value = 'Alpha'
+    result.current.bindings(node).inputRef(input)
+    const press = (key: string, metaKey = false): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    input.setSelectionRange(0, 0)
+    press('v')
+    press('l')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(2)
+
+    // The focus-changing shortcut drops the endpoints while Visual mode stays active, so the next
+    // motion must anchor at the reached caret instead of the previous focus position.
+    press('.', true)
+    expect(result.current.vimMode).toBe('visual')
+    press('l')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(2)
+    input.remove()
+  })
 })
 
 describe('drag caret freeze', () => {

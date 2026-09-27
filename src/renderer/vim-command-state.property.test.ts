@@ -5,6 +5,7 @@ import {
   beginStructuralChildOpen,
   beginStructuralOpen,
   beginStructuralVisual,
+  clearCommandAssembly,
   clearPending,
   clearVisualRange,
   createVimCommandHandles,
@@ -91,6 +92,7 @@ type WriteOp =
   | { slot: 'visualFocus'; value: number | undefined }
   | { slot: 'clearPending' }
   | { slot: 'clearVisualRange' }
+  | { slot: 'clearCommandAssembly' }
 
 const pendingArbitrary = fc.option(
   fc.record({ count: fc.string({ maxLength: 3 }), motionCount: fc.string({ maxLength: 3 }) }),
@@ -121,6 +123,7 @@ const writeOpArbitrary: fc.Arbitrary<WriteOp> = fc.oneof(
   fc.record({ slot: fc.constant('visualFocus' as const), value: cursorArbitrary }),
   fc.record({ slot: fc.constant('clearPending' as const) }),
   fc.record({ slot: fc.constant('clearVisualRange' as const) }),
+  fc.record({ slot: fc.constant('clearCommandAssembly' as const) }),
 )
 
 it('keeps every handle write last-write-wins in exactly one slot', () => {
@@ -161,8 +164,13 @@ it('keeps every handle write last-write-wins in exactly one slot', () => {
         } else if (op.slot === 'clearPending') {
           clearPending(state)
           model.pending = undefined
-        } else {
+        } else if (op.slot === 'clearVisualRange') {
           clearVisualRange(state)
+          model.visualAnchor = undefined
+          model.visualFocus = undefined
+        } else {
+          clearCommandAssembly(state)
+          model.pending = undefined
           model.visualAnchor = undefined
           model.visualFocus = undefined
         }

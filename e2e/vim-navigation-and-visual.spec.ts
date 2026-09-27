@@ -967,4 +967,57 @@ test.describe('Vim editing prototype', () => {
     await expect(link).toHaveAttribute('href', url)
     await expect(link).toHaveText(url)
   })
+
+  test('clears stale Visual state on a focus-changing shortcut and a whole-node Visual exit', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [] },
+          { id: 'charlie', text: 'Charlie', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const alpha = node(window, 1)
+    await alpha.focus()
+    await setCursor(alpha, 0)
+
+    // A focus-changing shortcut during character Visual mode keeps the mode but drops the stale
+    // endpoints, so the next motion anchors at the reached node's caret instead of the old focus.
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await expect(alpha).toHaveJSProperty('selectionStart', 0)
+    await expect(alpha).toHaveJSProperty('selectionEnd', 2)
+
+    await window.keyboard.press('Meta+.')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    const heading = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(heading).toHaveValue('Alpha')
+    await window.keyboard.press('l')
+    await expect(heading).toHaveJSProperty('selectionStart', 0)
+    await expect(heading).toHaveJSProperty('selectionEnd', 2)
+
+    // A whole-node Visual g prefix must not survive Escape and turn the next Normal d into gd.
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.keyboard.press('Meta+,')
+    await expect(heading).toHaveCount(0)
+    const alphaAgain = node(window, 1)
+    await expect(alphaAgain).toHaveValue('Alpha')
+    await alphaAgain.focus()
+    await window.keyboard.press('V')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await window.keyboard.press('g')
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+    await expect(window.locator('.node-row')).toHaveCount(2)
+    await expect(node(window, 1)).toHaveValue('Bravo')
+  })
 })

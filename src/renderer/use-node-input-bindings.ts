@@ -21,8 +21,8 @@ import {
   beginStructuralChildOpen,
   beginStructuralOpen,
   beginStructuralVisual,
+  clearCommandAssembly,
   clearPending,
-  clearVisualRange,
   createVimCommandHandles,
   createVimCommandState,
   recordRepeatChange,
@@ -268,6 +268,9 @@ export function useNodeInputBindings({
         setVimMode('normal')
         syncImageCaretToFocus()
       }
+      // The command exits whole-node Visual mode, so an unfinished `g` prefix must not survive into
+      // the mode the command lands in.
+      clearCommandAssembly(vimCommandState.current)
       setNodeVisualSelection(undefined)
     },
     [
@@ -695,10 +698,9 @@ export function useNodeInputBindings({
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
-        clearPending(vimCommandState.current)
         finishVimInsert(event.currentTarget)
         finishVimReplace(event.currentTarget)
-        clearVisualRange(vimCommandState.current)
+        clearCommandAssembly(vimCommandState.current)
       },
       onMouseUp: (event: MouseEvent<HTMLElement>) => {
         if (latestVimMode.current !== 'normal') return

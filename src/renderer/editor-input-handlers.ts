@@ -19,14 +19,30 @@ export type {
 } from './vim-keyboard-types'
 
 /**
+ * Drops the command assembly that belongs to the node being left — the pending command and both
+ * character-wise Visual endpoints — before a focus-changing shortcut runs. Character Visual mode
+ * keeps its mode; only the stale slots clear, matching the pointer rule that preserves the mode
+ * while re-anchoring. Mirrors `clearCommandAssembly` in `vim-command-state.ts`, which this module
+ * cannot call because it receives access-time handles to the owner rather than the owner itself.
+ */
+function clearVisualCommandAssembly(vim: VimKeyboardState | undefined): void {
+  if (vim?.mode !== 'visual') return
+  vim.pending.current = undefined
+  vim.visualAnchor.current = undefined
+  vim.visualFocus.current = undefined
+}
+
+/**
  * Finishes a pending Insert or Replace session before a command that moves focus off the current
  * node (`Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo). A pending Insert session's text is already
  * live in the store, so this only captures its dot-repeat bookkeeping (`.` later checks whether the
  * captured node still matches before replaying it); a pending Replace session commits its buffered
- * text and returns to Normal mode, matching the documented undo/redo rule.
+ * text and returns to Normal mode, matching the documented undo/redo rule. Character Visual mode's
+ * stale command assembly clears while the mode stays active.
  */
 function finishVimSessionBeforeNavigation(vim: VimKeyboardState | undefined, input: HTMLElement): void {
   vim?.finishInsert?.(input)
+  clearVisualCommandAssembly(vim)
   if (vim?.mode !== 'replace') return
   vim.finishReplace?.(input, false)
   vim.setMode('normal')
@@ -213,6 +229,7 @@ export function createEditorKeyDownHandler({
       } else if (vim?.mode === 'insert') {
         vim.finishInsert?.(event.currentTarget)
       }
+      clearVisualCommandAssembly(vim)
       if (event.shiftKey) store.redo()
       else store.undo()
       vim?.syncImageCaretToFocus()
