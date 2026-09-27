@@ -1696,6 +1696,177 @@ describe('useNodeInputBindings', () => {
     expect(input.selectionEnd).toBe(2)
     input.remove()
   })
+
+  it('clears character Visual endpoints when blur ends the session and re-anchors the next motion', () => {
+    const store = {
+      endTextSession: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const { bindings } = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode }
+    })
+    const node: TreeNode = { id: 'a', text: 'Alpha', children: [] }
+    const input = document.createElement('textarea')
+    document.body.append(input)
+    input.value = 'Alpha'
+    result.current.bindings(node).inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    input.setSelectionRange(0, 0)
+    press('v')
+    press('l')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(2)
+
+    // A blur (a pointer navigation such as a breadcrumb or enter-control click) drops the
+    // endpoints while Visual mode stays active, so the next motion must anchor at the caret.
+    act(() => {
+      result.current.bindings(node).onBlur()
+    })
+    expect(result.current.vimMode).toBe('visual')
+    press('l')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(2)
+    input.remove()
+  })
+
+  it('keeps whole-node Visual mode active when a range move blurs the previous input', () => {
+    const nodes: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      { id: 'b', text: 'B', children: [] },
+    ]
+    const store = {
+      endTextSession: vi.fn(),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: nodes },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+      selectNode: vi.fn(),
+      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      const { bindings } = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        nodeVisualSelection: selection,
+        setNodeVisualSelection: setSelection,
+        onPreviewAttachment: vi.fn(),
+      })
+      return { bindings, vimMode, selection }
+    })
+    const node = nodes[0]!
+    const input = document.createElement('textarea')
+    input.value = 'A'
+    result.current.bindings(node).inputRef(input)
+    act(() => {
+      result.current.bindings(node).onKeyDown({
+        currentTarget: input,
+        key: 'V',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: vi.fn(),
+      } as never)
+    })
+    expect(result.current.vimMode).toBe('visual-node')
+    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
+
+    // Extending the range moves focus between node inputs, so the previous input blurs on every
+    // move; that blur must not exit whole-node Visual mode or clear its range.
+    act(() => {
+      result.current.bindings(node).onBlur()
+    })
+    expect(result.current.vimMode).toBe('visual-node')
+    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
+  })
+
+  it('keeps a multi-character selection when a resize notification arrives in Normal mode', () => {
+    const callbacks: ResizeObserverCallback[] = []
+    class TestResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        callbacks.push(callback)
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    try {
+      const store = {
+        endTextSession: vi.fn(),
+        getSnapshot: () => ({
+          status: 'ready',
+          document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'a' },
+        }),
+      } as unknown as EditorStore
+      const { result } = renderHook(() => {
+        const [vimMode, setVimMode] = useState<VimMode>('normal')
+        const { bindings } = useNodeInputBindings({
+          store,
+          selectedNodeId: 'a',
+          vimMode,
+          setVimMode,
+          onPreviewAttachment: vi.fn(),
+        })
+        return { bindings, vimMode }
+      })
+      const node: TreeNode = { id: 'a', text: 'Alpha', children: [] }
+      const input = document.createElement('textarea')
+      document.body.append(input)
+      input.value = 'Alpha'
+      input.focus()
+      result.current.bindings(node).inputRef(input)
+      input.setSelectionRange(0, input.value.length)
+      const notifyResize = (): void => {
+        for (const callback of callbacks) {
+          callback([{ target: input } as unknown as ResizeObserverEntry], {} as ResizeObserver)
+        }
+      }
+
+      // A wrapped-row resize must not collapse the deliberate full-text selection to a block caret.
+      act(notifyResize)
+      expect(input.selectionStart).toBe(0)
+      expect(input.selectionEnd).toBe(input.value.length)
+
+      // A collapsed caret is still normalized to the one-character Normal block.
+      input.setSelectionRange(1, 1)
+      act(notifyResize)
+      expect(input.selectionStart).toBe(1)
+      expect(input.selectionEnd).toBe(2)
+      input.remove()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('drag caret freeze', () => {

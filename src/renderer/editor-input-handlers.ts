@@ -19,17 +19,22 @@ export type {
 } from './vim-keyboard-types'
 
 /**
- * Drops the command assembly that belongs to the node being left — the pending command and both
- * character-wise Visual endpoints — before a focus-changing shortcut runs. Character Visual mode
- * keeps its mode; only the stale slots clear, matching the pointer rule that preserves the mode
- * while re-anchoring. Mirrors `clearCommandAssembly` in `vim-command-state.ts`, which this module
- * cannot call because it receives access-time handles to the owner rather than the owner itself.
+ * Drops the command state that belongs to the node or level being left — the pending command and
+ * both character-wise Visual endpoints — and leaves whole-node Visual for Normal mode, because its
+ * range is relative to the displayed level and cannot survive a focus or level change. Character
+ * Visual mode keeps its mode; only the stale slots clear, matching the pointer rule that preserves
+ * the mode while re-anchoring. Mirrors `clearCommandAssembly` in `vim-command-state.ts`, which this
+ * module cannot call because it receives access-time handles to the owner rather than the owner
+ * itself.
  */
-function clearVisualCommandAssembly(vim: VimKeyboardState | undefined): void {
-  if (vim?.mode !== 'visual') return
+function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): void {
+  if (vim === undefined) return
   vim.pending.current = undefined
   vim.visualAnchor.current = undefined
   vim.visualFocus.current = undefined
+  if (vim.mode !== 'visual-node') return
+  vim.nodeVisual?.exit()
+  vim.setMode('normal')
 }
 
 /**
@@ -38,11 +43,12 @@ function clearVisualCommandAssembly(vim: VimKeyboardState | undefined): void {
  * live in the store, so this only captures its dot-repeat bookkeeping (`.` later checks whether the
  * captured node still matches before replaying it); a pending Replace session commits its buffered
  * text and returns to Normal mode, matching the documented undo/redo rule. Character Visual mode's
- * stale command assembly clears while the mode stays active.
+ * stale command assembly clears while the mode stays active, and whole-node Visual mode ends
+ * because its range belongs to the displayed level being left.
  */
 function finishVimSessionBeforeNavigation(vim: VimKeyboardState | undefined, input: HTMLElement): void {
   vim?.finishInsert?.(input)
-  clearVisualCommandAssembly(vim)
+  clearCommandAssemblyBeforeCommand(vim)
   if (vim?.mode !== 'replace') return
   vim.finishReplace?.(input, false)
   vim.setMode('normal')
@@ -185,6 +191,9 @@ export function createEditorKeyDownHandler({
     }
     if (selectingAll) {
       event.preventDefault()
+      // Select-all replaces the selection, so a pending command or character Visual endpoints must
+      // not survive it; whole-node Visual ends because its range no longer describes the selection.
+      clearCommandAssemblyBeforeCommand(vim)
       const input = event.currentTarget
       selectAll(input)
       globalThis.queueMicrotask(() => {
@@ -229,7 +238,7 @@ export function createEditorKeyDownHandler({
       } else if (vim?.mode === 'insert') {
         vim.finishInsert?.(event.currentTarget)
       }
-      clearVisualCommandAssembly(vim)
+      clearCommandAssemblyBeforeCommand(vim)
       if (event.shiftKey) store.redo()
       else store.undo()
       vim?.syncImageCaretToFocus()

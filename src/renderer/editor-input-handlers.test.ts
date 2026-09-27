@@ -1298,6 +1298,92 @@ describe('editor keyboard handler', () => {
     expect(vim.visualFocus.current).toBeUndefined()
   })
 
+  it.each([
+    { name: 'Cmd+.', key: '.', options: { metaKey: true } },
+    { name: 'Cmd+,', key: ',', options: { metaKey: true } },
+    { name: 'Cmd+Backspace', key: 'Backspace', options: { metaKey: true } },
+    { name: 'Cmd+Z', key: 'z', options: { metaKey: true } },
+    { name: 'Cmd+Shift+Z', key: 'z', options: { metaKey: true, shiftKey: true } },
+    { name: 'Cmd+A', key: 'a', options: { metaKey: true } },
+  ])('clears a Normal-mode pending command before $name', ({ key, options }) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    handle(keyEvent(input, 'd'))
+    expect(vim.pending.current).toBeDefined()
+
+    handle(keyEvent(input, key, options))
+
+    expect(vim.pending.current).toBeUndefined()
+    expect(vim.mode).toBe('normal')
+    if (key === '.') expect(store.enter).toHaveBeenCalledOnce()
+    else if (key === ',') expect(store.leave).toHaveBeenCalledOnce()
+    else if (key === 'Backspace') expect(store.deleteSelected).toHaveBeenCalledOnce()
+    else if (key === 'z') expect(options.shiftKey ? store.redo : store.undo).toHaveBeenCalledOnce()
+    else expect(input.selectionEnd).toBe(input.value.length)
+  })
+
+  it('clears a Normal-mode g prefix before Cmd+.', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    handle(keyEvent(input, 'g'))
+    expect(vim.pending.current).toEqual({ count: '', motionCount: '', prefix: 'g' })
+
+    handle(keyEvent(input, '.', { metaKey: true }))
+
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(vim.pending.current).toBeUndefined()
+  })
+
+  it.each([
+    { name: 'Cmd+.', key: '.', options: { metaKey: true } },
+    { name: 'Cmd+,', key: ',', options: { metaKey: true } },
+    { name: 'Cmd+Backspace', key: 'Backspace', options: { metaKey: true } },
+    { name: 'Cmd+Z', key: 'z', options: { metaKey: true } },
+    { name: 'Cmd+Shift+Z', key: 'z', options: { metaKey: true, shiftKey: true } },
+    { name: 'Cmd+A', key: 'a', options: { metaKey: true } },
+  ])('exits whole-node Visual mode to Normal before $name', ({ key, options }) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
+    const exit = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
+    vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 1
+
+    handle(keyEvent(input, key, options))
+
+    expect(exit).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+    expect(vim.pending.current).toBeUndefined()
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+  })
+
+  it('keeps character Visual mode but clears its command assembly before Cmd+A', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+    vim.visualAnchor.current = 0
+    vim.visualFocus.current = 2
+    vim.pending.current = { count: '', motionCount: '', prefix: 'i' }
+
+    handle(keyEvent(input, 'a', { metaKey: true }))
+
+    expect(vim.mode).toBe('visual')
+    expect(vim.visualAnchor.current).toBeUndefined()
+    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.pending.current).toBeUndefined()
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
+  })
+
   it('blocks unsupported editing keys in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

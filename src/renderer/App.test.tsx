@@ -559,6 +559,74 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
   })
 
+  it('keeps the text select-all after Cmd+A exits whole-node Visual mode', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: 'Project' } })
+    input.focus()
+    fireEvent.keyDown(input, { key: 'V' })
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
+
+    fireEvent.keyDown(input, { key: 'a', metaKey: true })
+
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
+  })
+
+  it('exits whole-node Visual mode when the enter control enters the node', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    renderReact(<App store={store} />)
+    const input = screen.getByRole('textbox', { name: 'Node 1' })
+    fireEvent.change(input, { target: { value: 'Root' } })
+    input.focus()
+    fireEvent.keyDown(input, { key: 'V' })
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
+    expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
+
+    const button = screen.getByRole('button', { name: 'Enter node 1' })
+    fireEvent.mouseDown(button)
+    fireEvent.click(button)
+
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+    expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(0)
+  })
+
+  it('exits whole-node Visual mode when a breadcrumb click changes the level', async () => {
+    const store = createStore()
+    await act(async () => {
+      await store.initialize()
+    })
+    render(<App store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' })
+    fireEvent.change(root, { target: { value: 'Root' } })
+    fireEvent.keyDown(root, { key: '.', metaKey: true })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+    const child = screen.getByRole('textbox', { name: 'Node 1' })
+    fireEvent.change(child, { target: { value: 'Child' } })
+    fireEvent.keyDown(child, { key: '.', metaKey: true })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+    const leaf = screen.getByRole('textbox', { name: 'Node 1' })
+
+    fireEvent.keyDown(leaf, { key: 'Escape' })
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+    fireEvent.keyDown(leaf, { key: 'V' })
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
+    expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Root' }))
+
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+    expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(0)
+  })
+
   it('toggles the always-on-top setting from the location toolbar', async () => {
     const store = createStore()
     await act(async () => {

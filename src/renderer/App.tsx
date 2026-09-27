@@ -66,10 +66,15 @@ export function App({ store }: AppProps): React.JSX.Element {
       // focus while dragging, which also suppresses the browser's default blur on click. Blur the
       // active input explicitly so a pending Insert or Replace session finishes before navigating.
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      // Whole-node Visual's range is relative to the displayed level, so entering a node ends it.
+      if (vimMode === 'visual-node') {
+        setNodeVisualSelection(undefined)
+        setVimMode('normal')
+      }
       store.selectNode(node.id, 0)
       store.enter()
     },
-    [store],
+    [store, vimMode, setNodeVisualSelection, setVimMode],
   )
   const activateNode = useCallback(
     (node: TreeNode): void => {
@@ -85,9 +90,14 @@ export function App({ store }: AppProps): React.JSX.Element {
   )
   const navigateToAncestor = useCallback(
     (parentId: string | null): void => {
+      // A breadcrumb click changes the displayed level, so a whole-node Visual range cannot survive.
+      if (vimMode === 'visual-node') {
+        setNodeVisualSelection(undefined)
+        setVimMode('normal')
+      }
       store.navigateToAncestor(parentId)
     },
-    [store],
+    [store, vimMode, setNodeVisualSelection, setVimMode],
   )
   const dismissQuitWithoutSaving = useCallback((): void => {
     store.dismissQuitWithoutSavingPrompt()

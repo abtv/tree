@@ -1020,4 +1020,157 @@ test.describe('Vim editing prototype', () => {
     await expect(window.locator('.node-row')).toHaveCount(2)
     await expect(node(window, 1)).toHaveValue('Bravo')
   })
+
+  test('drops a pending Normal-mode command before Cmd+A and undo', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'alpha', text: 'one two three', children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const alpha = node(window, 1)
+    await alpha.focus()
+    await setCursor(alpha, 0)
+
+    // Cmd+A replaces the selection but runs on the same input, so it must drop a pending operator
+    // before the next motion can consume it.
+    await window.keyboard.press('d')
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('w')
+    await expect(alpha).toHaveValue('one two three')
+
+    // The undo shortcut also runs on the same input without blurring.
+    await window.keyboard.press('d')
+    await window.keyboard.press('Meta+z')
+    await window.keyboard.press('$')
+    await expect(alpha).toHaveValue('one two three')
+  })
+
+  test('exits whole-node Visual on a focus-changing shortcut', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [] },
+          { id: 'charlie', text: 'Charlie', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const alpha = node(window, 1)
+    await alpha.focus()
+    await setCursor(alpha, 0)
+
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
+    // The range belongs to the displayed level, so entering the focused node must end the mode
+    // instead of leaving a range that the new level cannot resolve.
+    await window.keyboard.press('Meta+.')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Bravo')
+
+    await window.keyboard.press('Meta+,')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+    await expect(node(window, 1)).toHaveValue('Alpha')
+
+    // Cmd+A also ends whole-node Visual, and the full selection it applies must survive the exit.
+    await node(window, 1).focus()
+    await window.keyboard.press('V')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await window.keyboard.press('Meta+a')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 5)
+  })
+
+  test('exits whole-node Visual on a breadcrumb click and an enter-control click', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'child', text: 'Child', children: [] },
+              { id: 'other', text: 'Other', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const child = node(window, 1)
+    await child.focus()
+    await setCursor(child, 0)
+
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
+    // A breadcrumb click changes the displayed level, so the level-relative range must not survive.
+    await window.getByRole('button', { name: 'Top level' }).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+    await expect(node(window, 1)).toHaveValue('Root')
+
+    // The node's own enter control changes the level too.
+    await node(window, 1).focus()
+    await window.keyboard.press('V')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+  })
+
+  test('re-anchors character Visual after a breadcrumb click and an enter-control click', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [{ id: 'child', text: 'Child', children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const child = node(window, 1)
+    await child.focus()
+    await setCursor(child, 0)
+
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await expect(child).toHaveJSProperty('selectionStart', 0)
+    await expect(child).toHaveJSProperty('selectionEnd', 2)
+
+    // Character Visual keeps its mode across a level change but must drop the stale endpoints so
+    // the next motion anchors at the reached caret.
+    await window.getByRole('button', { name: 'Top level' }).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    const root = node(window, 1)
+    await expect(root).toHaveValue('Root')
+    await window.keyboard.press('l')
+    await expect(root).toHaveJSProperty('selectionStart', 0)
+    await expect(root).toHaveJSProperty('selectionEnd', 2)
+
+    // The enter control drops the endpoints the same way while the mode stays active. Entering a
+    // node with children focuses its first child, so the next motion anchors there.
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    const entered = node(window, 1)
+    await expect(entered).toHaveValue('Child')
+    await window.keyboard.press('l')
+    await expect(entered).toHaveJSProperty('selectionStart', 0)
+    await expect(entered).toHaveJSProperty('selectionEnd', 2)
+  })
 })

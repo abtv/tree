@@ -420,7 +420,10 @@ export function useNodeInputBindings({
     const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
     if (focusedInput === undefined) return
     if (vimMode === 'normal') {
-      setNormalCaret(focusedInput, getCaret(focusedInput))
+      // A mode change draws the Normal block caret, but a deliberate multi-character selection —
+      // notably the select-all Cmd+A applies, including when the same command ends whole-node
+      // Visual — must survive the change instead of collapsing to the one-character block.
+      if (!hasMultiCharacterSelection(focusedInput)) setNormalCaret(focusedInput, getCaret(focusedInput))
     } else if (vimMode === 'insert' || vimMode === 'replace') setCaret(focusedInput, getCaret(focusedInput))
   }, [focus, vimMode])
 
@@ -472,6 +475,9 @@ export function useNodeInputBindings({
       for (const entry of entries) {
         const input = entry.target as HTMLElement
         if (input.ownerDocument.activeElement !== input || latestVimMode.current !== 'normal') continue
+        // A resize notification can arrive after a mode change; re-drawing the Normal block caret
+        // must not discard a deliberate multi-character selection such as Cmd+A's select-all.
+        if (hasMultiCharacterSelection(input)) continue
         setNormalCaret(input, getCaret(input))
       }
     })
@@ -500,7 +506,9 @@ export function useNodeInputBindings({
       onBlur: () => {
         const input = inputs.current.get(node.id)
         setSelectAllNodeId(undefined)
-        clearPending(vimCommandState.current)
+        // A blur moves focus to a non-input control (a breadcrumb or enter-control click) or to
+        // another node, so the command assembly that belongs to this node must clear with it.
+        clearCommandAssembly(vimCommandState.current)
         // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and
         // immediately moving focus onto it, which blurs *this* node as an incidental side effect
         // before the user has typed anything into the new one. Only finish a structural session
@@ -763,6 +771,15 @@ export function useNodeInputBindings({
 
 function nodeTextLength(input: HTMLElement): number {
   return input instanceof HTMLTextAreaElement ? input.value.length : (input.textContent?.length ?? 0)
+}
+
+/**
+ * The Normal caret is a collapsed position or a one-character block; anything wider is a deliberate
+ * selection (Cmd+A or a pointer drag) that caret normalization must not overwrite.
+ */
+function hasMultiCharacterSelection(input: HTMLElement): boolean {
+  const selection = getSelectionRange(input)
+  return selection.end - selection.start > 1
 }
 
 function setEditableText(input: HTMLElement, text: string): void {
