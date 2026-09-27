@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions. Read the linked plan before 
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Renderer interaction state ownership](interaction-state-ownership.md) | In progress | OWN-2: correct `docs/ARCHITECTURE.md` |
+| [Renderer interaction state ownership](interaction-state-ownership.md) | In progress | OWN-3: reduce end-to-end wall time without deleting coverage |
 
 Remove a plan and its row when the initiative is complete. Git history retains the completed record.
