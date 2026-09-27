@@ -206,7 +206,9 @@ function assertSiblingMotionSequence(
       focus,
     }),
     moveSelection: vi.fn((direction: 'up' | 'down', cursor: number) => {
+      const selectedIndex = nodes.findIndex((node) => node.id === selectedNodeId)
       const target = moveSelectionTransition(documentTree, { currentParentId: null, selectedNodeId }, direction, cursor)
+      expect(target).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
       if (target === undefined) return
       if (target.nodeId !== selectedNodeId) imageTextCursor.current = undefined
       selectedNodeId = target.nodeId
@@ -311,6 +313,104 @@ const motionCommand = fc.oneof(
   fc.constant({ key: '$' as const, count: 1 }),
 )
 
+function expectedRootSiblingMove(
+  specifications: readonly { textLength: number }[],
+  selectedIndex: number,
+  direction: 'up' | 'down',
+  cursor: number,
+): { nodeId: string; cursor: number } {
+  const lastIndex = specifications.length - 1
+  if (direction === 'up' && selectedIndex === 0) return { nodeId: `node-${selectedIndex}`, cursor: 0 }
+  if (direction === 'down' && selectedIndex === lastIndex)
+    return { nodeId: `node-${selectedIndex}`, cursor: specifications[selectedIndex]!.textLength }
+  const targetIndex = selectedIndex + (direction === 'up' ? -1 : 1)
+  return {
+    nodeId: `node-${targetIndex}`,
+    cursor: Math.min(cursor, specifications[targetIndex]!.textLength),
+  }
+}
+
+function assertImagePutReturnSequence(text: string, cursor: number, pastedText: string): void {
+  let node: TreeNode = {
+    id: 'node',
+    text,
+    attachment: { id: 'image', mimeType: 'image/png' },
+    children: [],
+  }
+  const input = document.createElement('textarea')
+  input.value = text
+  input.setSelectionRange(cursor, cursor)
+  const row = document.createElement('div')
+  row.className = 'node-row'
+  row.dataset.hasAttachment = 'true'
+  row.append(input)
+  let imageCaret = false
+  const imageTextCursor: { current: number | undefined } = { current: undefined }
+  const store = {
+    getSnapshot: () => ({
+      status: 'ready',
+      document: { roots: [node] },
+      location: { currentParentId: null, selectedNodeId: node.id },
+    }),
+    replaceTextRange: vi.fn((_nodeId: string, start: number, end: number, inserted: string) => {
+      node = { ...node, text: node.text.slice(0, start) + inserted + node.text.slice(end) }
+      input.value = node.text
+    }),
+  } as unknown as EditorStore
+  const vim: VimKeyboardState = {
+    mode: 'normal',
+    register: { current: { kind: 'text', value: pastedText } },
+    lastFind: { current: undefined },
+    pending: { current: undefined },
+    visualAnchor: { current: undefined },
+    visualFocus: { current: undefined },
+    imageTextCursor,
+    moveBoundary: vi.fn(),
+    moveViewport: vi.fn(),
+    syncImageCaretToFocus: vi.fn(),
+    setMode: vi.fn(),
+    setImageCaret: vi.fn((_nodeId, active) => {
+      imageCaret = active
+      input.classList.toggle('node-input-image-caret', active)
+    }),
+    scheduleCaret: vi.fn((target, position) => setNormalCaret(target as HTMLTextAreaElement, position)),
+  }
+  const press = (key: string): void => {
+    const handler = createEditorKeyDownHandler({
+      store,
+      node,
+      isComposing: () => false,
+      setSelectAllNodeId: vi.fn(),
+      onPreviewAttachment: vi.fn(),
+      vim,
+    })
+    handler(keyEvent(input, key))
+  }
+
+  press('j')
+  expect(imageCaret).toBe(true)
+  expect(imageTextCursor.current).toBe(cursor)
+  expect(input.selectionStart).toBe(text.length)
+
+  press('p')
+  const expectedText = text + pastedText
+  const expectedCursor = expectedText.length - 1
+  expect(node.text).toBe(expectedText)
+  expect(input.selectionStart).toBe(expectedCursor)
+  expect(imageCaret).toBe(false)
+  expect(imageTextCursor.current).toBeUndefined()
+
+  press('l')
+  expect(input.selectionStart).toBe(expectedText.length)
+  expect(imageCaret).toBe(true)
+  expect(imageTextCursor.current).toBe(expectedCursor)
+
+  press('h')
+  expect(input.selectionStart).toBe(expectedCursor)
+  expect(imageCaret).toBe(false)
+  expect(imageTextCursor.current).toBeUndefined()
+}
+
 describe('generated Vim image-caret interaction sequences', () => {
   it('keeps the sole image character active when k is clamped at the first root', () => {
     assertImageMotionSequence(0, true, 0, [{ key: 'k', count: 1 }])
@@ -372,6 +472,56 @@ describe('generated Vim image-caret interaction sequences', () => {
           const selected = specifications[index]!
           const maximum = selected.hasAttachment ? selected.textLength : Math.max(0, selected.textLength - 1)
           assertSiblingMotionSequence(specifications, index, Math.min(arbitraryCursor, maximum), commands)
+        },
+      ),
+      { numRuns: 150 },
+    )
+  })
+
+  it('matches an independent destination model for root sibling moves', () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            textLength: fc.integer({ min: 0, max: 24 }),
+            hasAttachment: fc.boolean(),
+          }),
+          { minLength: 1, maxLength: 8 },
+        ),
+        fc.nat(32),
+        fc.nat(64),
+        fc.constantFrom<'up' | 'down'>('up', 'down'),
+        (specifications, arbitraryIndex, cursor, direction) => {
+          const selectedIndex = arbitraryIndex % specifications.length
+          const documentTree: Document = {
+            roots: specifications.map(({ textLength, hasAttachment }, index) => ({
+              id: `node-${index}`,
+              text: 'x'.repeat(textLength),
+              ...(hasAttachment ? { attachment: { id: `image-${index}`, mimeType: 'image/png' } } : {}),
+              children: [],
+            })),
+          }
+          const actual = moveSelectionTransition(
+            documentTree,
+            { currentParentId: null, selectedNodeId: `node-${selectedIndex}` },
+            direction,
+            cursor,
+          )
+          expect(actual).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
+        },
+      ),
+      { numRuns: 250 },
+    )
+  })
+
+  it('clears the image return position across a put, then restores the new final text position', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom('a', 'b', 'c'), { minLength: 2, maxLength: 40 }).map((parts) => parts.join('')),
+        fc.nat(1000),
+        fc.array(fc.constantFrom('x', 'y', 'z'), { minLength: 1, maxLength: 8 }).map((parts) => parts.join('')),
+        (text, arbitraryCursor, pastedText) => {
+          assertImagePutReturnSequence(text, arbitraryCursor % (text.length - 1), pastedText)
         },
       ),
       { numRuns: 150 },
