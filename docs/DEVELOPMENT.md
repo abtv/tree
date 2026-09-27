@@ -328,7 +328,7 @@ When a task ends at a commit or session boundary, provide a handoff recording wh
 
 ## 11. Multi-Session Initiatives
 
-The active initiative index is [`plans/README.md`](../plans/README.md). Use an initiative plan when an outcome needs multiple independently committable tasks or cannot fit one session. A single-session task needs only the normal temporary `WORKING_PLAN.md` when substantive. Active plans are coordination records; they do not replace `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, an ADR, or the Product Owner's authorization.
+The active initiative index is [`plans/README.md`](../plans/README.md). Use an initiative plan when an outcome needs multiple independently committable tasks or cannot fit one session. The same plan type records a review follow-up batch whose tasks the Product Owner authorizes one at a time, so repository state — not conversation memory — shows what remains. A single-session task needs only the normal temporary `WORKING_PLAN.md` when substantive. Active plans are coordination records; they do not replace `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, an ADR, or the Product Owner's authorization.
 
 Each active plan should contain:
 
@@ -336,13 +336,14 @@ Each active plan should contain:
 * an explicit authorization state, including decisions still reserved for the Product Owner;
 * an ordered table of task IDs, outcomes, dependencies, acceptance evidence, and status (`Planned`, `Ready`, `In progress`, `Blocked`, or `Done`);
 * for each task, the files it is expected to change and its §9 validation tier, as required by `AGENTS.md` §8;
+* the source review or report and its task IDs when the plan tracks a review follow-up batch, plus an explicit unverified-remainder note when the full list is unavailable;
 * a single exact next task, or the reason no task can proceed;
 * concise decisions and findings needed by later sessions, including baseline or final measurements when they affect the initiative;
 * a copyable prompt for the next session.
 
 At the start of a continuation session, read the index, the identified plan, `AGENTS.md`, and any existing `WORKING_PLAN.md`. Compare plan status with `git status` and recent commits. A dirty worktree or unfinished working plan means resuming that task first; do not skip ahead from a stale status field. When the worktree is clean, take the plan's next `Ready` task if the Product Owner requested continuation and its scope is authorized. Create or update the temporary working plan for that task, perform its required validation and review, and commit the task together with the initiative status update. In the handoff, cite the plan, completed task, next task, and a resume prompt. Do not repeat still-valid validation merely because the session changed.
 
-If blocked, record the concrete blocker and the safe next action in the active plan when that update can be committed independently; otherwise preserve the uncommitted work and `WORKING_PLAN.md` and give the same information in the handoff. A plan's status must never imply a task passed validation or was committed when it did not. At initiative completion, move lasting product, architecture, or development knowledge to its owner, then remove the plan and index entry in the final task's commit. Git history provides the completed plan's record; do not keep an archive or permanent validation log.
+If blocked, record the concrete blocker and the safe next action in the active plan when that update can be committed independently; otherwise preserve the uncommitted work and `WORKING_PLAN.md` and give the same information in the handoff. A plan's status must never imply a task passed validation or was committed when it did not. At completion of an initiative, or of a review follow-up batch whose last task has landed and for which the Product Owner confirmed no further tasks remain, move lasting product, architecture, or development knowledge to its owner, then remove the plan and index entry in the commit that records completion. Git history provides the completed plan's record; do not keep an archive or permanent validation log.
 
 ---
 
