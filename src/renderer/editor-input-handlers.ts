@@ -170,6 +170,11 @@ export function createEditorKeyDownHandler({
       store.deleteSelected()
     } else if (event.metaKey && event.key.toLowerCase() === 'z') {
       event.preventDefault()
+      if (vim?.mode === 'replace') {
+        const changed = vim.finishReplace?.(event.currentTarget) ?? false
+        vim.setMode('normal')
+        if (changed) setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - 1))
+      }
       if (event.shiftKey) store.redo()
       else store.undo()
       vim?.syncImageCaretToFocus()

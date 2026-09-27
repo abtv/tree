@@ -1463,10 +1463,14 @@ test.describe('Vim editing prototype', () => {
     await editor.press('u')
     await expect(editor).toHaveValue('ab')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
 
     await editor.press('Control+r')
     await expect(editor).toHaveValue('a')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
   })
 
   test('retains the image return position when focus-changing commands do nothing', async ({ userDataDir }) => {
@@ -1944,9 +1948,134 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('Escape')
     await expect(editor).toHaveValue('aXYd')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveJSProperty('selectionEnd', 3)
     await setCursor(editor, 0)
     await window.keyboard.press('.')
     await expect(editor).toHaveValue('XYYd')
+  })
+
+  test('leaves an image caret on replacement text after Escape', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('R')
+    await window.keyboard.type('XY')
+    await window.keyboard.press('Escape')
+
+    await expect(editor).toHaveValue('abcdXY')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 5)
+    await expect(editor).toHaveJSProperty('selectionEnd', 6)
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await editor.press('h')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 5)
+    await expect(editor).toHaveJSProperty('selectionEnd', 6)
+  })
+
+  test('clears the image caret when a pending Replace session commits on blur', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+          { id: 'peer', text: 'peer', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await node(window, 2).click()
+
+    await expect(editor).toHaveValue('abcdX')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('undoes a pending Replace-mode edit and focuses the restored text', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+          { id: 'peer', text: 'peer', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('R')
+    await window.keyboard.type('XY')
+    await expect(editor).toHaveValue('abcdXY')
+
+    await window.keyboard.press('Meta+z')
+
+    await expect(editor).toHaveValue('abcd')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
+    const restoredList = window.locator('.node-list')
+    await expect(restoredList).toHaveScreenshot('vim-replace-undo-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(restoredList).toHaveScreenshot('vim-replace-undo-dark.png')
+  })
+
+  test('ends a pending Replace session on Cmd+Shift+Z with a valid Normal caret', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'root', text: 'abcd', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 1)
+    await editor.press('j')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('R')
+    await window.keyboard.type('XY')
+
+    await window.keyboard.press('Meta+Shift+z')
+
+    await expect(editor).toHaveValue('abcdXY')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 5)
+    await expect(editor).toHaveJSProperty('selectionEnd', 6)
+    await editor.press('l')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+    await editor.press('h')
+    await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(editor).toHaveJSProperty('selectionStart', 5)
+    await expect(editor).toHaveJSProperty('selectionEnd', 6)
   })
 
   test('changes, replaces, swaps, and cases a Visual selection', async ({ userDataDir }) => {

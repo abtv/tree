@@ -1028,6 +1028,42 @@ describe('editor keyboard handler', () => {
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledTimes(2)
   })
 
+  it('commits and ends a pending Replace session before undoing it', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'z', { metaKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
+      (store.undo as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    )
+    expect(store.undo).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
+  })
+
+  it('commits and ends a pending Replace session before Cmd+Shift+Z redo', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'replace')
+    const finishReplace = vi.fn(() => true)
+    vim.finishReplace = finishReplace
+
+    handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
+
+    expect(finishReplace).toHaveBeenCalledWith(input)
+    expect(finishReplace.mock.invocationCallOrder[0]).toBeLessThan(
+      (store.redo as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    )
+    expect(store.redo).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+    expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
+  })
+
   it('resyncs the image caret after Cmd+Z, Cmd+Shift+Z, and Cmd+, in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

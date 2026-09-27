@@ -215,10 +215,15 @@ export function useNodeInputBindings({
         session.baseline.slice(session.position + replaced)
       store.replaceTextRange(session.nodeId, session.position, session.position + replaced, session.typed)
       vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced }
-      if (input !== undefined) setEditableText(input, finalText)
+      vimImageTextCursor.current = undefined
+      setImageCaretNodeId(undefined)
+      if (input !== undefined) {
+        setEditableText(input, finalText)
+        setCaret(input, session.position + session.typed.length)
+      }
       return true
     },
-    [store],
+    [store, setImageCaretNodeId],
   )
 
   const moveVimViewport = useCallback(
