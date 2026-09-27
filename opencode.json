@@ -118,6 +118,8 @@
           "npm run check:opencode *": "allow",
           "npm run validation:snapshot": "allow",
           "npm run validation:snapshot *": "allow",
+          "npm run retire:file": "allow",
+          "npm run retire:file *": "allow",
           "npm run changelog": "allow",
           "npm run changelog *": "allow",
           "npm run doctor": "allow",

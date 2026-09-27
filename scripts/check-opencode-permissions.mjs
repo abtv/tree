@@ -104,6 +104,9 @@ const developCases = {
     'npm run format:check:changed; git status --short',
     'npm run validation:snapshot',
     'npm run validation:snapshot 2>&1',
+    // Guardrailed deletion of one tracked file; the script enforces the path checks.
+    'npm run retire:file -- e2e/vim-editing.spec.ts',
+    'npm run retire:file -- src/renderer/editor-dom.ts 2>&1',
     'npm audit --omit=dev',
     'rm WORKING_PLAN.md',
     'rm -f WORKING_PLAN.md',
@@ -202,6 +205,7 @@ const developCases = {
     // Workflow allowances stay anchored to the exact script names and documented environment prefixes.
     'npm run format:check:changed-extra',
     'npm run validation:snapshot-extra',
+    'npm run retire:file-extra',
     'FOO=1 npm run validation:snapshot',
     'TREE_E2E_VISIBLE=1 npm run format:check:changed',
     'unzip archive.zip',
