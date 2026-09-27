@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
-import type { VimKeyboardState, VimTextCommandState } from './editor-input-handlers'
+import type { VimKeyboardState, VimPendingCommand, VimTextCommandState } from './editor-input-handlers'
 
 function createStore(): EditorStore {
   return {
@@ -1047,6 +1047,64 @@ describe('editor keyboard handler', () => {
     expect(store.undo).toHaveBeenCalledOnce()
     expect(store.redo).toHaveBeenCalledOnce()
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledTimes(2)
+  })
+
+  // Ctrl+r is dispatched outside handleVimKey, so it used to redo while the same unfinished command
+  // followed by u correctly made no change.
+  it('discards an unfinished Normal-mode command instead of undoing or redoing', () => {
+    const unfinished: VimPendingCommand[] = [
+      { count: '3', motionCount: '' },
+      { count: '', motionCount: '', operator: 'd' },
+      { count: '', motionCount: '', prefix: 'g' },
+      { count: '', motionCount: '', awaiting: 'r' },
+      { count: '', motionCount: '', awaiting: 'f' },
+      { count: '', motionCount: '', surround: { stage: 'target', operation: 'delete', count: 1 } },
+    ]
+
+    for (const pending of unfinished) {
+      for (const key of ['u', 'r'] as const) {
+        const store = createStore()
+        const input = document.createElement('textarea')
+        input.value = 'text'
+        const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+        vim.pending.current = { ...pending }
+        const context = `${JSON.stringify(pending)} then ${key === 'u' ? 'u' : 'Ctrl+r'}`
+
+        handle(keyEvent(input, key, key === 'r' ? { ctrlKey: true } : {}))
+
+        expect(store.undo, context).not.toHaveBeenCalled()
+        expect(store.redo, context).not.toHaveBeenCalled()
+        expect(vim.pending.current, context).toBeUndefined()
+      }
+    }
+  })
+
+  it('discards an unfinished Normal-mode command instead of leaving the current parent with Ctrl+o', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    vim.pending.current = { count: '', motionCount: '', operator: 'd' }
+
+    handle(keyEvent(input, 'o', { ctrlKey: true }))
+
+    expect(store.leave).not.toHaveBeenCalled()
+    expect(vim.pending.current).toBeUndefined()
+  })
+
+  it('discards a pending count instead of moving by half a page with Ctrl+d and Ctrl+u', () => {
+    for (const key of ['d', 'u'] as const) {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = 'text'
+      const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+      vim.pending.current = { count: '3', motionCount: '' }
+
+      handle(keyEvent(input, key, { ctrlKey: true }))
+
+      expect(vim.moveViewport, key).not.toHaveBeenCalled()
+      expect(vim.pending.current, key).toBeUndefined()
+    }
   })
 
   it('commits and ends a pending Replace session before undoing it', () => {

@@ -95,6 +95,42 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('ab')
   })
 
+  test('drops an unfinished command before u and Ctrl+r instead of undoing or redoing', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+
+    await editor.press('x')
+    await expect(editor).toHaveValue('bcd')
+    await editor.press('u')
+    await expect(editor).toHaveValue('abcd')
+
+    // A count is not a repeat for undo or redo, so it makes both commands no-ops instead of
+    // applying to the next one.
+    await editor.press('3')
+    await editor.press('Control+r')
+    await expect(editor).toHaveValue('abcd')
+    await editor.press('2')
+    await editor.press('u')
+    await expect(editor).toHaveValue('abcd')
+
+    // An unfinished operator aborts the same way, and the next motion starts a new command.
+    await editor.press('d')
+    await editor.press('Control+r')
+    await expect(editor).toHaveValue('abcd')
+    await editor.press('l')
+    await expect(editor).toHaveJSProperty('selectionStart', 1)
+
+    // Redo still works once nothing is pending.
+    await editor.press('Control+r')
+    await expect(editor).toHaveValue('bcd')
+  })
+
   test('undoes two separate Vim character replacements without an empty history step', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'ab', children: [] }] },

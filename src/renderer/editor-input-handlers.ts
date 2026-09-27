@@ -42,6 +42,21 @@ function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): v
 }
 
 /**
+ * A Ctrl-modified Normal-mode command is dispatched here instead of in `handleVimKey`, so it must
+ * apply the rule the in-handler commands apply for itself: an unfinished command — a pending count,
+ * operator, prefix, or a command awaiting a character or delimiter (`r`, `f`/`F`/`t`/`T`, a surround
+ * stage) — is discarded and the command makes no change, as `u`, `i`, `o`, `R`, `S`, and `H`/`M`/`L`
+ * already do. A Ctrl-modified key can never be the awaited character, so unlike plain `u` it always
+ * discards. Without this a half-typed command followed by `Ctrl+r` redid a change while the same
+ * prefix followed by `u` correctly did nothing.
+ */
+function discardsUnfinishedCommand(vim: VimKeyboardState): boolean {
+  if (vim.pending.current === undefined) return false
+  vim.pending.current = undefined
+  return true
+}
+
+/**
  * The renderer-local state a text-editing application command must resolve before it runs. The
  * full `VimKeyboardState` satisfies it structurally; the narrowed shape lets the context-menu
  * command path resolve the same state without receiving the whole keyboard surface.
@@ -168,7 +183,7 @@ export function createEditorKeyDownHandler({
       (event.key === 'd' || event.key === 'u')
     ) {
       event.preventDefault()
-      vim.pending.current = undefined
+      if (discardsUnfinishedCommand(vim)) return
       vim.moveViewport(node.id, event.key === 'd' ? 'half-down' : 'half-up', cursor)
       return
     }
@@ -181,7 +196,7 @@ export function createEditorKeyDownHandler({
       event.key.toLowerCase() === 'o'
     ) {
       event.preventDefault()
-      vim.pending.current = undefined
+      if (discardsUnfinishedCommand(vim)) return
       store.leave()
       vim.syncImageCaretToFocus()
       return
@@ -195,7 +210,7 @@ export function createEditorKeyDownHandler({
       event.key.toLowerCase() === 'r'
     ) {
       event.preventDefault()
-      vim.pending.current = undefined
+      if (discardsUnfinishedCommand(vim)) return
       store.redo()
       vim.syncImageCaretToFocus()
       return
