@@ -851,6 +851,118 @@ describe('useNodeInputBindings', () => {
     expect(store.copy).toHaveBeenCalledWith('node', 1, 4)
   })
 
+  it('commits a pending Replace session exactly once when the store re-enters the finish path', () => {
+    const node: TreeNode = { id: 'a', text: 'ab', children: [] }
+    const store = {
+      endTextSession: vi.fn(),
+      replaceTextRange: vi.fn(() => {
+        // A store side effect that synchronously re-enters the finish path must not be able to
+        // commit the Replace session a second time; the session is consumed before this call.
+        result.current.bindings.onBlur()
+      }),
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: [node] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      }),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const bindings = useNodeInputBindings({
+        store,
+        selectedNodeId: 'a',
+        vimMode,
+        setVimMode,
+        onPreviewAttachment: vi.fn(),
+      })(node)
+      return { bindings, vimMode }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'ab'
+    input.setSelectionRange(2, 2)
+    result.current.bindings.inputRef(input)
+    const press = (key: string): void => {
+      act(() => {
+        result.current.bindings.onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press('R')
+    press('X')
+    press('Escape')
+
+    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
+    expect(store.replaceTextRange).toHaveBeenCalledWith('a', 2, 2, 'X')
+    expect(result.current.vimMode).toBe('normal')
+  })
+
+  it('reads the register written directly by the keyboard handler through the shared owner', () => {
+    const nodes: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      { id: 'b', text: 'B', children: [] },
+    ]
+    let selectedNodeId = 'a'
+    const store = {
+      getSnapshot: () => ({
+        status: 'ready',
+        document: { roots: nodes },
+        location: { currentParentId: null, selectedNodeId },
+      }),
+      selectNode: vi.fn((id: string) => {
+        selectedNodeId = id
+      }),
+      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
+      endTextSession: vi.fn(),
+    } as unknown as EditorStore
+    const { result } = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
+      return {
+        bindings: useNodeInputBindings({
+          store,
+          selectedNodeId,
+          vimMode,
+          setVimMode,
+          nodeVisualSelection: selection,
+          setNodeVisualSelection: setSelection,
+          onPreviewAttachment: vi.fn(),
+        }),
+      }
+    })
+    const input = document.createElement('textarea')
+    input.value = 'A'
+    const press = (node: TreeNode, key: string): void => {
+      act(() => {
+        result.current.bindings(node).onKeyDown({
+          currentTarget: input,
+          key,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          preventDefault: vi.fn(),
+        } as never)
+      })
+    }
+
+    press(nodes[0]!, 'y')
+    press(nodes[0]!, 'y')
+    press(nodes[0]!, 'V')
+    press(nodes[0]!, 'j')
+    press(nodes[1]!, 'd')
+
+    expect(store.applyNodeVisual).toHaveBeenCalledWith('d', 'a', 'b', {
+      nodes: [{ id: 'a', text: 'A', children: [] }],
+      sourceIds: ['a'],
+    })
+  })
+
   it('prevents a secondary-button press from changing the text selection', () => {
     const store = createStore()
     const { result } = renderBindings({ store, selectedNodeId: 'node' })

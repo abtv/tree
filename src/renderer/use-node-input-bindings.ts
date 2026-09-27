@@ -1,14 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
-import {
-  cloneNode,
-  displayedNodes,
-  reconcileLinkTextEdit,
-  requireNode,
-  type LinkRange,
-  type TreeNode,
-} from '../domain/document'
+import { displayedNodes, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import {
   getCaret,
   getSelectionRange,
@@ -25,7 +18,6 @@ import type {
   VimFindCommand,
   VimPendingCommand,
   VimRegister,
-  VimTextChange,
   VimRepeatChange,
   VimStructuralChange,
   VimViewportMotion,
@@ -38,7 +30,19 @@ import {
   pointerCaretTransition,
   type VimCaretState,
 } from './vim-caret-transition'
-import { diffTypedText, resolveReplaceCommit } from './vim-edit-session'
+import {
+  applyReplaceKey,
+  beginInsertSession,
+  beginReplaceSession,
+  createVimEditSessionState,
+  insertRepeatChange,
+  nodeRegister,
+  registerSource,
+  resolveReplaceCommit,
+  takeInsertSession,
+  takeReplaceSession,
+  visualCommandRegister,
+} from './vim-edit-session'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -74,16 +78,25 @@ export function useNodeInputBindings({
   const latestVimMode = useRef(vimMode)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
-  const vimRegister = useRef<VimRegister>({ kind: 'empty' })
+  // The pure owner instance is created once per mount and kept in a ref because its register and
+  // pending session are intentionally mutable local editing state that must not trigger renders.
+  // The handle reads and writes the owner's register at access time so the keyboard handler's
+  // direct `register.current` writes stay in sync without re-creating the bindings callback.
+  const vimSession = useRef(createVimEditSessionState())
+  const registerHandle = useMemo(
+    () => ({
+      get current(): VimRegister {
+        return vimSession.current.register
+      },
+      set current(value: VimRegister) {
+        vimSession.current.register = value
+      },
+    }),
+    [vimSession],
+  )
   const vimPending = useRef<VimPendingCommand | undefined>(undefined)
   const vimLastChange = useRef<VimRepeatChange | undefined>(undefined)
   const vimLastFind = useRef<VimFindCommand | undefined>(undefined)
-  const vimInsertSession = useRef<
-    { nodeId: string; baseline: string; position: number; change: VimTextChange } | undefined
-  >(undefined)
-  const vimReplaceSession = useRef<{ nodeId: string; baseline: string; position: number; typed: string } | undefined>(
-    undefined,
-  )
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
   const caretAuthority = useRef<{ nodeId?: string; caret: VimCaretState }>({
@@ -169,16 +182,11 @@ export function useNodeInputBindings({
       const focus = nodes.findIndex((node) => node.id === nodeVisualSelection.focusId)
       if (anchor < 0 || focus < 0) return
       const span = Math.abs(anchor - focus) + 1
-      const register = vimRegister.current
-      const source =
-        register.kind === 'nodes'
-          ? register.value
-          : register.kind === 'node'
-            ? { nodes: [register.value], sourceIds: register.sourceIds ?? [] }
-            : undefined
+      const source = registerSource(vimSession.current.register)
       const result = store.applyNodeVisual(command, nodeVisualSelection.anchorId, nodeVisualSelection.focusId, source)
       if (result === undefined) return
-      if ('ydxcs'.includes(command)) vimRegister.current = { kind: 'nodes', value: result }
+      const nextRegister = visualCommandRegister(command, result)
+      if (nextRegister !== undefined) vimSession.current.register = nextRegister
       if (command === 'c' || command === 's') {
         structuralInsert.current = { kind: 'visual', originNodeId: nodeVisualSelection.focusId, command, span }
         setVimMode('insert')
@@ -195,7 +203,7 @@ export function useNodeInputBindings({
       }
       setNodeVisualSelection(undefined)
     },
-    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode, syncImageCaretToFocus],
+    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode, syncImageCaretToFocus, vimSession],
   )
 
   const repeatStructural = useCallback(
@@ -206,8 +214,7 @@ export function useNodeInputBindings({
         const selected = displayedNodes(state.document, state.location.currentParentId).find(
           (node) => node.id === state.location.selectedNodeId,
         )
-        if (selected !== undefined)
-          vimRegister.current = { kind: 'node', value: cloneNode(selected), sourceIds: [selected.id] }
+        if (selected !== undefined) vimSession.current.register = nodeRegister(selected)
         store.deleteSelected()
       } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
       else if (change.kind === 'structural-child-open') store.createChildWithText(change.text)
@@ -221,17 +228,18 @@ export function useNodeInputBindings({
         const end = nodes[start + change.span - 1]
         if (start < 0 || end === undefined) return
         const result = store.applyNodeVisual(change.command, nodes[start]!.id, end.id, change.source, change.text)
-        if (result !== undefined && 'dxcs'.includes(change.command))
-          vimRegister.current = { kind: 'nodes', value: result }
+        if (result !== undefined) {
+          const nextRegister = visualCommandRegister(change.command, result)
+          if (nextRegister !== undefined) vimSession.current.register = nextRegister
+        }
       }
     },
-    [store],
+    [store, vimSession],
   )
 
   const finishVimReplace = useCallback(
     (input?: HTMLElement, retreatCursor = false): boolean => {
-      const session = vimReplaceSession.current
-      vimReplaceSession.current = undefined
+      const session = takeReplaceSession(vimSession.current)
       if (session === undefined) return false
       const commit = resolveReplaceCommit(session)
       if (commit === undefined) return false
@@ -263,7 +271,7 @@ export function useNodeInputBindings({
       }
       return true
     },
-    [store, applyCaretState],
+    [store, applyCaretState, vimSession],
   )
 
   const finishVimInsert = useCallback(
@@ -273,18 +281,13 @@ export function useNodeInputBindings({
     // Safety instead lives at dot-repeat replay time, which checks the stamped `nodeId`.
     (input: HTMLElement): void => {
       finishStructuralInsert(input)
-      const session = vimInsertSession.current
-      vimInsertSession.current = undefined
+      const session = takeInsertSession(vimSession.current)
       if (session === undefined) return
       const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-      const { nodeId, baseline, position, change } = session
-      if (change.kind === 'insert' && finalText === baseline) return
-      if (change.kind === 'insert' || change.kind === 'change' || change.kind === 'substitute') {
-        const diff = diffTypedText(baseline, finalText, position)
-        vimLastChange.current = { ...change, ...diff, nodeId }
-      }
+      const change = insertRepeatChange(session, finalText)
+      if (change !== undefined) vimLastChange.current = change
     },
-    [finishStructuralInsert],
+    [finishStructuralInsert, vimSession],
   )
 
   const moveVimViewport = useCallback(
@@ -456,12 +459,11 @@ export function useNodeInputBindings({
             event.currentTarget instanceof HTMLTextAreaElement
               ? event.currentTarget.value
               : readEditableContent(event.currentTarget).text
-          vimReplaceSession.current = {
+          beginReplaceSession(vimSession.current, {
             nodeId: node.id,
             baseline,
             position: getCaret(event.currentTarget),
-            typed: '',
-          }
+          })
         }
       },
       onCompositionStart: () => {
@@ -518,30 +520,22 @@ export function useNodeInputBindings({
         onPreviewAttachment,
         vim: {
           mode: vimMode,
-          register: vimRegister,
+          register: registerHandle,
           pending: vimPending,
           lastChange: vimLastChange,
           lastFind: vimLastFind,
           beginInsert: (nodeId, baseline, position, change) => {
-            vimInsertSession.current = { nodeId, baseline, position, change }
+            beginInsertSession(vimSession.current, { nodeId, baseline, position, change })
           },
           finishInsert: finishVimInsert,
           beginReplace: (nodeId, _input, baseline, position) => {
-            vimReplaceSession.current = { nodeId, baseline, position, typed: '' }
+            beginReplaceSession(vimSession.current, { nodeId, baseline, position })
           },
           handleReplaceKey: (input, key) => {
-            const session = vimReplaceSession.current
-            if (session === undefined) return false
-            if (key === 'Backspace') session.typed = session.typed.slice(0, -1)
-            else if (key.length === 1) session.typed += key
-            else return false
-            const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
-            const working =
-              session.baseline.slice(0, session.position) +
-              session.typed +
-              session.baseline.slice(session.position + replaced)
-            setEditableText(input, working)
-            setCaret(input, session.position + session.typed.length)
+            const result = applyReplaceKey(vimSession.current.replace, key)
+            if (result === undefined) return false
+            setEditableText(input, result.workingText)
+            setCaret(input, result.cursor)
             return true
           },
           finishReplace: (input, retreatCursor) => {
@@ -667,11 +661,13 @@ export function useNodeInputBindings({
       selectedNodeId,
       repeatStructural,
       nodeVisualSelection,
+      registerHandle,
       setNodeVisualSelection,
       setVimMode,
       syncImageCaretToFocus,
       store,
       vimMode,
+      vimSession,
     ],
   )
 }

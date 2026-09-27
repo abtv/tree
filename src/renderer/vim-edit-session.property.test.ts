@@ -1,0 +1,155 @@
+import fc from 'fast-check'
+import { expect, it } from 'vitest'
+import {
+  applyReplaceKey,
+  beginInsertSession,
+  beginReplaceSession,
+  createVimEditSessionState,
+  insertRepeatChange,
+  resolveReplaceCommit,
+  takeInsertSession,
+  takeReplaceSession,
+} from './vim-edit-session'
+import type { VimTextChange } from './vim-keyboard-types'
+
+// A single UTF-16 code unit, so `key.length === 1` holds for every generated character key.
+const characterKey = fc.integer({ min: 0x20, max: 0x7e }).map((code) => String.fromCharCode(code))
+const replaceKey = fc.oneof(fc.constant('Backspace'), characterKey, fc.string({ minLength: 2, maxLength: 3 }))
+
+it('consumes each pending session at most once without disturbing the other session', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ maxLength: 40 }),
+      fc.string({ maxLength: 40 }),
+      fc.nat(1000),
+      fc.nat(1000),
+      (insertBaseline, replaceBaseline, insertSeed, replaceSeed) => {
+        const state = createVimEditSessionState()
+        state.register = { kind: 'text', value: insertBaseline }
+        const insertSession = {
+          nodeId: 'insert-node',
+          baseline: insertBaseline,
+          position: insertSeed % (insertBaseline.length + 1),
+          change: { kind: 'insert', entry: 'i' } as const,
+        }
+        const replaceSession = {
+          nodeId: 'replace-node',
+          baseline: replaceBaseline,
+          position: replaceSeed % (replaceBaseline.length + 1),
+        }
+        beginInsertSession(state, insertSession)
+        beginReplaceSession(state, replaceSession)
+
+        expect(takeInsertSession(state)).toBe(insertSession)
+        expect(takeInsertSession(state)).toBeUndefined()
+        expect(state.replace).toEqual({ ...replaceSession, typed: '' })
+        expect(state.register).toEqual({ kind: 'text', value: insertBaseline })
+
+        expect(takeReplaceSession(state)).toEqual({ ...replaceSession, typed: '' })
+        expect(takeReplaceSession(state)).toBeUndefined()
+        expect(state.insert).toBeUndefined()
+      },
+    ),
+  )
+})
+
+it('commits every buffered Replace character at its recorded position', () => {
+  fc.assert(
+    fc.property(fc.string({ maxLength: 60 }), fc.nat(1000), fc.string({ maxLength: 40 }), (baseline, seed, typed) => {
+      const position = seed % (baseline.length + 1)
+      const commit = resolveReplaceCommit({ baseline, position, typed })
+      if (typed === '') {
+        expect(commit).toBeUndefined()
+        return
+      }
+      if (commit === undefined) throw new Error('expected a commit for non-empty typed text')
+      const replacedEnd = position + Math.min(typed.length, baseline.length - position)
+      expect(commit.replacedStart).toBe(position)
+      expect(commit.replacedEnd).toBe(replacedEnd)
+      expect(commit.rawCursor).toBe(position + typed.length)
+      expect(commit.finalText).toBe(baseline.slice(0, position) + typed + baseline.slice(replacedEnd))
+    }),
+  )
+})
+
+it('captures an Insert session as a diff that reconstructs its final text on the origin node', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ maxLength: 60 }),
+      fc.string({ maxLength: 60 }),
+      fc.nat(1000),
+      fc.constantFrom('insert', 'change', 'substitute'),
+      (baseline, finalText, seed, kind) => {
+        const position = seed % (baseline.length + 1)
+        const change: VimTextChange =
+          kind === 'insert'
+            ? { kind: 'insert', entry: 'i' }
+            : kind === 'change'
+              ? { kind: 'change', motion: 'w', count: 1 }
+              : { kind: 'substitute', count: 1 }
+        const captured = insertRepeatChange({ nodeId: 'origin', baseline, position, change }, finalText)
+        if (kind === 'insert' && finalText === baseline) {
+          expect(captured).toBeUndefined()
+          return
+        }
+        if (captured === undefined) throw new Error('expected a captured text change')
+        const capture = captured as {
+          nodeId?: string
+          insertedText?: string
+          insertOffset?: number
+          deleteCount?: number
+        }
+        expect(capture.nodeId).toBe('origin')
+        const { insertedText = '', insertOffset = 0, deleteCount = 0 } = capture
+        expect(
+          baseline.slice(0, position + insertOffset) +
+            insertedText +
+            baseline.slice(position + insertOffset + deleteCount),
+        ).toBe(finalText)
+      },
+    ),
+  )
+})
+
+it('keeps the incremental Replace working text equal to the splice its commit would produce', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ maxLength: 40 }),
+      fc.nat(1000),
+      fc.array(replaceKey, { maxLength: 30 }),
+      (baseline, seed, keys) => {
+        const position = seed % (baseline.length + 1)
+        const session = { nodeId: 'a', baseline, position, typed: '' }
+        let expected = ''
+        for (const key of keys) {
+          const typedBefore = session.typed
+          const result = applyReplaceKey(session, key)
+          if (key === 'Backspace') {
+            expected = expected.slice(0, -1)
+            if (result === undefined) throw new Error('expected Backspace to be consumed')
+          } else if (key.length === 1) {
+            expected += key
+            if (result === undefined) throw new Error('expected a character key to be consumed')
+          } else {
+            expect(result).toBeUndefined()
+            expect(session.typed).toBe(typedBefore)
+            continue
+          }
+          expect(session.typed).toBe(expected)
+          const replaced = Math.min(expected.length, baseline.length - position)
+          expect(result?.workingText).toBe(baseline.slice(0, position) + expected + baseline.slice(position + replaced))
+          expect(result?.cursor).toBe(position + expected.length)
+        }
+
+        const commit = resolveReplaceCommit(session)
+        if (expected === '') {
+          expect(commit).toBeUndefined()
+          return
+        }
+        const replaced = Math.min(expected.length, baseline.length - position)
+        expect(commit?.finalText).toBe(baseline.slice(0, position) + expected + baseline.slice(position + replaced))
+        expect(commit?.rawCursor).toBe(position + expected.length)
+      },
+    ),
+  )
+})
