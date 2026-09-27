@@ -333,7 +333,7 @@ Each active plan should contain:
 * the objective, scope limits, and relevant source-of-truth links;
 * an explicit authorization state, including decisions still reserved for the Product Owner;
 * an ordered table of task IDs, outcomes, dependencies, acceptance evidence, and status (`Planned`, `Ready`, `In progress`, `Blocked`, or `Done`);
-* for each task, the files it is expected to change and its `§9` validation tier, so that a different or cheaper agent can execute it from repository state alone, as required by `AGENTS.md` §8;
+* for each task, the files it is expected to change and its §9 validation tier, as required by `AGENTS.md` §8;
 * a single exact next task, or the reason no task can proceed;
 * concise decisions and findings needed by later sessions, including baseline or final measurements when they affect the initiative;
 * a copyable prompt for the next session.
