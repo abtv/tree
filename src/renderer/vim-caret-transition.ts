@@ -6,6 +6,65 @@ export interface VimCaretState {
   imageTextReturnCursor?: number | undefined
 }
 
+export interface VimVerticalStep {
+  caret: VimCaretState
+  crossNode: boolean
+  focusCursor: number
+}
+
+/** Resolve one vertical key step before asking the store for a different node. */
+export function verticalCaretTransition(
+  state: VimCaretState,
+  direction: 'up' | 'down',
+  textLength: number,
+  hasAttachment: boolean,
+  canCrossNode: boolean,
+): VimVerticalStep {
+  if (direction === 'down' && hasAttachment && !state.imageActive && state.cursor < textLength) {
+    const caret = sameNodeImageTransition(state, 'enter', textLength)
+    return { caret, crossNode: false, focusCursor: caret.cursor }
+  }
+  if (direction === 'up' && hasAttachment && state.imageActive && textLength > 0) {
+    const caret = sameNodeImageTransition(state, 'exit', textLength)
+    return { caret, crossNode: false, focusCursor: caret.cursor }
+  }
+  if (!canCrossNode) return { caret: state, crossNode: false, focusCursor: state.cursor }
+  return {
+    caret: state,
+    crossNode: true,
+    focusCursor: direction === 'down' && state.imageActive ? 0 : state.cursor,
+  }
+}
+
+/** A new focus token replaces local image state; an old token is a true no-op. */
+export function focusCaretTransition(
+  state: VimCaretState,
+  focusCursor: number,
+  textLength: number,
+  hasAttachment: boolean,
+  isNewFocus: boolean,
+  preferImage = false,
+): VimCaretState {
+  if (!isNewFocus) return state
+  const imageActive = hasAttachment && (preferImage || focusCursor >= textLength)
+  return {
+    cursor: imageActive ? textLength : Math.max(0, Math.min(focusCursor, Math.max(0, textLength - 1))),
+    imageActive,
+    imageTextReturnCursor:
+      imageActive && preferImage && textLength > 0 ? Math.max(0, Math.min(focusCursor, textLength - 1)) : undefined,
+  }
+}
+
+/** Pointer placement is an explicit new caret intent, even on the selected node. */
+export function pointerCaretTransition(
+  state: VimCaretState,
+  pointerCursor: number,
+  textLength: number,
+  hasAttachment: boolean,
+): VimCaretState {
+  return focusCaretTransition(state, pointerCursor, textLength, hasAttachment, true)
+}
+
 export function sameNodeImageTransition(
   state: VimCaretState,
   action: 'enter' | 'exit',

@@ -30,7 +30,8 @@ import type {
   VimViewportMotion,
 } from './vim-keyboard-types'
 import type { NodeInputBindings } from './NodeInput'
-import { isImageCaretCursor, type VimMode } from './vim-editing'
+import type { VimMode } from './vim-editing'
+import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -76,7 +77,21 @@ export function useNodeInputBindings({
   )
   const vimVisualAnchor = useRef<number | undefined>(undefined)
   const vimVisualFocus = useRef<number | undefined>(undefined)
-  const vimImageTextCursor = useRef<number | undefined>(undefined)
+  const caretAuthority = useRef<{ nodeId?: string; caret: VimCaretState }>({
+    caret: { cursor: focus?.cursor ?? 0, imageActive: false },
+  })
+
+  const applyCaretState = useCallback(
+    (nodeId: string, caret: VimCaretState, fromFocus = false): void => {
+      caretAuthority.current = { nodeId, caret }
+      if (fromFocus) {
+        const state = store.getSnapshot()
+        if (state.status === 'ready') syncedImageFocusToken.current = state.focus?.token
+      }
+      setImageCaretNodeId(caret.imageActive ? nodeId : undefined)
+    },
+    [store, setImageCaretNodeId],
+  )
   const structuralInsert = useRef<
     | { kind: 'open'; position: 'before' | 'after' }
     | { kind: 'child-open' }
@@ -102,15 +117,16 @@ export function useNodeInputBindings({
     if (state.status !== 'ready') return
     if (state.focus?.token === syncedImageFocusToken.current) return
     syncedImageFocusToken.current = state.focus?.token
-    vimImageTextCursor.current = undefined
     const target = requireNode(state.document, state.location.selectedNodeId).node
-    setImageCaretNodeId(
-      state.focus !== undefined &&
-        isImageCaretCursor(target.attachment !== undefined, target.text.length, state.focus.cursor)
-        ? target.id
-        : undefined,
+    const next = focusCaretTransition(
+      caretAuthority.current.caret,
+      state.focus?.cursor ?? 0,
+      target.text.length,
+      target.attachment !== undefined,
+      true,
     )
-  }, [store, setImageCaretNodeId])
+    applyCaretState(target.id, next)
+  }, [store, applyCaretState])
 
   const moveNodeVisual = useCallback(
     (direction: 'up' | 'down' | 'first' | 'last'): void => {
@@ -215,15 +231,14 @@ export function useNodeInputBindings({
         session.baseline.slice(session.position + replaced)
       store.replaceTextRange(session.nodeId, session.position, session.position + replaced, session.typed)
       vimLastChange.current = { kind: 'overwrite', text: session.typed, replaced }
-      vimImageTextCursor.current = undefined
-      setImageCaretNodeId(undefined)
+      applyCaretState(session.nodeId, { cursor: session.position + session.typed.length, imageActive: false })
       if (input !== undefined) {
         setEditableText(input, finalText)
         setCaret(input, session.position + session.typed.length)
       }
       return true
     },
-    [store, setImageCaretNodeId],
+    [store, applyCaretState],
   )
 
   const moveVimViewport = useCallback(
@@ -516,7 +531,19 @@ export function useNodeInputBindings({
           },
           visualAnchor: vimVisualAnchor,
           visualFocus: vimVisualFocus,
-          imageTextCursor: vimImageTextCursor,
+          imageTextCursor: {
+            get current() {
+              return caretAuthority.current.caret.imageTextReturnCursor
+            },
+            set current(value: number | undefined) {
+              caretAuthority.current.caret = { ...caretAuthority.current.caret, imageTextReturnCursor: value }
+            },
+          },
+          getCaretState: (nodeId, cursor, imageActive) =>
+            caretAuthority.current.nodeId === nodeId
+              ? { ...caretAuthority.current.caret, cursor }
+              : { cursor, imageActive, imageTextReturnCursor: undefined },
+          applyCaretState,
           moveBoundary: (boundary, cursor, count) => {
             store.moveSelectionBoundary(boundary, cursor, count)
             syncImageCaretToFocus()
@@ -526,12 +553,15 @@ export function useNodeInputBindings({
           setMode: setVimMode,
           openAttachment: onPreviewAttachment,
           setImageCaret: (nodeId, active, fromFocus) => {
-            if (fromFocus === true) {
-              const state = store.getSnapshot()
-              if (state.status === 'ready' && state.focus !== undefined)
-                syncedImageFocusToken.current = state.focus.token
-            }
-            setImageCaretNodeId(active ? nodeId : undefined)
+            applyCaretState(
+              nodeId,
+              {
+                cursor: caretAuthority.current.caret.cursor,
+                imageActive: active,
+                imageTextReturnCursor: active ? caretAuthority.current.caret.imageTextReturnCursor : undefined,
+              },
+              fromFocus,
+            )
           },
           scheduleCaret: (input, cursor) => {
             pendingCaret.current = { input, cursor }
@@ -561,8 +591,15 @@ export function useNodeInputBindings({
         },
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
-        setImageCaretNodeId(undefined)
-        vimImageTextCursor.current = undefined
+        applyCaretState(
+          node.id,
+          pointerCaretTransition(
+            caretAuthority.current.caret,
+            getCaret(event.currentTarget),
+            node.text.length,
+            node.attachment !== undefined,
+          ),
+        )
         if (event.button === 2) event.preventDefault()
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
@@ -572,6 +609,18 @@ export function useNodeInputBindings({
         finishVimReplace(event.currentTarget)
         vimVisualAnchor.current = undefined
         vimVisualFocus.current = undefined
+      },
+      onMouseUp: (event: MouseEvent<HTMLElement>) => {
+        if (latestVimMode.current !== 'normal') return
+        applyCaretState(
+          node.id,
+          pointerCaretTransition(
+            caretAuthority.current.caret,
+            getCaret(event.currentTarget),
+            node.text.length,
+            node.attachment !== undefined,
+          ),
+        )
       },
       onPaste: (event: ClipboardEvent<HTMLElement>) => {
         setSelectAllNodeId(undefined)
@@ -588,6 +637,7 @@ export function useNodeInputBindings({
     }),
     [
       composing,
+      applyCaretState,
       commandNodeVisual,
       finishVimReplace,
       finishStructuralInsert,
@@ -601,7 +651,6 @@ export function useNodeInputBindings({
       nodeVisualSelection,
       setNodeVisualSelection,
       setVimMode,
-      setImageCaretNodeId,
       syncImageCaretToFocus,
       store,
       vimMode,

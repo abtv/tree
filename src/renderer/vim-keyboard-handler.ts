@@ -22,7 +22,7 @@ import type {
   VimTextChange,
 } from './vim-keyboard-types'
 import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
-import { horizontalCaretTransition, sameNodeImageTransition } from './vim-caret-transition'
+import { focusCaretTransition, horizontalCaretTransition, verticalCaretTransition } from './vim-caret-transition'
 
 function syncImageCaretAtCursor(
   vim: VimKeyboardState,
@@ -67,7 +67,8 @@ export function handleVimKey(
   const cursor = getCaret(input)
   const selection = getSelectionRange(input)
   const visual = vim.mode === 'visual'
-  if (!visual) vim.setImageCaret?.(node.id, node.attachment !== undefined && cursor === node.text.length)
+  if (!visual && vim.getCaretState === undefined)
+    vim.setImageCaret?.(node.id, node.attachment !== undefined && cursor === node.text.length)
   const motionCursor = visual ? (vim.visualFocus.current ?? cursor) : cursor
   const move = (target: number, allowAttachment = false): void => {
     const maximum =
@@ -351,9 +352,11 @@ export function handleVimKey(
 
   if (!visual && (event.key === 'h' || event.key === 'l')) {
     const next = horizontalCaretTransition(
-      {
+      vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
         cursor,
-        imageActive: input.classList.contains('node-input-image-caret'),
+        imageActive:
+          input.classList.contains('node-input-image-caret') ||
+          (node.attachment !== undefined && cursor === node.text.length),
         imageTextReturnCursor: vim.imageTextCursor?.current,
       },
       event.key === 'h' ? 'left' : 'right',
@@ -361,9 +364,12 @@ export function handleVimKey(
       node.text.length,
       node.attachment !== undefined,
     )
-    if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
     setNormalCaret(input, next.cursor)
-    vim.setImageCaret?.(node.id, next.imageActive)
+    if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
+    else {
+      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
+      vim.setImageCaret?.(node.id, next.imageActive)
+    }
   } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
     if (range !== undefined) move(range.target)
@@ -420,86 +426,87 @@ export function handleVimKey(
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     const direction = event.key === 'j' ? 'down' : 'up'
-    const imageCaretActive = input.classList.contains('node-input-image-caret')
-    if (direction === 'down' && imageCaretActive) {
-      const state = store.getSnapshot()
-      if (state.status === 'ready' && state.document !== undefined) {
-        const noNextNode =
-          state.location.selectedNodeId === state.location.currentParentId
-            ? requireNode(state.document, node.id).node.children.length === 0
-            : displayedNodes(state.document, state.location.currentParentId).at(-1)?.id === node.id
-        if (noNextNode) return handled()
-      }
+    let currentNode = node
+    let caret = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
+      cursor,
+      imageActive:
+        input.classList.contains('node-input-image-caret') ||
+        (node.attachment !== undefined && vim.imageTextCursor?.current !== undefined),
+      imageTextReturnCursor: vim.imageTextCursor?.current,
     }
     let navigationCursor = cursor
-    let remainingCount = count
-    if (event.key === 'j' && !imageCaretActive && node.attachment !== undefined && cursor < node.text.length) {
-      const next = sameNodeImageTransition({ cursor, imageActive: false }, 'enter', node.text.length)
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
-      navigationCursor = next.cursor
-      setNormalCaret(input, navigationCursor)
-      vim.setImageCaret?.(node.id, next.imageActive)
-      remainingCount -= 1
-    } else if (
-      event.key === 'k' &&
-      node.attachment !== undefined &&
-      (imageCaretActive || cursor === node.text.length) &&
-      node.text.length > 0
-    ) {
-      const next = sameNodeImageTransition(
-        { cursor, imageActive: true, imageTextReturnCursor: vim.imageTextCursor?.current },
-        'exit',
-        node.text.length,
+    for (let index = 0; index < count; index += 1) {
+      const before = store.getSnapshot()
+      if (before.status !== 'ready') break
+      const siblings =
+        before.document === undefined ? undefined : displayedNodes(before.document, before.location.currentParentId)
+      const selectedIndex = siblings?.findIndex((candidate) => candidate.id === before.location.selectedNodeId) ?? -1
+      const canCrossNode =
+        siblings === undefined ||
+        (direction === 'down'
+          ? before.location.selectedNodeId === before.location.currentParentId
+            ? currentNode.children.length > 0
+            : selectedIndex < siblings.length - 1
+          : before.location.selectedNodeId === before.location.currentParentId ||
+            selectedIndex > 0 ||
+            before.location.currentParentId !== null)
+      const step = verticalCaretTransition(
+        caret,
+        direction,
+        currentNode.text.length,
+        index === 0 && currentNode.attachment !== undefined,
+        canCrossNode,
       )
-      navigationCursor = next.cursor
-      setNormalCaret(input, navigationCursor)
-      vim.setImageCaret?.(node.id, next.imageActive)
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
-      remainingCount -= 1
-    }
-    for (let index = 0; index < remainingCount; index += 1) {
-      if (count > 1) {
-        const state = store.getSnapshot()
-        if (
-          state.status === 'ready' &&
-          state.document !== undefined &&
-          state.location.selectedNodeId !== state.location.currentParentId
-        ) {
-          const visibleNodes = displayedNodes(state.document, state.location.currentParentId)
-          const selectedIndex = visibleNodes.findIndex((candidate) => candidate.id === state.location.selectedNodeId)
-          const atBoundary =
-            (direction === 'down' && selectedIndex === visibleNodes.length - 1) ||
-            (direction === 'up' && selectedIndex === 0 && state.location.currentParentId === null)
-          if (atBoundary) break
+      if (!step.crossNode) {
+        if (step.caret === caret) {
+          if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret)
+          else if (direction === 'up' && before.location.selectedNodeId === before.location.currentParentId)
+            vim.setImageCaret?.(currentNode.id, caret.imageActive, true)
+          else vim.setImageCaret?.(currentNode.id, caret.imageActive)
+          break
         }
-      }
-      if (direction === 'down' && imageCaretActive) {
-        navigationCursor = 0
-        if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
-        vim.setImageCaret?.(node.id, false)
-      }
-      store.moveSelection(direction, navigationCursor)
-      if (direction === 'down' && vim.imageTextCursor !== undefined) {
-        const state = store.getSnapshot()
-        if (state.status === 'ready' && state.location.selectedNodeId !== node.id)
-          vim.imageTextCursor.current = undefined
-      }
-      if (direction === 'up') {
-        const state = store.getSnapshot()
-        if (state.status === 'ready' && state.document !== undefined) {
-          const target = requireNode(state.document, state.location.selectedNodeId).node
-          if (target.id !== node.id && vim.imageTextCursor !== undefined) {
-            vim.imageTextCursor.current =
-              target.attachment !== undefined && target.text.length > 0
-                ? Math.min(state.focus?.cursor ?? navigationCursor, target.text.length - 1)
-                : undefined
-          }
-          const targetImageCaretActive =
-            target.id !== node.id
-              ? target.attachment !== undefined
-              : imageCaretActive && node.text.length === 0 && node.attachment !== undefined
-          vim.setImageCaret?.(target.id, targetImageCaretActive, true)
+        caret = step.caret
+        navigationCursor = caret.cursor
+        setNormalCaret(input, caret.cursor)
+        if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret)
+        else {
+          if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = caret.imageTextReturnCursor
+          vim.setImageCaret?.(currentNode.id, caret.imageActive)
         }
+        continue
+      }
+      const focusCursor = index === 0 ? step.focusCursor : navigationCursor
+      store.moveSelection(direction, focusCursor)
+      if (index === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
+      const after = store.getSnapshot()
+      if (after.status !== 'ready') break
+      if (
+        (after.focus !== undefined && after.focus.token === before.focus?.token) ||
+        (after.focus === undefined &&
+          after.location.selectedNodeId === before.location.selectedNodeId &&
+          after.location.selectedNodeId === currentNode.id &&
+          count === 1)
+      ) {
+        if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret)
+        else if (direction === 'up' && before.location.selectedNodeId === before.location.currentParentId)
+          vim.setImageCaret?.(currentNode.id, caret.imageActive, true)
+        break
+      }
+      if (after.document === undefined) continue
+      const crossedToDifferentNode = after.location.selectedNodeId !== currentNode.id
+      currentNode = requireNode(after.document, after.location.selectedNodeId).node
+      caret = focusCaretTransition(
+        caret,
+        after.focus?.cursor ?? focusCursor,
+        currentNode.text.length,
+        currentNode.attachment !== undefined,
+        true,
+        direction === 'up' && crossedToDifferentNode,
+      )
+      if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret, true)
+      else {
+        if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = caret.imageTextReturnCursor
+        vim.setImageCaret?.(currentNode.id, caret.imageActive, true)
       }
     }
   } else if (visual && event.key === 'v') {

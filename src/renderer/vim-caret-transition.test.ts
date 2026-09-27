@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { horizontalCaretTransition, sameNodeImageTransition } from './vim-caret-transition'
+import {
+  focusCaretTransition,
+  horizontalCaretTransition,
+  pointerCaretTransition,
+  sameNodeImageTransition,
+  verticalCaretTransition,
+} from './vim-caret-transition'
 
 describe('Vim caret transitions', () => {
   it('saves the last traversed text character on a counted image entry and restores it', () => {
@@ -32,6 +38,59 @@ describe('Vim caret transitions', () => {
     expect(horizontalCaretTransition({ cursor: 2, imageActive: false }, 'right', 5, 3, false)).toEqual({
       cursor: 2,
       imageActive: false,
+    })
+  })
+
+  it('round trips between a non-final text position and its image with vertical keys', () => {
+    const text = { cursor: 1, imageActive: false }
+    const entered = verticalCaretTransition(text, 'down', 4, true, true)
+    expect(entered).toEqual({
+      caret: { cursor: 4, imageActive: true, imageTextReturnCursor: 1 },
+      crossNode: false,
+      focusCursor: 4,
+    })
+    expect(verticalCaretTransition(entered.caret, 'up', 4, true, true).caret).toEqual({
+      cursor: 1,
+      imageActive: false,
+    })
+  })
+
+  it('preserves an image-only caret and return position at vertical no-op boundaries', () => {
+    const image = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
+    const step = verticalCaretTransition(image, 'down', 3, true, false)
+    expect(step.caret).toBe(image)
+    expect(step.crossNode).toBe(false)
+    expect(focusCaretTransition(image, 0, 3, true, false)).toBe(image)
+    const onlyImage = { cursor: 0, imageActive: true }
+    expect(verticalCaretTransition(onlyImage, 'up', 0, true, false).caret).toBe(onlyImage)
+  })
+
+  it('transfers authority across nodes and never carries the previous image return position', () => {
+    const oldImage = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+    expect(verticalCaretTransition(oldImage, 'down', 4, true, true).focusCursor).toBe(0)
+    expect(focusCaretTransition(oldImage, 2, 5, false, true)).toEqual({
+      cursor: 2,
+      imageActive: false,
+      imageTextReturnCursor: undefined,
+    })
+    expect(focusCaretTransition(oldImage, 2, 5, true, true, true)).toEqual({
+      cursor: 5,
+      imageActive: true,
+      imageTextReturnCursor: 2,
+    })
+  })
+
+  it('treats pointer placement as a new caret intent on the selected node', () => {
+    const image = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+    expect(pointerCaretTransition(image, 2, 4, true)).toEqual({
+      cursor: 2,
+      imageActive: false,
+      imageTextReturnCursor: undefined,
+    })
+    expect(pointerCaretTransition(image, 4, 4, true)).toEqual({
+      cursor: 4,
+      imageActive: true,
+      imageTextReturnCursor: undefined,
     })
   })
 })

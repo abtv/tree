@@ -28,6 +28,7 @@ export interface NodeInputBindings {
   onFocus: (event: FocusEvent<HTMLElement>) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
   onMouseDown: (event: MouseEvent<HTMLElement>) => void
+  onMouseUp: (event: MouseEvent<HTMLElement>) => void
   onPaste: (event: ClipboardEvent<HTMLElement>) => void
   onSelect: (event: SyntheticEvent<HTMLElement>) => void
 }
@@ -61,6 +62,7 @@ export function NodeInput({
   onFocus,
   onKeyDown,
   onMouseDown,
+  onMouseUp,
   onPaste,
   onSelect,
 }: NodeInputProps): React.JSX.Element {
@@ -94,6 +96,7 @@ export function NodeInput({
     },
     onKeyDown,
     onMouseDown,
+    onMouseUp,
     onPaste,
     onSelect,
     spellCheck: true,

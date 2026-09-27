@@ -1,6 +1,7 @@
 import type { NodeForest, NodeVisualCommand } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { VimMode } from './vim-editing'
+import type { VimCaretState } from './vim-caret-transition'
 
 export type VimTextChange =
   | {
@@ -79,6 +80,8 @@ export interface VimKeyboardState {
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
   imageTextCursor?: { current: number | undefined }
+  getCaretState?: (nodeId: string, cursor: number, imageActive: boolean) => VimCaretState
+  applyCaretState?: (nodeId: string, state: VimCaretState, fromFocus?: boolean) => void
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   syncImageCaretToFocus: () => void
