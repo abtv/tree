@@ -346,4 +346,79 @@ for (const command of documentedWorkflows) {
   checked += 1
 }
 
-console.log(`Checked ${checked} OpenCode permission expectations.`)
+// AGENTS.md §4 requires repository edits to go through the agent's own file-editing tool. Both
+// OpenCode and Claude Code enforce that by denying interpreters and in-place stream editing, and
+// the two configurations previously drifted: OpenCode denied them while Claude Code did not. This
+// asserts parity for that category only; OpenCode's other denials are its own approval boundary,
+// because a Claude Code session keeps the Product Owner in the loop for them.
+const claudeSettings = JSON.parse(await readFile(new URL('../.claude/settings.json', import.meta.url), 'utf8'))
+const claudeDeny = claudeSettings.permissions?.deny ?? []
+
+// Claude Code matches a whole Bash command against the pattern inside `Bash(...)`, treating `*` as
+// a wildcard. It has no trailing-" *" leniency, so this matcher deliberately omits the OpenCode
+// special case in globMatches rather than passing a rule Claude Code would not actually apply.
+function claudeDenies(command) {
+  return claudeDeny.some((entry) => {
+    const pattern = /^Bash\((.*)\)$/su.exec(entry)?.[1]
+    if (pattern === undefined) return false
+    const expression = [...pattern]
+      .map((character) => {
+        if (character === '*') return '.*'
+        if (character === '?') return '.'
+        return character.replace(/[\\^$+.()|{}[\]]/g, '\\$&')
+      })
+      .join('')
+    return new RegExp(`^${expression}$`, 'us').test(command)
+  })
+}
+
+const shellEditingCommands = [
+  'python script.py',
+  'python3 script.py',
+  "python3 -c \"open('AGENTS.md','w')\"",
+  "python3 - <<'PY'",
+  'node',
+  'node script.mjs',
+  "node -e \"require('fs').writeFileSync('AGENTS.md','')\"",
+  'perl -e 1',
+  'perl -i -pe s/a/b/ AGENTS.md',
+  'ruby script.rb',
+  'osascript -e beep',
+  'sh',
+  'sh script.sh',
+  'bash',
+  'bash script.sh',
+  'zsh',
+  'zsh script.zsh',
+  "sed -i '' s/a/b/ AGENTS.md",
+  'sed -i.bak s/a/b/ AGENTS.md',
+  'sed -e s/a/b/ -i AGENTS.md',
+]
+
+for (const command of shellEditingCommands) {
+  assert.equal(
+    chainedPermissionFor(config.agent.develop.permission.bash, command),
+    'deny',
+    `develop: shell editing command ${command} should resolve to deny`,
+  )
+  assert.ok(
+    claudeDenies(command),
+    `Claude Code: shell editing command ${command} should be denied by .claude/settings.json`,
+  )
+  checked += 2
+}
+
+// Read-only stream editing and search stay available in both tools; a parity rule must not
+// over-block them, because the file-editing requirement is about writes, not reads.
+const readOnlyInspectionCommands = ['sed -n 1,80p AGENTS.md', "awk '{print}' AGENTS.md"]
+for (const command of readOnlyInspectionCommands) {
+  assert.notEqual(
+    chainedPermissionFor(config.agent.develop.permission.bash, command),
+    'deny',
+    `develop: read-only inspection ${command} should not be denied`,
+  )
+  assert.ok(!claudeDenies(command), `Claude Code: read-only inspection ${command} should not be denied`)
+  checked += 2
+}
+
+console.log(`Checked ${checked} agent permission expectations.`)
