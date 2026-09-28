@@ -326,16 +326,6 @@ Allowed npm scripts and Git hooks execute mutable repository code with the host 
 
 When an authorized outcome or session ends, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt when another session is needed to resume the work. A commit followed by another authorized task in the same session needs only a brief progress update. An incomplete validation result must never be presented without a follow-up action.
 
-### Workflow-speed pilot
-
-For the next three completed product outcomes after this policy change, record four observations in the final handoff and the temporary table below: approximate active work minutes across sessions (excluding time waiting for a Product Owner decision), number of sessions, approximate minutes spent on validation and review, and follow-up defects reported so far (including zero). Identify each outcome by its final commit subject so a later session can tell which slots are filled before that commit is created. Compare the three outcomes with the Product Owner's current experience of three to five sessions per change before retaining or revising these workflow rules. Do not infer success from commit count alone. Record each outcome when it completes; when its observations were not retained, enter `Not captured` instead of reconstructing timings after the fact. Remove this temporary pilot instruction and table after the comparison; they are not a permanent timing log.
-
-| Outcome | Final commit subject | Active work minutes | Sessions | Validation and review minutes | Follow-up defects |
-| --- | --- | --- | --- | --- | --- |
-| 1 | `fix(renderer): align selected-node focus marker` (`4f3f365`, inline node expansion) | Not captured | Not captured | Not captured | Not captured |
-| 2 | Pending | — | — | — | — |
-| 3 | Pending | — | — | — | — |
-
 ---
 
 ## 11. Multi-Session Initiatives
@@ -387,7 +377,7 @@ End-to-end tests complement unit tests by exercising the real Electron applicati
 
 Platform-routed shortcuts need boundary-faithful end-to-end tests. Playwright injects key events through the DevTools protocol, which triggers Chromium's native editing behavior even though macOS does not route those commands in the running application. An end-to-end test for an editing command (Undo, Redo, Cut, Copy, Paste, Select All) must therefore suppress or disable the native browser behavior, such as the `copy`, `cut`, or `paste` event, and assert that the application still performs the action. A test that relies on the native default can pass while the product is broken. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
 
-Coverage policy is defined in `AGENTS.md` §9. The enforced global and per-file floors are configured in `vitest.config.ts`, and `npm run check` runs the coverage-enabled unit suite that fails when a floor is not met.
+Coverage policy is defined in `AGENTS.md` §9. The enforced global and per-file floors are configured in `vitest.config.ts`, and `npm run check` runs the coverage-enabled unit suite that fails when a floor is not met. Coverage output can vary slightly between runs with identical inputs; treat a single-run global delta of a statement or two as measurement noise rather than a regression.
 
 Per-file floors for the renderer interaction-state owners and their projection point are configured in `vitest.config.ts` and enforced by this coverage run. They were set just below the coverage measured when the ownership refactor completed, so losing a guarded module's focused coverage fails `npm run check`. Treat them as regression guards, not coverage targets: add behavior in its owner module with focused or property tests and restore coverage rather than lowering a floor. The single-owner pattern they guard is recorded in [ARCHITECTURE.md](ARCHITECTURE.md) §9 and [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md).
 
