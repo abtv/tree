@@ -53,6 +53,22 @@ function createStore(
   return new EditorStore(services, () => ['root', 'child', 'sibling'][id++] ?? `node-${id}`)
 }
 
+async function createSeededStore(document: unknown, location: unknown): Promise<EditorStore> {
+  const services: EditorServices = {
+    load: async () => ({ version: 1, document, location }),
+    save: async () => undefined,
+    readClipboard: async () => ({ kind: 'text', text: '' }),
+    writeAttachment: async () => undefined,
+    cleanupAttachments: async () => undefined,
+  }
+  let id = 0
+  const store = new EditorStore(services, () => `created-${id++}`)
+  await act(async () => {
+    await store.initialize()
+  })
+  return store
+}
+
 async function createLockedStore(): Promise<EditorStore> {
   const services: EditorServices = {
     load: async () => null,
@@ -623,6 +639,188 @@ describe('App', () => {
 
       expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Expand node 1' })).toBeInTheDocument()
+    })
+  })
+
+  describe('Vim fold commands over inline expansion', () => {
+    const nestedDocument = {
+      roots: [
+        {
+          id: 'root',
+          text: 'Alpha',
+          children: [
+            {
+              id: 'child',
+              text: 'Alpha child',
+              children: [{ id: 'grandchild', text: 'Alpha grandchild', children: [] }],
+            },
+            { id: 'leaf', text: 'Alpha leaf', children: [] },
+          ],
+        },
+        { id: 'sibling', text: 'Bravo', children: [] },
+      ],
+    }
+
+    async function renderNested(): Promise<EditorStore> {
+      const store = await createSeededStore(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      renderReact(<App store={store} />)
+      return store
+    }
+
+    function readySnapshot(store: EditorStore): {
+      location: { currentParentId: string | null; selectedNodeId: string }
+      focus?: { nodeId: string; cursor: number; token: number }
+    } {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('The editor is not ready.')
+      return snapshot
+    }
+
+    function press(input: HTMLElement, key: string): void {
+      fireEvent.keyDown(input, { key })
+    }
+
+    function fold(input: HTMLElement, key: string): void {
+      press(input, 'z')
+      press(input, key)
+    }
+
+    function texts(): string[] {
+      return screen
+        .getAllByRole('textbox')
+        .filter((input) => !/Current parent/u.test(input.getAttribute('aria-label') ?? ''))
+        .map((input) => (input as HTMLTextAreaElement).value)
+    }
+
+    it('closes, opens, and toggles the selected node’s own fold without moving the caret', async () => {
+      const store = await renderNested()
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      expect(texts()).toEqual(['Alpha', 'Bravo'])
+
+      fold(alpha, 'a')
+      expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
+      expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+
+      fold(alpha, 'c')
+      expect(texts()).toEqual(['Alpha', 'Bravo'])
+
+      fold(alpha, 'o')
+      expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
+      expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+    })
+
+    it('clears nested choices with zC and opens the whole subtree with zO', async () => {
+      await renderNested()
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      fold(alpha, 'a')
+      const child = screen.getByRole('textbox', { name: 'Node 2' })
+      act(() => child.focus())
+      fold(child, 'a')
+      expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
+
+      act(() => alpha.focus())
+      fold(alpha, 'C')
+      expect(texts()).toEqual(['Alpha', 'Bravo'])
+
+      // zC discarded the nested choice, so reopening the root shows only its direct children.
+      fold(alpha, 'o')
+      expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
+
+      fold(alpha, 'O')
+      expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
+    })
+
+    it('closes every fold with zM and selects the displayed ancestor of a hidden caret', async () => {
+      const store = await renderNested()
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      fold(alpha, 'a')
+      const child = screen.getByRole('textbox', { name: 'Node 2' })
+      act(() => child.focus())
+      fold(child, 'a')
+      const grandchild = screen.getByRole('textbox', { name: 'Node 3' })
+      act(() => grandchild.focus())
+      expect(readySnapshot(store).location.selectedNodeId).toBe('grandchild')
+
+      fold(grandchild, 'M')
+
+      expect(texts()).toEqual(['Alpha', 'Bravo'])
+      const snapshot = readySnapshot(store)
+      expect(snapshot.location.selectedNodeId).toBe('root')
+      expect(snapshot.focus?.cursor).toBe(0)
+      expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
+    })
+
+    it('clears a stale image caret when zM hides the node holding it', async () => {
+      const store = await createSeededStore(
+        {
+          roots: [
+            {
+              id: 'root',
+              text: 'Alpha',
+              children: [
+                { id: 'child', text: '', attachment: { id: 'child-image', mimeType: 'image/png' }, children: [] },
+              ],
+            },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      renderReact(<App store={store} />)
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      fold(alpha, 'a')
+      const child = screen.getByRole('textbox', { name: 'Node 2' })
+      act(() => child.focus())
+      expect(child).toHaveClass('node-input-image-caret')
+
+      fold(child, 'M')
+
+      const destination = screen.getByRole('textbox', { name: 'Node 1' })
+      expect(destination).toHaveFocus()
+      expect(destination).not.toHaveClass('node-input-image-caret')
+      expect(readySnapshot(store).focus?.cursor).toBe(0)
+    })
+
+    it('opens every fold with zR while the caret stays on the focused descendant', async () => {
+      const store = await renderNested()
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      fold(alpha, 'a')
+      const child = screen.getByRole('textbox', { name: 'Node 2' })
+      act(() => child.focus())
+
+      fold(child, 'R')
+
+      expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
+      const snapshot = readySnapshot(store)
+      expect(snapshot.location.selectedNodeId).toBe('child')
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveFocus()
+    })
+
+    it('does nothing for fold commands on a leaf', async () => {
+      await renderNested()
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      fold(alpha, 'a')
+      const leaf = screen.getByRole('textbox', { name: 'Node 3' })
+      act(() => leaf.focus())
+
+      for (const key of ['c', 'o', 'a', 'C', 'O']) {
+        fold(leaf, key)
+        expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
+      }
+      expect(leaf).toHaveFocus()
+    })
+
+    it('does nothing for per-node fold commands on the editable current-parent heading', async () => {
+      const store = await renderNested()
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+      fireEvent.keyDown(alpha, { key: '.', metaKey: true })
+      const heading = screen.getByRole('textbox', { name: 'Current parent' })
+      act(() => heading.focus())
+      expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+
+      for (const key of ['c', 'o', 'a', 'C', 'O']) fold(heading, key)
+
+      expect(texts()).toEqual(['Alpha child', 'Alpha leaf'])
+      expect(heading).toHaveFocus()
     })
   })
 

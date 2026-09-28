@@ -69,6 +69,59 @@ test.describe('inline expansion at scale', () => {
     expect(paintMaxMs).toBeLessThan(250)
   })
 
+  test('keeps fold-all keyboard commands responsive across many collapsed branches', async ({ userDataDir }) => {
+    const seed = largeSeed(600, 2)
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { foldPaints: number[] }).foldPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'R' && event.key !== 'M') return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    const foldPair = async (): Promise<void> => {
+      await window.keyboard.press('z')
+      await window.keyboard.press('R')
+      await window.keyboard.press('z')
+      await window.keyboard.press('M')
+    }
+
+    // The first open-all pushes the 1,800 visible rows past the windowing threshold; only the paint
+    // after each fold command is measured, not the `z` prefix keypress. Four more pairs cover both
+    // directions repeatedly.
+    await foldPair()
+    expect(await window.locator('.node-list-spacer').count()).toBe(2)
+    expect(await window.locator('.node-row').count()).toBeLessThan(600 + 600 * 2)
+    for (let index = 0; index < 4; index += 1) await foldPair()
+    await window.waitForFunction(() => (window as unknown as { foldPaints: number[] }).foldPaints.length === 10)
+    await expect(input).toBeFocused()
+    const samples = await window.evaluate(() =>
+      (window as unknown as { foldPaints: number[] }).foldPaints.slice().sort((a, b) => a - b),
+    )
+
+    const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
+    const paintMaxMs = samples[samples.length - 1]!
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'fold-open-all-and-close-all-600-roots',
+      samples: samples.length,
+      metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
+    })
+    expect(paintP95Ms).toBeLessThan(100)
+    expect(paintMaxMs).toBeLessThan(250)
+  })
+
   test('does not grow the renderer heap unboundedly when expanding many branches', async ({ userDataDir }) => {
     // 400 top-level roots alone stay under the 500-row windowing threshold; expanding 100 of them
     // (400 + 100 * 2 = 600 visible rows) pushes past it, and collapsing them again must drop back

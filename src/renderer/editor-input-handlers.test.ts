@@ -1098,6 +1098,7 @@ describe('editor keyboard handler', () => {
       { count: '3', motionCount: '' },
       { count: '', motionCount: '', operator: 'd' },
       { count: '', motionCount: '', prefix: 'g' },
+      { count: '', motionCount: '', prefix: 'z' },
       { count: '', motionCount: '', awaiting: 'r' },
       { count: '', motionCount: '', awaiting: 'f' },
       { count: '', motionCount: '', surround: { stage: 'target', operation: 'delete', count: 1 } },
@@ -1436,6 +1437,114 @@ describe('editor keyboard handler', () => {
 
     expect(store.enter).toHaveBeenCalledOnce()
     expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it('clears a Normal-mode z prefix before Cmd+.', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    handle(keyEvent(input, 'z'))
+    expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+
+    handle(keyEvent(input, '.', { metaKey: true }))
+
+    expect(store.enter).toHaveBeenCalledOnce()
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(vim.fold).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { keys: ['z', 'c'], command: 'close' },
+    { keys: ['z', 'o'], command: 'open' },
+    { keys: ['z', 'a'], command: 'toggle' },
+    { keys: ['z', 'C'], command: 'close-recursive' },
+    { keys: ['z', 'O'], command: 'open-recursive' },
+    { keys: ['z', 'M'], command: 'close-all' },
+    { keys: ['z', 'R'], command: 'open-all' },
+  ])('dispatches the $command fold command for $keys', ({ keys, command }) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    for (const key of keys) handle(keyEvent(input, key))
+
+    expect(vim.fold).toHaveBeenCalledExactlyOnceWith(command, 'node')
+    expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it('ignores an unrecognized z key without editing or continuing the command', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'z'))
+    handle(keyEvent(input, 'q'))
+
+    expect(vim.fold).not.toHaveBeenCalled()
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+  })
+
+  it('discards a pending count and runs the fold command once', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, '3'))
+    handle(keyEvent(input, 'z'))
+    handle(keyEvent(input, 'c'))
+
+    expect(vim.fold).toHaveBeenCalledExactlyOnceWith('close', 'node')
+    expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it('clears a pending z prefix on Escape without dispatching a fold', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'z'))
+    handle(keyEvent(input, 'Escape'))
+
+    expect(vim.fold).not.toHaveBeenCalled()
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(vim.mode).toBe('normal')
+  })
+
+  it('leaves a z key unhandled in character Visual mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
+
+    handle(keyEvent(input, 'z'))
+
+    expect(vim.fold).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('visual')
+    expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it('leaves a z key unhandled in whole-node Visual mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
+    const exit = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
+    const event = keyEvent(input, 'z')
+
+    handle(event)
+
+    expect(vim.fold).not.toHaveBeenCalled()
+    expect(exit).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('visual-node')
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(event.preventDefault).toHaveBeenCalled()
   })
 
   it.each([

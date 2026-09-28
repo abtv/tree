@@ -139,6 +139,63 @@ test.describe('inline node expansion', () => {
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
 
+  test('folds inline expansion with the Vim fold keys, moving the caret to the displayed ancestor it hides', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await node(window, 1).focus()
+
+    // za toggles the selected node's own fold; zc and zo close and open it.
+    await window.keyboard.press('z')
+    await window.keyboard.press('a')
+    await expect(node(window, 2)).toHaveValue('Alpha child one')
+    await window.keyboard.press('z')
+    await window.keyboard.press('c')
+    await expect(node(window, 2)).toHaveValue('Bravo')
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
+    await expect(node(window, 2)).toHaveValue('Alpha child one')
+
+    // zR opens every fold recursively, including the nested grandchild.
+    await node(window, 2).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('R')
+    expect(await nodeTexts(window)).toEqual([
+      'Alpha',
+      'Alpha child one',
+      'Alpha grandchild',
+      'Alpha child two',
+      'Bravo',
+    ])
+
+    // zM closes every fold and hands the caret to the displayed ancestor of the hidden descendant.
+    await node(window, 3).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('M')
+    await expect(node(window, 1)).toBeFocused()
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
+    // zC discards the nested choice, so reopening the root shows one level; a leaf ignores zO.
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('a')
+    await node(window, 2).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('a')
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('C')
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+    await node(window, 4).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('O')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+  })
+
   test('leaves the caret unchanged when collapsing a branch that does not contain it', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

@@ -21,7 +21,7 @@ import {
 } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
-import type { VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
+import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
   beginStructuralChildOpen,
   beginStructuralOpen,
@@ -67,6 +67,11 @@ interface UseNodeInputBindingsOptions {
   setImageCaretNodeId?: (nodeId: string | undefined) => void
   nodeVisualSelection?: { anchorId: string; focusId: string } | undefined
   setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
+  /**
+   * Applies a Normal-mode fold key to the transient inline-expansion state. `App.tsx` owns that
+   * state, so the keyboard handler dispatches the command here instead of touching it directly.
+   */
+  onFoldCommand?: (command: VimFoldCommand, nodeId: string) => void
 }
 
 export interface NodeInputBindingsResult {
@@ -85,6 +90,7 @@ export function useNodeInputBindings({
   setImageCaretNodeId = () => undefined,
   nodeVisualSelection,
   setNodeVisualSelection = () => undefined,
+  onFoldCommand = () => undefined,
 }: UseNodeInputBindingsOptions): NodeInputBindingsResult {
   const inputs = useRef(new Map<string, HTMLElement>())
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
@@ -726,6 +732,7 @@ export function useNodeInputBindings({
             beginStructuralChildOpen(vimCommandState.current, node.id)
           },
           repeatStructural,
+          fold: onFoldCommand,
         },
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
@@ -789,6 +796,7 @@ export function useNodeInputBindings({
       selectedNodeId,
       repeatStructural,
       nodeVisualSelection,
+      onFoldCommand,
       registerHandle,
       setNodeVisualSelection,
       setVimMode,

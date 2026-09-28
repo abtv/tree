@@ -1,5 +1,6 @@
 import type { NodeForest, NodeVisualCommand } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
+import type { NodeFoldCommand } from './expansion-state'
 import type { VimMode } from './vim-editing'
 import type { VimCaretState } from './vim-caret-transition'
 import type { VimCommandState } from './vim-command-state'
@@ -79,9 +80,15 @@ export interface VimPendingCommand {
   operator?: 'd' | 'y' | 'c' | 's'
   motionCount: string
   awaiting?: 'f' | 'F' | 't' | 'T' | 'r'
-  prefix?: 'g' | 'i' | 'a'
+  prefix?: 'g' | 'i' | 'a' | 'z'
   surround?: VimSurroundStage
 }
+
+/**
+ * The fold transitions the `z` keys request (`docs/PRODUCT.md` §20.2). The per-node commands act on
+ * the selected node's own fold; the `-all` forms act on every fold in the current location.
+ */
+export type VimFoldCommand = NodeFoldCommand | 'close-all' | 'open-all'
 
 export interface VimKeyboardState {
   mode: VimMode
@@ -119,6 +126,7 @@ export interface VimKeyboardState {
   beginStructuralOpen: (position: 'before' | 'after') => void
   beginStructuralChildOpen: () => void
   repeatStructural: (change: VimStructuralChange) => void
+  fold: (command: VimFoldCommand, nodeId: string) => void
 }
 
 export type VimViewportMotion = 'top' | 'middle' | 'bottom' | 'half-up' | 'half-down'

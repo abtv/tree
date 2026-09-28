@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
-import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
+import { displayedNodes, nodePath, normalizeCollapsedLocation, requireNode, type TreeNode } from '../domain/document'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
-import { COLLAPSED_EXPANSION_STATE, isNodeExpanded, toggleNodeExpansion, type ExpansionState } from './expansion-state'
+import {
+  applyNodeFold,
+  COLLAPSED_EXPANSION_STATE,
+  expandForest,
+  isNodeExpanded,
+  toggleNodeExpansion,
+  type ExpansionState,
+} from './expansion-state'
+import type { VimFoldCommand } from './vim-keyboard-types'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
@@ -62,6 +70,31 @@ export function App({ store }: AppProps): React.JSX.Element {
       store.reportError(error)
     })
   }, [alwaysOnTop, store])
+  // The Vim fold keys dispatch here because this component owns the transient expansion state.
+  // Closing all folds can hide the caret, so it applies the §2.4 collapse rule: the displayed
+  // ancestor-or-self of the hidden caret becomes selected with its caret at the beginning.
+  const applyFoldCommand = useCallback(
+    (command: VimFoldCommand, nodeId: string): void => {
+      const before = store.getSnapshot()
+      if (before.status !== 'ready') return
+      if (command === 'close-all') {
+        const normalized = normalizeCollapsedLocation(before.document, before.location)
+        setExpansion(COLLAPSED_EXPANSION_STATE)
+        if (normalized.selectedNodeId !== before.location.selectedNodeId) store.selectNode(normalized.selectedNodeId, 0)
+        return
+      }
+      if (command === 'open-all') {
+        const displayed = displayedNodes(before.document, before.location.currentParentId)
+        setExpansion((previous) => expandForest(previous, displayed))
+        return
+      }
+      // The editable current-parent heading owns no fold: its children are the location itself.
+      if (nodeId === before.location.currentParentId) return
+      const node = requireNode(before.document, nodeId).node
+      setExpansion((previous) => applyNodeFold(previous, command, node))
+    },
+    [store],
+  )
   const { bindings: nodeInputBindings, dragFreeze } = useNodeInputBindings({
     store,
     selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
@@ -73,6 +106,7 @@ export function App({ store }: AppProps): React.JSX.Element {
     setImageCaretNodeId,
     nodeVisualSelection,
     setNodeVisualSelection,
+    onFoldCommand: applyFoldCommand,
   })
   const enterNode = useCallback(
     (node: TreeNode): void => {

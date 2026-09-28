@@ -16,6 +16,7 @@ import {
 } from './vim-text-commands'
 import type {
   VimFindCommand,
+  VimFoldCommand,
   VimKeyboardState,
   VimStructuralChange,
   VimSurroundChange,
@@ -25,6 +26,17 @@ import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
 import { clearCommandAssembly, clearPending, clearVisualRange, recordRepeatChange } from './vim-command-state'
 import { editCaretTransition, horizontalCaretTransition } from './vim-caret-transition'
 import { navigateVertically } from './vim-vertical-navigation'
+
+/** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2). */
+const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
+  c: 'close',
+  o: 'open',
+  a: 'toggle',
+  C: 'close-recursive',
+  O: 'open-recursive',
+  M: 'close-all',
+  R: 'open-all',
+}
 
 function syncImageCaretAtCursor(
   vim: VimKeyboardState,
@@ -207,6 +219,13 @@ export function handleVimKey(
       store.enter()
       vim.syncImageCaretToFocus()
     }
+    return handled()
+  }
+
+  if (pending.prefix === 'z') {
+    clearPending(commandState)
+    const fold = FOLD_COMMANDS[event.key]
+    if (fold !== undefined) vim.fold(fold, node.id)
     return handled()
   }
 
@@ -572,6 +591,10 @@ export function handleVimKey(
     }
   } else if (!visual && event.key === 'g') {
     commandState.pending = { count: pending.count, motionCount: '', prefix: 'g' }
+  } else if (!visual && event.key === 'z') {
+    // A count before a fold command is discarded: Vim's fold keys take no count, and keeping the
+    // digits pending would let the following key be read as a command continuation.
+    commandState.pending = { count: pending.count, motionCount: '', prefix: 'z' }
   } else if (!visual && event.key === 'G') {
     const state = store.getSnapshot()
     if (state.status === 'ready') {

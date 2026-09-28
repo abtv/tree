@@ -706,6 +706,54 @@ test.describe('Vim editing prototype', () => {
     await expect(root).not.toHaveClass(/node-input-image-caret/)
   })
 
+  test('clears a stale image caret when zM closes the folds hiding it', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            attachment: { id: 'parent-image', mimeType: 'image/png' },
+            children: [
+              {
+                id: 'child',
+                text: 'Child',
+                attachment: { id: 'child-image', mimeType: 'image/png' },
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'parent' },
+    })
+    seedAttachmentImage(userDataDir, 'parent-image')
+    seedAttachmentImage(userDataDir, 'child-image')
+    const { window } = await launchTree(userDataDir)
+
+    // Expand the parent and move the child's caret onto its own image, then close every fold with
+    // zM: the hidden image caret must not stay active when the displayed ancestor is selected.
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('a')
+    const child = node(window, 2)
+    await child.focus()
+    await setCursor(child, 'Child'.length - 1)
+    await child.press('l')
+    await expect(child).toHaveClass(/node-input-image-caret/)
+
+    await child.press('z')
+    await child.press('M')
+
+    const destination = node(window, 1)
+    await expect(destination).toBeFocused()
+    await expect(destination).toHaveValue('Parent')
+    await expect(destination).not.toHaveClass(/node-input-image-caret/)
+    await expect(destination).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 2)).toHaveCount(0)
+    await expect(window.locator('.attachment-image-caret')).toHaveCount(0)
+  })
+
   test('moves the image caret to the change that undo and redo apply', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
