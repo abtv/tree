@@ -202,7 +202,7 @@ Keep Vim coverage layered. Caret arithmetic and clamps, counts, image return pos
 
 Vim command sequences that need a shifted continuation key must be tested in physical key order. A real keyboard fires the modifier's own keydown before the key it modifies — `Shift` before `O` in `zO`, `$` in `d$`, `A` in `rA`, or `{` in `ys{` — and that keydown must not consume the pending command. A test that dispatches only the capital or shifted key event (for example Playwright's `press('O')` or a focused test that sends `key: 'O'` directly) does not exercise that order and can hide a defect that breaks physical typing. Use `pressShifted` from `e2e/fixtures.ts` for real-boundary cases, and in focused tests send the bare modifier keydown explicitly between the prefix and its continuation.
 
-The same event-sequence fidelity applies wherever handler behavior depends on platform-generated surrounding events, such as lock or dead keys, native composition, or key repeat. A helper or double that collapses a physical keypress into one synthetic event can stay green while real typing is broken, so model the event sequence the platform actually delivers whenever the handler observes more than the logical key.
+The same event-sequence fidelity applies wherever handler behavior depends on platform-generated surrounding events, such as lock or dead keys, native composition, or key repeat. A helper or double that collapses a physical keypress into one synthetic event can stay green while real typing is broken, so model the event sequence the platform actually delivers whenever the handler observes more than the logical key. Native IME composition cannot be driven through Playwright, so composition handling is verified with unit-level contract sequences; do not claim real-IME end-to-end coverage.
 
 ---
 
@@ -376,6 +376,8 @@ In particular, domain tests should cover:
 Tests should verify behavior rather than implementation details.
 
 A refactoring that preserves behavior should not require unnecessary test changes.
+
+Store and keyboard interaction tests use the typed doubles in `src/renderer/test/` (`vim-keyboard-double.ts`, `editor-store-double.ts`) instead of object literals cast to the owner type with `as unknown as`. A double supplies every member of its owner, so adding, removing, or renaming a member fails `npm run typecheck` at the double, while an unchecked literal can silently diverge and exercise a path the application never takes — the failure class [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md) removed for the interaction-state owners. Build a store stub with `createEditorStoreDouble`, supplying the snapshot and the member behaviors the test exercises; do not recreate an `as unknown as EditorStore` literal.
 
 End-to-end tests complement unit tests by exercising the real Electron application through the UI. They should target integration points that unit tests cannot cover: preload/IPC wiring, autosave and restart behavior, attachment files, the system clipboard, and the application startup path. See `docs/decisions/0002-e2e-testing-with-playwright.md`.
 

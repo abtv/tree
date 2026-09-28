@@ -6,32 +6,33 @@ import type { SyntheticEvent } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
+import { createEditorStoreDouble } from './test/editor-store-double'
 import { useNodeInputBindings } from './use-node-input-bindings'
 import type { VimMode } from './vim-editing'
 
 afterEach(cleanup)
 
 function createStore(): EditorStore {
-  return {
+  return createEditorStoreDouble({
+    snapshot: () => ({
+      status: 'ready',
+      document: { roots: [{ id: 'node', text: 'hello', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'node' },
+      focus: { nodeId: 'node', cursor: 3, token: 1 },
+    }),
     copy: vi.fn(async () => true),
     cut: vi.fn(async () => true),
     deleteSelected: vi.fn(),
     editContent: vi.fn(),
     editText: vi.fn(),
     endTextSession: vi.fn(),
-    getSnapshot: vi.fn(() => ({
-      status: 'ready',
-      document: { roots: [{ id: 'node', text: 'hello', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'node' },
-      focus: { nodeId: 'node', cursor: 3, token: 1 },
-    })),
     markNextTextEditStandalone: vi.fn(),
     paste: vi.fn(async () => {}),
     replaceTextRange: vi.fn(),
     reportError: vi.fn(),
     selectNode: vi.fn(),
     registerPendingEditFinisher: vi.fn(() => () => undefined),
-  } as unknown as EditorStore
+  })
 }
 
 function renderBindings(options: {
@@ -52,8 +53,8 @@ describe('useNodeInputBindings', () => {
     ]
     let selectedNodeId = 'a'
     let currentParentId: string | null = null
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: nodes },
         location: { currentParentId, selectedNodeId },
@@ -65,7 +66,7 @@ describe('useNodeInputBindings', () => {
       pasteNodeForest: vi.fn(() => true),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -128,8 +129,8 @@ describe('useNodeInputBindings', () => {
     let selectedNodeId = 'root'
     let focus: { nodeId: string; cursor: number; token: number } = { nodeId: 'root', cursor: 0, token: 0 }
     let focusToken = 0
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [node] },
         location: { currentParentId: null, selectedNodeId },
@@ -147,7 +148,7 @@ describe('useNodeInputBindings', () => {
       }),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -201,8 +202,8 @@ describe('useNodeInputBindings', () => {
     let selectedNodeId = 'root'
     let focus: { nodeId: string; cursor: number; token: number } = { nodeId: 'root', cursor: 0, token: 0 }
     let focusToken = 0
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [node] },
         location: { currentParentId: null, selectedNodeId },
@@ -214,7 +215,7 @@ describe('useNodeInputBindings', () => {
         focus = { nodeId: id, cursor, token: focusToken }
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -270,8 +271,8 @@ describe('useNodeInputBindings', () => {
       children: [],
     }
     let focus = { nodeId: 'root', cursor: 0, token: 1 }
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [node] },
         location: { currentParentId: null, selectedNodeId: 'root' },
@@ -285,7 +286,7 @@ describe('useNodeInputBindings', () => {
         focus = { nodeId: 'root', cursor, token: focus.token + 1 }
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -365,8 +366,8 @@ describe('useNodeInputBindings', () => {
     }
     let selectedNodeId = child.id
     let focus = { nodeId: child.id, cursor: 0, token: 1 }
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [parent] },
         location: { currentParentId: parent.id, selectedNodeId },
@@ -378,7 +379,7 @@ describe('useNodeInputBindings', () => {
       }),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result, rerender } = renderHook(() => {
       const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
       return {
@@ -412,19 +413,19 @@ describe('useNodeInputBindings', () => {
   })
 
   it('captures opened child text for structural dot repeat', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       createChild: vi.fn(() => true),
       createChildWithText: vi.fn(),
       createSibling: vi.fn(() => true),
       createSiblingWithText: vi.fn(),
       endTextSession: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'A', children: [] }] },
         location: { currentParentId: 'a', selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -459,16 +460,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('captures a plain Insert session when blur leaves the node selected', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRange: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'a', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -507,16 +508,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('captures a plain Insert session across a node change but does not replay it on a different node', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRange: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'a', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -562,16 +563,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('replays a plain Insert session once the user returns to the node it was captured on', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRange: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'a', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -616,16 +617,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('captures a plain Insert session when a same-node pointer click commits it', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRange: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'a', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -666,19 +667,19 @@ describe('useNodeInputBindings', () => {
     // node as an incidental side effect before any text is typed. Model that with two distinct
     // tracked nodes (as real node creation always produces a new id) so the structural session is
     // only finished by a later blur on the node it actually ends up focused on.
-    const store = {
+    const store = createEditorStoreDouble({
       createChild: vi.fn(() => true),
       createChildWithText: vi.fn(),
       createSibling: vi.fn(() => true),
       createSiblingWithText: vi.fn(),
       endTextSession: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'A', children: [] }] },
         location: { currentParentId: 'a', selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -1022,20 +1023,20 @@ describe('useNodeInputBindings', () => {
 
   it('commits a pending Replace session exactly once when the store re-enters the finish path', () => {
     const node: TreeNode = { id: 'a', text: 'ab', children: [] }
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRange: vi.fn(() => {
         // A store side effect that synchronously re-enters the finish path must not be able to
         // commit the Replace session a second time; the session is consumed before this call.
         result.current.bindings.onBlur()
       }),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [node] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const bindings = useNodeInputBindings({
@@ -1079,8 +1080,8 @@ describe('useNodeInputBindings', () => {
       { id: 'b', text: 'B', children: [] },
     ]
     let selectedNodeId = 'a'
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: nodes },
         location: { currentParentId: null, selectedNodeId },
@@ -1091,7 +1092,7 @@ describe('useNodeInputBindings', () => {
       applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -1367,15 +1368,15 @@ describe('useNodeInputBindings', () => {
       registeredFinish = finish
       return unregister
     })
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'node', text: 'abcd', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'node' },
       }),
       endTextSession: vi.fn(),
       registerPendingEditFinisher,
-    } as unknown as EditorStore
+    })
 
     const { unmount } = renderHook(() => useNodeInputBindings({ store, onPreviewAttachment: vi.fn() }))
 
@@ -1387,8 +1388,8 @@ describe('useNodeInputBindings', () => {
 
   it('commits a pending Replace session when the shutdown finisher runs and consumes it once', () => {
     let finish: (() => boolean) | undefined
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'node', text: 'abcd', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'node' },
@@ -1399,7 +1400,7 @@ describe('useNodeInputBindings', () => {
         finish = registered
         return () => undefined
       }),
-    } as unknown as EditorStore
+    })
     const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
@@ -1446,8 +1447,8 @@ describe('useNodeInputBindings', () => {
 
   it('returns an empty Replace session to Normal without a store edit when the shutdown finisher runs', () => {
     let finish: (() => boolean) | undefined
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'node', text: 'abcd', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'node' },
@@ -1458,7 +1459,7 @@ describe('useNodeInputBindings', () => {
         finish = registered
         return () => undefined
       }),
-    } as unknown as EditorStore
+    })
     const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
@@ -1494,8 +1495,8 @@ describe('useNodeInputBindings', () => {
 
   it('activates the image caret when a Replace session commits on blur at the terminal position', () => {
     const node: TreeNode = { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [node] },
         location: { currentParentId: null, selectedNodeId: 'node' },
@@ -1503,7 +1504,7 @@ describe('useNodeInputBindings', () => {
       replaceTextRange: vi.fn(),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
@@ -1547,8 +1548,8 @@ describe('useNodeInputBindings', () => {
 
   it('activates the image caret when a same-node pointer click commits a Replace session at the terminal position', () => {
     const node: TreeNode = { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [node] },
         location: { currentParentId: null, selectedNodeId: 'node' },
@@ -1556,7 +1557,7 @@ describe('useNodeInputBindings', () => {
       replaceTextRange: vi.fn(),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
@@ -1598,16 +1599,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('applies surround commands as one edit and repeats them with dot', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRanges: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -1719,16 +1720,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('leaves an image-only node untouched by every surround command', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRanges: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: '', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -1776,16 +1777,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('surrounds a character-wise Visual selection with S and returns to Normal mode', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRanges: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -1835,16 +1836,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('clears a character Visual selection on a pointer press and re-anchors at the pointer', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       replaceTextRanges: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -1897,8 +1898,8 @@ describe('useNodeInputBindings', () => {
       { id: 'a', text: 'A', children: [] },
       { id: 'b', text: 'B', children: [] },
     ]
-    const store = {
-      getSnapshot: () => ({
+    const store = createEditorStoreDouble({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: nodes },
         location: { currentParentId: null, selectedNodeId: 'a' },
@@ -1909,7 +1910,7 @@ describe('useNodeInputBindings', () => {
       enter: vi.fn(),
       endTextSession: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -1953,16 +1954,16 @@ describe('useNodeInputBindings', () => {
   })
 
   it('anchors the next character Visual motion at the reached caret after Cmd+.', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
       enter: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -2009,15 +2010,15 @@ describe('useNodeInputBindings', () => {
   })
 
   it('clears character Visual endpoints when blur ends the session and re-anchors the next motion', () => {
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'a' },
       }),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const { bindings } = useNodeInputBindings({
@@ -2070,9 +2071,9 @@ describe('useNodeInputBindings', () => {
       { id: 'a', text: 'A', children: [] },
       { id: 'b', text: 'B', children: [] },
     ]
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: nodes },
         location: { currentParentId: null, selectedNodeId: 'a' },
@@ -2080,7 +2081,7 @@ describe('useNodeInputBindings', () => {
       selectNode: vi.fn(),
       applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const { result } = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
       const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
@@ -2133,15 +2134,15 @@ describe('useNodeInputBindings', () => {
     }
     vi.stubGlobal('ResizeObserver', TestResizeObserver)
     try {
-      const store = {
+      const store = createEditorStoreDouble({
         endTextSession: vi.fn(),
-        getSnapshot: () => ({
+        snapshot: () => ({
           status: 'ready',
           document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
           location: { currentParentId: null, selectedNodeId: 'a' },
         }),
         registerPendingEditFinisher: vi.fn(() => () => undefined),
-      } as unknown as EditorStore
+      })
       const { result } = renderHook(() => {
         const [vimMode, setVimMode] = useState<VimMode>('normal')
         const { bindings } = useNodeInputBindings({
@@ -2405,9 +2406,9 @@ describe('drag caret freeze', () => {
       children: [],
     }
     let focus = { nodeId: 'node', cursor: 5, token: 1 }
-    const store = {
+    const store = createEditorStoreDouble({
       endTextSession: vi.fn(),
-      getSnapshot: () => ({
+      snapshot: () => ({
         status: 'ready',
         document: { roots: [imageNode] },
         location: { currentParentId: null, selectedNodeId: 'node' },
@@ -2415,7 +2416,7 @@ describe('drag caret freeze', () => {
       }),
       selectNode: vi.fn(),
       registerPendingEditFinisher: vi.fn(() => () => undefined),
-    } as unknown as EditorStore
+    })
     const setImageCaretNodeId = vi.fn()
     const { result, rerender } = renderHook(() =>
       useNodeInputBindings({

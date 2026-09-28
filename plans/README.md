@@ -4,6 +4,5 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Model fidelity and test-double hardening](model-fidelity-hardening.md) | Active — MFH-4 done; MFH-5 ready | MFH-5: typed store double removes unchecked mock assertions |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

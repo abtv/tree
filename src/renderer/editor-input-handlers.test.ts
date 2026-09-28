@@ -6,12 +6,17 @@ import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
 import type { VimKeyboardState, VimPendingCommand, VimTextCommandState } from './editor-input-handlers'
+import { createEditorStoreDouble } from './test/editor-store-double'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 import { clearPending } from './vim-command-state'
 
 function createStore(): EditorStore {
-  return {
+  return createEditorStoreDouble({
+    snapshot: {
+      status: 'ready',
+      location: { currentParentId: null, selectedNodeId: 'node' },
+    },
     createChild: vi.fn(() => true),
     createChildWithText: vi.fn(),
     copy: vi.fn(async () => true),
@@ -33,11 +38,7 @@ function createStore(): EditorStore {
     replaceTextRange: vi.fn(),
     reportError: vi.fn(),
     undo: vi.fn(),
-    getSnapshot: vi.fn(() => ({
-      status: 'ready',
-      location: { currentParentId: null, selectedNodeId: 'node' },
-    })),
-  } as unknown as EditorStore
+  })
 }
 
 function keyEvent(

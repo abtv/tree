@@ -4,11 +4,11 @@ import type { KeyboardEvent } from 'react'
 import fc from 'fast-check'
 import { describe, expect, it, vi } from 'vitest'
 import { moveSelectionTransition } from '../application/editor-command-transitions'
-import type { EditorStore } from '../application/editor-store'
 import type { Document, TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { setNormalCaret } from './editor-dom'
 import type { VimKeyboardState } from './vim-keyboard-types'
+import { createEditorStoreDouble } from './test/editor-store-double'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 
@@ -50,14 +50,14 @@ function assertImageMotionSequence(
   row.className = 'node-row'
   row.dataset.hasAttachment = String(hasAttachment)
   row.append(input)
-  const store = {
-    getSnapshot: () => ({
+  const store = createEditorStoreDouble({
+    snapshot: () => ({
       status: 'ready',
       document: { roots: [node] },
       location: { currentParentId: null, selectedNodeId: node.id },
     }),
     moveSelection: vi.fn(),
-  } as unknown as EditorStore
+  })
   const double = createVimKeyboardDouble(node.id)
   const { vim } = double
   // Production always reaches the handler with the caret authority already holding the focused
@@ -213,8 +213,8 @@ function assertSiblingMotionSequence(
   }
   inputAt(selectedNodeId).focus()
 
-  const store = {
-    getSnapshot: () => ({
+  const store = createEditorStoreDouble({
+    snapshot: () => ({
       status: 'ready',
       document: documentTree,
       location: { currentParentId: null, selectedNodeId },
@@ -237,7 +237,7 @@ function assertSiblingMotionSequence(
       }
       projectImageCaret()
     }),
-  } as unknown as EditorStore
+  })
 
   const double = createVimKeyboardDouble(selectedNodeId)
   const vim: VimKeyboardState = {
@@ -359,8 +359,8 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   row.className = 'node-row'
   row.dataset.hasAttachment = 'true'
   row.append(input)
-  const store = {
-    getSnapshot: () => ({
+  const store = createEditorStoreDouble({
+    snapshot: () => ({
       status: 'ready',
       document: { roots: [node] },
       location: { currentParentId: null, selectedNodeId: node.id },
@@ -369,7 +369,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
       node = { ...node, text: node.text.slice(0, start) + inserted + node.text.slice(end) }
       input.value = node.text
     }),
-  } as unknown as EditorStore
+  })
   const double = createVimKeyboardDouble(node.id, { register: { kind: 'text', value: pastedText } })
   const vim: VimKeyboardState = {
     ...double.vim,
