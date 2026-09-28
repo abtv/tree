@@ -19,6 +19,8 @@ interface SaveControl {
   cleanupDurations: number[]
 }
 
+const MIB = 1024 * 1024
+
 async function readProcessWorkingSet(app: Awaited<ReturnType<typeof launchTree>>['app']): Promise<{
   mainBytes: number
   rendererBytes: number
@@ -90,6 +92,8 @@ test.describe('state and persistence work', () => {
     })
     expect(memory.mainBytes).toBeGreaterThan(0)
     expect(memory.rendererBytes).toBeGreaterThan(0)
+    expect(memory.rendererBytes).toBeLessThan(300 * MIB)
+    expect(memory.totalBytes).toBeLessThan(800 * MIB)
   })
 
   test('large-10000 structural burst, save policy, and cleanup scan', async ({ userDataDir }) => {
@@ -234,6 +238,7 @@ test.describe('state and persistence work', () => {
     const finalProcess = await readProcessWorkingSet(app)
     const growthBytes = finalHeapBytes - warmHeapBytes
     const lateRendererWorkingSetGrowthBytes = finalProcess.rendererBytes - middleProcess.rendererBytes
+    const lateTotalWorkingSetGrowthBytes = finalProcess.totalBytes - middleProcess.totalBytes
 
     recordPerfResult({
       kind: 'state',
@@ -250,6 +255,7 @@ test.describe('state and persistence work', () => {
         middleRendererWorkingSetBytes: middleProcess.rendererBytes,
         finalRendererWorkingSetBytes: finalProcess.rendererBytes,
         lateRendererWorkingSetGrowthBytes,
+        lateTotalWorkingSetGrowthBytes,
         warmTotalWorkingSetBytes: warmProcess.totalBytes,
         middleTotalWorkingSetBytes: middleProcess.totalBytes,
         finalTotalWorkingSetBytes: finalProcess.totalBytes,
@@ -263,6 +269,9 @@ test.describe('state and persistence work', () => {
     expect(warmProcess.rendererBytes).toBeGreaterThan(0)
     expect(growthBytes).toBeLessThan(5_000_000)
     expect(lateRendererWorkingSetGrowthBytes).toBeLessThan(30_000_000)
+    expect(lateTotalWorkingSetGrowthBytes).toBeLessThan(50 * MIB)
+    expect(finalProcess.rendererBytes).toBeLessThan(500 * MIB)
+    expect(finalProcess.totalBytes).toBeLessThan(1_100 * MIB)
   })
 
   test('image insertion decode latency for small and larger images', async ({ userDataDir }) => {
