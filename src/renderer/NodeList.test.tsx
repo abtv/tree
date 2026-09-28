@@ -53,6 +53,8 @@ interface RenderOptions {
   list?: TreeNode[]
   renderInput?: (node: TreeNode, label: string) => ReactNode
   visualNodeSelection?: { anchorId: string; focusId: string } | undefined
+  isExpanded?: (nodeId: string) => boolean
+  onToggleExpansion?: (node: TreeNode) => void
 }
 
 type StubDragFreeze = {
@@ -77,6 +79,7 @@ function renderRows(
     <NodeList
       dragFreeze={dragFreeze}
       focusedNodeId={options.focusedNodeId}
+      isExpanded={options.isExpanded}
       locked={options.locked === true}
       nodes={list}
       renderInput={
@@ -85,6 +88,7 @@ function renderRows(
       }
       onEnter={() => undefined}
       onMove={onMove}
+      onToggleExpansion={options.onToggleExpansion}
       visualNodeSelection={options.visualNodeSelection}
     />,
   )
@@ -166,8 +170,8 @@ describe('NodeList', () => {
 
     const parentButton = getByRole('button', { name: 'Enter node 1' })
     const leafButton = getByRole('button', { name: 'Enter node 2' })
-    expect(parentButton.className).toContain('node-disclosure-has-children')
-    expect(leafButton.className).not.toContain('node-disclosure-has-children')
+    expect(parentButton.className).toContain('node-enter-control-has-children')
+    expect(leafButton.className).not.toContain('node-enter-control-has-children')
 
     fireEvent.mouseDown(parentButton)
     fireEvent.click(parentButton)
@@ -204,6 +208,122 @@ describe('NodeList', () => {
 
     rerender(element(undefined))
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(0)
+  })
+})
+
+describe('NodeList inline expansion', () => {
+  it('renders no disclosure triangle for a leaf row', () => {
+    renderRows()
+
+    expect(screen.queryByRole('button', { name: /Expand node|Collapse node/ })).not.toBeInTheDocument()
+  })
+
+  it('renders a collapsed disclosure triangle for a node with children and reports it accessibly', () => {
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    renderRows({ list: [parentNode, ...nodes] })
+
+    const triangle = screen.getByRole('button', { name: 'Expand node 1' })
+    expect(triangle).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('flattens an expanded node’s children inline, in preorder, without windowing them separately', () => {
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    const { container } = renderRows({ list: [parentNode, ...nodes], isExpanded: (id) => id === 'p' })
+
+    const rows = rowElements(container)
+    expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['p', 'c', 'a', 'b'])
+    expect(screen.getByRole('button', { name: 'Collapse node 1' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('calls back with the node when its own disclosure triangle is clicked, without entering or selecting it', () => {
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    const onToggleExpansion = vi.fn()
+    const onEnter = vi.fn()
+    render(
+      <NodeList
+        dragFreeze={stubDragFreeze()}
+        nodes={[parentNode, ...nodes]}
+        renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
+        onEnter={onEnter}
+        onMove={() => undefined}
+        onToggleExpansion={onToggleExpansion}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
+    expect(onToggleExpansion).toHaveBeenCalledWith(parentNode)
+    expect(onEnter).not.toHaveBeenCalled()
+  })
+
+  it('snaps a drop position inside a dragged node’s own descendant block to the nearest real boundary', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    // p1 has its own child p1a; p2 is p1's next real sibling. Flattened: a, p1, p1a, p2, b. The
+    // position between p1 and p1a (row index 2) is not a valid boundary for a's children — it sits
+    // inside p1's own visible block — so it must snap to the nearest real boundary (before p1) and
+    // dropping there commits nothing.
+    const parentNode: TreeNode = {
+      id: 'a',
+      text: 'A',
+      children: [
+        { id: 'p1', text: 'P1', children: [{ id: 'p1a', text: 'P1a', children: [] }] },
+        { id: 'p2', text: 'P2', children: [] },
+      ],
+    }
+    const { container, onMove } = renderRows({
+      list: [parentNode, { id: 'b', text: 'B', children: [] }],
+      isExpanded: (id) => id === 'a' || id === 'p1',
+    })
+    const rows = rowElements(container)
+    expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['a', 'p1', 'p1a', 'p2', 'b'])
+
+    activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
+    pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
+    expect(rows[1]).toHaveClass('node-row-drop-before')
+    expect(container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')).toHaveLength(1)
+    pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
+
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
+  it('commits a drag among a descendant’s own real siblings to the position after them', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const parentNode: TreeNode = {
+      id: 'a',
+      text: 'A',
+      children: [
+        { id: 'p1', text: 'P1', children: [] },
+        { id: 'p2', text: 'P2', children: [] },
+      ],
+    }
+    const { container, onMove } = renderRows({
+      list: [parentNode, { id: 'b', text: 'B', children: [] }],
+      isExpanded: (id) => id === 'a',
+    })
+    const rows = rowElements(container)
+    expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['a', 'p1', 'p2', 'b'])
+
+    activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
+    pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 + 5)
+    expect(rows[3]).toHaveClass('node-row-drop-before')
+    pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 + 5)
+
+    expect(onMove).toHaveBeenCalledWith('p1', 2)
+  })
+
+  it('does not start a drag from the disclosure triangle', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    const { container } = renderRows({ list: [parentNode, ...nodes] })
+    const triangle = screen.getByRole('button', { name: 'Expand node 1' })
+
+    pointerDownAt(triangle, 13)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
   })
 })
 

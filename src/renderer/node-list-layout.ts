@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
-import type { TreeNode } from '../domain/document'
 import { computeOffsets, ROW_HEIGHT_ESTIMATE, type ListWindow } from './list-window'
+import type { VisibleRow } from './visible-tree'
 
 export interface ListLayout {
   offsets: Float64Array
@@ -24,14 +24,14 @@ export function collectWindowIndices(windowRange: ListWindow): number[] {
   return indices
 }
 
-export function buildLayout(nodes: readonly TreeNode[], heights: ReadonlyMap<string, number>): ListLayout {
-  const rowHeights = nodes.map((node) => heights.get(node.id) ?? ROW_HEIGHT_ESTIMATE)
+export function buildLayout(rows: readonly VisibleRow[], heights: ReadonlyMap<string, number>): ListLayout {
+  const rowHeights = rows.map((row) => heights.get(row.node.id) ?? ROW_HEIGHT_ESTIMATE)
   const { offsets, total } = computeOffsets(rowHeights)
-  return { offsets, total, count: nodes.length }
+  return { offsets, total, count: rows.length }
 }
 
-export function pruneHeights(heights: Map<string, number>, nodes: readonly TreeNode[]): void {
-  const ids = new Set(nodes.map((node) => node.id))
+export function pruneHeights(heights: Map<string, number>, rows: readonly VisibleRow[]): void {
+  const ids = new Set(rows.map((row) => row.node.id))
   for (const id of heights.keys()) {
     if (!ids.has(id)) heights.delete(id)
   }

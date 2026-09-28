@@ -31,6 +31,28 @@ const document: Document = {
   ],
 }
 
+// A visible descendant several levels below the current parent, reachable through inline expansion
+// (docs/PRODUCT.md §2.4): `alpha` is a top-level root; `alpha1` is its child; `alpha1a` is `alpha1`'s
+// own child. The current parent stays `null` throughout, matching how expansion never changes it.
+const nestedDocument: Document = {
+  roots: [
+    {
+      id: 'alpha',
+      text: 'Alpha',
+      children: [
+        {
+          id: 'alpha1',
+          text: 'Alpha child one',
+          children: [{ id: 'alpha1a', text: 'Alpha grandchild', children: [] }],
+        },
+        { id: 'alpha2', text: 'Alpha child two', children: [] },
+      ],
+    },
+    { id: 'beta', text: 'Beta', children: [] },
+  ],
+}
+const rootLocation = { currentParentId: null, selectedNodeId: 'alpha' }
+
 describe('editor command transitions', () => {
   it('rejects a child at maximum depth before requesting an ID', () => {
     const deepest: TreeNode = {
@@ -311,5 +333,72 @@ describe('editor command transitions', () => {
     expect(
       moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 1),
     ).toBeUndefined()
+  })
+
+  describe('sibling-relative commands at descendant depth (inline expansion)', () => {
+    it('moves up/down to a visible descendant’s own real parent and siblings, not the current-parent heading', () => {
+      // alpha1's real parent is alpha, several levels above the null current parent; up from its
+      // first real child (alpha1a) goes to alpha1 itself, not to the current-parent heading.
+      expect(moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1a' }, 'up', 0)).toEqual({
+        nodeId: 'alpha1',
+        cursor: 0,
+      })
+      // Down from alpha1's second real child (alpha2 does not exist under alpha1; alpha1 has only
+      // one real child) exercises the other boundary: alpha1a is alpha1's only child, so down stays.
+      expect(
+        moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1a' }, 'down', 0),
+      ).toEqual({ nodeId: 'alpha1a', cursor: 16 })
+      // Down from alpha (a real root) skips straight to its real sibling beta, never descending into
+      // alpha's own children even though they would be displayed if alpha were expanded.
+      expect(moveSelectionTransition(nestedDocument, rootLocation, 'down', 0)).toEqual({ nodeId: 'beta', cursor: 0 })
+      // Up from alpha1 (first real child of alpha) goes to alpha, its own real parent, which is a
+      // visible descendant row itself, not the current-parent heading (there is none at root level).
+      expect(moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1' }, 'up', 0)).toEqual({
+        nodeId: 'alpha',
+        cursor: 0,
+      })
+    })
+
+    it('keeps gg anchored to the current-parent heading while G targets the descendant’s own last real sibling', () => {
+      const nested: Document = {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            children: [
+              { id: 'child1', text: 'Child one', children: [{ id: 'grand', text: 'Grand', children: [] }] },
+              { id: 'child2', text: 'Child two', children: [] },
+            ],
+          },
+        ],
+      }
+      const atGrandchild = { currentParentId: 'parent', selectedNodeId: 'grand' }
+      // gg (boundary 'parent') must stay anchored to the current-parent heading regardless of how
+      // deep the focused descendant is, never generalized to the descendant's own real parent.
+      expect(moveSelectionBoundaryTransition(nested, atGrandchild, 'parent', 99)).toEqual({
+        nodeId: 'parent',
+        cursor: 6,
+      })
+      // G (boundary 'last') targets the descendant's own real siblings: grand's real parent is
+      // child1, whose only real child is itself, so G leaves it selected.
+      expect(moveSelectionBoundaryTransition(nested, atGrandchild, 'last', 99)).toEqual({
+        nodeId: 'grand',
+        cursor: 5,
+      })
+      // From child1 itself (a direct child of the heading), G still resolves to the last real
+      // sibling among the heading's children, matching the existing non-nested behavior.
+      expect(
+        moveSelectionBoundaryTransition(nested, { currentParentId: 'parent', selectedNodeId: 'child1' }, 'last', 99),
+      ).toEqual({ nodeId: 'child2', cursor: 9 })
+    })
+
+    it('scopes a dragged descendant’s insertion index to its own real siblings', () => {
+      // alpha1 and alpha2 are alpha's real children; dragging alpha1 to insertion index 2 (after
+      // alpha2) must land it there among alpha's children, never among the top-level roots.
+      const moved = moveNodeTransition(nestedDocument, rootLocation, 'alpha1', 2)
+      const alpha = moved?.document.roots.find((node) => node.id === 'alpha')
+      expect(alpha?.children.map((node) => node.id)).toEqual(['alpha2', 'alpha1'])
+      expect(moved?.document.roots.map((node) => node.id)).toEqual(['alpha', 'beta'])
+    })
   })
 })

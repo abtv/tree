@@ -68,6 +68,48 @@ describe('whole-node Visual transitions', () => {
       expect(deletion.transition.document.roots.map((node) => node.id)).toEqual(['new-1'])
   })
 
+  it('scopes a visible descendant’s range to its own real siblings and falls back to its own real parent', () => {
+    // mid's real parent is root, but the current location stays at the root level (currentParentId
+    // null), several levels above mid, exactly as inline expansion leaves it when mid and its
+    // children are shown through expansion rather than by entering mid (docs/PRODUCT.md §2.4).
+    const document: Document = {
+      roots: [
+        {
+          id: 'root',
+          text: 'Root',
+          children: [
+            {
+              id: 'mid',
+              text: 'Mid',
+              children: [
+                { id: 'c1', text: 'C1', children: [] },
+                { id: 'c2', text: 'C2', children: [] },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+    let id = 0
+    const createId = (): string => `new-${++id}`
+    const rootLevelLocation: Location = { currentParentId: null, selectedNodeId: 'root' }
+
+    const yank = nodeVisualTransition(document, rootLevelLocation, 'y', 'c1', 'c2', undefined, '', true, createId)
+    expect(yank.kind).toBe('yank')
+    if (yank.kind === 'yank') expect(yank.register.sourceIds).toEqual(['c1', 'c2'])
+
+    // Deleting both of mid's children empties its own sibling array; the fallback selection must be
+    // mid itself (the real parent), not the unrelated root-level `currentParentId`.
+    const deletion = nodeVisualTransition(document, rootLevelLocation, 'd', 'c1', 'c2', undefined, '', true, createId)
+    expect(deletion.kind).toBe('changed')
+    if (deletion.kind === 'changed') {
+      expect(deletion.transition.location.selectedNodeId).toBe('mid')
+      const mid = deletion.transition.document.roots[0]?.children[0]
+      expect(mid?.id).toBe('mid')
+      expect(mid?.children).toEqual([])
+    }
+  })
+
   it('shifts hyperlink offsets when Unicode case conversion expands text', () => {
     const text = 'İhttps://a.com'
     const document: Document = {

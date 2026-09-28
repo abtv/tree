@@ -3,6 +3,7 @@ import {
   cloneNodeWithNewIds,
   displayedNodes,
   ensureRoot,
+  locateNode,
   nodePath,
   normalizeLinks,
   replaceSiblingRange,
@@ -67,10 +68,16 @@ export function nodeVisualTransition(
   canMutate: boolean,
   createId: () => NodeId,
 ): NodeVisualTransition {
-  const siblings = displayedNodes(document, location.currentParentId)
-  const anchor = siblings.findIndex((node) => node.id === anchorId)
+  // A whole-node Visual range only ever spans one real sibling array (`moveNodeVisual` only moves
+  // within it), so the anchor's actual siblings resolve both endpoints, whatever depth they are
+  // displayed at through inline expansion.
+  const anchorLocated = locateNode(document, anchorId)
+  if (anchorLocated === undefined) return { kind: 'none' }
+  const siblings = anchorLocated.siblings
+  const realParentId = anchorLocated.parent?.id ?? null
+  const anchor = anchorLocated.index
   const focus = siblings.findIndex((node) => node.id === focusId)
-  if (anchor < 0 || focus < 0) return { kind: 'none' }
+  if (focus < 0) return { kind: 'none' }
   const start = Math.min(anchor, focus)
   const selected = siblings.slice(start, Math.max(anchor, focus) + 1)
   const first = selected[0]
@@ -121,9 +128,9 @@ export function nodeVisualTransition(
   }
   let nextDocument = replaceSiblingRange(document, first.id, selected.length, replacements)
   if (nextDocument.roots.length === 0) nextDocument = ensureRoot(nextDocument, createId())
-  const nextSiblings = displayedNodes(nextDocument, location.currentParentId)
+  const nextSiblings = displayedNodes(nextDocument, realParentId)
   const target = replacements[0] ?? nextSiblings[start] ?? nextSiblings[start - 1]
-  const selectedId = target?.id ?? location.currentParentId ?? nextDocument.roots[0]!.id
+  const selectedId = target?.id ?? realParentId ?? nextDocument.roots[0]!.id
   return {
     kind: 'changed',
     register,

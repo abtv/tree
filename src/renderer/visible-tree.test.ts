@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '../domain/document'
-import { buildVisibleRows } from './visible-tree'
+import { buildVisibleRows, nearestSiblingBoundary, siblingBoundaryIndices, type VisibleRow } from './visible-tree'
 
 function node(id: string, children: TreeNode[] = []): TreeNode {
   return { id, text: id, children }
@@ -54,5 +54,48 @@ describe('buildVisibleRows', () => {
 
   it('returns no rows for an empty sibling list', () => {
     expect(buildVisibleRows([], () => true)).toEqual([])
+  })
+})
+
+describe('siblingBoundaryIndices', () => {
+  it('offers a boundary only before or after each real child’s whole visible block, never inside it', () => {
+    // A > A1 > A1a, A2 > A2a, then B as A's next real sibling.
+    const nodes = [node('a', [node('a1', [node('a1a')]), node('a2', [node('a2a')])]), node('b')]
+    const rows = buildVisibleRows(nodes, () => true)
+    expect(rows.map((row) => row.node.id)).toEqual(['a', 'a1', 'a1a', 'a2', 'a2a', 'b'])
+    expect(siblingBoundaryIndices(rows, 'a')).toEqual([1, 3, 5])
+    expect(siblingBoundaryIndices(rows, null)).toEqual([0, 5, 6])
+  })
+
+  it('offers exactly two boundaries around an only child’s whole block', () => {
+    const nodes = [node('a', [node('a1', [node('a1a')])])]
+    const rows = buildVisibleRows(nodes, () => true)
+    expect(siblingBoundaryIndices(rows, 'a')).toEqual([1, 3])
+    expect(siblingBoundaryIndices(rows, null)).toEqual([0, 3])
+  })
+
+  it('matches the flat sibling case when nothing is expanded', () => {
+    const nodes = [node('a'), node('b'), node('c')]
+    const rows = buildVisibleRows(nodes, () => false)
+    expect(siblingBoundaryIndices(rows, null)).toEqual([0, 1, 2, 3])
+  })
+
+  it('returns no boundaries for a parent with no rendered children', () => {
+    const rows: VisibleRow[] = [{ node: node('a'), depth: 0, parentId: null, siblingIndex: 0, siblingCount: 1 }]
+    expect(siblingBoundaryIndices(rows, 'a')).toEqual([])
+  })
+})
+
+describe('nearestSiblingBoundary', () => {
+  it('snaps to the closest boundary, favoring the earlier one on a tie', () => {
+    expect(nearestSiblingBoundary([1, 3, 5], 2)).toBe(1)
+    expect(nearestSiblingBoundary([1, 3, 5], 4)).toBe(3)
+    expect(nearestSiblingBoundary([1, 3, 5], 0)).toBe(1)
+    expect(nearestSiblingBoundary([1, 3, 5], 10)).toBe(5)
+    expect(nearestSiblingBoundary([1, 3, 5], 3)).toBe(3)
+  })
+
+  it('returns undefined for no boundaries', () => {
+    expect(nearestSiblingBoundary([], 2)).toBeUndefined()
   })
 })

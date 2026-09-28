@@ -6,6 +6,7 @@ import {
   insertSiblingAfter,
   insertSiblingBefore,
   insertSubtreeSibling,
+  locateNode,
   moveSibling,
   nodePath,
   requireNode,
@@ -132,9 +133,11 @@ export function moveNodeTransition(
   insertionIndex: number,
   cursor = 0,
 ): StructuralTransition | undefined {
-  const nodes = displayedNodes(document, location.currentParentId)
-  const sourceIndex = nodes.findIndex((node) => node.id === nodeId)
-  if (sourceIndex < 0) return undefined
+  // Drag reordering is scoped to the dragged node's own actual siblings, whatever depth it is
+  // displayed at through inline expansion, so `insertionIndex` is always resolved against them.
+  const located = locateNode(document, nodeId)
+  if (located === undefined) return undefined
+  const sourceIndex = located.index
   const destination = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
   if (destination === sourceIndex) return undefined
   return {
@@ -159,20 +162,20 @@ export function moveSelectionTransition(
       : { nodeId: child.id, cursor: Math.min(cursor, child.text.length) }
   }
 
-  const nodes = displayedNodes(document, location.currentParentId)
-  const index = nodes.findIndex((node) => node.id === location.selectedNodeId)
-  if (direction === 'up' && index === 0 && location.currentParentId === null) {
-    return { nodeId: nodes[0]!.id, cursor: 0 }
+  // `↑`/`↓` act on the selected node's own actual sibling level, so a visible descendant's real
+  // parent may be another visible descendant row rather than the current-parent heading.
+  const selected = requireNode(document, location.selectedNodeId)
+  const siblings = selected.siblings
+  const index = selected.index
+  if (direction === 'up' && index === 0) {
+    if (selected.parent === null) return { nodeId: siblings[0]!.id, cursor: 0 }
+    return { nodeId: selected.parent.id, cursor: Math.min(cursor, selected.parent.text.length) }
   }
-  if (direction === 'up' && index === 0 && location.currentParentId !== null) {
-    const parent = requireNode(document, location.currentParentId).node
-    return { nodeId: parent.id, cursor: Math.min(cursor, parent.text.length) }
-  }
-  if (direction === 'down' && index === nodes.length - 1) {
-    const node = nodes[index]!
+  if (direction === 'down' && index === siblings.length - 1) {
+    const node = siblings[index]!
     return { nodeId: node.id, cursor: node.text.length }
   }
-  const target = nodes[index + (direction === 'up' ? -1 : 1)]
+  const target = siblings[index + (direction === 'up' ? -1 : 1)]
   return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 
@@ -187,7 +190,13 @@ export function moveSelectionBoundaryTransition(
     const parent = requireNode(document, location.currentParentId).node
     return { nodeId: parent.id, cursor: Math.min(cursor, parent.text.length) }
   }
-  const nodes = displayedNodes(document, location.currentParentId)
+  // `gg` always targets the current-parent heading (handled above) or the first top-level root
+  // (below); it is intentionally not generalized to the focused node's own real parent. `G` targets
+  // the focused node's own actual siblings, except when the heading itself is selected.
+  const nodes =
+    boundary === 'last' && location.selectedNodeId !== location.currentParentId
+      ? requireNode(document, location.selectedNodeId).siblings
+      : displayedNodes(document, location.currentParentId)
   if (nodes.length === 0) return undefined
   const target =
     boundary === 'last' ? nodes[Math.min(nodes.length - 1, Math.max(0, (count ?? nodes.length) - 1))] : nodes[0]

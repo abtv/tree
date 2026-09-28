@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '../domain/document'
-import { buildVisibleRows } from './visible-tree'
+import { buildVisibleRows, siblingBoundaryIndices } from './visible-tree'
 
 interface RawNode {
   children: RawNode[]
@@ -93,6 +93,34 @@ describe('buildVisibleRows invariants', () => {
         for (const row of rows) {
           if (row.parentId === null) continue
           expect(indexOf.get(row.parentId)!).toBeLessThan(indexOf.get(row.node.id)!)
+        }
+      }),
+    )
+  })
+
+  it('offers exactly one drop boundary more than the real child count, strictly ordered, for every fully expanded parent', () => {
+    fc.assert(
+      fc.property(forest, (rawForest) => {
+        const nodes = materialize(rawForest)
+        const rows = buildVisibleRows(nodes, () => true)
+        const ancestry = buildAncestry(nodes)
+        const realParentIds = new Set<string | null>([null, ...[...ancestry.values()].map((entry) => entry.node.id)])
+        for (const parentId of realParentIds) {
+          const childCount = parentId === null ? nodes.length : (ancestry.get(parentId)?.node.children.length ?? 0)
+          if (childCount === 0) continue
+          const boundaries = siblingBoundaryIndices(rows, parentId)
+          expect(boundaries).toHaveLength(childCount + 1)
+          for (let index = 1; index < boundaries.length; index += 1) {
+            expect(boundaries[index]!).toBeGreaterThan(boundaries[index - 1]!)
+          }
+          // Every boundary but the last is exactly the start of a real child's own row, in order; the
+          // last sits strictly after the final child's own start (its whole visible block).
+          const childStarts = rows.reduce<number[]>((acc, row, index) => {
+            if (row.parentId === parentId) acc.push(index)
+            return acc
+          }, [])
+          expect(boundaries.slice(0, -1)).toEqual(childStarts)
+          expect(boundaries[boundaries.length - 1]!).toBeGreaterThan(childStarts[childStarts.length - 1]!)
         }
       }),
     )

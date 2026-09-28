@@ -5,6 +5,7 @@ import {
   editNodeContent,
   isValidLocation,
   locateNode,
+  normalizeCollapsedLocation,
   parsePersistedState,
   replaceLinkedText,
   replaceLinkedTextRanges,
@@ -160,11 +161,12 @@ export class EditorStore {
       }
 
       const parsed = parsePersistedState(loaded)
+      const location = normalizeCollapsedLocation(parsed.document, parsed.location)
       this.runtime.snapshot = {
         status: 'ready',
         document: parsed.document,
-        location: parsed.location,
-        focus: this.runtime.newFocus(parsed.location.selectedNodeId, 0),
+        location,
+        focus: this.runtime.newFocus(location.selectedNodeId, 0),
         structuralVersion: this.runtime.getStructuralVersion(),
       }
       this.runtime.emit()

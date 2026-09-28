@@ -479,7 +479,7 @@ describe('App', () => {
     const before = store.getSnapshot()
     if (before.status !== 'ready') throw new Error('The editor is not ready.')
     const button = screen.getByRole('button', { name: 'Enter node 1' })
-    expect(button.className).not.toContain('node-disclosure-has-children')
+    expect(button.className).not.toContain('node-enter-control-has-children')
 
     fireEvent.mouseDown(button)
     fireEvent.click(button)
@@ -503,12 +503,127 @@ describe('App', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
     const disclosure = screen.getByRole('button', { name: 'Enter node 1' })
-    expect(disclosure.className).toContain('node-disclosure-has-children')
+    expect(disclosure.className).toContain('node-enter-control-has-children')
     fireEvent.mouseDown(disclosure)
     fireEvent.click(disclosure)
 
     expect(screen.getByRole('textbox', { name: 'Current parent' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
+  })
+
+  describe('inline node expansion', () => {
+    async function buildRootWithChild(): Promise<EditorStore> {
+      const store = createStore()
+      await act(async () => {
+        await store.initialize()
+      })
+      render(<App store={store} />)
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
+      return store
+    }
+
+    function readySnapshot(store: EditorStore): {
+      location: { currentParentId: string | null; selectedNodeId: string }
+    } {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('The editor is not ready.')
+      return snapshot
+    }
+
+    it('expands a node’s children inline without changing the current location or the caret', async () => {
+      const store = await buildRootWithChild()
+      expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
+      expect(readySnapshot(store).location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
+    })
+
+    it('collapses a node’s children again from the same disclosure control', async () => {
+      await buildRootWithChild()
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+
+      expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+    })
+
+    it('selects the collapsing node with the caret at the start when collapse hides the caret', async () => {
+      const store = await buildRootWithChild()
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      const child = screen.getByRole('textbox', { name: 'Node 2' })
+      act(() => child.focus())
+      expect(readySnapshot(store).location.selectedNodeId).toBe('child')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('The editor is not ready.')
+      expect(snapshot.location.selectedNodeId).toBe('root')
+      expect(snapshot.focus?.cursor).toBe(0)
+    })
+
+    it('leaves selection unchanged when the caret is on the collapsing node itself', async () => {
+      const store = await buildRootWithChild()
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+      const focusBefore = store.getSnapshot().status === 'ready' ? store.getSnapshot() : undefined
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+
+      expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+      expect(focusBefore).toBeDefined()
+    })
+
+    it('ends whole-node Visual mode when collapse hides its anchor and focus', async () => {
+      const store = await buildRootWithChild()
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      const child = screen.getByRole('textbox', { name: 'Node 2' })
+      act(() => child.focus())
+      fireEvent.keyDown(child, { key: 'Escape' })
+      fireEvent.keyDown(child, { key: 'V' })
+      expect(screen.getByText('VISUAL NODE')).toBeInTheDocument()
+      expect(readySnapshot(store).location.selectedNodeId).toBe('child')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+
+      expect(screen.queryByText('VISUAL NODE')).not.toBeInTheDocument()
+      expect(screen.getByText('NORMAL')).toBeInTheDocument()
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('The editor is not ready.')
+      expect(snapshot.location.selectedNodeId).toBe('root')
+      expect(snapshot.focus?.cursor).toBe(0)
+    })
+
+    it('leaves an unrelated whole-node Visual selection active when collapsing a different branch', async () => {
+      const store = await buildRootWithChild()
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'Escape' })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'V' })
+      expect(screen.getByText('VISUAL NODE')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+
+      expect(screen.getByText('VISUAL NODE')).toBeInTheDocument()
+      expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+    })
+
+    it('resets expansion when navigating to a different location', async () => {
+      await buildRootWithChild()
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
+
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
+
+      expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand node 1' })).toBeInTheDocument()
+    })
   })
 
   it('marks the node containing the caret and never the current-parent heading', async () => {

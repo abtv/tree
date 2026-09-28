@@ -14,9 +14,10 @@ import {
   type NodeDragSource,
   type NodeDropRegion,
 } from './node-drag'
+import { nearestSiblingBoundary, siblingBoundaryIndices, type VisibleRow } from './visible-tree'
 
 interface UseNodeListDragOptions {
-  nodes: readonly TreeNode[]
+  rows: readonly VisibleRow[]
   locked: boolean
   windowed: boolean
   listRef: RefObject<HTMLElement | null>
@@ -39,7 +40,7 @@ interface NodeListDrag {
 }
 
 export function useNodeListDrag({
-  nodes,
+  rows,
   locked,
   windowed,
   listRef,
@@ -54,7 +55,7 @@ export function useNodeListDrag({
   const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
   const suppressClickRef = useRef(false)
   const sourceCandidate = drag.source
-  const sourceAvailable = sourceCandidate === undefined || nodes.some((node) => node.id === sourceCandidate.nodeId)
+  const sourceAvailable = sourceCandidate === undefined || rows.some((row) => row.node.id === sourceCandidate.nodeId)
   // One resolved state owns the freeze; every projection below reads it rather than the raw reducer
   // state, so the body class, row marker, drop marker, pointer capture, and caret suspension cannot
   // describe different gestures.
@@ -84,6 +85,19 @@ export function useNodeListDrag({
       return insertionIndexAtPoint(regions, clientY)
     },
     [observedElementsRef],
+  )
+
+  // Drag-and-drop reorders only among the dragged node's actual siblings (`docs/PRODUCT.md` §2.4): a
+  // raw flattened position from pointer geometry is snapped to the nearest boundary that does not
+  // cross into or out of another real child's visible block.
+  const snapToRealParentBoundary = useCallback(
+    (rawIndex: number, nodeId: string): number | undefined => {
+      const sourceRow = rows.find((row) => row.node.id === nodeId)
+      if (sourceRow === undefined) return rawIndex
+      const boundaries = siblingBoundaryIndices(rows, sourceRow.parentId)
+      return nearestSiblingBoundary(boundaries, rawIndex) ?? rawIndex
+    },
+    [rows],
   )
 
   useEffect(() => {
@@ -151,7 +165,11 @@ export function useNodeListDrag({
     (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (locked) return
       if (event.button === 2) event.preventDefault()
-      if (event.target instanceof Element && event.target.closest('.node-disclosure') !== null) return
+      if (
+        event.target instanceof Element &&
+        event.target.closest('.node-enter-control, .node-disclosure-triangle') !== null
+      )
+        return
       dragFreeze.end()
       suppressClickRef.current = false
       pressPointRef.current = { x: event.clientX, y: event.clientY }
@@ -203,16 +221,23 @@ export function useNodeListDrag({
       return
     }
     pointerYRef.current = event.clientY
-    setDropIndex(computeInsertionIndex(event.clientY))
+    const raw = computeInsertionIndex(event.clientY)
+    setDropIndex(raw === undefined ? undefined : snapToRealParentBoundary(raw, resolved.source.nodeId))
     if (windowed) setAutoScrollDirection(autoScrollStep(event.clientY, globalThis.innerHeight))
   }
 
   const onListPointerUp = (event: ReactPointerEvent<HTMLElement>): void => {
     if (freeze !== undefined && freeze.pointerId === event.pointerId) {
       suppressClickRef.current = true
-      const insertionIndex = computeInsertionIndex(event.clientY)
-      if (insertionIndex !== undefined && shouldCommitMove(insertionIndex, freeze.index)) {
-        onMove(freeze.nodeId, insertionIndex)
+      const raw = computeInsertionIndex(event.clientY)
+      const sourceRow = rows.find((row) => row.node.id === freeze.nodeId)
+      if (raw !== undefined && sourceRow !== undefined) {
+        const boundaries = siblingBoundaryIndices(rows, sourceRow.parentId)
+        const snapped = nearestSiblingBoundary(boundaries, raw)
+        const realInsertionIndex = snapped === undefined ? -1 : boundaries.indexOf(snapped)
+        if (realInsertionIndex >= 0 && shouldCommitMove(realInsertionIndex, sourceRow.siblingIndex)) {
+          onMove(freeze.nodeId, realInsertionIndex)
+        }
       }
     }
     dragFreeze.end(event.pointerId)
@@ -238,8 +263,9 @@ export function useNodeListDrag({
     if (freeze === undefined) return
     const pointerY = pointerYRef.current
     if (pointerY === undefined) return
-    setDropIndex(computeInsertionIndex(pointerY))
-  }, [computeInsertionIndex, freeze])
+    const raw = computeInsertionIndex(pointerY)
+    setDropIndex(raw === undefined ? undefined : snapToRealParentBoundary(raw, freeze.nodeId))
+  }, [computeInsertionIndex, freeze, snapToRealParentBoundary])
 
   return {
     freeze,

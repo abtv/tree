@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
-import { displayedNodes, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
+import { locateNode, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import {
   collapseSelectionToAnchor,
   getCaret,
@@ -216,9 +216,13 @@ export function useNodeInputBindings({
     (direction: 'up' | 'down' | 'first' | 'last'): void => {
       const state = store.getSnapshot()
       if (state.status !== 'ready' || nodeVisualSelection === undefined) return
-      const nodes = displayedNodes(state.document, state.location.currentParentId)
-      const index = nodes.findIndex((node) => node.id === nodeVisualSelection.focusId)
-      if (index < 0 || nodes.length === 0) return
+      // Whole-node Visual extension stays within the focused node's actual sibling array, whatever
+      // depth it is displayed at through inline expansion.
+      const located = locateNode(state.document, nodeVisualSelection.focusId)
+      if (located === undefined) return
+      const nodes = located.siblings
+      const index = located.index
+      if (nodes.length === 0) return
       const targetIndex =
         direction === 'first'
           ? 0
@@ -239,11 +243,13 @@ export function useNodeInputBindings({
       if (nodeVisualSelection === undefined) return
       const state = store.getSnapshot()
       if (state.status !== 'ready') return
-      const nodes = displayedNodes(state.document, state.location.currentParentId)
-      const anchor = nodes.findIndex((node) => node.id === nodeVisualSelection.anchorId)
-      const focus = nodes.findIndex((node) => node.id === nodeVisualSelection.focusId)
-      if (anchor < 0 || focus < 0) return
-      const span = Math.abs(anchor - focus) + 1
+      // The anchor and focus of a whole-node Visual range always share a real parent (see
+      // `moveNodeVisual`), so the anchor's actual siblings resolve the span.
+      const anchorLocated = locateNode(state.document, nodeVisualSelection.anchorId)
+      if (anchorLocated === undefined) return
+      const focus = anchorLocated.siblings.findIndex((node) => node.id === nodeVisualSelection.focusId)
+      if (focus < 0) return
+      const span = Math.abs(anchorLocated.index - focus) + 1
       const source = registerSource(vimSession.current.register)
       const result = store.applyNodeVisual(command, nodeVisualSelection.anchorId, nodeVisualSelection.focusId, source)
       if (result === undefined) return
@@ -284,9 +290,7 @@ export function useNodeInputBindings({
       const state = store.getSnapshot()
       if (state.status !== 'ready') return
       if (change.kind === 'structural-delete') {
-        const selected = displayedNodes(state.document, state.location.currentParentId).find(
-          (node) => node.id === state.location.selectedNodeId,
-        )
+        const selected = locateNode(state.document, state.location.selectedNodeId)?.node
         if (selected !== undefined) vimSession.current.register = nodeRegister(selected)
         store.deleteSelected()
       } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
@@ -296,11 +300,12 @@ export function useNodeInputBindings({
       else if (change.kind === 'structural-forest-put')
         store.pasteNodeForest(state.location.selectedNodeId, change.position, change.source)
       else {
-        const nodes = displayedNodes(state.document, state.location.currentParentId)
-        const start = nodes.findIndex((node) => node.id === state.location.selectedNodeId)
-        const end = nodes[start + change.span - 1]
-        if (start < 0 || end === undefined) return
-        const result = store.applyNodeVisual(change.command, nodes[start]!.id, end.id, change.source, change.text)
+        // A repeated whole-node Visual mutation applies to the current node's own actual siblings.
+        const located = locateNode(state.document, state.location.selectedNodeId)
+        if (located === undefined) return
+        const end = located.siblings[located.index + change.span - 1]
+        if (end === undefined) return
+        const result = store.applyNodeVisual(change.command, located.node.id, end.id, change.source, change.text)
         if (result !== undefined) {
           const nextRegister = visualCommandRegister(change.command, result)
           if (nextRegister !== undefined) vimSession.current.register = nextRegister

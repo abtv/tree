@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, displayedNodes, linkAtPosition, type TreeNode } from '../domain/document'
+import { cloneNode, displayedNodes, linkAtPosition, locateNode, requireNode, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
@@ -575,7 +575,12 @@ export function handleVimKey(
   } else if (!visual && event.key === 'G') {
     const state = store.getSnapshot()
     if (state.status === 'ready') {
-      const nodes = displayedNodes(state.document, state.location.currentParentId)
+      // `G` targets the focused node's own actual sibling level, not the current parent's
+      // children, except when the editable current-parent heading itself is selected.
+      const nodes =
+        state.location.selectedNodeId === state.location.currentParentId
+          ? displayedNodes(state.document, state.location.currentParentId)
+          : requireNode(state.document, state.location.selectedNodeId).siblings
       const targetIndex = pending.count === '' ? nodes.length - 1 : Math.min(nodes.length - 1, Math.max(0, count - 1))
       const target = nodes[targetIndex]
       if (target !== undefined) vim.setImageCaret(target.id, target.attachment !== undefined)
@@ -639,10 +644,10 @@ function selectedSiblingForest(
 ): { nodes: TreeNode[]; sourceIds: string[] } | undefined {
   const state = store.getSnapshot()
   if (state.status !== 'ready') return undefined
-  const nodes = displayedNodes(state.document, state.location.currentParentId)
-  const index = nodes.findIndex((candidate) => candidate.id === nodeId)
-  if (index < 0) return undefined
-  const selected = nodes.slice(index, index + count)
+  // Counted `dd`/`yy` operate on the node's own actual siblings, whatever depth it is displayed at.
+  const located = locateNode(state.document, nodeId)
+  if (located === undefined) return undefined
+  const selected = located.siblings.slice(located.index, located.index + count)
   if (selected.length === 0) return undefined
   return { nodes: selected.map(cloneNode), sourceIds: selected.map((candidate) => candidate.id) }
 }

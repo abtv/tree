@@ -1,5 +1,5 @@
 import type { EditorSnapshot } from '../application/editor-store-types'
-import { displayedNodes, requireNode, type TreeNode } from '../domain/document'
+import { requireNode, type TreeNode } from '../domain/document'
 import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
 
 export interface VimVerticalNavigationStore {
@@ -34,18 +34,19 @@ export function navigateVertically({
   for (let index = 0; index < count; index += 1) {
     const before = store.getSnapshot()
     if (before.status !== 'ready') break
-    const siblings =
-      before.document === undefined ? undefined : displayedNodes(before.document, before.location.currentParentId)
-    const selectedIndex = siblings?.findIndex((candidate) => candidate.id === before.location.selectedNodeId) ?? -1
+    // Counted vertical motion crosses onto the selected node's own actual sibling (or real parent),
+    // whatever depth it is displayed at through inline expansion.
+    const located =
+      before.document === undefined ? undefined : requireNode(before.document, before.location.selectedNodeId)
     const canCrossNode =
-      siblings === undefined ||
+      located === undefined ||
       (direction === 'down'
         ? before.location.selectedNodeId === before.location.currentParentId
           ? currentNode.children.length > 0
-          : selectedIndex < siblings.length - 1
+          : located.index < located.siblings.length - 1
         : before.location.selectedNodeId === before.location.currentParentId ||
-          selectedIndex > 0 ||
-          before.location.currentParentId !== null)
+          located.index > 0 ||
+          located.parent !== null)
     const step = verticalCaretTransition(
       caret,
       direction,

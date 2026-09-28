@@ -50,6 +50,7 @@ export {
   isValidLocation,
   moveSibling,
   nodePath,
+  normalizeCollapsedLocation,
   pasteMultilineText,
   pasteText,
   removeTextRange,

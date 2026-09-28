@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import { NodeRow } from './NodeRow'
@@ -15,6 +15,7 @@ import {
 } from './node-list-layout'
 import { dropMarkerFor } from './node-drag'
 import { useNodeListDrag } from './use-node-list-drag'
+import { buildVisibleRows } from './visible-tree'
 
 interface NodeListProps {
   nodes: readonly TreeNode[]
@@ -22,6 +23,8 @@ interface NodeListProps {
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
   onMove: (nodeId: string, insertionIndex: number) => void
+  isExpanded?: ((nodeId: string) => boolean) | undefined
+  onToggleExpansion?: ((node: TreeNode) => void) | undefined
   dragFreeze: NodeDragCaretFreeze
   focusedNodeId?: string | undefined
   structuralVersion?: number
@@ -29,12 +32,16 @@ interface NodeListProps {
   locked?: boolean
 }
 
+const NEVER_EXPANDED = (): boolean => false
+
 export function NodeList({
   nodes,
   renderInput,
   onActivate,
   onEnter,
   onMove,
+  isExpanded = NEVER_EXPANDED,
+  onToggleExpansion,
   dragFreeze,
   focusedNodeId,
   structuralVersion = 0,
@@ -48,12 +55,16 @@ export function NodeList({
   const widthRef = useRef(typeof globalThis.innerWidth === 'number' ? globalThis.innerWidth : 0)
   const [measureRevision, setMeasureRevision] = useState(0)
   const [viewport, setViewport] = useState({ start: 0, end: 0 })
+  // The rendered, windowed, and measured row list is the flattened projection of `nodes` and every
+  // expanded node's descendants (docs/PRODUCT.md §2.4), not `nodes` itself; a collapsed subtree still
+  // costs exactly one row here regardless of its own size (`buildVisibleRows`).
+  const visibleRows = useMemo(() => buildVisibleRows(nodes, isExpanded), [nodes, isExpanded])
   const [layoutState, setLayoutState] = useState<LayoutState>(() => ({
-    key: `initial:${nodes.length}`,
-    layout: shouldWindow(nodes.length) ? buildLayout(nodes, EMPTY_HEIGHTS) : EMPTY_LAYOUT,
+    key: `initial:${visibleRows.length}`,
+    layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, EMPTY_HEIGHTS) : EMPTY_LAYOUT,
     structuralVersion,
   }))
-  const windowed = shouldWindow(nodes.length)
+  const windowed = shouldWindow(visibleRows.length)
 
   const measureRow = useCallback((nodeId: string, element: HTMLElement | null) => {
     if (element === null) {
@@ -107,15 +118,15 @@ export function NodeList({
   }, [])
 
   useLayoutEffect(() => {
-    const key = `${structuralVersion}:${measureRevision}:${nodes.length}`
+    const key = `${structuralVersion}:${measureRevision}:${visibleRows.length}`
     if (layoutState.key === key) return
-    if (layoutState.structuralVersion !== structuralVersion) pruneHeights(heightsRef.current, nodes)
+    if (layoutState.structuralVersion !== structuralVersion) pruneHeights(heightsRef.current, visibleRows)
     setLayoutState({
       key,
-      layout: shouldWindow(nodes.length) ? buildLayout(nodes, heightsRef.current) : EMPTY_LAYOUT,
+      layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, heightsRef.current) : EMPTY_LAYOUT,
       structuralVersion,
     })
-  }, [layoutState.key, layoutState.structuralVersion, measureRevision, nodes, structuralVersion])
+  }, [layoutState.key, layoutState.structuralVersion, measureRevision, structuralVersion, visibleRows])
 
   const updateViewport = useCallback(() => {
     const element = listRef.current
@@ -152,7 +163,7 @@ export function NodeList({
     onLostPointerCapture,
     onListClick,
     recomputeDropIndex,
-  } = useNodeListDrag({ nodes, locked, windowed, listRef, observedElementsRef, onMove, dragFreeze })
+  } = useNodeListDrag({ rows: visibleRows, locked, windowed, listRef, observedElementsRef, onMove, dragFreeze })
 
   useLayoutEffect(() => {
     recomputeDropIndex()
@@ -160,10 +171,10 @@ export function NodeList({
 
   const layout = layoutState.layout
   const focusedIndex =
-    windowed && focusedNodeId !== undefined ? nodes.findIndex((node) => node.id === focusedNodeId) : -1
+    windowed && focusedNodeId !== undefined ? visibleRows.findIndex((row) => row.node.id === focusedNodeId) : -1
   const listWindow = windowed
     ? computeListWindow({
-        count: nodes.length,
+        count: visibleRows.length,
         offsets: layout.offsets,
         viewportStart: viewport.start,
         viewportEnd: viewport.end,
@@ -172,22 +183,32 @@ export function NodeList({
       })
     : undefined
   const visualAnchorIndex =
-    visualNodeSelection === undefined ? -1 : nodes.findIndex((node) => node.id === visualNodeSelection.anchorId)
+    visualNodeSelection === undefined
+      ? -1
+      : visibleRows.findIndex((row) => row.node.id === visualNodeSelection.anchorId)
   const visualFocusIndex =
-    visualNodeSelection === undefined ? -1 : nodes.findIndex((node) => node.id === visualNodeSelection.focusId)
+    visualNodeSelection === undefined ? -1 : visibleRows.findIndex((row) => row.node.id === visualNodeSelection.focusId)
   const visualStart = visualAnchorIndex < 0 || visualFocusIndex < 0 ? -1 : Math.min(visualAnchorIndex, visualFocusIndex)
   const visualEnd = visualStart < 0 ? -1 : Math.max(visualAnchorIndex, visualFocusIndex)
   const dropMarker = dropMarkerFor(
     freeze === undefined ? undefined : dropIndex,
-    nodes.length,
+    visibleRows.length,
     listWindow === undefined ? undefined : collectWindowIndices(listWindow),
   )
 
-  const renderRow = (node: TreeNode, index: number, pinned = false, pinnedOffset = 0): React.JSX.Element => (
+  const renderRow = (
+    node: TreeNode,
+    depth: number,
+    index: number,
+    pinned = false,
+    pinnedOffset = 0,
+  ): React.JSX.Element => (
     <NodeRow
+      depth={depth}
       dragging={freeze?.nodeId === node.id}
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
+      expanded={isExpanded(node.id)}
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}
       visualSelected={visualStart >= 0 && index >= visualStart && index <= visualEnd}
       index={index}
@@ -195,6 +216,7 @@ export function NodeList({
       node={node}
       {...(onActivate === undefined ? {} : { onActivate })}
       onEnter={onEnter}
+      {...(onToggleExpansion === undefined ? {} : { onToggleExpansion })}
       onPointerDown={onRowPointerDown}
       onPointerLeave={onRowPointerLeave}
       pinned={pinned}
@@ -216,8 +238,10 @@ export function NodeList({
       ref={listRef}
     >
       <DropZone index={0} start />
-      {listWindow === undefined ? nodes.map((node, index) => renderRow(node, index)) : renderWindowed(listWindow)}
-      <DropZone end index={nodes.length} />
+      {listWindow === undefined
+        ? visibleRows.map((row, index) => renderRow(row.node, row.depth, index))
+        : renderWindowed(listWindow)}
+      <DropZone end index={visibleRows.length} />
     </section>
   )
 
@@ -225,16 +249,16 @@ export function NodeList({
     const leadingHeight = layout.offsets[windowRange.start] ?? 0
     const trailingHeight = layout.total - (layout.offsets[windowRange.end] ?? 0)
     const pinnedIndex = windowRange.pinnedIndex
-    const pinnedNode = pinnedIndex === undefined ? undefined : nodes[pinnedIndex]
+    const pinnedRow = pinnedIndex === undefined ? undefined : visibleRows[pinnedIndex]
     const children: ReactNode[] = [
       <div aria-hidden="true" className="node-list-spacer" key="leading-spacer" style={{ height: leadingHeight }} />,
     ]
     for (let index = windowRange.start; index < windowRange.end; index += 1) {
-      const node = nodes[index]
-      if (node !== undefined) children.push(renderRow(node, index))
+      const row = visibleRows[index]
+      if (row !== undefined) children.push(renderRow(row.node, row.depth, index))
     }
-    if (pinnedIndex !== undefined && pinnedNode !== undefined) {
-      children.push(renderRow(pinnedNode, pinnedIndex, true, layout.offsets[pinnedIndex] ?? 0))
+    if (pinnedIndex !== undefined && pinnedRow !== undefined) {
+      children.push(renderRow(pinnedRow.node, pinnedRow.depth, pinnedIndex, true, layout.offsets[pinnedIndex] ?? 0))
     }
     children.push(
       <div aria-hidden="true" className="node-list-spacer" key="trailing-spacer" style={{ height: trailingHeight }} />,

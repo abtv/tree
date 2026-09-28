@@ -37,14 +37,12 @@ export function validatePersistedState(value: unknown): PersistedEditorState {
   }
   const currentParentId = value.location.currentParentId
   const selectedNodeId = value.location.selectedNodeId
-  let selectedParentId: NodeId | null | undefined
+  const parentOf = new Map<NodeId, NodeId | null>()
   let selectedFound = false
   let currentParentFound = false
   walkNodes(roots, new Set(), false, (id, parentId) => {
-    if (id === selectedNodeId) {
-      selectedFound = true
-      selectedParentId = parentId
-    }
+    parentOf.set(id, parentId)
+    if (id === selectedNodeId) selectedFound = true
     if (id === currentParentId) currentParentFound = true
   })
   if (roots.length === 0) {
@@ -53,22 +51,33 @@ export function validatePersistedState(value: unknown): PersistedEditorState {
   if ((typeof currentParentId !== 'string' && currentParentId !== null) || typeof selectedNodeId !== 'string') {
     throw new Error('The saved document location is invalid.')
   }
-  if (!isLocationReachable(selectedFound, selectedParentId, currentParentFound, currentParentId, selectedNodeId)) {
+  if (!isLocationReachable(selectedFound, currentParentFound, currentParentId, selectedNodeId, parentOf)) {
     throw new Error('The saved document location does not match its tree.')
   }
   return value as unknown as PersistedEditorState
 }
 
+/**
+ * Mirrors `isValidLocation` (`document-operations.ts`) for the pre-parse structural check: the
+ * selected node must be the current parent itself or any of its descendants, at any depth, since
+ * inline expansion can display and select a descendant below a direct child.
+ */
 function isLocationReachable(
   selectedFound: boolean,
-  selectedParentId: NodeId | null | undefined,
   currentParentFound: boolean,
   currentParentId: NodeId | null,
   selectedNodeId: NodeId,
+  parentOf: ReadonlyMap<NodeId, NodeId | null>,
 ): boolean {
   if (!selectedFound) return false
-  if (currentParentId === null) return selectedParentId === null
-  return currentParentFound && (selectedNodeId === currentParentId || selectedParentId === currentParentId)
+  if (currentParentId === null) return true
+  if (!currentParentFound) return false
+  let cursor: NodeId | null | undefined = selectedNodeId
+  while (cursor !== null && cursor !== undefined) {
+    if (cursor === currentParentId) return true
+    cursor = parentOf.get(cursor) ?? null
+  }
+  return false
 }
 
 export function parsePersistedState(value: unknown): PersistedEditorState {
