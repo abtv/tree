@@ -464,6 +464,46 @@ describe('EditorStore', () => {
     })
   })
 
+  it('creates an empty sibling before or after the selected node and focuses the new node', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'a', text: 'A', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('before', 'after'))
+    await store.initialize()
+
+    expect(store.createSibling('before')).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: { roots: [{ id: 'root', children: [{ id: 'a' }, { id: 'before', text: '' }, { id: 'b' }] }] },
+      location: { currentParentId: 'root', selectedNodeId: 'before' },
+      focus: { nodeId: 'before', cursor: 0 },
+    })
+
+    expect(store.createSibling('after')).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      document: {
+        roots: [
+          { id: 'root', children: [{ id: 'a' }, { id: 'before', text: '' }, { id: 'after', text: '' }, { id: 'b' }] },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'after' },
+      focus: { nodeId: 'after', cursor: 0 },
+    })
+  })
+
   it('returns to the current parent after deleting its only child', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
     await store.initialize()
@@ -1863,6 +1903,92 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
   })
 
+  it('moves to the first displayed or current parent boundary and clamps the cursor', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'Alpha', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+          { id: 'other', text: 'Other', children: [] },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    store.moveSelectionBoundary('first', 99)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: 'root', selectedNodeId: 'a' },
+      focus: { nodeId: 'a', cursor: 5 },
+    })
+
+    store.moveSelectionBoundary('parent', 99)
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: 'root', selectedNodeId: 'root' },
+      focus: { nodeId: 'root', cursor: 6 },
+    })
+
+    const after = store.getSnapshot()
+    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(after.document).toBe(before.document)
+  })
+
+  it('clamps a counted last boundary to the available siblings and cursor', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'Alpha', children: [] },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+          { id: 'other', text: 'Other', children: [] },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    store.moveSelectionBoundary('last', 99, 1)
+    expect(store.getSnapshot()).toMatchObject({
+      location: { currentParentId: 'root', selectedNodeId: 'a' },
+      focus: { nodeId: 'a', cursor: 5 },
+    })
+
+    store.moveSelectionBoundary('last', 99, 10)
+    expect(store.getSnapshot()).toMatchObject({
+      location: { currentParentId: 'root', selectedNodeId: 'b' },
+      focus: { nodeId: 'b', cursor: 1 },
+    })
+
+    store.moveSelectionBoundary('last', 99)
+    expect(store.getSnapshot()).toMatchObject({
+      location: { currentParentId: 'root', selectedNodeId: 'b' },
+      focus: { nodeId: 'b', cursor: 1 },
+    })
+
+    const after = store.getSnapshot()
+    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(after.document).toBe(before.document)
+  })
+
   it('moves horizontally between siblings and from child boundaries to the parent', async () => {
     const services = loadedState(
       {
@@ -2662,6 +2788,21 @@ describe('EditorStore', () => {
     expect(selected.status === 'ready' && selected.location.selectedNodeId).toBe('root')
     await expect(store.copy('root', 0, 1)).resolves.toBe(true)
     expect(writes).toHaveLength(1)
+  })
+
+  it('rejects createSibling while locked without changing document, location, or focus', async () => {
+    const clock = new FakeClock()
+    const { store } = await lockEditor(clock)
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    expect(store.createSibling('after')).toBe(false)
+
+    const after = store.getSnapshot()
+    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(after.document).toBe(before.document)
+    expect(after.location).toEqual(before.location)
+    expect(after.focus).toEqual(before.focus)
   })
 
   it('retries failed cleanup without saving the document, never locks, and recovers on cleanup success', async () => {

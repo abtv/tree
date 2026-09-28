@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Domain and Application Soundness Review](domain-application-soundness.md) | In progress | S3 — give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage |
+| [Domain and Application Soundness Review](domain-application-soundness.md) | In progress | S4 — pin `validatePersistedState` and `parsePersistedState` to one accept/reject decision |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
