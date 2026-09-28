@@ -1,4 +1,18 @@
-import { dragRow, expect, launchTree, node, nodeTexts, parent, seedDocument, startRowDrag, test } from './fixtures'
+import {
+  closeApp,
+  dragRow,
+  expect,
+  launchTree,
+  node,
+  nodeTexts,
+  parent,
+  readPersisted,
+  seedDocument,
+  setCursor,
+  startRowDrag,
+  test,
+  typeInto,
+} from './fixtures'
 
 function nestedSeed(): { document: unknown; location: unknown } {
   return {
@@ -172,6 +186,36 @@ test.describe('inline node expansion', () => {
 
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
     await expect(window.getByRole('button', { name: 'Expand node 1' })).toBeVisible()
+  })
+
+  test('starts collapsed after relaunch while the saved document persists', async ({ userDataDir }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const first = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    // Edit the selected root so the relaunched window must load the saved document: a relaunch that
+    // accidentally showed the seed instead of persisted content would fail on "Alpha edited".
+    await setCursor(node(first.window, 1), 'Alpha'.length)
+    await typeInto(node(first.window, 1), ' edited')
+
+    // Expand two levels so an incorrectly restored expansion would render extra descendant rows.
+    await first.window.getByRole('button', { name: 'Expand node 1' }).click()
+    await first.window.getByRole('button', { name: 'Expand node 2' }).click()
+    expect(await nodeTexts(first.window)).toEqual([
+      'Alpha edited',
+      'Alpha child one',
+      'Alpha grandchild',
+      'Alpha child two',
+      'Bravo',
+    ])
+
+    await closeApp(first.app)
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Alpha edited')
+
+    const second = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    // docs/PRODUCT.md §2.4: reopening the application starts collapsed.
+    expect(await nodeTexts(second.window)).toEqual(['Alpha edited', 'Bravo'])
+    await expect(second.window.getByRole('button', { name: 'Expand node 1' })).toBeVisible()
   })
 
   test('keeps gg on the first displayed root while G targets the descendant’s own last real sibling', async ({
