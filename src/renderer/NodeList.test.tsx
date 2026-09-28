@@ -449,6 +449,24 @@ describe('NodeList drag interaction', () => {
     expect(onMove).not.toHaveBeenCalled()
   })
 
+  it('cancels a pending hold when the pointer leaves the row within the move tolerance', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+
+    // The press lands 2px below the row's top edge and the pointer moves 3px up: within the 4px
+    // hold tolerance but outside the row, which cancels the pending hold (`docs/PRODUCT.md` §11).
+    pointerDownAt(rows[0]!, 2)
+    pointerMoveAt(rows[0]!, -1)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+    pointerUpAt(rows[0]!, -1)
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
   it('keeps a pending hold when a hover reset reports no pressed buttons', () => {
     vi.useFakeTimers()
     mockRowRects()
@@ -652,6 +670,40 @@ describe('NodeList drag interaction', () => {
       expect(onMove, label).not.toHaveBeenCalled()
       unmount()
     }
+  })
+
+  it('keeps an active drag through events that do not belong to the gesture', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows()
+    const rows = rowElements(container)
+    const list = container.querySelector('.node-list')!
+
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, 47)
+    expect(rows[1]).toHaveClass('node-row-drop-after')
+
+    // A release from another pointer, another pointer's lost capture, the source row's hover
+    // reset, and an ordinary key must not end the gesture; only the owning pointer and Escape do.
+    fireEvent.pointerUp(window, { pointerId: 2, clientX: 100, clientY: 47 })
+    fireEvent.lostPointerCapture(list, { pointerId: 2 })
+    fireEvent.pointerOut(rows[0]!, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 200,
+      buttons: 1,
+      relatedTarget: document.body,
+    })
+    fireEvent.keyDown(window, { key: 'x' })
+
+    expect(rows[0]).toHaveClass('node-row-dragging')
+    expect(rows[1]).toHaveClass('node-row-drop-after')
+
+    pointerUpAt(rows[0]!, 47)
+
+    expect(onMove).toHaveBeenCalledTimes(1)
+    expect(onMove).toHaveBeenCalledWith('a', 2)
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
   })
 
   it('cancels a pending hold when the rows become locked or the source row disappears', () => {
@@ -874,6 +926,34 @@ describe('NodeList windowing', () => {
     expect(marker).not.toBeNull()
     pointerUpAt(list, globalThis.innerHeight - 1)
     expect(onMove).toHaveBeenCalledWith('n0', 431)
+  })
+
+  it('never arms or keeps a pending hold when windowing unmounts the pressed row', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, dragFreeze } = renderRows({ list: buildNodes(600) })
+    const list = container.querySelector('.node-list')!
+    const pressedRow = rowElements(container)[0]!
+
+    pointerDownAt(pressedRow, 13)
+    // Scrolling far enough unmounts the pressed row while its hold is still pending. The hold
+    // timer must not arm against the missing element, and a later pointer move must cancel the
+    // pending hold instead of reading bounds from it.
+    mockRowRects(-ROW_HEIGHT_ESTIMATE * 300)
+    fireEvent.scroll(window)
+    expect(container.contains(pressedRow)).toBe(false)
+
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(dragFreeze.begin).not.toHaveBeenCalled()
+
+    pointerMoveAt(list, 13)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(dragFreeze.begin).not.toHaveBeenCalled()
   })
 })
 
