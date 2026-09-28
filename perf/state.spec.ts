@@ -19,6 +19,24 @@ interface SaveControl {
   cleanupDurations: number[]
 }
 
+async function readProcessWorkingSet(app: Awaited<ReturnType<typeof launchTree>>['app']): Promise<{
+  mainBytes: number
+  rendererBytes: number
+  totalBytes: number
+  processCount: number
+}> {
+  return app.evaluate(({ app, BrowserWindow }) => {
+    const metrics = app.getAppMetrics()
+    const rendererPid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId()
+    return {
+      mainBytes: (metrics.find((metric) => metric.pid === process.pid)?.memory.workingSetSize ?? 0) * 1024,
+      rendererBytes: (metrics.find((metric) => metric.pid === rendererPid)?.memory.workingSetSize ?? 0) * 1024,
+      totalBytes: metrics.reduce((total, metric) => total + metric.memory.workingSetSize * 1024, 0),
+      processCount: metrics.length,
+    }
+  })
+}
+
 async function installPersistenceProbes(app: Awaited<ReturnType<typeof launchTree>>['app']): Promise<void> {
   await app.evaluate(() => {
     const control = globalThis as typeof globalThis & {
@@ -56,6 +74,24 @@ async function readProbe(app: Awaited<ReturnType<typeof launchTree>>['app']): Pr
 }
 
 test.describe('state and persistence work', () => {
+  test('fresh application process footprint', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    const memory = await readProcessWorkingSet(app)
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'fresh-process-footprint',
+      metrics: {
+        mainWorkingSetBytes: memory.mainBytes,
+        rendererWorkingSetBytes: memory.rendererBytes,
+        totalWorkingSetBytes: memory.totalBytes,
+        processCount: memory.processCount,
+      },
+    })
+    expect(memory.mainBytes).toBeGreaterThan(0)
+    expect(memory.rendererBytes).toBeGreaterThan(0)
+  })
+
   test('large-10000 structural burst, save policy, and cleanup scan', async ({ userDataDir }) => {
     seedDocument(userDataDir, largeAttachmentSeed(100, 100))
     seedAttachmentFiles(
@@ -176,7 +212,7 @@ test.describe('state and persistence work', () => {
 
   test('sustained-10000 structural edits keep renderer memory bounded', async ({ userDataDir }) => {
     seedDocument(userDataDir, largeSeed(100, 100))
-    const { window } = await launchTree(userDataDir, { memoryProbe: true })
+    const { app, window } = await launchTree(userDataDir, { memoryProbe: true })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
     await expect(input).toBeFocused()
@@ -187,20 +223,46 @@ test.describe('state and persistence work', () => {
     }
     for (let index = 0; index < 50; index += 1) await structuralCycle()
     const warmHeapBytes = await collectRendererHeap(window)
+    const warmProcess = await readProcessWorkingSet(app)
 
     const cycles = 250
     for (let index = 0; index < cycles; index += 1) await structuralCycle()
+    const middleHeapBytes = await collectRendererHeap(window)
+    const middleProcess = await readProcessWorkingSet(app)
+    for (let index = 0; index < cycles; index += 1) await structuralCycle()
     const finalHeapBytes = await collectRendererHeap(window)
+    const finalProcess = await readProcessWorkingSet(app)
     const growthBytes = finalHeapBytes - warmHeapBytes
+    const lateRendererWorkingSetGrowthBytes = finalProcess.rendererBytes - middleProcess.rendererBytes
 
     recordPerfResult({
       kind: 'state',
       scenario: 'sustained-memory',
-      metrics: { warmHeapBytes, finalHeapBytes, growthBytes, cycles },
+      metrics: {
+        warmHeapBytes,
+        finalHeapBytes,
+        growthBytes,
+        cycles: cycles * 2,
+        warmMainWorkingSetBytes: warmProcess.mainBytes,
+        middleMainWorkingSetBytes: middleProcess.mainBytes,
+        finalMainWorkingSetBytes: finalProcess.mainBytes,
+        warmRendererWorkingSetBytes: warmProcess.rendererBytes,
+        middleRendererWorkingSetBytes: middleProcess.rendererBytes,
+        finalRendererWorkingSetBytes: finalProcess.rendererBytes,
+        lateRendererWorkingSetGrowthBytes,
+        warmTotalWorkingSetBytes: warmProcess.totalBytes,
+        middleTotalWorkingSetBytes: middleProcess.totalBytes,
+        finalTotalWorkingSetBytes: finalProcess.totalBytes,
+        middleHeapBytes,
+        warmProcessCount: warmProcess.processCount,
+        finalProcessCount: finalProcess.processCount,
+      },
     })
 
     expect(warmHeapBytes).toBeGreaterThan(0)
+    expect(warmProcess.rendererBytes).toBeGreaterThan(0)
     expect(growthBytes).toBeLessThan(5_000_000)
+    expect(lateRendererWorkingSetGrowthBytes).toBeLessThan(30_000_000)
   })
 
   test('image insertion decode latency for small and larger images', async ({ userDataDir }) => {

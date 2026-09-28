@@ -1,7 +1,265 @@
 import { expect, largeSeed, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
 import { recordPerfResult } from './results'
+import { startRowDrag } from '../e2e/fixtures'
 
 test.describe('Vim interactions at scale', () => {
+  test('character Visual selection responds through repeated motions', async ({ userDataDir }) => {
+    const children = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `c${index}`,
+      text: index === 500 ? 'abcdefghijklmnopqrstuvwxyz'.repeat(4) : `Child ${index}`,
+      children: [],
+    }))
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Root', children }] },
+      location: { currentParentId: 'root', selectedNodeId: 'c500' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 501', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { visualPaints: number[] }).visualPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (!['v', 'l', 'h', 'Escape'].includes(event.key)) return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    await window.keyboard.press('v')
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press('l')
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press('h')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    await window.keyboard.press('Escape')
+    await window.waitForFunction(() => (window as unknown as { visualPaints: number[] }).visualPaints.length === 42)
+    const samples = await window.evaluate(() =>
+      (window as unknown as { visualPaints: number[] }).visualPaints.slice().sort((a, b) => a - b),
+    )
+    await expect(input).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
+    const paintMaxMs = samples[samples.length - 1]!
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-character-visual-wide-1000',
+      samples: samples.length,
+      metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
+    })
+    expect(paintP95Ms).toBeLessThan(100)
+    expect(paintMaxMs).toBeLessThan(250)
+  })
+
+  test('whole-node Visual selection responds through repeated motions', async ({ userDataDir }) => {
+    const seed = wideSeed(1_000)
+    seed.location = { currentParentId: 'root', selectedNodeId: 'c500' }
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 501', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { nodeVisualPaints: number[] }).nodeVisualPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (!['V', 'j', 'k', 'Escape'].includes(event.key)) return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    await window.keyboard.press('V')
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press('j')
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press('k')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await window.keyboard.press('Escape')
+    await window.waitForFunction(
+      () => (window as unknown as { nodeVisualPaints: number[] }).nodeVisualPaints.length === 42,
+    )
+    const samples = await window.evaluate(() =>
+      (window as unknown as { nodeVisualPaints: number[] }).nodeVisualPaints.slice().sort((a, b) => a - b),
+    )
+    await expect(input).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
+    const paintMaxMs = samples[samples.length - 1]!
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-node-visual-wide-1000',
+      samples: samples.length,
+      metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
+    })
+    expect(paintP95Ms).toBeLessThan(100)
+    expect(paintMaxMs).toBeLessThan(250)
+  })
+
+  for (const siblingCount of [1_000, 10_000]) {
+    test(`standalone dd responds in a ${siblingCount}-sibling level`, async ({ userDataDir }) => {
+      const middle = Math.floor(siblingCount / 2)
+      const seed = wideSeed(siblingCount)
+      seed.location = { currentParentId: 'root', selectedNodeId: `c${middle}` }
+      seedDocument(userDataDir, seed)
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const input = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
+      await input.focus()
+      await expect(input).toBeFocused()
+      await window.evaluate(() => {
+        const samples: number[] = []
+        ;(window as unknown as { ddPaints: number[] }).ddPaints = samples
+        document.addEventListener(
+          'keydown',
+          (event) => {
+            if (event.key !== 'd') return
+            requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+          },
+          { capture: true },
+        )
+      })
+
+      await window.keyboard.press('d')
+      await window.keyboard.press('d')
+      await window.waitForFunction(() => (window as unknown as { ddPaints: number[] }).ddPaints.length === 2)
+      const deletePaintMs = await window.evaluate(() => (window as unknown as { ddPaints: number[] }).ddPaints[1]!)
+      await expect(window.locator(`.node-row[data-node-id="c${middle}"]`)).toHaveCount(0)
+      await expect(window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })).toBeFocused()
+      recordPerfResult({
+        kind: 'state',
+        scenario: `vim-dd-wide-${siblingCount}`,
+        metrics: { deletePaintMs: round(deletePaintMs) },
+      })
+      expect(deletePaintMs).toBeLessThan(250)
+    })
+  }
+
+  test('wide sibling movement responds after a completed drag', async ({ userDataDir }) => {
+    seedDocument(userDataDir, wideSeed(1_000))
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const source = window.locator('.node-row[data-node-id="c0"]')
+    const target = window.locator('.node-row[data-node-id="c1"]')
+    await startRowDrag(window, source.getByRole('textbox'))
+    const targetBox = await target.boundingBox()
+    if (targetBox === null) throw new Error('The movement target was not rendered.')
+    await window.mouse.move(targetBox.x + 8, targetBox.y + targetBox.height - 4, { steps: 5 })
+    await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
+    await window.evaluate(() => {
+      document.addEventListener(
+        'pointerup',
+        (event) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              ;(window as unknown as { movePaintMs: number }).movePaintMs = performance.now() - event.timeStamp
+            })
+          })
+        },
+        { capture: true, once: true },
+      )
+    })
+    await window.mouse.up()
+    await window.waitForFunction(() => (window as unknown as { movePaintMs?: number }).movePaintMs !== undefined)
+    const movePaintMs = await window.evaluate(() => (window as unknown as { movePaintMs: number }).movePaintMs)
+    await expect(window.locator('.node-row[data-node-id="c0"]')).toHaveAttribute('data-node-index', '1')
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'sibling-move-wide-1000',
+      metrics: { movePaintMs: round(movePaintMs) },
+    })
+    expect(movePaintMs).toBeLessThan(250)
+  })
+
+  test('common editing remains usable with four-times renderer CPU throttling', async ({ userDataDir }) => {
+    const children = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `c${index}`,
+      text: index === 500 ? 'abcdefghijklmnopqrstuvwxyz'.repeat(4) : `Child ${index}`,
+      children: [],
+    }))
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Root', children }] },
+      location: { currentParentId: 'root', selectedNodeId: 'c500' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 501', exact: true })
+    await input.focus()
+    const session = await window.context().newCDPSession(window)
+    await session.send('Emulation.setCPUThrottlingRate', { rate: 4 })
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { throttledPaints: number[] }).throttledPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    for (let index = 0; index < 20; index += 1) {
+      await window.keyboard.press('l')
+      await window.keyboard.press('h')
+    }
+    await window.waitForFunction(
+      () => (window as unknown as { throttledPaints: number[] }).throttledPaints.length === 40,
+    )
+    await window.keyboard.press('v')
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press('l')
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press('h')
+    await window.keyboard.press('Escape')
+    await window.waitForFunction(
+      () => (window as unknown as { throttledPaints: number[] }).throttledPaints.length === 82,
+    )
+    await window.keyboard.press('i')
+    await window.keyboard.type('abcdefghijklmnopqrstuvwxyz')
+    await window.waitForFunction(
+      () => (window as unknown as { throttledPaints: number[] }).throttledPaints.length === 109,
+    )
+    const samples = await window.evaluate(() => (window as unknown as { throttledPaints: number[] }).throttledPaints)
+    for (const [scenario, phase] of [
+      ['normal', samples.slice(0, 40)],
+      ['visual', samples.slice(40, 82)],
+      ['insert', samples.slice(82)],
+    ] as const) {
+      const sorted = phase.slice().sort((a, b) => a - b)
+      const paintP95Ms = sorted[Math.floor(sorted.length * 0.95)]!
+      const paintMaxMs = sorted[sorted.length - 1]!
+      recordPerfResult({
+        kind: 'state',
+        scenario: `vim-throttled-${scenario}-1000`,
+        samples: sorted.length,
+        metrics: {
+          paintP95Ms: round(paintP95Ms),
+          paintMaxMs: round(paintMaxMs),
+        },
+      })
+      expect(paintP95Ms).toBeLessThan(100)
+      expect(paintMaxMs).toBeLessThan(250)
+    }
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await expect(input).toBeFocused()
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+    await window.waitForFunction(
+      () => (window as unknown as { throttledPaints: number[] }).throttledPaints.length === 112,
+    )
+    const deletePaintMs = await window.evaluate(
+      () => (window as unknown as { throttledPaints: number[] }).throttledPaints[111]!,
+    )
+    await expect(window.locator('.node-row[data-node-id="c500"]')).toHaveCount(0)
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-throttled-dd-wide-1000',
+      metrics: { deletePaintMs: round(deletePaintMs) },
+    })
+    expect(deletePaintMs).toBeLessThan(250)
+    await session.detach()
+  })
+
   test('ordinary Vim editing keeps repeated key-to-paint latency low', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(100))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
