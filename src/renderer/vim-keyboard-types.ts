@@ -86,41 +86,41 @@ export interface VimKeyboardState {
   mode: VimMode
   register: { current: VimRegister }
   pending: { current: VimPendingCommand | undefined }
-  lastChange?: { current: VimRepeatChange | undefined }
+  lastChange: { current: VimRepeatChange | undefined }
   lastFind: { current: VimFindCommand | undefined }
-  beginInsert?: (nodeId: string, baseline: string, position: number, change: VimTextChange) => void
-  finishInsert?: (input: HTMLElement) => void
-  beginReplace?: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
-  handleReplaceKey?: (input: HTMLElement, key: string) => boolean
+  beginInsert: (nodeId: string, baseline: string, position: number, change: VimTextChange) => void
+  finishInsert: (input: HTMLElement) => void
+  beginReplace: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
+  handleReplaceKey: (input: HTMLElement, key: string) => boolean
   /**
    * Commit and consume a pending Replace session. `retreatCursor` mirrors the Escape/undo retreat;
    * `preserveDomSelection` commits only to the store and leaves the DOM text, selection, and caret
    * untouched, because a text-editing command that interrupts the session (paste/cut) must act on
    * what the user still sees selected.
    */
-  finishReplace?: (input: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
+  finishReplace: (input: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
   visualAnchor: { current: number | undefined }
   visualFocus: { current: number | undefined }
-  imageTextCursor?: { current: number | undefined }
-  getCaretState?: (nodeId: string, cursor: number, imageActive: boolean) => VimCaretState
-  applyCaretState?: (nodeId: string, state: VimCaretState, fromFocus?: boolean) => void
+  imageTextCursor: { current: number | undefined }
+  getCaretState: (nodeId: string, cursor: number, imageActive: boolean) => VimCaretState
+  applyCaretState: (nodeId: string, state: VimCaretState, fromFocus?: boolean) => void
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   syncImageCaretToFocus: () => void
   setMode: (mode: VimMode) => void
-  openAttachment?: (attachmentId: string) => void
-  setImageCaret?: (nodeId: string, active: boolean, fromFocus?: boolean) => void
+  openAttachment: (attachmentId: string) => void
+  setImageCaret: (nodeId: string, active: boolean, fromFocus?: boolean) => void
   scheduleCaret: (input: HTMLElement, cursor: number) => void
-  nodeVisual?: {
+  nodeVisual: {
     enter: (nodeId: string) => boolean
     move: (direction: 'up' | 'down' | 'first' | 'last') => void
     swap: () => void
     exit: () => void
     command: (command: NodeVisualCommand) => void
   }
-  beginStructuralOpen?: (position: 'before' | 'after') => void
-  beginStructuralChildOpen?: () => void
-  repeatStructural?: (change: VimStructuralChange) => void
+  beginStructuralOpen: (position: 'before' | 'after') => void
+  beginStructuralChildOpen: () => void
+  repeatStructural: (change: VimStructuralChange) => void
 }
 
 export type VimViewportMotion = 'top' | 'middle' | 'bottom' | 'half-up' | 'half-down'

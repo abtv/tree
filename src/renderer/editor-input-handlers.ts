@@ -37,7 +37,7 @@ function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): v
   if (vim === undefined) return
   clearCommandAssemblySlots(vim)
   if (vim.mode !== 'visual-node') return
-  vim.nodeVisual?.exit()
+  vim.nodeVisual.exit()
   vim.setMode('normal')
 }
 
@@ -107,10 +107,10 @@ export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefi
  * because its range belongs to the displayed level being left.
  */
 function finishVimSessionBeforeNavigation(vim: VimKeyboardState | undefined, input: HTMLElement): void {
-  vim?.finishInsert?.(input)
+  vim?.finishInsert(input)
   clearCommandAssemblyBeforeCommand(vim)
   if (vim?.mode !== 'replace') return
-  vim.finishReplace?.(input, false)
+  vim.finishReplace(input, false)
   vim.setMode('normal')
 }
 
@@ -167,11 +167,11 @@ export function createEditorKeyDownHandler({
     if (vim !== undefined && vim.mode === 'replace' && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault()
       if (event.key === 'Escape') {
-        const changed = vim.finishReplace?.(event.currentTarget, true) ?? false
+        const changed = vim.finishReplace(event.currentTarget, true)
         vim.setMode('normal')
         setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - (changed ? 1 : 0)))
         store.endTextSession()
-      } else vim.handleReplaceKey?.(event.currentTarget, event.key)
+      } else vim.handleReplaceKey(event.currentTarget, event.key)
       return
     }
     if (
@@ -241,19 +241,13 @@ export function createEditorKeyDownHandler({
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
-        vim.finishInsert?.(event.currentTarget)
+        vim.finishInsert(event.currentTarget)
         vim.pending.current = undefined
         vim.visualAnchor.current = undefined
         vim.visualFocus.current = undefined
         vim.setMode('normal')
         const input = event.currentTarget
-        const prior = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
-          cursor,
-          imageActive:
-            input.classList.contains('node-input-image-caret') ||
-            (node.attachment !== undefined && cursor === node.text.length),
-          imageTextReturnCursor: vim.imageTextCursor?.current,
-        }
+        const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
         const next = editCaretTransition(
           prior,
           Math.max(0, cursor - 1),
@@ -261,11 +255,7 @@ export function createEditorKeyDownHandler({
           node.attachment !== undefined,
         )
         setNormalCaret(input, next.cursor)
-        if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
-        else {
-          if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
-          vim.setImageCaret?.(node.id, next.imageActive)
-        }
+        vim.applyCaretState(node.id, next)
         store.endTextSession()
         return
       }
@@ -327,11 +317,11 @@ export function createEditorKeyDownHandler({
     } else if (event.metaKey && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       if (vim?.mode === 'replace') {
-        const changed = vim.finishReplace?.(event.currentTarget, true) ?? false
+        const changed = vim.finishReplace(event.currentTarget, true)
         vim.setMode('normal')
         if (changed) setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - 1))
       } else if (vim?.mode === 'insert') {
-        vim.finishInsert?.(event.currentTarget)
+        vim.finishInsert(event.currentTarget)
       }
       clearCommandAssemblyBeforeCommand(vim)
       if (event.shiftKey) store.redo()

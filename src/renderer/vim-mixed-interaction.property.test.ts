@@ -2,13 +2,14 @@
 
 import type { KeyboardEvent } from 'react'
 import fc from 'fast-check'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { EditorStore, type EditorServices } from '../application/editor-store'
 import { requireNode, type Document, type TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { setNormalCaret } from './editor-dom'
 import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 import type { VimKeyboardState } from './vim-keyboard-types'
+import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 
 type Event =
   | { kind: 'motion'; key: 'h' | 'l' | 'j' | 'k' | '0' | '$'; count: number }
@@ -230,21 +231,15 @@ async function assertSequence(
   }
   store.subscribe(syncFocus)
   const vim: VimKeyboardState = {
+    ...createVimKeyboardDouble('node').vim,
     mode,
-    register: { current: { kind: 'empty' } },
-    lastFind: { current: undefined },
-    pending: { current: undefined },
-    visualAnchor: { current: undefined },
-    visualFocus: { current: undefined },
     imageTextCursor: { current: undefined },
     getCaretState: () => caret,
     applyCaretState: (_nodeId, next) => {
       caret = next
-      vim.imageTextCursor!.current = next.imageTextReturnCursor
+      vim.imageTextCursor.current = next.imageTextReturnCursor
       paint()
     },
-    moveBoundary: vi.fn(),
-    moveViewport: vi.fn(),
     syncImageCaretToFocus: syncFocus,
     setMode: (next) => {
       mode = next
@@ -296,7 +291,7 @@ async function assertSequence(
         const index = event.index % specs.length
         store.selectNode(nodes[index]!.id, Math.min(event.position, maximum(specs[index]!, expected.texts[index]!)))
         caret = pointerCaretTransition(caret, event.position, expected.texts[index]!.length, specs[index]!.image)
-        vim.imageTextCursor!.current = caret.imageTextReturnCursor
+        vim.imageTextCursor.current = caret.imageTextReturnCursor
         paint()
         vim.pending.current = undefined
       } else if (event.kind === 'history') {

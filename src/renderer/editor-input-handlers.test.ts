@@ -6,6 +6,8 @@ import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
 import type { VimKeyboardState, VimPendingCommand, VimTextCommandState } from './editor-input-handlers'
+import { createVimKeyboardDouble } from './test/vim-keyboard-double'
+import type { VimCaretState } from './vim-caret-transition'
 
 function createStore(): EditorStore {
   return {
@@ -70,29 +72,13 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
 
 function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['mode'] = 'normal') {
   const onPreviewAttachment = vi.fn()
-  const vim: VimKeyboardState = {
-    mode,
-    register: { current: { kind: 'empty' } },
-    lastFind: { current: undefined },
-    pending: { current: undefined },
-    lastChange: { current: undefined },
-    beginInsert: vi.fn(),
-    finishInsert: vi.fn(),
-    visualAnchor: { current: undefined },
-    visualFocus: { current: undefined },
-    imageTextCursor: { current: undefined },
-    moveBoundary: vi.fn(),
-    moveViewport: vi.fn(),
-    syncImageCaretToFocus: vi.fn(),
-    setMode: vi.fn((next) => {
-      vim.mode = next
-    }),
-    openAttachment: onPreviewAttachment,
-    setImageCaret: vi.fn(),
-    scheduleCaret: vi.fn(),
-  }
+  const double = createVimKeyboardDouble(node.id, { mode, onPreviewAttachment })
+  const { vim } = double
   return {
     vim,
+    caret: double.caret,
+    caretNodeId: double.caretNodeId,
+    commandState: double.commandState,
     handle: createEditorKeyDownHandler({
       store,
       node,
@@ -103,6 +89,21 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     }),
     onPreviewAttachment,
   }
+}
+
+/**
+ * The image caret is owned by the caret authority, so assert the authority's resulting state rather
+ * than the `setImageCaret` call that the pre-owner wiring used to emit. `fromFocus` is still a call
+ * detail, so tests that care about it assert on `applyCaretState` directly.
+ */
+function expectImageCaret(
+  caretNodeId: () => string | undefined,
+  caret: () => VimCaretState,
+  nodeId: string,
+  active: boolean,
+): void {
+  expect(caretNodeId()).toBe(nodeId)
+  expect(caret().imageActive).toBe(active)
 }
 
 describe('editor keyboard handler', () => {
@@ -207,7 +208,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'ab'
     input.setSelectionRange(1, 1)
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: 'ab',
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -218,7 +219,7 @@ describe('editor keyboard handler', () => {
 
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 1, 2, '')
     expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 1)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expectImageCaret(caretNodeId, caret, 'node', true)
   })
 
   it('keeps the sole image as the caret after deleting its only text character', () => {
@@ -226,7 +227,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'a'
     input.setSelectionRange(0, 0)
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: 'a',
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -236,7 +237,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'x'))
 
     expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 0)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expectImageCaret(caretNodeId, caret, 'node', true)
   })
 
   it('keeps a text-only deletion on the preceding character', () => {
@@ -244,12 +245,12 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'ab'
     input.setSelectionRange(1, 1)
-    const { handle, vim } = vimHandler(store, { id: 'node', text: 'ab', children: [] })
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, { id: 'node', text: 'ab', children: [] })
 
     handle(keyEvent(input, 'x'))
 
     expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 0)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(caretNodeId, caret, 'node', false)
   })
 
   it('activates the terminal image after a Visual deletion of final text', () => {
@@ -257,7 +258,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'ab'
     input.setSelectionRange(1, 2)
-    const { handle, vim } = vimHandler(
+    const { handle, vim, caret, caretNodeId } = vimHandler(
       store,
       { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
       'visual',
@@ -267,7 +268,7 @@ describe('editor keyboard handler', () => {
 
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 1, 2, '')
     expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 1)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expectImageCaret(caretNodeId, caret, 'node', true)
   })
 
   it('clears the image caret when putting plain text from an attached image', () => {
@@ -276,7 +277,7 @@ describe('editor keyboard handler', () => {
     input.value = 'ab'
     input.setSelectionRange(2, 2)
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: 'ab',
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -288,7 +289,7 @@ describe('editor keyboard handler', () => {
 
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, 'Z')
     expect(vim.scheduleCaret).toHaveBeenCalledWith(input, 2)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(caretNodeId, caret, 'node', false)
   })
 
   it('preserves the saved return position when a no-op edit is pressed while already on the image', () => {
@@ -297,19 +298,22 @@ describe('editor keyboard handler', () => {
     input.value = 'abcd'
     input.setSelectionRange(4, 4)
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: 'abcd',
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
-    vim.imageTextCursor!.current = 1
+    // Seed through the caret authority, as production does. Writing `imageTextCursor` alone is not
+    // enough once the authority owns the node: an authority that has never seen this node reports
+    // no saved return position regardless of what the DOM class says.
+    vim.applyCaretState('node', { cursor: 4, imageActive: true, imageTextReturnCursor: 1 })
 
     handle(keyEvent(input, 'x'))
 
     expect(store.replaceTextRange).not.toHaveBeenCalled()
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
-    expect(vim.imageTextCursor?.current).toBe(1)
+    expectImageCaret(caretNodeId, caret, 'node', true)
+    expect(vim.imageTextCursor.current).toBe(1)
   })
 
   it('applies a navigation count before the next command', () => {
@@ -347,12 +351,15 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Child'
     input.setSelectionRange(4, 5)
-    const { handle, vim } = vimHandler(store, { id: 'child', text: input.value, children: [] })
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, { id: 'child', text: input.value, children: [] })
 
     handle(keyEvent(input, 'k'))
 
     expect(store.moveSelection).toHaveBeenCalledWith('up', 4)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true, true)
+    expectImageCaret(caretNodeId, caret, 'parent', true)
+    // The cross-node write is a focus-driven one, which the projection uses to consume the store's
+    // focus token; assert that flag on the authority call, since it is not part of the caret value.
+    expect(vim.applyCaretState).toHaveBeenLastCalledWith('parent', expect.objectContaining({ imageActive: true }), true)
   })
 
   it('moves from an active parent image to its text with k', () => {
@@ -361,7 +368,7 @@ describe('editor keyboard handler', () => {
     input.value = 'Parent'
     input.setSelectionRange(4, 5)
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -372,7 +379,7 @@ describe('editor keyboard handler', () => {
 
     expect(input.selectionStart).toBe(5)
     expect(input.selectionEnd).toBe(6)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
+    expectImageCaret(caretNodeId, caret, 'parent', false)
   })
 
   it('restores the text position after moving from text to an image and back', () => {
@@ -381,19 +388,19 @@ describe('editor keyboard handler', () => {
     input.value = 'Parent'
     input.setSelectionRange(2, 3)
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
-    vim.imageTextCursor!.current = 2
+    vim.applyCaretState('parent', { cursor: 6, imageActive: true, imageTextReturnCursor: 2 })
 
     handle(keyEvent(input, 'k'))
 
     expect(input.selectionStart).toBe(2)
     expect(input.selectionEnd).toBe(3)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false)
+    expectImageCaret(caretNodeId, caret, 'parent', false)
   })
 
   it('applies the remaining h count after restoring the text position from an image', () => {
@@ -408,7 +415,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
-    vim.imageTextCursor!.current = 1
+    vim.applyCaretState('node', { cursor: 4, imageActive: true, imageTextReturnCursor: 1 })
 
     handle(keyEvent(input, '2'))
     handle(keyEvent(input, 'h'))
@@ -430,22 +437,21 @@ describe('editor keyboard handler', () => {
     row.dataset.hasAttachment = 'true'
     row.append(input)
     document.body.append(row)
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
-    vim.setImageCaret = vi.fn((_nodeId, active) => input.classList.toggle('node-input-image-caret', active))
 
     handle(keyEvent(input, 'j'))
-    expect(input.classList.contains('node-input-image-caret')).toBe(true)
-    expect(vim.imageTextCursor?.current).toBe(1)
+    expectImageCaret(caretNodeId, caret, 'node', true)
+    expect(vim.imageTextCursor.current).toBe(1)
 
     handle(keyEvent(input, motion))
     expect(input.selectionStart).toBe(destination)
-    expect(input.classList.contains('node-input-image-caret')).toBe(false)
-    expect(vim.imageTextCursor?.current).toBeUndefined()
+    expectImageCaret(caretNodeId, caret, 'node', false)
+    expect(vim.imageTextCursor.current).toBeUndefined()
 
     handle(keyEvent(input, 'h'))
     expect(input.selectionStart).toBe(afterH)
@@ -462,13 +468,12 @@ describe('editor keyboard handler', () => {
     row.dataset.hasAttachment = 'true'
     row.append(input)
     document.body.append(row)
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
-    vim.setImageCaret = vi.fn((_nodeId, active) => input.classList.toggle('node-input-image-caret', active))
 
     handle(keyEvent(input, 'j'))
     handle(keyEvent(input, 'v'))
@@ -477,8 +482,8 @@ describe('editor keyboard handler', () => {
 
     expect(vim.mode).toBe('normal')
     expect(input.selectionStart).toBe(0)
-    expect(input.classList.contains('node-input-image-caret')).toBe(false)
-    expect(vim.imageTextCursor?.current).toBeUndefined()
+    expectImageCaret(caretNodeId, caret, 'node', false)
+    expect(vim.imageTextCursor.current).toBeUndefined()
     row.remove()
   })
 
@@ -495,19 +500,19 @@ describe('editor keyboard handler', () => {
     input.value = 'Last'
     input.setSelectionRange(4, 4)
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
-    vim.imageTextCursor!.current = 1
+    vim.applyCaretState('node', { cursor: 4, imageActive: true, imageTextReturnCursor: 1 })
 
     handle(keyEvent(input, 'j'))
 
     expect(store.moveSelection).not.toHaveBeenCalled()
-    expect(vim.imageTextCursor!.current).toBe(1)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expect(vim.imageTextCursor.current).toBe(1)
+    expectImageCaret(caretNodeId, caret, 'node', true)
   })
 
   it('keeps an image caret on a current-parent heading with no child', () => {
@@ -523,7 +528,7 @@ describe('editor keyboard handler', () => {
     input.value = 'Parent'
     input.setSelectionRange(6, 6)
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -533,7 +538,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'j'))
 
     expect(store.moveSelection).not.toHaveBeenCalled()
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', true)
+    expectImageCaret(caretNodeId, caret, 'parent', true)
   })
 
   it('keeps image-only horizontal motions on its sole image character', () => {
@@ -541,7 +546,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = ''
     input.classList.add('node-input-image-caret')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, caret, caretNodeId } = vimHandler(store, {
       id: 'image-only',
       text: '',
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -551,7 +556,7 @@ describe('editor keyboard handler', () => {
     for (const key of ['h', 'l', '2', 'h', '2', 'l']) {
       handle(keyEvent(input, key))
       expect(input.selectionStart).toBe(0)
-      expect(vim.setImageCaret).toHaveBeenLastCalledWith('image-only', true)
+      expectImageCaret(caretNodeId, caret, 'image-only', true)
     }
   })
 
@@ -574,7 +579,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Parent'
     input.setSelectionRange(5, 6)
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -583,7 +588,12 @@ describe('editor keyboard handler', () => {
 
     handle(keyEvent(input, 'k'))
 
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('parent', false, true)
+    expectImageCaret(caretNodeId, caret, 'parent', false)
+    // A clamped `k` produces no new focus intent, so it must not be reported as a focus-driven
+    // write: `docs/VIM_CONFORMANCE.md` requires a no-op to preserve the local caret rather than
+    // consume the store's focus token. The removed fallback passed `fromFocus` here and the shipped
+    // path never did; the shipped path is the one that matches the contract.
+    expect(vim.applyCaretState).toHaveBeenLastCalledWith('parent', expect.objectContaining({ imageActive: false }))
   })
 
   it('opens a new child with Normal-mode o and enters Insert mode', () => {
@@ -1922,7 +1932,7 @@ describe('editor keyboard handler', () => {
     expect(lowerStore.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 4, 'bcd')
     expect(lower.vim.mode).toBe('normal')
     expect(lower.vim.scheduleCaret).toHaveBeenLastCalledWith(lowerInput, 1)
-    expect(lower.vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(lower.caretNodeId, lower.caret, 'node', false)
 
     const upperStore = createStore()
     const upperInput = document.createElement('textarea')
@@ -1952,7 +1962,7 @@ describe('editor keyboard handler', () => {
     image.handle(keyEvent(imageInput, 'u'))
 
     expect(image.vim.scheduleCaret).toHaveBeenLastCalledWith(imageInput, 0)
-    expect(image.vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(image.caretNodeId, image.caret, 'node', false)
   })
 
   it('does not dispatch commands while native text composition is active', () => {
@@ -2206,7 +2216,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' as const },
       children: [],
     }
-    const { handle, onPreviewAttachment, vim } = vimHandler(store, node)
+    const { handle, onPreviewAttachment, caret, caretNodeId } = vimHandler(store, node)
 
     handle(keyEvent(input, '3'))
     handle(keyEvent(input, 'l'))
@@ -2214,7 +2224,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'l'))
     expect(input.selectionStart).toBe(6)
     expect(input.selectionEnd).toBe(6)
-    expect(vim.setImageCaret).toHaveBeenCalledWith('node', true)
+    expectImageCaret(caretNodeId, caret, 'node', true)
 
     const enter = keyEvent(input, 'Enter')
     handle(enter)
@@ -2226,7 +2236,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'h'))
     expect(input.selectionStart).toBe(5)
     expect(input.selectionEnd).toBe(6)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(caretNodeId, caret, 'node', false)
     row.remove()
   })
 
@@ -2246,7 +2256,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' as const },
       children: [],
     }
-    const { handle, vim } = vimHandler(store, node)
+    const { handle, caret, caretNodeId } = vimHandler(store, node)
 
     handle(keyEvent(input, 'j'))
     input.classList.add('node-input-image-caret')
@@ -2254,7 +2264,7 @@ describe('editor keyboard handler', () => {
 
     expect(input.selectionStart).toBe(1)
     expect(input.selectionEnd).toBe(2)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(caretNodeId, caret, 'node', false)
     row.remove()
   })
 
@@ -2274,18 +2284,18 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' as const },
       children: [],
     }
-    const { handle, vim } = vimHandler(store, node)
+    const { handle, caret, caretNodeId } = vimHandler(store, node)
 
     handle(keyEvent(input, 'j'))
     expect(input.selectionStart).toBe(4)
     expect(store.moveSelection).not.toHaveBeenCalled()
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expectImageCaret(caretNodeId, caret, 'node', true)
 
     handle(keyEvent(input, 'k'))
     expect(input.selectionStart).toBe(1)
     expect(input.selectionEnd).toBe(2)
     expect(store.moveSelection).not.toHaveBeenCalled()
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(caretNodeId, caret, 'node', false)
     row.remove()
   })
 
@@ -2294,7 +2304,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     input.setSelectionRange(4, 4)
-    const { handle, vim } = vimHandler(store, {
+    const { handle } = vimHandler(store, {
       id: 'node',
       text: 'text',
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -2314,7 +2324,10 @@ describe('editor keyboard handler', () => {
     const imageOnlyHandler = vimHandler(store, imageOnly)
     imageOnlyHandler.handle(keyEvent(imageOnlyInput, 'k'))
     expect(store.moveSelection).toHaveBeenLastCalledWith('up', 0)
-    expect(vim.setImageCaret).toHaveBeenCalled()
+    // The cross-node caret lands from the destination node's focus intent, which this store double
+    // does not supply (it returns no document), so there is no local caret write to assert here.
+    // The destination-caret behavior is covered by `e2e/vim-image-caret.spec.ts`.
+    expect(imageOnlyHandler.caretNodeId()).toBeUndefined()
   })
 
   it('restores a valid text character after an oversized counted l enters an image', () => {
@@ -2327,7 +2340,7 @@ describe('editor keyboard handler', () => {
     row.dataset.hasAttachment = 'true'
     row.append(input)
     document.body.append(row)
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: input.value,
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -2337,19 +2350,19 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, '9'))
     handle(keyEvent(input, 'l'))
     expect(input.selectionStart).toBe(4)
-    expect(vim.imageTextCursor?.current).toBe(3)
+    expect(vim.imageTextCursor.current).toBe(3)
     input.classList.add('node-input-image-caret')
     handle(keyEvent(input, 'h'))
     expect(input.selectionStart).toBe(3)
     expect(input.selectionEnd).toBe(4)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+    expectImageCaret(caretNodeId, caret, 'node', false)
     row.remove()
   })
 
   it('does not save a text return position for an image-only node before its caret class settles', () => {
     const store = createStore()
     const input = document.createElement('textarea')
-    const { handle, vim } = vimHandler(store, {
+    const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
       text: '',
       attachment: { id: 'image', mimeType: 'image/png' },
@@ -2357,9 +2370,9 @@ describe('editor keyboard handler', () => {
     })
 
     handle(keyEvent(input, 'l'))
-    expect(vim.imageTextCursor?.current).toBeUndefined()
+    expect(vim.imageTextCursor.current).toBeUndefined()
     expect(input.selectionStart).toBe(0)
-    expect(vim.setImageCaret).toHaveBeenLastCalledWith('node', true)
+    expectImageCaret(caretNodeId, caret, 'node', true)
   })
 
   it('starts the next node at its text caret when j leaves an active image', () => {

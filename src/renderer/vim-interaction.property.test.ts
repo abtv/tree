@@ -9,6 +9,8 @@ import type { Document, TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { setNormalCaret } from './editor-dom'
 import type { VimKeyboardState } from './vim-keyboard-types'
+import { createVimKeyboardDouble } from './test/vim-keyboard-double'
+import type { VimCaretState } from './vim-caret-transition'
 
 type Motion = 'h' | 'j' | 'k' | 'l' | '0' | '$'
 
@@ -48,8 +50,6 @@ function assertImageMotionSequence(
   row.className = 'node-row'
   row.dataset.hasAttachment = String(hasAttachment)
   row.append(input)
-  let imageCaret = hasAttachment && initialCursor === textLength
-  const imageTextCursor: { current: number | undefined } = { current: undefined }
   const store = {
     getSnapshot: () => ({
       status: 'ready',
@@ -58,24 +58,16 @@ function assertImageMotionSequence(
     }),
     moveSelection: vi.fn(),
   } as unknown as EditorStore
-  const vim: VimKeyboardState = {
-    mode: 'normal',
-    register: { current: { kind: 'empty' } },
-    lastFind: { current: undefined },
-    pending: { current: undefined },
-    visualAnchor: { current: undefined },
-    visualFocus: { current: undefined },
-    imageTextCursor,
-    moveBoundary: vi.fn(),
-    moveViewport: vi.fn(),
-    syncImageCaretToFocus: vi.fn(),
-    setMode: vi.fn(),
-    setImageCaret: vi.fn((_nodeId, active) => {
-      imageCaret = active
-      input.classList.toggle('node-input-image-caret', active)
-    }),
-    scheduleCaret: vi.fn(),
-  }
+  const double = createVimKeyboardDouble(node.id)
+  const { vim } = double
+  // Production always reaches the handler with the caret authority already holding the focused
+  // node, so seed it rather than letting the first motion fall through the unknown-node branch.
+  vim.applyCaretState(node.id, {
+    cursor: initialCursor,
+    imageActive: hasAttachment && initialCursor === textLength,
+  })
+  const imageCaretActive = (): boolean => double.caret().imageActive
+  const imageTextCursor = vim.imageTextCursor
   const handler = createEditorKeyDownHandler({
     store,
     node,
@@ -89,7 +81,7 @@ function assertImageMotionSequence(
     if (count > 1) handler(keyEvent(input, String(count)))
 
     let expectedCursor = input.selectionStart
-    let expectedImageCaret = imageCaret
+    let expectedImageCaret = imageCaretActive()
     let expectedReturnCursor = imageTextCursor.current
     const current = input.selectionStart
 
@@ -134,9 +126,9 @@ function assertImageMotionSequence(
     handler(keyEvent(input, key))
 
     expect(input.selectionStart, `cursor after ${count}${key}`).toBe(expectedCursor)
-    expect(imageCaret, `image caret after ${count}${key}`).toBe(expectedImageCaret)
+    expect(imageCaretActive(), `image caret after ${count}${key}`).toBe(expectedImageCaret)
     expect(imageTextCursor.current, `saved return cursor after ${count}${key}`).toBe(expectedReturnCursor)
-    expect(imageCaret).toBe(hasAttachment && input.selectionStart === textLength)
+    expect(imageCaretActive()).toBe(hasAttachment && input.selectionStart === textLength)
     if (imageTextCursor.current !== undefined) {
       expect(hasAttachment).toBe(true)
       expect(textLength).toBeGreaterThan(0)
@@ -186,15 +178,38 @@ function assertSiblingMotionSequence(
     startNode.attachment !== undefined ? startNode.text.length : Math.max(0, startNode.text.length - 1)
   const startCursor = Math.min(initialCursor, startMaximum)
   let focus = { nodeId: selectedNodeId, cursor: startCursor, token: 0 }
-  let imageCaretNodeId =
-    startNode.attachment !== undefined && startCursor === startNode.text.length ? startNode.id : undefined
-  const imageTextCursor: { current: number | undefined } = { current: undefined }
+  // One caret authority across every node, mirroring `use-node-input-bindings.ts`. The image-caret
+  // owner is derived from it rather than tracked in parallel, so this fixture cannot disagree with
+  // the state the handler actually writes.
+  const authority: { nodeId?: string; caret: VimCaretState } = {
+    nodeId: startNode.id,
+    caret: {
+      cursor: startCursor,
+      imageActive: startNode.attachment !== undefined && startCursor === startNode.text.length,
+    },
+  }
+  const imageCaretNodeId = (): string | undefined => (authority.caret.imageActive ? authority.nodeId : undefined)
+  const imageTextCursor = {
+    get current(): number | undefined {
+      return authority.caret.imageTextReturnCursor
+    },
+    set current(value: number | undefined) {
+      authority.caret = { ...authority.caret, imageTextReturnCursor: value }
+    },
+  }
+  const projectImageCaret = (): void => {
+    for (const node of nodes) {
+      const active = imageCaretNodeId() === node.id
+      rows.get(node.id)!.classList.toggle('node-row-image-caret', active)
+      inputs.get(node.id)!.classList.toggle('node-input-image-caret', active)
+    }
+  }
   const inputAt = (id: string): HTMLTextAreaElement => inputs.get(id)!
 
   for (const node of nodes) {
     const input = inputAt(node.id)
     setNormalCaret(input, node.id === selectedNodeId ? startCursor : 0)
-    input.classList.toggle('node-input-image-caret', imageCaretNodeId === node.id)
+    input.classList.toggle('node-input-image-caret', imageCaretNodeId() === node.id)
   }
   inputAt(selectedNodeId).focus()
 
@@ -210,47 +225,47 @@ function assertSiblingMotionSequence(
       const target = moveSelectionTransition(documentTree, { currentParentId: null, selectedNodeId }, direction, cursor)
       expect(target).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
       if (target === undefined) return
-      if (target.nodeId !== selectedNodeId) imageTextCursor.current = undefined
       selectedNodeId = target.nodeId
       focus = { ...target, token: focus.token + 1 }
       const targetNode = nodes.find((node) => node.id === target.nodeId)!
       setNormalCaret(inputAt(target.nodeId), target.cursor)
       inputAt(target.nodeId).focus()
-      imageCaretNodeId =
-        targetNode.attachment !== undefined && target.cursor === targetNode.text.length ? targetNode.id : undefined
-      for (const node of nodes) {
-        const active = imageCaretNodeId === node.id
-        rows.get(node.id)!.classList.toggle('node-row-image-caret', active)
-        inputAt(node.id).classList.toggle('node-input-image-caret', active)
+      authority.nodeId = targetNode.id
+      authority.caret = {
+        cursor: target.cursor,
+        imageActive: targetNode.attachment !== undefined && target.cursor === targetNode.text.length,
       }
+      projectImageCaret()
     }),
   } as unknown as EditorStore
 
+  const double = createVimKeyboardDouble(selectedNodeId)
   const vim: VimKeyboardState = {
-    mode: 'normal',
-    register: { current: { kind: 'empty' } },
-    lastFind: { current: undefined },
-    pending: { current: undefined },
-    visualAnchor: { current: undefined },
-    visualFocus: { current: undefined },
+    ...double.vim,
     imageTextCursor,
-    moveBoundary: vi.fn(),
-    moveViewport: vi.fn(),
-    syncImageCaretToFocus: () => {
-      imageTextCursor.current = undefined
-      const target = nodes.find((node) => node.id === focus.nodeId)!
-      imageCaretNodeId = target.attachment !== undefined && focus.cursor === target.text.length ? target.id : undefined
+    getCaretState: (nodeId, cursor, imageActive) =>
+      authority.nodeId === nodeId
+        ? { ...authority.caret, cursor }
+        : { cursor, imageActive, imageTextReturnCursor: undefined },
+    applyCaretState: (nodeId, caret) => {
+      authority.nodeId = nodeId
+      authority.caret = caret
+      projectImageCaret()
     },
-    setMode: vi.fn(),
-    setImageCaret: vi.fn((nodeId, active) => {
-      imageCaretNodeId = active ? nodeId : undefined
-      for (const node of nodes) {
-        const selected = active && node.id === nodeId
-        rows.get(node.id)!.classList.toggle('node-row-image-caret', selected)
-        inputAt(node.id).classList.toggle('node-input-image-caret', selected)
-      }
-    }),
-    scheduleCaret: vi.fn(),
+    setImageCaret: (nodeId, active) => {
+      vim.applyCaretState(nodeId, {
+        cursor: authority.caret.cursor,
+        imageActive: active,
+        imageTextReturnCursor: active ? authority.caret.imageTextReturnCursor : undefined,
+      })
+    },
+    syncImageCaretToFocus: () => {
+      const target = nodes.find((node) => node.id === focus.nodeId)!
+      vim.applyCaretState(target.id, {
+        cursor: focus.cursor,
+        imageActive: target.attachment !== undefined && focus.cursor === target.text.length,
+      })
+    },
   }
   const press = (key: Motion): void => {
     const node = nodes.find((candidate) => candidate.id === selectedNodeId)!
@@ -289,8 +304,8 @@ function assertSiblingMotionSequence(
       expect(focus.nodeId, `focus owner after ${count}${key}`).toBe(selectedNodeId)
       expect(cursor, `cursor bounds after ${count}${key}`).toBeGreaterThanOrEqual(0)
       expect(cursor, `cursor bounds after ${count}${key}`).toBeLessThanOrEqual(maximum)
-      if (imageCaretNodeId !== undefined) {
-        expect(imageCaretNodeId, `image caret owner after ${count}${key}`).toBe(selectedNodeId)
+      if (imageCaretNodeId() !== undefined) {
+        expect(imageCaretNodeId(), `image caret owner after ${count}${key}`).toBe(selectedNodeId)
         expect(selected.attachment, `image caret target after ${count}${key}`).toBeDefined()
       }
       if (imageTextCursor.current !== undefined) {
@@ -344,8 +359,6 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   row.className = 'node-row'
   row.dataset.hasAttachment = 'true'
   row.append(input)
-  let imageCaret = false
-  const imageTextCursor: { current: number | undefined } = { current: undefined }
   const store = {
     getSnapshot: () => ({
       status: 'ready',
@@ -357,24 +370,14 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
       input.value = node.text
     }),
   } as unknown as EditorStore
+  const double = createVimKeyboardDouble(node.id, { register: { kind: 'text', value: pastedText } })
   const vim: VimKeyboardState = {
-    mode: 'normal',
-    register: { current: { kind: 'text', value: pastedText } },
-    lastFind: { current: undefined },
-    pending: { current: undefined },
-    visualAnchor: { current: undefined },
-    visualFocus: { current: undefined },
-    imageTextCursor,
-    moveBoundary: vi.fn(),
-    moveViewport: vi.fn(),
-    syncImageCaretToFocus: vi.fn(),
-    setMode: vi.fn(),
-    setImageCaret: vi.fn((_nodeId, active) => {
-      imageCaret = active
-      input.classList.toggle('node-input-image-caret', active)
-    }),
+    ...double.vim,
     scheduleCaret: vi.fn((target, position) => setNormalCaret(target as HTMLTextAreaElement, position)),
   }
+  vim.applyCaretState(node.id, { cursor, imageActive: false })
+  const imageCaretActive = (): boolean => double.caret().imageActive
+  const imageTextCursor = vim.imageTextCursor
   const press = (key: string): void => {
     const handler = createEditorKeyDownHandler({
       store,
@@ -388,7 +391,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   }
 
   press('j')
-  expect(imageCaret).toBe(true)
+  expect(imageCaretActive()).toBe(true)
   expect(imageTextCursor.current).toBe(cursor)
   expect(input.selectionStart).toBe(text.length)
 
@@ -397,17 +400,17 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   const expectedCursor = expectedText.length - 1
   expect(node.text).toBe(expectedText)
   expect(input.selectionStart).toBe(expectedCursor)
-  expect(imageCaret).toBe(false)
+  expect(imageCaretActive()).toBe(false)
   expect(imageTextCursor.current).toBeUndefined()
 
   press('l')
   expect(input.selectionStart).toBe(expectedText.length)
-  expect(imageCaret).toBe(true)
+  expect(imageCaretActive()).toBe(true)
   expect(imageTextCursor.current).toBe(expectedCursor)
 
   press('h')
   expect(input.selectionStart).toBe(expectedCursor)
-  expect(imageCaret).toBe(false)
+  expect(imageCaretActive()).toBe(false)
   expect(imageTextCursor.current).toBeUndefined()
 }
 

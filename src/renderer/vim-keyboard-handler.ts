@@ -36,18 +36,8 @@ function syncImageCaretAtCursor(
   cursor: number,
   textLength = node.text.length,
 ): void {
-  const prior = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
-    cursor,
-    imageActive:
-      input.classList.contains('node-input-image-caret') || (node.attachment !== undefined && cursor === textLength),
-    imageTextReturnCursor: vim.imageTextCursor?.current,
-  }
-  const next = editCaretTransition(prior, cursor, textLength, node.attachment !== undefined)
-  if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
-  else {
-    if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
-    vim.setImageCaret?.(node.id, next.imageActive)
-  }
+  const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
+  vim.applyCaretState(node.id, editCaretTransition(prior, cursor, textLength, node.attachment !== undefined))
 }
 
 export function handleVimKey(
@@ -62,7 +52,7 @@ export function handleVimKey(
       return true
     }
     if (event.key === 'Escape' || event.key === 'V') {
-      vim.nodeVisual?.exit()
+      vim.nodeVisual.exit()
       // Whole-node Visual mode can hold only the pending `g` prefix; a prefix that survived the
       // exit would be read as a Normal-mode continuation (`d` would run `gd`). The local
       // clearPending helper below is declared after this branch, so write the owner slots directly.
@@ -72,24 +62,22 @@ export function handleVimKey(
       vim.setMode('normal')
       vim.syncImageCaretToFocus()
     } else if (event.key === 'j' || event.key === 'k') {
-      vim.nodeVisual?.move(event.key === 'j' ? 'down' : 'up')
-    } else if (event.key === 'G') vim.nodeVisual?.move('last')
+      vim.nodeVisual.move(event.key === 'j' ? 'down' : 'up')
+    } else if (event.key === 'G') vim.nodeVisual.move('last')
     else if (event.key === 'g' && vim.pending.current?.prefix !== 'g') {
       vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
     } else if (event.key === 'g' && vim.pending.current?.prefix === 'g') {
       vim.pending.current = undefined
-      vim.nodeVisual?.move('first')
-    } else if (event.key === 'o') vim.nodeVisual?.swap()
+      vim.nodeVisual.move('first')
+    } else if (event.key === 'o') vim.nodeVisual.swap()
     else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1)
-      vim.nodeVisual?.command(event.key as NodeVisualCommand)
+      vim.nodeVisual.command(event.key as NodeVisualCommand)
     return handled()
   }
   const input = event.currentTarget
   const cursor = getCaret(input)
   const selection = getSelectionRange(input)
   const visual = vim.mode === 'visual'
-  if (!visual && vim.getCaretState === undefined)
-    vim.setImageCaret?.(node.id, node.attachment !== undefined && cursor === node.text.length)
   const motionCursor = visual ? (vim.visualFocus.current ?? cursor) : cursor
   const move = (target: number, allowAttachment = false): void => {
     const maximum =
@@ -265,15 +253,14 @@ export function handleVimKey(
         const count = parseCount(pending.count)
         if (count === 1) {
           vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
-          if (store.deleteSelected() && vim.lastChange !== undefined)
-            vim.lastChange.current = { kind: 'structural-delete' }
+          if (store.deleteSelected()) vim.lastChange.current = { kind: 'structural-delete' }
         } else {
           const source = selectedSiblingForest(store, node.id, count)
           if (source !== undefined) {
             vim.register.current = { kind: 'nodes', value: source }
             let deleted = 0
             while (deleted < source.nodes.length && store.deleteSelected()) deleted += 1
-            if (deleted > 0 && vim.lastChange !== undefined) vim.lastChange.current = { kind: 'structural-delete' }
+            if (deleted > 0) vim.lastChange.current = { kind: 'structural-delete' }
           }
         }
       } else if (pending.operator === 'y') {
@@ -373,24 +360,14 @@ export function handleVimKey(
 
   if (!visual && (event.key === 'h' || event.key === 'l')) {
     const next = horizontalCaretTransition(
-      vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
-        cursor,
-        imageActive:
-          input.classList.contains('node-input-image-caret') ||
-          (node.attachment !== undefined && cursor === node.text.length),
-        imageTextReturnCursor: vim.imageTextCursor?.current,
-      },
+      vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
       event.key === 'h' ? 'left' : 'right',
       count,
       node.text.length,
       node.attachment !== undefined,
     )
     setNormalCaret(input, next.cursor)
-    if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
-    else {
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
-      vim.setImageCaret?.(node.id, next.imageActive)
-    }
+    vim.applyCaretState(node.id, next)
   } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
     if (range !== undefined) move(range.target)
@@ -400,7 +377,7 @@ export function handleVimKey(
       return handled()
     }
     const entry = event.key
-    vim.beginInsert?.(node.id, node.text, insertPosition(node.text, cursor, entry), { kind: 'insert', entry })
+    vim.beginInsert(node.id, node.text, insertPosition(node.text, cursor, entry), { kind: 'insert', entry })
     vim.setMode('insert')
     setCaret(input, insertPosition(node.text, cursor, entry))
   } else if (!visual && event.key === 'R') {
@@ -408,7 +385,7 @@ export function handleVimKey(
       clearPending()
       return handled()
     }
-    vim.beginReplace?.(node.id, input, node.text, cursor)
+    vim.beginReplace(node.id, input, node.text, cursor)
     vim.setMode('replace')
     setCaret(input, cursor)
   } else if (!visual && (event.key === 'o' || event.key === 'O')) {
@@ -424,14 +401,14 @@ export function handleVimKey(
     if (event.key === 'o') {
       const created = headingSelected ? store.createChild() : store.createSibling('after')
       if (created) {
-        if (headingSelected) vim.beginStructuralChildOpen?.()
-        else vim.beginStructuralOpen?.('after')
+        if (headingSelected) vim.beginStructuralChildOpen()
+        else vim.beginStructuralOpen('after')
         vim.setMode('insert')
       }
     } else {
       if (headingSelected) return handled()
       if (store.createSibling('before')) {
-        vim.beginStructuralOpen?.('before')
+        vim.beginStructuralOpen('before')
         vim.setMode('insert')
       }
     }
@@ -441,20 +418,14 @@ export function handleVimKey(
     vim.setMode('visual')
     setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
   } else if (!visual && event.key === 'V') {
-    if (vim.nodeVisual?.enter(node.id)) {
+    if (vim.nodeVisual.enter(node.id)) {
       setSelectionRange(input, cursor, cursor)
       vim.setMode('visual-node')
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
     const direction = event.key === 'j' ? 'down' : 'up'
     let currentNode = node
-    let caret = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
-      cursor,
-      imageActive:
-        input.classList.contains('node-input-image-caret') ||
-        (node.attachment !== undefined && vim.imageTextCursor?.current !== undefined),
-      imageTextReturnCursor: vim.imageTextCursor?.current,
-    }
+    let caret = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
     let navigationCursor = cursor
     for (let index = 0; index < count; index += 1) {
       const before = store.getSnapshot()
@@ -480,20 +451,13 @@ export function handleVimKey(
       )
       if (!step.crossNode) {
         if (step.caret === caret) {
-          if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret)
-          else if (direction === 'up' && before.location.selectedNodeId === before.location.currentParentId)
-            vim.setImageCaret?.(currentNode.id, caret.imageActive, true)
-          else vim.setImageCaret?.(currentNode.id, caret.imageActive)
+          vim.applyCaretState(currentNode.id, caret)
           break
         }
         caret = step.caret
         navigationCursor = caret.cursor
         setNormalCaret(input, caret.cursor)
-        if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret)
-        else {
-          if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = caret.imageTextReturnCursor
-          vim.setImageCaret?.(currentNode.id, caret.imageActive)
-        }
+        vim.applyCaretState(currentNode.id, caret)
         continue
       }
       const focusCursor = index === 0 ? step.focusCursor : navigationCursor
@@ -508,9 +472,7 @@ export function handleVimKey(
           after.location.selectedNodeId === currentNode.id &&
           count === 1)
       ) {
-        if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret)
-        else if (direction === 'up' && before.location.selectedNodeId === before.location.currentParentId)
-          vim.setImageCaret?.(currentNode.id, caret.imageActive, true)
+        vim.applyCaretState(currentNode.id, caret)
         break
       }
       if (after.document === undefined) continue
@@ -524,11 +486,7 @@ export function handleVimKey(
         true,
         direction === 'up' && crossedToDifferentNode,
       )
-      if (vim.applyCaretState !== undefined) vim.applyCaretState(currentNode.id, caret, true)
-      else {
-        if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = caret.imageTextReturnCursor
-        vim.setImageCaret?.(currentNode.id, caret.imageActive, true)
-      }
+      vim.applyCaretState(currentNode.id, caret, true)
     }
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, node, input, selection.start, node.text.length)
@@ -544,10 +502,8 @@ export function handleVimKey(
     }
     if (event.key !== 'y' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, '')
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
-      if (vim.lastChange !== undefined) {
-        vim.lastChange.current = { kind: 'delete', motion: 'x', count: selection.end - selection.start }
-      }
+      vim.imageTextCursor.current = undefined
+      vim.lastChange.current = { kind: 'delete', motion: 'x', count: selection.end - selection.start }
     } else setNormalCaret(input, selection.start)
     leaveVisual(
       vim,
@@ -561,7 +517,7 @@ export function handleVimKey(
       vim.register.current = { kind: 'text', value: node.text.slice(selection.start, selection.end) }
       const nextText = node.text.slice(0, selection.start) + node.text.slice(selection.end)
       store.replaceTextRange(node.id, selection.start, selection.end, '')
-      vim.beginInsert?.(node.id, nextText, selection.start, {
+      vim.beginInsert(node.id, nextText, selection.start, {
         kind: 'change',
         motion: 'x',
         count: selection.end - selection.start,
@@ -584,9 +540,8 @@ export function handleVimKey(
     const register = vim.register.current
     if (register.kind === 'text' && register.value !== '' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, register.value)
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
-      if (vim.lastChange !== undefined)
-        vim.lastChange.current = { kind: 'overwrite', text: register.value, replaced: selection.end - selection.start }
+      vim.imageTextCursor.current = undefined
+      vim.lastChange.current = { kind: 'overwrite', text: register.value, replaced: selection.end - selection.start }
       leaveVisual(
         vim,
         node,
@@ -623,7 +578,7 @@ export function handleVimKey(
         pasted =
           store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value, register.sourceIds) ||
           pasted
-      if (pasted && vim.lastChange !== undefined)
+      if (pasted)
         vim.lastChange.current = {
           kind: 'structural-put',
           position: event.key === 'p' ? 'after' : 'before',
@@ -634,7 +589,7 @@ export function handleVimKey(
       let pasted = false
       for (let index = 0; index < count; index += 1)
         pasted = store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value) || pasted
-      if (pasted && vim.lastChange !== undefined)
+      if (pasted)
         vim.lastChange.current = {
           kind: 'structural-forest-put',
           position: event.key === 'p' ? 'after' : 'before',
@@ -648,10 +603,10 @@ export function handleVimKey(
       })
     }
   } else if (!visual && event.key === '.') {
-    const last = vim.lastChange?.current
+    const last = vim.lastChange.current
     if (last !== undefined) {
       if (last.kind.startsWith('structural-')) {
-        for (let index = 0; index < count; index += 1) vim.repeatStructural?.(last as VimStructuralChange)
+        for (let index = 0; index < count; index += 1) vim.repeatStructural(last as VimStructuralChange)
         return handled()
       }
       if (last.kind.startsWith('surround-')) {
@@ -687,7 +642,7 @@ export function handleVimKey(
       const nodes = displayedNodes(state.document, state.location.currentParentId)
       const targetIndex = pending.count === '' ? nodes.length - 1 : Math.min(nodes.length - 1, Math.max(0, count - 1))
       const target = nodes[targetIndex]
-      if (target !== undefined) vim.setImageCaret?.(target.id, target.attachment !== undefined)
+      if (target !== undefined) vim.setImageCaret(target.id, target.attachment !== undefined)
     }
     if (pending.count === '') vim.moveBoundary('last', cursor)
     else vim.moveBoundary('last', cursor, count)
@@ -710,8 +665,8 @@ export function handleVimKey(
       return handled()
     }
     if (node.attachment !== undefined && cursor === node.text.length) {
-      vim.setImageCaret?.(node.id, true)
-      vim.openAttachment?.(node.attachment.id)
+      vim.setImageCaret(node.id, true)
+      vim.openAttachment(node.attachment.id)
     } else {
       const link = linkAtPosition(node.links, cursor)
       if (link !== undefined) window.open(link.url, '_blank')
@@ -737,7 +692,7 @@ function applySurround(
   if (result === undefined) return undefined
   store.replaceTextRanges(node.id, result.edits)
   vim.scheduleCaret(input, result.cursor)
-  if (vim.lastChange !== undefined) vim.lastChange.current = change
+  vim.lastChange.current = change
   return { text: result.nextText, cursor: result.cursor }
 }
 
@@ -771,27 +726,17 @@ function applyTextChange(
   if (result.kind === 'yank') return undefined
   if (replay && result.nextText === node.text) return undefined
   if (result.nextText !== node.text) store.replaceTextRange(node.id, result.start, result.end, result.inserted)
-  if (result.nextText !== node.text && vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
+  if (result.nextText !== node.text) vim.imageTextCursor.current = undefined
   if (!replay && (change.kind === 'change' || change.kind === 'substitute')) {
-    vim.beginInsert?.(node.id, result.nextText, result.start, change)
+    vim.beginInsert(node.id, result.nextText, result.start, change)
     vim.setMode('insert')
     vim.scheduleCaret(input, result.start)
   } else {
-    const prior = vim.getCaretState?.(node.id, cursor, input.classList.contains('node-input-image-caret')) ?? {
-      cursor,
-      imageActive:
-        input.classList.contains('node-input-image-caret') ||
-        (node.attachment !== undefined && cursor === node.text.length),
-      imageTextReturnCursor: vim.imageTextCursor?.current,
-    }
+    const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
     const next = editCaretTransition(prior, result.nextCursor, result.nextText.length, node.attachment !== undefined)
     vim.scheduleCaret(input, next.cursor)
-    if (vim.applyCaretState !== undefined) vim.applyCaretState(node.id, next)
-    else {
-      if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = next.imageTextReturnCursor
-      vim.setImageCaret?.(node.id, next.imageActive)
-    }
-    if (!replay && result.nextText !== node.text && vim.lastChange !== undefined) vim.lastChange.current = change
+    vim.applyCaretState(node.id, next)
+    if (!replay && result.nextText !== node.text) vim.lastChange.current = change
   }
   return {
     text: result.nextText,
@@ -825,9 +770,8 @@ function applyVisualCase(
   if (selection.start === selection.end) return
   const replacement = transformCase(node.text.slice(selection.start, selection.end), mode)
   store.replaceTextRange(node.id, selection.start, selection.end, replacement)
-  if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
-  if (vim.lastChange !== undefined)
-    vim.lastChange.current = { kind: 'case', mode, count: selection.end - selection.start }
+  vim.imageTextCursor.current = undefined
+  vim.lastChange.current = { kind: 'case', mode, count: selection.end - selection.start }
   // Vim leaves the cursor at the start of the operated range for a Visual-mode operator,
   // independent of the selection direction and of any length change from the case transform.
   leaveVisual(
