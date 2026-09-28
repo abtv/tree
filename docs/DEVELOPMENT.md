@@ -202,6 +202,8 @@ Keep Vim coverage layered. Caret arithmetic and clamps, counts, image return pos
 
 Vim command sequences that need a shifted continuation key must be tested in physical key order. A real keyboard fires the modifier's own keydown before the key it modifies — `Shift` before `O` in `zO`, `$` in `d$`, `A` in `rA`, or `{` in `ys{` — and that keydown must not consume the pending command. A test that dispatches only the capital or shifted key event (for example Playwright's `press('O')` or a focused test that sends `key: 'O'` directly) does not exercise that order and can hide a defect that breaks physical typing. Use `pressShifted` from `e2e/fixtures.ts` for real-boundary cases, and in focused tests send the bare modifier keydown explicitly between the prefix and its continuation.
 
+The same event-sequence fidelity applies wherever handler behavior depends on platform-generated surrounding events, such as lock or dead keys, native composition, or key repeat. A helper or double that collapses a physical keypress into one synthetic event can stay green while real typing is broken, so model the event sequence the platform actually delivers whenever the handler observes more than the logical key.
+
 ---
 
 ## 9. Full Validation
