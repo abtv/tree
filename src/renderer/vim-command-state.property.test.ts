@@ -8,8 +8,8 @@ import {
   clearCommandAssembly,
   clearPending,
   clearVisualRange,
-  createVimCommandHandles,
   createVimCommandState,
+  recordRepeatChange,
   structuralRepeatChange,
   takeStructuralInsert,
   type VimStructuralInsertSession,
@@ -90,6 +90,7 @@ type WriteOp =
   | { slot: 'lastFind'; value: VimFindCommand | undefined }
   | { slot: 'visualAnchor'; value: number | undefined }
   | { slot: 'visualFocus'; value: number | undefined }
+  | { slot: 'recordRepeatChange'; value: VimRepeatChange }
   | { slot: 'clearPending' }
   | { slot: 'clearVisualRange' }
   | { slot: 'clearCommandAssembly' }
@@ -98,17 +99,17 @@ const pendingArbitrary = fc.option(
   fc.record({ count: fc.string({ maxLength: 3 }), motionCount: fc.string({ maxLength: 3 }) }),
   { nil: undefined },
 )
-const repeatChangeArbitrary: fc.Arbitrary<VimRepeatChange | undefined> = fc.option(
-  fc.oneof(
-    fc.record({
-      kind: fc.constant('delete' as const),
-      motion: fc.constantFrom('w', 'x', '$', 'ge'),
-      count: fc.integer({ min: 1, max: 9 }),
-    }),
-    fc.record({ kind: fc.constant('overwrite' as const), text: fc.string({ maxLength: 10 }), replaced: fc.nat(10) }),
-  ),
-  { nil: undefined },
+const repeatChangeArbitrary: fc.Arbitrary<VimRepeatChange> = fc.oneof(
+  fc.record({
+    kind: fc.constant('delete' as const),
+    motion: fc.constantFrom('w', 'x', '$', 'ge'),
+    count: fc.integer({ min: 1, max: 9 }),
+  }),
+  fc.record({ kind: fc.constant('overwrite' as const), text: fc.string({ maxLength: 10 }), replaced: fc.nat(10) }),
 )
+const optionalRepeatChangeArbitrary: fc.Arbitrary<VimRepeatChange | undefined> = fc.option(repeatChangeArbitrary, {
+  nil: undefined,
+})
 const findArbitrary: fc.Arbitrary<VimFindCommand | undefined> = fc.option(
   fc.record({ kind: fc.constantFrom('f' as const, 'F' as const, 't' as const, 'T' as const), character: characterKey }),
   { nil: undefined },
@@ -117,20 +118,20 @@ const cursorArbitrary = fc.option(fc.nat(500), { nil: undefined })
 
 const writeOpArbitrary: fc.Arbitrary<WriteOp> = fc.oneof(
   fc.record({ slot: fc.constant('pending' as const), value: pendingArbitrary }),
-  fc.record({ slot: fc.constant('lastChange' as const), value: repeatChangeArbitrary }),
+  fc.record({ slot: fc.constant('lastChange' as const), value: optionalRepeatChangeArbitrary }),
   fc.record({ slot: fc.constant('lastFind' as const), value: findArbitrary }),
   fc.record({ slot: fc.constant('visualAnchor' as const), value: cursorArbitrary }),
   fc.record({ slot: fc.constant('visualFocus' as const), value: cursorArbitrary }),
+  fc.record({ slot: fc.constant('recordRepeatChange' as const), value: repeatChangeArbitrary }),
   fc.record({ slot: fc.constant('clearPending' as const) }),
   fc.record({ slot: fc.constant('clearVisualRange' as const) }),
   fc.record({ slot: fc.constant('clearCommandAssembly' as const) }),
 )
 
-it('keeps every handle write last-write-wins in exactly one slot', () => {
+it('keeps each direct owner write in one slot and each transition scoped to its slots', () => {
   fc.assert(
     fc.property(fc.array(writeOpArbitrary, { maxLength: 40 }), (ops) => {
       const state = createVimCommandState()
-      const handles = createVimCommandHandles({ current: state })
       const model: {
         pending: VimPendingCommand | undefined
         lastChange: VimRepeatChange | undefined
@@ -147,20 +148,23 @@ it('keeps every handle write last-write-wins in exactly one slot', () => {
 
       for (const op of ops) {
         if (op.slot === 'pending') {
-          handles.pending.current = op.value
+          state.pending = op.value
           model.pending = op.value
         } else if (op.slot === 'lastChange') {
-          handles.lastChange.current = op.value
+          state.lastChange = op.value
           model.lastChange = op.value
         } else if (op.slot === 'lastFind') {
-          handles.lastFind.current = op.value
+          state.lastFind = op.value
           model.lastFind = op.value
         } else if (op.slot === 'visualAnchor') {
-          handles.visualAnchor.current = op.value
+          state.visualAnchor = op.value
           model.visualAnchor = op.value
         } else if (op.slot === 'visualFocus') {
-          handles.visualFocus.current = op.value
+          state.visualFocus = op.value
           model.visualFocus = op.value
+        } else if (op.slot === 'recordRepeatChange') {
+          recordRepeatChange(state, op.value)
+          model.lastChange = op.value
         } else if (op.slot === 'clearPending') {
           clearPending(state)
           model.pending = undefined
@@ -176,11 +180,6 @@ it('keeps every handle write last-write-wins in exactly one slot', () => {
         }
       }
 
-      expect(handles.pending.current).toBe(model.pending)
-      expect(handles.lastChange.current).toBe(model.lastChange)
-      expect(handles.lastFind.current).toBe(model.lastFind)
-      expect(handles.visualAnchor.current).toBe(model.visualAnchor)
-      expect(handles.visualFocus.current).toBe(model.visualFocus)
       expect(state.pending).toBe(model.pending)
       expect(state.lastChange).toBe(model.lastChange)
       expect(state.lastFind).toBe(model.lastFind)

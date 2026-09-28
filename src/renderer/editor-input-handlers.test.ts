@@ -628,7 +628,7 @@ describe('editor keyboard handler', () => {
     expect(store.replaceTextRange).toHaveBeenCalledWith('node', 0, 8, '')
     expect(store.deleteSelected).not.toHaveBeenCalled()
     expect(vim.register.current).toEqual({ kind: 'text', value: 'one two ' })
-    expect(vim.lastChange?.current).toEqual({ kind: 'delete', motion: 'w', count: 2 })
+    expect(vim.commandState.lastChange).toEqual({ kind: 'delete', motion: 'w', count: 2 })
   })
 
   it('changes the current word and enters Insert mode with a text baseline', () => {
@@ -744,7 +744,7 @@ describe('editor keyboard handler', () => {
     for (const key of ['y', 'w', '.']) handle(keyEvent(input, key))
 
     expect(store.replaceTextRange).toHaveBeenNthCalledWith(2, 'node', 4, 8, '')
-    expect(vim.lastChange?.current).toEqual({ kind: 'delete', motion: 'w', count: 1 })
+    expect(vim.commandState.lastChange).toEqual({ kind: 'delete', motion: 'w', count: 1 })
   })
 
   it('enters Insert mode at the end of the node with A', () => {
@@ -1001,13 +1001,13 @@ describe('editor keyboard handler', () => {
       const input = document.createElement('textarea')
       input.value = 'text'
       const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, mode)
-      vim.pending.current = { count: '', motionCount: '', operator: 'd' }
+      vim.commandState.pending = { count: '', motionCount: '', operator: 'd' }
 
       const event = keyEvent(input, 'w', { ctrlKey: true })
       handle(event)
 
       expect(event.preventDefault, mode).toHaveBeenCalledOnce()
-      expect(vim.pending.current, mode).toBeUndefined()
+      expect(vim.commandState.pending, mode).toBeUndefined()
       expect(store.leave, mode).not.toHaveBeenCalled()
       expect(store.enter, mode).not.toHaveBeenCalled()
       expect(store.undo, mode).not.toHaveBeenCalled()
@@ -1109,14 +1109,14 @@ describe('editor keyboard handler', () => {
         const input = document.createElement('textarea')
         input.value = 'text'
         const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
-        vim.pending.current = { ...pending }
+        vim.commandState.pending = { ...pending }
         const context = `${JSON.stringify(pending)} then ${key === 'u' ? 'u' : 'Ctrl+r'}`
 
         handle(keyEvent(input, key, key === 'r' ? { ctrlKey: true } : {}))
 
         expect(store.undo, context).not.toHaveBeenCalled()
         expect(store.redo, context).not.toHaveBeenCalled()
-        expect(vim.pending.current, context).toBeUndefined()
+        expect(vim.commandState.pending, context).toBeUndefined()
       }
     }
   })
@@ -1126,12 +1126,12 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
-    vim.pending.current = { count: '', motionCount: '', operator: 'd' }
+    vim.commandState.pending = { count: '', motionCount: '', operator: 'd' }
 
     handle(keyEvent(input, 'o', { ctrlKey: true }))
 
     expect(store.leave).not.toHaveBeenCalled()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
   })
 
   it('discards a pending count instead of moving by half a page with Ctrl+d and Ctrl+u', () => {
@@ -1140,12 +1140,12 @@ describe('editor keyboard handler', () => {
       const input = document.createElement('textarea')
       input.value = 'text'
       const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
-      vim.pending.current = { count: '3', motionCount: '' }
+      vim.commandState.pending = { count: '3', motionCount: '' }
 
       handle(keyEvent(input, key, { ctrlKey: true }))
 
       expect(vim.moveViewport, key).not.toHaveBeenCalled()
-      expect(vim.pending.current, key).toBeUndefined()
+      expect(vim.commandState.pending, key).toBeUndefined()
     }
   })
 
@@ -1295,10 +1295,10 @@ describe('editor keyboard handler', () => {
     vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
 
     handle(keyEvent(input, 'g'))
-    expect(vim.pending.current).toEqual({ count: '', motionCount: '', prefix: 'g' })
+    expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
     handle(keyEvent(input, 'Escape'))
     expect(exit).toHaveBeenCalledOnce()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     handle(keyEvent(input, 'd'))
     expect(store.enter).not.toHaveBeenCalled()
   })
@@ -1316,7 +1316,7 @@ describe('editor keyboard handler', () => {
 
     expect(exit).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('normal')
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     handle(keyEvent(input, 'd'))
     expect(store.enter).not.toHaveBeenCalled()
   })
@@ -1326,17 +1326,17 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 1
-    vim.pending.current = { count: '', motionCount: '', prefix: 'i' }
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 1
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
     handle(keyEvent(input, '.', { metaKey: true }))
 
     expect(store.enter).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
   })
 
   it('keeps character Visual mode but clears its command assembly before Cmd+,', () => {
@@ -1344,15 +1344,15 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 1
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 1
 
     handle(keyEvent(input, ',', { metaKey: true }))
 
     expect(store.leave).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
   })
 
   it('keeps character Visual mode but clears its command assembly before Cmd+Backspace', () => {
@@ -1360,15 +1360,15 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 1
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 1
 
     handle(keyEvent(input, 'Backspace', { metaKey: true }))
 
     expect(store.deleteSelected).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
   })
 
   it('keeps character Visual mode but clears its command assembly before Cmd+Z and Cmd+Shift+Z', () => {
@@ -1376,26 +1376,26 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 1
-    vim.pending.current = { count: '', motionCount: '', prefix: 'a' }
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 1
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'a' }
 
     handle(keyEvent(input, 'z', { metaKey: true }))
 
     expect(store.undo).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
 
-    vim.visualAnchor.current = 2
-    vim.visualFocus.current = 3
+    vim.commandState.visualAnchor = 2
+    vim.commandState.visualFocus = 3
     handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
 
     expect(store.redo).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
   })
 
   it.each([
@@ -1411,11 +1411,11 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
     handle(keyEvent(input, 'd'))
-    expect(vim.pending.current).toBeDefined()
+    expect(vim.commandState.pending).toBeDefined()
 
     handle(keyEvent(input, key, options))
 
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     expect(vim.mode).toBe('normal')
     if (key === '.') expect(store.enter).toHaveBeenCalledOnce()
     else if (key === ',') expect(store.leave).toHaveBeenCalledOnce()
@@ -1430,12 +1430,12 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
     handle(keyEvent(input, 'g'))
-    expect(vim.pending.current).toEqual({ count: '', motionCount: '', prefix: 'g' })
+    expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
 
     handle(keyEvent(input, '.', { metaKey: true }))
 
     expect(store.enter).toHaveBeenCalledOnce()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
   })
 
   it.each([
@@ -1452,17 +1452,17 @@ describe('editor keyboard handler', () => {
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
     const exit = vi.fn()
     vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
-    vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 1
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'g' }
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 1
 
     handle(keyEvent(input, key, options))
 
     expect(exit).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('normal')
-    expect(vim.pending.current).toBeUndefined()
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
   })
 
   it('keeps character Visual mode but clears its command assembly before Cmd+A', () => {
@@ -1470,16 +1470,16 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 2
-    vim.pending.current = { count: '', motionCount: '', prefix: 'i' }
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 2
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
     handle(keyEvent(input, 'a', { metaKey: true }))
 
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(input.value.length)
   })
@@ -1561,11 +1561,11 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 1)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
     handle(keyEvent(input, 'd'))
-    expect(vim.pending.current).toBeDefined()
+    expect(vim.commandState.pending).toBeDefined()
 
     handle(keyEvent(input, key, { metaKey: true }))
 
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     expect(vim.mode).toBe('normal')
     if (key === 'v') expect(store.paste).toHaveBeenCalledOnce()
     else expect(store.cut).toHaveBeenCalledWith('node', 0, 1)
@@ -1577,16 +1577,16 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     input.setSelectionRange(0, 2)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 2
-    vim.pending.current = { count: '', motionCount: '', prefix: 'i' }
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 2
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
     handle(keyEvent(input, 'v', { metaKey: true }))
 
     expect(vim.mode).toBe('visual')
-    expect(vim.visualAnchor.current).toBeUndefined()
-    expect(vim.visualFocus.current).toBeUndefined()
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.visualAnchor).toBeUndefined()
+    expect(vim.commandState.visualFocus).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     expect(store.paste).toHaveBeenCalledWith('node', 0)
   })
 
@@ -1598,13 +1598,13 @@ describe('editor keyboard handler', () => {
     const exit = vi.fn()
     vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn() }
     const pending = { count: '', motionCount: '', prefix: 'g' as const }
-    vim.pending.current = pending
+    vim.commandState.pending = pending
 
     handle(keyEvent(input, 'v', { metaKey: true }))
 
     expect(exit).not.toHaveBeenCalled()
     expect(vim.mode).toBe('visual-node')
-    expect(vim.pending.current).toBe(pending)
+    expect(vim.commandState.pending).toBe(pending)
     expect(store.paste).toHaveBeenCalledOnce()
   })
 
@@ -1626,9 +1626,7 @@ describe('editor keyboard handler', () => {
       get mode() {
         return vim.mode
       },
-      pending: vim.pending,
-      visualAnchor: vim.visualAnchor,
-      visualFocus: vim.visualFocus,
+      commandState: vim.commandState,
       finishReplace: vim.finishReplace,
       setMode: vim.setMode,
     }
@@ -1685,7 +1683,7 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     input.setSelectionRange(0, 0)
     const { vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
-    vim.pending.current = { count: '', motionCount: '', prefix: 'g' }
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'g' }
 
     executeEditorContextMenuCommand(
       'paste',
@@ -1695,7 +1693,7 @@ describe('editor keyboard handler', () => {
       textCommandState(vim),
     )
 
-    expect(vim.pending.current).toBeUndefined()
+    expect(vim.commandState.pending).toBeUndefined()
     expect(store.paste).toHaveBeenCalledOnce()
   })
 
@@ -1720,8 +1718,8 @@ describe('editor keyboard handler', () => {
 
     first.handle(keyEvent(input, 'v'))
     const second = vimHandler(store, { id: 'node', text: 'abc', children: [] }, 'visual')
-    second.vim.visualAnchor.current = first.vim.visualAnchor.current
-    second.vim.visualFocus.current = first.vim.visualFocus.current
+    second.vim.commandState.visualAnchor = first.vim.commandState.visualAnchor
+    second.vim.commandState.visualFocus = first.vim.commandState.visualFocus
     second.handle(keyEvent(input, 'h'))
 
     expect(input.selectionStart).toBe(0)
@@ -1848,7 +1846,7 @@ describe('editor keyboard handler', () => {
     expect(input.selectionStart).toBe(3)
     handle(keyEvent(input, ','))
     expect(input.selectionStart).toBe(1)
-    expect(vim.lastFind.current).toEqual({ kind: 'f', character: '.' })
+    expect(vim.commandState.lastFind).toEqual({ kind: 'f', character: '.' })
   })
 
   it('changes the whole node with cc and S without deleting its subtree', () => {
@@ -1893,12 +1891,12 @@ describe('editor keyboard handler', () => {
     input.value = 'AbCd'
     input.setSelectionRange(0, 2)
     const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
-    vim.visualAnchor.current = 0
-    vim.visualFocus.current = 1
+    vim.commandState.visualAnchor = 0
+    vim.commandState.visualFocus = 1
 
     handle(keyEvent(input, 'o'))
-    expect(vim.visualAnchor.current).toBe(1)
-    expect(vim.visualFocus.current).toBe(0)
+    expect(vim.commandState.visualAnchor).toBe(1)
+    expect(vim.commandState.visualFocus).toBe(0)
     handle(keyEvent(input, 'u'))
     expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 2, 'ab')
     expect(vim.mode).toBe('normal')
@@ -1924,8 +1922,8 @@ describe('editor keyboard handler', () => {
     lowerInput.value = 'aBcDe'
     lowerInput.setSelectionRange(1, 4)
     const lower = vimHandler(lowerStore, { id: 'node', text: lowerInput.value, children: [] }, 'visual')
-    lower.vim.visualAnchor.current = 3
-    lower.vim.visualFocus.current = 1
+    lower.vim.commandState.visualAnchor = 3
+    lower.vim.commandState.visualFocus = 1
 
     lower.handle(keyEvent(lowerInput, 'u'))
 
@@ -1939,8 +1937,8 @@ describe('editor keyboard handler', () => {
     upperInput.value = 'ab'
     upperInput.setSelectionRange(0, 2)
     const upper = vimHandler(upperStore, { id: 'node', text: upperInput.value, children: [] }, 'visual')
-    upper.vim.visualAnchor.current = 0
-    upper.vim.visualFocus.current = 1
+    upper.vim.commandState.visualAnchor = 0
+    upper.vim.commandState.visualFocus = 1
 
     upper.handle(keyEvent(upperInput, 'U'))
 
@@ -1956,8 +1954,8 @@ describe('editor keyboard handler', () => {
       { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
       'visual',
     )
-    image.vim.visualAnchor.current = 0
-    image.vim.visualFocus.current = 1
+    image.vim.commandState.visualAnchor = 0
+    image.vim.commandState.visualFocus = 1
 
     image.handle(keyEvent(imageInput, 'u'))
 
@@ -2481,7 +2479,7 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(1, 1)
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     const { handle, vim } = vimHandler(store, { id: 'node', text, links, children: [] })
-    vim.pending.current = { count: '3', motionCount: '' }
+    vim.commandState.pending = { count: '3', motionCount: '' }
 
     handle(keyEvent(input, 'Enter'))
 

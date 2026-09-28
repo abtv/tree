@@ -293,7 +293,7 @@ async function assertSequence(
         caret = pointerCaretTransition(caret, event.position, expected.texts[index]!.length, specs[index]!.image)
         vim.imageTextCursor.current = caret.imageTextReturnCursor
         paint()
-        vim.pending.current = undefined
+        vim.commandState.pending = undefined
       } else if (event.kind === 'history') {
         if (event.shortcut) press('z', true, false, event.direction === 'redo')
         else if (event.direction === 'undo') press('u')
@@ -319,7 +319,7 @@ async function assertSequence(
       expect(selectedIndex(), `${context} selected node`).toBe(expected.index)
       expect(document.activeElement, `${context} focus`).toBe(inputs[expected.index])
       expect(mode, `${context} mode`).toBe('normal')
-      expect(vim.pending.current, `${context} pending`).toBeUndefined()
+      expect(vim.commandState.pending, `${context} pending`).toBeUndefined()
       expect(caret.cursor, `${context} cursor`).toBe(expected.cursor)
       expect(caret.imageActive, `${context} image`).toBe(expected.image)
       expect(caret.imageTextReturnCursor, `${context} return`).toBe(expected.returned)

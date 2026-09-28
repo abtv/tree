@@ -8,11 +8,11 @@ export type VimStructuralInsertSession =
 /**
  * The single owner of the renderer-local Vim command state: the pending command being assembled,
  * the last repeatable change and character find, the character-wise Visual endpoints, and the one
- * structural Insert session. `use-node-input-bindings.ts` holds one instance in a ref and performs
- * its own writes through the transitions below; `createVimCommandHandles` exposes owner-backed
- * access-time accessors so `vim-keyboard-handler.ts`'s direct reads and writes land in the same
- * object. This module must stay free of React, DOM, Electron, filesystem, and store dependencies
- * so its behavior is unit-testable without a browser.
+ * structural Insert session. `use-node-input-bindings.ts` holds one instance in a ref and exposes
+ * it through the keyboard state, so `vim-keyboard-handler.ts` and `editor-input-handlers.ts` read
+ * and write the same object and clear pending and Visual state only through the transitions below.
+ * This module must stay free of React, DOM, Electron, filesystem, and store dependencies so its
+ * behavior is unit-testable without a browser.
  */
 export interface VimCommandState {
   pending?: VimPendingCommand | undefined
@@ -84,67 +84,4 @@ export function structuralRepeatChange(session: VimStructuralInsertSession, text
   if (session.kind === 'open') return { kind: 'structural-open', position: session.position, text }
   if (session.kind === 'child-open') return { kind: 'structural-child-open', text }
   return { kind: 'structural-visual', command: session.command, span: session.span, text }
-}
-
-/** A stable holder for one owner state; a React ref is structurally compatible. */
-export interface VimCommandStateHolder {
-  readonly current: VimCommandState
-}
-
-export interface VimCommandHandles {
-  pending: { current: VimPendingCommand | undefined }
-  lastChange: { current: VimRepeatChange | undefined }
-  lastFind: { current: VimFindCommand | undefined }
-  visualAnchor: { current: number | undefined }
-  visualFocus: { current: number | undefined }
-}
-
-/**
- * Access-time accessors over one owner state, shaped for the `VimKeyboardState` fields
- * `vim-keyboard-handler.ts` already reads and writes directly. Each read reflects the latest write
- * from either side and each write lands in the owner slot immediately.
- */
-export function createVimCommandHandles(holder: VimCommandStateHolder): VimCommandHandles {
-  return {
-    pending: {
-      get current(): VimPendingCommand | undefined {
-        return holder.current.pending
-      },
-      set current(value: VimPendingCommand | undefined) {
-        holder.current.pending = value
-      },
-    },
-    lastChange: {
-      get current(): VimRepeatChange | undefined {
-        return holder.current.lastChange
-      },
-      set current(value: VimRepeatChange | undefined) {
-        holder.current.lastChange = value
-      },
-    },
-    lastFind: {
-      get current(): VimFindCommand | undefined {
-        return holder.current.lastFind
-      },
-      set current(value: VimFindCommand | undefined) {
-        holder.current.lastFind = value
-      },
-    },
-    visualAnchor: {
-      get current(): number | undefined {
-        return holder.current.visualAnchor
-      },
-      set current(value: number | undefined) {
-        holder.current.visualAnchor = value
-      },
-    },
-    visualFocus: {
-      get current(): number | undefined {
-        return holder.current.visualFocus
-      },
-      set current(value: number | undefined) {
-        holder.current.visualFocus = value
-      },
-    },
-  }
 }

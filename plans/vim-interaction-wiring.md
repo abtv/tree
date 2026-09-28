@@ -49,7 +49,7 @@ Reserved for the Product Owner:
 | ID | Outcome | Depends on | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- | --- |
 | VIW-1 | `VimKeyboardState` members that production always supplies are required; every caret-state fallback and `applyCaretState` branch is deleted; the `editor-input-handlers.test.ts` double wires the shipped path | — | No `getCaretState?.`, `?? { cursor, imageActive`, or `applyCaretState !== undefined` remains in `src/renderer/`; the `vimHandler` double supplies the members production supplies; Vim unit, property, and E2E suites pass | Moderate | Done |
-| VIW-2 | `vim-keyboard-handler.ts` and `editor-input-handlers.ts` receive the `VimCommandState` owner and call its transitions; `createVimCommandHandles` and the mirrored clearing helpers are deleted | VIW-1 | `createVimCommandHandles`, `clearCommandAssemblySlots`, and the raw `vim.pending.current = undefined` slot writes no longer exist; the command-assembly invariant has one implementation in `vim-command-state.ts` | Moderate | Planned |
+| VIW-2 | `vim-keyboard-handler.ts` and `editor-input-handlers.ts` receive the `VimCommandState` owner and call its transitions; `createVimCommandHandles` and the mirrored clearing helpers are deleted | VIW-1 | `createVimCommandHandles`, `clearCommandAssemblySlots`, and the raw `vim.pending.current = undefined` slot writes no longer exist; the command-assembly invariant has one implementation in `vim-command-state.ts` | Moderate | Done |
 | VIW-3 | The counted `j`/`k` vertical-navigation loop is a separate module with a narrow store interface, and its per-step snapshot read is hoisted out of the count loop | VIW-1 | New `vim-vertical-navigation.ts` with focused unit tests; `handleVimKey` no longer contains the inline loop; counted-motion property tests pass unchanged | Moderate | Planned |
 
 ### VIW-1 — Require the supplied `VimKeyboardState` members
@@ -160,9 +160,25 @@ Two results worth carrying forward:
   `e2e/vim-image-caret.spec.ts` "keeps the image-only caret when k is clamped at the first root" and "moves k onto
   an attached current-parent image from its first child" (third `k` press).
 
+## VIW-2 outcome
+
+Landed behavior-preserving. `VimKeyboardState` and `VimTextCommandState` carry the `VimCommandState` owner instead
+of five `{ current }` slot handles; `createVimCommandHandles`, `VimCommandStateHolder`, `VimCommandHandles`, the
+handler-local `clearPending`, and `clearCommandAssemblySlots` are deleted. Every clear now calls `clearPending`,
+`clearVisualRange`, or `clearCommandAssembly` in `vim-command-state.ts`, and every repeat-change write calls
+`recordRepeatChange`. `use-node-input-bindings.ts` exposes the owner through an access-time getter on both handler
+shapes, so the owner identity stays stable without reading the ref during render.
+
+Two results worth carrying forward:
+
+* `vim-keyboard-types.ts` now imports the `VimCommandState` type from `vim-command-state.ts`, a type-only cycle
+  erased under `verbatimModuleSyntax`. Keep it type-only; do not import runtime values across the pair.
+* The `vim-command-state.property.test.ts` handle model became a direct-owner model plus a `recordRepeatChange` op,
+  keeping the transition-scoping property without the deleted accessors.
+
 ## Next task
 
-VIW-2 — give the command-assembly invariant one implementation.
+VIW-3 — extract counted vertical navigation.
 
 ## Resume prompt
 

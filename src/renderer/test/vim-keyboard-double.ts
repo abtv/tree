@@ -2,7 +2,6 @@ import { vi } from 'vitest'
 import {
   beginStructuralChildOpen,
   beginStructuralOpen,
-  createVimCommandHandles,
   createVimCommandState,
   type VimCommandState,
 } from '../vim-command-state'
@@ -42,7 +41,6 @@ export function createVimKeyboardDouble(
 ): VimKeyboardDouble {
   const authority: { nodeId?: string; caret: VimCaretState } = { caret: { cursor: 0, imageActive: false } }
   const commandState = createVimCommandState()
-  const handles = createVimCommandHandles({ current: commandState })
 
   // Typed from the interface so callers may pass `fromFocus`; the double has no store focus token
   // to consume, so that flag does not affect the caret the authority holds. Tests that care about
@@ -71,11 +69,7 @@ export function createVimKeyboardDouble(
   const vim: VimKeyboardState = {
     mode: options.mode ?? 'normal',
     register: { current: options.register ?? { kind: 'empty' } },
-    pending: handles.pending,
-    lastChange: handles.lastChange,
-    lastFind: handles.lastFind,
-    visualAnchor: handles.visualAnchor,
-    visualFocus: handles.visualFocus,
+    commandState,
     imageTextCursor: {
       get current(): number | undefined {
         return authority.caret.imageTextReturnCursor

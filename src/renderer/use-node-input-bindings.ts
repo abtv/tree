@@ -28,7 +28,6 @@ import {
   beginStructuralVisual,
   clearCommandAssembly,
   clearPending,
-  createVimCommandHandles,
   createVimCommandState,
   recordRepeatChange,
   structuralRepeatChange,
@@ -113,19 +112,10 @@ export function useNodeInputBindings({
     [vimSession],
   )
   // The pending command, dot-repeat, find, Visual endpoints, and structural insert live in one
-  // pure owner; the handles below keep the keyboard handler's direct `{ current }` reads and
-  // writes landing in that owner without re-creating the bindings callback. The getter holder
-  // reads the ref only when the handler accesses a slot, not during render.
+  // pure owner. The keyboard state exposes it through an access-time getter, so the handlers read
+  // and write that owner and clear through its transitions; the getter reads the ref only when a
+  // handler accesses it, not during render.
   const vimCommandState = useRef(createVimCommandState())
-  const vimCommandHandles = useMemo(
-    () =>
-      createVimCommandHandles({
-        get current(): VimCommandState {
-          return vimCommandState.current
-        },
-      }),
-    [vimCommandState],
-  )
   const caretAuthority = useRef<{ nodeId?: string; caret: VimCaretState }>({
     caret: { cursor: focus?.cursor ?? 0, imageActive: false },
   })
@@ -396,20 +386,20 @@ export function useNodeInputBindings({
 
   // The context-menu and native-paste paths resolve the same renderer-local session state as the
   // keyboard handler, but they run from bindings that do not hold the full `VimKeyboardState`.
-  // Getters keep the mode current across the async menu round trip.
+  // Getters keep the mode and the command-state owner current across the async menu round trip.
   const vimTextCommandState = useMemo<VimTextCommandState>(
     () => ({
       get mode() {
         return latestVimMode.current
       },
-      pending: vimCommandHandles.pending,
-      visualAnchor: vimCommandHandles.visualAnchor,
-      visualFocus: vimCommandHandles.visualFocus,
+      get commandState(): VimCommandState {
+        return vimCommandState.current
+      },
       finishReplace: (input, retreatCursor, preserveDomSelection) =>
         finishVimReplace(input, retreatCursor, preserveDomSelection),
       setMode: setVimMode,
     }),
-    [finishVimReplace, setVimMode, vimCommandHandles],
+    [finishVimReplace, setVimMode, vimCommandState],
   )
 
   const moveVimViewport = useCallback(
@@ -651,9 +641,9 @@ export function useNodeInputBindings({
         vim: {
           mode: vimMode,
           register: registerHandle,
-          pending: vimCommandHandles.pending,
-          lastChange: vimCommandHandles.lastChange,
-          lastFind: vimCommandHandles.lastFind,
+          get commandState(): VimCommandState {
+            return vimCommandState.current
+          },
           beginInsert: (nodeId, baseline, position, change) => {
             beginInsertSession(vimSession.current, { nodeId, baseline, position, change })
           },
@@ -671,8 +661,6 @@ export function useNodeInputBindings({
           finishReplace: (input, retreatCursor, preserveDomSelection) => {
             return finishVimReplace(input, retreatCursor, preserveDomSelection)
           },
-          visualAnchor: vimCommandHandles.visualAnchor,
-          visualFocus: vimCommandHandles.visualFocus,
           imageTextCursor: {
             get current() {
               return caretAuthority.current.caret.imageTextReturnCursor
@@ -801,7 +789,6 @@ export function useNodeInputBindings({
       vimMode,
       vimSession,
       vimCommandState,
-      vimCommandHandles,
       vimTextCommandState,
     ],
   )

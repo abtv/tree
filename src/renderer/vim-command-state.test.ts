@@ -7,7 +7,6 @@ import {
   clearCommandAssembly,
   clearPending,
   clearVisualRange,
-  createVimCommandHandles,
   createVimCommandState,
   recordRepeatChange,
   structuralRepeatChange,
@@ -125,49 +124,5 @@ describe('structural insert session', () => {
       span: 3,
       text: 'typed',
     })
-  })
-})
-
-describe('createVimCommandHandles', () => {
-  it('reads and writes the owner at access time for every slot', () => {
-    const state = createVimCommandState()
-    const handles = createVimCommandHandles({ current: state })
-
-    expect(handles.pending.current).toBeUndefined()
-    expect(handles.lastChange.current).toBeUndefined()
-    expect(handles.lastFind.current).toBeUndefined()
-    expect(handles.visualAnchor.current).toBeUndefined()
-    expect(handles.visualFocus.current).toBeUndefined()
-
-    handles.pending.current = pending
-    handles.lastChange.current = change
-    handles.lastFind.current = find
-    handles.visualAnchor.current = 0
-    handles.visualFocus.current = 4
-    expect(state.pending).toBe(pending)
-    expect(state.lastChange).toBe(change)
-    expect(state.lastFind).toBe(find)
-    expect(state.visualAnchor).toBe(0)
-    expect(state.visualFocus).toBe(4)
-
-    state.pending = { count: '9', motionCount: '' }
-    state.visualFocus = 2
-    expect(handles.pending.current).toEqual({ count: '9', motionCount: '' })
-    expect(handles.visualFocus.current).toBe(2)
-
-    handles.pending.current = undefined
-    expect(state.pending).toBeUndefined()
-    expect(state.lastChange).toBe(change)
-  })
-
-  it('keeps a single owner shared by every accessor', () => {
-    const state = createVimCommandState()
-    const handles = createVimCommandHandles({ current: state })
-    const second = createVimCommandHandles({ current: state })
-    handles.visualAnchor.current = 7
-    expect(second.visualAnchor.current).toBe(7)
-    second.visualFocus.current = 8
-    expect(state.visualAnchor).toBe(7)
-    expect(state.visualFocus).toBe(8)
   })
 })

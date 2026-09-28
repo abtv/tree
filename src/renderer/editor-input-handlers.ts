@@ -3,6 +3,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
+import { clearCommandAssembly, clearPending } from './vim-command-state'
 import { getCaret, getSelectionRange, selectAll, setNormalCaret } from './editor-dom'
 import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
@@ -18,24 +19,16 @@ export type {
   VimViewportMotion,
 } from './vim-keyboard-types'
 
-function clearCommandAssemblySlots(vim: VimTextCommandState): void {
-  vim.pending.current = undefined
-  vim.visualAnchor.current = undefined
-  vim.visualFocus.current = undefined
-}
-
 /**
  * Drops the command state that belongs to the node or level being left — the pending command and
  * both character-wise Visual endpoints — and leaves whole-node Visual for Normal mode, because its
  * range is relative to the displayed level and cannot survive a focus or level change. Character
  * Visual mode keeps its mode; only the stale slots clear, matching the pointer rule that preserves
- * the mode while re-anchoring. Mirrors `clearCommandAssembly` in `vim-command-state.ts`, which this
- * module cannot call because it receives access-time handles to the owner rather than the owner
- * itself.
+ * the mode while re-anchoring.
  */
 function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): void {
   if (vim === undefined) return
-  clearCommandAssemblySlots(vim)
+  clearCommandAssembly(vim.commandState)
   if (vim.mode !== 'visual-node') return
   vim.nodeVisual.exit()
   vim.setMode('normal')
@@ -51,21 +44,20 @@ function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): v
  * prefix followed by `u` correctly did nothing.
  */
 function discardsUnfinishedCommand(vim: VimKeyboardState): boolean {
-  if (vim.pending.current === undefined) return false
-  vim.pending.current = undefined
+  if (vim.commandState.pending === undefined) return false
+  clearPending(vim.commandState)
   return true
 }
 
 /**
  * The renderer-local state a text-editing application command must resolve before it runs. The
  * full `VimKeyboardState` satisfies it structurally; the narrowed shape lets the context-menu
- * command path resolve the same state without receiving the whole keyboard surface.
+ * command path resolve the same state — its mode and the command-state owner it clears through —
+ * without receiving the whole keyboard surface.
  */
 export interface VimTextCommandState {
   mode: VimKeyboardState['mode']
-  pending: VimKeyboardState['pending']
-  visualAnchor: VimKeyboardState['visualAnchor']
-  visualFocus: VimKeyboardState['visualFocus']
+  commandState: VimKeyboardState['commandState']
   finishReplace?: VimKeyboardState['finishReplace']
   setMode: VimKeyboardState['setMode']
 }
@@ -94,7 +86,7 @@ export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefi
   if (vim.mode === 'replace') {
     commitPendingReplace(vim, input)
   } else if (vim.mode === 'insert' || vim.mode === 'visual-node') return
-  clearCommandAssemblySlots(vim)
+  clearCommandAssembly(vim.commandState)
 }
 
 /**
@@ -242,9 +234,7 @@ export function createEditorKeyDownHandler({
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
         vim.finishInsert(event.currentTarget)
-        vim.pending.current = undefined
-        vim.visualAnchor.current = undefined
-        vim.visualFocus.current = undefined
+        clearCommandAssembly(vim.commandState)
         vim.setMode('normal')
         const input = event.currentTarget
         const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))

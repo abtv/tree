@@ -2,6 +2,7 @@ import type { NodeForest, NodeVisualCommand } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { VimMode } from './vim-editing'
 import type { VimCaretState } from './vim-caret-transition'
+import type { VimCommandState } from './vim-command-state'
 
 export type VimTextChange =
   | {
@@ -85,9 +86,8 @@ export interface VimPendingCommand {
 export interface VimKeyboardState {
   mode: VimMode
   register: { current: VimRegister }
-  pending: { current: VimPendingCommand | undefined }
-  lastChange: { current: VimRepeatChange | undefined }
-  lastFind: { current: VimFindCommand | undefined }
+  /** The command-state owner; handlers read and write its fields and clear through its transitions. */
+  commandState: VimCommandState
   beginInsert: (nodeId: string, baseline: string, position: number, change: VimTextChange) => void
   finishInsert: (input: HTMLElement) => void
   beginReplace: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
@@ -99,8 +99,6 @@ export interface VimKeyboardState {
    * what the user still sees selected.
    */
   finishReplace: (input: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
-  visualAnchor: { current: number | undefined }
-  visualFocus: { current: number | undefined }
   imageTextCursor: { current: number | undefined }
   getCaretState: (nodeId: string, cursor: number, imageActive: boolean) => VimCaretState
   applyCaretState: (nodeId: string, state: VimCaretState, fromFocus?: boolean) => void

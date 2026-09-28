@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim Interaction Wiring Consolidation](vim-interaction-wiring.md) | In progress | VIW-2 — give the command-assembly invariant one implementation |
+| [Vim Interaction Wiring Consolidation](vim-interaction-wiring.md) | In progress | VIW-3 — extract counted vertical navigation |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
