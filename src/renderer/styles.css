@@ -245,7 +245,7 @@ textarea {
 
 .node-enter-control {
   position: absolute;
-  top: 4.5px;
+  top: 1.5px;
   left: 2px;
   display: grid;
   place-items: center;
@@ -286,7 +286,7 @@ textarea {
    alignment is untouched. */
 .node-disclosure-triangle {
   position: absolute;
-  top: 4.5px;
+  top: 1.5px;
   left: -26px;
   display: grid;
   place-items: center;
