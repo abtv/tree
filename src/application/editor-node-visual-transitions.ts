@@ -4,16 +4,18 @@ import {
   displayedNodes,
   ensureRoot,
   locateNode,
+  MAX_DOCUMENT_DEPTH_ERROR,
   nodePath,
   normalizeLinks,
   replaceSiblingRange,
   requireNode,
+  wouldExceedMaximumDepth,
   type Document,
   type Location,
   type NodeId,
   type TreeNode,
 } from '../domain/document'
-import type { StructuralTransition } from './editor-command-transitions'
+import type { RejectedTransition, StructuralTransition } from './editor-command-transitions'
 
 export type NodeVisualCommand = 'y' | 'd' | 'x' | 'c' | 's' | 'u' | 'U' | 'p' | 'P'
 
@@ -38,7 +40,10 @@ export function pasteNodeForestTransition(
   position: 'before' | 'after',
   source: NodeForest,
   createId: () => NodeId,
-): StructuralTransition {
+): StructuralTransition | RejectedTransition {
+  if (wouldExceedMaximumDepth(document, nodeId, source.nodes)) {
+    return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+  }
   const copies = source.nodes.map((node) => cloneNodeWithNewIds(node, createId))
   const target = requireNode(document, nodeId).node
   const replacements = position === 'before' ? copies : [target, ...copies]
@@ -93,6 +98,9 @@ export function nodeVisualTransition(
     isPasteIntoSourceDescendant(document, first.id, source?.sourceIds ?? [])
   ) {
     return { kind: 'rejected', message: 'Cannot paste a node into one of its descendants.' }
+  }
+  if ((command === 'p' || command === 'P') && wouldExceedMaximumDepth(document, first.id, source!.nodes)) {
+    return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
   }
   let replacements: readonly TreeNode[] = []
   if (command === 'c' || command === 's') replacements = [{ id: createId(), text: insertedText, children: [] }]

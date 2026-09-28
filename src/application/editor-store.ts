@@ -476,6 +476,10 @@ export class EditorStore {
       source,
       this.createId,
     )
+    if (transition.kind === 'rejected') {
+      this.reportError(new Error(transition.message))
+      return false
+    }
     this.endTextSession()
     this.applyStructural(
       transition.document,
@@ -500,6 +504,10 @@ export class EditorStore {
       source,
       this.createId,
     )
+    if (transition.kind === 'rejected') {
+      this.reportError(new Error(transition.message))
+      return false
+    }
     this.endTextSession()
     this.applyStructural(
       transition.document,

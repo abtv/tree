@@ -34,8 +34,9 @@ Baseline measured on `fdaa52e` with
 | `src/application` | 93.42 | 87.30 | 97.22 | 96.97 |
 | `src/domain` | 96.49 | 86.70 | 97.24 | 97.67 |
 
-Coverage is not the problem; both defects below sit inside covered files. No task is started. The
-worktree was clean at the end of the review session.
+Coverage is not the problem; both defects below sit inside covered files. The worktree was clean at
+the end of the review session. S1 (High Risk) is complete and committed with its implementation,
+tests, property guard, and end-to-end scenario; S2, S3, and S4 remain.
 
 ## Decisions
 
@@ -131,13 +132,13 @@ currently harmless because load-side normalization cleans up, but nothing pins t
 
 | ID | Outcome and acceptance evidence | Files expected to change | Tier | Status |
 | --- | --- | --- | --- | --- |
-| S1 | Enforce `MAX_DOCUMENT_DEPTH` on subtree and node-forest paste per D2. Acceptance: a defect-first regression test that fails before the fix by reproducing the over-depth document described above; after the fix an over-depth `p`/`P` and an over-depth node-visual paste leave document, selection, focus, and history unchanged, show `MAX_DOCUMENT_DEPTH_ERROR` as an operation error, and the document still saves; a property test asserting no operation produces a node past `MAX_DOCUMENT_DEPTH`; an E2E scenario asserting the persisted file is byte-for-byte unchanged and no `.save-error` appears. | `src/domain/document-operations.ts` (depth/height helper), `src/domain/document.ts` (re-export), `src/application/editor-command-transitions.ts`, `src/application/editor-node-visual-transitions.ts`, `src/application/editor-store.ts`, their tests, `src/domain/document.property.test.ts`, `e2e/persistence.spec.ts`, `docs/PRODUCT.md` §2.3 | High | Ready |
+| S1 | Enforce `MAX_DOCUMENT_DEPTH` on subtree and node-forest paste per D2. Acceptance: a defect-first regression test that fails before the fix by reproducing the over-depth document described above; after the fix an over-depth `p`/`P` and an over-depth node-visual paste leave document, selection, focus, and history unchanged, show `MAX_DOCUMENT_DEPTH_ERROR` as an operation error, and the document still saves; a property test asserting no operation produces a node past `MAX_DOCUMENT_DEPTH`; an E2E scenario asserting the persisted file is byte-for-byte unchanged and no `.save-error` appears. | `src/domain/document-operations.ts` (depth/height helper), `src/domain/document.ts` (re-export), `src/application/editor-command-transitions.ts`, `src/application/editor-node-visual-transitions.ts`, `src/application/editor-store.ts`, their tests, `src/domain/document.property.test.ts`, `e2e/persistence.spec.ts`, `docs/PRODUCT.md` §2.3 | High | Done |
 | S2 | Make `insertLinks` preserve the link-text invariant per D1. Acceptance: a defect-first regression test that fails before the fix on the `"XYZ"`-at-offset-5 case; a widened property test asserting `text.slice(link.start, link.end) === link.url` for `pasteText`, `pasteMultilineText`, `splitNode`, `removeTextRange`, `deleteLink`, and `replaceLinkedTextRanges`; a serialize/parse round-trip test showing a pasted-into link survives or is absent consistently before and after reload; the valid-URL-after-paste case from D1 stays a link with the recomputed URL. | `src/domain/document-links.ts`, `src/domain/document-links.test.ts`, `src/domain/document.test.ts`, `src/domain/document.property.test.ts`, `src/domain/document-links.property.test.ts`, `e2e/hyperlink.spec.ts` if the flow needs it, `docs/PRODUCT.md` §11 if D1 needs stating | Moderate | Ready |
-| S3 | Give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage, including the persistence-locked early return and the boundary/count clamping. `pasteSubtree` is covered by S1, so cover only what S1 left. Acceptance: each method is exercised through the real `EditorStore` (not the renderer double) and asserts the resulting document, location, and focus. | `src/application/editor-store.test.ts` | Low | Planned (after S1) |
+| S3 | Give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage, including the persistence-locked early return and the boundary/count clamping. `pasteSubtree` is covered by S1, so cover only what S1 left. Acceptance: each method is exercised through the real `EditorStore` (not the renderer double) and asserts the resulting document, location, and focus. | `src/application/editor-store.test.ts` | Low | Ready |
 | S4 | Add one shared conformance test pinning `validatePersistedState` and `parsePersistedState` to the same accept/reject decision over a table of malformed states, covering the currently untested `parsePersistedState` rejection paths. Record the intended link-normalization difference as an explicit expectation rather than removing it. | `src/domain/document-serialization.test.ts` or `src/domain/document.test.ts` | Low | Planned |
 
-Dependencies: S3 depends on S1 (S1 adds the `pasteSubtree` tests). S1, S2, and S4 are independent of
-each other.
+Dependencies: S3 depended on S1 (S1 adds the `pasteSubtree` tests) and is now unblocked. S1, S2,
+and S4 are independent of each other.
 
 Per `AGENTS.md` §13, S1 additionally requires an independent reviewer and a separate product
 verifier (High Risk, persistence boundary, changed user-visible behavior). S2 needs product
@@ -149,26 +150,21 @@ changes and need neither role.
 
 ## Next task
 
-**S1 — enforce the depth limit on subtree and node-forest paste.** Implementation notes for that
-task:
+**S2 — make `insertLinks` preserve the link-text invariant per D1.** Acceptance evidence and files
+are in the task table above. Context for that task:
 
-* Put the height/depth helper in the domain (`src/domain/AGENTS.md` makes the domain the owner of the
-  depth invariant) and export it through `src/domain/document.ts`.
-* For a sibling paste at `nodeId`, the pasted roots land at
-  `requireNode(document, nodeId).ancestors.length + 1`. Reject when
-  `thatDepth + height(pastedRoot) - 1 > MAX_DOCUMENT_DEPTH` for any pasted root.
-* `pasteSubtreeTransition` currently returns `StructuralTransition`; it needs to return
-  `StructuralTransition | RejectedTransition`. `nodeVisualTransition` already has a `rejected` kind
-  (`src/application/editor-node-visual-transitions.ts:88`), so reuse it.
-* `EditorStore.pasteSubtree` and `EditorStore.pasteNodeForest` must `reportError` with
-  `MAX_DOCUMENT_DEPTH_ERROR` and return `false`, leaving history untouched — follow the existing
-  rejected-transition handling in `createChild` (`src/application/editor-store.ts:406`).
-* A counted put loops over `store.pasteSubtree`, so a `false` return already rejects each repetition;
-  confirm this rather than changing the renderer.
-* `e2e/persistence.spec.ts` already has `depthSeed` and `depthSeedWithLeaf` helpers and an
-  over-depth interaction test at line 233; model the new scenario on it.
+* The single offender is `insertLinks` (`src/domain/document-links.ts:120`): it calls
+  `normalizeLinks` with `requireMatchingText = false` against a synthetic run of spaces, so a link
+  spanning the paste position keeps its `start` while `end` shifts over the inserted text.
+* D1 resolves the behavior: a paste that lands strictly inside an existing link mirrors what typing
+  already does through `reconcileLinkTextEdit` (`src/domain/document-links.ts:37`) — recompute the
+  URL from the new covered text, keep the range as a link when that text is still a valid HTTP(S)
+  URL, and drop the link otherwise.
+* Moderate Risk: `npm run check`, affected unit and property tests, focused E2E if link rendering
+  changes, and primary-agent product verification. Reuse the `e2e/hyperlink.spec.ts` screenshot
+  baselines rather than regenerating them without inspection.
+* S3 is now unblocked and can be taken after S2. S4 remains independent.
 
 Next-session prompt: "Read `plans/domain-application-soundness.md` and `AGENTS.md`, then implement
-task S1 (enforce `MAX_DOCUMENT_DEPTH` on subtree and node-forest paste). Follow the defect-first
-workflow, use the High Risk validation tier, and commit the task together with the plan status
-update."
+task S2 (make `insertLinks` preserve the link-text invariant). Follow the defect-first workflow, use
+the Moderate Risk validation tier, and commit the task together with the plan status update."

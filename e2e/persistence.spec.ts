@@ -56,6 +56,34 @@ function depthSeedWithLeaf(parentDepth: number) {
   }
 }
 
+// Level 18 with two level-19 children, each holding a level-20 leaf: yanking the second subtree and
+// putting it after the first subtree's leaf would place its child at level 21.
+function overDepthPasteSeed() {
+  type BuiltNode = { id: string; text: string; children: BuiltNode[] }
+  const root: BuiltNode = { id: 'n0', text: 'Level 1', children: [] }
+  let current = root
+  for (let index = 1; index < 18; index += 1) {
+    const child: BuiltNode = { id: `n${index}`, text: `Level ${index + 1}`, children: [] }
+    current.children.push(child)
+    current = child
+  }
+  const target: BuiltNode = {
+    id: 'n18',
+    text: 'Level 19',
+    children: [{ id: 'n19', text: 'Level 20', children: [] }],
+  }
+  const source: BuiltNode = {
+    id: 'm18',
+    text: 'Source level 19',
+    children: [{ id: 'm19', text: 'Source level 20', children: [] }],
+  }
+  current.children.push(target, source)
+  return {
+    document: { roots: [root] },
+    location: { currentParentId: current.id, selectedNodeId: target.id },
+  }
+}
+
 test.describe('persistence', () => {
   configureHiddenParallelTests()
 
@@ -244,6 +272,31 @@ test.describe('persistence', () => {
     await expect(window.getByRole('alert')).toHaveText(
       'Operation failed: Nodes cannot be nested deeper than 20 levels.',
     )
+    expect(readFileSync(documentPath(userDataDir))).toEqual(before)
+  })
+
+  test('rejects an over-depth paste without changing the persisted bytes or showing a save error', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, overDepthPasteSeed())
+    const before = readFileSync(documentPath(userDataDir))
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
+
+    // Yank the level-19 sibling subtree, enter the target's parent, and put the register after the
+    // level-20 node: the copied child would land at level 21, so the paste must reject in full.
+    await node(window, 2).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.getByRole('button', { name: 'Enter node 1' }).click()
+    await expect(parent(window)).toHaveValue('Level 19')
+
+    await window.keyboard.press('p')
+    await expect(window.getByRole('alert')).toHaveText(
+      'Operation failed: Nodes cannot be nested deeper than 20 levels.',
+    )
+    await expect(window.locator('.save-error[role="status"]')).toHaveCount(0)
+    await expect(window.locator('.persistence-locked')).toHaveCount(0)
     expect(readFileSync(documentPath(userDataDir))).toEqual(before)
   })
 })

@@ -259,6 +259,31 @@ export function insertSiblingBefore(document: Document, nodeId: NodeId, newNodeI
   return next
 }
 
+/**
+ * Height of a subtree: 1 for a leaf, plus one for each nested level below it. The depth invariant
+ * uses this together with `wouldExceedMaximumDepth` to keep every insertion within
+ * `MAX_DOCUMENT_DEPTH`.
+ */
+export function subtreeHeight(node: TreeNode): number {
+  let maximum = 0
+  const stack: Array<{ node: TreeNode; depth: number }> = [{ node, depth: 1 }]
+  while (stack.length > 0) {
+    const entry = stack.pop()!
+    maximum = Math.max(maximum, entry.depth)
+    for (const child of entry.node.children) stack.push({ node: child, depth: entry.depth + 1 })
+  }
+  return maximum
+}
+
+/**
+ * Whether inserting `roots` as siblings of `nodeId` would place any node below `MAX_DOCUMENT_DEPTH`.
+ * The roots land at the target's own depth, so each root's subtree may extend only to the limit.
+ */
+export function wouldExceedMaximumDepth(document: Document, nodeId: NodeId, roots: readonly TreeNode[]): boolean {
+  const targetDepth = requireNode(document, nodeId).ancestors.length + 1
+  return roots.some((root) => targetDepth + subtreeHeight(root) - 1 > MAX_DOCUMENT_DEPTH)
+}
+
 export function insertSubtreeSibling(
   document: Document,
   nodeId: NodeId,
@@ -267,6 +292,9 @@ export function insertSubtreeSibling(
   createId: () => NodeId,
 ): Document {
   const located = requireNode(document, nodeId)
+  if (wouldExceedMaximumDepth(document, nodeId, [source])) {
+    throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
+  }
   const copy = cloneNodeWithFreshIds(source, createId)
   const siblings = located.siblings.slice()
   siblings.splice(located.index + (position === 'after' ? 1 : 0), 0, copy)
@@ -282,6 +310,9 @@ export function replaceSiblingRange(
   replacements: readonly TreeNode[],
 ): Document {
   const located = requireNode(document, nodeId)
+  if (wouldExceedMaximumDepth(document, nodeId, replacements)) {
+    throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
+  }
   const boundedCount = Math.max(0, Math.min(count, located.siblings.length - located.index))
   const removed = located.siblings.slice(located.index, located.index + boundedCount)
   const siblings = located.siblings.slice()

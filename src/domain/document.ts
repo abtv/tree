@@ -56,6 +56,8 @@ export {
   removeTextRange,
   replaceSiblingRange,
   splitNode,
+  subtreeHeight,
+  wouldExceedMaximumDepth,
 } from './document-operations'
 
 export { assertDocument, parsePersistedState, serializeState, validatePersistedState } from './document-serialization'

@@ -118,6 +118,8 @@ If an action would create a node below level 20:
 
 Sibling creation, multiline paste, image paste, editing, and reordering remain available at level 20 because they do not increase node depth.
 
+Pasting a subtree or a multi-node Vim register is rejected in full when any copied node would fall below level 20; it is never partially applied or truncated.
+
 A persisted document containing a node below level 20 is invalid. Loading such a document must fail safely, display the document-error state, and leave the persisted data unchanged.
 
 ### 2.4 Inline Expansion

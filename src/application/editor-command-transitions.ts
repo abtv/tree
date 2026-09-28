@@ -11,6 +11,7 @@ import {
   nodePath,
   requireNode,
   splitNode,
+  wouldExceedMaximumDepth,
   type Document,
   type Location,
   type NodeId,
@@ -46,7 +47,10 @@ export function pasteSubtreeTransition(
   position: SiblingInsertionPosition,
   source: TreeNode,
   createId: () => NodeId,
-): StructuralTransition {
+): StructuralTransition | RejectedTransition {
+  if (wouldExceedMaximumDepth(document, location.selectedNodeId, [source])) {
+    return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+  }
   let insertedId: NodeId | undefined
   const nextDocument = insertSubtreeSibling(document, location.selectedNodeId, position, source, () => {
     const id = createId()

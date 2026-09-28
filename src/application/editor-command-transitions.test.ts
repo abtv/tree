@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Document, TreeNode } from '../domain/document'
-import { MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
+import { assertDocument, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import {
   ancestorNavigationTransition,
   createFirstChildTransition,
@@ -75,6 +75,43 @@ describe('editor command transitions', () => {
 
     expect(result).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
     expect(createId).not.toHaveBeenCalled()
+  })
+
+  it('rejects a sibling subtree paste that would pass the maximum depth before consuming an ID', () => {
+    let node: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      node = { id: `n${index}`, text: '', children: [node] }
+    }
+    const deepDocument: Document = { roots: [node] }
+    const source: TreeNode = {
+      id: 'source',
+      text: 'Source',
+      children: [{ id: 'source-child', text: 'Child', children: [] }],
+    }
+    const createId = vi.fn(() => 'unused')
+
+    expect(
+      pasteSubtreeTransition(
+        deepDocument,
+        { currentParentId: `n${MAX_DOCUMENT_DEPTH - 1}`, selectedNodeId: `n${MAX_DOCUMENT_DEPTH - 1}` },
+        'after',
+        source,
+        createId,
+      ),
+    ).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(createId).not.toHaveBeenCalled()
+
+    // One level higher the same two-level subtree lands exactly on the limit and is accepted.
+    let nextId = 0
+    const accepted = pasteSubtreeTransition(
+      deepDocument,
+      { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: `n${MAX_DOCUMENT_DEPTH - 2}` },
+      'after',
+      source,
+      () => `copy-${nextId++}`,
+    )
+    if (!('document' in accepted)) throw new Error('Expected an accepted transition.')
+    expect(() => assertDocument(accepted.document)).not.toThrow()
   })
 
   it('resolves vertical and horizontal navigation targets without changing the document', () => {
@@ -184,6 +221,8 @@ describe('editor command transitions', () => {
       source,
       () => beforeIds.shift()!,
     )
+
+    if (!('document' in after) || !('document' in before)) throw new Error('Expected accepted transitions.')
 
     expect(after.document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'copy', 'second'])
     expect(after.location.selectedNodeId).toBe('copy')

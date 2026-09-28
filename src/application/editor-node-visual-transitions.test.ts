@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Document, Location } from '../domain/document'
+import type { Document, Location, TreeNode } from '../domain/document'
+import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import {
   isPasteIntoSourceDescendant,
   nodeVisualTransition,
@@ -37,6 +38,32 @@ describe('whole-node Visual transitions', () => {
     expect(nextId).toBe(0)
   })
 
+  it('rejects an over-depth node-forest and whole-node Visual paste before consuming IDs', () => {
+    let node: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      node = { id: `n${index}`, text: '', children: [node] }
+    }
+    const deepDocument: Document = { roots: [node] }
+    const deepestId = `n${MAX_DOCUMENT_DEPTH - 1}`
+    const deepestLocation: Location = { currentParentId: deepestId, selectedNodeId: deepestId }
+    const source: TreeNode = {
+      id: 'source',
+      text: 'Source',
+      children: [{ id: 'source-child', text: 'Child', children: [] }],
+    }
+    const sourceForest = { nodes: [source], sourceIds: ['source'] }
+    let nextId = 0
+    const createId = (): string => `new-${++nextId}`
+
+    expect(
+      pasteNodeForestTransition(deepDocument, deepestLocation, deepestId, 'after', sourceForest, createId),
+    ).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(
+      nodeVisualTransition(deepDocument, deepestLocation, 'p', deepestId, deepestId, sourceForest, '', true, createId),
+    ).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(nextId).toBe(0)
+  })
+
   it('creates fresh forest IDs and preserves attachments', () => {
     const document: Document = { roots: [{ id: 'a', text: 'A', children: [] }] }
     const transition = pasteNodeForestTransition(
@@ -50,6 +77,7 @@ describe('whole-node Visual transitions', () => {
       },
       () => 'copy',
     )
+    if (!('document' in transition)) throw new Error('Expected an accepted transition.')
     expect(transition.document.roots.map((node) => node.id)).toEqual(['a', 'copy'])
     expect(transition.document.roots[1]?.attachment?.id).toBe('png')
     expect(transition.location.selectedNodeId).toBe('copy')

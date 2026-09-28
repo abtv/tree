@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Domain and Application Soundness Review](domain-application-soundness.md) | Not started | S1 — enforce `MAX_DOCUMENT_DEPTH` on subtree and node-forest paste |
+| [Domain and Application Soundness Review](domain-application-soundness.md) | In progress | S2 — make `insertLinks` preserve the link-text invariant |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

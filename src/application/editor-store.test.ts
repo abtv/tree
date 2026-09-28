@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from './editor-store'
-import { MAX_DOCUMENT_DEPTH, reconcileLinkTextEdit, type TreeNode } from '../domain/document'
+import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR, reconcileLinkTextEdit, type TreeNode } from '../domain/document'
 
 class FakeClock implements Clock {
   private readonly timers = new Map<number, () => void>()
@@ -275,6 +275,58 @@ describe('EditorStore', () => {
 
     store.undo()
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
+  })
+
+  it('rejects an over-depth subtree or forest paste without changing state, history, or persistence', async () => {
+    const deepest: TreeNode = {
+      id: `n${MAX_DOCUMENT_DEPTH - 1}`,
+      text: `node-${MAX_DOCUMENT_DEPTH - 1}`,
+      children: [],
+    }
+    let root: TreeNode = deepest
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      root = { id: `n${index}`, text: index === 0 ? 'root' : `node-${index}`, children: [root] }
+    }
+    const services = loadedState(
+      { roots: [root] },
+      { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
+    )
+    const createId = vi.fn(() => 'must-not-be-consumed')
+    const store = new EditorStore(services, createId)
+    await store.initialize()
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+    const source: TreeNode = {
+      id: 'source',
+      text: 'Source',
+      children: [{ id: 'source-child', text: 'Child', children: [] }],
+    }
+    const forest = { nodes: [source], sourceIds: ['source'] }
+
+    expect(store.pasteSubtree(deepest.id, 'after', source, ['source'])).toBe(false)
+    expect(store.pasteNodeForest(deepest.id, 'after', forest)).toBe(false)
+    expect(store.applyNodeVisual('p', deepest.id, deepest.id, forest)).toBeUndefined()
+
+    const after = store.getSnapshot()
+    expect(after).toMatchObject({
+      status: 'ready',
+      location: { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
+      operationError: MAX_DOCUMENT_DEPTH_ERROR,
+    })
+    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+    expect(after.document).toEqual(before.document)
+    expect(after.focus).toEqual(before.focus)
+    expect(createId).not.toHaveBeenCalled()
+    expect(services.saves).toEqual([])
+
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
+
+    // The document is still valid, so a later change saves normally instead of failing on the
+    // over-depth document the rejected paste must never create.
+    expect(store.createSibling('after')).toBe(true)
+    await store.flushPersistence()
+    expect(services.saves).toHaveLength(1)
   })
 
   it('advances the structural version for displayed-list changes but not for text edits or selection', async () => {

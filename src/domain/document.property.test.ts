@@ -31,6 +31,7 @@ import {
   splitNode,
   validatePersistedState,
   MAX_DOCUMENT_DEPTH,
+  MAX_DOCUMENT_DEPTH_ERROR,
   type Document,
   type LocatedNode,
   type Location,
@@ -87,6 +88,17 @@ function allIds(document: Document): string[] {
 function maxDepth(document: Document): number {
   let maximum = 0
   const stack = document.roots.map((node) => ({ node, depth: 1 }))
+  while (stack.length > 0) {
+    const entry = stack.pop()!
+    maximum = Math.max(maximum, entry.depth)
+    entry.node.children.forEach((child) => stack.push({ node: child, depth: entry.depth + 1 }))
+  }
+  return maximum
+}
+
+function heightOf(node: TreeNode): number {
+  let maximum = 0
+  const stack = [{ node, depth: 1 }]
   while (stack.length > 0) {
     const entry = stack.pop()!
     maximum = Math.max(maximum, entry.depth)
@@ -199,6 +211,44 @@ describe('document invariants', () => {
         expect(state.document).toBe(document)
         expect(validatePersistedState(state)).toBe(state)
         expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
+      }),
+    )
+  })
+
+  it('never places a pasted sibling subtree or sibling range replacement below the maximum depth', () => {
+    const chain = (depth: number): { document: Document; deepestId: string } => {
+      let node: TreeNode = { id: `n${depth - 1}`, text: '', children: [] }
+      for (let index = depth - 2; index >= 0; index -= 1) {
+        node = { id: `n${index}`, text: '', children: [node] }
+      }
+      return { document: { roots: [node] }, deepestId: `n${depth - 1}` }
+    }
+
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: MAX_DOCUMENT_DEPTH }), forest, (targetDepth, rawSources) => {
+        const { document, deepestId } = chain(targetDepth)
+        const before = JSON.parse(JSON.stringify(document)) as Document
+        const sources = rawSources.map((raw) => materialize([raw]).roots[0]!)
+        const tallest = sources.reduce((current, candidate) =>
+          heightOf(candidate) > heightOf(current) ? candidate : current,
+        )
+        const overDepth = targetDepth + heightOf(tallest) - 1 > MAX_DOCUMENT_DEPTH
+        let nextId = 0
+        const createId = (): string => `copy-${nextId++}`
+
+        if (overDepth) {
+          expect(() => insertSubtreeSibling(document, deepestId, 'after', tallest, createId)).toThrow(
+            MAX_DOCUMENT_DEPTH_ERROR,
+          )
+          expect(() => replaceSiblingRange(document, deepestId, 1, sources)).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+          expect(JSON.parse(JSON.stringify(document))).toEqual(before)
+          return
+        }
+
+        const inserted = insertSubtreeSibling(document, deepestId, 'after', tallest, createId)
+        expect(maxDepth(inserted)).toBeLessThanOrEqual(MAX_DOCUMENT_DEPTH)
+        const replaced = replaceSiblingRange(document, deepestId, 1, sources)
+        expect(maxDepth(replaced)).toBeLessThanOrEqual(MAX_DOCUMENT_DEPTH)
       }),
     )
   })

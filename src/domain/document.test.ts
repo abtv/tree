@@ -24,9 +24,11 @@ import {
   removeTextRange,
   reconcileLinkTextEdit,
   replaceLinkedText,
+  replaceSiblingRange,
   releaseNodeIndex,
   serializeState,
   splitNode,
+  subtreeHeight,
   isHttpUrl,
   linksAfterTextEdit,
   normalizeLinks,
@@ -286,6 +288,36 @@ describe('document operations', () => {
 
     expect(() => createFirstChild(document, deepest.id, 'new')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
     expect(deepest.children).toEqual([])
+  })
+
+  it('rejects a subtree paste or sibling range replacement below the maximum depth', () => {
+    let node: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      node = { id: `n${index}`, text: '', children: [node] }
+    }
+    const document: Document = { roots: [node] }
+    const deepestId = `n${MAX_DOCUMENT_DEPTH - 1}`
+    const source: TreeNode = {
+      id: 'source',
+      text: 'Source',
+      children: [{ id: 'source-child', text: 'Child', children: [] }],
+    }
+    expect(subtreeHeight(source)).toBe(2)
+
+    expect(() => insertSubtreeSibling(document, deepestId, 'after', source, () => 'copy')).toThrow(
+      MAX_DOCUMENT_DEPTH_ERROR,
+    )
+    expect(() => replaceSiblingRange(document, deepestId, 1, [source])).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+
+    let nextId = 0
+    const accepted = insertSubtreeSibling(
+      document,
+      `n${MAX_DOCUMENT_DEPTH - 2}`,
+      'after',
+      source,
+      () => `copy-${nextId++}`,
+    )
+    expect(() => assertDocument(accepted)).not.toThrow()
   })
 
   it('does not split a surrogate pair when the cursor is inside it', () => {
