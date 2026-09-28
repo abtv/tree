@@ -26,7 +26,7 @@ tasks remain.
 | ID | Outcome | Status | Depends on | Validation tier |
 | --- | --- | --- | --- | --- |
 | VCC-1 | Character-wise Visual `u`/`U` leaves the caret at the start of the operated range | Done | — | Moderate Risk |
-| VCC-2 | `docs/VIM_CONFORMANCE.md` marks rows that intentionally diverge from Vim | Planned | — | Minimal Risk |
+| VCC-2 | `docs/VIM_CONFORMANCE.md` marks rows that intentionally diverge from Vim | Done | — | Minimal Risk |
 
 ### VCC-1 — Visual `u`/`U` caret
 
@@ -71,13 +71,21 @@ VCC-1 landed on 2026-09-28 (see git history): `applyVisualCase` leaves the caret
 `selection.start`, `docs/PRODUCT.md` §20.2 specifies it, and focused and real-Electron tests
 (including inspected light/dark screenshots of the resulting block caret) cover it.
 
+VCC-2 landed on 2026-09-28 (see git history): `docs/VIM_CONFORMANCE.md` states the marker
+convention and marks the 19 rows whose expected behavior deliberately departs from Vim, with the
+reason; `docs/DEVELOPMENT.md` §8 makes an unmarked divergence a defect in the implementation
+review. The rows left unmarked are either conformance claims or application mechanisms and
+attachment state outside the comparison, as the convention defines.
+
 ## Next task
 
-VCC-2, the only remaining task. It is a documentation change with no product decision, but the
-Product Owner authorizes each task individually, so confirm the go-ahead before starting it.
+None. The batch is complete pending the Product Owner's confirmation that no further tasks
+remain. After that confirmation, remove this plan and its index row in the commit that records
+completion; do not start new work from this plan.
 
 ## Resume prompt
 
-> Continue the Vim caret conformance batch in `plans/vim-caret-conformance.md`. Start VCC-2: mark
-> the rows in `docs/VIM_CONFORMANCE.md` whose expected behavior intentionally diverges from Vim,
-> with the reason, so an unmarked divergence reads as a defect.
+> The Vim caret conformance batch has no remaining task. If the Product Owner confirms that no
+> further tasks remain, remove `plans/vim-caret-conformance.md` and its row from `plans/README.md`,
+> then commit the removal; the lasting knowledge is already in `docs/VIM_CONFORMANCE.md` and
+> `docs/DEVELOPMENT.md` §8.
