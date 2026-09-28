@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Model fidelity and test-double hardening](model-fidelity-hardening.md) | Active — MFH-2 ready; MFH-3 through MFH-5 planned | MFH-2: keep `Process` and `Unidentified` keydowns pending-command neutral, with a composition-sequence contract test |
+| [Model fidelity and test-double hardening](model-fidelity-hardening.md) | Active — MFH-3 ready; MFH-4 and MFH-5 planned | MFH-3: keep a keydown with the native composition flag from reaching Vim command handling |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

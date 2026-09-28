@@ -39,14 +39,16 @@ const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
 }
 
 /**
- * Keydowns that never form a command key by themselves: modifier and lock keys, and dead or compose
- * keys. A physical keyboard fires the modifier's keydown before the key it modifies, so `zO`, `rA`,
- * `d$`, `ys{`, and `3G` arrive as a bare `Shift` keydown followed by the shifted key; toggling Caps
- * Lock mid-command and pressing a dead key before its composed character have the same shape.
- * Treating any of them as the command key consumed the pending prefix, operator, or
- * awaited-character state, so the next key ran as an unrelated command. The Ctrl, Meta, and Alt
- * keydowns never reach here because their own events carry the matching modifier flag and the caller
- * excludes it.
+ * Keydowns that never form a command key by themselves: modifier and lock keys, dead or compose
+ * keys, and the `Process`/`Unidentified` keydowns a native input method can emit while it consumes
+ * the key. A physical keyboard fires the modifier's keydown before the key it modifies, so `zO`,
+ * `rA`, `d$`, `ys{`, and `3G` arrive as a bare `Shift` keydown followed by the shifted key;
+ * toggling Caps Lock mid-command and pressing a dead key before its composed character have the
+ * same shape. Chromium reports an IME-consumed keydown as `Process` (keyCode 229) or
+ * `Unidentified`, and it can arrive before `compositionstart` sets the composing state. Treating
+ * any of them as the command key consumed the pending prefix, operator, or awaited-character
+ * state, so the next key ran as an unrelated command. The Ctrl, Meta, and Alt keydowns never reach
+ * here because their own events carry the matching modifier flag and the caller excludes it.
  */
 function isNeutralKeydown(key: string): boolean {
   return (
@@ -58,7 +60,9 @@ function isNeutralKeydown(key: string): boolean {
     key === 'FnLock' ||
     key === 'AltGraph' ||
     key === 'Dead' ||
-    key === 'Compose'
+    key === 'Compose' ||
+    key === 'Process' ||
+    key === 'Unidentified'
   )
 }
 
@@ -80,7 +84,8 @@ export function handleVimKey(
   vim: VimKeyboardState,
 ): boolean {
   const commandState = vim.commandState
-  // A modifier, lock, or dead-key keydown stays pending-command-neutral; it is not the command key.
+  // A modifier, lock, dead-key, or IME keydown stays pending-command-neutral; it is not the command
+  // key.
   if (isNeutralKeydown(event.key)) {
     event.preventDefault()
     return true

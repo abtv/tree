@@ -8,6 +8,7 @@ import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './e
 import type { VimKeyboardState, VimPendingCommand, VimTextCommandState } from './editor-input-handlers'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
+import { clearPending } from './vim-command-state'
 
 function createStore(): EditorStore {
   return {
@@ -71,7 +72,12 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
   }
 }
 
-function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['mode'] = 'normal') {
+function vimHandler(
+  store: EditorStore,
+  node: TreeNode,
+  mode: VimKeyboardState['mode'] = 'normal',
+  isComposing: () => boolean = () => false,
+) {
   const onPreviewAttachment = vi.fn()
   const double = createVimKeyboardDouble(node.id, { mode, onPreviewAttachment })
   const { vim } = double
@@ -83,7 +89,7 @@ function vimHandler(store: EditorStore, node: TreeNode, mode: VimKeyboardState['
     handle: createEditorKeyDownHandler({
       store,
       node,
-      isComposing: () => false,
+      isComposing,
       setSelectAllNodeId: vi.fn(),
       onPreviewAttachment,
       vim,
@@ -1574,10 +1580,12 @@ describe('editor keyboard handler', () => {
     { key: 'AltGraph', options: {} },
     { key: 'Dead', options: {} },
     { key: 'Compose', options: {} },
+    { key: 'Process', options: {} },
+    { key: 'Unidentified', options: {} },
     { key: 'Control', options: { ctrlKey: true } },
     { key: 'Meta', options: { metaKey: true } },
     { key: 'Alt', options: { altKey: true } },
-  ])('keeps a pending fold prefix through the bare $key keydown', ({ key, options }) => {
+  ])('keeps a pending fold prefix through the neutral $key keydown', ({ key, options }) => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
@@ -1590,6 +1598,45 @@ describe('editor keyboard handler', () => {
 
     expect(vim.fold).toHaveBeenCalledExactlyOnceWith('close', 'node')
   })
+
+  it.each(['Process', 'Unidentified'])(
+    'clears a pending fold prefix through composition started by a %s keydown',
+    (imeKey) => {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = 'text'
+      input.setSelectionRange(2, 2)
+      let composing = false
+      const { handle, vim, commandState } = vimHandler(
+        store,
+        { id: 'node', text: 'text', children: [] },
+        'normal',
+        () => composing,
+      )
+
+      // Chromium can report the keydown that begins composition before `compositionstart` sets the
+      // composing state, as `Process` (keyCode 229) or `Unidentified`. It is not the command key, so
+      // the pending `z` must survive it and stay available for the composition path to clear.
+      handle(keyEvent(input, 'z'))
+      handle(keyEvent(input, imeKey))
+      expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+
+      // `compositionstart` then clears the unfinished command — the same production `clearPending`
+      // call `use-node-input-bindings.ts` makes — and the composed keydown is ignored because the
+      // composing state is set.
+      clearPending(commandState)
+      composing = true
+      handle(keyEvent(input, 'Enter'))
+
+      expect(commandState.pending).toBeUndefined()
+      expect(vim.fold).not.toHaveBeenCalled()
+      expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+      expect(store.replaceTextRange).not.toHaveBeenCalled()
+      expect(input.value).toBe('text')
+      expect(input.selectionStart).toBe(2)
+      expect(input.selectionEnd).toBe(2)
+    },
+  )
 
   it('keeps a pending operator and an awaited character across a bare Shift keydown', () => {
     const store = createStore()
