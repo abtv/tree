@@ -14,7 +14,7 @@ Each node:
 * may contain at most one image attachment;
 * can be edited inline.
 
-The user is always viewing one level: either the top-level root nodes or the immediate children of the current parent.
+The user's location is one level: either the top-level root nodes or the immediate children of the current parent. Nodes at that level may be expanded to show descendants inline (see §2.4).
 
 The application is keyboard-first. Mouse interaction is primarily used for drag-and-drop reordering.
 
@@ -49,8 +49,6 @@ The implicit document container:
 
 At the root level, the user views and edits the top-level root nodes. Below the root level, the user views the immediate children of a real current-parent node.
 
-The UI does not display the entire expanded tree.
-
 The user enters a node to view and edit its children.
 
 The node representing the current parent is displayed as contextual information, is visually highlighted, and can be edited inline.
@@ -69,7 +67,7 @@ Nodes are presented as plain outline rows with a solid 7px circular bullet to th
 
 Nodes with one or more direct children display a muted outer circle surrounding their solid bullet, producing two concentric circles. Nodes without children display only the solid bullet. Clicking the circular indicator enters that node and displays its children; it does not place the text cursor or edit the node.
 
-The node whose text field contains the caret (the selected node) displays a solid right-pointing triangle immediately to the left of its circular indicator, separated by a small gap. The triangle has the same visual weight as the solid bullet, is decorative and not a pointer target, and is shown whether or not the node has children. The editable current-parent heading never displays the triangle; when the caret is in the current-parent heading, no node displays it.
+Nodes with children display a disclosure triangle to the left of their circular indicator. Clicking it expands or collapses that node inline without entering it, moving the text caret, or editing the node. Its direction indicates whether the node is expanded. Leaf rows retain the same text alignment without an active disclosure control. The selected node has a separate visible focus indication that is distinct from the disclosure triangle, whether or not it has children. The editable current-parent heading has no disclosure triangle.
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
@@ -119,6 +117,16 @@ If an action would create a node below level 20:
 Sibling creation, multiline paste, image paste, editing, and reordering remain available at level 20 because they do not increase node depth.
 
 A persisted document containing a node below level 20 is invalid. Loading such a document must fail safely, display the document-error state, and leave the persisted data unchanged.
+
+### 2.4 Inline Expansion
+
+All nodes begin collapsed when a location is opened. Clicking a node's disclosure triangle shows its direct children immediately beneath it, indented to reflect their depth. An expanded child can be expanded in the same way, and collapsing an ancestor hides every visible descendant beneath it. Expanding that ancestor again restores any nested expansion choices made during the same visit to the location.
+
+Visible descendants are ordinary editable nodes: the user can click their text, place the caret, edit them, use their circular indicator to enter them, and expand or collapse their children. The location path and current-parent heading continue to represent the current location, even when a visible descendant has the caret. Existing keyboard commands that act on nodes use the focused node's actual sibling level; expansion adds no keyboard or Vim command and does not make the flattened view a new sibling list.
+
+Expansion is view state, not a document edit. It creates no undo entry or save. Changing location, including entering a node or using the location path, clears all expansion choices; reopening the application also starts collapsed. If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged.
+
+Dragging visible descendants can reorder nodes only among their actual siblings. An expanded view provides no cross-level drop target and cannot change hierarchy by dragging.
 
 ---
 
@@ -514,7 +522,7 @@ Sibling reordering begins when the primary mouse button is pressed and held on a
 
 Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row shows its gray drag highlight. The node's text surface loses focus while the drag is active: any transient selection is cleared, no text can be selected, and pointer movement cannot move the text cursor. Moving the pointer highlights the current between-row drop target and releasing completes the move. Releasing without changing the position leaves the document unchanged. When the drag ends, focus and the text cursor return to the node. `Escape` cancels an active drag without moving the node, and cancellation keeps text selection disabled until the primary mouse button is released.
 
-Drag-and-drop is allowed only between nodes on the displayed level: either top-level root nodes or immediate children of the current parent.
+Drag-and-drop is allowed only between actual siblings at the dragged node's level, including when those siblings are visible through inline expansion.
 
 A drag operation:
 
@@ -876,11 +884,11 @@ The user normally interacts with the application through:
 * clipboard;
 * mouse drag-and-drop for sibling reordering.
 
-The tree hierarchy is primarily navigated by entering and leaving nodes rather than by expanding and collapsing a full tree view.
+The tree hierarchy can be navigated by entering and leaving nodes or inspected and edited through inline expansion. Expansion does not change the current location.
 
 ### 20.1 Very Wide Node Lists
 
-When a displayed level contains more than 500 siblings, the application renders only the rows near the viewport plus a small overscan. The off-screen rows are absent from the DOM: browser find-in-page and assistive technology expose only the mounted rows, and selecting or copying text that spans off-screen rows requires scrolling to them.
+When the current location contains more than 500 visible rows, including inline descendants, the application renders only the rows near the viewport plus a small overscan. The off-screen rows are absent from the DOM: browser find-in-page and assistive technology expose only the mounted rows, and selecting or copying text that spans off-screen rows requires scrolling to them.
 
 The focused row stays mounted even when it is off-screen, so keyboard navigation, focus restoration, typing, and the caret never lose their input.
 
@@ -888,7 +896,7 @@ A drag that reaches the top or bottom edge of the window scrolls the page automa
 
 The page continues to scroll as a single document. The location bar and the current-parent heading scroll with the content.
 
-At or below 500 displayed siblings, the list renders every row and behaves exactly as before, including find-in-page and accessibility.
+At or below 500 visible rows, the list renders every row, including inline descendants, without windowing.
 
 ### 20.2 Vim-Inspired Editing
 
