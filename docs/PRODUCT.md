@@ -65,6 +65,8 @@ The current parent is not part of `↑` / `↓` sibling navigation, except that 
 
 Nodes are presented as plain outline rows with a solid 7px circular bullet to the left of their text. The bullet and text are aligned to consistent outline columns.
 
+The visible center of each row's bullet, disclosure triangle, and selected-node focus indication aligns vertically with the center of the first text line. This alignment holds for wrapped text and remains correct as focus moves between rows. This is a product requirement, not a stylistic preference.
+
 Nodes with one or more direct children display a muted outer circle surrounding their solid bullet, producing two concentric circles. Nodes without children display only the solid bullet. Clicking the circular indicator enters that node and displays its children; it does not place the text cursor or edit the node.
 
 Nodes with children display a disclosure triangle to the left of their circular indicator. Clicking it expands or collapses that node inline without entering it, moving the text caret, or editing the node. Its direction indicates whether the node is expanded. Leaf rows retain the same text alignment without an active disclosure control. The selected node has a separate visible focus indication that is distinct from the disclosure triangle, whether or not it has children. The editable current-parent heading has no disclosure triangle.

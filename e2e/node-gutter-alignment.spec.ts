@@ -26,6 +26,7 @@ interface GutterAlignment {
   textCenter: number
   enterControlCenter: number
   triangleCenter: number | null
+  focusMarkerCenter: number | null
 }
 
 // Reads real layout geometry from the Electron renderer rather than asserting on fixed pixel
@@ -51,7 +52,11 @@ function gutterAlignment(window: Page, rowIndex: number): Promise<GutterAlignmen
       const triangleRect = triangle instanceof HTMLElement ? triangle.getBoundingClientRect() : null
       const triangleCenter = triangleRect === null ? null : triangleRect.top + triangleRect.height / 2
 
-      return { textCenter, enterControlCenter, triangleCenter }
+      const focusMarker = row.querySelector('.node-focus-marker')
+      const focusMarkerRect = focusMarker instanceof HTMLElement ? focusMarker.getBoundingClientRect() : null
+      const focusMarkerCenter = focusMarkerRect === null ? null : focusMarkerRect.top + focusMarkerRect.height / 2
+
+      return { textCenter, enterControlCenter, triangleCenter, focusMarkerCenter }
     })
 }
 
@@ -63,6 +68,18 @@ test.describe('node gutter alignment', () => {
     const leaf = await gutterAlignment(window, 0)
     expect(leaf.triangleCenter).toBeNull()
     expect(Math.abs(leaf.enterControlCenter - leaf.textCenter)).toBeLessThanOrEqual(1)
+    expect(leaf.focusMarkerCenter).not.toBeNull()
+    expect(Math.abs((leaf.focusMarkerCenter as number) - leaf.enterControlCenter)).toBeLessThanOrEqual(1)
+    await expect(window.locator('.node-list')).toHaveScreenshot('node-focus-marker-alignment.png')
+
+    await window.locator('.node-row').nth(1).click()
+    const unfocused = await gutterAlignment(window, 0)
+    expect(unfocused.focusMarkerCenter).toBeNull()
+    const newlyFocused = await gutterAlignment(window, 1)
+    expect(newlyFocused.focusMarkerCenter).not.toBeNull()
+    expect(Math.abs((newlyFocused.focusMarkerCenter as number) - newlyFocused.enterControlCenter)).toBeLessThanOrEqual(
+      1,
+    )
 
     const parent = await gutterAlignment(window, 1)
     expect(parent.triangleCenter).not.toBeNull()

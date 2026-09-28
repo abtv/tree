@@ -326,7 +326,7 @@ textarea {
 
 .node-focus-marker {
   position: absolute;
-  top: 8.5px;
+  top: 6px;
   left: -9px;
   width: 0;
   height: 0;
