@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { cloneNode, displayedNodes, linkAtPosition, requireNode, type TreeNode } from '../domain/document'
+import { cloneNode, displayedNodes, linkAtPosition, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
@@ -23,12 +23,8 @@ import type {
 } from './vim-keyboard-types'
 import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
 import { clearCommandAssembly, clearPending, clearVisualRange, recordRepeatChange } from './vim-command-state'
-import {
-  editCaretTransition,
-  focusCaretTransition,
-  horizontalCaretTransition,
-  verticalCaretTransition,
-} from './vim-caret-transition'
+import { editCaretTransition, horizontalCaretTransition } from './vim-caret-transition'
+import { navigateVertically } from './vim-vertical-navigation'
 
 function syncImageCaretAtCursor(
   vim: VimKeyboardState,
@@ -416,71 +412,15 @@ export function handleVimKey(
       vim.setMode('visual-node')
     }
   } else if (!visual && (event.key === 'j' || event.key === 'k')) {
-    const direction = event.key === 'j' ? 'down' : 'up'
-    let currentNode = node
-    let caret = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
-    let navigationCursor = cursor
-    for (let index = 0; index < count; index += 1) {
-      const before = store.getSnapshot()
-      if (before.status !== 'ready') break
-      const siblings =
-        before.document === undefined ? undefined : displayedNodes(before.document, before.location.currentParentId)
-      const selectedIndex = siblings?.findIndex((candidate) => candidate.id === before.location.selectedNodeId) ?? -1
-      const canCrossNode =
-        siblings === undefined ||
-        (direction === 'down'
-          ? before.location.selectedNodeId === before.location.currentParentId
-            ? currentNode.children.length > 0
-            : selectedIndex < siblings.length - 1
-          : before.location.selectedNodeId === before.location.currentParentId ||
-            selectedIndex > 0 ||
-            before.location.currentParentId !== null)
-      const step = verticalCaretTransition(
-        caret,
-        direction,
-        currentNode.text.length,
-        index === 0 && currentNode.attachment !== undefined,
-        canCrossNode,
-      )
-      if (!step.crossNode) {
-        if (step.caret === caret) {
-          vim.applyCaretState(currentNode.id, caret)
-          break
-        }
-        caret = step.caret
-        navigationCursor = caret.cursor
-        setNormalCaret(input, caret.cursor)
-        vim.applyCaretState(currentNode.id, caret)
-        continue
-      }
-      const focusCursor = index === 0 ? step.focusCursor : navigationCursor
-      store.moveSelection(direction, focusCursor)
-      if (index === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
-      const after = store.getSnapshot()
-      if (after.status !== 'ready') break
-      if (
-        (after.focus !== undefined && after.focus.token === before.focus?.token) ||
-        (after.focus === undefined &&
-          after.location.selectedNodeId === before.location.selectedNodeId &&
-          after.location.selectedNodeId === currentNode.id &&
-          count === 1)
-      ) {
-        vim.applyCaretState(currentNode.id, caret)
-        break
-      }
-      if (after.document === undefined) continue
-      const crossedToDifferentNode = after.location.selectedNodeId !== currentNode.id
-      currentNode = requireNode(after.document, after.location.selectedNodeId).node
-      caret = focusCaretTransition(
-        caret,
-        after.focus?.cursor ?? focusCursor,
-        currentNode.text.length,
-        currentNode.attachment !== undefined,
-        true,
-        direction === 'up' && crossedToDifferentNode,
-      )
-      vim.applyCaretState(currentNode.id, caret, true)
-    }
+    navigateVertically({
+      store,
+      node,
+      caret: vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
+      direction: event.key === 'j' ? 'down' : 'up',
+      count,
+      setCaret: (nextCursor) => setNormalCaret(input, nextCursor),
+      applyCaretState: vim.applyCaretState,
+    })
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, node, input, selection.start, node.text.length)
   } else if (visual && event.key === 'o') {
