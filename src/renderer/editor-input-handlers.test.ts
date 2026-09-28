@@ -43,7 +43,14 @@ function createStore(): EditorStore {
 function keyEvent(
   input: HTMLElement,
   key: string,
-  options: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; isComposing?: boolean } = {},
+  options: {
+    altKey?: boolean
+    ctrlKey?: boolean
+    metaKey?: boolean
+    shiftKey?: boolean
+    isComposing?: boolean
+    repeat?: boolean
+  } = {},
 ) {
   return {
     currentTarget: input,
@@ -52,6 +59,7 @@ function keyEvent(
     ctrlKey: options.ctrlKey ?? false,
     metaKey: options.metaKey ?? false,
     shiftKey: options.shiftKey ?? false,
+    repeat: options.repeat ?? false,
     nativeEvent: { isComposing: options.isComposing ?? false },
     preventDefault: vi.fn(),
   } as unknown as KeyboardEvent<HTMLElement>
@@ -1734,6 +1742,121 @@ describe('editor keyboard handler', () => {
     second.handle(keyEvent(input, 'Shift', { shiftKey: true }))
     second.handle(keyEvent(input, 'A'))
     expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 1, 'A')
+  })
+
+  // Auto-repeat: holding a key sends keydowns with `repeat: true`, and the handler treats each as
+  // one more ordinary press. `z`, `r`, `g`, and operator keys change pending state on the first
+  // press, so the repeat completes or consumes that state. `l` follows each repeat because a
+  // prefix that wrongly stayed pending would swallow it as an unrecognized key, and the repeat
+  // event's `preventDefault` keeps the held key out of native editing.
+  it('treats a repeated z keydown as the second press of the fold prefix', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(0, 0)
+    const { handle, vim, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'z'))
+    expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+
+    const repeat = keyEvent(input, 'z', { repeat: true })
+    handle(repeat)
+
+    // `zz` is not one of the implemented fold keys, so the repeat consumes the prefix as an
+    // ordinary second press and dispatches no fold.
+    expect(vim.fold).not.toHaveBeenCalled()
+    expect(commandState.pending).toBeUndefined()
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(input.value).toBe('one two')
+    expect(input.selectionStart).toBe(0)
+    expect(repeat.preventDefault).toHaveBeenCalledOnce()
+
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(1)
+    expect(vim.fold).not.toHaveBeenCalled()
+  })
+
+  it('treats a repeated r keydown as the awaited replacement character', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc'
+    input.setSelectionRange(0, 0)
+    const { handle, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'r'))
+    expect(commandState.pending).toEqual({ count: '', motionCount: '', awaiting: 'r' })
+
+    const repeat = keyEvent(input, 'r', { repeat: true })
+    handle(repeat)
+
+    // Holding `r` types literal `r`s in Vim: the repeat is the awaited character, so it replaces
+    // the character under the caret once and clears the pending command.
+    expect(store.replaceTextRange).toHaveBeenCalledExactlyOnceWith('node', 0, 1, 'r')
+    expect(commandState.pending).toBeUndefined()
+    expect(input.selectionStart).toBe(0)
+    expect(repeat.preventDefault).toHaveBeenCalledOnce()
+
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(1)
+    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a repeated g keydown as the second g of the parent-boundary motion', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 0)
+    const { handle, vim, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'g'))
+    expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
+
+    const repeat = keyEvent(input, 'g', { repeat: true })
+    handle(repeat)
+
+    // `gg` consumes the prefix and selects the current parent; the repeat leaves no second `g`
+    // pending and runs no store command.
+    expect(vim.moveBoundary).toHaveBeenCalledExactlyOnceWith('parent', 0)
+    expect(commandState.pending).toBeUndefined()
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(input.selectionStart).toBe(0)
+    expect(repeat.preventDefault).toHaveBeenCalledOnce()
+
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(1)
+    expect(vim.moveBoundary).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a repeated d operator keydown as the second d of the node delete', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 0)
+    const { handle, vim, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'd'))
+    expect(commandState.pending).toEqual({ count: '', motionCount: '', operator: 'd' })
+
+    const repeat = keyEvent(input, 'd', { repeat: true })
+    handle(repeat)
+
+    // `dd` consumes the operator: the repeat deletes the node exactly once, records one repeatable
+    // structural change, and does not fall through to a text edit.
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
+    expect(vim.register.current).toMatchObject({
+      kind: 'node',
+      value: { id: 'node', text: 'text' },
+      sourceIds: ['node'],
+    })
+    expect(commandState.lastChange).toEqual({ kind: 'structural-delete' })
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(commandState.pending).toBeUndefined()
+    expect(input.selectionStart).toBe(0)
+    expect(repeat.preventDefault).toHaveBeenCalledOnce()
+
+    handle(keyEvent(input, 'l'))
+    expect(input.selectionStart).toBe(1)
+    expect(store.deleteSelected).toHaveBeenCalledOnce()
   })
 
   it.each([
