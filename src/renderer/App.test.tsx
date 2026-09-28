@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, render as renderReact, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
+import type { Document } from '../domain/document'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
@@ -53,10 +54,14 @@ function createStore(
   return new EditorStore(services, () => ['root', 'child', 'sibling'][id++] ?? `node-${id}`)
 }
 
-async function createSeededStore(document: unknown, location: unknown): Promise<EditorStore> {
+async function createSeededStore(
+  document: unknown,
+  location: unknown,
+  save: EditorServices['save'] = async () => undefined,
+): Promise<EditorStore> {
   const services: EditorServices = {
     load: async () => ({ version: 1, document, location }),
-    save: async () => undefined,
+    save,
     readClipboard: async () => ({ kind: 'text', text: '' }),
     writeAttachment: async () => undefined,
     cleanupAttachments: async () => undefined,
@@ -668,6 +673,7 @@ describe('App', () => {
     }
 
     function readySnapshot(store: EditorStore): {
+      document: Document
       location: { currentParentId: string | null; selectedNodeId: string }
       focus?: { nodeId: string; cursor: number; token: number }
     } {
@@ -821,6 +827,48 @@ describe('App', () => {
 
       expect(texts()).toEqual(['Alpha child', 'Alpha leaf'])
       expect(heading).toHaveFocus()
+    })
+
+    it('creates no undo entry or save when expanding inline', async () => {
+      const save = vi.fn(async () => undefined)
+      const store = await createSeededStore(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }, save)
+      renderReact(<App store={store} />)
+      const alpha = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      const beforeEdit = readySnapshot(store)
+
+      fireEvent.change(alpha, { target: { value: 'Alpha edited' } })
+      await act(async () => {
+        await store.flushPersistence()
+      })
+      const edited = readySnapshot(store).document
+      const savesAfterEdit = save.mock.calls.length
+      // The edit itself persists; the assertions below attribute any further save to expansion.
+      expect(savesAfterEdit).toBeGreaterThan(0)
+
+      // docs/PRODUCT.md §2.4: expansion is view state. The disclosure triangle, `za`, and `zR` must
+      // not edit the document, add an undo entry, or schedule a save.
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha leaf', 'Bravo'])
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+      fold(alpha, 'a')
+      expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha leaf', 'Bravo'])
+      fold(alpha, 'R')
+      expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
+
+      expect(readySnapshot(store).document).toEqual(edited)
+      await act(async () => {
+        await store.flushPersistence()
+      })
+      expect(save).toHaveBeenCalledTimes(savesAfterEdit)
+
+      // One undo removes exactly the text edit, so expansion added no history entry; a second undo
+      // has nothing left to remove.
+      press(alpha, 'u')
+      const undone = readySnapshot(store)
+      expect(undone.document).toEqual(beforeEdit.document)
+      expect(undone.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
+      press(alpha, 'u')
+      expect(readySnapshot(store).document).toEqual(beforeEdit.document)
     })
   })
 
