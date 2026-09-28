@@ -2,6 +2,50 @@ import { expect, largeSeed, launchTree, round, seedDocument, test, wideSeed } fr
 import { recordPerfResult } from './results'
 
 test.describe('Vim interactions at scale', () => {
+  test('ordinary Vim editing keeps repeated key-to-paint latency low', async ({ userDataDir }) => {
+    seedDocument(userDataDir, wideSeed(100))
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 51', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+
+    await window.evaluate(() => {
+      const paints: number[] = []
+      ;(window as unknown as { vimEditingPaints: number[] }).vimEditingPaints = paints
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (!['l', 'h', 'j', 'k', 'i', 'Escape'].includes(event.key)) return
+          requestAnimationFrame(() => requestAnimationFrame(() => paints.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    for (let index = 0; index < 20; index += 1) {
+      for (const key of ['l', 'h', 'j', 'k', 'i', 'Escape']) await window.keyboard.press(key)
+    }
+    await window.waitForFunction(
+      () => (window as unknown as { vimEditingPaints: number[] }).vimEditingPaints.length === 120,
+    )
+    const paints = await window.evaluate(() =>
+      (window as unknown as { vimEditingPaints: number[] }).vimEditingPaints.slice().sort((a, b) => a - b),
+    )
+    const paintP95Ms = paints[Math.floor(paints.length * 0.95)]!
+    const paintMaxMs = paints[paints.length - 1]!
+
+    await expect(input).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-ordinary-100',
+      samples: paints.length,
+      metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
+    })
+    expect(paintP95Ms).toBeLessThan(100)
+    expect(paintMaxMs).toBeLessThan(250)
+  })
+
   test('large-10000 cross-parent subtree relocation with dd and P', async ({ userDataDir }) => {
     seedDocument(userDataDir, largeSeed(100, 100))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
