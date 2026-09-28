@@ -1908,6 +1908,53 @@ describe('editor keyboard handler', () => {
     expect(put.vim.mode).toBe('normal')
   })
 
+  it('leaves the caret at the start of a character-wise Visual case range', () => {
+    const lowerStore = createStore()
+    const lowerInput = document.createElement('textarea')
+    lowerInput.value = 'aBcDe'
+    lowerInput.setSelectionRange(1, 4)
+    const lower = vimHandler(lowerStore, { id: 'node', text: lowerInput.value, children: [] }, 'visual')
+    lower.vim.visualAnchor.current = 3
+    lower.vim.visualFocus.current = 1
+
+    lower.handle(keyEvent(lowerInput, 'u'))
+
+    expect(lowerStore.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 4, 'bcd')
+    expect(lower.vim.mode).toBe('normal')
+    expect(lower.vim.scheduleCaret).toHaveBeenLastCalledWith(lowerInput, 1)
+    expect(lower.vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+
+    const upperStore = createStore()
+    const upperInput = document.createElement('textarea')
+    upperInput.value = 'ab'
+    upperInput.setSelectionRange(0, 2)
+    const upper = vimHandler(upperStore, { id: 'node', text: upperInput.value, children: [] }, 'visual')
+    upper.vim.visualAnchor.current = 0
+    upper.vim.visualFocus.current = 1
+
+    upper.handle(keyEvent(upperInput, 'U'))
+
+    expect(upperStore.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 2, 'AB')
+    expect(upper.vim.scheduleCaret).toHaveBeenLastCalledWith(upperInput, 0)
+
+    const imageStore = createStore()
+    const imageInput = document.createElement('textarea')
+    imageInput.value = 'ab'
+    imageInput.setSelectionRange(0, 2)
+    const image = vimHandler(
+      imageStore,
+      { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+      'visual',
+    )
+    image.vim.visualAnchor.current = 0
+    image.vim.visualFocus.current = 1
+
+    image.handle(keyEvent(imageInput, 'u'))
+
+    expect(image.vim.scheduleCaret).toHaveBeenLastCalledWith(imageInput, 0)
+    expect(image.vim.setImageCaret).toHaveBeenLastCalledWith('node', false)
+  })
+
   it('does not dispatch commands while native text composition is active', () => {
     const store = createStore()
     const input = document.createElement('textarea')

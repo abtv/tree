@@ -922,6 +922,13 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('o')
     await window.keyboard.press('u')
     await expect(editor).toHaveValue('abCd')
+    // Vim leaves the caret at the start of the operated range for a Visual-mode case change.
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 1)
+    await expect(editor).toHaveScreenshot('vim-visual-case-caret-light.png')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(editor).toHaveScreenshot('vim-visual-case-caret-dark.png')
+    await window.emulateMedia({ colorScheme: 'light' })
 
     await setCursor(editor, 0)
     await window.keyboard.press('v')

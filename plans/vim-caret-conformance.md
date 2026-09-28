@@ -25,7 +25,7 @@ tasks remain.
 
 | ID | Outcome | Status | Depends on | Validation tier |
 | --- | --- | --- | --- | --- |
-| VCC-1 | Character-wise Visual `u`/`U` leaves the caret at the start of the operated range | Ready | — | Moderate Risk |
+| VCC-1 | Character-wise Visual `u`/`U` leaves the caret at the start of the operated range | Done | — | Moderate Risk |
 | VCC-2 | `docs/VIM_CONFORMANCE.md` marks rows that intentionally diverge from Vim | Planned | — | Minimal Risk |
 
 ### VCC-1 — Visual `u`/`U` caret
@@ -65,12 +65,19 @@ structural commands that land at cursor `0`.
 Files expected to change: `docs/VIM_CONFORMANCE.md`, and `docs/DEVELOPMENT.md` §8 if the marker
 becomes part of the required review procedure.
 
+## Progress
+
+VCC-1 landed on 2026-09-28 (see git history): `applyVisualCase` leaves the caret at
+`selection.start`, `docs/PRODUCT.md` §20.2 specifies it, and focused and real-Electron tests
+(including inspected light/dark screenshots of the resulting block caret) cover it.
+
 ## Next task
 
-VCC-1. It is authorized and unblocked, and it changes product behavior, so it goes first; VCC-2 is a
-documentation task that can follow in its own session.
+VCC-2, the only remaining task. It is a documentation change with no product decision, but the
+Product Owner authorizes each task individually, so confirm the go-ahead before starting it.
 
 ## Resume prompt
 
-> Continue the Vim caret conformance batch in `plans/vim-caret-conformance.md`. Start VCC-1: make
-> character-wise Visual `u`/`U` leave the caret at the start of the operated range, as Vim does.
+> Continue the Vim caret conformance batch in `plans/vim-caret-conformance.md`. Start VCC-2: mark
+> the rows in `docs/VIM_CONFORMANCE.md` whose expected behavior intentionally diverges from Vim,
+> with the reason, so an unmarked divergence reads as a defect.

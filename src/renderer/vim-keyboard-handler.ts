@@ -828,11 +828,13 @@ function applyVisualCase(
   if (vim.imageTextCursor !== undefined) vim.imageTextCursor.current = undefined
   if (vim.lastChange !== undefined)
     vim.lastChange.current = { kind: 'case', mode, count: selection.end - selection.start }
+  // Vim leaves the cursor at the start of the operated range for a Visual-mode operator,
+  // independent of the selection direction and of any length change from the case transform.
   leaveVisual(
     vim,
     node,
     input,
-    selection.start + Math.max(0, replacement.length - 1),
+    selection.start,
     node.text.length - (selection.end - selection.start) + replacement.length,
   )
 }
