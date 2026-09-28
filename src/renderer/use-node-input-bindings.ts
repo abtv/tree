@@ -498,6 +498,9 @@ export function useNodeInputBindings({
     const update = (): void => {
       for (const input of inputs.current.values()) {
         if (!(input instanceof HTMLTextAreaElement)) updateSelectedLinks(input)
+        if (input === document.activeElement) {
+          input.classList.toggle('node-input-text-selected', hasMultiCharacterSelection(input))
+        }
       }
     }
     document.addEventListener('selectionchange', update)

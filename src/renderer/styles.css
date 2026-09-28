@@ -430,6 +430,15 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: var(--color-ink);
 }
 
+/* A normal-mode selection wider than the one-character block caret — a pointer drag or Cmd+A — is
+   a deliberate text selection, not the caret, so it uses the shared highlight pair. The renderer
+   marks the input while its selection is wider than the block caret. */
+.vim-state-normal .node-input.node-input-text-selected::selection,
+.vim-state-normal .node-input.node-input-text-selected *::selection {
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
+}
+
 .vim-state-visual .node-input::selection,
 .vim-state-visual .node-input *::selection {
   color: var(--highlight-foreground);

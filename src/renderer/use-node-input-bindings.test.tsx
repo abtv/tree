@@ -2181,6 +2181,36 @@ describe('useNodeInputBindings', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it('marks a deliberate multi-character selection and clears the mark at the block caret', () => {
+    const store = createStore()
+    const { result } = renderBindings({ store, selectedNodeId: 'node' })
+    const node: TreeNode = { id: 'node', text: 'hello', children: [] }
+    const input = document.createElement('textarea')
+    input.value = node.text
+    document.body.append(input)
+    input.focus()
+    act(() => result.current(node).inputRef(input))
+
+    act(() => {
+      input.setSelectionRange(0, input.value.length)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    expect(input.classList.contains('node-input-text-selected')).toBe(true)
+
+    act(() => {
+      input.setSelectionRange(2, 2)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    expect(input.classList.contains('node-input-text-selected')).toBe(false)
+
+    act(() => {
+      input.setSelectionRange(1, 2)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    expect(input.classList.contains('node-input-text-selected')).toBe(false)
+    input.remove()
+  })
 })
 
 describe('drag caret freeze', () => {

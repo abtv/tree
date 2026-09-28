@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import {
   allowRendererError,
   exactMessage,
@@ -20,6 +21,16 @@ const selectionColors = (field: ReturnType<typeof node>) =>
     const style = element.ownerDocument.defaultView?.getComputedStyle(element, '::selection')
     return { background: style?.backgroundColor, color: style?.color }
   })
+
+async function dragSelect(window: Page, field: ReturnType<typeof node>, fromX: number, toX: number): Promise<void> {
+  const box = await field.boundingBox()
+  if (box === null) throw new Error('The node was not rendered.')
+  const y = box.y + box.height / 2
+  await window.mouse.move(box.x + fromX, y)
+  await window.mouse.down()
+  await window.mouse.move(box.x + toX, y, { steps: 8 })
+  await window.mouse.up()
+}
 
 test.describe('Vim editing prototype', () => {
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
@@ -427,6 +438,60 @@ test.describe('Vim editing prototype', () => {
 
     expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.toString())).toBe('t')
     await expect(link).not.toHaveClass(/link-selected/)
+  })
+
+  test('uses the highlight pair for a deliberate Normal-mode text selection', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'With images', children: [] },
+          { id: 'second', text: 'Next node', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    const second = node(window, 2)
+
+    // The one-character block caret is not a deliberate selection and keeps the ink block.
+    await expect(first).toBeFocused()
+    await expect(first).not.toHaveClass(/node-input-text-selected/)
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+
+    // A pointer drag wider than the block caret is a deliberate text selection and uses the
+    // highlight pair, in both appearances.
+    await dragSelect(window, first, 6, 70)
+    expect(
+      await first.evaluate(
+        (element) => (element as HTMLTextAreaElement).selectionEnd - (element as HTMLTextAreaElement).selectionStart,
+      ),
+    ).toBeGreaterThan(1)
+    await expect(first).toHaveClass(/node-input-text-selected/)
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    await expect(first).toHaveScreenshot('vim-normal-text-selection-light.png')
+
+    await window.emulateMedia({ colorScheme: 'dark' })
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    await expect(first).toHaveScreenshot('vim-normal-text-selection-dark.png')
+    await window.emulateMedia({ colorScheme: 'light' })
+
+    // Moving focus keeps the unfocused selection on the highlight while the newly focused row
+    // shows its ink block caret.
+    await second.focus()
+    await expect(second).not.toHaveClass(/node-input-text-selected/)
+    expect(await selectionColors(second)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+
+    // Collapsing back to the block caret removes the deliberate-selection highlight.
+    await first.click({ position: { x: 20, y: 10 } })
+    await expect(first).not.toHaveClass(/node-input-text-selected/)
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+
+    // Select-all is also a deliberate selection, not the one-character block caret.
+    await window.keyboard.press('Meta+a')
+    await expect(first).toHaveClass(/node-input-text-selected/)
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
   })
 
   test('crosses a hyperlink one character at a time', async ({ userDataDir }) => {
