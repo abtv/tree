@@ -1,6 +1,7 @@
 {
   "model": "sonnet",
   "permissions": {
+    "defaultMode": "default",
     "allow": [
       "Bash(npm run typecheck*)",
       "Bash(npm run format:check*)",
