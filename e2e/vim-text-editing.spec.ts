@@ -95,6 +95,76 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('ab')
   })
 
+  test('keeps the caret on the change that u and Ctrl+r apply', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcde', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+
+    await window.keyboard.press('x')
+    await expect(editor).toHaveValue('abde')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('abcde')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveJSProperty('selectionEnd', 3)
+
+    await window.keyboard.press('Control+r')
+    await expect(editor).toHaveValue('abde')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveJSProperty('selectionEnd', 3)
+
+    // The caret jumps back to the change even when it moved away first, as Vim's undo does.
+    await window.keyboard.press('0')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('abcde')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveJSProperty('selectionEnd', 3)
+  })
+
+  test('returns to the level of the change when u applies it elsewhere', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'alpha', text: 'alpha', children: [{ id: 'inner', text: 'abcde', children: [] }] },
+              { id: 'beta', text: 'beta', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'alpha', selectedNodeId: 'inner' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const heading = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(heading).toHaveValue('alpha')
+    await node(window, 1).focus()
+    await setCursor(node(window, 1), 2)
+    await window.keyboard.press('x')
+    await expect(node(window, 1)).toHaveValue('abde')
+
+    // Leave the level the edit was made on, so undo has to come back to it.
+    await window.keyboard.press('Control+o')
+    await expect(heading).toHaveValue('Parent')
+    await expect(node(window, 1)).toHaveValue('alpha')
+
+    await window.keyboard.press('u')
+
+    await expect(heading).toHaveValue('alpha')
+    await expect(node(window, 1)).toHaveValue('abcde')
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 2)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 3)
+  })
+
   test('blocks an unhandled Ctrl-modified key from reaching native text editing in Normal mode', async ({
     userDataDir,
   }) => {
@@ -513,9 +583,9 @@ test.describe('Vim editing prototype', () => {
 
     await expect(editor).toHaveValue('abcd')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
-    await expect(editor).not.toHaveClass(/node-input-image-caret/)
-    await expect(editor).toHaveJSProperty('selectionStart', 0)
-    await expect(editor).toHaveJSProperty('selectionEnd', 1)
+    // The undone replacement started at offset 4, which is this node's image character, so the
+    // caret lands back on the image the replacement was typed from.
+    await expect(editor).toHaveClass(/node-input-image-caret/)
     const restoredList = window.locator('.node-list')
     await expect(restoredList).toHaveScreenshot('vim-replace-undo-light.png')
     await window.emulateMedia({ colorScheme: 'dark' })

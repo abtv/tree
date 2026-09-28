@@ -39,7 +39,7 @@ import {
 } from './editor-command-transitions'
 import { clipboardIntroducesLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
-import { EditorRuntimeState } from './editor-runtime-state'
+import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import {
   isPasteIntoSourceDescendant,
   nodeVisualTransition,
@@ -48,6 +48,7 @@ import {
   type NodeVisualCommand,
 } from './editor-node-visual-transitions'
 import { EditorSaveScheduler } from './editor-save-scheduler'
+import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import type { PersistenceFailureKind } from './persistence-coordinator'
@@ -645,15 +646,7 @@ export class EditorStore {
     if (this.isPersistenceLocked()) return
     const previous = this.history.undo(state.document, state.location)
     if (previous === undefined) return
-    this.runtime.replaceReady(
-      {
-        ...state,
-        document: previous.document,
-        location: previous.location,
-        focus: this.runtime.newFocus(previous.location.selectedNodeId, 0),
-      },
-      true,
-    )
+    this.applyHistoryState(state, previous.document, previous.location)
     this.markPersistedChange()
     this.queueAttachmentCleanup()
   }
@@ -664,17 +657,28 @@ export class EditorStore {
     if (this.isPersistenceLocked()) return
     const next = this.history.redo(state.document, state.location)
     if (next === undefined) return
+    this.applyHistoryState(state, next.document, next.location)
+    this.markPersistedChange()
+    this.queueAttachmentCleanup()
+  }
+
+  /**
+   * Publish a restored history snapshot with the caret at the start of the change it made, which is
+   * where Vim leaves it after undo and redo. `reconciled` is the reconciled prior location, used
+   * only when the two snapshots hold no locatable difference.
+   */
+  private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
+    const target = changeSiteFocus(state.document, document, state.location)
+    const location = target?.location ?? reconciled
     this.runtime.replaceReady(
       {
         ...state,
-        document: next.document,
-        location: next.location,
-        focus: this.runtime.newFocus(next.location.selectedNodeId, 0),
+        document,
+        location,
+        focus: this.runtime.newFocus(target?.focus.nodeId ?? location.selectedNodeId, target?.focus.cursor ?? 0),
       },
       true,
     )
-    this.markPersistedChange()
-    this.queueAttachmentCleanup()
   }
 
   private applyStructural(document: Document, location: Location, focus: FocusIntent): void {

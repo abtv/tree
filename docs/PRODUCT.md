@@ -496,7 +496,9 @@ A continuous text-editing session ends when any of the following occurs:
 
 Normal cursor advancement caused by typing or deletion does not end the session. Cut, paste, structural commands, undo, and redo are recorded separately from the preceding text-editing session.
 
-Undo and redo do not restore the previous selection, text cursor position, or navigation state. The application must still keep those runtime states valid after the document changes.
+Undo and redo place the caret at the start of the change they apply, in the resulting document, as Vim does. The caret therefore stays on an undone or redone text edit rather than returning to the beginning of the node, and it reaches the change even when the user moved the caret away first. A change that restored, removed, or reordered whole nodes places the caret at the start of the affected node; when a removal leaves no node in that place, the caret moves to the next remaining sibling, then the previous one, then the parent. This may select a different node and change the current parent so that the change is displayed. The rule is the same whether undo or redo was invoked with `u` and `Ctrl+r` in Normal mode or with the `Cmd+Z` and `Cmd+Shift+Z` application shortcuts.
+
+Undo and redo restore no other previous selection or navigation state. The application must still keep those runtime states valid after the document changes.
 
 Undo/redo history does not need to survive application restart.
 

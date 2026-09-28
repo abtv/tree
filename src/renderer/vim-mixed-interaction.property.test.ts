@@ -49,10 +49,29 @@ function expectedStep(state: Expected, specs: readonly Spec[], event: Event): vo
     const target = event.direction === 'undo' ? state.future : state.past
     const prior = source.pop()
     if (prior === undefined) return
-    target.push([...state.texts])
+    const outgoing = [...state.texts]
+    target.push(outgoing)
     state.texts = prior
-    state.cursor = 0
-    state.image = specs[state.index]!.image && state.texts[state.index]!.length === 0
+    // Undo and redo select the change and put the caret at its start, then the ordinary focus
+    // transition clamps that offset and decides whether the node's image becomes the active caret.
+    const changed = prior.findIndex((value, index) => value !== outgoing[index])
+    if (changed < 0) {
+      state.cursor = 0
+      state.image = specs[state.index]!.image && state.texts[state.index]!.length === 0
+      state.returned = undefined
+      return
+    }
+    state.index = changed
+    const restored = prior[changed]!
+    let offset = 0
+    while (
+      offset < restored.length &&
+      offset < outgoing[changed]!.length &&
+      restored[offset] === outgoing[changed]![offset]
+    )
+      offset += 1
+    state.image = specs[changed]!.image && offset >= restored.length
+    state.cursor = state.image ? restored.length : Math.min(offset, Math.max(0, restored.length - 1))
     state.returned = undefined
     return
   }

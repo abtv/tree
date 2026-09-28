@@ -706,7 +706,7 @@ test.describe('Vim editing prototype', () => {
     await expect(root).not.toHaveClass(/node-input-image-caret/)
   })
 
-  test('clears a stale image caret after undo and redo', async ({ userDataDir }) => {
+  test('moves the image caret to the change that undo and redo apply', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [{ id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
@@ -723,17 +723,18 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('a')
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
+    // Undo restores the deleted character and puts the caret on it, clearing the stale image caret.
     await editor.press('u')
     await expect(editor).toHaveValue('ab')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
-    await expect(editor).toHaveJSProperty('selectionStart', 0)
-    await expect(editor).toHaveJSProperty('selectionEnd', 1)
+    await expect(editor).toHaveJSProperty('selectionStart', 1)
+    await expect(editor).toHaveJSProperty('selectionEnd', 2)
 
+    // Redoing the deletion leaves the same state the original `x` did: the change is at offset 1,
+    // which is the image once the final text character is gone.
     await editor.press('Control+r')
     await expect(editor).toHaveValue('a')
-    await expect(editor).not.toHaveClass(/node-input-image-caret/)
-    await expect(editor).toHaveJSProperty('selectionStart', 0)
-    await expect(editor).toHaveJSProperty('selectionEnd', 1)
+    await expect(editor).toHaveClass(/node-input-image-caret/)
   })
 
   test('retains the image return position when focus-changing commands do nothing', async ({ userDataDir }) => {

@@ -1,7 +1,7 @@
 import { releaseNodeIndex, type NodeId } from '../domain/document'
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
 
-type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
+export type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
 
 export class EditorRuntimeState {
   private readonly listeners = new Set<() => void>()

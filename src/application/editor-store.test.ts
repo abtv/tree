@@ -1629,6 +1629,77 @@ describe('EditorStore', () => {
     if (recovered.status === 'ready') expect(recovered.operationError).toBeUndefined()
   })
 
+  it('places the caret on the restored character when a mid-text deletion is undone', async () => {
+    const store = new EditorStore(
+      loadedState(
+        { roots: [{ id: 'root', text: 'abcde', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      ),
+      ids('unused'),
+    )
+    await store.initialize()
+
+    store.replaceTextRange('root', 2, 3, '')
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abde' }] } })
+
+    store.undo()
+
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ text: 'abcde' }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+      focus: { nodeId: 'root', cursor: 2 },
+    })
+
+    store.redo()
+
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ text: 'abde' }] },
+      focus: { nodeId: 'root', cursor: 2 },
+    })
+  })
+
+  it('redoes an empty-node Backspace onto the node that takes its place', async () => {
+    // The forward command selects the previous sibling so typing can continue there, but a redo
+    // restores nothing to that sibling: the change is the removal itself, so the caret lands on the
+    // node now occupying the vacated position, as it does for any other removal.
+    const store = new EditorStore(
+      loadedState(
+        {
+          roots: [
+            {
+              id: 'root',
+              text: 'Root',
+              children: [
+                { id: 'a', text: 'Alpha', children: [] },
+                { id: 'b', text: '', children: [] },
+                { id: 'c', text: 'Gamma', children: [] },
+              ],
+            },
+          ],
+        },
+        { currentParentId: 'root', selectedNodeId: 'b' },
+      ),
+      ids('unused'),
+    )
+    await store.initialize()
+
+    store.deleteEmptySelected()
+    expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'a', cursor: 5 } })
+
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ children: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }] },
+      focus: { nodeId: 'b', cursor: 0 },
+    })
+
+    store.redo()
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ children: [{ id: 'a' }, { id: 'c' }] }] },
+      location: { currentParentId: 'root', selectedNodeId: 'c' },
+      focus: { nodeId: 'c', cursor: 0 },
+    })
+  })
+
   it('ignores repeated text and empty undo or redo', async () => {
     const store = new EditorStore(createServices(), ids('root'))
     await store.initialize()
