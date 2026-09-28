@@ -250,6 +250,8 @@ Use the highest applicable tier. Focused checks may be run during implementation
 
 When categories overlap or the tier is uncertain, use the higher tier. A suite that cannot execute its real boundary is blocked, not passed.
 
+For a contained change, use a concise conversation plan, a focused development loop, the tier's required validation, and a primary-agent diff review. Add a working plan, independent reviewer, or separate product verifier only under the triggers in `AGENTS.md` §§8 and 13. A user-visible change still needs product verification by the primary agent when no separate verifier is required. Keep defect-first regressions, boundary tests, and visual evidence whenever their specific triggers in `AGENTS.md` §9 apply.
+
 Classify the complete change, not only its purpose. For example, a workflow-documentation change that also modifies a validation script or its tests is Low Risk because executable validation tooling changed.
 
 `npm run format:check:changed` is the canonical scoped formatting check. It checks supported staged, unstaged, and non-ignored untracked files relative to `HEAD`, excludes deleted files, safely passes filenames without shell interpolation, and succeeds with an explicit message when there are no eligible files. The full-repository `npm run format:check` remains part of broader validation.
@@ -322,13 +324,23 @@ For unattended sessions, OpenCode's auto-approve mode (`opencode --auto`, or the
 
 Allowed npm scripts and Git hooks execute mutable repository code with the host user's authority. The policy assumes this repository is trusted and reduces accidental or unexpected shell use; it does not protect the host from deliberately malicious repository code. OpenCode-native file tools remain subject to the denied external-directory boundary.
 
-When a task ends at a commit or session boundary, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt for resuming the work. An incomplete validation result must never be presented without a follow-up action.
+When an authorized outcome or session ends, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt when another session is needed to resume the work. A commit followed by another authorized task in the same session needs only a brief progress update. An incomplete validation result must never be presented without a follow-up action.
+
+### Workflow-speed pilot
+
+For the next three completed product outcomes after this policy change, record four observations in the final handoff and the temporary table below: approximate active work minutes across sessions (excluding time waiting for a Product Owner decision), number of sessions, approximate minutes spent on validation and review, and follow-up defects reported so far (including zero). Identify each outcome by its final commit subject so a later session can tell which slots are filled before that commit is created. Compare the three outcomes with the Product Owner's current experience of three to five sessions per change before retaining or revising these workflow rules. Do not infer success from commit count alone. Remove this temporary pilot instruction and table after the comparison; they are not a permanent timing log.
+
+| Outcome | Final commit subject | Active work minutes | Sessions | Validation and review minutes | Follow-up defects |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Pending | — | — | — | — |
+| 2 | Pending | — | — | — | — |
+| 3 | Pending | — | — | — | — |
 
 ---
 
 ## 11. Multi-Session Initiatives
 
-The active initiative index is [`plans/README.md`](../plans/README.md). Use an initiative plan when an outcome needs multiple independently committable tasks or cannot fit one session. The same plan type records a review follow-up batch whose tasks the Product Owner authorizes one at a time, so repository state — not conversation memory — shows what remains. A single-session task needs only the normal temporary `WORKING_PLAN.md` when substantive. Active plans are coordination records; they do not replace `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, an ADR, or the Product Owner's authorization.
+The active initiative index is [`plans/README.md`](../plans/README.md). Use an initiative plan when an outcome needs coordination across sessions. The same plan type records a review follow-up batch whose tasks the Product Owner authorizes one at a time, so repository state — not conversation memory — shows what remains. A single-session outcome may contain several focused commits without an initiative plan; use a temporary `WORKING_PLAN.md` only when `AGENTS.md` §8 requires it. Active plans are coordination records; they do not replace `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, an ADR, or the Product Owner's authorization.
 
 Each active plan should contain:
 
@@ -341,7 +353,7 @@ Each active plan should contain:
 * concise decisions and findings needed by later sessions, including baseline or final measurements when they affect the initiative;
 * a copyable prompt for the next session.
 
-At the start of a continuation session, read the index, the identified plan, `AGENTS.md`, and any existing `WORKING_PLAN.md`. Compare plan status with `git status` and recent commits. A dirty worktree or unfinished working plan means resuming that task first; do not skip ahead from a stale status field. When the worktree is clean, take the plan's next `Ready` task if the Product Owner requested continuation and its scope is authorized. Create or update the temporary working plan for that task, perform its required validation and review, and commit the task together with the initiative status update. In the handoff, cite the plan, completed task, next task, and a resume prompt. Do not repeat still-valid validation merely because the session changed.
+At the start of a continuation session, read the index, the identified plan, `AGENTS.md`, and any existing `WORKING_PLAN.md`. Compare plan status with `git status` and recent commits. A dirty worktree or unfinished working plan means resuming that task first; do not skip ahead from a stale status field. When the worktree is clean, take the plan's next `Ready` task if the Product Owner requested continuation and its scope is authorized. Create or update the temporary working plan for that task, perform its required validation and review, and commit the task together with the initiative status update. The next authorized task may start in the same session under `AGENTS.md` §12. In the handoff, cite the plan, completed task, next task, and a resume prompt. Do not repeat still-valid validation merely because the session changed.
 
 If blocked, record the concrete blocker and the safe next action in the active plan when that update can be committed independently; otherwise preserve the uncommitted work and `WORKING_PLAN.md` and give the same information in the handoff. A plan's status must never imply a task passed validation or was committed when it did not. At completion of an initiative, or of a review follow-up batch whose last task has landed and for which the Product Owner confirmed no further tasks remain, move lasting product, architecture, or development knowledge to its owner, then remove the plan and index entry in the commit that records completion. Git history provides the completed plan's record; do not keep an archive or permanent validation log.
 

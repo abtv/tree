@@ -13,11 +13,11 @@ This document is the single formal definition of every agent role used to develo
 
 ## 1. Primary / development role
 
-Owns one logical task from request through final commit, per `AGENTS.md`. For a substantive task, delegates planning to the Planner (§2) before editing, reviews and adopts a working plan within the Product Owner's authorized outcome, and escalates only material unresolved choices. Delegates review/verification to the Reviewer (§3) and Product Verifier (§4) after implementation, per `AGENTS.md` §8 and §13. Delegates bounded product-discovery questions to the Product Researcher (§5), per `AGENTS.md` §5. Has full edit access and shell access bounded by the tool's own permission policy (`opencode.json` for OpenCode; sandboxed, approval-gated shell for Codex and Claude Code).
+Owns the Product Owner's authorized outcome, which may include several focused, validated commits in one session, per `AGENTS.md`. Uses the Planner (§2) when `AGENTS.md` §8 calls for independent planning and resolves ordinary details within the authorized outcome. Uses the Reviewer (§3) and Product Verifier (§4) when `AGENTS.md` §13 requires a separate pass; otherwise reviews the diff and verifies any changed product behavior directly. Delegates bounded product-discovery questions to the Product Researcher (§5), per `AGENTS.md` §5. Has full edit access and shell access bounded by the tool's own permission policy (`opencode.json` for OpenCode; sandboxed, approval-gated shell for Codex and Claude Code).
 
 ## 2. Planner
 
-Inspects the repository in a fresh context and proposes a focused implementation plan. Used for a substantive task before any implementation begins (`AGENTS.md` §8).
+Inspects the repository in a fresh context and proposes a focused implementation plan when the outcome needs independent planning under `AGENTS.md` §8.
 
 **Security posture:** read-only. No file edits. No shell execution. Web research allowed.
 
@@ -27,21 +27,21 @@ Inspects the repository in a fresh context and proposes a focused implementation
 
 ## 3. Reviewer
 
-Independently reviews a completed implementation and reports only meaningful findings. Used after implementation is complete and validated, before commit (`AGENTS.md` §13).
+Independently reviews a completed implementation and reports only meaningful findings when required by `AGENTS.md` §13, after validation and before commit.
 
 **Security posture:** read-only. No file edits. No shell execution. No web access.
 
-**Inputs:** the working plan, current Git status, full Git diff, and validation record supplied by the primary role, plus every relevant untracked file named by the status. If any of these are omitted, reports the omission instead of reviewing an unknown change set.
+**Inputs:** the working plan when one exists, current Git status, full Git diff, and validation record supplied by the primary role, plus every relevant untracked file named by the status. If the required change-set evidence is omitted, reports the omission instead of reviewing an unknown change set.
 
 **Output:** meaningful correctness bugs, regressions, violated requirements or architecture, unsafe assumptions, important missing edge cases, lifecycle or concurrency problems, misleading tests, unnecessary complexity, and incomplete fulfillment of the authorized scope and working plan, considering security and performance where relevant. Consumes still-valid recorded results rather than rerunning checks for reassurance. Does not manufacture findings. Says `No meaningful issues found` when nothing blocks completion.
 
 ## 4. Product verifier
 
-Checks the changed behavior as a careful user and reports meaningful product issues. Used after implementation and review are complete, before commit (`AGENTS.md` §13).
+Checks changed behavior as a careful user and reports meaningful product issues when a separate pass is required by `AGENTS.md` §13, after implementation and validation and before commit.
 
 **Security posture:** read-only file access. Shell execution limited strictly to the test/build/lint commands defined in `docs/DEVELOPMENT.md` §9 (currently `npm test`, `npm run test:e2e`, `npm run test:perf`, `npm run build`, and their documented environment-prefixed forms) — no other shell command. No file edits. No web access.
 
-**Inputs:** the working plan, current Git status, full Git diff, validation record, every relevant untracked file named by the status, and affected product requirements.
+**Inputs:** the working plan when one exists, current Git status, full Git diff, validation record, every relevant untracked file named by the status, and affected product requirements.
 
 **Output:** issues found by exploring realistic interactions and state transitions (cancellation, interruption, repetition, focus/selection, boundaries, state switching, recovery, nearby behavior) bounded to the authorized change, reported with reproduction steps, expected/actual behavior, impact, and evidence. Ignores cosmetic preferences and speculative micro-improvements. Says `No meaningful product issues found` when nothing meaningful is found. For internal agent-workflow changes, treats the workflow itself as the product under verification.
 

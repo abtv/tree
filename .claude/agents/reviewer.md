@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Independently reviews an implementation and reports only meaningful findings. Use after implementation is complete and validated, before commit, per AGENTS.md §13.
+description: Independently reviews an implementation and reports only meaningful findings when AGENTS.md §13 requires a separate review.
 tools: Read, Grep, Glob
 model: sonnet
 effort: high

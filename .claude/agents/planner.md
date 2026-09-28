@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Inspects the repository in a fresh context and proposes a focused implementation plan. Use for a substantive task before any implementation begins, per AGENTS.md §8.
+description: Inspects the repository in a fresh context and proposes a focused implementation plan when independent planning is needed, per AGENTS.md §8.
 tools: Read, Grep, Glob, WebFetch, WebSearch
 model: sonnet
 effort: max

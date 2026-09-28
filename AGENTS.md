@@ -25,7 +25,7 @@ The agent is not the Product Owner and must not silently change product requirem
 
 ### Agent and Model Routing
 
-Stay within the agent the Product Owner started for the session. Do not launch or delegate to a different coding agent or tool. Change only the model within the active agent when needed: Codex uses OpenAI models, Claude uses Anthropic models, and OpenCode uses DeepSeek models.
+Stay within the coding tool the Product Owner started for the session. Do not switch to or delegate work to a different coding tool. The primary agent may use that tool's configured planner, reviewer, product verifier, and product researcher subagents when the task calls for their roles under §§5, 8, and 13. Codex uses OpenAI models, Claude uses Anthropic models, and OpenCode uses DeepSeek models.
 
 ---
 
@@ -91,7 +91,7 @@ When a requested change modifies product behavior:
 3. Update `docs/PRODUCT.md` to describe the authorized behavior.
 4. Plan and implement within the authorized scope under §8. A separate implementation-plan approval is not required for ordinary engineering decisions.
 5. Add or update tests.
-6. Complete the validation, independent review, product verification, documentation, and commit requirements in §§10-13.
+6. Complete the applicable validation, review, product verification, documentation, and commit requirements in §§10-13.
 
 Do not make product decisions on behalf of the Product Owner.
 
@@ -152,17 +152,17 @@ Domain logic must be unit-testable without launching Electron or a browser envir
 
 ## 8. Plans and Architecture Decisions
 
-For a substantive task, use the configured planner subagent in a fresh context after inspecting the relevant implementation and documentation. Review its plan against the Product Owner's request and the repository requirements, resolve ordinary engineering details, and share a concise plan or progress update with the Product Owner. Continue without a separate approval pause when the plan stays within the authorized outcome. Ask for a decision before implementing a material unresolved choice or expanding the authorized product behavior or major architecture.
+For a contained change with a clear outcome and one existing owner, make a concise plan in the conversation and proceed without a planner subagent or temporary plan file. Use the configured planner subagent in a fresh context when the outcome requires a multi-session initiative, changes major architecture, or has several interacting owners or material design choices that benefit from independent planning. Review its plan against the Product Owner's request and repository requirements, resolve ordinary engineering details, and share a concise plan or progress update. Continue without a separate approval pause within the authorized outcome. Ask for a decision before implementing a material unresolved choice or expanding product behavior or major architecture.
 
-Keep a substantive task's temporary working plan at `WORKING_PLAN.md` in the repository root. The plan is an implementation contract, not permanent project documentation. Keep it current when authorized scope changes, make it available to review roles, and delete it before the final commit. Small, unambiguous tasks may use a concise plan in the conversation instead of a file.
+Keep a temporary working plan at `WORKING_PLAN.md` for a multi-session initiative or a change that crosses several interaction-state owners or process boundaries. It is an implementation contract, not permanent project documentation. Keep it current when authorized scope changes, make it available to any review roles, and delete it before the final commit for that task. Other tasks use a concise plan in the conversation.
 
-For work spanning multiple sessions, keep a durable initiative plan under `plans/` and link it from `plans/README.md`. The initiative plan records the authorized objective, boundaries, ordered logical tasks, acceptance criteria, current status, decisions, and exact next task. It is a coordination record, not a product requirement or authorization to implement unrequested behavior. A request to continue an identified initiative authorizes the next ready task within its existing scope; ask the Product Owner about material choices or scope expansion. Each session still owns one logical task and uses `WORKING_PLAN.md` for its temporary implementation and validation evidence. Update the initiative plan as part of that task's commit so the next session can resume from repository state. See `docs/DEVELOPMENT.md` §11 for the format and resume procedure.
+For work spanning multiple sessions, keep a durable initiative plan under `plans/` and link it from `plans/README.md`. The initiative plan records the authorized objective, boundaries, ordered logical tasks, acceptance criteria, current status, decisions, and exact next task. It is a coordination record, not a product requirement or authorization to implement unrequested behavior. A request to continue an identified initiative authorizes the next ready task within its existing scope; ask the Product Owner about material choices or scope expansion. Each task uses `WORKING_PLAN.md` for its temporary implementation and validation evidence. Update the initiative plan as part of each completed task's commit so another session can resume from repository state. See `docs/DEVELOPMENT.md` §11 for the format and resume procedure.
 
 A review or report that identified several follow-up fixes is a multi-task outcome even when its tasks are requested one at a time. The session that receives the first cited task captures the complete task list the Product Owner can provide as a plan under `plans/` before implementing that task, marks each task's status as it lands, and keeps the plan until the Product Owner confirms no further tasks remain. Each task in the batch is authorized explicitly, so implementing one cited task does not authorize the others. If the remaining list is unavailable, record the batch with an explicit unverified remainder instead of assuming the cited task is the last one; review tasks must not live only in conversation.
 
-Propose a multi-session initiative when a requested outcome needs several related changes that are better committed separately: a recurring defect cluster with one underlying cause, a review that identified several follow-up fixes, a refactoring that touches many call sites, or work that cannot fit one session. Say why the work does not fit a single task and list the proposed ordered tasks. Do not silently narrow such an outcome to the part that fits one session, and do not attempt all of it in one commit. Create the plan once the Product Owner authorizes the objective.
+Propose a multi-session initiative when a requested outcome needs coordinated work across sessions: a recurring defect cluster with one underlying cause, a review that identified several follow-up fixes, a refactoring that touches many call sites, or work that cannot fit one session. Say why the work needs multiple tasks and list the proposed order. Do not silently narrow the outcome or combine unrelated logical tasks into one commit. Create the plan once the Product Owner authorizes the objective. Several focused commits may still land in one session under §12.
 
-Write every initiative plan so that a different agent, or a smaller and cheaper model, can execute any single task from repository state alone. Each task must name the files it is expected to change, its acceptance evidence, its validation tier, and any decision reserved for the Product Owner. Do not rely on the planning session's context, and do not leave a task whose scope can only be inferred from conversation. The Product Owner may deliberately use a more capable model to plan an initiative and a cheaper one to implement its tasks; §1 still forbids an agent from delegating to another agent or tool within its own session.
+Write every initiative plan so that a future session, possibly using a smaller model, can execute any single task from repository state alone. Each task must name the files it is expected to change, its acceptance evidence, its validation tier, and any decision reserved for the Product Owner. Do not rely on the planning session's context, and do not leave a task whose scope can only be inferred from conversation. The Product Owner may deliberately use a more capable model to plan an initiative and a cheaper one to implement its tasks; §1 keeps all work within the coding tool started for each session.
 
 Before completion, extract knowledge that remains useful into its durable owner:
 
@@ -211,7 +211,7 @@ Do not remove or weaken tests merely to make an implementation pass.
 
 ### Navigation and caret changes
 
-Follow the project-wide navigation and caret matrix and invariant in `docs/DEVELOPMENT.md` §8. Before changing implementation, inventory the affected caret and selection state and every command or interaction path that can change it, including paths that keep the selected node unchanged. Record the affected transitions and their expected states; for substantive tasks, keep the inventory and matrix in `WORKING_PLAN.md`. Update them when implementation reveals another path. Before handoff, compare the implementation and tests against the complete affected inventory and matrix, and explicitly report any intentionally unsupported combination. Independent review must trace the affected state-changing paths in the code against that inventory, rather than infer completeness from passing tests alone.
+Follow the project-wide navigation and caret matrix and invariant in `docs/DEVELOPMENT.md` §8. Before changing implementation, inventory the affected caret and selection state and every command or interaction path that can change it, including paths that keep the selected node unchanged. Record the affected transitions and their expected states; when a working plan is required under §8, keep the inventory and matrix there. Update them when implementation reveals another path. Before handoff, compare the implementation and tests against the complete affected inventory and matrix, and explicitly report any intentionally unsupported combination. The required independent review under §13 must trace the affected state-changing paths in the code against that inventory, rather than infer completeness from passing tests alone.
 
 ### Visual-regression workflow
 
@@ -256,7 +256,7 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands and when `npm run check` or `npm run check:full` is mandatory. Focused checks remain the preferred development loop.
 
-Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. For an active substantive task, keep this validation record in `WORKING_PLAN.md`; include a summary in the final handoff.
+Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. Keep this record in `WORKING_PLAN.md` when one is required under §8; otherwise include it in the final handoff.
 
 For a visual-regression workflow, record the inspected states, command, screenshot artifact, and outcome as visual evidence; a passing DOM, CSS, or computed-style assertion does not substitute for this record.
 
@@ -330,26 +330,22 @@ When the Product Owner reports that the most recently committed fix still does n
 
 ### Session boundaries
 
-A session should cover a single logical task.
+A session may cover multiple logical tasks and commits within one Product Owner-authorized outcome. Keep each commit focused and independently validated. Continue to the next authorized task in that outcome when context remains manageable; stop at a completed outcome, a material decision reserved for the Product Owner, or a context limit that warrants a new session. Do not infer authorization for unrelated work from permission to continue the session.
 
-After a commit completes a logical task, stop working and tell the Product Owner to start a new session before beginning the next task. Do not continue with a new, unrelated task in the same session.
+For a multi-session initiative, commit the updated task status and next task with the completed change. A later session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 
-For a multi-session initiative, commit the updated task status and next task with the completed change. The next session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
-
-Before stopping after a commit, provide an explicit handoff that states:
+Before ending a session or authorized outcome, provide an explicit handoff that states:
 
 * what was completed;
 * which validation passed;
 * which validation failed or was blocked;
 * whether unresolved failures remain;
-* the exact next task to start;
-* a suggested prompt the Product Owner can use to resume the work.
+* the exact next authorized task, if one remains;
+* a suggested prompt if another session is needed to resume the work.
 
 Never leave unresolved validation failures without identifying the next action needed to investigate them.
 
-The only exception is a direct follow-up fix to the most recently committed change, which stays in the current session as described above.
-
-Context grows with every message and tool call, increasing cost and latency. A new session per task keeps the context small and focused.
+The direct follow-up rule above still applies when the Product Owner reports that the most recently committed fix does not work. Context grows with every message and tool call; use a new session when continuing would make the work harder to verify.
 
 ---
 
@@ -366,9 +362,9 @@ A task is complete only when:
 * no unrelated behavior was changed;
 * the repository remains in a coherent state.
 
-For a substantive task, the working plan must be satisfied and its durable knowledge extracted before the temporary plan is deleted.
+When a working plan is required, satisfy it and extract durable knowledge before deleting it.
 
-One independent code-review pass and one product-verification pass must complete after implementation and automated verification. Both roles receive the validation record and reuse still-valid results. For Minimal-Risk/Low-Risk internal-workflow changes, code review checks policy ownership, consistency, command safety, tests, and fulfillment of the authorized change. Product verification follows the agent workflow through representative relevant states, such as clean and dirty trees, failed stages, evidence reuse, and handoff; application UI exploration is not required when application behavior did not change. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes.
+The primary agent reviews every completed diff against the request, tests, policy, and validation evidence. An independent code-review pass is additionally required for shared interaction-state changes, process or persistence boundaries, major architecture, and High Risk changes under `docs/DEVELOPMENT.md` §9. Product verification is required for changed user-visible behavior: the primary agent checks contained flows, while a separate product verifier checks changes spanning interaction states or process/platform boundaries and other High Risk user-visible changes. Inspect affected flows and nearby states. Review roles receive the validation record and reuse still-valid results. Contained internal changes need no separate reviewer or product verifier. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes when those roles are used.
 
 ---
 
