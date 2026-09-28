@@ -43,7 +43,7 @@ function createStore(): EditorStore {
 function keyEvent(
   input: HTMLElement,
   key: string,
-  options: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {},
+  options: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; isComposing?: boolean } = {},
 ) {
   return {
     currentTarget: input,
@@ -52,6 +52,7 @@ function keyEvent(
     ctrlKey: options.ctrlKey ?? false,
     metaKey: options.metaKey ?? false,
     shiftKey: options.shiftKey ?? false,
+    nativeEvent: { isComposing: options.isComposing ?? false },
     preventDefault: vi.fn(),
   } as unknown as KeyboardEvent<HTMLElement>
 }
@@ -1637,6 +1638,83 @@ describe('editor keyboard handler', () => {
       expect(input.selectionEnd).toBe(2)
     },
   )
+
+  it.each(['w', 'x', 'Enter'])('ignores a keydown the native composition flag marks as composing: %s', (key) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(0, 0)
+    const { handle, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    // The keydown that begins composition can arrive before `compositionstart` sets React's
+    // composing state, so the native event flag is the only signal that the key belongs to the input
+    // method. It must run no command — a motion (`w`), a text edit (`x`), or a structural command
+    // (`Enter`) — and must stay available to the IME instead of being prevented and consumed.
+    const event = keyEvent(input, key, { isComposing: true })
+    handle(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(0)
+    expect(commandState.pending).toBeUndefined()
+    expect(store.moveHorizontal).not.toHaveBeenCalled()
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    expect(store.endTextSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps a pending operator through a keydown the native composition flag marks as composing', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'one two'
+    input.setSelectionRange(0, 0)
+    const { handle, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'd'))
+    handle(keyEvent(input, 'w', { isComposing: true }))
+
+    // The composition keydown must not complete `dw`; `compositionstart` clears the unfinished
+    // command itself, so it stays available for that path.
+    expect(commandState.pending).toEqual({ count: '', motionCount: '', operator: 'd' })
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+  })
+
+  it('does not type a keydown the native composition flag marks as composing in Replace mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abcd'
+    input.setSelectionRange(2, 3)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
+
+    const event = keyEvent(input, 'X', { isComposing: true })
+    handle(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(vim.handleReplaceKey).not.toHaveBeenCalled()
+    expect(vim.finishReplace).not.toHaveBeenCalled()
+    expect(input.value).toBe('abcd')
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(3)
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
+  })
+
+  it('does not end an Insert session for an Escape the native composition flag marks as composing', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+
+    const event = keyEvent(input, 'Escape', { isComposing: true })
+    handle(event)
+
+    // The first Escape during composition cancels the composition, so the Insert session must
+    // survive it; the IME owns the event and the handler must not consume it.
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(vim.finishInsert).not.toHaveBeenCalled()
+    expect(vim.setMode).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('insert')
+    expect(store.endTextSession).not.toHaveBeenCalled()
+  })
 
   it('keeps a pending operator and an awaited character across a bare Shift keydown', () => {
     const store = createStore()

@@ -147,7 +147,16 @@ export function createEditorKeyDownHandler({
   vim,
 }: EditorKeyboardHandlerDependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event): void => {
-    if (isComposing()) return
+    // PRODUCT §20.2 suspends Vim handling during native text composition. The `composing` state is
+    // set by `onCompositionStart`, but the keydown that begins composition can arrive before that
+    // handler runs, so the browser's own flag on the native event is honored as well: a composing
+    // key must not run a command, move the caret, or edit text. The optional read keeps the partial
+    // key-event doubles used by other focused tests working. Chromium can instead report that first
+    // keydown as `Process` or `Unidentified` (keyCode 229) with `isComposing` false, which the
+    // neutral-key set in `vim-keyboard-handler.ts` covers; "ignores a keydown the native composition
+    // flag marks as composing" and "clears a pending fold prefix through composition started by a
+    // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
+    if (isComposing() || event.nativeEvent?.isComposing) return
     const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
     const copying = event.metaKey && event.key.toLowerCase() === 'c'
     const pasting = event.metaKey && event.key.toLowerCase() === 'v'
