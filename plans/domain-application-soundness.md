@@ -40,7 +40,10 @@ tests, property guard, and end-to-end scenario. S2 is complete and committed wit
 regression tests, widened property guard, save/reload round-trip test, focused E2E coverage, and the
 `docs/PRODUCT.md` §13 paste rule it makes explicit. S3 is complete and committed with direct
 `EditorStore` unit coverage for `createSibling` and `moveSelectionBoundary`, including the
-persistence-locked early return and the boundary/count clamping. S4 remains.
+persistence-locked early return and the boundary/count clamping. S4 is complete and committed with a
+shared conformance table pinning both validators to the same accept/reject decision, coverage of the
+previously untested `parsePersistedState` rejection paths, and an explicit expectation for the
+intended link-normalization difference.
 
 ## Decisions
 
@@ -139,9 +142,11 @@ currently harmless because load-side normalization cleans up, but nothing pins t
 | S1 | Enforce `MAX_DOCUMENT_DEPTH` on subtree and node-forest paste per D2. Acceptance: a defect-first regression test that fails before the fix by reproducing the over-depth document described above; after the fix an over-depth `p`/`P` and an over-depth node-visual paste leave document, selection, focus, and history unchanged, show `MAX_DOCUMENT_DEPTH_ERROR` as an operation error, and the document still saves; a property test asserting no operation produces a node past `MAX_DOCUMENT_DEPTH`; an E2E scenario asserting the persisted file is byte-for-byte unchanged and no `.save-error` appears. | `src/domain/document-operations.ts` (depth/height helper), `src/domain/document.ts` (re-export), `src/application/editor-command-transitions.ts`, `src/application/editor-node-visual-transitions.ts`, `src/application/editor-store.ts`, their tests, `src/domain/document.property.test.ts`, `e2e/persistence.spec.ts`, `docs/PRODUCT.md` §2.3 | High | Done |
 | S2 | Make `insertLinks` preserve the link-text invariant per D1. Acceptance: a defect-first regression test that fails before the fix on the `"XYZ"`-at-offset-5 case; a widened property test asserting `text.slice(link.start, link.end) === link.url` for `pasteText`, `pasteMultilineText`, `splitNode`, `removeTextRange`, `deleteLink`, and `replaceLinkedTextRanges`; a serialize/parse round-trip test showing a pasted-into link survives or is absent consistently before and after reload; the valid-URL-after-paste case from D1 stays a link with the recomputed URL. | `src/domain/document-links.ts`, `src/domain/document-links.test.ts`, `src/domain/document.test.ts`, `src/domain/document.property.test.ts`, `src/domain/document-links.property.test.ts`, `e2e/hyperlink.spec.ts` if the flow needs it, `docs/PRODUCT.md` §11 if D1 needs stating | Moderate | Done |
 | S3 | Give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage, including the persistence-locked early return and the boundary/count clamping. `pasteSubtree` is covered by S1, so cover only what S1 left. Acceptance: each method is exercised through the real `EditorStore` (not the renderer double) and asserts the resulting document, location, and focus. | `src/application/editor-store.test.ts` | Low | Done |
-| S4 | Add one shared conformance test pinning `validatePersistedState` and `parsePersistedState` to the same accept/reject decision over a table of malformed states, covering the currently untested `parsePersistedState` rejection paths. Record the intended link-normalization difference as an explicit expectation rather than removing it. | `src/domain/document-serialization.test.ts` or `src/domain/document.test.ts` | Low | Ready |
+| S4 | Add one shared conformance test pinning `validatePersistedState` and `parsePersistedState` to the same accept/reject decision over a table of malformed states, covering the currently untested `parsePersistedState` rejection paths. Record the intended link-normalization difference as an explicit expectation rather than removing it. | `src/domain/document-serialization.test.ts` or `src/domain/document.test.ts` | Low | Done |
 
-Dependencies: S1, S2, and S3 are complete. S4 is independent of them and is the only remaining task.
+Dependencies: S1, S2, S3, and S4 are complete, and no further task remains. Per `AGENTS.md` §8 and
+`docs/DEVELOPMENT.md` §11, this plan and its index entry are removed once the Product Owner confirms
+no further tasks remain.
 
 Per `AGENTS.md` §13, S1 additionally requires an independent reviewer and a separate product
 verifier (High Risk, persistence boundary, changed user-visible behavior). S2 needs product
@@ -153,23 +158,14 @@ changes and need neither role.
 
 ## Next task
 
-**S4 — pin `validatePersistedState` and `parsePersistedState` to one accept/reject decision.**
-Acceptance evidence and files are in the task table above. Context for that task:
+None. All four tasks have landed. The conformance test now pins the shared accept/reject decision,
+covers the previously untested `parsePersistedState` rejection paths, and records the intended
+link-normalization difference (`validatePersistedState` preserves denormalized links;
+`parsePersistedState` normalizes them away) as an explicit expectation in
+`src/domain/document-serialization.test.ts`.
 
-* `validatePersistedState` (`src/main/ipc-security.ts:27`) is the main-process IPC guard;
-  `parsePersistedState` (`src/domain/document-serialization.ts`, reached from
-  `src/application/editor-store.ts:163`) is the renderer load parser. The review found every
-  `parsePersistedState` rejection path (`document-serialization.ts:90,95,100,104`) untested while
-  its `validatePersistedState` counterparts are covered.
-* Exercise both validators over one shared table of malformed persisted states and assert the same
-  accept/reject decision for each row.
-* The two validators already differ benignly: `validatePersistedState` discards `normalizeLinks`'
-  result, so it accepts denormalized links a compromised renderer could send. Keep that difference
-  and record it as an explicit expectation in the table rather than removing it.
-* Expected files: `src/domain/document-serialization.test.ts` or `src/domain/document.test.ts`.
-* Low Risk: focused unit tests plus affected checks.
+The only remaining action is retirement: when the Product Owner confirms no further tasks remain,
+remove this plan and its `plans/README.md` row in the commit that records completion.
 
-Next-session prompt: "Read `plans/domain-application-soundness.md` and `AGENTS.md`, then implement
-task S4 (add one shared conformance test pinning `validatePersistedState` and `parsePersistedState`
-to the same accept/reject decision over malformed states). Use the Low Risk validation tier, and
-commit the task together with the plan status update."
+Retirement prompt: "The domain and application soundness review is complete. Confirm no further
+tasks remain, then remove `plans/domain-application-soundness.md` and its `plans/README.md` row."
