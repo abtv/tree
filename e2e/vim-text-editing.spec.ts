@@ -7,6 +7,7 @@ import {
   launchTree as launchTreeBase,
   lockSystemClipboard,
   node,
+  pressShifted,
   seedDocument,
   setCursor,
   test,
@@ -44,7 +45,7 @@ test.describe('Vim editing prototype', () => {
     await setCursor(editor, 5)
     await window.keyboard.press('d')
     await window.keyboard.press('a')
-    await window.keyboard.press('(')
+    await pressShifted(window, '(')
     await expect(editor).toHaveValue('one  "three"')
     await setCursor(editor, 7)
     await window.keyboard.press('c')
@@ -235,7 +236,7 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('qb')
     await editor.press('l')
     await editor.press('r')
-    await editor.press('Z')
+    await pressShifted(window, 'Z')
     await expect(editor).toHaveValue('qZ')
 
     await editor.press('u')
@@ -866,13 +867,13 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('c')
     await window.keyboard.press('s')
     await window.keyboard.press('"')
-    await window.keyboard.press(')')
+    await pressShifted(window, ')')
     await expect(editor).toHaveValue('one (two) three')
 
     await setCursor(editor, 5)
     await window.keyboard.press('d')
     await window.keyboard.press('s')
-    await window.keyboard.press(')')
+    await pressShifted(window, ')')
     await expect(editor).toHaveValue('one two three')
 
     // The opening bracket pads the inside; its closing counterpart does not.
@@ -881,14 +882,14 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('s')
     await window.keyboard.press('i')
     await window.keyboard.press('w')
-    await window.keyboard.press('{')
+    await pressShifted(window, '{')
     await expect(editor).toHaveValue('one { two } three')
 
     // Deleting with the opening key strips that padding again.
     await setCursor(editor, 6)
     await window.keyboard.press('d')
     await window.keyboard.press('s')
-    await window.keyboard.press('{')
+    await pressShifted(window, '{')
     await expect(editor).toHaveValue('one two three')
   })
 
@@ -905,7 +906,7 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('y')
     await window.keyboard.press('s')
     await window.keyboard.press('s')
-    await window.keyboard.press(')')
+    await pressShifted(window, ')')
     await expect(editor).toHaveValue('(alpha beta)')
 
     await window.keyboard.press('u')

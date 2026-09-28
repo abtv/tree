@@ -637,6 +637,18 @@ export async function firePaste(input: ReturnType<Page['locator']>): Promise<voi
   })
 }
 
+/**
+ * Presses a shifted key the way a physical keyboard produces it: with Shift held down, so Shift's
+ * own keydown arrives before the key. Playwright's plain `press('O')`/`press('$')` omits that
+ * keydown, which can hide a defect in Normal-mode command assembly (`zO`, `rA`, `d$`, `ys{`,
+ * `3G`). Callers pass the character the key produces, such as `$`, `(` or `Z`.
+ */
+export async function pressShifted(window: Page, key: string): Promise<void> {
+  await window.keyboard.down('Shift')
+  await window.keyboard.press(key)
+  await window.keyboard.up('Shift')
+}
+
 export async function typeInto(input: ReturnType<Page['locator']>, text: string): Promise<void> {
   await input.focus()
   const normalMode = await input.evaluate(

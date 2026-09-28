@@ -39,22 +39,26 @@ const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
 }
 
 /**
- * Modifier and lock keydowns that carry no command on their own. A physical keyboard fires the
- * modifier's keydown before the key it modifies, so `zO`, `rA`, `d$`, `ys{`, and `3G` arrive as a
- * bare `Shift` keydown followed by the shifted key; a Caps Lock toggle mid-command has the same
- * shape. Treating either as the command key consumed the pending prefix, operator, or
- * awaited-character state, so the shifted key then ran as an unrelated command. The Ctrl, Meta, and
- * Alt keydowns never reach here because their own events carry the matching modifier flag and the
- * caller excludes it.
+ * Keydowns that never form a command key by themselves: modifier and lock keys, and dead or compose
+ * keys. A physical keyboard fires the modifier's keydown before the key it modifies, so `zO`, `rA`,
+ * `d$`, `ys{`, and `3G` arrive as a bare `Shift` keydown followed by the shifted key; toggling Caps
+ * Lock mid-command and pressing a dead key before its composed character have the same shape.
+ * Treating any of them as the command key consumed the pending prefix, operator, or
+ * awaited-character state, so the next key ran as an unrelated command. The Ctrl, Meta, and Alt
+ * keydowns never reach here because their own events carry the matching modifier flag and the caller
+ * excludes it.
  */
-function isModifierKeydown(key: string): boolean {
+function isNeutralKeydown(key: string): boolean {
   return (
     key === 'Shift' ||
     key === 'CapsLock' ||
     key === 'NumLock' ||
     key === 'ScrollLock' ||
     key === 'Fn' ||
-    key === 'FnLock'
+    key === 'FnLock' ||
+    key === 'AltGraph' ||
+    key === 'Dead' ||
+    key === 'Compose'
   )
 }
 
@@ -76,8 +80,8 @@ export function handleVimKey(
   vim: VimKeyboardState,
 ): boolean {
   const commandState = vim.commandState
-  // A bare modifier keydown stays pending-command-neutral; it is not the command key.
-  if (isModifierKeydown(event.key)) {
+  // A modifier, lock, or dead-key keydown stays pending-command-neutral; it is not the command key.
+  if (isNeutralKeydown(event.key)) {
     event.preventDefault()
     return true
   }

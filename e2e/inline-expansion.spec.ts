@@ -6,6 +6,7 @@ import {
   node,
   nodeTexts,
   parent,
+  pressShifted,
   readPersisted,
   seedDocument,
   setCursor,
@@ -146,14 +147,7 @@ test.describe('inline node expansion', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     await node(window, 1).focus()
 
-    // A physical keyboard fires Shift's own keydown before a capital key, so the capital fold keys
-    // are pressed with Shift held down rather than as a bare uppercase key event.
-    const pressShifted = async (key: 'C' | 'O' | 'M' | 'R'): Promise<void> => {
-      await window.keyboard.down('Shift')
-      await window.keyboard.press(key)
-      await window.keyboard.up('Shift')
-    }
-
+    // The capital fold keys are pressed with Shift held down, as a physical keyboard sends it.
     // za toggles the selected node's own fold; zc and zo close and open it.
     await window.keyboard.press('z')
     await window.keyboard.press('a')
@@ -168,7 +162,7 @@ test.describe('inline node expansion', () => {
     // zR opens every fold recursively, including the nested grandchild.
     await node(window, 2).focus()
     await window.keyboard.press('z')
-    await pressShifted('R')
+    await pressShifted(window, 'R')
     expect(await nodeTexts(window)).toEqual([
       'Alpha',
       'Alpha child one',
@@ -180,7 +174,7 @@ test.describe('inline node expansion', () => {
     // zM closes every fold and hands the caret to the displayed ancestor of the hidden descendant.
     await node(window, 3).focus()
     await window.keyboard.press('z')
-    await pressShifted('M')
+    await pressShifted(window, 'M')
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
@@ -194,19 +188,19 @@ test.describe('inline node expansion', () => {
     await window.keyboard.press('a')
     await node(window, 1).focus()
     await window.keyboard.press('z')
-    await pressShifted('C')
+    await pressShifted(window, 'C')
     await window.keyboard.press('z')
     await window.keyboard.press('o')
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await node(window, 4).focus()
     await window.keyboard.press('z')
-    await pressShifted('O')
+    await pressShifted(window, 'O')
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
 
     // zO on the root opens the whole nested subtree, including the grandchild.
     await node(window, 1).focus()
     await window.keyboard.press('z')
-    await pressShifted('O')
+    await pressShifted(window, 'O')
     expect(await nodeTexts(window)).toEqual([
       'Alpha',
       'Alpha child one',

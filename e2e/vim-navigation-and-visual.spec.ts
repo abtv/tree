@@ -6,6 +6,7 @@ import {
   launchTree as launchTreeBase,
   lockSystemClipboard,
   node,
+  pressShifted,
   seedDocument,
   setCursor,
   setMainWindowBounds,
@@ -198,7 +199,7 @@ test.describe('Vim editing prototype', () => {
     await setCursor(editor, 6)
     await window.keyboard.press('v')
     await window.keyboard.press('i')
-    await window.keyboard.press('(')
+    await pressShifted(window, '(')
     await expect(editor).toHaveJSProperty('selectionStart', 5)
     await expect(editor).toHaveJSProperty('selectionEnd', 8)
     await window.keyboard.press('y')
@@ -1032,8 +1033,8 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('y')
     await window.keyboard.press('s')
     await window.keyboard.press('i')
-    await window.keyboard.press('W')
-    await window.keyboard.press(')')
+    await pressShifted(window, 'W')
+    await pressShifted(window, ')')
 
     await expect(editor).toHaveText(`see (${url}) now`)
     const link = editor.getByRole('link')

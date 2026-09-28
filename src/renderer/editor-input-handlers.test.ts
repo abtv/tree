@@ -42,11 +42,12 @@ function createStore(): EditorStore {
 function keyEvent(
   input: HTMLElement,
   key: string,
-  options: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {},
+  options: { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {},
 ) {
   return {
     currentTarget: input,
     key,
+    altKey: options.altKey ?? false,
     ctrlKey: options.ctrlKey ?? false,
     metaKey: options.metaKey ?? false,
     shiftKey: options.shiftKey ?? false,
@@ -1561,6 +1562,33 @@ describe('editor keyboard handler', () => {
 
     expect(vim.fold).toHaveBeenCalledExactlyOnceWith('open-recursive', 'node')
     expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it.each([
+    { key: 'Shift', options: { shiftKey: true } },
+    { key: 'CapsLock', options: {} },
+    { key: 'NumLock', options: {} },
+    { key: 'ScrollLock', options: {} },
+    { key: 'Fn', options: {} },
+    { key: 'FnLock', options: {} },
+    { key: 'AltGraph', options: {} },
+    { key: 'Dead', options: {} },
+    { key: 'Compose', options: {} },
+    { key: 'Control', options: { ctrlKey: true } },
+    { key: 'Meta', options: { metaKey: true } },
+    { key: 'Alt', options: { altKey: true } },
+  ])('keeps a pending fold prefix through the bare $key keydown', ({ key, options }) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'z'))
+    handle(keyEvent(input, key, options))
+    expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+    handle(keyEvent(input, 'c'))
+
+    expect(vim.fold).toHaveBeenCalledExactlyOnceWith('close', 'node')
   })
 
   it('keeps a pending operator and an awaited character across a bare Shift keydown', () => {

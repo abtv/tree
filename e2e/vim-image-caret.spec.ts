@@ -5,6 +5,7 @@ import {
   expect,
   launchTree as launchTreeBase,
   node,
+  pressShifted,
   seedDocument,
   setCursor,
   startRowDrag,
@@ -743,8 +744,7 @@ test.describe('Vim editing prototype', () => {
     await expect(child).toHaveClass(/node-input-image-caret/)
 
     await child.press('z')
-    // Shift held down, as a physical keyboard sends it before the capital `M` keydown.
-    await child.press('Shift+M')
+    await pressShifted(window, 'M')
 
     const destination = node(window, 1)
     await expect(destination).toBeFocused()
