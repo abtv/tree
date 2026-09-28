@@ -328,11 +328,11 @@ When an authorized outcome or session ends, provide a handoff recording what was
 
 ### Workflow-speed pilot
 
-For the next three completed product outcomes after this policy change, record four observations in the final handoff and the temporary table below: approximate active work minutes across sessions (excluding time waiting for a Product Owner decision), number of sessions, approximate minutes spent on validation and review, and follow-up defects reported so far (including zero). Identify each outcome by its final commit subject so a later session can tell which slots are filled before that commit is created. Compare the three outcomes with the Product Owner's current experience of three to five sessions per change before retaining or revising these workflow rules. Do not infer success from commit count alone. Remove this temporary pilot instruction and table after the comparison; they are not a permanent timing log.
+For the next three completed product outcomes after this policy change, record four observations in the final handoff and the temporary table below: approximate active work minutes across sessions (excluding time waiting for a Product Owner decision), number of sessions, approximate minutes spent on validation and review, and follow-up defects reported so far (including zero). Identify each outcome by its final commit subject so a later session can tell which slots are filled before that commit is created. Compare the three outcomes with the Product Owner's current experience of three to five sessions per change before retaining or revising these workflow rules. Do not infer success from commit count alone. Record each outcome when it completes; when its observations were not retained, enter `Not captured` instead of reconstructing timings after the fact. Remove this temporary pilot instruction and table after the comparison; they are not a permanent timing log.
 
 | Outcome | Final commit subject | Active work minutes | Sessions | Validation and review minutes | Follow-up defects |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Pending | — | — | — | — |
+| 1 | `fix(renderer): align selected-node focus marker` (`4f3f365`, inline node expansion) | Not captured | Not captured | Not captured | Not captured |
 | 2 | Pending | — | — | — | — |
 | 3 | Pending | — | — | — | — |
 

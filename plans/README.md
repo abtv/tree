@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Testing signal and feedback](testing-signal-and-feedback.md) | In progress — TSF-1 and TSF-2 complete; TSF-3 awaits three product outcomes | TSF-3: measure feedback cost across the next three product outcomes |
+| [Testing signal and feedback](testing-signal-and-feedback.md) | In progress — TSF-1 and TSF-2 complete; TSF-3 has recorded 1 of 3 product outcomes (slot 1 retrospective, values not captured) | TSF-3: record the next two product outcomes at their handoffs |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
