@@ -53,6 +53,49 @@ test.describe('external hyperlinks', () => {
     await expect(editor).toHaveText(text)
   })
 
+  test('drops a link when pasted text makes its covered text invalid', async ({ userDataDir }, testInfo) => {
+    const url = 'https://example.com'
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: url, links: [{ start: 0, end: url.length, url }], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await setCursor(editor, 5)
+    await writeClipboardText(app, 'XYZ')
+    await firePaste(editor)
+
+    await expect(editor).toHaveText('httpsXYZ://example.com')
+    await expect(editor.getByRole('link')).toHaveCount(0)
+    await expect(editor).toHaveAttribute('contenteditable', 'true')
+    await editor.screenshot({ path: testInfo.outputPath('paste-inside-link-invalid-light.png') })
+  })
+
+  test('recomputes the destination when pasted text keeps the covered text a valid URL', async ({
+    userDataDir,
+  }, testInfo) => {
+    const url = 'https://example.com'
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: url, links: [{ start: 0, end: url.length, url }], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await setCursor(editor, 15)
+    await writeClipboardText(app, 'x')
+    await firePaste(editor)
+
+    await expect(editor).toHaveText('https://examplex.com')
+    const link = editor.getByRole('link', { name: 'https://examplex.com' })
+    await expect(link).toHaveAttribute('href', 'https://examplex.com')
+    await expect(link).toHaveCSS('text-decoration-line', 'underline')
+    await editor.screenshot({ path: testInfo.outputPath('paste-inside-link-valid-light.png') })
+  })
+
   test('edits on plain click and opens on Cmd+click through the main process', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await app.evaluate(({ shell }) => {

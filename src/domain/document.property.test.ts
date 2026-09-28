@@ -26,6 +26,7 @@ import {
   pasteMultilineText,
   pasteText,
   removeTextRange,
+  replaceLinkedTextRanges,
   replaceSiblingRange,
   serializeState,
   splitNode,
@@ -33,6 +34,7 @@ import {
   MAX_DOCUMENT_DEPTH,
   MAX_DOCUMENT_DEPTH_ERROR,
   type Document,
+  type LinkRange,
   type LocatedNode,
   type Location,
   type TreeNode,
@@ -141,6 +143,43 @@ function positionOf(text: string, cursor: number): number {
     }
   }
   return position
+}
+
+/** A node text with non-overlapping HTTP(S) links separated by ordinary text. */
+const linkedText = fc
+  .array(
+    fc.tuple(
+      fc.string({ maxLength: 8 }).map((segment) => segment.replace(/\s/g, 'x')),
+      fc.webUrl().filter(isHttpUrl),
+    ),
+    { maxLength: 3 },
+  )
+  .map((parts) => {
+    let text = ''
+    const links: LinkRange[] = []
+    for (const [prefix, url] of parts) {
+      if (text.length > 0) text += ' '
+      text += prefix
+      links.push({ start: text.length, end: text.length + url.length, url })
+      text += url
+    }
+    return { text, links }
+  })
+
+/** Asserts the link-text invariant: each link covers exactly the text its URL names. */
+function expectLinksAligned(text: string, links: readonly LinkRange[]): void {
+  let previousEnd = 0
+  for (const link of links) {
+    expect(link.end).toBeGreaterThan(link.start)
+    expect(text.slice(link.start, link.end)).toBe(link.url)
+    expect(isHttpUrl(link.url)).toBe(true)
+    expect(link.start).toBeGreaterThanOrEqual(previousEnd)
+    previousEnd = link.end
+  }
+}
+
+function expectDocumentLinksAligned(document: Document): void {
+  for (const node of allNodes(document)) expectLinksAligned(node.text, node.links ?? [])
 }
 
 interface NormalizedLocation {
@@ -723,6 +762,52 @@ describe('document invariants', () => {
           expect(link.start).toBeGreaterThanOrEqual(index === 0 ? 0 : nextLinks[index - 1]!.end)
         }
       }),
+    )
+  })
+
+  it('keeps every link aligned with its URL across paste and text operations', () => {
+    fc.assert(
+      fc.property(
+        linkedText,
+        fc.nat(),
+        fc.string({ maxLength: 8 }),
+        fc.array(fc.string({ maxLength: 4 }), { minLength: 2, maxLength: 3 }),
+        (generated, seed, inserted, lines) => {
+          const document: Document = {
+            roots: [
+              {
+                id: 'root',
+                text: generated.text,
+                ...(generated.links.length === 0 ? {} : { links: generated.links }),
+                children: [],
+              },
+            ],
+          }
+          const cursor = seed % (generated.text.length + 1)
+          const results: Document[] = [
+            pasteText(document, 'root', cursor, inserted),
+            pasteMultilineText(
+              document,
+              'root',
+              cursor,
+              lines,
+              lines.slice(1).map((_, index) => `pasted-${index}`),
+            ),
+            splitNode(document, 'root', cursor, 'split'),
+            removeTextRange(document, 'root', cursor, cursor + 2),
+          ]
+          const target = generated.links.length === 0 ? undefined : generated.links[seed % generated.links.length]
+          const deleted = target === undefined ? undefined : deleteLink(document, 'root', target.end)
+          if (deleted !== undefined) results.push(deleted)
+          for (const result of results) expectDocumentLinksAligned(result)
+
+          const ranges = replaceLinkedTextRanges(generated.text, generated.links, [
+            { start: cursor, end: Math.min(cursor + 2, generated.text.length), inserted },
+          ])
+          expectLinksAligned(ranges.text, ranges.links)
+        },
+      ),
+      { numRuns: 200 },
     )
   })
 })

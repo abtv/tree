@@ -36,7 +36,9 @@ Baseline measured on `fdaa52e` with
 
 Coverage is not the problem; both defects below sit inside covered files. The worktree was clean at
 the end of the review session. S1 (High Risk) is complete and committed with its implementation,
-tests, property guard, and end-to-end scenario; S2, S3, and S4 remain.
+tests, property guard, and end-to-end scenario. S2 is complete and committed with its defect-first
+regression tests, widened property guard, save/reload round-trip test, focused E2E coverage, and the
+`docs/PRODUCT.md` §13 paste rule it makes explicit. S3 and S4 remain.
 
 ## Decisions
 
@@ -133,7 +135,7 @@ currently harmless because load-side normalization cleans up, but nothing pins t
 | ID | Outcome and acceptance evidence | Files expected to change | Tier | Status |
 | --- | --- | --- | --- | --- |
 | S1 | Enforce `MAX_DOCUMENT_DEPTH` on subtree and node-forest paste per D2. Acceptance: a defect-first regression test that fails before the fix by reproducing the over-depth document described above; after the fix an over-depth `p`/`P` and an over-depth node-visual paste leave document, selection, focus, and history unchanged, show `MAX_DOCUMENT_DEPTH_ERROR` as an operation error, and the document still saves; a property test asserting no operation produces a node past `MAX_DOCUMENT_DEPTH`; an E2E scenario asserting the persisted file is byte-for-byte unchanged and no `.save-error` appears. | `src/domain/document-operations.ts` (depth/height helper), `src/domain/document.ts` (re-export), `src/application/editor-command-transitions.ts`, `src/application/editor-node-visual-transitions.ts`, `src/application/editor-store.ts`, their tests, `src/domain/document.property.test.ts`, `e2e/persistence.spec.ts`, `docs/PRODUCT.md` §2.3 | High | Done |
-| S2 | Make `insertLinks` preserve the link-text invariant per D1. Acceptance: a defect-first regression test that fails before the fix on the `"XYZ"`-at-offset-5 case; a widened property test asserting `text.slice(link.start, link.end) === link.url` for `pasteText`, `pasteMultilineText`, `splitNode`, `removeTextRange`, `deleteLink`, and `replaceLinkedTextRanges`; a serialize/parse round-trip test showing a pasted-into link survives or is absent consistently before and after reload; the valid-URL-after-paste case from D1 stays a link with the recomputed URL. | `src/domain/document-links.ts`, `src/domain/document-links.test.ts`, `src/domain/document.test.ts`, `src/domain/document.property.test.ts`, `src/domain/document-links.property.test.ts`, `e2e/hyperlink.spec.ts` if the flow needs it, `docs/PRODUCT.md` §11 if D1 needs stating | Moderate | Ready |
+| S2 | Make `insertLinks` preserve the link-text invariant per D1. Acceptance: a defect-first regression test that fails before the fix on the `"XYZ"`-at-offset-5 case; a widened property test asserting `text.slice(link.start, link.end) === link.url` for `pasteText`, `pasteMultilineText`, `splitNode`, `removeTextRange`, `deleteLink`, and `replaceLinkedTextRanges`; a serialize/parse round-trip test showing a pasted-into link survives or is absent consistently before and after reload; the valid-URL-after-paste case from D1 stays a link with the recomputed URL. | `src/domain/document-links.ts`, `src/domain/document-links.test.ts`, `src/domain/document.test.ts`, `src/domain/document.property.test.ts`, `src/domain/document-links.property.test.ts`, `e2e/hyperlink.spec.ts` if the flow needs it, `docs/PRODUCT.md` §11 if D1 needs stating | Moderate | Done |
 | S3 | Give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage, including the persistence-locked early return and the boundary/count clamping. `pasteSubtree` is covered by S1, so cover only what S1 left. Acceptance: each method is exercised through the real `EditorStore` (not the renderer double) and asserts the resulting document, location, and focus. | `src/application/editor-store.test.ts` | Low | Ready |
 | S4 | Add one shared conformance test pinning `validatePersistedState` and `parsePersistedState` to the same accept/reject decision over a table of malformed states, covering the currently untested `parsePersistedState` rejection paths. Record the intended link-normalization difference as an explicit expectation rather than removing it. | `src/domain/document-serialization.test.ts` or `src/domain/document.test.ts` | Low | Planned |
 
@@ -150,21 +152,20 @@ changes and need neither role.
 
 ## Next task
 
-**S2 — make `insertLinks` preserve the link-text invariant per D1.** Acceptance evidence and files
-are in the task table above. Context for that task:
+**S3 — give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage.**
+Acceptance evidence and files are in the task table above. Context for that task:
 
-* The single offender is `insertLinks` (`src/domain/document-links.ts:120`): it calls
-  `normalizeLinks` with `requireMatchingText = false` against a synthetic run of spaces, so a link
-  spanning the paste position keeps its `start` while `end` shifts over the inserted text.
-* D1 resolves the behavior: a paste that lands strictly inside an existing link mirrors what typing
-  already does through `reconcileLinkTextEdit` (`src/domain/document-links.ts:37`) — recompute the
-  URL from the new covered text, keep the range as a link when that text is still a valid HTTP(S)
-  URL, and drop the link otherwise.
-* Moderate Risk: `npm run check`, affected unit and property tests, focused E2E if link rendering
-  changes, and primary-agent product verification. Reuse the `e2e/hyperlink.spec.ts` screenshot
-  baselines rather than regenerating them without inspection.
-* S3 is now unblocked and can be taken after S2. S4 remains independent.
+* `createSibling` (`src/application/editor-store.ts:389`) and `moveSelectionBoundary` (`:311`) are
+  live paths — Vim `o`/`O`, `p`/`P`, and the `gg`/`G`/count boundary motions — but no test under
+  `src/application` calls them; the renderer tests use the typed store double, which is correct for
+  renderer isolation but hides defects at this seam.
+* Cover the persistence-locked early return in `createSibling` and the boundary/count clamping in
+  `moveSelectionBoundary`; `pasteSubtree` is covered by S1, so cover only what S1 left.
+* Each method must be exercised through the real `EditorStore` (not the renderer double) and assert
+  the resulting document, location, and focus.
+* Low Risk: focused `EditorStore` unit tests plus affected checks. S4 remains independent and can be
+  taken after S3.
 
 Next-session prompt: "Read `plans/domain-application-soundness.md` and `AGENTS.md`, then implement
-task S2 (make `insertLinks` preserve the link-text invariant). Follow the defect-first workflow, use
-the Moderate Risk validation tier, and commit the task together with the plan status update."
+task S3 (give `createSibling` and `moveSelectionBoundary` direct `EditorStore` unit coverage). Use
+the Low Risk validation tier, and commit the task together with the plan status update."

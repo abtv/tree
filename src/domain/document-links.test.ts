@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { linkAtPosition, replaceLinkedText, replaceLinkedTextRanges } from './document-links'
+import { insertLinks, linkAtPosition, replaceLinkedText, replaceLinkedTextRanges } from './document-links'
 
 describe('replaceLinkedText', () => {
   it('preserves unaffected links and shifts them around an edit', () => {
@@ -26,6 +26,30 @@ describe('replaceLinkedText', () => {
 
     const valid = replaceLinkedText(url, [{ start: 0, end: url.length, url }], url.length, url.length, '/a')
     expect(valid.links).toEqual([{ start: 0, end: url.length + 2, url: `${url}/a` }])
+  })
+})
+
+describe('insertLinks', () => {
+  const url = 'https://example.com'
+  const link = { start: 0, end: url.length, url }
+
+  it('recomputes the URL and keeps a link a paste lands inside when the covered text stays valid', () => {
+    expect(insertLinks([link], 15, 'x')).toEqual([{ start: 0, end: 20, url: 'https://examplex.com' }])
+  })
+
+  it('drops a link a paste lands inside when the covered text is no longer a valid URL', () => {
+    expect(insertLinks([link], 5, 'XYZ')).toEqual([])
+  })
+
+  it('leaves a link untouched when the paste lands exactly at either boundary', () => {
+    expect(insertLinks([link], url.length, '!')).toEqual([link])
+    expect(insertLinks([link], 0, '!')).toEqual([{ start: 1, end: url.length + 1, url }])
+  })
+
+  it('keeps a valid pasted link range when the surrounding link is dropped', () => {
+    const pasted = 'https://paste.example'
+    const result = insertLinks([link], 5, pasted, [{ start: 0, end: pasted.length, url: pasted }])
+    expect(result).toEqual([{ start: 5, end: 5 + pasted.length, url: pasted }])
   })
 })
 

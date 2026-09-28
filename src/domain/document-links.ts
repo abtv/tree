@@ -117,15 +117,23 @@ export function insertLinks(
       : insertedLinks
           .filter((link) => insertedText.slice(link.start, link.end) === link.url)
           .map((link) => ({ ...link, start: link.start + position, end: link.end + position }))
+  const shifted: LinkRange[] = []
+  for (const link of links) {
+    if (link.start < position && position < link.end) {
+      // A paste strictly inside a link mirrors typing: the destination follows the new covered
+      // text, and the link is dropped when that text is no longer a valid HTTP(S) URL.
+      const url = `${link.url.slice(0, position - link.start)}${insertedText}${link.url.slice(position - link.start)}`
+      if (isHttpUrl(url)) shifted.push({ start: link.start, end: link.end + delta, url })
+      continue
+    }
+    shifted.push({
+      ...link,
+      start: link.start >= position ? link.start + delta : link.start,
+      end: link.end > position ? link.end + delta : link.end,
+    })
+  }
   return normalizeLinks(
-    [
-      ...links.map((link) => ({
-        ...link,
-        start: link.start >= position ? link.start + delta : link.start,
-        end: link.end > position ? link.end + delta : link.end,
-      })),
-      ...inserted,
-    ],
+    [...shifted, ...inserted],
     ' '.repeat(Math.max(position + delta, ...links.map((link) => link.end + delta), 0)),
     false,
   )

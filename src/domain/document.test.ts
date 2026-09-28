@@ -344,6 +344,40 @@ describe('document operations', () => {
     expect(plain.roots[0]!.links).toBeUndefined()
   })
 
+  it('recomputes or drops a link when text is pasted inside it', () => {
+    const url = 'https://example.com'
+    const document: Document = {
+      roots: [{ id: 'a', text: url, links: [{ start: 0, end: url.length, url }], children: [] }],
+    }
+
+    const invalid = pasteText(document, 'a', 5, 'XYZ')
+    expect(invalid.roots[0]!.text).toBe('httpsXYZ://example.com')
+    expect(invalid.roots[0]!.links).toBeUndefined()
+
+    const valid = pasteText(document, 'a', 15, 'x')
+    expect(valid.roots[0]!.text).toBe('https://examplex.com')
+    expect(valid.roots[0]!.links).toEqual([{ start: 0, end: 20, url: 'https://examplex.com' }])
+  })
+
+  it('keeps a pasted-into link consistent across a save and reload', () => {
+    const url = 'https://example.com'
+    const document: Document = {
+      roots: [{ id: 'a', text: url, links: [{ start: 0, end: url.length, url }], children: [] }],
+    }
+    const location = { currentParentId: null, selectedNodeId: 'a' }
+
+    const valid = pasteText(document, 'a', 15, 'x')
+    const validState = serializeState(valid, location)
+    expect(parsePersistedState(JSON.parse(JSON.stringify(validState)))).toEqual(validState)
+    expect(validState.document.roots[0]!.links).toEqual([{ start: 0, end: 20, url: 'https://examplex.com' }])
+
+    const invalid = pasteText(document, 'a', 5, 'XYZ')
+    const invalidState = serializeState(invalid, location)
+    const reloaded = parsePersistedState(JSON.parse(JSON.stringify(invalidState)))
+    expect(reloaded.document.roots[0]!.links).toBeUndefined()
+    expect(reloaded).toEqual(invalidState)
+  })
+
   it('updates an edited URL and its destination on each valid character edit', () => {
     const original = 'go https://example.com now'
     const links = [{ start: 3, end: 22, url: 'https://example.com' }]
