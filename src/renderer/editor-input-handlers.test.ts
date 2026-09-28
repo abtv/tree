@@ -1547,6 +1547,42 @@ describe('editor keyboard handler', () => {
     expect(event.preventDefault).toHaveBeenCalled()
   })
 
+  it('keeps a pending fold prefix across the Shift keydown of a capital key', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
+    handle(keyEvent(input, 'z'))
+    // A physical keyboard fires Shift's own keydown before the capital key that follows it.
+    handle(keyEvent(input, 'Shift', { shiftKey: true }))
+    expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+    handle(keyEvent(input, 'O'))
+
+    expect(vim.fold).toHaveBeenCalledExactlyOnceWith('open-recursive', 'node')
+    expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it('keeps a pending operator and an awaited character across a bare Shift keydown', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'abc def'
+    input.setSelectionRange(4, 4)
+    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
+
+    handle(keyEvent(input, 'd'))
+    handle(keyEvent(input, 'Shift', { shiftKey: true }))
+    handle(keyEvent(input, '$'))
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 4, 7, '')
+
+    input.setSelectionRange(0, 0)
+    const second = vimHandler(store, { id: 'node', text: input.value, children: [] })
+    second.handle(keyEvent(input, 'r'))
+    second.handle(keyEvent(input, 'Shift', { shiftKey: true }))
+    second.handle(keyEvent(input, 'A'))
+    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 1, 'A')
+  })
+
   it.each([
     { name: 'Cmd+.', key: '.', options: { metaKey: true } },
     { name: 'Cmd+,', key: ',', options: { metaKey: true } },

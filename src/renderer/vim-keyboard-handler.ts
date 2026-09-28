@@ -38,6 +38,26 @@ const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
   R: 'open-all',
 }
 
+/**
+ * Modifier and lock keydowns that carry no command on their own. A physical keyboard fires the
+ * modifier's keydown before the key it modifies, so `zO`, `rA`, `d$`, `ys{`, and `3G` arrive as a
+ * bare `Shift` keydown followed by the shifted key; a Caps Lock toggle mid-command has the same
+ * shape. Treating either as the command key consumed the pending prefix, operator, or
+ * awaited-character state, so the shifted key then ran as an unrelated command. The Ctrl, Meta, and
+ * Alt keydowns never reach here because their own events carry the matching modifier flag and the
+ * caller excludes it.
+ */
+function isModifierKeydown(key: string): boolean {
+  return (
+    key === 'Shift' ||
+    key === 'CapsLock' ||
+    key === 'NumLock' ||
+    key === 'ScrollLock' ||
+    key === 'Fn' ||
+    key === 'FnLock'
+  )
+}
+
 function syncImageCaretAtCursor(
   vim: VimKeyboardState,
   node: TreeNode,
@@ -56,6 +76,11 @@ export function handleVimKey(
   vim: VimKeyboardState,
 ): boolean {
   const commandState = vim.commandState
+  // A bare modifier keydown stays pending-command-neutral; it is not the command key.
+  if (isModifierKeydown(event.key)) {
+    event.preventDefault()
+    return true
+  }
   if (vim.mode === 'visual-node') {
     const handled = (): true => {
       event.preventDefault()

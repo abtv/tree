@@ -743,7 +743,8 @@ test.describe('Vim editing prototype', () => {
     await expect(child).toHaveClass(/node-input-image-caret/)
 
     await child.press('z')
-    await child.press('M')
+    // Shift held down, as a physical keyboard sends it before the capital `M` keydown.
+    await child.press('Shift+M')
 
     const destination = node(window, 1)
     await expect(destination).toBeFocused()
