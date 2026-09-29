@@ -267,6 +267,33 @@ test.describe('inline node expansion', () => {
     await expect(window.getByRole('button', { name: 'Collapse node 1' })).toBeVisible()
   })
 
+  test('keeps the location when deleting and undoing a visible descendant', async ({ userDataDir }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const expandedRows = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
+    const locationBefore = await window.getByLabel('Current location').innerText()
+
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+
+    for (const [remove, undo] of [
+      ['Meta+Backspace', 'Meta+z'],
+      ['dd', 'u'],
+    ] as const) {
+      await node(window, 3).click()
+      for (const key of remove === 'dd' ? ['d', 'd'] : [remove]) await window.keyboard.press(key)
+      // The only child is gone; its own parent is selected and nothing was entered.
+      await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+      await expect(node(window, 2)).toBeFocused()
+      await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+
+      await window.keyboard.press(undo)
+      await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
+      await expect(node(window, 3)).toBeFocused()
+      await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+    }
+  })
+
   test('keeps expansion when navigating via the location breadcrumb', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
