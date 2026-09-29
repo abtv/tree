@@ -44,7 +44,7 @@ npm install
 
 The install runs the project's `postinstall` script to download the Electron runtime for the current platform, and its `prepare` script to point Git at the repository's tracked hooks (`.githooks/`). Do not disable lifecycle scripts when preparing a development environment.
 
-The tracked `commit-msg` hook rejects a commit message that adds an agent co-authorship or attribution line, per `AGENTS.md` §12. It applies to every coding agent through Git itself, not through any one tool's configuration, so it holds regardless of which tool is committing or what a session-level instruction suggests.
+The tracked `commit-msg` hook rejects a commit message that adds an agent co-authorship or attribution line, per `AGENTS.md` §12. It applies to every coding agent through Git itself, not through any one tool's configuration, so it holds regardless of which tool is committing or what a session-level instruction suggests. It only runs on the machine that makes the commit, so the Attribution GitHub Actions workflow (`§9`) is the backstop for a commit made without the hook installed and for a pull request description, which no Git hook can see.
 
 The end-to-end suite drives Electron, not browser binaries, so the Playwright browser download is not needed. To skip it and reduce install size and time:
 
@@ -242,6 +242,8 @@ This runs `npm run check`, the end-to-end suite, and the performance suite. The 
 ### GitHub Actions
 
 GitHub Actions runs `npm run check` on Ubuntu and the real Electron end-to-end suite on macOS for every pull request and push to `main`; the Electron suite also supports manual dispatch. The jobs run independently, and superseded runs for the same pull request or branch are canceled. The performance suite runs on a scheduled or manual macOS workflow and is intentionally separate from pull-request validation because its measurements are machine-sensitive and macOS minutes are limited for private repositories. Failed E2E and performance runs upload their available reports and result artifacts.
+
+The Attribution workflow runs `scripts/check-attribution.mjs` on every pull request. It fails the check when the pull request description or any of its commits carries an agent co-authorship or "generated with/by" line, per `AGENTS.md` §12. This is the server-side backstop described in §3; it holds regardless of whether the author's machine had the `commit-msg` hook installed.
 
 ### Risk-Based Validation
 
