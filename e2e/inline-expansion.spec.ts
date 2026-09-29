@@ -406,6 +406,78 @@ test.describe('inline node expansion', () => {
     await expect(node(window, 1)).toBeFocused()
   })
 
+  test('keeps whole-node Visual, dd, and yy scoped to actual siblings across an expanded branch', async ({
+    userDataDir,
+  }) => {
+    // V, dd, and yy act on the focused node's actual sibling level (§2.4), unlike motion, which
+    // follows visible rows. This pins that split: with Alpha expanded, its real next sibling (Bravo)
+    // is three visible rows away, so a range or count that mistakenly followed visible rows instead
+    // of siblings would stop short of Bravo or reach past it into Alpha's own descendants.
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'a',
+            text: 'Alpha',
+            children: [
+              {
+                id: 'a1',
+                text: 'Alpha child one',
+                children: [{ id: 'a1a', text: 'Alpha grandchild', children: [] }],
+              },
+              { id: 'a2', text: 'Alpha child two', children: [] },
+            ],
+          },
+          { id: 'b', text: 'Bravo', children: [] },
+          { id: 'c', text: 'Charlie', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+    // Rows: Alpha(1), Alpha child one(2), Alpha grandchild(3), Alpha child two(4), Bravo(5), Charlie(6).
+
+    // V + j extends the range to Alpha's real next sibling (Bravo, row 5), highlighting every row
+    // between the anchor and that sibling, and must not stop at Alpha child one (row 2).
+    await node(window, 1).click()
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(5)
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    // 2yy yanks Alpha's whole subtree and Bravo as a two-sibling forest, then p puts fresh-ID copies
+    // of both subtrees after Charlie — not two flattened visible rows.
+    await node(window, 1).click()
+    await window.keyboard.press('2')
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await node(window, 6).click()
+    await window.keyboard.press('p')
+    expect(await nodeTexts(window)).toEqual([
+      'Alpha',
+      'Alpha child one',
+      'Alpha grandchild',
+      'Alpha child two',
+      'Bravo',
+      'Charlie',
+      'Alpha',
+      'Bravo',
+    ])
+
+    // 2dd deletes Alpha's whole subtree and Bravo as the same two-sibling range, leaving Charlie and
+    // the pasted copies untouched.
+    await node(window, 1).click()
+    await window.keyboard.press('2')
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+    expect(await nodeTexts(window)).toEqual(['Charlie', 'Alpha', 'Bravo'])
+  })
+
   test('reorders a dragged descendant only among its own real siblings', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

@@ -67,6 +67,43 @@ test.describe('inline expansion at scale', () => {
     })
     expect(paintP95Ms).toBeLessThan(100)
     expect(paintMaxMs).toBeLessThan(250)
+
+    // Counted motion issues one visible-row scan per step (`vim-vertical-navigation.ts`), so a
+    // 50-step count exercises the O(count × visible rows) path directly rather than 50 independent
+    // single-step calls; single-step j/k above stay each below the windowing threshold's own cost.
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { countedPaints: number[] }).countedPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (!['j', 'k'].includes(event.key)) return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    await window.keyboard.press('5')
+    await window.keyboard.press('0')
+    await window.keyboard.press('j')
+    await window.keyboard.press('5')
+    await window.keyboard.press('0')
+    await window.keyboard.press('k')
+    await window.waitForFunction(() => (window as unknown as { countedPaints: number[] }).countedPaints.length === 2)
+    const countedSamples = await window.evaluate(() =>
+      (window as unknown as { countedPaints: number[] }).countedPaints.slice().sort((a, b) => a - b),
+    )
+    await expect(input).toBeFocused()
+
+    const countedMaxMs = countedSamples[countedSamples.length - 1]!
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'inline-expansion-counted-vertical-traversal-50-steps-1100-visible-rows',
+      samples: countedSamples.length,
+      metrics: { paintMaxMs: round(countedMaxMs) },
+    })
+    expect(countedMaxMs).toBeLessThan(250)
   })
 
   test('keeps fold-all keyboard commands responsive across many collapsed branches', async ({ userDataDir }) => {
