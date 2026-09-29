@@ -29,7 +29,7 @@ The product holds four standing commitments. Their details are owned elsewhere; 
 * **Durability.** The user's work is never silently lost. Owned by §16 and its save, recovery, and failure behavior.
 * **Privacy.** The user's content stays on their machine, and the application is safe to run without expecting anything to leave it. Owned by [SECURITY.md](SECURITY.md).
 * **Vim fidelity.** Editing text inside a node behaves as Vim does, and every deliberate divergence is recorded with its reason. Owned by §20.2 and [VIM_CONFORMANCE.md](VIM_CONFORMANCE.md).
-* **Responsiveness.** The application feels immediate, and ordinary editing never develops noticeable pauses. Owned by §22.
+* **Responsiveness.** The application feels immediate, and ordinary editing never develops noticeable pauses. Owned by §20.4 and §22.
 
 When two of them conflict, they yield in this order: durability first, then privacy, then Vim fidelity, then responsiveness. A change must not trade a higher commitment for a lower one. Flushing every save to disk before it reports success is an existing example — it spends responsiveness to keep durability, and that is the intended direction.
 
@@ -979,6 +979,14 @@ Unsupported unmodified keys do not edit text in Normal or Visual mode. Applicati
 The application uses the bundled JetBrains Mono typeface for all user-interface text. The bundled
 font is distributed under the SIL Open Font License 1.1; the application source remains under the
 project's MIT license.
+
+### 20.4 Immediate Interaction
+
+The application does not animate its own interface. Navigation, entering and leaving a node, expanding and collapsing a node inline, creating and deleting nodes, reordering, selection, Vim mode changes, and error states all apply immediately: no transition, easing, or fade stands between the user's action and its visible result.
+
+This deepens the Responsiveness commitment in §1.1: even a smooth, well-performing animation still spends a fixed delay before the user can act on its result, and that delay cannot be removed by animation quality alone.
+
+This does not govern motion the application does not itself decide to add: native macOS window chrome, and scrolling driven directly by continuous user input, such as the page's own scroll position or the drag auto-scroll in §11 and §20.1, whose motion is the direct feedback of an ongoing input rather than a transition inserted after an action completes.
 
 ---
 

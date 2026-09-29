@@ -134,42 +134,6 @@ Support requires repeated mouse transitions for sibling moves and a shortcut tha
 - 2026-09-21 — Product Owner statement: fast note-taking as a touch typist is important.
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` defines drag-and-drop as the only sibling-reordering interaction.
 
-## PD-003: Distraction-free behavior as an explicit principle
-
-Kind: product
-Status: Exploring
-
-### Observation
-
-Product Owner statement: the absence of animations is valued because it avoids distraction. Repository fact: current renderer styles define no animation or transition behavior, but `docs/PRODUCT.md` does not protect that characteristic explicitly.
-
-### Hypothesis
-
-Documenting immediate, non-animated interaction as a product principle would prevent future changes from accidentally weakening a defining quality of the application.
-
-### Product Owner perspective
-
-The absence of animations is important because it avoids distraction. The exact scope of a normative rule is pending.
-
-### Counter-hypotheses and tradeoffs
-
-- A blanket rule might prevent subtle feedback that improves comprehension or accessibility.
-- The desired principle may be immediate interaction rather than a prohibition on every visual transition.
-- Existing simplicity may be sufficient without a formal requirement.
-
-### Experiment
-
-Identify the interactions where motion could plausibly be introduced—navigation, creation, deletion, reordering, overlays, focus, and errors—and review whether any transition would provide information that cannot be communicated immediately.
-
-### Decision criteria
-
-Support requires a stable wording that protects focus and immediacy without forbidding necessary platform or accessibility behavior. If no likely change could violate the preference, a normative rule may be unnecessary.
-
-### Evidence
-
-- 2026-09-21 — Product Owner statement: the application's lack of animations is liked because there are no distractions.
-- 2026-09-21 — Repository fact: no renderer animation, transition, keyframe, or smooth-scroll declarations were found during the initial review.
-
 ## PD-004: User-controlled export and backup
 
 Kind: product
