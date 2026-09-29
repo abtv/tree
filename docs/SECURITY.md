@@ -21,6 +21,27 @@ The main controls are:
 
 Transient security considerations, such as the attachment byte limit and the PNG chunk rules, are owned by the implementing modules and `docs/ARCHITECTURE.md`, not restated here.
 
+## Network egress and content disclosure
+
+Tree makes no network requests of its own, sends no telemetry, and stores documents and attachments
+only on the local machine; it has no cloud document service. Content can still be disclosed to a
+third party when the user explicitly invokes these features:
+
+* **Open an external hyperlink.** `src/main/index.ts` hands the HTTP(S) URL to the operating
+  system's default hyperlink application, typically a browser. The URL may itself contain document
+  content. This implements the link-opening behavior in `docs/PRODUCT.md` §12.
+* **Search with Google.** `src/main/editor-context-menu.ts` sends the selected text as a Google
+  search query through the system browser. This is the user-invoked menu item specified in
+  `docs/PRODUCT.md` §13.2.
+* **macOS Look Up.** `src/main/editor-context-menu.ts` passes selected text to the macOS lookup
+  service. Depending on the user's macOS settings, that service may consult network sources. This is
+  the native Look Up item specified in `docs/PRODUCT.md` §13.2.
+
+The editor enables spellchecking in `src/renderer/NodeInput.tsx`. On macOS, the operating system's
+spellchecker downloads no dictionaries. A future Windows or Linux build must disable Electron's
+Hunspell dictionary download before shipping, because Electron may otherwise download dictionaries
+from a Google-hosted CDN on first use.
+
 ## Agent execution threat model
 
 This section covers the development agents that modify or validate the repository. It is separate from the application's runtime security model above. Agents can execute repository-controlled scripts, so the repository and its dependencies are treated as trusted inputs for normal development. A malicious repository change could otherwise use an allowed build or test command to act with the agent process's host privileges.
