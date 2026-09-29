@@ -10,7 +10,7 @@ import {
   shell,
 } from 'electron'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
 import {
@@ -30,12 +30,15 @@ import {
   isAllowedExternalUrl,
   isAllowedRendererUrl,
   reportMainProcessError,
+  resolveRendererUrl,
   surfaceWindow,
 } from './window'
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
 let alwaysOnTopStore: AlwaysOnTopStore | null = null
+const packagedRendererPath = join(__dirname, '../renderer/index.html')
+let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 
 const nativeClipboard: NativeClipboard = {
   read: () => clipboard.read(),
@@ -54,6 +57,8 @@ const nativeClipboard: NativeClipboard = {
 
 function createMainWindow(): void {
   if (appQuitting) return
+  const resolvedRenderer = renderer
+  if (resolvedRenderer === null) throw new Error('Renderer URL was not resolved before creating the window.')
   const windowBoundsStore = createWindowBoundsStore(join(app.getPath('userData'), 'data', 'window-bounds.json'))
   const windowAlwaysOnTopStore =
     alwaysOnTopStore ?? createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
@@ -75,10 +80,8 @@ function createMainWindow(): void {
   }
   window.on('move', saveWindowBounds)
   window.on('resize', saveWindowBounds)
-  const rendererUrl =
-    process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
   window.webContents.on('will-navigate', (event, url) => {
-    if (!isAllowedRendererUrl(url, rendererUrl)) event.preventDefault()
+    if (!isAllowedRendererUrl(url, resolvedRenderer.url)) event.preventDefault()
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) {
@@ -95,9 +98,9 @@ function createMainWindow(): void {
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
   })
-  const load = process.env['ELECTRON_RENDERER_URL']
-    ? window.loadURL(rendererUrl)
-    : window.loadFile(join(__dirname, '../renderer/index.html'))
+  const load = resolvedRenderer.isDevelopment
+    ? window.loadURL(resolvedRenderer.url)
+    : window.loadFile(fileURLToPath(resolvedRenderer.url))
   void load.catch((error: unknown) => {
     reportMainProcessError('Could not load the renderer', error)
     appQuitting = true
@@ -117,13 +120,17 @@ bootstrapApplication({
   createMainWindow,
   getWindowCount: () => BrowserWindow.getAllWindows().length,
   registerReadyServices: (quitHandshake, onQuitConfirmed) => {
-    const rendererUrl =
-      process.env['ELECTRON_RENDERER_URL'] ?? pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+    const resolvedRenderer = resolveRendererUrl(
+      app.isPackaged,
+      process.env['ELECTRON_RENDERER_URL'],
+      pathToFileURL(packagedRendererPath).toString(),
+    )
+    renderer = resolvedRenderer
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
     alwaysOnTopStore = createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     registerIpcHandlers({
       ipcMain,
-      rendererUrl,
+      rendererUrl: resolvedRenderer.url,
       fileServices,
       nativeClipboard,
       quitHandshake,

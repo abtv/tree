@@ -5,6 +5,7 @@ import {
   isAllowedExternalUrl,
   isAllowedRendererUrl,
   reportMainProcessError,
+  resolveRendererUrl,
   surfaceWindow,
 } from './window'
 
@@ -122,5 +123,30 @@ describe('isAllowedRendererUrl', () => {
   it('rejects values that are not valid URLs', () => {
     expect(isAllowedRendererUrl('not a url', 'file:///app/renderer/index.html')).toBe(false)
     expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'not a url')).toBe(false)
+  })
+})
+
+describe('resolveRendererUrl', () => {
+  const packagedDocumentUrl = 'file:///app/renderer/index.html'
+
+  it('ignores the environment URL in a packaged build', () => {
+    expect(resolveRendererUrl(true, 'https://attacker.example/', packagedDocumentUrl)).toEqual({
+      url: packagedDocumentUrl,
+      isDevelopment: false,
+    })
+  })
+
+  it('uses the environment URL in an unpackaged build', () => {
+    expect(resolveRendererUrl(false, 'http://localhost:5173/', packagedDocumentUrl)).toEqual({
+      url: 'http://localhost:5173/',
+      isDevelopment: true,
+    })
+  })
+
+  it('uses the packaged document URL in an unpackaged build without an environment URL', () => {
+    expect(resolveRendererUrl(false, undefined, packagedDocumentUrl)).toEqual({
+      url: packagedDocumentUrl,
+      isDevelopment: false,
+    })
   })
 })

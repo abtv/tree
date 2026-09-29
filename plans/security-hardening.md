@@ -7,9 +7,10 @@ Follow-up fixes from a Product Owner-requested security review of the whole repo
 target. The review was performed in conversation and is not otherwise recorded in the repository;
 its complete findings are reproduced below, so no task depends on that conversation.
 
-The Product Owner authorized this plan and authorized implementing all eight tasks it lists. Every
-task is therefore `Ready`; nothing further needs to be authorized before starting one. That
-authorization covers these tasks only — it is not authorization for work this plan does not list.
+The Product Owner authorized this plan and authorized implementing all eight tasks it lists. The
+seven tasks not yet completed remain `Ready`; nothing further needs to be authorized before starting
+one. That authorization covers these tasks only — it is not authorization for work this plan does
+not list.
 
 The Product Owner stated the security goals the review used as acceptance criteria:
 
@@ -41,7 +42,8 @@ boundaries); [`docs/PRODUCT.md`](../docs/PRODUCT.md) §13.2 (editable-node conte
 
 ## State
 
-No task has started. The worktree was clean at the end of the review session, at `c8a9834`.
+The review began from a clean worktree at `c8a9834`. SEC1 is now complete and validated; SEC2 is the
+next ready task.
 
 The review read every file under `src/`, the Electron entry and window configuration, the whole
 preload and IPC surface, the persistence and clipboard infrastructure, the renderer's HTML-producing
@@ -322,7 +324,7 @@ See D4: recording the requirement is in scope for this plan; implementing it is 
 
 | ID | Outcome and acceptance evidence | Files expected to change | Tier | Status |
 | --- | --- | --- | --- | --- |
-| SEC1 | Ignore `ELECTRON_RENDERER_URL` unless the build is unpackaged, per F1 and D1. Add one exported pure helper to `src/main/window.ts` that takes the packaged flag, the environment value, and the packaged document URL and returns the renderer URL plus whether it is the development one; call it once in `src/main/index.ts` and use its result for `loadURL`/`loadFile`, the navigation guard, and the trusted-caller URL. Acceptance: unit tests that a packaged build returns the packaged document URL and reports "not development" even when the environment variable is set to a remote URL, that an unpackaged build honors it, and that an unpackaged build without it returns the packaged document URL; `src/main/index.ts` reads `process.env['ELECTRON_RENDERER_URL']` exactly once; the end-to-end suite passes unchanged. Update `docs/SECURITY.md` ("Restricted navigation" and "Trusted callers") and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Ready |
+| SEC1 | Ignore `ELECTRON_RENDERER_URL` unless the build is unpackaged, per F1 and D1. Add one exported pure helper to `src/main/window.ts` that takes the packaged flag, the environment value, and the packaged document URL and returns the renderer URL plus whether it is the development one; call it once in `src/main/index.ts` and use its result for `loadURL`/`loadFile`, the navigation guard, and the trusted-caller URL. Acceptance: unit tests that a packaged build returns the packaged document URL and reports "not development" even when the environment variable is set to a remote URL, that an unpackaged build honors it, and that an unpackaged build without it returns the packaged document URL; `src/main/index.ts` reads `process.env['ELECTRON_RENDERER_URL']` exactly once; the end-to-end suite passes unchanged. Update `docs/SECURITY.md` ("Restricted navigation" and "Trusted callers") and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC2 | Deny every session permission request and every non-local renderer network request, per F2 and D2. Add one exported function to `src/main/window.ts` that takes a session-like object and the resolved renderer URL from SEC1 and installs: a permission request handler, a permission check handler, and a device permission handler that all deny; and a `webRequest.onBeforeRequest` filter that cancels any request whose URL is not `file:`, `devtools:`, `blob:`, or `data:`, and not same-origin with the renderer URL when that URL is the development one. Call it from `registerReadyServices` in `src/main/index.ts`. Acceptance: unit tests for each handler denying and for the filter allowing local schemes, allowing the development origin only in development, and cancelling `https:`; a new end-to-end assertion that a renderer-initiated request to an external HTTPS origin fails while the application still loads and edits normally; `e2e/hyperlink.spec.ts` still passes, proving `shell.openExternal` is unaffected. Update `docs/SECURITY.md` (new control plus its row in the verification map) and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Ready |
 | SEC3 | Make the save boundary reject the leaf values the rest of the application refuses, per F3. In `src/domain/document-serialization.ts`, apply the shared attachment-identifier character rule in `parseAttachment` and make `parseLinks` throw on a destination that is not `http`/`https` instead of letting `normalizeLinks` filter it. Keep the character rule in one place so `src/main/ipc-security.ts` and `src/infrastructure/main/file-services.ts` cannot drift from it. Acceptance: defect-first unit tests that fail before the change — `validatePersistedState` accepting an attachment identifier containing a path separator, and accepting a `javascript:` link destination — and pass after it; a test that an identifier of the shape the application actually generates is still accepted; a contract test that `tree:save` rejects both payloads; an end-to-end assertion that a document written with such an identifier is refused at the save boundary rather than producing a document whose attachments can never be cleaned up. No `docs/PRODUCT.md` change: this rejects states the application never produces. | `src/domain/document-serialization.ts`, `src/domain/document.test.ts`, `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts`, `e2e/persistence.spec.ts`, `docs/SECURITY.md` | High | Ready |
 | SEC4 | Close the navigation-guard gaps in F4. Install the navigation and window-open guards from `app.on('web-contents-created', …)` so they apply to any web contents, handle `will-frame-navigate` with the same rule as `will-navigate`, and deny `will-attach-webview`. Add `frame-src 'none'`, `child-src 'none'`, `worker-src 'none'`, `media-src 'none'`, and `frame-ancestors 'none'` to the policy in `electron.vite.config.ts`. Acceptance: unit tests for the shared guard predicate applied to a frame navigation and to a webview attach; an extension of `e2e/csp.spec.ts` asserting the new directives are present, that an iframe cannot navigate to an external origin, and that the existing no-violations check still passes on reload. Update `docs/SECURITY.md`. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `electron.vite.config.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md` | High | Ready |
@@ -356,31 +358,25 @@ suite must be reported as blocked, not as passed.
 
 ## Next task
 
-SEC1 — stop trusting `ELECTRON_RENDERER_URL` in packaged builds, following F1 and D1.
+SEC2 — deny unnecessary Electron session permissions and outbound renderer requests, following F2 and D2.
 
-Implementation notes for SEC1, so the task does not depend on this plan's authoring session:
+Implementation notes for SEC2, so the task does not depend on this plan's authoring session:
 
-* The packaged document URL is built twice today, identically, at `src/main/index.ts:79` and `:121`:
-  `pathToFileURL(join(__dirname, '../renderer/index.html')).toString()`. The new helper belongs in
-  `src/main/window.ts` beside `isAllowedRendererUrl`, takes the already-computed packaged URL as a
-  parameter, and returns both the URL to use and whether it is the development one. Keeping it free
-  of `app`, `process.env`, `__dirname`, and `node:path` is what makes it unit testable, and
-  `src/main/window.ts` has no Electron value imports today — keep it that way.
-* `src/main/index.ts:98` currently branches on the environment variable to choose between
-  `loadURL` and `loadFile`. Branch on the helper's development flag instead. Both branches must use
-  the same resolved URL the guards use; do not leave `loadFile` computing its own path.
-* `createMainWindow` and `registerReadyServices` both need the resolved value, and `app.isPackaged`
-  is only reliable after the app is ready, so resolve it inside each rather than at module scope, or
-  resolve it once in `registerReadyServices` and hand it to `createMainWindow`. Either is acceptable;
-  the requirement is a single `process.env` read in the file.
-* Do not change `isAllowedRendererUrl` or `isTrustedRendererUrl`. They are correct; the defect is the
-  value they are compared against.
-* Validation for SEC1 is the High Risk tier (`docs/DEVELOPMENT.md` §9): `npm run check:full`.
-* Commit as `fix(main): ignore the development renderer URL in packaged builds`, together with this
-  plan's status update for SEC1 (`AGENTS.md` §12).
+* SEC1 resolves the renderer URL after `app.whenReady()` and stores that one result for window
+  creation and IPC registration. Use that resolved value to determine the development origin allowed
+  by the request filter, as required by D2.
+* Install the permission and network handlers on the renderer's session in
+  `registerReadyServices`; keep the function unit-testable by accepting the narrow session-like
+  interface and resolved renderer URL described in the SEC2 task row.
+* The request filter must allow `file:`, `devtools:`, `blob:`, and `data:` URLs, plus same-origin
+  requests only when SEC1 resolved an unpackaged development URL. It must cancel external
+  `https:` requests in both development and packaged builds.
+* Validation for SEC2 is the High Risk tier (`docs/DEVELOPMENT.md` §9): `npm run check:full`.
+  Commit as `fix(main): block renderer session permissions and egress`, together with this plan's
+  status update for SEC2 (`AGENTS.md` §12).
 
-All eight tasks are authorized and `Ready`, so a session may continue to the next one in the
-recommended order after committing the previous task, while context stays manageable
+All eight tasks are authorized, with seven remaining `Ready`, so a session may continue to the next
+one in the recommended order after committing the previous task, while context stays manageable
 (`AGENTS.md` §12). A reasonable split is SEC1 and SEC2 in one session, SEC3 and SEC4 in the next,
 then SEC5 through SEC8; judge by remaining context rather than by that split. Mark each task `Done`
 in the same commit that lands it, and leave the plan and any `WORKING_PLAN.md` in place if a session

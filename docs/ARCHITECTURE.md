@@ -491,6 +491,11 @@ Electron is responsible for desktop functionality such as:
 
 The domain must not import Electron APIs.
 
+The main process resolves the renderer URL once. Packaged builds always use the packaged renderer
+document and ignore `ELECTRON_RENDERER_URL`; unpackaged builds may use that variable for the
+development renderer. Window loading, navigation checks, and trusted IPC caller validation all use
+the same resolved URL.
+
 Window geometry is persisted with a short debounce, so moving or resizing the window does not perform a synchronous disk write for every event. The pending geometry is flushed when the window closes.
 
 The always-on-top preference is stored as one validated boolean in the main-process window-state directory. Toggling it performs one small write and one native window update; it adds no work to document editing or navigation paths and retains no growing in-memory structure. Existing installations without the preference default to an unpinned window.

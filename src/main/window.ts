@@ -52,6 +52,23 @@ export function isAllowedRendererUrl(value: string, expected: string): boolean {
   }
 }
 
+export interface ResolvedRendererUrl {
+  url: string
+  isDevelopment: boolean
+}
+
+export function resolveRendererUrl(
+  isPackaged: boolean,
+  environmentUrl: string | undefined,
+  packagedDocumentUrl: string,
+): ResolvedRendererUrl {
+  const isDevelopment = !isPackaged && environmentUrl !== undefined && environmentUrl.length > 0
+  return {
+    url: isDevelopment ? environmentUrl : packagedDocumentUrl,
+    isDevelopment,
+  }
+}
+
 export function surfaceWindow(window: WindowSurface | null): void {
   if (window === null || window.isDestroyed() || window.isFocused()) {
     return
