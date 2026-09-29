@@ -634,7 +634,7 @@ describe('App', () => {
       expect(readySnapshot(store).location.selectedNodeId).toBe('root')
     })
 
-    it('resets expansion when navigating to a different location', async () => {
+    it('keeps a node expanded after entering it and leaving again', async () => {
       await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
@@ -642,8 +642,8 @@ describe('App', () => {
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
 
-      expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Expand node 1' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Collapse node 1' })).toBeInTheDocument()
     })
   })
 
@@ -829,8 +829,8 @@ describe('App', () => {
       expect(heading).toHaveFocus()
     })
 
-    it('creates no undo entry or save when expanding inline', async () => {
-      const save = vi.fn(async () => undefined)
+    it('creates no undo entry or document edit when expanding inline, and saves the expansion', async () => {
+      const save = vi.fn<EditorServices['save']>(async () => undefined)
       const store = await createSeededStore(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }, save)
       renderReact(<App store={store} />)
       const alpha = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
@@ -846,7 +846,7 @@ describe('App', () => {
       expect(savesAfterEdit).toBeGreaterThan(0)
 
       // docs/PRODUCT.md §2.4: expansion is view state. The disclosure triangle, `za`, and `zR` must
-      // not edit the document, add an undo entry, or schedule a save.
+      // not edit the document or add an undo entry; the choices are saved with the document.
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
       expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha leaf', 'Bravo'])
       fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
@@ -859,7 +859,11 @@ describe('App', () => {
       await act(async () => {
         await store.flushPersistence()
       })
-      expect(save).toHaveBeenCalledTimes(savesAfterEdit)
+      expect(save).toHaveBeenCalledTimes(savesAfterEdit + 1)
+      expect(save.mock.calls.at(-1)?.[0]).toMatchObject({
+        document: edited,
+        view: { expandedIds: ['root', 'child'] },
+      })
 
       // One undo removes exactly the text edit, so expansion added no history entry; a second undo
       // has nothing left to remove.

@@ -100,7 +100,7 @@ async function lockEditor(
 }
 
 describe('EditorStore', () => {
-  it('owns transient expansion and memoizes visible rows until document, location, or expansion changes', async () => {
+  it('owns expansion and memoizes visible rows until document, location, or expansion changes', async () => {
     const store = new EditorStore(
       loadedState(
         {
@@ -140,23 +140,157 @@ describe('EditorStore', () => {
     })
   })
 
-  it('resets expansion when the current parent changes and supports fold commands without persistence', async () => {
-    const store = new EditorStore(
-      loadedState(
-        { roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }] },
-        { currentParentId: null, selectedNodeId: 'root' },
-      ),
-      ids('unused'),
-      new FakeClock(),
-    )
-    await store.initialize()
-    store.applyFold('open', 'root')
-    const expandedRows = store.getVisibleRows()
-    expect(expandedRows.map((row) => row.node.id)).toEqual(['root', 'child'])
-    store.enter()
-    expect(store.getSnapshot()).toMatchObject({ status: 'ready', expansion: { expandedIds: new Set() } })
-    expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['child'])
-    expect(store.getVisibleRows()).not.toBe(expandedRows)
+  describe('remembered expansion', () => {
+    // root ─ child ─ grandchild ─ leaf, plus a second root 'other' with one child.
+    const nestedDocument = {
+      roots: [
+        {
+          id: 'root',
+          text: 'Root',
+          children: [
+            {
+              id: 'child',
+              text: 'Child',
+              children: [
+                { id: 'grandchild', text: 'Grandchild', children: [{ id: 'leaf', text: 'Leaf', children: [] }] },
+              ],
+            },
+          ],
+        },
+        { id: 'other', text: 'Other', children: [{ id: 'other-child', text: 'Other child', children: [] }] },
+      ],
+    }
+
+    function viewState(document: unknown, location: unknown, view: unknown): EditorServices & { saves: unknown[] } {
+      const services = createServices()
+      services.load = async () => ({ version: 3, document, location, view })
+      return services
+    }
+
+    function rowIds(store: EditorStore): string[] {
+      return store.getVisibleRows().map((row) => row.node.id)
+    }
+
+    it('keeps each node’s expansion across entering, leaving, and breadcrumb navigation', async () => {
+      const store = new EditorStore(
+        loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      store.toggleExpansion('root')
+      store.toggleExpansion('child')
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+
+      store.enter()
+      expect(rowIds(store)).toEqual(['child', 'grandchild'])
+      store.selectNode('child', 0)
+      store.enter()
+      expect(rowIds(store)).toEqual(['grandchild'])
+      store.navigateToAncestor(null)
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+      store.selectNode('child', 0)
+      store.enter()
+      store.leave()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: 'root', selectedNodeId: 'child' } })
+      expect(rowIds(store)).toEqual(['child', 'grandchild'])
+    })
+
+    it('saves an expansion change by the idle and quit triggers without an undo entry', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+
+      store.toggleExpansion('root')
+      expect(services.saves).toHaveLength(0)
+      clock.runAll()
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ version: 3, view: { expandedIds: ['root'] } })
+
+      store.applyFold('open', 'child')
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { expandedIds: ['root', 'child'] } })
+
+      store.undo()
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+    })
+
+    it('restores expansion and a descendant selection it displays after a restart', async () => {
+      const store = new EditorStore(
+        viewState(
+          nestedDocument,
+          { currentParentId: null, selectedNodeId: 'grandchild' },
+          { expandedIds: ['root', 'child'] },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+      expect(store.getSnapshot()).toMatchObject({
+        location: { currentParentId: null, selectedNodeId: 'grandchild' },
+        focus: { nodeId: 'grandchild', cursor: 0 },
+      })
+    })
+
+    it('moves a restored selection hidden by a collapsed ancestor to the nearest displayed row', async () => {
+      const store = new EditorStore(
+        viewState(nestedDocument, { currentParentId: null, selectedNodeId: 'leaf' }, { expandedIds: ['root'] }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+
+      expect(store.getSnapshot()).toMatchObject({
+        location: { currentParentId: null, selectedNodeId: 'child' },
+        focus: { nodeId: 'child', cursor: 0 },
+      })
+    })
+
+    it('closes only the folds inside the current location with zM', async () => {
+      const store = new EditorStore(
+        viewState(
+          nestedDocument,
+          { currentParentId: 'root', selectedNodeId: 'grandchild' },
+          { expandedIds: ['root', 'child', 'grandchild', 'other'] },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      expect(rowIds(store)).toEqual(['child', 'grandchild', 'leaf'])
+
+      store.applyFold('close-all')
+      expect(rowIds(store)).toEqual(['child'])
+      expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'child' }, focus: { cursor: 0 } })
+
+      store.navigateToAncestor(null)
+      expect(rowIds(store)).toEqual(['root', 'child', 'other', 'other-child'])
+      store.applyFold('close-all')
+      expect(rowIds(store)).toEqual(['root', 'other'])
+    })
+
+    it('keeps an undo site displayed after navigation left its branch expanded', async () => {
+      const store = new EditorStore(
+        loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      store.toggleExpansion('root')
+      store.toggleExpansion('child')
+      store.editText('grandchild', 'Edited')
+      store.selectNode('other', 0)
+      store.enter()
+
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({
+        location: { currentParentId: 'child', selectedNodeId: 'grandchild' },
+      })
+      expect(rowIds(store)).toContain('grandchild')
+    })
   })
   it('edits a whole-node Visual sibling range in one undo step and rejects paste into a source descendant', async () => {
     const services = loadedState(

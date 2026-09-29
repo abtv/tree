@@ -52,6 +52,8 @@ const command = fc.record({
     'paste',
     'pasteImage',
     'selectDescendant',
+    'toggleExpansion',
+    'foldAll',
   ),
   a: fc.nat({ max: 1_000 }),
   b: fc.nat({ max: 1_000 }),
@@ -76,6 +78,8 @@ type CommandAction = {
     | 'paste'
     | 'pasteImage'
     | 'selectDescendant'
+    | 'toggleExpansion'
+    | 'foldAll'
   a: number
   b: number
   text: string
@@ -151,7 +155,15 @@ function assertInvariants(store: EditorStore): void {
   expect(locateNode(state.document, state.location.selectedNodeId)).toBeDefined()
   expect(locateNode(state.document, state.focus.nodeId)).toBeDefined()
   expect(() => assertDocument(state.document)).not.toThrow()
-  expect(() => serializeState(state.document, state.location)).not.toThrow()
+  expect(() => serializeState(state.document, state.location, state.expansion)).not.toThrow()
+}
+
+/** Whether the selected node is the heading or one of the location's visible rows. */
+function isDisplayed(store: EditorStore): boolean {
+  const state = store.getSnapshot()
+  if (state.status !== 'ready') return false
+  const selected = state.location.selectedNodeId
+  return selected === state.location.currentParentId || store.getVisibleRows().some((row) => row.node.id === selected)
 }
 
 /**
@@ -242,6 +254,14 @@ async function applyCommand(
       }
       break
     }
+    case 'toggleExpansion': {
+      const rows = store.getVisibleRows().filter((row) => row.node.children.length > 0)
+      if (rows.length > 0) store.toggleExpansion(rows[action.a % rows.length]!.node.id)
+      break
+    }
+    case 'foldAll':
+      store.applyFold(action.a % 2 === 0 ? 'close-all' : 'open-all')
+      break
   }
 
   return true
@@ -293,7 +313,9 @@ describe('EditorStore invariants under command sequences', () => {
         const state = store.getSnapshot()
         if (state.status !== 'ready') return
 
-        const persisted = JSON.parse(JSON.stringify(serializeState(state.document, state.location))) as unknown
+        const persisted = JSON.parse(
+          JSON.stringify(serializeState(state.document, state.location, state.expansion)),
+        ) as unknown
 
         const restoredStore = new EditorStore(
           createServices(persisted, () => ({ kind: 'text', text: '' })),
@@ -306,11 +328,17 @@ describe('EditorStore invariants under command sequences', () => {
         if (restored.status !== 'ready') return
         expect(restored.document).toEqual(state.document)
         expect(restored.location.currentParentId).toBe(state.location.currentParentId)
-        const restoredDisplayed = displayedNodes(restored.document, restored.location.currentParentId)
-        expect(
-          restored.location.selectedNodeId === restored.location.currentParentId ||
-            restoredDisplayed.some((node) => node.id === restored.location.selectedNodeId),
-        ).toBe(true)
+        // Every remembered choice for a node the document still holds survives the restart, so the
+        // restored location shows the same rows, and a selection that was displayed is kept.
+        const liveIds = new Set(allIds(state.document))
+        expect(restored.expansion.expandedIds).toEqual(
+          new Set([...state.expansion.expandedIds].filter((id) => liveIds.has(id))),
+        )
+        expect(restoredStore.getVisibleRows().map((row) => row.node.id)).toEqual(
+          store.getVisibleRows().map((row) => row.node.id),
+        )
+        expect(isDisplayed(restoredStore)).toBe(true)
+        if (isDisplayed(store)) expect(restored.location.selectedNodeId).toBe(state.location.selectedNodeId)
       }),
       { seed: 20_260_929, numRuns: 300 },
     )

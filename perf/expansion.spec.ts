@@ -179,14 +179,14 @@ test.describe('inline expansion at scale', () => {
     expect(await window.locator('.node-list-spacer').count()).toBe(2)
     const afterExpand = await collectRendererHeap(window)
 
-    // A location change resets expansion regardless of which rows are currently mounted (most of
+    // `zM` closes every fold in the location regardless of which rows are currently mounted (most of
     // the 100 expanded roots have scrolled out of the windowed viewport by now, so re-clicking their
-    // own disclosure triangles is not an option). Entering and leaving the current parent must
-    // release the flattened rows and expansion-id bookkeeping; heap usage should return close to the
-    // pre-expansion baseline rather than accumulate across visits.
-    await window.keyboard.press('Meta+.')
-    await window.keyboard.press('Meta+,')
-    expect(await window.locator('.node-list-spacer').count()).toBe(0)
+    // own disclosure triangles is not an option). Closing them must release the flattened rows and
+    // expansion-id bookkeeping; heap usage should return close to the pre-expansion baseline rather
+    // than accumulate.
+    await window.keyboard.press('z')
+    await window.keyboard.press('M')
+    await expect(window.locator('.node-list-spacer')).toHaveCount(0)
     const afterCollapse = await collectRendererHeap(window)
 
     const expandGrowthBytes = afterExpand - before

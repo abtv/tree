@@ -1,4 +1,4 @@
-export { MAX_DOCUMENT_DEPTH } from './document-types'
+export { EMPTY_PERSISTED_VIEW, MAX_DOCUMENT_DEPTH } from './document-types'
 export type {
   AttachmentId,
   AttachmentReference,
@@ -10,6 +10,7 @@ export type {
   NodeId,
   NodeIndex,
   PersistedEditorState,
+  PersistedView,
   TreeNode,
 } from './document-types'
 
@@ -50,7 +51,7 @@ export {
   isValidLocation,
   moveSibling,
   nodePath,
-  normalizeCollapsedLocation,
+  normalizeVisibleLocation,
   pasteMultilineText,
   pasteText,
   removeTextRange,
@@ -61,3 +62,4 @@ export {
 } from './document-operations'
 
 export { assertDocument, parsePersistedState, serializeState, validatePersistedState } from './document-serialization'
+export type { ViewState } from './document-serialization'

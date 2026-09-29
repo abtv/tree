@@ -1,4 +1,5 @@
 import {
+  EMPTY_PERSISTED_VIEW,
   MAX_DOCUMENT_DEPTH,
   type AttachmentReference,
   type BuildNode,
@@ -7,6 +8,7 @@ import {
   type Location,
   type NodeId,
   type PersistedEditorState,
+  type PersistedView,
   type TreeNode,
 } from './document-types'
 import { isValidLocation } from './document-operations'
@@ -14,23 +16,68 @@ import { normalizeLinks } from './document-links'
 import { isValidAttachmentId } from './document-attachments'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 
-export function serializeState(document: Document, location: Location): PersistedEditorState {
-  assertDocument(document)
+/** The view state to persist; `expandedIds` may hold ids of nodes the document no longer contains. */
+export interface ViewState {
+  readonly expandedIds: Iterable<NodeId>
+  readonly scrollTop?: number
+}
+
+/**
+ * Serializes the current schema. Expansion choices are remembered per node for the running session,
+ * including for nodes an undo could restore, but only ids of nodes the saved document contains are
+ * written, so the file never accumulates choices for deleted nodes.
+ */
+export function serializeState(
+  document: Document,
+  location: Location,
+  view: ViewState = EMPTY_PERSISTED_VIEW,
+): PersistedEditorState {
+  const nodeIds = assertDocumentIds(document)
   if (!isValidLocation(document, location)) {
     throw new Error('The selected node is not valid for the persisted location.')
   }
-  return { version: 2, document, location: { ...location } }
+  const expandedIds: NodeId[] = []
+  for (const id of view.expandedIds) if (nodeIds.has(id)) expandedIds.push(id)
+  return {
+    version: 3,
+    document,
+    location: { ...location },
+    view: view.scrollTop === undefined ? { expandedIds } : { expandedIds, scrollTop: view.scrollTop },
+  }
+}
+
+function isSupportedVersion(version: unknown): version is 1 | 2 | 3 {
+  return version === 1 || version === 2 || version === 3
+}
+
+/**
+ * Checks the view shape of a version 3 state. An expanded id that names no node is tolerated, since
+ * it cannot display anything; a malformed view is rejected like any other malformed field.
+ */
+function assertView(value: Record<string, unknown>): void {
+  if (value.version !== 3) return
+  const view = value.view
+  if (
+    !isRecord(view) ||
+    !Array.isArray(view.expandedIds) ||
+    !view.expandedIds.every((id) => typeof id === 'string' && id.length > 0) ||
+    (view.scrollTop !== undefined &&
+      (typeof view.scrollTop !== 'number' || !Number.isFinite(view.scrollTop) || view.scrollTop < 0))
+  ) {
+    throw new Error('The saved view state is invalid.')
+  }
 }
 
 export function validatePersistedState(value: unknown): PersistedEditorState {
   if (
     !isRecord(value) ||
-    (value.version !== 1 && value.version !== 2) ||
+    !isSupportedVersion(value.version) ||
     !isRecord(value.document) ||
     !isRecord(value.location)
   ) {
     throw new Error('The saved document has an unsupported format.')
   }
+  assertView(value)
 
   const roots = value.document.roots
   if (!Array.isArray(roots)) {
@@ -81,17 +128,23 @@ function isLocationReachable(
   return false
 }
 
+/**
+ * Parses and migrates a saved state to the current schema. A version 1 or 2 file predates persisted
+ * view state and loads with every node collapsed; expanded ids that name no node are dropped.
+ */
 export function parsePersistedState(value: unknown): PersistedEditorState {
   if (
     !isRecord(value) ||
-    (value.version !== 1 && value.version !== 2) ||
+    !isSupportedVersion(value.version) ||
     !isRecord(value.document) ||
     !isRecord(value.location)
   ) {
     throw new Error('The saved document has an unsupported format.')
   }
+  assertView(value)
 
-  const document: Document = { roots: parseNodes(value.document.roots, new Set()) }
+  const nodeIds = new Set<NodeId>()
+  const document: Document = { roots: parseNodes(value.document.roots, nodeIds) }
   if (document.roots.length === 0) {
     throw new Error('The saved document must contain at least one root node.')
   }
@@ -104,14 +157,27 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
   if (!isValidLocation(document, location)) {
     throw new Error('The saved document location does not match its tree.')
   }
-  return { version: 2, document, location }
+  return { version: 3, document, location, view: parseView(value, nodeIds) }
+}
+
+function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>): PersistedView {
+  if (value.version !== 3 || !isRecord(value.view)) return EMPTY_PERSISTED_VIEW
+  const expandedIds = (value.view.expandedIds as string[]).filter((id) => nodeIds.has(id))
+  const scrollTop = value.view.scrollTop
+  return typeof scrollTop === 'number' ? { expandedIds, scrollTop } : { expandedIds }
 }
 
 export function assertDocument(document: Document): void {
+  assertDocumentIds(document)
+}
+
+function assertDocumentIds(document: Document): Set<NodeId> {
   if (!Array.isArray(document.roots) || document.roots.length === 0) {
     throw new Error('A document must contain at least one root node.')
   }
-  walkNodes(document.roots, new Set(), false)
+  const nodeIds = new Set<NodeId>()
+  walkNodes(document.roots, nodeIds, false)
+  return nodeIds
 }
 
 function parseNodes(value: unknown, nodeIds: Set<NodeId>): TreeNode[] {

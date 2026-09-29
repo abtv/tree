@@ -3,10 +3,12 @@ import type { TreeNode } from '../domain/document'
 import {
   COLLAPSED_EXPANSION_STATE,
   applyNodeFold,
+  collapseForest,
   collapseNode,
   collapseSubtree,
   expandForest,
   expandNode,
+  expansionFromIds,
   expandSubtree,
   isNodeExpanded,
   toggleNodeExpansion,
@@ -42,7 +44,7 @@ describe('collapseNode', () => {
     expect(collapseNode(COLLAPSED_EXPANSION_STATE, 'a')).toBe(COLLAPSED_EXPANSION_STATE)
   })
 
-  it('retains a descendant choice made during the same visit across a collapse/expand round trip', () => {
+  it('retains a descendant choice across a collapse/expand round trip', () => {
     // Collapsing an ancestor only removes the ancestor's own id: the child's choice is untouched, so
     // expanding the ancestor again immediately restores the nested expansion, per PRODUCT.md §2.4.
     let state = expandNode(COLLAPSED_EXPANSION_STATE, 'parent')
@@ -144,5 +146,23 @@ describe('expandForest', () => {
     expect(isNodeExpanded(expanded, 'second')).toBe(true)
     expect(isNodeExpanded(expanded, 'second-child')).toBe(false)
     expect(expandForest(expanded, [first, second])).toBe(expanded)
+  })
+})
+
+describe('collapseForest', () => {
+  it('forgets every choice under the given nodes and keeps choices elsewhere', () => {
+    const first = tree('first', [tree('first-child', [tree('first-grandchild')])])
+    const state = expansionFromIds(['first', 'first-child', 'elsewhere'])
+    const collapsed = collapseForest(state, [first])
+    expect([...collapsed.expandedIds]).toEqual(['elsewhere'])
+    expect(collapseForest(collapsed, [first])).toBe(collapsed)
+    expect(collapseForest(COLLAPSED_EXPANSION_STATE, [first])).toBe(COLLAPSED_EXPANSION_STATE)
+  })
+})
+
+describe('expansionFromIds', () => {
+  it('builds a state from ids and shares the collapsed state when there are none', () => {
+    expect([...expansionFromIds(['a', 'b', 'a']).expandedIds]).toEqual(['a', 'b'])
+    expect(expansionFromIds([])).toBe(COLLAPSED_EXPANSION_STATE)
   })
 })

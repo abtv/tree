@@ -6,7 +6,7 @@ import {
   editNodeContent,
   isValidLocation,
   locateNode,
-  normalizeCollapsedLocation,
+  normalizeVisibleLocation,
   parsePersistedState,
   replaceLinkedText,
   replaceLinkedTextRanges,
@@ -57,8 +57,10 @@ import type { PersistenceFailureKind } from './persistence-coordinator'
 import { countInsertedWords, countPastedWords } from './save-policy'
 import {
   applyNodeFold,
+  collapseForest,
   COLLAPSED_EXPANSION_STATE,
   expandForest,
+  expansionFromIds,
   isNodeExpanded,
   toggleNodeExpansion,
   type ExpansionState,
@@ -87,7 +89,11 @@ export class EditorStore {
   ) {
     this.textSession = new EditorTextSession(clock)
     this.saveScheduler = new EditorSaveScheduler(services, clock, {
-      currentState: () => (this.runtime.snapshot.status === 'ready' ? this.runtime.snapshot : undefined),
+      currentState: () => {
+        const state = this.runtime.snapshot
+        if (state.status !== 'ready') return undefined
+        return { document: state.document, location: state.location, view: state.expansion }
+      },
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
       isPersistenceLocked: () => this.isPersistenceLocked(),
       onPersistenceResult: (error, kind) => this.handlePersistenceResult(error, kind),
@@ -135,29 +141,42 @@ export class EditorStore {
         ? { location: { ...state.location, selectedNodeId: nodeId }, focus: this.runtime.newFocus(nodeId, 0) }
         : {}),
     })
+    this.markPersistedChange()
   }
 
   public applyFold(command: NodeFoldCommand | 'close-all' | 'open-all', nodeId?: NodeId): void {
     const state = this.runtime.ready()
     if (command === 'close-all') {
-      const location = normalizeCollapsedLocation(state.document, state.location)
+      // At the root level the location holds every node, so closing its folds forgets every choice
+      // without walking the document.
+      const expansion =
+        state.location.currentParentId === null
+          ? COLLAPSED_EXPANSION_STATE
+          : collapseForest(state.expansion, displayedNodes(state.document, state.location.currentParentId))
+      if (expansion === state.expansion) return
+      const location = normalizeVisibleLocation(state.document, state.location, (id) => isNodeExpanded(expansion, id))
       this.runtime.replaceReady({
         ...state,
-        expansion: COLLAPSED_EXPANSION_STATE,
+        expansion,
         ...(location.selectedNodeId !== state.location.selectedNodeId
           ? { location, focus: this.runtime.newFocus(location.selectedNodeId, 0) }
           : {}),
       })
+      this.markPersistedChange()
       return
     }
     if (command === 'open-all') {
       const expansion = expandForest(state.expansion, displayedNodes(state.document, state.location.currentParentId))
-      if (expansion !== state.expansion) this.runtime.replaceReady({ ...state, expansion })
+      if (expansion === state.expansion) return
+      this.runtime.replaceReady({ ...state, expansion })
+      this.markPersistedChange()
       return
     }
     if (nodeId === undefined || nodeId === state.location.currentParentId) return
     const expansion = applyNodeFold(state.expansion, command, requireNode(state.document, nodeId).node)
-    if (expansion !== state.expansion) this.runtime.replaceReady({ ...state, expansion })
+    if (expansion === state.expansion) return
+    this.runtime.replaceReady({ ...state, expansion })
+    this.markPersistedChange()
   }
 
   /**
@@ -237,14 +256,15 @@ export class EditorStore {
       }
 
       const parsed = parsePersistedState(loaded)
-      const location = normalizeCollapsedLocation(parsed.document, parsed.location)
+      const expansion = expansionFromIds(parsed.view?.expandedIds ?? [])
+      const location = normalizeVisibleLocation(parsed.document, parsed.location, (id) => isNodeExpanded(expansion, id))
       this.runtime.snapshot = {
         status: 'ready',
         document: parsed.document,
         location,
         focus: this.runtime.newFocus(location.selectedNodeId, 0),
         structuralVersion: this.runtime.getStructuralVersion(),
-        expansion: COLLAPSED_EXPANSION_STATE,
+        expansion,
       }
       this.runtime.emit()
       this.queueAttachmentCleanup()
@@ -763,14 +783,13 @@ export class EditorStore {
    */
   private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
     const target = changeSiteFocus(state.document, document, state.location)
-    const location = target?.location ?? reconciled
+    // A change site is always a direct child or the heading of its location. The fallback location
+    // was recorded earlier and may select a descendant a collapse has since hidden.
+    const location =
+      target?.location ?? normalizeVisibleLocation(document, reconciled, (id) => isNodeExpanded(state.expansion, id))
+    const focus = target?.focus ?? { nodeId: location.selectedNodeId, cursor: 0 }
     this.runtime.replaceReady(
-      {
-        ...state,
-        document,
-        location,
-        focus: this.runtime.newFocus(target?.focus.nodeId ?? location.selectedNodeId, target?.focus.cursor ?? 0),
-      },
+      { ...state, document, location, focus: this.runtime.newFocus(focus.nodeId, focus.cursor) },
       true,
     )
   }

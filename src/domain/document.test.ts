@@ -18,7 +18,7 @@ import {
   locateNode,
   moveSibling,
   nodePath,
-  normalizeCollapsedLocation,
+  normalizeVisibleLocation,
   parsePersistedState,
   pasteMultilineText,
   pasteText,
@@ -211,7 +211,7 @@ describe('document operations', () => {
 
     expect(validatePersistedState(state)).toBe(state)
     expect(validatePersistedState({ ...state, version: 1 })).toEqual({ ...state, version: 1 })
-    expect(() => validatePersistedState({ ...state, version: 3 })).toThrow('unsupported format')
+    expect(() => validatePersistedState({ ...state, version: 4 })).toThrow('unsupported format')
     expect(() => validatePersistedState({ ...state, document: { roots: [] } })).toThrow('at least one root node')
     expect(() =>
       validatePersistedState({ ...state, location: { currentParentId: 'missing', selectedNodeId: 'root' } }),
@@ -608,15 +608,50 @@ describe('document operations', () => {
     expect(result?.roots[0]!.links).toBeUndefined()
   })
 
-  it('migrates version one documents and persists links as version two', () => {
+  it('migrates version one documents with an empty view and persists links as version three', () => {
     const parsed = parsePersistedState({
       version: 1,
       document: { roots: [{ id: 'a', text: 'https://example.com', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
-    expect(parsed.version).toBe(2)
+    expect(parsed.version).toBe(3)
+    expect(parsed.view).toEqual({ expandedIds: [] })
     const document = pasteText(parsed.document, 'a', 0, 'https://example.com')
-    expect(serializeState(document, parsed.location).version).toBe(2)
+    expect(serializeState(document, parsed.location).version).toBe(3)
+  })
+
+  it('migrates a version two document to version three with every node collapsed', () => {
+    const parsed = parsePersistedState({
+      version: 2,
+      document: { roots: [{ id: 'a', text: '', children: [{ id: 'b', text: '', children: [] }] }] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+
+    expect(parsed).toMatchObject({ version: 3, view: { expandedIds: [] } })
+  })
+
+  it('persists only expanded ids of nodes the document contains, with the scroll offset', () => {
+    const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
+    const state = serializeState(
+      document,
+      { currentParentId: null, selectedNodeId: 'child' },
+      { expandedIds: new Set(['deleted', 'root']), scrollTop: 48 },
+    )
+
+    expect(state.view).toEqual({ expandedIds: ['root'], scrollTop: 48 })
+    expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
+    expect(serializeState(document, state.location).view).toEqual({ expandedIds: [] })
+  })
+
+  it('drops loaded expanded ids that name no node', () => {
+    const parsed = parsePersistedState({
+      version: 3,
+      document: { roots: [{ id: 'a', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+      view: { expandedIds: ['missing', 'a'] },
+    })
+
+    expect(parsed.view).toEqual({ expandedIds: ['a'] })
   })
 
   it('builds a parent index that maps every node to its parent or the root collection', () => {
@@ -872,19 +907,25 @@ describe('document operations', () => {
   })
 })
 
-describe('normalizeCollapsedLocation', () => {
+describe('normalizeVisibleLocation', () => {
+  const collapsed = (): boolean => false
+  const expandedOnly =
+    (...ids: string[]) =>
+    (id: string): boolean =>
+      ids.includes(id)
+
   it('returns a location already at the displayed level unchanged', () => {
     const document = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
     const location = { currentParentId: 'parent', selectedNodeId: 'child' }
 
-    expect(normalizeCollapsedLocation(document, location)).toEqual(location)
+    expect(normalizeVisibleLocation(document, location, collapsed)).toEqual(location)
   })
 
   it('returns the current parent heading unchanged', () => {
     const document = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
     const location = { currentParentId: 'parent', selectedNodeId: 'parent' }
 
-    expect(normalizeCollapsedLocation(document, location)).toEqual(location)
+    expect(normalizeVisibleLocation(document, location, collapsed)).toEqual(location)
   })
 
   it('walks a descendant back to the direct child of a non-null current parent', () => {
@@ -894,7 +935,9 @@ describe('normalizeCollapsedLocation', () => {
       'grandchild',
     )
 
-    expect(normalizeCollapsedLocation(document, { currentParentId: 'parent', selectedNodeId: 'grandchild' })).toEqual({
+    expect(
+      normalizeVisibleLocation(document, { currentParentId: 'parent', selectedNodeId: 'grandchild' }, collapsed),
+    ).toEqual({
       currentParentId: 'parent',
       selectedNodeId: 'child',
     })
@@ -907,9 +950,34 @@ describe('normalizeCollapsedLocation', () => {
       'grandchild',
     )
 
-    expect(normalizeCollapsedLocation(document, { currentParentId: null, selectedNodeId: 'grandchild' })).toEqual({
+    expect(
+      normalizeVisibleLocation(document, { currentParentId: null, selectedNodeId: 'grandchild' }, collapsed),
+    ).toEqual({
       currentParentId: null,
       selectedNodeId: 'root',
     })
+  })
+
+  it('keeps a descendant whose every ancestor below the current parent is expanded', () => {
+    const document = createFirstChild(
+      createFirstChild(createInitialDocument('root'), 'root', 'child'),
+      'child',
+      'grandchild',
+    )
+    const location = { currentParentId: null, selectedNodeId: 'grandchild' }
+
+    expect(normalizeVisibleLocation(document, location, expandedOnly('root', 'child'))).toBe(location)
+  })
+
+  it('selects the outermost collapsed ancestor, ignoring expansion above the current parent', () => {
+    const document = createFirstChild(
+      createFirstChild(createFirstChild(createInitialDocument('parent'), 'parent', 'child'), 'child', 'grandchild'),
+      'grandchild',
+      'leaf',
+    )
+
+    expect(
+      normalizeVisibleLocation(document, { currentParentId: 'parent', selectedNodeId: 'leaf' }, expandedOnly('child')),
+    ).toEqual({ currentParentId: 'parent', selectedNodeId: 'grandchild' })
   })
 })

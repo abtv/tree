@@ -136,24 +136,30 @@ export function isValidLocation(document: Document, location: Location): boolean
 }
 
 /**
- * Where the caret belongs when a location is first displayed with all inline expansion collapsed
- * (application startup, `docs/PRODUCT.md` §2.4). A persisted `selectedNodeId` may be a descendant
- * several levels below `currentParentId`; this walks back up to the direct child of
- * `currentParentId` on the path to it (or the top-level root ancestor at the root level) so the
- * initial caret always lands on a rendered row. A location that is already at that depth, including
- * the heading itself, is returned unchanged.
+ * Where the caret belongs when the selected node may be hidden by a collapsed ancestor (application
+ * startup and the fold commands, `docs/PRODUCT.md` §2.4). A `selectedNodeId` may be a descendant
+ * several levels below `currentParentId`; it is displayed only while every ancestor between the
+ * current parent and it is expanded. Otherwise this selects the outermost collapsed ancestor on that
+ * path, which is the nearest displayed row, so the caret always lands on a rendered row. A displayed
+ * selection, including the heading itself, is returned unchanged.
  */
-export function normalizeCollapsedLocation(document: Document, location: Location): Location {
+export function normalizeVisibleLocation(
+  document: Document,
+  location: Location,
+  isExpanded: (nodeId: NodeId) => boolean,
+): Location {
   const selected = requireNode(document, location.selectedNodeId)
-  if (location.currentParentId === null) {
-    const topAncestor = selected.ancestors[0]
-    return topAncestor === undefined ? location : { ...location, selectedNodeId: topAncestor.id }
-  }
   if (selected.node.id === location.currentParentId) return location
-  const parentDepth = selected.ancestors.findIndex((ancestor) => ancestor.id === location.currentParentId)
-  if (parentDepth === -1) return location
-  const directChild = selected.ancestors[parentDepth + 1]
-  return directChild === undefined ? location : { ...location, selectedNodeId: directChild.id }
+  const parentDepth =
+    location.currentParentId === null
+      ? -1
+      : selected.ancestors.findIndex((ancestor) => ancestor.id === location.currentParentId)
+  if (location.currentParentId !== null && parentDepth === -1) return location
+  for (let index = parentDepth + 1; index < selected.ancestors.length; index += 1) {
+    const ancestor = selected.ancestors[index]!
+    if (!isExpanded(ancestor.id)) return { ...location, selectedNodeId: ancestor.id }
+  }
+  return location
 }
 
 export function editNodeText(document: Document, nodeId: NodeId, text: string): Document {

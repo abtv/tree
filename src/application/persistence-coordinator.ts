@@ -1,12 +1,18 @@
-import { serializeState, type AttachmentId, type Document, type Location } from '../domain/document'
+import { serializeState, type AttachmentId, type Document, type Location, type ViewState } from '../domain/document'
 
 export interface PersistenceServices {
   save(state: ReturnType<typeof serializeState>): Promise<void>
   cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
 }
 
+export interface PersistedStateSource {
+  document: Document
+  location: Location
+  view?: ViewState
+}
+
 export interface PersistenceCoordinatorDependencies {
-  currentState(): { document: Document; location: Location } | undefined
+  currentState(): PersistedStateSource | undefined
   referencedAttachmentIds(): Iterable<AttachmentId>
   hasPendingDocumentChanges(): boolean
   onSaveCaptured(): void
@@ -79,7 +85,7 @@ export class PersistenceCoordinator {
             if (saveRequested) {
               this.dependencies.onSaveCaptured()
               try {
-                await this.services.save(serializeState(state.document, state.location))
+                await this.services.save(serializeState(state.document, state.location, state.view))
                 this.saveError = undefined
                 this.dependencies.onDocumentSaved()
               } catch (error) {

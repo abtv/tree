@@ -1,6 +1,5 @@
 import { releaseNodeIndex, type NodeId } from '../domain/document'
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
-import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 
 export type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
 
@@ -34,13 +33,7 @@ export class EditorRuntimeState {
   public replaceReady(state: ReadySnapshot, changedStructure = false): void {
     const previous = this.snapshot
     if (changedStructure) this.structuralVersion += 1
-    const locationChanged =
-      previous.status === 'ready' && previous.location.currentParentId !== state.location.currentParentId
-    const next = {
-      ...state,
-      expansion: locationChanged ? COLLAPSED_EXPANSION_STATE : state.expansion,
-      structuralVersion: this.structuralVersion,
-    }
+    const next = { ...state, structuralVersion: this.structuralVersion }
     if (next.operationError === undefined) {
       this.snapshot = next
     } else {

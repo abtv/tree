@@ -145,11 +145,11 @@ A persisted document containing a node below level 20 is invalid. Loading such a
 
 ### 2.4 Inline Expansion
 
-All nodes begin collapsed when a location is opened. Clicking a node's disclosure triangle shows its direct children immediately beneath it, indented to reflect their depth. An expanded child can be expanded in the same way, and collapsing an ancestor hides every visible descendant beneath it. Expanding that ancestor again restores any nested expansion choices made during the same visit to the location.
+Every node remembers whether it is expanded. A node that has never been expanded is collapsed. Clicking a node's disclosure triangle shows its direct children immediately beneath it, indented to reflect their depth. An expanded child can be expanded in the same way, and collapsing an ancestor hides every visible descendant beneath it. Expanding that ancestor again restores the nested expansion choices beneath it.
 
 Visible descendants are ordinary editable nodes: the user can click their text, place the caret, edit them, use their circular indicator to enter them, and expand or collapse their children. The location path and current-parent heading continue to represent the current location, even when a visible descendant has the caret. Motion between nodes (`↑`, `↓`, `j`, `k`, `←`, `→`, `G`, and counted forms) follows the location's visible rows, including descendants shown by inline expansion. Commands that act on the tree — sibling creation, deletion, yank and put, whole-node Visual ranges, and drag reordering — use the focused node's actual sibling level instead: each of these operates on a sibling subtree as one unit, and a range or move spanning a node together with its own descendant has no meaning for them. The Vim fold commands in §20.2 operate on the selected node's own fold and on the folds within the current location; expansion adds no other keyboard command.
 
-Expansion is view state, not a document edit. It creates no undo entry or save. Changing location, including entering a node or using the location path, clears all expansion choices; reopening the application also starts collapsed. If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged.
+Expansion is view state, not a document edit. It creates no undo entry and never saves by itself. An expansion change is a pending change like a selection change: the idle, volume, and quit triggers in §16.1 save it together with the document. Expansion choices are kept when the location changes: entering a node shows its children with their own remembered expansion, and leaving it or using the location path shows the destination with the choices made there before. Reopening the application restores every remembered choice. If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged. When the application opens with a selected node that a collapsed ancestor hides, for example a document saved before expansion was remembered, the nearest displayed ancestor is selected instead, with its caret at the beginning of its text.
 
 Dragging visible descendants can reorder nodes only among their actual siblings. An expanded view provides no cross-level drop target and cannot change hierarchy by dragging.
 
@@ -758,7 +758,7 @@ A save is performed when:
 
 Editing the characters of an existing hyperlink is a text edit, not a new hyperlink insertion; it follows the word-volume, idle, and quit triggers rather than saving immediately for each changed URL.
 
-Changes that do not insert content — creating, splitting, deleting, reordering, or undoing/redoing nodes — do not by themselves trigger a save. They remain pending and are saved by the next volume, idle, or quit trigger.
+Changes that do not insert content — creating, splitting, deleting, reordering, or undoing/redoing nodes, and changing the selected node or a node's expansion — do not by themselves trigger a save. They remain pending and are saved by the next volume, idle, or quit trigger.
 
 Only inserted words count toward the volume threshold. Deletions and other changes still reset the idle timer and keep changes pending.
 
@@ -789,7 +789,8 @@ The following state must be persisted:
 * the ordered top-level root nodes and their trees;
 * stable node IDs;
 * the current parent, or the root-level location when there is no current parent;
-* the selected node.
+* the selected node, including a descendant displayed by inline expansion;
+* each node's remembered inline expansion (§2.4).
 
 The exact text cursor position does not need to be persisted.
 

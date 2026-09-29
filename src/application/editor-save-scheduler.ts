@@ -1,7 +1,8 @@
-import type { AttachmentId, Document, Location } from '../domain/document'
+import type { AttachmentId } from '../domain/document'
 import type { Clock } from './editor-store-types'
 import {
   PersistenceCoordinator,
+  type PersistedStateSource,
   type PersistenceFailureKind,
   type PersistenceServices,
 } from './persistence-coordinator'
@@ -13,7 +14,7 @@ import {
 } from './save-policy'
 
 export interface SaveSchedulerContext {
-  currentState(): { document: Document; location: Location } | undefined
+  currentState(): PersistedStateSource | undefined
   referencedAttachmentIds(): Iterable<AttachmentId>
   isPersistenceLocked(): boolean
   onPersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void

@@ -12,6 +12,8 @@ export interface Launched {
 export interface Seed {
   document: unknown
   location: unknown
+  /** Persisted view state; a seed with one is written as the version 3 schema. */
+  view?: { expandedIds: string[]; scrollTop?: number }
 }
 
 const launchedApps: ElectronApplication[] = []
@@ -204,7 +206,7 @@ async function waitForProcessExit(
 export function seedDocument(userDataDir: string, seed: Seed): void {
   const directory = join(userDataDir, 'data')
   mkdirSync(directory, { recursive: true })
-  writeFileSync(join(directory, 'document.json'), JSON.stringify({ version: 1, ...seed }))
+  writeFileSync(join(directory, 'document.json'), JSON.stringify({ version: seed.view === undefined ? 1 : 3, ...seed }))
 }
 
 interface BuiltNode {

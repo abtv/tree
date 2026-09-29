@@ -54,4 +54,14 @@ test.describe('startup', () => {
   test('large-10000', async ({ userDataDir }) => {
     await measureStartup(userDataDir, 'large-10000', { seed: largeSeed(100, 100) })
   })
+
+  test('large-10000-expanded', async ({ userDataDir }) => {
+    // Every root restored expanded, so startup restores about 10,100 visible rows.
+    const seed = largeSeed(100, 100)
+    const expandedIds = Array.from({ length: 100 }, (_, index) => `r${index}`)
+    await measureStartup(userDataDir, 'large-10000-expanded', {
+      seed: { ...seed, location: { currentParentId: null, selectedNodeId: 'r99c99' }, view: { expandedIds } },
+      rendererCeilingMs: 2_000,
+    })
+  })
 })

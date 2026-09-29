@@ -128,9 +128,43 @@ const cases: PersistedStateCase[] = [
   },
   {
     name: 'rejects an unsupported version',
-    state: { ...validState, version: 3 },
+    state: { ...validState, version: 4, view: { expandedIds: [] } },
     decision: 'reject',
     error: 'The saved document has an unsupported format.',
+  },
+  {
+    name: 'accepts a version three state with expansion and a scroll offset',
+    state: { ...validState, version: 3, view: { expandedIds: ['root'], scrollTop: 120 } },
+    decision: 'accept',
+  },
+  {
+    name: 'accepts a version three expanded id that names no node',
+    state: { ...validState, version: 3, view: { expandedIds: ['missing'] } },
+    decision: 'accept',
+  },
+  {
+    name: 'rejects a version three state without a view',
+    state: { ...validState, version: 3 },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects expanded ids that are not non-empty strings',
+    state: { ...validState, version: 3, view: { expandedIds: ['root', ''] } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects a negative scroll offset',
+    state: { ...validState, version: 3, view: { expandedIds: [], scrollTop: -1 } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects a non-finite scroll offset',
+    state: { ...validState, version: 3, view: { expandedIds: [], scrollTop: Number.POSITIVE_INFINITY } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
   },
   {
     name: 'rejects a non-record document',

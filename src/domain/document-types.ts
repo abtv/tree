@@ -32,11 +32,20 @@ export interface Location {
   readonly selectedNodeId: NodeId
 }
 
+/** Persisted view state: remembered expansion choices and the page scroll offset. */
+export interface PersistedView {
+  readonly expandedIds: readonly NodeId[]
+  readonly scrollTop?: number
+}
+
 export interface PersistedEditorState {
-  readonly version: 1 | 2
+  readonly version: 1 | 2 | 3
   readonly document: Document
   readonly location: Location
+  readonly view?: PersistedView
 }
+
+export const EMPTY_PERSISTED_VIEW: PersistedView = { expandedIds: [] }
 
 export interface LocatedNode {
   readonly node: TreeNode

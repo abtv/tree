@@ -84,6 +84,27 @@ describe('main IPC handlers', () => {
     expect(fileServices.save).not.toHaveBeenCalled()
   })
 
+  it('forwards a version three view state and rejects a malformed one before filesystem persistence', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const base = {
+      version: 3,
+      document: { roots: [{ id: 'root', text: '', children: [{ id: 'child', text: '', children: [] }] }] },
+      location: { currentParentId: null, selectedNodeId: 'child' },
+    }
+    const state = { ...base, view: { expandedIds: ['root'], scrollTop: 24 } }
+
+    await handlers.get(ipcChannels.save)!(event, state)
+    expect(vi.mocked(fileServices.save).mock.calls[0]![0]).toBe(state)
+
+    for (const view of [undefined, { expandedIds: 'root' }, { expandedIds: [7] }, { expandedIds: [], scrollTop: -5 }]) {
+      await expect(
+        Promise.resolve().then(() => handlers.get(ipcChannels.save)!(event, { ...base, view })),
+      ).rejects.toThrow()
+    }
+    expect(fileServices.save).toHaveBeenCalledOnce()
+  })
+
   it('validates the maximum persisted depth before filesystem persistence', async () => {
     const { handlers, fileServices } = createHarness()
     const root = { id: 'n0', text: '', children: [] as { id: string; text: string; children: never[] }[] }

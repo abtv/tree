@@ -9,10 +9,8 @@ import {
   pressShifted,
   readPersisted,
   seedDocument,
-  setCursor,
   startRowDrag,
   test,
-  typeInto,
 } from './fixtures'
 
 function nestedSeed(): { document: unknown; location: unknown } {
@@ -77,7 +75,7 @@ test.describe('inline node expansion', () => {
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
   })
 
-  test('restores nested expansion choices made during the same visit when re-expanding', async ({ userDataDir }) => {
+  test('restores nested expansion choices when re-expanding', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -241,24 +239,35 @@ test.describe('inline node expansion', () => {
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
   })
 
-  test('resets expansion when entering and leaving a node', async ({ userDataDir }) => {
+  test('keeps each node’s expansion when entering and leaving a node', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+    expect(await nodeTexts(window)).toEqual([
+      'Alpha',
+      'Alpha child one',
+      'Alpha grandchild',
+      'Alpha child two',
+      'Bravo',
+    ])
 
     await node(window, 1).click()
     await window.keyboard.press('Meta+.')
-    await expect(parent(window)).toBeVisible()
+    await expect(parent(window)).toHaveValue('Alpha')
+    // The entered location shows the child's remembered expansion.
+    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
     await window.keyboard.press('Meta+,')
 
     await expect(node(window, 1)).toBeFocused()
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
-    await expect(window.getByRole('button', { name: 'Expand node 1' })).toBeVisible()
+    await expect
+      .poll(() => nodeTexts(window))
+      .toEqual(['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo'])
+    await expect(window.getByRole('button', { name: 'Collapse node 1' })).toBeVisible()
   })
 
-  test('resets expansion when navigating via the location breadcrumb', async ({ userDataDir }) => {
+  test('keeps expansion when navigating via the location breadcrumb', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -270,73 +279,77 @@ test.describe('inline node expansion', () => {
     await expect(parent(window)).toBeVisible()
     await window.getByRole('button', { name: 'Top level' }).click()
 
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
-    await expect(window.getByRole('button', { name: 'Expand node 1' })).toBeVisible()
+    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+    await expect(window.getByRole('button', { name: 'Collapse node 1' })).toBeVisible()
   })
 
-  test('starts collapsed after relaunch while the saved document persists', async ({ userDataDir }) => {
+  test('restores expansion and the selected descendant after relaunch with no other change', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, nestedSeed())
     const first = await launchTree(userDataDir, { initialMode: 'normal' })
 
-    // Edit the selected root so the relaunched window must load the saved document: a relaunch that
-    // accidentally showed the seed instead of persisted content would fail on "Alpha edited".
-    await setCursor(node(first.window, 1), 'Alpha'.length)
-    await typeInto(node(first.window, 1), ' edited')
-
-    // Expand two levels so an incorrectly restored expansion would render extra descendant rows.
+    // Only view changes: expansion and selection. Quit must save them without any text edit.
     await first.window.getByRole('button', { name: 'Expand node 1' }).click()
     await first.window.getByRole('button', { name: 'Expand node 2' }).click()
-    expect(await nodeTexts(first.window)).toEqual([
-      'Alpha edited',
-      'Alpha child one',
-      'Alpha grandchild',
-      'Alpha child two',
-      'Bravo',
-    ])
+    await node(first.window, 3).click()
+    await expect(node(first.window, 3)).toHaveValue('Alpha grandchild')
 
     await closeApp(first.app)
-    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Alpha edited')
+    const persisted = readPersisted(userDataDir)
+    expect(persisted.version).toBe(3)
+    expect(persisted.location).toEqual({ currentParentId: null, selectedNodeId: 'a1a' })
+    expect(new Set(persisted.view?.expandedIds)).toEqual(new Set(['a', 'a1']))
 
     const second = await launchTree(userDataDir, { initialMode: 'normal' })
 
-    // docs/PRODUCT.md §2.4: reopening the application starts collapsed.
-    expect(await nodeTexts(second.window)).toEqual(['Alpha edited', 'Bravo'])
-    await expect(second.window.getByRole('button', { name: 'Expand node 1' })).toBeVisible()
+    await expect
+      .poll(() => nodeTexts(second.window))
+      .toEqual(['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo'])
+    await expect(node(second.window, 3)).toHaveValue('Alpha grandchild')
+    await expect(node(second.window, 3)).toBeFocused()
   })
 
-  test('normalizes an inline-expanded descendant selected below a non-null current parent after relaunch', async ({
-    userDataDir,
-  }) => {
+  test('restores the remembered expansion of a location entered before relaunch', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const first = await launchTree(userDataDir, { initialMode: 'normal' })
 
     await node(first.window, 1).click()
     await first.window.keyboard.press('Meta+.')
     await expect(parent(first.window)).toHaveValue('Alpha')
-    expect(await nodeTexts(first.window)).toEqual(['Alpha child one', 'Alpha child two'])
-
     await first.window.getByRole('button', { name: 'Expand node 1' }).click()
-    expect(await nodeTexts(first.window)).toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
-
-    // Select and edit the inline-expanded grandchild so the persisted location has a non-null
-    // current parent and a selected node several levels below the direct child it should normalize to.
     await node(first.window, 2).click()
-    await setCursor(node(first.window, 2), 'Alpha grandchild'.length)
-    await typeInto(node(first.window, 2), ' edited')
+    await expect(node(first.window, 2)).toHaveValue('Alpha grandchild')
 
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
     expect(persisted.location).toEqual({ currentParentId: 'a', selectedNodeId: 'a1a' })
+    expect(persisted.view?.expandedIds).toEqual(['a1'])
 
     const second = await launchTree(userDataDir, { initialMode: 'normal' })
 
-    // docs/PRODUCT.md §2.4: reopening starts collapsed, so the restored caret must land on the
-    // displayed direct child on the path to the persisted descendant, not the descendant itself.
     await expect(parent(second.window)).toHaveValue('Alpha')
-    expect(await nodeTexts(second.window)).toEqual(['Alpha child one', 'Alpha child two'])
-    await expect(node(second.window, 1)).toHaveValue('Alpha child one')
-    await expect(node(second.window, 1)).toBeFocused()
-    expect(await node(second.window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+    await expect
+      .poll(() => nodeTexts(second.window))
+      .toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
+    await expect(node(second.window, 2)).toBeFocused()
+    // 'Alpha' itself was never expanded, so it stays collapsed at the top level.
+    await second.window.getByRole('button', { name: 'Top level' }).click()
+    await expect.poll(() => nodeTexts(second.window)).toEqual(['Alpha', 'Bravo'])
+  })
+
+  test('opens an older document collapsed, moving a hidden selection to its displayed ancestor', async ({
+    userDataDir,
+  }) => {
+    // A version 1 seed predates persisted expansion, so the selected grandchild starts hidden.
+    seedDocument(userDataDir, { ...nestedSeed(), location: { currentParentId: 'a', selectedNodeId: 'a1a' } })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    await expect(parent(window)).toHaveValue('Alpha')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha child one', 'Alpha child two'])
+    await expect(node(window, 1)).toHaveValue('Alpha child one')
+    await expect(node(window, 1)).toBeFocused()
+    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
 
   test('keeps gg on the first displayed root while G reaches the last visible row', async ({ userDataDir }) => {
