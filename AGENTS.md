@@ -112,9 +112,15 @@ Classify each gap:
 * **Minor.** It concerns an edge case, leaves the requirement's main flow intact, is reversible in a later change, and one option is clearly more consistent with the principles `docs/PRODUCT.md` already records than the alternatives are. Choose that option, write the resulting behavior into `docs/PRODUCT.md` as part of the change, implement it, and report the decision and the principle it followed in the handoff.
 * **Material.** It changes a requirement's main flow, is not reversible in a later change, touches data or persistence, or two reasonable readings would produce a different user experience. Raise it under §14 before implementing.
 
+Size of the implementation is not the measure. A change that gives the user something they could not do before is material by definition, however small its code: a new command, mode, control, gesture, or screen enters the product for good and is expensive to withdraw. Settling an edge case of behavior the product already has stays minor.
+
 A gap is material whenever the agent cannot name the specific recorded principle that settles it. Consistency with recorded intent is the test — not the agent's own preference, and not how small the code change would be.
 
 An accumulation of minor decisions is itself material. When one task needs more than three of them, the requirement is underspecified: stop and raise that, rather than filling it in a decision at a time.
+
+By default no area is exploratory, and the rule above applies everywhere. The Product Owner marks an area exploratory explicitly, with the marker `docs/PRODUCT.md` §1.2 defines, and removes it once the behavior settles. The agent never marks or unmarks an area itself, and never infers that an area is exploratory from how new or incomplete it looks.
+
+Inside a marked section the minor-gap rule does not apply. Implement exactly what the Product Owner asked, do not fill a gap by choosing a default, and do not extend the behavior to a neighbouring case. Report what you noticed — friction, an inconsistency with adjacent behavior, or a case the section does not cover — in the handoff, as observations rather than proposals. Everything else applies unchanged, including tests, validation, and documentation.
 
 ### Product Discovery
 

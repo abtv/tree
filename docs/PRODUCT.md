@@ -35,6 +35,14 @@ When two of them conflict, they yield in this order: durability first, then priv
 
 This order resolves conflicts between the four commitments. It does not rank them against any other requirement in this document, and it does not authorize weakening any of them.
 
+### 1.2 Exploratory Sections
+
+A section of this document may carry a bold **Exploratory.** line directly under its heading, with a short note. It records that the Product Owner is still working that behavior out through use.
+
+Only the Product Owner sets or removes the marker. No section is exploratory unless it carries one, and an agent must never add a marker, remove a marker, or treat a section as exploratory because the behavior looks new or incomplete.
+
+The requirements in a marked section stay normative: they are implemented, tested, and validated exactly like every other section. What the marker changes is how an agent may resolve what the section does not yet say, which `AGENTS.md` §5 defines.
+
 ---
 
 ## 2. Tree Model
