@@ -77,9 +77,10 @@ describe('undo focus invariants', () => {
             fc.string({ maxLength: 6 }),
             fc.boolean(),
             fc.constantFrom<'text' | 'remove' | 'insert'>('text', 'remove', 'insert'),
+            fc.boolean(),
           ),
         ),
-        ([document, id, text, undoDirection, kind]) => {
+        ([document, id, text, undoDirection, kind, everythingExpanded]) => {
           const mutated =
             kind === 'text'
               ? mapNode(document, id, (node) => ({ ...node, text }))
@@ -92,9 +93,11 @@ describe('undo focus invariants', () => {
           const before = undoDirection ? document : mutated
           const after = undoDirection ? mutated : document
           const current = { currentParentId: null, selectedNodeId: document.roots[0]!.id }
-          const target = changeSiteFocus(before, after, current, () => false)
+          const target = changeSiteFocus(before, after, current, () => everythingExpanded)
           if (target === undefined) return
           expect(isValidLocation(after, target.location)).toBe(true)
+          // Every row is visible from the top-level location, so no change site needs navigation.
+          if (everythingExpanded) expect(target.location.currentParentId).toBeNull()
           expect(target.focus.nodeId).toBe(target.location.selectedNodeId)
           expect(target.focus.cursor).toBeGreaterThanOrEqual(0)
           const node = locateNode(after, target.focus.nodeId)

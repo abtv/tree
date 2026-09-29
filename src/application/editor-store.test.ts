@@ -391,6 +391,30 @@ describe('EditorStore', () => {
       expect(rowIds(store)).not.toContain('grandchild')
     })
 
+    it('keeps the location for a whole-node Visual delete and a subtree put on a visible descendant, and their undo', async () => {
+      const store = new EditorStore(
+        loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),
+        ids('copy'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      for (const id of ['root', 'child', 'grandchild']) store.toggleExpansion(id)
+      const atRoot = (selectedNodeId: string) => ({ location: { currentParentId: null, selectedNodeId } })
+
+      store.selectNode('leaf', 0)
+      store.applyNodeVisual('d', 'leaf', 'leaf')
+      expect(store.getSnapshot()).toMatchObject(atRoot('grandchild'))
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject(atRoot('leaf'))
+
+      store.pasteSubtree('leaf', 'after', { id: 'src', text: 'Src', children: [] })
+      expect(store.getSnapshot()).toMatchObject(atRoot('copy'))
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject(atRoot('leaf'))
+      store.redo()
+      expect(store.getSnapshot()).toMatchObject(atRoot('copy'))
+    })
+
     it('keeps the location for Backspace on an empty visible descendant and for undoing a visible text edit', async () => {
       const store = new EditorStore(
         loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),
