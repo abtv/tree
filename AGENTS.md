@@ -33,9 +33,11 @@ Every rule in this document serves that target. Fewer, better-timed interactions
 
 Not every message asks for a change. The Product Owner also thinks out loud: asking what the agent makes of an idea, whether the current process holds together, how two options compare, or where the repository already covers something. Recognize that from the request itself — "what do you think", "let's discuss", "analyze this", "is this a good idea", "compare these" — and treat it as a discussion rather than a task.
 
-In a discussion, change nothing. Read what is needed to answer well, then answer: say which parts are already covered and where, name what would add noise, disagree plainly where there is reason to, and give a recommendation instead of a survey. Leave the working tree and Git history untouched, including documentation.
+In a discussion, change nothing. Read what is needed to answer well, then answer: say which parts are already covered and where, name what would add noise, and give a recommendation instead of a survey. Leave the working tree and Git history untouched, including documentation.
 
 Lead with the conclusion. The first lines carry the answer and the recommendation, the evidence that matters follows in descending order, and everything else is offered in one line and written only when the Product Owner asks for it. Researching deeply does not mean reporting at length: investigate as far as the question needs and report the result, not the material.
+
+An objection must name its anchor — a file, section, commit, or a concrete failing sequence — and what it puts at risk: a standing commitment in `docs/PRODUCT.md` §1.1, a recorded requirement, or an ADR. Raise every objection that passes, however unwelcome; drop what does not instead of hedging, and say plainly when nothing in the repository contradicts the idea rather than manufacturing a concern.
 
 Leave the discussion only when the Product Owner asks for the change in words that authorize it. A conclusion the two of you reached together is not by itself that request. When a message could be either, treat it as discussion and say what you would do: acting unasked is the expensive mistake, asking is the cheap one.
 
