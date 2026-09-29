@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
@@ -250,6 +250,25 @@ describe('NodeList inline expansion', () => {
 
     const triangle = screen.getByRole('button', { name: 'Expand node 1' })
     expect(triangle).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('prevents caret placement and clears the document selection on disclosure mouse down', () => {
+    const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
+    const { container } = renderRows({ list: [parentNode, ...nodes], renderInput: (node) => <span>{node.text}</span> })
+    const parentText = container.querySelector('[data-node-id="p"] span')
+    expect(parentText).not.toBeNull()
+    const range = document.createRange()
+    range.selectNodeContents(parentText!)
+    const selection = globalThis.getSelection()
+    selection?.addRange(range)
+    expect(selection?.rangeCount).toBe(1)
+
+    const triangle = screen.getByRole('button', { name: 'Expand node 1' })
+    const event = createEvent.mouseDown(triangle)
+    fireEvent(triangle, event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(selection?.rangeCount).toBe(0)
   })
 
   it('flattens an expanded node’s children inline, in preorder, without windowing them separately', () => {
