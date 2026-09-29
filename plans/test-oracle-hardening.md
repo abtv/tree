@@ -52,8 +52,8 @@ Decisions reserved for the Product Owner:
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Ready |
-| T2 | Property seed and run-count policy with a soak run | — | Planned |
+| T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Blocked (Product Owner decision, see T1 findings) |
+| T2 | Property seed and run-count policy with a soak run | — | Ready |
 | T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Planned |
 | T4 | Location and display invariants checked after every command | T3 | Planned |
 | T5 | Command inventory guard for the property generators | T4 | Planned |
@@ -81,6 +81,20 @@ Files: `package.json`, `package-lock.json`, `stryker.config.mjs` (new), `.gitign
 Acceptance: `npm run test:mutation` completes locally. The plan records the run time and the mutation score per file in the Baseline section. `npm run check` passes. Manually dispatching the workflow is left to the Product Owner and recorded as not yet verified until it has run.
 
 Validation tier: High Risk (dependency and toolchain change): `npm run check:full`.
+
+**Findings (2026-09-30, session 1, nothing committed except this note).** The latest released `@stryker-mutator/vitest-runner` is 10.0.0 (with `@stryker-mutator/core` 10.0.0). Its peer range is `vitest >=2.0.0`, so it installs against the pinned `vitest` 5.0.0. It does not work with it. Setup: `testRunner: 'vitest'`, `coverageAnalysis: 'perTest'`, mutate `src/domain/**` and `src/application/**`. The initial dry run passed (935 tests, 3660 mutants). In the mutation phase, no mutant was killed:
+
+* full run: about 96% of the first 2792 tested mutants survived before the run hit a 10-minute limit;
+* `--mutate src/domain/document-links.ts`: 0 killed, 508 survived, 23 without coverage, "0.00 tests per mutant on average";
+* the same result with `vitest: { related: false }` and with `coverageAnalysis: 'off'`, on lines 255-265 of that file: 0 of 20 killed.
+
+The runner's source handles Vitest up to the 4.1 pool options (`maxWorkers`) and has no 5.x handling. The cause inside the runner is not established: the debug log crashes with "Converting circular structure to JSON". The tooling was reverted; the repository holds no Stryker files or dependencies.
+
+Options for the Product Owner (reserved decision above):
+
+1. Wait for a runner release that supports Vitest 5 (no date known).
+2. Downgrade `vitest` and `@vitest/coverage-v8` to a 4.x version the runner handles. This changes the test toolchain and needs its own validation.
+3. Use another mutation tool. None was evaluated in this session.
 
 ### T2 — Property seed and run-count policy (W5)
 
@@ -209,7 +223,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 — Mutation testing tooling and baseline.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2 has no dependency on T1 and is the next ready task once the Product Owner chooses to proceed without mutation testing first. T3-T5 depend only on T2. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 
