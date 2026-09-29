@@ -6,6 +6,7 @@ import {
   launchTree as launchTreeBase,
   lockSystemClipboard,
   node,
+  nodeTexts,
   pressShifted,
   seedDocument,
   setCursor,
@@ -956,6 +957,45 @@ test.describe('Vim editing prototype', () => {
     await window.keyboard.press('d')
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Child')
     await expect(node(window, 1)).toHaveValue('Grandchild')
+  })
+
+  test('does nothing when p or P puts a subtree on the current-parent heading', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'child', text: 'Child', children: [] },
+              { id: 'sibling', text: 'Sibling', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    const heading = window.getByRole('textbox', { name: 'Current parent' })
+    await expect(heading).toBeFocused()
+
+    await window.keyboard.press('p')
+    await window.keyboard.press('P')
+    await expect(heading).toBeFocused()
+    await expect(heading).toHaveValue('Root')
+    await expect(node(window, 1)).toHaveValue('Child')
+    await expect(node(window, 2)).toHaveValue('Sibling')
+    await expect(node(window, 3)).toHaveCount(0)
+
+    // A sibling of the heading would be invisible here, so leave the location and look for it.
+    await window.keyboard.press('Meta+,')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Root'])
   })
 
   test('keeps backward Visual selections inclusive and $ on the final character', async ({ userDataDir }) => {

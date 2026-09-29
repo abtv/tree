@@ -415,6 +415,29 @@ describe('EditorStore', () => {
       expect(store.getSnapshot()).toMatchObject(atRoot('copy'))
     })
 
+    it('does nothing when a subtree or forest is put on the current-parent heading', async () => {
+      const store = new EditorStore(
+        loadedState(nestedDocument, { currentParentId: 'child', selectedNodeId: 'child' }),
+        ids('copy'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = store.getSnapshot()
+
+      expect(store.pasteSubtree('child', 'after', { id: 'src', text: 'Src', children: [] })).toBe(false)
+      expect(store.pasteSubtree('child', 'before', { id: 'src', text: 'Src', children: [] })).toBe(false)
+      expect(
+        store.pasteNodeForest('child', 'after', {
+          nodes: [{ id: 'src', text: 'Src', children: [] }],
+          sourceIds: [],
+        }),
+      ).toBe(false)
+
+      const after = store.getSnapshot()
+      expect(after).toMatchObject({ document: (before as { document: unknown }).document })
+      expect(after).toMatchObject({ location: { currentParentId: 'child', selectedNodeId: 'child' } })
+    })
+
     it('keeps the location for Backspace on an empty visible descendant and for undoing a visible text edit', async () => {
       const store = new EditorStore(
         loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),

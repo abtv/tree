@@ -610,6 +610,8 @@ export class EditorStore {
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
+    // A sibling of the current-parent heading would sit outside the displayed location.
+    if (nodeId === state.location.currentParentId) return false
     if (isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
@@ -637,6 +639,7 @@ export class EditorStore {
   public pasteNodeForest(nodeId: NodeId, position: SiblingInsertionPosition, source: NodeForest): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked() || source.nodes.length === 0) return false
+    if (nodeId === state.location.currentParentId) return false
     if (isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
