@@ -51,10 +51,24 @@ export function extractClipboardLinks(html: string, text: string): LinkRange[] {
 }
 
 function decodeHtml(value: string): string {
-  return value
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
+  return value.replace(/&(?:amp|quot|lt|gt|nbsp|#(?:\d+|x[\da-f]+));/gi, (reference) => {
+    switch (reference.toLowerCase()) {
+      case '&amp;':
+        return '&'
+      case '&quot;':
+        return '"'
+      case '&lt;':
+        return '<'
+      case '&gt;':
+        return '>'
+      case '&nbsp;':
+        return '\u00a0'
+    }
+
+    const numeric = reference.slice(2, -1)
+    const codePoint =
+      numeric[0]?.toLowerCase() === 'x' ? Number.parseInt(numeric.slice(1), 16) : Number.parseInt(numeric, 10)
+    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return '\ufffd'
+    return String.fromCodePoint(codePoint)
+  })
 }
