@@ -42,6 +42,24 @@ spellchecker downloads no dictionaries. A future Windows or Linux build must dis
 Hunspell dictionary download before shipping, because Electron may otherwise download dictionaries
 from a Google-hosted CDN on first use.
 
+## Distribution hardening before shipment
+
+The repository does not yet package the application: `npm run build` produces unpackaged build
+output, not a distributable application. Before a build is handed to anyone, the distribution must:
+
+* Disable the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, and
+  `EnableNodeCliInspectArguments` Electron fuses, as well as any adjacent `EnableRunAsNode` fuse
+  controls.
+* Enable `OnlyLoadAppFromAsar` and ASAR archive integrity validation.
+* Sign and notarize the macOS application with the hardened runtime. Keep entitlements minimal and
+  do not grant `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or
+  `disable-library-validation`.
+
+These controls protect against using the bundled, signed Electron binary to run arbitrary Node.js
+code or inject code into the main process with `NODE_OPTIONS`, which would bypass every renderer-side
+control documented here. The packaging toolchain has not been chosen; selecting it is reserved for
+the Product Owner.
+
 ## Agent execution threat model
 
 This section covers the development agents that modify or validate the repository. It is separate from the application's runtime security model above. Agents can execute repository-controlled scripts, so the repository and its dependencies are treated as trusted inputs for normal development. A malicious repository change could otherwise use an allowed build or test command to act with the agent process's host privileges.

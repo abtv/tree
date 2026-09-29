@@ -7,10 +7,9 @@ Follow-up fixes from a Product Owner-requested security review of the whole repo
 target. The review was performed in conversation and is not otherwise recorded in the repository;
 its complete findings are reproduced below, so no task depends on that conversation.
 
-The Product Owner authorized this plan and authorized implementing all eight tasks it lists. The
-one task not yet completed remains `Ready`; nothing further needs to be authorized before starting
-one. That authorization covers these tasks only — it is not authorization for work this plan does
-not list.
+The Product Owner authorized this plan and authorized implementing all eight tasks it lists. All
+listed tasks are now complete. This review-batch plan remains until the Product Owner confirms that
+no further tasks remain; its authorization does not extend to work it does not list.
 
 The Product Owner stated the security goals the review used as acceptance criteria:
 
@@ -42,8 +41,8 @@ boundaries); [`docs/PRODUCT.md`](../docs/PRODUCT.md) §13.2 (editable-node conte
 
 ## State
 
-The review began from a clean worktree at `c8a9834`. SEC1 through SEC7 are complete and validated;
-SEC8 is the next ready task.
+The review began from a clean worktree at `c8a9834`. SEC1 through SEC8 are complete and validated.
+Plan closure is pending the Product Owner's confirmation that no further tasks remain.
 
 The review read every file under `src/`, the Electron entry and window configuration, the whole
 preload and IPC surface, the persistence and clipboard infrastructure, the renderer's HTML-producing
@@ -331,7 +330,7 @@ See D4: recording the requirement is in scope for this plan; implementing it is 
 | SEC5 | Bound the clipboard HTML that `extractClipboardLinks` parses, per F5, and bound the number of links it returns. Prefer removing the backtracking prefix over relying on the bound alone. Acceptance: a test that an adversarial input of the `<a <a <a …` shape returns promptly and yields no links — assert on completion within a generous deterministic budget, not on a tight timing threshold; a test that an oversized HTML flavor is ignored and the paste still delivers its plain text through Electron; a test that the link count is capped; every existing case in `src/infrastructure/main/clipboard.test.ts` and `e2e/clipboard.spec.ts` passes unchanged, including hyperlink-preserving copy and paste. No `docs/PRODUCT.md` change: the bounds are not reachable by pasting from an ordinary application. | `src/infrastructure/main/clipboard.ts`, `src/infrastructure/main/clipboard.test.ts`, `e2e/clipboard.spec.ts`, `e2e/fixtures.ts` | High | Done |
 | SEC6 | Bound the editor context-menu request, per F6 and D3. In `validateEditorContextMenuRequest`, require finite coordinates and reject or truncate `selectionText` beyond a stated bound; if truncating, the `Look Up` label ends with an ellipsis and the Google query uses the same bounded text. State the bound in `docs/PRODUCT.md` §13.2 only. Acceptance: unit and IPC contract tests rejecting `NaN` and `Infinity` coordinates and covering normalized bounded selection text; Electron coverage verifies both the ordinary menu items and the truncated Look Up label. | `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts`, `src/main/editor-context-menu.test.ts`, `docs/PRODUCT.md`, `e2e/context-menu.spec.ts` | High | Done |
 | SEC7 | Document the application's network egress, per F7. Add a section to `docs/SECURITY.md` that states the application performs no network requests of its own, sends no telemetry, and stores documents only on the local machine; then enumerate the three user-initiated paths by which content can reach a third party (external link opening, the Google search menu item, macOS Look Up), naming the file and the product requirement for each. Add the spellchecker note: the macOS spellchecker downloads nothing, and a future Windows or Linux build must disable the Hunspell dictionary download before shipping. Acceptance: `npm run check:docs` passes, each stated path is traceable to the named source file, and no product quantity is restated outside `docs/PRODUCT.md`. No source change. | `docs/SECURITY.md` | Minimal | Done |
-| SEC8 | Record the distribution hardening requirements, per F8 and D4. Add a section to `docs/SECURITY.md` stating that the application is not yet packaged and listing what a distributable build must satisfy before it is handed to anyone: the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`, and `EnableRunAsNode`-adjacent fuses disabled; `OnlyLoadAppFromAsar` and archive integrity validation enabled; the macOS hardened runtime with no `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or `disable-library-validation` entitlement; code signing and notarization; and a note that these defend against a vector that bypasses every renderer-side control in this repository. State explicitly that the toolchain is not chosen and is reserved for the Product Owner. Acceptance: `npm run check:docs` passes; no packaging dependency, script, or configuration file is added. | `docs/SECURITY.md` | Minimal | Ready |
+| SEC8 | Record the distribution hardening requirements, per F8 and D4. Add a section to `docs/SECURITY.md` stating that the application is not yet packaged and listing what a distributable build must satisfy before it is handed to anyone: the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`, and `EnableRunAsNode`-adjacent fuses disabled; `OnlyLoadAppFromAsar` and archive integrity validation enabled; the macOS hardened runtime with no `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or `disable-library-validation` entitlement; code signing and notarization; and a note that these defend against a vector that bypasses every renderer-side control in this repository. State explicitly that the toolchain is not chosen and is reserved for the Product Owner. Acceptance: `npm run check:docs` passes; no packaging dependency, script, or configuration file is added. | `docs/SECURITY.md` | Minimal | Done |
 
 Dependencies: SEC2 consumes the resolved renderer URL that SEC1 introduces, so SEC1 must land first.
 SEC1, SEC2, and SEC4 all touch `src/main/window.ts`, `src/main/window.test.ts`, and
@@ -356,9 +355,11 @@ attachment validation, and the production content security policy). SEC7 and SEC
 in `docs/DEVELOPMENT.md` §9 and `npm run validation:snapshot`. A blocked end-to-end or performance
 suite must be reported as blocked, not as passed.
 
-## Next task
+## Closure status
 
-SEC8 — record distribution hardening requirements, following F8.
+All eight tasks in this review are complete and validated. No additional task is authorized by this
+plan. The Product Owner must confirm that no further security-review tasks remain before this
+review-batch plan and its index row are removed, as required by `AGENTS.md` §8.
 
 SEC6 validation passed on the completed implementation: `npm run check:full` (typecheck, lint,
 format, documentation and policy checks, 1,174 unit tests, production build, audit, 284 Electron
@@ -370,20 +371,8 @@ review result is recorded in the task handoff/commit.
 SEC7 passed `npm run format:check:changed` and `npm run check:docs`; the security section enumerates
 the three user-initiated disclosures and spellchecker caveat.
 
-SEC8 is documentation-only. Update `docs/SECURITY.md` with the distribution-hardening checklist in
-the task table. Do not add a packaging dependency, script, or configuration. Run
-`npm run format:check:changed` and `npm run check:docs`, capture `npm run validation:snapshot`, then
-remove this completed initiative plan and its index row in the commit that records completion after
-the durable security documentation is updated.
+SEC8 validation: pending `npm run format:check:changed`, `npm run check:docs`, and
+`npm run validation:snapshot`.
 
-All eight tasks are authorized, with one remaining `Ready`, so a session may continue to the next
-one in the recommended order after committing the previous task, while context stays manageable
-(`AGENTS.md` §12). A reasonable split is SEC1 and SEC2 in one session, SEC3 and SEC4 in the next,
-then SEC5 through SEC8; judge by remaining context rather than by that split. Mark each task `Done`
-in the same commit that lands it, and leave the plan and any `WORKING_PLAN.md` in place if a session
-stops before committing.
-
-Resume prompt: "Continue the security hardening review in `plans/security-hardening.md`. Read
-`AGENTS.md`, that plan, `docs/SECURITY.md`, and `docs/DEVELOPMENT.md` §9, then implement its next
-Ready task in the recommended order, commit it together with the plan status update, and continue to
-the following task if context allows."
+Handoff: ask the Product Owner whether any further tasks remain from the security review. If none,
+remove this plan and its index row in a documentation-only commit. Do not infer additional scope.
