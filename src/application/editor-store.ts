@@ -381,7 +381,7 @@ export class EditorStore {
 
   public moveSelection(direction: 'up' | 'down', cursor: number): void {
     const state = this.runtime.ready()
-    const target = moveSelectionTransition(state.document, state.location, direction, cursor)
+    const target = moveSelectionTransition(state.document, state.location, this.getVisibleRows(), direction, cursor)
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 

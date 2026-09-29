@@ -18,6 +18,7 @@ import {
   type TreeNode,
 } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
+import type { VisibleRow } from './visible-rows'
 
 export interface FocusTarget {
   nodeId: NodeId
@@ -154,32 +155,34 @@ export function moveNodeTransition(
 export function moveSelectionTransition(
   document: Document,
   location: Location,
+  visibleRows: readonly VisibleRow[],
   direction: 'up' | 'down',
   cursor: number,
 ): FocusTarget | undefined {
   if (location.currentParentId === location.selectedNodeId) {
     const parent = requireNode(document, location.currentParentId).node
-    if (direction === 'up') return { nodeId: parent.id, cursor: 0 }
-    const child = parent.children[0]
+    if (direction === 'up') return cursor === 0 ? undefined : { nodeId: parent.id, cursor: 0 }
+    const child = visibleRows[0]?.node
     return child === undefined
-      ? { nodeId: parent.id, cursor: parent.text.length }
+      ? cursor === parent.text.length
+        ? undefined
+        : { nodeId: parent.id, cursor: parent.text.length }
       : { nodeId: child.id, cursor: Math.min(cursor, child.text.length) }
   }
 
-  // `↑`/`↓` act on the selected node's own actual sibling level, so a visible descendant's real
-  // parent may be another visible descendant row rather than the current-parent heading.
-  const selected = requireNode(document, location.selectedNodeId)
-  const siblings = selected.siblings
-  const index = selected.index
+  const index = visibleRows.findIndex((row) => row.node.id === location.selectedNodeId)
+  if (index < 0) return undefined
   if (direction === 'up' && index === 0) {
-    if (selected.parent === null) return { nodeId: siblings[0]!.id, cursor: 0 }
-    return { nodeId: selected.parent.id, cursor: Math.min(cursor, selected.parent.text.length) }
+    if (location.currentParentId === null)
+      return cursor === 0 ? undefined : { nodeId: visibleRows[0]!.node.id, cursor: 0 }
+    const parent = requireNode(document, location.currentParentId).node
+    return { nodeId: parent.id, cursor: Math.min(cursor, parent.text.length) }
   }
-  if (direction === 'down' && index === siblings.length - 1) {
-    const node = siblings[index]!
-    return { nodeId: node.id, cursor: node.text.length }
+  if (direction === 'down' && index === visibleRows.length - 1) {
+    const node = visibleRows[index]!.node
+    return cursor === node.text.length ? undefined : { nodeId: node.id, cursor: node.text.length }
   }
-  const target = siblings[index + (direction === 'up' ? -1 : 1)]
+  const target = visibleRows[index + (direction === 'up' ? -1 : 1)]?.node
   return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 

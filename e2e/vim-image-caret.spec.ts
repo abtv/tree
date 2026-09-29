@@ -26,6 +26,45 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing prototype', () => {
+  test('keeps image-character steps within an expanded row before visible-row motion', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'branch',
+            text: 'Branch',
+            attachment: { id: 'branch-image', mimeType: 'image/png' },
+            children: [{ id: 'child', text: 'Child', children: [] }],
+          },
+          { id: 'next', text: 'Next', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'branch' },
+    })
+    seedAttachmentImage(userDataDir, 'branch-image')
+    const { window } = await launchTree(userDataDir)
+    const branch = node(window, 1)
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await branch.focus()
+    await setCursor(branch, 1)
+
+    await branch.press('j')
+    await expect(branch).toHaveClass(/node-input-image-caret/)
+    await branch.press('j')
+    await expect(node(window, 2)).toBeFocused()
+    await node(window, 2).press('k')
+    await expect(branch).toBeFocused()
+    await expect(branch).toHaveClass(/node-input-image-caret/)
+    await branch.press('k')
+    await expect(branch).not.toHaveClass(/node-input-image-caret/)
+    await expect(branch).toHaveJSProperty('selectionStart', 0)
+
+    await setCursor(branch, 1)
+    await branch.press('2')
+    await branch.press('j')
+    await expect(node(window, 2)).toBeFocused()
+  })
+
   test('navigates between text and its image before moving between nodes', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

@@ -66,7 +66,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     getSnapshot,
     subscribe: vi.fn(() => () => undefined),
     getVisibleRows: vi.fn(() => {
-      const value = typeof snapshot === 'function' ? snapshot() : snapshot
+      const value = getSnapshot()
       return value.status === 'ready' && value.document !== undefined && value.location !== undefined
         ? buildVisibleRows(displayedNodes(value.document, value.location.currentParentId), (id) =>
             isNodeExpanded(value.expansion ?? COLLAPSED_EXPANSION_STATE, id),

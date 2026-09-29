@@ -89,11 +89,11 @@ The application layer may depend on the domain and the renderer may depend on th
 | ID | Outcome | Depends on | Status | Validation tier |
 | --- | --- | --- | --- | --- |
 | T1 | The application layer owns inline expansion and the visible-row order, with no user-visible change | — | Complete | Moderate Risk |
-| T2 | `↑`, `↓`, `j`, `k`, and their counted forms move by visible rows | T1 | Ready | Moderate Risk |
-| T3 | `←` and `→` boundary crossings and `G` / `NG` move by visible rows | T2 | Planned | Moderate Risk |
+| T2 | `↑`, `↓`, `j`, `k`, and their counted forms move by visible rows | T1 | Complete | Moderate Risk |
+| T3 | `←` and `→` boundary crossings and `G` / `NG` move by visible rows | T2 | Ready | Moderate Risk |
 | T4 | What stays sibling-scoped is recorded; property and performance guards close the initiative | T3 | Planned | Moderate Risk |
 
-**Next task: T2.**
+**Next task: T3.**
 
 Tier note. Every task changes renderer and application behavior within one process, with no persistence, IPC, clipboard, attachment, or native-shortcut boundary, so the Moderate Risk row of `docs/DEVELOPMENT.md` §9 applies: `npm run check`, the affected unit and property tests, and focused end-to-end coverage for every affected requirement. T2 and T3 additionally change shared interaction state, so `AGENTS.md` §13 requires an **independent reviewer** and a **separate product verifier** for them, and `docs/DEVELOPMENT.md` §8 requires a navigation and caret matrix built **before** the implementation. T1 and T4 need the primary agent's own diff review and product verification.
 

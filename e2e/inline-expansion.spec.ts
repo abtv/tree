@@ -104,24 +104,39 @@ test.describe('inline node expansion', () => {
     ])
   })
 
-  test('does not descend into an expanded node’s children on j (Normal mode) or ArrowDown (Insert mode)', async ({
+  test('moves through expanded rows on j and ArrowDown, including entering and leaving branches', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
     await node(window, 1).click()
     await window.keyboard.press('j')
 
+    await expect(node(window, 2)).toBeFocused()
+    await window.keyboard.press('j')
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('j')
     await expect(node(window, 4)).toBeFocused()
-    await expect(node(window, 4)).toHaveValue('Bravo')
+    await window.keyboard.press('j')
+    await expect(node(window, 5)).toBeFocused()
+    await window.keyboard.press('k')
+    await expect(node(window, 4)).toBeFocused()
+    await node(window, 1).click()
+    await window.keyboard.press('2')
+    await window.keyboard.press('j')
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('2')
+    await window.keyboard.press('k')
+    await expect(node(window, 1)).toBeFocused()
 
-    // The plain application shortcut (used from Insert mode) must resolve the same real sibling.
+    // ArrowDown in Insert mode follows the same visible-row order.
     await node(window, 1).click()
     await window.keyboard.press('i')
     await window.keyboard.press('ArrowDown')
-    await expect(node(window, 4)).toBeFocused()
+    await expect(node(window, 2)).toBeFocused()
   })
 
   test('selects the collapsing node with the caret at the start when collapse hides the caret', async ({

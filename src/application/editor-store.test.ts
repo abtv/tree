@@ -799,6 +799,24 @@ describe('EditorStore', () => {
     })
   })
 
+  it('does not publish a new focus intent for a vertical boundary with no caret change', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'A', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+    store.moveSelection('up', 0)
+    store.moveSelection('down', 1)
+
+    const after = store.getSnapshot()
+    expect(after.status).toBe('ready')
+    if (after.status === 'ready') expect(after.focus).toBe(before.focus)
+  })
+
   it('moves the current parent caret to the beginning on ArrowUp', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] }] },

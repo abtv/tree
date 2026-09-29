@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react'
 import fc from 'fast-check'
 import { describe, expect, it, vi } from 'vitest'
 import { moveSelectionTransition } from '../application/editor-command-transitions'
+import { buildVisibleRows } from '../application/visible-rows'
 import type { Document, TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { setNormalCaret } from './editor-dom'
@@ -222,7 +223,13 @@ function assertSiblingMotionSequence(
     }),
     moveSelection: vi.fn((direction: 'up' | 'down', cursor: number) => {
       const selectedIndex = nodes.findIndex((node) => node.id === selectedNodeId)
-      const target = moveSelectionTransition(documentTree, { currentParentId: null, selectedNodeId }, direction, cursor)
+      const target = moveSelectionTransition(
+        documentTree,
+        { currentParentId: null, selectedNodeId },
+        buildVisibleRows(documentTree.roots, () => false),
+        direction,
+        cursor,
+      )
       expect(target).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
       if (target === undefined) return
       selectedNodeId = target.nodeId
@@ -333,11 +340,14 @@ function expectedRootSiblingMove(
   selectedIndex: number,
   direction: 'up' | 'down',
   cursor: number,
-): { nodeId: string; cursor: number } {
+): { nodeId: string; cursor: number } | undefined {
   const lastIndex = specifications.length - 1
-  if (direction === 'up' && selectedIndex === 0) return { nodeId: `node-${selectedIndex}`, cursor: 0 }
-  if (direction === 'down' && selectedIndex === lastIndex)
-    return { nodeId: `node-${selectedIndex}`, cursor: specifications[selectedIndex]!.textLength }
+  if (direction === 'up' && selectedIndex === 0)
+    return cursor === 0 ? undefined : { nodeId: `node-${selectedIndex}`, cursor: 0 }
+  if (direction === 'down' && selectedIndex === lastIndex) {
+    const end = specifications[selectedIndex]!.textLength
+    return cursor === end ? undefined : { nodeId: `node-${selectedIndex}`, cursor: end }
+  }
   const targetIndex = selectedIndex + (direction === 'up' ? -1 : 1)
   return {
     nodeId: `node-${targetIndex}`,
@@ -507,6 +517,7 @@ describe('generated Vim image-caret interaction sequences', () => {
           const actual = moveSelectionTransition(
             documentTree,
             { currentParentId: null, selectedNodeId: `node-${selectedIndex}` },
+            buildVisibleRows(documentTree.roots, () => false),
             direction,
             cursor,
           )

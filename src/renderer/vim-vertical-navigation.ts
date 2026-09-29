@@ -4,6 +4,7 @@ import { focusCaretTransition, verticalCaretTransition, type VimCaretState } fro
 
 export interface VimVerticalNavigationStore {
   getSnapshot: () => EditorSnapshot
+  getVisibleRows: () => readonly { node: TreeNode }[]
   moveSelection: (direction: 'up' | 'down', cursor: number) => void
 }
 
@@ -34,19 +35,17 @@ export function navigateVertically({
   for (let index = 0; index < count; index += 1) {
     const before = store.getSnapshot()
     if (before.status !== 'ready') break
-    // Counted vertical motion crosses onto the selected node's own actual sibling (or real parent),
-    // whatever depth it is displayed at through inline expansion.
-    const located =
-      before.document === undefined ? undefined : requireNode(before.document, before.location.selectedNodeId)
-    const canCrossNode =
-      located === undefined ||
-      (direction === 'down'
-        ? before.location.selectedNodeId === before.location.currentParentId
-          ? currentNode.children.length > 0
-          : located.index < located.siblings.length - 1
-        : before.location.selectedNodeId === before.location.currentParentId ||
-          located.index > 0 ||
-          located.parent !== null)
+    // Counted vertical motion crosses onto the adjacent visible row, or to the current-parent
+    // heading when moving up from the first visible row.
+    const rows = store.getVisibleRows()
+    const rowIndex = rows.findIndex((row) => row.node.id === before.location.selectedNodeId)
+    const headingSelected = before.location.selectedNodeId === before.location.currentParentId
+    const canCrossNode = headingSelected
+      ? direction === 'down'
+        ? rows.length > 0
+        : true
+      : rowIndex < 0 ||
+        (direction === 'down' ? rowIndex < rows.length - 1 : rowIndex > 0 || before.location.currentParentId !== null)
     const step = verticalCaretTransition(
       caret,
       direction,

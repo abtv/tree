@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Document, TreeNode } from '../domain/document'
-import { assertDocument, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
+import { assertDocument, displayedNodes, MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
+import { buildVisibleRows } from './visible-rows'
 import {
   ancestorNavigationTransition,
   createFirstChildTransition,
@@ -50,6 +51,14 @@ const nestedDocument: Document = {
     },
     { id: 'beta', text: 'Beta', children: [] },
   ],
+}
+
+function rowsFor(
+  document: Document,
+  location: { currentParentId: string | null },
+  expandedIds: readonly string[] = [],
+) {
+  return buildVisibleRows(displayedNodes(document, location.currentParentId), (id) => expandedIds.includes(id))
 }
 const rootLocation = { currentParentId: null, selectedNodeId: 'alpha' }
 
@@ -117,8 +126,9 @@ describe('editor command transitions', () => {
   it('resolves vertical and horizontal navigation targets without changing the document', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
 
-    expect(moveSelectionTransition(document, childLocation, 'up', 4)).toEqual({ nodeId: 'root', cursor: 4 })
-    expect(moveSelectionTransition(document, childLocation, 'down', 99)).toEqual({ nodeId: 'second', cursor: 6 })
+    const rows = rowsFor(document, childLocation)
+    expect(moveSelectionTransition(document, childLocation, rows, 'up', 4)).toEqual({ nodeId: 'root', cursor: 4 })
+    expect(moveSelectionTransition(document, childLocation, rows, 'down', 99)).toEqual({ nodeId: 'second', cursor: 6 })
     expect(moveHorizontalTransition(document, childLocation, 'left', 0)).toEqual({ nodeId: 'root', cursor: 4 })
     expect(moveHorizontalTransition(document, childLocation, 'right', 2)).toBeUndefined()
     expect(document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'second'])
@@ -375,27 +385,47 @@ describe('editor command transitions', () => {
   })
 
   describe('sibling-relative commands at descendant depth (inline expansion)', () => {
-    it('moves up/down to a visible descendant’s own real parent and siblings, not the current-parent heading', () => {
-      // alpha1's real parent is alpha, several levels above the null current parent; up from its
-      // first real child (alpha1a) goes to alpha1 itself, not to the current-parent heading.
-      expect(moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1a' }, 'up', 0)).toEqual({
+    it('moves in both directions through the flattened visible rows', () => {
+      const rows = rowsFor(nestedDocument, rootLocation, ['alpha', 'alpha1'])
+      expect(moveSelectionTransition(nestedDocument, rootLocation, rows, 'down', 0)).toEqual({
         nodeId: 'alpha1',
         cursor: 0,
       })
-      // Down from alpha1's second real child (alpha2 does not exist under alpha1; alpha1 has only
-      // one real child) exercises the other boundary: alpha1a is alpha1's only child, so down stays.
       expect(
-        moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1a' }, 'down', 0),
-      ).toEqual({ nodeId: 'alpha1a', cursor: 16 })
-      // Down from alpha (a real root) skips straight to its real sibling beta, never descending into
-      // alpha's own children even though they would be displayed if alpha were expanded.
-      expect(moveSelectionTransition(nestedDocument, rootLocation, 'down', 0)).toEqual({ nodeId: 'beta', cursor: 0 })
-      // Up from alpha1 (first real child of alpha) goes to alpha, its own real parent, which is a
-      // visible descendant row itself, not the current-parent heading (there is none at root level).
-      expect(moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1' }, 'up', 0)).toEqual({
-        nodeId: 'alpha',
-        cursor: 0,
-      })
+        moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1a' }, rows, 'up', 0),
+      ).toEqual({ nodeId: 'alpha1', cursor: 0 })
+      expect(
+        moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha1a' }, rows, 'down', 0),
+      ).toEqual({ nodeId: 'alpha2', cursor: 0 })
+      expect(
+        moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'alpha2' }, rows, 'down', 0),
+      ).toEqual({ nodeId: 'beta', cursor: 0 })
+      expect(
+        moveSelectionTransition(nestedDocument, { ...rootLocation, selectedNodeId: 'missing' }, rows, 'up', 0),
+      ).toBeUndefined()
+    })
+
+    it('returns no target when a boundary motion would keep the same caret state', () => {
+      const rows = rowsFor(nestedDocument, rootLocation)
+      expect(moveSelectionTransition(nestedDocument, rootLocation, rows, 'up', 0)).toBeUndefined()
+      expect(
+        moveSelectionTransition(
+          nestedDocument,
+          { ...rootLocation, selectedNodeId: 'beta' },
+          rows,
+          'down',
+          'Beta'.length,
+        ),
+      ).toBeUndefined()
+      expect(
+        moveSelectionTransition(
+          nestedDocument,
+          { currentParentId: 'alpha', selectedNodeId: 'alpha' },
+          rowsFor(nestedDocument, { currentParentId: 'alpha' }),
+          'up',
+          0,
+        ),
+      ).toBeUndefined()
     })
 
     it('keeps gg anchored to the current-parent heading while G targets the descendant’s own last real sibling', () => {

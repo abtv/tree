@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReadySnapshot } from '../application/editor-runtime-state'
+import { displayedNodes, type Document, type TreeNode } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE } from '../application/expansion-state'
-import type { Document, TreeNode } from '../domain/document'
+import { buildVisibleRows } from '../application/visible-rows'
 import { navigateVertically, type VimVerticalNavigationStore } from './vim-vertical-navigation'
 
 function node(id: string, text: string, children: TreeNode[] = []): TreeNode {
@@ -12,6 +13,7 @@ function store(
   document: Document,
   selectedNodeId: string,
   currentParentId: string | null,
+  expandedIds: readonly string[] = [],
 ): VimVerticalNavigationStore & {
   snapshot: ReadySnapshot
 } {
@@ -23,7 +25,7 @@ function store(
       location: { currentParentId, selectedNodeId },
       focus: { nodeId: selectedNodeId, cursor: 0, token },
       structuralVersion: 0,
-      expansion: COLLAPSED_EXPANSION_STATE,
+      expansion: expandedIds.length === 0 ? COLLAPSED_EXPANSION_STATE : { expandedIds: new Set(expandedIds) },
     },
   }
   return {
@@ -31,11 +33,18 @@ function store(
       return state.snapshot
     },
     getSnapshot: () => state.snapshot,
+    getVisibleRows: () =>
+      buildVisibleRows(
+        displayedNodes(document, currentParentId),
+        (id) => state.snapshot.status === 'ready' && state.snapshot.expansion.expandedIds.has(id),
+      ),
     moveSelection: (direction, cursor) => {
-      const siblings = currentParentId === null ? document.roots : (document.roots[0]?.children ?? [])
-      const index = siblings.findIndex((candidate) => candidate.id === state.snapshot.location.selectedNodeId)
-      const nextIndex = direction === 'down' ? Math.min(siblings.length - 1, index + 1) : Math.max(0, index - 1)
-      const next = siblings[nextIndex]
+      const rows = buildVisibleRows(
+        displayedNodes(document, currentParentId),
+        (id) => state.snapshot.status === 'ready' && state.snapshot.expansion.expandedIds.has(id),
+      )
+      const index = rows.findIndex((row) => row.node.id === state.snapshot.location.selectedNodeId)
+      const next = rows[direction === 'down' ? Math.min(rows.length - 1, index + 1) : Math.max(0, index - 1)]?.node
       if (next === undefined || next.id === state.snapshot.location.selectedNodeId) return
       token += 1
       state.snapshot = {
@@ -75,10 +84,10 @@ describe('Vim vertical navigation', () => {
     })
   })
 
-  it('uses one displayed-sibling lookup per counted step and moves across siblings', () => {
-    const first = node('first', 'a')
+  it('uses the visible-row order for each counted step across expanded branches', () => {
+    const first = node('first', 'a', [node('first-child', 'child')])
     const second = node('second', 'abcdef')
-    const navigationStore = store({ roots: [first, second] }, first.id, null)
+    const navigationStore = store({ roots: [first, second] }, first.id, null, ['first'])
     const getSnapshot = vi.spyOn(navigationStore, 'getSnapshot')
     const setCaret = vi.fn()
     const applyCaretState = vi.fn()
@@ -93,15 +102,19 @@ describe('Vim vertical navigation', () => {
       applyCaretState,
     })
 
-    expect(getSnapshot).toHaveBeenCalledTimes(3)
+    expect(getSnapshot).toHaveBeenCalledTimes(4)
     expect(navigationStore.snapshot.status).toBe('ready')
     if (navigationStore.snapshot.status === 'ready')
       expect(navigationStore.snapshot.location.selectedNodeId).toBe('second')
-    expect(applyCaretState).toHaveBeenLastCalledWith('second', {
-      cursor: 0,
-      imageActive: false,
-      imageTextReturnCursor: undefined,
-    })
+    expect(applyCaretState).toHaveBeenLastCalledWith(
+      'second',
+      {
+        cursor: 0,
+        imageActive: false,
+        imageTextReturnCursor: undefined,
+      },
+      true,
+    )
   })
 
   it('keeps a boundary caret when the store cannot move selection', () => {
