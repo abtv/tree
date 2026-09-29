@@ -31,8 +31,9 @@ export function locateChangeSite(before: Document, after: Document): ChangeSite 
 
 /**
  * Resolve the change between two snapshots into the focus and location undo or redo should publish.
- * A change site that is the node the user is currently inside stays the current-parent heading;
- * any other site is displayed at its own parent's level, so the change is visible.
+ * A change site that is the node the user is currently inside stays the current-parent heading; a
+ * site that is already a visible row of the location keeps the location; any other site is
+ * displayed at its own parent's level, so the change is visible.
  */
 export function changeSiteFocus(
   before: Document,

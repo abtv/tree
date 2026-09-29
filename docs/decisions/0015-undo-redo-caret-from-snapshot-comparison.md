@@ -49,8 +49,10 @@ worth that.
 
 - Undo and redo leave the caret on the change, and reach it even when the caret moved away first.
 - Undo and redo may select a different node and change the current parent, which `docs/PRODUCT.md`
-  §10 now states. A change site that is the node the user is currently inside stays the current
-  parent heading rather than re-leveling.
+  §10 now states, but only when the change site is not already a visible row of the location
+  (including a descendant shown by inline expansion); a visible site keeps the location. A change
+  site that is the node the user is currently inside stays the current parent heading rather than
+  re-leveling.
 - A snapshot comparison is symmetric while the edit that produced it was not, so two cases are
   deliberately approximate. Redoing a split or a multiline paste lands on the modified original node
   at the text offset rather than on the newly created node, because the diff cannot tell which side

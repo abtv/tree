@@ -385,6 +385,30 @@ describe('EditorStore', () => {
       store.undo()
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'grandchild' } })
       expect(rowIds(store)).toContain('grandchild')
+
+      store.redo()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'child' } })
+      expect(rowIds(store)).not.toContain('grandchild')
+    })
+
+    it('keeps the location for Backspace on an empty visible descendant and for undoing a visible text edit', async () => {
+      const store = new EditorStore(
+        loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      for (const id of ['root', 'child', 'grandchild']) store.toggleExpansion(id)
+      store.editText('leaf', 'Edited')
+      store.selectNode('other', 0)
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'leaf' } })
+
+      store.editText('leaf', '')
+      store.deleteEmptySelected()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'grandchild' } })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'leaf' } })
     })
   })
   it('edits a whole-node Visual sibling range in one undo step and rejects paste into a source descendant', async () => {
