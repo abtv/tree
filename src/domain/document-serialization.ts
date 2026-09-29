@@ -11,6 +11,7 @@ import {
 } from './document-types'
 import { isValidLocation } from './document-operations'
 import { normalizeLinks } from './document-links'
+import { isValidAttachmentId } from './document-attachments'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 
 export function serializeState(document: Document, location: Location): PersistedEditorState {
@@ -204,6 +205,8 @@ function parseLinks(value: unknown, text: string): LinkRange[] {
       return { start: candidate.start as number, end: candidate.end as number, url: candidate.url }
     }),
     text,
+    true,
+    true,
   )
 }
 
@@ -211,7 +214,12 @@ function parseAttachment(value: unknown): AttachmentReference | undefined {
   if (value === undefined) {
     return undefined
   }
-  if (!isRecord(value) || typeof value.id !== 'string' || value.id.length === 0 || value.mimeType !== 'image/png') {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    !isValidAttachmentId(value.id) ||
+    value.mimeType !== 'image/png'
+  ) {
     throw new Error('A saved attachment is invalid.')
   }
   return { id: value.id, mimeType: value.mimeType }

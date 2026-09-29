@@ -10,16 +10,24 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
-export function normalizeLinks(links: readonly LinkRange[], text: string, requireMatchingText = true): LinkRange[] {
+export function normalizeLinks(
+  links: readonly LinkRange[],
+  text: string,
+  requireMatchingText = true,
+  rejectInvalidUrls = false,
+): LinkRange[] {
   const sorted = links
-    .filter(
-      (link) =>
+    .filter((link) => {
+      const validUrl = isHttpUrl(link.url)
+      if (rejectInvalidUrls && !validUrl) throw new Error('Saved link URLs must use HTTP or HTTPS.')
+      return (
         link.start >= 0 &&
         link.end > link.start &&
         link.end <= text.length &&
         (!requireMatchingText || text.slice(link.start, link.end) === link.url) &&
-        isHttpUrl(link.url),
-    )
+        validUrl
+      )
+    })
     .sort((a, b) => a.start - b.start)
   const result: LinkRange[] = []
   for (const link of sorted) {

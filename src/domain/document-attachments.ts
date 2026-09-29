@@ -1,5 +1,11 @@
 import type { AttachmentId, AttachmentSummary, Document, TreeNode } from './document-types'
 
+const attachmentIdPattern = /^[A-Za-z0-9_-]+$/
+
+export function isValidAttachmentId(value: string): boolean {
+  return value.length > 0 && attachmentIdPattern.test(value)
+}
+
 const attachmentCountCache = new WeakMap<Document, ReadonlyMap<AttachmentId, number>>()
 
 export function collectAttachmentIds(document: Document): Set<AttachmentId> {

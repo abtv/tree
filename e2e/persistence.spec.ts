@@ -111,6 +111,44 @@ test.describe('persistence', () => {
     expect(readFileSync(`${userDataDir}/data/document.json`)).toEqual(before)
   })
 
+  test('rejects unsafe persisted attachment ids and link destinations before writing', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const before = readFileSync(documentPath(userDataDir))
+    const invalidStates = [
+      {
+        version: 2,
+        document: {
+          roots: [{ id: 'root', text: '', attachment: { id: '../escape', mimeType: 'image/png' }, children: [] }],
+        },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      },
+      {
+        version: 2,
+        document: {
+          roots: [
+            { id: 'root', text: 'unsafe', links: [{ start: 0, end: 6, url: 'javascript:alert(1)' }], children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      },
+    ]
+
+    for (const state of invalidStates) {
+      const result = await window.evaluate(async (payload) => {
+        try {
+          await (globalThis as typeof globalThis & { treeApi: { save(value: unknown): Promise<void> } }).treeApi.save(
+            payload,
+          )
+          return 'resolved'
+        } catch {
+          return 'rejected'
+        }
+      }, state)
+      expect(result).toBe('rejected')
+      expect(readFileSync(documentPath(userDataDir))).toEqual(before)
+    }
+  })
+
   test('does not surface a save error during rapid edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const text = 'rapid '.repeat(100)

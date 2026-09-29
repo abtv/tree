@@ -29,7 +29,7 @@ export type { LinkedTextEdit } from './document-links'
 
 export { buildNodeIndex, locateNode, releaseNodeIndex, requireNode } from './document-index'
 
-export { attachmentSummary, collectAttachmentIds } from './document-attachments'
+export { attachmentSummary, collectAttachmentIds, isValidAttachmentId } from './document-attachments'
 
 export {
   attachImage,

@@ -60,6 +60,29 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it.each([
+    ['an attachment path separator', { id: '../escape', mimeType: 'image/png' }, ''],
+    ['a non-HTTP(S) link destination', undefined, 'javascript:alert(1)'],
+  ])('rejects a save payload containing %s before filesystem persistence', async (_description, attachment, url) => {
+    const { handlers, fileServices } = createHarness()
+    const root = {
+      id: 'root',
+      text: url ? 'unsafe' : '',
+      ...(attachment ? { attachment } : {}),
+      ...(url ? { links: [{ start: 0, end: 6, url }] } : {}),
+      children: [],
+    }
+    const state = {
+      version: 2,
+      document: { roots: [root] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    }
+    const event = { senderFrame: { url: rendererUrl } }
+
+    await expect(Promise.resolve().then(() => handlers.get(ipcChannels.save)!(event, state))).rejects.toThrow()
+    expect(fileServices.save).not.toHaveBeenCalled()
+  })
+
   it('validates the maximum persisted depth before filesystem persistence', async () => {
     const { handlers, fileServices } = createHarness()
     const root = { id: 'n0', text: '', children: [] as { id: string; text: string; children: never[] }[] }

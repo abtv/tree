@@ -1,12 +1,10 @@
 import type { PersistedEditorState } from '../domain/document'
-import { validatePersistedState } from '../domain/document'
+import { isValidAttachmentId, validatePersistedState } from '../domain/document'
 import type { ClipboardWritePayload, EditorContextMenuRequest } from '../shared/ipc'
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 export const MAX_ATTACHMENT_DIMENSION = 32_767
 export const MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024
-
-const attachmentIdPattern = /^[A-Za-z0-9_-]+$/
 
 export function isTrustedRendererUrl(value: string | undefined, expected: string): boolean {
   if (value === undefined) return false
@@ -59,7 +57,7 @@ export function validateEditorContextMenuRequest(value: unknown): EditorContextM
 }
 
 export function validateAttachmentId(value: unknown): string {
-  if (typeof value !== 'string' || value.length === 0 || !attachmentIdPattern.test(value)) {
+  if (typeof value !== 'string' || !isValidAttachmentId(value)) {
     throw new Error('Attachment IDs may contain only letters, numbers, underscores, and hyphens.')
   }
   return value

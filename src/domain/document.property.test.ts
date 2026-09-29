@@ -239,6 +239,28 @@ function locateNodeReference(document: Document, id: string): NormalizedLocation
 }
 
 describe('document invariants', () => {
+  it('accepts only safe attachment identifiers across generated persisted states', () => {
+    const safeId = fc
+      .array(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'), {
+        minLength: 1,
+        maxLength: 48,
+      })
+      .map((characters) => characters.join(''))
+
+    fc.assert(
+      fc.property(safeId, (attachmentId) => {
+        const state = {
+          version: 2,
+          document: {
+            roots: [{ id: 'root', text: '', attachment: { id: attachmentId, mimeType: 'image/png' }, children: [] }],
+          },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        }
+        expect(validatePersistedState(state)).toBe(state)
+      }),
+    )
+  })
+
   it('round-trips any valid document and location through serialization', () => {
     fc.assert(
       fc.property(forest, fc.nat(), (rawForest, seed) => {

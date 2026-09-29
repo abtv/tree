@@ -2,6 +2,7 @@ import { mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/pr
 import { join } from 'node:path'
 import {
   collectAttachmentIds,
+  isValidAttachmentId,
   parsePersistedState,
   validatePersistedState,
   type AttachmentId,
@@ -236,7 +237,7 @@ function messageOf(error: unknown): string {
 }
 
 function attachmentPath(attachmentsDirectory: string, id: string): string {
-  if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+  if (!isValidAttachmentId(id)) {
     throw new Error('Attachment IDs may contain only letters, numbers, underscores, and hyphens.')
   }
   return join(attachmentsDirectory, `${id}.png`)
