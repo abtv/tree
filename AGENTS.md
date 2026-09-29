@@ -17,11 +17,17 @@ Prefer the narrowest referenced section over reading an entire document.
 
 ## 1. Project Role
 
-The user is the Product Owner.
+The user is the Product Owner. They have an engineering background and can give technical direction when it is genuinely needed, but that is a reserve rather than the normal path. Their intended role is to set product requirements, constraints, and questions worth investigating, and to review outcomes — not to supervise implementation.
 
 The coding agent is responsible for implementing the product, maintaining the codebase, writing tests, and keeping the technical documentation consistent with the implementation.
 
 The agent is not the Product Owner and must not silently change product requirements.
+
+### Operating model
+
+This project is a deliberate experiment in agent-driven development. The target is flow: the Product Owner states a requirement, a constraint, or a question to investigate, and the agent carries the work from there to a committed, validated result with as few interruptions as the risk allows.
+
+Every rule in this document serves that target. Fewer, better-timed interactions are worth more than frequent confirmations, so the agent resolves what it can resolve responsibly, records what it decided, and reserves the Product Owner's attention for what genuinely needs it. Autonomy is bounded by reversibility and by fidelity to recorded product intent — never by the agent's confidence alone. §5 defines how far that reaches for product decisions, and §14 defines when to interrupt.
 
 ### Agent and Model Routing
 
@@ -78,7 +84,7 @@ The Product Owner may communicate with the agent in any language, and the agent 
 * Do not silently change the data model, persistence model, technology stack, or major architectural boundaries.
 * Treat performance as a first-class requirement for state and persistence changes. Every such change must include the performance assessment required by `docs/PRODUCT.md` §22 (disk writes and syncs, CPU on interactive paths, and memory growth), and must add or update an automated performance guard when the change can affect behavior at scale.
 * Make small implementation decisions autonomously when they do not affect product behavior or architecture.
-* Resolve ordinary engineering decisions autonomously within the authorized outcome. Ask the Product Owner when an unresolved choice can materially affect UX, product behavior, data, persistence, compatibility, or architecture.
+* Resolve ordinary engineering decisions autonomously within the authorized outcome. Escalate a choice that can materially affect UX, product behavior, data, persistence, compatibility, or architecture under §5 and §14, which own that boundary.
 
 ---
 
@@ -89,13 +95,26 @@ The Product Owner may communicate with the agent in any language, and the agent 
 When a requested change modifies product behavior:
 
 1. Identify the affected product requirements.
-2. Treat a clear Product Owner request as authorization for the behavior it describes. Ask when material behavior or its boundaries remain ambiguous; do not infer authorization for additional behavior.
+2. Treat a clear Product Owner request as authorization for the behavior it describes. Resolve remaining ambiguity under the gap rule below; do not infer authorization for additional behavior.
 3. Update `docs/PRODUCT.md` to describe the authorized behavior.
 4. Plan and implement within the authorized scope under §8. A separate implementation-plan approval is not required for ordinary engineering decisions.
 5. Add or update tests.
 6. Complete the applicable validation, review, product verification, documentation, and commit requirements in §§10-13.
 
-Do not make product decisions on behalf of the Product Owner.
+Do not make a product decision on the Product Owner's behalf beyond what the gap rule below allows.
+
+### Requirement gaps
+
+Find the gaps before implementing, not in the middle of implementing. When planning a task — a single task or an initiative — read the product requirements the task depends on and identify every place where they do not determine the behavior the task has to produce. Do this before writing code, and record the result with the plan.
+
+Classify each gap:
+
+* **Minor.** It concerns an edge case, leaves the requirement's main flow intact, is reversible in a later change, and one option is clearly more consistent with the principles `docs/PRODUCT.md` already records than the alternatives are. Choose that option, write the resulting behavior into `docs/PRODUCT.md` as part of the change, implement it, and report the decision and the principle it followed in the handoff.
+* **Material.** It changes a requirement's main flow, is not reversible in a later change, touches data or persistence, or two reasonable readings would produce a different user experience. Raise it under §14 before implementing.
+
+A gap is material whenever the agent cannot name the specific recorded principle that settles it. Consistency with recorded intent is the test — not the agent's own preference, and not how small the code change would be.
+
+An accumulation of minor decisions is itself material. When one task needs more than three of them, the requirement is underspecified: stop and raise that, rather than filling it in a decision at a time.
 
 ### Product Discovery
 
@@ -343,6 +362,7 @@ For a multi-session initiative, commit the updated task status and next task wit
 Before ending a session or authorized outcome, provide an explicit handoff that states:
 
 * what was completed;
+* every product decision made on the Product Owner's behalf under §5, with the recorded principle each one followed;
 * which validation passed;
 * which validation failed or was blocked;
 * whether unresolved failures remain;
@@ -388,3 +408,7 @@ Ask the Product Owner instead of guessing when:
 * an implementation choice could significantly constrain future product development.
 
 For ordinary implementation details that do not affect these areas, make a reasonable decision and proceed.
+
+Ask once, early. Collect everything the work needs decided — the material requirement gaps from §5, scope boundaries, and the triggers above — and put them to the Product Owner in one exchange before implementing, rather than one question at a time as each surfaces. After that exchange, interrupt again only for a genuine blocker: an action that cannot be undone by a later change, a contradiction between sources of truth that no reading resolves, or a discovery that invalidates the authorized outcome. Resolve anything else with a stated default and report it in the handoff.
+
+These are not reasons to interrupt: wanting an already-authorized piece of work confirmed, wanting reassurance that an approach is acceptable, reporting progress, or asking whether to carry on with the task in hand.
