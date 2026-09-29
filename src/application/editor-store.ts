@@ -823,8 +823,10 @@ export class EditorStore {
    * only when the two snapshots hold no locatable difference.
    */
   private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
-    const target = changeSiteFocus(state.document, document, state.location)
-    // A change site is always a direct child or the heading of its location. The fallback location
+    const target = changeSiteFocus(state.document, document, state.location, (id) =>
+      isNodeExpanded(state.expansion, id),
+    )
+    // A change site is a visible row or the heading of its location. The fallback location
     // was recorded earlier and may select a descendant a collapse has since hidden.
     const location =
       target?.location ?? normalizeVisibleLocation(document, reconciled, (id) => isNodeExpanded(state.expansion, id))

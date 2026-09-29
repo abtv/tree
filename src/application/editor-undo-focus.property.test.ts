@@ -92,7 +92,7 @@ describe('undo focus invariants', () => {
           const before = undoDirection ? document : mutated
           const after = undoDirection ? mutated : document
           const current = { currentParentId: null, selectedNodeId: document.roots[0]!.id }
-          const target = changeSiteFocus(before, after, current)
+          const target = changeSiteFocus(before, after, current, () => false)
           if (target === undefined) return
           expect(isValidLocation(after, target.location)).toBe(true)
           expect(target.focus.nodeId).toBe(target.location.selectedNodeId)

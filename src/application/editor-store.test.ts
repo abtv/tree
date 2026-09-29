@@ -367,6 +367,25 @@ describe('EditorStore', () => {
       })
       expect(rowIds(store)).toContain('grandchild')
     })
+
+    it('keeps the location when undoing the deletion of a visible descendant', async () => {
+      const store = new EditorStore(
+        loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      store.toggleExpansion('root')
+      store.toggleExpansion('child')
+      store.selectNode('grandchild', 0)
+
+      store.deleteSelected()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'child' } })
+
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'grandchild' } })
+      expect(rowIds(store)).toContain('grandchild')
+    })
   })
   it('edits a whole-node Visual sibling range in one undo step and rejects paste into a source descendant', async () => {
     const services = loadedState(

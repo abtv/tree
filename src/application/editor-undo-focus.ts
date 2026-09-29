@@ -1,4 +1,5 @@
 import type { Document, LinkRange, Location, NodeId, TreeNode } from '../domain/document'
+import { locateNode } from '../domain/document'
 
 /** Where the caret belongs after undo or redo, and the location that displays it. */
 export interface UndoFocusTarget {
@@ -33,14 +34,39 @@ export function locateChangeSite(before: Document, after: Document): ChangeSite 
  * A change site that is the node the user is currently inside stays the current-parent heading;
  * any other site is displayed at its own parent's level, so the change is visible.
  */
-export function changeSiteFocus(before: Document, after: Document, current: Location): UndoFocusTarget | undefined {
+export function changeSiteFocus(
+  before: Document,
+  after: Document,
+  current: Location,
+  isExpanded: (nodeId: NodeId) => boolean,
+): UndoFocusTarget | undefined {
   const site = locateChangeSite(before, after)
   if (site === undefined) return undefined
   const location: Location =
     site.nodeId === current.currentParentId
       ? { currentParentId: site.nodeId, selectedNodeId: site.nodeId }
-      : { currentParentId: site.parentId, selectedNodeId: site.nodeId }
+      : isVisibleInLocation(after, site.nodeId, current, isExpanded)
+        ? { currentParentId: current.currentParentId, selectedNodeId: site.nodeId }
+        : { currentParentId: site.parentId, selectedNodeId: site.nodeId }
   return { location, focus: { nodeId: site.nodeId, cursor: site.cursor } }
+}
+
+/** Whether the node is already a visible row of the location, so showing it needs no navigation (§2.4). */
+function isVisibleInLocation(
+  document: Document,
+  nodeId: NodeId,
+  location: Location,
+  isExpanded: (nodeId: NodeId) => boolean,
+): boolean {
+  const located = locateNode(document, nodeId)
+  if (located === undefined) return false
+  const start = location.currentParentId === null ? 0 : indexOfId(located.ancestors, location.currentParentId) + 1
+  if (start === 0 && location.currentParentId !== null) return false
+  return located.ancestors.slice(start).every((ancestor) => isExpanded(ancestor.id))
+}
+
+function indexOfId(nodes: readonly TreeNode[], id: NodeId): number {
+  return nodes.findIndex((node) => node.id === id)
 }
 
 function forestChangeSite(

@@ -12,6 +12,8 @@ function tree(...roots: TreeNode[]): Document {
   return { roots }
 }
 
+const collapsed = () => false
+
 describe('locateChangeSite', () => {
   it('reports no site for the same document', () => {
     const document = tree(node('a', 'text'))
@@ -140,7 +142,7 @@ describe('changeSiteFocus', () => {
   const after = tree(node('root', 'Root', [node('a', 'one'), node('b', 'tXo')]))
 
   it('displays the change site at its own parent level', () => {
-    const target = changeSiteFocus(before, after, { currentParentId: 'root', selectedNodeId: 'a' })
+    const target = changeSiteFocus(before, after, { currentParentId: 'root', selectedNodeId: 'a' }, collapsed)
     expect(target).toEqual({
       location: { currentParentId: 'root', selectedNodeId: 'b' },
       focus: { nodeId: 'b', cursor: 1 },
@@ -151,7 +153,7 @@ describe('changeSiteFocus', () => {
   it('re-levels to the change site when it sits outside the displayed level', () => {
     const nested = tree(node('root', 'Root', [node('a', 'one'), node('b', 'two', [node('deep', 'deep')])]))
     const outside = tree(node('root', 'Root', [node('a', 'one'), node('b', 'two', [node('deep', 'dXep')])]))
-    const target = changeSiteFocus(nested, outside, { currentParentId: 'root', selectedNodeId: 'a' })
+    const target = changeSiteFocus(nested, outside, { currentParentId: 'root', selectedNodeId: 'a' }, collapsed)
     expect(target).toEqual({
       location: { currentParentId: 'b', selectedNodeId: 'deep' },
       focus: { nodeId: 'deep', cursor: 1 },
@@ -159,9 +161,29 @@ describe('changeSiteFocus', () => {
     expect(isValidLocation(outside, target!.location)).toBe(true)
   })
 
+  it('keeps the location when the change site is a visible descendant shown by inline expansion', () => {
+    // Undoing `dd` on `deep` restores it beneath expanded `alpha` and `b`; the location stays the root.
+    const removed = tree(node('alpha', 'Alpha', [node('b', 'two')]), node('beta', 'Beta'))
+    const restored = tree(node('alpha', 'Alpha', [node('b', 'two', [node('deep', 'deep')])]), node('beta', 'Beta'))
+    const root = { currentParentId: null, selectedNodeId: 'b' }
+    const expanded = (id: string) => id === 'alpha' || id === 'b'
+    const target = changeSiteFocus(removed, restored, root, expanded)
+    expect(target).toEqual({
+      location: { currentParentId: null, selectedNodeId: 'deep' },
+      focus: { nodeId: 'deep', cursor: 0 },
+    })
+    const inside = changeSiteFocus(removed, restored, { currentParentId: 'alpha', selectedNodeId: 'b' }, expanded)
+    expect(inside?.location).toEqual({ currentParentId: 'alpha', selectedNodeId: 'deep' })
+    // A collapsed ancestor hides the site, so the change is displayed at its own parent as before.
+    expect(changeSiteFocus(removed, restored, root, (id) => id === 'alpha')?.location).toEqual({
+      currentParentId: 'b',
+      selectedNodeId: 'deep',
+    })
+  })
+
   it('keeps the current-parent heading selected when the change is in the heading itself', () => {
     const heading = tree(node('root', 'Rxot', [node('a', 'one'), node('b', 'two')]))
-    const target = changeSiteFocus(before, heading, { currentParentId: 'root', selectedNodeId: 'a' })
+    const target = changeSiteFocus(before, heading, { currentParentId: 'root', selectedNodeId: 'a' }, collapsed)
     expect(target).toEqual({
       location: { currentParentId: 'root', selectedNodeId: 'root' },
       focus: { nodeId: 'root', cursor: 1 },
@@ -170,6 +192,6 @@ describe('changeSiteFocus', () => {
   })
 
   it('reports no target when the snapshots hold the same content', () => {
-    expect(changeSiteFocus(before, before, { currentParentId: 'root', selectedNodeId: 'a' })).toBeUndefined()
+    expect(changeSiteFocus(before, before, { currentParentId: 'root', selectedNodeId: 'a' }, collapsed)).toBeUndefined()
   })
 })
