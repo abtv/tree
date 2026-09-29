@@ -21,7 +21,7 @@ const WORKFLOW_POLICY_MARKER = '<!-- workflow-policy-owner -->'
 const VALIDATION_MECHANICS_MARKER = '<!-- validation-mechanics-owner -->'
 const WORKFLOW_POLICY_REFERENCE = '<!-- workflow-policy-reference: AGENTS.md -->'
 const VALIDATION_MECHANICS_REFERENCE = '<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->'
-const PRODUCT_DISCOVERY_DECLARATION = '> This document is non-normative.'
+const OPEN_QUESTIONS_DECLARATION = '> This document is non-normative.'
 
 export function validateAdr({ fileName, content, adrNumbers }) {
   const issues = []
@@ -121,9 +121,9 @@ export function validateWorkflowOwnership({ agentContent, developmentContent }) 
   return issues
 }
 
-export function validateProductDiscovery({ content, displayPath = 'docs/PRODUCT_DISCOVERY.md' }) {
-  if (content.includes(PRODUCT_DISCOVERY_DECLARATION)) return []
-  return [`${displayPath}: missing the non-normative product-discovery declaration`]
+export function validateOpenQuestions({ content, displayPath = 'docs/OPEN_QUESTIONS.md' }) {
+  if (content.includes(OPEN_QUESTIONS_DECLARATION)) return []
+  return [`${displayPath}: missing the non-normative open-questions declaration`]
 }
 
 const SKIPPED_DIRECTORIES = new Set([
@@ -142,7 +142,7 @@ function collectLiveDocuments(rootDirectory) {
     if (existsSync(filePath)) documents.add(filePath)
   }
   for (const name of ['README.md', 'AGENTS.md', 'SECURITY.md']) addIfPresent(join(rootDirectory, name))
-  for (const name of ['PRODUCT.md', 'PRODUCT_DISCOVERY.md', 'ARCHITECTURE.md', 'DEVELOPMENT.md', 'SECURITY.md']) {
+  for (const name of ['PRODUCT.md', 'OPEN_QUESTIONS.md', 'ARCHITECTURE.md', 'DEVELOPMENT.md', 'SECURITY.md']) {
     addIfPresent(join(rootDirectory, 'docs', name))
   }
   const decisions = join(rootDirectory, 'docs', 'decisions')
@@ -206,8 +206,8 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     if (!displayPath.endsWith('PRODUCT.md')) {
       issues.push(...findProductQuantityRestatements({ content, displayPath }))
     }
-    if (displayPath === 'docs/PRODUCT_DISCOVERY.md') {
-      issues.push(...validateProductDiscovery({ content, displayPath }))
+    if (displayPath === 'docs/OPEN_QUESTIONS.md') {
+      issues.push(...validateOpenQuestions({ content, displayPath }))
     }
   }
   const agentPath = join(rootDirectory, 'AGENTS.md')

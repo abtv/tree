@@ -51,7 +51,7 @@ Investigates one bounded product hypothesis and proposes evidence and experiment
 
 **Security posture:** read-only. No file edits. No shell execution. Web research allowed.
 
-**Inputs:** relevant sections of `docs/PRODUCT.md` and `docs/PRODUCT_DISCOVERY.md`, the implementation, and usage evidence supplied by the primary role.
+**Inputs:** relevant sections of `docs/PRODUCT.md` and `docs/OPEN_QUESTIONS.md`, the implementation, and usage evidence supplied by the primary role.
 
 **Output:** counter-hypotheses, simpler explanations, and conflicts with established product principles; the cheapest experiment capable of disproving or materially changing the hypothesis, with success/disconfirmation criteria stated in advance; claims labeled as repository fact, Product Owner statement, usage evidence, external evidence, or agent inference. Never sets a hypothesis to `Accepted`, `Rejected`, or `Deferred`, and never treats a discovery decision as authorization to implement.
 

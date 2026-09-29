@@ -9,7 +9,7 @@ import {
   runChecks,
   validateAdr,
   validateAdrIndex,
-  validateProductDiscovery,
+  validateOpenQuestions,
   validateWorkflowOwnership,
 } from './check-docs.mjs'
 
@@ -146,11 +146,11 @@ describe('validateWorkflowOwnership', () => {
   })
 })
 
-describe('validateProductDiscovery', () => {
+describe('validateOpenQuestions', () => {
   it('requires an explicit non-normative declaration', () => {
-    expect(validateProductDiscovery({ content: '> This document is non-normative. Research only.\n' })).toEqual([])
-    expect(validateProductDiscovery({ content: '# Product Discovery\n' })).toEqual([
-      expect.stringContaining('missing the non-normative product-discovery declaration'),
+    expect(validateOpenQuestions({ content: '> This document is non-normative. Research only.\n' })).toEqual([])
+    expect(validateOpenQuestions({ content: '# Open Questions\n' })).toEqual([
+      expect.stringContaining('missing the non-normative open-questions declaration'),
     ])
   })
 })
@@ -181,13 +181,13 @@ describe('runChecks', () => {
     expect(result.liveDocumentCount).toBe(2)
   })
 
-  it('governs the product-discovery document as a live document', () => {
+  it('governs the open-questions document as a live document', () => {
     const root = createTemporaryRoot()
-    writeFile(root, 'docs/PRODUCT_DISCOVERY.md', '# Discovery\n[missing](MISSING.md)\nNodes remain at level 20.\n')
+    writeFile(root, 'docs/OPEN_QUESTIONS.md', '# Questions\n[missing](MISSING.md)\nNodes remain at level 20.\n')
     const result = runChecks({ rootDirectory: root })
     expect(result.issues).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('missing the non-normative product-discovery declaration'),
+        expect.stringContaining('missing the non-normative open-questions declaration'),
         expect.stringContaining('link target not found'),
         expect.stringContaining('restates the node-depth value'),
       ]),
@@ -195,9 +195,9 @@ describe('runChecks', () => {
     expect(result.liveDocumentCount).toBe(1)
   })
 
-  it('accepts a valid product-discovery document', () => {
+  it('accepts a valid open-questions document', () => {
     const root = createTemporaryRoot()
-    writeFile(root, 'docs/PRODUCT_DISCOVERY.md', '# Discovery\n> This document is non-normative.\n')
+    writeFile(root, 'docs/OPEN_QUESTIONS.md', '# Questions\n> This document is non-normative.\n')
     const result = runChecks({ rootDirectory: root })
     expect(result.issues).toEqual([])
     expect(result.liveDocumentCount).toBe(1)

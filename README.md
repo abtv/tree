@@ -5,7 +5,7 @@ A macOS desktop application for working with a hierarchical tree of text nodes a
 ## Documentation
 
 * [Product Requirements](docs/PRODUCT.md) — user-visible product behavior and requirements.
-* [Product Discovery](docs/PRODUCT_DISCOVERY.md) — non-normative hypotheses, experiments, evidence, and unresolved product questions.
+* [Open Questions](docs/OPEN_QUESTIONS.md) — non-normative product and technical questions that are still open, with their evidence and decisions.
 * [Architecture](docs/ARCHITECTURE.md) — technology stack, technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development environment, commands, testing, validation, and repository conventions.
 * [Agent Roles](docs/AGENT_ROLES.md) — the formal definition of each agent role, shared by every coding-agent tool's config.
@@ -18,9 +18,9 @@ A macOS desktop application for working with a hierarchical tree of text nodes a
 
 Use [Product Requirements](docs/PRODUCT.md) for behavior you have decided the application should have. If you know what you want, describe it to the coding agent. The agent can update the requirements, implement the change, and test it. If an important detail is unclear, decide it together before implementation.
 
-Use [Product Discovery](docs/PRODUCT_DISCOVERY.md) when you are unsure whether a problem needs solving or which solution would help. Write down a real example from using the app, possible explanations, and a small way to learn more. You do not need a discovery entry for every fix or clear request.
+Use [Open Questions](docs/OPEN_QUESTIONS.md) when you are unsure whether a problem needs solving, which solution would help, or which technical direction to take. Write down a real example from using the app, possible explanations, and a small way to learn more. You do not need an entry for every fix or clear request.
 
-After trying an idea, decide whether to pursue it. A discovery note is not permission to build it. When you want the change, ask the agent for the specific behavior; it will then update Product Requirements and follow the normal development workflow. After using the result, note whether it solved the original problem.
+After trying an idea, decide whether to pursue it. An open-question note is not permission to build it. When you want the change, ask the agent for the specific behavior; it will then update Product Requirements and follow the normal development workflow. After using the result, note whether it solved the original problem.
 
 For example, you could say: “I had trouble finding a note today. Record what happened in Product Discovery and suggest a simple way to check whether this keeps happening.” If you later decide you want search, describe how search should work and ask the agent to implement it.
 

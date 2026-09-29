@@ -8,7 +8,7 @@
 At the start of a session:
 
 1. Read this file and `WORKING_PLAN.md` when an approved task is in progress. For a multi-session initiative, read `plans/README.md` and its linked active plan before selecting the next task.
-2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references. Read `docs/PRODUCT_DISCOVERY.md` only for product-discovery work or when an approved task explicitly references a discovery entry.
+2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references. Read `docs/OPEN_QUESTIONS.md` only when working on an open question, when an approved task references one, or when a handoff must list them because no plan has a ready task.
 3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
 
 Prefer the narrowest referenced section over reading an entire document.
@@ -40,7 +40,7 @@ Stay within the coding tool the Product Owner started for the session. Do not sw
 Before making changes, read the documentation relevant to the task:
 
 * `docs/PRODUCT.md` — product behavior and user-visible requirements.
-* `docs/PRODUCT_DISCOVERY.md` — non-normative product hypotheses, experiments, evidence, and decisions; it is never an implementation requirement.
+* `docs/OPEN_QUESTIONS.md` — non-normative product and technical questions that are still open, with their evidence and decisions; it is never an implementation requirement.
 * `docs/ARCHITECTURE.md` — technical architecture and architectural boundaries.
 * `docs/DEVELOPMENT.md` — development workflow, tooling, testing, and validation.
 * `docs/AGENT_ROLES.md` — the formal, tool-agnostic definition of each agent role (planner, reviewer, product verifier, product researcher) and their security posture; every coding-agent tool's config implements it.
@@ -122,11 +122,11 @@ By default no area is exploratory, and the rule above applies everywhere. The Pr
 
 Inside a marked section the minor-gap rule does not apply. Implement exactly what the Product Owner asked, do not fill a gap by choosing a default, and do not extend the behavior to a neighbouring case. Report what you noticed — friction, an inconsistency with adjacent behavior, or a case the section does not cover — in the handoff, as observations rather than proposals. Everything else applies unchanged, including tests, validation, and documentation.
 
-### Product Discovery
+### Open Questions
 
-`docs/PRODUCT_DISCOVERY.md` is the durable research notebook for uncertain product questions. It is not a backlog, specification, or source of implementation authority.
+`docs/OPEN_QUESTIONS.md` holds the questions the project has not answered yet, product and technical alike. It is not a backlog, specification, or source of implementation authority. An answered question leaves it: settled product behavior belongs in `docs/PRODUCT.md`, a settled technical decision in an ADR.
 
-For product-discovery tasks, agents may:
+For work on an open question, agents may:
 
 * record observations and Product Owner statements without changing their meaning;
 * frame hypotheses and counter-hypotheses;
@@ -134,9 +134,11 @@ For product-discovery tasks, agents may:
 * propose the cheapest experiment capable of changing a decision;
 * organize evidence and identify conflicts with established product principles.
 
-Agents must preserve Product Owner disagreement instead of resolving it silently. They must not invent the Product Owner's position, set a discovery entry to `Accepted`, `Rejected`, or `Deferred`, or treat any discovery status as approval to change the product. Only the Product Owner makes discovery decisions.
+Agents must preserve Product Owner disagreement instead of resolving it silently. They must not invent the Product Owner's position, set an entry to `Accepted`, `Rejected`, or `Deferred`, or treat any status as approval to change the product. Only the Product Owner decides, for technical questions as well as product ones.
 
-When the Product Owner accepts a direction, propose the corresponding `docs/PRODUCT.md` change separately. Acceptance of a discovery direction alone does not authorize implementation; follow the product-change rules above once the Product Owner requests the change.
+When the Product Owner accepts a direction, propose the corresponding `docs/PRODUCT.md` change or ADR separately. Acceptance alone does not authorize implementation; follow the product-change rules above once the Product Owner requests the change.
+
+Open questions need a moment when the Product Owner actually sees them, or they accumulate unread. When no plan in `plans/README.md` has a ready next task, the handoff lists the open questions in one line each as candidates and stops there. Selecting one is the Product Owner's decision: never start work on an open question because nothing else was pending.
 
 ---
 
@@ -320,7 +322,7 @@ Keep each document focused on its responsibility:
 
 * `README.md` — the project identity and documentation index.
 * `PRODUCT.md` — what the product does.
-* `PRODUCT_DISCOVERY.md` — uncertain product questions, experiments, evidence, and Product Owner decisions that are not yet requirements.
+* `OPEN_QUESTIONS.md` — product and technical questions that are still open, with their evidence and Product Owner decisions, none of which are requirements yet.
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
 * `AGENT_ROLES.md` — the formal definition of each agent role, shared by every coding-agent tool's config.

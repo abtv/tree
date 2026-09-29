@@ -1,12 +1,16 @@
-# Product Discovery
+# Open Questions
 
-> This document is non-normative. It records unapproved product ideas, hypotheses, experiments, evidence, and decisions. Nothing here is an implementation requirement. Only behavior approved by the Product Owner and incorporated into `docs/PRODUCT.md` may be planned or implemented.
+> This document is non-normative. It records questions that are still open — product and technical alike — together with their evidence and the Product Owner's decisions. Nothing here is an implementation requirement. Only what the Product Owner approves and moves into `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, or an ADR may be planned or implemented.
 
 ## 1. Purpose and Ownership
 
-This document is the durable research notebook for questions that may influence the product. It is not a prioritized feature backlog and does not imply delivery commitments, estimates, or implementation assignments.
+This document holds the questions the project has not answered yet. Answered ones live elsewhere: settled product behavior in `docs/PRODUCT.md`, settled technical decisions in `docs/decisions/`. A question belongs here exactly while it is open.
 
-The Product Owner decides whether a product direction is accepted, rejected, or deferred. Agents may investigate questions, challenge hypotheses, organize supplied evidence, identify conflicts with product principles, and propose experiments. Agents must not invent the Product Owner's position or convert a discovery conclusion into a requirement.
+It is not a prioritized backlog and implies no delivery commitment, estimate, or assignment. Work that is authorized and scheduled lives in [`../plans/README.md`](../plans/README.md) instead.
+
+Each entry is tagged `Kind: product` or `Kind: technical`, with `PD-` and `TD-` identifiers. A product question asks what the product should do for the user; a technical one asks how the implementation should work, including durability, performance, and the agent-driven development process itself. The tag chooses where an accepted answer lands, not how seriously the question is taken.
+
+The Product Owner decides whether a direction is accepted, rejected, or deferred — for technical questions as well as product ones, since a technical answer can constrain the product for a long time. Agents may investigate questions, challenge hypotheses, organize supplied evidence, identify conflicts with the standing commitments in `docs/PRODUCT.md` §1.1, and propose experiments. Agents must not invent the Product Owner's position or convert a conclusion here into a requirement.
 
 Every claim should be labeled by its basis when that basis is not self-evident:
 
@@ -27,65 +31,48 @@ Every claim should be labeled by its basis when that basis is not self-evident:
 
 Only the Product Owner may set `Accepted`, `Rejected`, or `Deferred`. Accepting a direction does not authorize implementation. When the Product Owner requests a specific behavior, update `docs/PRODUCT.md` and follow the planning and development workflow in `AGENTS.md`. Ordinary implementation plans do not need separate approval; ask the Product Owner about material choices that remain unresolved.
 
-## 3. Discovery Lifecycle
+## 3. How a Question Moves
 
-1. Capture the observation without prescribing a feature.
-2. Frame a falsifiable hypothesis and plausible counter-hypotheses.
-3. Identify conflicts with the product's established principles.
-4. Choose the cheapest experiment capable of changing the decision.
-5. State success and disconfirmation criteria before collecting evidence.
-6. Record evidence separately from interpretation.
-7. Ask the Product Owner to decide, defer, or request more evidence.
-8. If a direction is accepted, propose the corresponding `docs/PRODUCT.md` change separately.
+Capture the question without prescribing an answer. Say what would settle it before collecting evidence, and keep evidence separate from interpretation. Ask the Product Owner to decide, defer, or ask for more evidence. When a direction is accepted, propose the corresponding change to `docs/PRODUCT.md` or an ADR separately — acceptance is not authorization to implement.
 
-Experiments should prefer ordinary use and reversible prototypes over production implementation. Changing product code for an experiment requires a separate Product Owner request and the planning and development workflow in `AGENTS.md`.
+Prefer ordinary use and reversible prototypes over production implementation. Changing product code for an experiment requires a separate Product Owner request and the workflow in `AGENTS.md`.
+
+Some questions are answered by living with the behavior rather than by an experiment. When the Product Owner marks a `docs/PRODUCT.md` section exploratory (§1.2 there), the entry here records what to watch and cites that section, and the implemented behavior stays the source of truth for what the product currently does.
 
 ## 4. Entry Template
 
-Copy this template for a new discovery question:
+Three sections are required. Start with these and nothing else:
 
 ```md
-## PD-NNN: Short question or direction
+## PD-NNN: Short question
 
+Kind: product
 Status: Idea
 
-### Observation
+### Question
 
-Describe the observed problem or opportunity without assuming a solution.
+What is uncertain and why it matters, without assuming an answer.
 
-### Hypothesis
+### What we are watching
 
-State what is believed and why it would matter.
+The use, measurement, or observation that would move this either way.
 
-### Product Owner perspective
+### What would settle it
 
-Record the Product Owner's position or `Pending`. Preserve disagreement explicitly.
-
-### Counter-hypotheses and tradeoffs
-
-List plausible alternative explanations, simpler responses, and conflicts with product principles.
-
-### Experiment
-
-Describe the cheapest useful way to test the hypothesis.
-
-### Decision criteria
-
-State what evidence would support, disconfirm, or leave the hypothesis unresolved.
-
-### Evidence
-
-Record dated repository facts, Product Owner statements, usage evidence, external evidence, and agent inference with their basis identified.
-
-### Decision and rationale
-
-Pending. Only the Product Owner decides. If accepted behavior is later specified, link the affected `docs/PRODUCT.md` section.
+The evidence or cheapest experiment that would change the decision, and what each outcome would mean.
 ```
+
+Use `TD-NNN` and `Kind: technical` for a technical question.
+
+Add a section only when it has content to hold: **Product Owner perspective** (their position, with disagreement preserved rather than resolved), **Counter-hypotheses and tradeoffs**, **Evidence** (dated, each item labeled with its basis per §1), and **Decision and rationale** (the Product Owner's only). An empty heading reading `Pending` carries no information; leave it out until it does.
+
+Keep an entry short enough to re-read in a minute. A question that needs more than that is usually several questions.
 
 ## 5. Active Questions
 
 ## PD-001: Retrieval across the hierarchy
 
+Kind: product
 Status: Exploring
 
 ### Observation
@@ -95,10 +82,6 @@ Repository fact: the application navigates and renders one level at a time. It h
 ### Hypothesis
 
 As personal notes accumulate, remembering that a note exists but not where it lives will become a frequent enough problem that hierarchy navigation alone is insufficient.
-
-### Product Owner perspective
-
-Pending.
 
 ### Counter-hypotheses and tradeoffs
 
@@ -119,12 +102,9 @@ Support requires recurring retrieval failures that a focused search interaction 
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies one-level navigation and describes browser-find limitations for windowed sibling lists.
 - 2026-09-21 — Agent inference: retrieval is likely to become more important as the document grows; real usage evidence is still required.
 
-### Decision and rationale
-
-Pending.
-
 ## PD-002: Keyboard-only sibling reordering
 
+Kind: product
 Status: Exploring
 
 ### Observation
@@ -134,10 +114,6 @@ Repository fact: ordinary editing and navigation are keyboard-first, while sibli
 ### Hypothesis
 
 Keyboard sibling-reordering commands would reduce interruptions for a touch typist without weakening the one-level-at-a-time interaction model.
-
-### Product Owner perspective
-
-Pending.
 
 ### Counter-hypotheses and tradeoffs
 
@@ -158,12 +134,9 @@ Support requires repeated mouse transitions for sibling moves and a shortcut tha
 - 2026-09-21 — Product Owner statement: fast note-taking as a touch typist is important.
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` defines drag-and-drop as the only sibling-reordering interaction.
 
-### Decision and rationale
-
-Pending.
-
 ## PD-003: Distraction-free behavior as an explicit principle
 
+Kind: product
 Status: Exploring
 
 ### Observation
@@ -197,12 +170,9 @@ Support requires a stable wording that protects focus and immediacy without forb
 - 2026-09-21 — Product Owner statement: the application's lack of animations is liked because there are no distractions.
 - 2026-09-21 — Repository fact: no renderer animation, transition, keyframe, or smooth-scroll declarations were found during the initial review.
 
-### Decision and rationale
-
-Pending.
-
 ## PD-004: User-controlled export and backup
 
+Kind: product
 Status: Exploring
 
 ### Observation
@@ -212,10 +182,6 @@ Repository fact: the application automatically persists the document and retains
 ### Hypothesis
 
 A personal note store needs a user-controlled way to preserve and leave with its data even when internal persistence is reliable.
-
-### Product Owner perspective
-
-Pending.
 
 ### Counter-hypotheses and tradeoffs
 
@@ -235,7 +201,3 @@ Support requires at least one important scenario that current persistence and sy
 
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies automatic persistence and retained generations but no user-facing data-portability workflow.
 - 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
-
-### Decision and rationale
-
-Pending.
