@@ -81,6 +81,34 @@ describe('file services', () => {
     expect(await readFile(join(directory, 'document.json'), 'utf8')).not.toContain(directory)
   })
 
+  it('serializes a concurrent load behind the save that is rotating the primary document', async () => {
+    const { directory, services } = await servicesForTest()
+    const previous = stateWithoutImage('Previous')
+    const next = stateWithoutImage('Next')
+    await services.save(previous)
+    await ageFile(join(directory, 'document.json'), 10)
+
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    let load: Promise<unknown | null> | undefined
+    let renames = 0
+    vi.mocked(rename).mockImplementation(async (from, to) => {
+      renames += 1
+      if (renames === 1) {
+        load = services.load()
+        // Let an unqueued load reach its promotion rename before the save continues.
+        for (let turn = 0; turn < 20; turn += 1) {
+          await new Promise<void>((resolve) => setImmediate(resolve))
+        }
+      }
+      await real.rename(from, to)
+    })
+
+    const save = services.save(next)
+    await expect(save).resolves.toBeUndefined()
+    await expect(load).resolves.toEqual(next)
+    await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('preserves each replaced document as a numbered generation', async () => {
     const { directory, services } = await servicesForTest()
     const first = stateWithoutImage('First')

@@ -52,7 +52,7 @@ export function createFileServices(
 
   return {
     async load(): Promise<unknown | null> {
-      return runOperation('load', [documentPath, temporaryDocumentPath, dataDirectory], async () => {
+      return enqueue('load', [documentPath, temporaryDocumentPath, dataDirectory], async () => {
         const candidates = await listLoadCandidates(dataDirectory, documentPath, temporaryDocumentPath)
         const reads = new Map<string, { value: unknown } | { error: unknown }>()
         const readCandidate = async (path: string): Promise<{ value: unknown } | { error: unknown }> => {
