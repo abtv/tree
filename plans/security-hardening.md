@@ -8,7 +8,7 @@ target. The review was performed in conversation and is not otherwise recorded i
 its complete findings are reproduced below, so no task depends on that conversation.
 
 The Product Owner authorized this plan and authorized implementing all eight tasks it lists. The
-seven tasks not yet completed remain `Ready`; nothing further needs to be authorized before starting
+four tasks not yet completed remain `Ready`; nothing further needs to be authorized before starting
 one. That authorization covers these tasks only — it is not authorization for work this plan does
 not list.
 
@@ -31,7 +31,7 @@ Scope limits:
 * No task adds a test purely to raise coverage (`AGENTS.md` §9). Each new test pins a specific
   control that is currently unenforced.
 * The review found no issue in the domain or application layers, and no task changes them except
-  SEC3's single validator.
+  SEC3's persisted-state leaf validation and shared attachment-ID rule.
 
 Sources of truth: [`docs/SECURITY.md`](../docs/SECURITY.md) (security model and verification map);
 [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) §16 (Electron integration), §17 (process
@@ -42,8 +42,8 @@ boundaries); [`docs/PRODUCT.md`](../docs/PRODUCT.md) §13.2 (editable-node conte
 
 ## State
 
-The review began from a clean worktree at `c8a9834`. SEC1, SEC2, and SEC3 are complete and validated;
-SEC4 is the next ready task.
+The review began from a clean worktree at `c8a9834`. SEC1 through SEC4 are complete and validated;
+SEC5 is the next ready task.
 
 The review read every file under `src/`, the Electron entry and window configuration, the whole
 preload and IPC surface, the persistence and clipboard infrastructure, the renderer's HTML-producing
@@ -327,7 +327,7 @@ See D4: recording the requirement is in scope for this plan; implementing it is 
 | SEC1 | Ignore `ELECTRON_RENDERER_URL` unless the build is unpackaged, per F1 and D1. Add one exported pure helper to `src/main/window.ts` that takes the packaged flag, the environment value, and the packaged document URL and returns the renderer URL plus whether it is the development one; call it once in `src/main/index.ts` and use its result for `loadURL`/`loadFile`, the navigation guard, and the trusted-caller URL. Acceptance: unit tests that a packaged build returns the packaged document URL and reports "not development" even when the environment variable is set to a remote URL, that an unpackaged build honors it, and that an unpackaged build without it returns the packaged document URL; `src/main/index.ts` reads `process.env['ELECTRON_RENDERER_URL']` exactly once; the end-to-end suite passes unchanged. Update `docs/SECURITY.md` ("Restricted navigation" and "Trusted callers") and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC2 | Deny every session permission request and every non-local renderer network request, per F2 and D2. Add one exported function to `src/main/window.ts` that takes a session-like object and the resolved renderer URL from SEC1 and installs: a permission request handler, a permission check handler, and a device permission handler that all deny; and a `webRequest.onBeforeRequest` filter that cancels any request whose URL is not `file:`, `devtools:`, `blob:`, or `data:`, and not same-origin with the renderer URL when that URL is the development one. Call it from `registerReadyServices` in `src/main/index.ts`. Acceptance: unit tests for each handler denying and for the filter allowing local schemes, allowing the development origin only in development, and cancelling `https:`; a new end-to-end assertion that a renderer-initiated request to an external HTTPS origin fails while the application still loads and edits normally; `e2e/hyperlink.spec.ts` still passes, proving `shell.openExternal` is unaffected. Update `docs/SECURITY.md` (new control plus its row in the verification map) and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC3 | Make the save boundary reject the leaf values the rest of the application refuses, per F3. In `src/domain/document-serialization.ts`, apply the shared attachment-identifier character rule in `parseAttachment` and make `parseLinks` throw on a destination that is not `http`/`https` instead of letting `normalizeLinks` filter it. Keep the character rule in one place so `src/main/ipc-security.ts` and `src/infrastructure/main/file-services.ts` cannot drift from it. Acceptance: defect-first unit tests that fail before the change — `validatePersistedState` accepting an attachment identifier containing a path separator, and accepting a `javascript:` link destination — and pass after it; a test that an identifier of the shape the application actually generates is still accepted; a property test that generated safe attachment identifiers pass persisted-state validation; a contract test that `tree:save` rejects both payloads; an end-to-end assertion that a document written with such an identifier is refused at the save boundary rather than producing a document whose attachments can never be cleaned up. No `docs/PRODUCT.md` change: this rejects states the application never produces. | `src/domain/document-serialization.ts`, `src/domain/document-serialization.test.ts`, `src/domain/document.property.test.ts`, `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts`, `src/infrastructure/main/file-services.ts`, `e2e/persistence.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
-| SEC4 | Close the navigation-guard gaps in F4. Install the navigation and window-open guards from `app.on('web-contents-created', …)` so they apply to any web contents, handle `will-frame-navigate` with the same rule as `will-navigate`, and deny `will-attach-webview`. Add `frame-src 'none'`, `child-src 'none'`, `worker-src 'none'`, `media-src 'none'`, and `frame-ancestors 'none'` to the policy in `electron.vite.config.ts`. Acceptance: unit tests for the shared guard predicate applied to a frame navigation and to a webview attach; an extension of `e2e/csp.spec.ts` asserting the new directives are present, that an iframe cannot navigate to an external origin, and that the existing no-violations check still passes on reload. Update `docs/SECURITY.md`. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `electron.vite.config.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md` | High | Ready |
+| SEC4 | Close the navigation-guard gaps in F4. Install the navigation and window-open guards from `app.on('web-contents-created', …)` so they apply to any web contents, handle `will-frame-navigate` with the same rule as `will-navigate`, deny `will-attach-webview`, and block redirects to any URL other than the resolved renderer document. Add `frame-src 'none'`, `child-src 'none'`, `worker-src 'none'`, `media-src 'none'`, and `frame-ancestors 'none'` to the policy in `electron.vite.config.ts`. Acceptance: unit tests for the shared guard applied to a frame navigation, redirect, and webview attach; an extension of `e2e/csp.spec.ts` asserting the new directives are present, that an iframe cannot navigate to an external origin, and that the existing no-violations check still passes on reload. Update `docs/SECURITY.md`. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `electron.vite.config.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC5 | Bound the clipboard HTML that `extractClipboardLinks` parses, per F5, and bound the number of links it returns. Prefer removing the backtracking prefix over relying on the bound alone. Acceptance: a test that an adversarial input of the `<a <a <a …` shape returns promptly and yields no links — assert on completion within a generous deterministic budget, not on a tight timing threshold; a test that an oversized HTML flavor is ignored and the paste still delivers its plain text; a test that the link count is capped; every existing case in `src/infrastructure/main/clipboard.test.ts` and `e2e/clipboard.spec.ts` passes unchanged, including hyperlink-preserving copy and paste. No `docs/PRODUCT.md` change: the bounds are not reachable by pasting from an ordinary application. | `src/infrastructure/main/clipboard.ts`, `src/infrastructure/main/clipboard.test.ts` | High | Ready |
 | SEC6 | Bound the editor context-menu request, per F6 and D3. In `validateEditorContextMenuRequest`, require finite coordinates and reject or truncate `selectionText` beyond a stated bound; if truncating, the `Look Up` label ends with an ellipsis and the Google query uses the same bounded text. State the bound in `docs/PRODUCT.md` §13.2 only. Acceptance: unit tests rejecting `NaN` and `Infinity` coordinates and covering the bounded selection text; an end-to-end assertion that the menu still opens with its documented items for an ordinary selection. | `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/editor-context-menu.ts`, `src/main/editor-context-menu.test.ts`, `docs/PRODUCT.md`, `e2e/context-menu.spec.ts` | High | Ready |
 | SEC7 | Document the application's network egress, per F7. Add a section to `docs/SECURITY.md` that states the application performs no network requests of its own, sends no telemetry, and stores documents only on the local machine; then enumerate the three user-initiated paths by which content can reach a third party (external link opening, the Google search menu item, macOS Look Up), naming the file and the product requirement for each. Add the spellchecker note: the macOS spellchecker downloads nothing, and a future Windows or Linux build must disable the Hunspell dictionary download before shipping. Acceptance: `npm run check:docs` passes, each stated path is traceable to the named source file, and no product quantity is restated outside `docs/PRODUCT.md`. No source change. | `docs/SECURITY.md` | Minimal | Ready |
@@ -358,23 +358,21 @@ suite must be reported as blocked, not as passed.
 
 ## Next task
 
-SEC4 — close the navigation-guard gaps and deny embedded content, following F4.
+SEC5 — bound clipboard HTML parsing and extracted links, following F5.
 
-Implementation notes for SEC4, so the task does not depend on this plan's authoring session:
+Implementation notes for SEC5, so the task does not depend on this plan's authoring session:
 
-* Install navigation and window-open guards from `app.on('web-contents-created', …)` so every web
-  contents receives them; handle `will-frame-navigate` with the existing renderer/external URL rules
-  and deny `will-attach-webview`.
-* Add explicit `frame-src 'none'`, `child-src 'none'`, `worker-src 'none'`, `media-src 'none'`, and
-  `frame-ancestors 'none'` CSP directives.
-* Add unit and real Electron coverage listed in the SEC4 task row, including an external iframe
-  navigation attempt and verification that normal renderer resources remain violation-free.
-* Update `docs/SECURITY.md`; no product behavior or architecture change is authorized.
+* Remove the regex backtracking prefix from `extractClipboardLinks` and bound both parsed HTML size
+  and returned link count, per SEC5's task-row acceptance criteria.
+* Preserve plain-text paste when the HTML flavor exceeds its cap, and preserve all existing
+  hyperlink copy/paste behavior for ordinary input.
+* Add deterministic adversarial-input, oversized-HTML, and link-count tests; do not use a tight
+  timing threshold.
 * Validation is High Risk (`docs/DEVELOPMENT.md` §9): `npm run check:full`.
-* Commit as `fix(main): guard frame navigation and embedded content`, together with this plan's
-  status update for SEC4 (`AGENTS.md` §12).
+* Commit as `fix(infrastructure): bound clipboard link parsing`, together with this plan's status
+  update for SEC5 (`AGENTS.md` §12).
 
-All eight tasks are authorized, with five remaining `Ready`, so a session may continue to the next
+All eight tasks are authorized, with four remaining `Ready`, so a session may continue to the next
 one in the recommended order after committing the previous task, while context stays manageable
 (`AGENTS.md` §12). A reasonable split is SEC1 and SEC2 in one session, SEC3 and SEC4 in the next,
 then SEC5 through SEC8; judge by remaining context rather than by that split. Mark each task `Done`

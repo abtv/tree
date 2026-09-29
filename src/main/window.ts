@@ -1,4 +1,4 @@
-import type { Session, WebPreferences } from 'electron'
+import type { App, Session, WebContents, WebPreferences } from 'electron'
 
 export interface WindowSurface {
   isDestroyed(): boolean
@@ -50,6 +50,29 @@ export function isAllowedRendererUrl(value: string, expected: string): boolean {
   } catch {
     return false
   }
+}
+
+export function configureWebContentsSecurity(
+  app: Pick<App, 'on'>,
+  rendererUrl: string,
+  openExternal: (url: string) => void,
+): void {
+  app.on('web-contents-created', (_event, contents: WebContents) => {
+    contents.on('will-navigate', (event, url) => {
+      if (!isAllowedRendererUrl(url, rendererUrl)) event.preventDefault()
+    })
+    contents.on('will-frame-navigate', (event) => {
+      if (!isAllowedRendererUrl(event.url, rendererUrl)) event.preventDefault()
+    })
+    contents.on('will-redirect', (event) => {
+      if (!isAllowedRendererUrl(event.url, rendererUrl)) event.preventDefault()
+    })
+    contents.on('will-attach-webview', (event) => event.preventDefault())
+    contents.setWindowOpenHandler(({ url }) => {
+      if (isAllowedExternalUrl(url)) openExternal(url)
+      return { action: 'deny' }
+    })
+  })
 }
 
 export interface ResolvedRendererUrl {

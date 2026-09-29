@@ -28,9 +28,8 @@ import { createPngDecoder } from './png-decoder'
 import {
   configureSingleInstance,
   configureRendererSessionSecurity,
+  configureWebContentsSecurity,
   createWindowWebPreferences,
-  isAllowedExternalUrl,
-  isAllowedRendererUrl,
   reportMainProcessError,
   resolveRendererUrl,
   surfaceWindow,
@@ -82,17 +81,6 @@ function createMainWindow(): void {
   }
   window.on('move', saveWindowBounds)
   window.on('resize', saveWindowBounds)
-  window.webContents.on('will-navigate', (event, url) => {
-    if (!isAllowedRendererUrl(url, resolvedRenderer.url)) event.preventDefault()
-  })
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isAllowedExternalUrl(url)) {
-      void shell
-        .openExternal(url)
-        .catch((error: unknown) => reportMainProcessError('Could not open external link', error))
-    }
-    return { action: 'deny' }
-  })
   window.on('close', () => {
     saveWindowBounds()
     windowBounds.flush()
@@ -129,6 +117,11 @@ bootstrapApplication({
     )
     renderer = resolvedRenderer
     configureRendererSessionSecurity(session.defaultSession, resolvedRenderer)
+    configureWebContentsSecurity(app, resolvedRenderer.url, (url) => {
+      void shell
+        .openExternal(url)
+        .catch((error: unknown) => reportMainProcessError('Could not open external link', error))
+    })
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
     alwaysOnTopStore = createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     registerIpcHandlers({

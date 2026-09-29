@@ -10,9 +10,15 @@ test.describe('content security policy', () => {
     expect(policy).toContain("script-src 'self'")
     expect(policy).toContain("img-src 'self' blob: data:")
     expect(policy).toContain("object-src 'none'")
+    expect(policy).toContain("frame-src 'none'")
+    expect(policy).toContain("child-src 'none'")
+    expect(policy).toContain("worker-src 'none'")
+    expect(policy).toContain("media-src 'none'")
+    expect(policy).toContain("frame-ancestors 'none'")
 
     const violations: string[] = []
     window.on('console', (message) => {
+      if (/frame-ancestors.+ignored when delivered via a <meta> element/i.test(message.text())) return
       if (/Content Security Policy|Refused to (load|execute|apply)/i.test(message.text())) {
         violations.push(message.text())
       }
@@ -24,6 +30,26 @@ test.describe('content security policy', () => {
     expect(violations).toEqual([])
   })
 
+  test('blocks an iframe from navigating to an external origin', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    const blockedUri = await window.evaluate(async () => {
+      const policyViolation = new Promise<string>((resolve) => {
+        document.addEventListener('securitypolicyviolation', (event) => resolve(event.blockedURI), { once: true })
+      })
+      const frame = document.createElement('iframe')
+      frame.src = 'https://example.com/'
+      document.body.append(frame)
+      return Promise.race([
+        policyViolation,
+        new Promise<string>((resolve) => setTimeout(() => resolve('no policy violation'), 5000)),
+      ])
+    })
+
+    expect(blockedUri).toBe('https://example.com/')
+    await expect(node(window, 1)).toBeVisible()
+  })
+
   test('blocks navigation away from the application renderer', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const initialUrl = window.url()
@@ -32,7 +58,7 @@ test.describe('content security policy', () => {
       const webContents = BrowserWindow.getAllWindows()[0]?.webContents
       if (webContents === undefined) throw new Error('The main window is unavailable.')
       const control = globalThis as typeof globalThis & { __navigationPrevented?: boolean }
-      webContents.once('will-navigate', (event) => {
+      webContents.once('will-frame-navigate', (event) => {
         control.__navigationPrevented = event.defaultPrevented
       })
     })

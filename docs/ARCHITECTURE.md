@@ -502,6 +502,12 @@ checks, and device permissions on that session, and blocks network requests exce
 External HTTP(S) links are handed to the operating system through `shell.openExternal`; they do not
 use the renderer session.
 
+The main process installs navigation and window-open guards for every web contents as it is created.
+Main-frame, subframe, and redirected navigation are restricted to the resolved renderer document,
+and webview attachment is denied. The production content security policy denies child frames,
+workers, and media. It also declares `frame-ancestors 'none'`, but Chromium ignores that directive
+when delivered through a meta element, so it is not an enforced control in this delivery mode.
+
 Window geometry is persisted with a short debounce, so moving or resizing the window does not perform a synchronous disk write for every event. The pending geometry is flushed when the window closes.
 
 The always-on-top preference is stored as one validated boolean in the main-process window-state directory. Toggling it performs one small write and one native window update; it adds no work to document editing or navigation paths and retains no growing in-memory structure. Existing installations without the preference default to an unpinned window.

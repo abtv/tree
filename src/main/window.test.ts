@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Session, WebContents } from 'electron'
+import type { App, Session, WebContents } from 'electron'
 import {
+  configureWebContentsSecurity,
   configureRendererSessionSecurity,
   configureSingleInstance,
   createWindowWebPreferences,
@@ -36,6 +37,49 @@ describe('configureSingleInstance', () => {
 
     expect(configureSingleInstance(app, vi.fn())).toBe(false)
     expect(app.on).not.toHaveBeenCalled()
+  })
+})
+
+describe('configureWebContentsSecurity', () => {
+  it('installs navigation, webview, and window-open guards on every web contents', () => {
+    let onCreated: ((_event: unknown, contents: WebContents) => void) | undefined
+    const app = {
+      on: vi.fn((_event: string, listener: (_event: unknown, contents: WebContents) => void) => {
+        onCreated = listener
+      }),
+    }
+    const listeners = new Map<string, (...args: never[]) => void>()
+    const contents = {
+      on: vi.fn((event: string, listener: (...args: never[]) => void) => listeners.set(event, listener)),
+      setWindowOpenHandler: vi.fn(),
+    }
+    const openExternal = vi.fn()
+
+    configureWebContentsSecurity(app as unknown as Pick<App, 'on'>, 'file:///app/index.html', openExternal)
+    onCreated?.({}, contents as unknown as WebContents)
+
+    const preventDefault = vi.fn()
+    const frameNavigation = listeners.get('will-frame-navigate') as
+      ((event: { preventDefault(): void; url: string }) => void) | undefined
+    frameNavigation?.({ preventDefault, url: 'https://evil.example/' })
+    expect(preventDefault).toHaveBeenCalledOnce()
+
+    const redirect = listeners.get('will-redirect') as
+      ((event: { preventDefault(): void; url: string }) => void) | undefined
+    redirect?.({ preventDefault, url: 'https://evil.example/redirected' })
+    expect(preventDefault).toHaveBeenCalledTimes(2)
+
+    const webviewAttachment = listeners.get('will-attach-webview') as
+      ((event: { preventDefault(): void }) => void) | undefined
+    webviewAttachment?.({ preventDefault })
+    expect(preventDefault).toHaveBeenCalledTimes(3)
+
+    const openHandler = contents.setWindowOpenHandler.mock.calls[0]?.[0] as
+      ((details: { url: string }) => { action: 'deny' }) | undefined
+    expect(openHandler?.({ url: 'https://example.com/' })).toEqual({ action: 'deny' })
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/')
+    expect(openHandler?.({ url: 'javascript:alert(1)' })).toEqual({ action: 'deny' })
+    expect(openExternal).toHaveBeenCalledOnce()
   })
 })
 
