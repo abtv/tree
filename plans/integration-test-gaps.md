@@ -75,11 +75,11 @@ The whole in-process suite is 73 files / 1174 tests in about 4 seconds. The end-
 | ID | Outcome | Depends on | Status | Validation tier |
 | --- | --- | --- | --- | --- |
 | T1 | Focused tests for `normalizeCollapsedLocation` and the `EditorStore` restore path | — | Done | Low Risk |
-| T2 | Serialize-and-restore round-trip property in the store property suite | T1 | Ready | Low Risk |
+| T2 | Serialize-and-restore round-trip property in the store property suite | T1 | Done | Low Risk |
 | T3 | Real-boundary restart with an inline-expanded descendant selected | T1 | Ready | Low Risk (end-to-end run required) |
 | T4 | Clipboard rich-copy round-trip contract test | — | Ready | Low Risk |
 
-**Next task: T2 or T4.**
+**Next task: T3 or T4.**
 
 Tier note: every task is test-only, so the Low Risk row of `docs/DEVELOPMENT.md` §9 applies — affected type, lint, formatting, and focused test checks. If a task is ever extended to change production code under a separate authorization, it becomes High Risk (persistence, clipboard, or process boundary) and needs `npm run check:full`.
 
