@@ -18,6 +18,7 @@ import {
   locateNode,
   moveSibling,
   nodePath,
+  normalizeCollapsedLocation,
   parsePersistedState,
   pasteMultilineText,
   pasteText,
@@ -868,5 +869,47 @@ describe('document operations', () => {
 
     expect(mutateRoots).toBeTypeOf('function')
     expect(mutateNode).toBeTypeOf('function')
+  })
+})
+
+describe('normalizeCollapsedLocation', () => {
+  it('returns a location already at the displayed level unchanged', () => {
+    const document = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
+    const location = { currentParentId: 'parent', selectedNodeId: 'child' }
+
+    expect(normalizeCollapsedLocation(document, location)).toEqual(location)
+  })
+
+  it('returns the current parent heading unchanged', () => {
+    const document = createFirstChild(createInitialDocument('parent'), 'parent', 'child')
+    const location = { currentParentId: 'parent', selectedNodeId: 'parent' }
+
+    expect(normalizeCollapsedLocation(document, location)).toEqual(location)
+  })
+
+  it('walks a descendant back to the direct child of a non-null current parent', () => {
+    const document = createFirstChild(
+      createFirstChild(createInitialDocument('parent'), 'parent', 'child'),
+      'child',
+      'grandchild',
+    )
+
+    expect(normalizeCollapsedLocation(document, { currentParentId: 'parent', selectedNodeId: 'grandchild' })).toEqual({
+      currentParentId: 'parent',
+      selectedNodeId: 'child',
+    })
+  })
+
+  it('walks a descendant back to the top-level root when the current parent is null', () => {
+    const document = createFirstChild(
+      createFirstChild(createInitialDocument('root'), 'root', 'child'),
+      'child',
+      'grandchild',
+    )
+
+    expect(normalizeCollapsedLocation(document, { currentParentId: null, selectedNodeId: 'grandchild' })).toEqual({
+      currentParentId: null,
+      selectedNodeId: 'root',
+    })
   })
 })

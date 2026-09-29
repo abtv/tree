@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from './editor-store'
-import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR, reconcileLinkTextEdit, type TreeNode } from '../domain/document'
+import {
+  displayedNodes,
+  MAX_DOCUMENT_DEPTH,
+  MAX_DOCUMENT_DEPTH_ERROR,
+  reconcileLinkTextEdit,
+  type TreeNode,
+} from '../domain/document'
 
 class FakeClock implements Clock {
   private readonly timers = new Map<number, () => void>()
@@ -2995,5 +3001,69 @@ describe('EditorStore', () => {
     store.dismissQuitWithoutSavingPrompt()
     const dismissed = store.getSnapshot()
     expect(dismissed.status === 'ready' && dismissed.quitWithoutSavingPrompt).toBeUndefined()
+  })
+
+  it('normalizes a restored descendant selection below a non-null current parent to its direct child', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            children: [
+              {
+                id: 'child',
+                text: 'Child',
+                children: [{ id: 'grandchild', text: 'Grandchild', children: [] }],
+              },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'parent', selectedNodeId: 'grandchild' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    const snapshot = store.getSnapshot()
+    expect(snapshot.status).toBe('ready')
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'child' })
+    expect(displayedNodes(snapshot.document, snapshot.location.currentParentId).map((node) => node.id)).toContain(
+      snapshot.location.selectedNodeId,
+    )
+    expect(snapshot.focus.nodeId).toBe('child')
+  })
+
+  it('normalizes a restored descendant selection below a null current parent to its top-level root', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              {
+                id: 'child',
+                text: 'Child',
+                children: [{ id: 'grandchild', text: 'Grandchild', children: [] }],
+              },
+            ],
+          },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'grandchild' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    const snapshot = store.getSnapshot()
+    expect(snapshot.status).toBe('ready')
+    if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+    expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
+    expect(displayedNodes(snapshot.document, snapshot.location.currentParentId).map((node) => node.id)).toContain(
+      snapshot.location.selectedNodeId,
+    )
+    expect(snapshot.focus.nodeId).toBe('root')
   })
 })
