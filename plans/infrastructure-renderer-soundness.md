@@ -50,7 +50,8 @@ cannot execute or defensive guards, not untested behavior — see "Observations 
 not tasks". I1 is a defect; I3 is an incomplete implementation of a stated product rule; I2, I4, and
 I5 close named gaps the review found while tracing those paths.
 
-No task has started. The worktree was clean at the end of the review session.
+At the end of the review session, no task had started and the worktree was clean. I1 and I2 are now
+done; I3 is next.
 
 ## Decisions
 
@@ -214,7 +215,7 @@ elsewhere or are intentionally unexecuted; do not add tests for them.
 | ID | Outcome and acceptance evidence | Files expected to change | Tier | Status |
 | --- | --- | --- | --- | --- |
 | I1 | Serialize `load` with every other file operation per F1, by routing it through `enqueue` with its existing operation name and log paths so the logged start/success/failure shape is unchanged. Acceptance: a defect-first contract test that fails before the fix because the save rejects with `ENOENT`, and after the fix has the concurrent `load` resolve to the state being saved while the save resolves and `document.json.tmp` is gone; confirm it fails again with the fix reverted (`AGENTS.md` §9); existing `file-services` tests and the persistence end-to-end suites pass unchanged. See D3: no new end-to-end test. | `src/infrastructure/main/file-services.ts`, `src/infrastructure/main/file-services.test.ts` | High | Done |
-| I2 | Add unit coverage for the windowed list's height bookkeeping per F2: a `ResizeObserver` entry with `borderBoxSize` updates the stored height and re-lays out; an entry without `borderBoxSize` falls back to `getBoundingClientRect().height`; a zero height does not overwrite a known height; a `resize` event that changes `globalThis.innerWidth` clears measured heights and re-measures, while one that leaves the width unchanged does nothing. Acceptance: each rule asserted through observable output (rendered rows and `.node-list-spacer` heights) above `WINDOWING_THRESHOLD`, following `NodeList.test.tsx:783-792` and the stub at `use-node-input-bindings.test.tsx:2126-2135`; no production file changes. | `src/renderer/NodeList.test.tsx` | Low | Ready |
+| I2 | Add unit coverage for the windowed list's height bookkeeping per F2: a `ResizeObserver` entry with `borderBoxSize` updates the stored height and re-lays out; an entry without `borderBoxSize` falls back to `getBoundingClientRect().height`; a zero height does not overwrite a known height; a `resize` event that changes `globalThis.innerWidth` clears measured heights and re-measures, while one that leaves the width unchanged does nothing. Acceptance: each rule asserted through observable output (rendered rows and `.node-list-spacer` heights) above `WINDOWING_THRESHOLD`, following `NodeList.test.tsx:783-792` and the stub at `use-node-input-bindings.test.tsx:2126-2135`; no production file changes. | `src/renderer/NodeList.test.tsx` | Low | Done |
 | I3 | Decode HTML character references in one pass per F3, covering the currently handled named references plus `&nbsp;` and decimal and hexadecimal numeric references, so `&amp;lt;` no longer double-decodes. Acceptance: defect-first tests that fail before the change for a `&nbsp;` label matching a U+00A0 plain-text flavor and for a numeric-reference label; tests pinning `&amp;lt;` to the literal `&lt;`, an `&amp;`-escaped `href` decoding to a single `&`, and a two-anchor paste keeping both links in order; existing clipboard tests and `e2e/clipboard.spec.ts` pass unchanged. Honor D1: no whitespace normalization. See D4: no new end-to-end test. | `src/infrastructure/main/clipboard.ts`, `src/infrastructure/main/clipboard.test.ts` | High | Ready |
 | I4 | Record the retention fallback in F4 as a code comment next to the `safetyIndex < 0` branch, naming what it keeps, why the safety rule cannot be satisfied when no generation is old enough, and that the save cadence keeps it unreachable. Acceptance: the comment states the invariant the existing `file-services.test.ts:275` case pins; no behavior change, no test change, no `docs/PRODUCT.md` change. Honor D2: do not change which generations survive. | `src/infrastructure/main/file-services.ts` | Low | Ready |
 | I5 | Cover the disclosure triangle's `onMouseDown` per F5: fire `mouseDown` on the triangle and assert the default is prevented and the document selection is cleared, mirroring the enter-control case at `App.test.tsx:528`. Acceptance: the new assertion fails when the handler body is removed; no production file changes. | `src/renderer/NodeList.test.tsx` or `src/renderer/App.test.tsx` | Low | Ready |
@@ -241,8 +242,8 @@ Owner before implementing (`AGENTS.md` §5).
 
 ## Next task
 
-I2 — cover the windowed list's height bookkeeping in
-`src/renderer/NodeList.test.tsx`, following F2.
+I3 — decode HTML character references in clipboard hyperlink labels in
+`src/infrastructure/main/clipboard.ts` and its focused tests, following F3.
 
 Implementation notes for I1, so the task does not depend on this plan's authoring session:
 

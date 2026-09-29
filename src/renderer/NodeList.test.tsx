@@ -47,6 +47,32 @@ function mockRowRects(originTop = 0, height = ROW_HEIGHT_ESTIMATE): void {
   })
 }
 
+class TestResizeObserver {
+  static instances: TestResizeObserver[] = []
+
+  constructor(private readonly callback: ResizeObserverCallback) {
+    TestResizeObserver.instances.push(this)
+  }
+
+  observe = vi.fn<(target: Element) => void>()
+  unobserve = vi.fn<(target: Element) => void>()
+  disconnect = vi.fn<() => void>()
+
+  trigger(entries: ResizeObserverEntry[]): void {
+    act(() => this.callback(entries, this as unknown as ResizeObserver))
+  }
+}
+
+function resizeEntry(target: Element, blockSize?: number): ResizeObserverEntry {
+  return {
+    target,
+    borderBoxSize: blockSize === undefined ? [] : [{ blockSize, inlineSize: 600 }],
+    contentBoxSize: [],
+    devicePixelContentBoxSize: [],
+    contentRect: rect(0),
+  } as unknown as ResizeObserverEntry
+}
+
 interface RenderOptions {
   focusedNodeId?: string | undefined
   locked?: boolean
@@ -790,6 +816,94 @@ describe('NodeList windowing', () => {
     expect(spacers).toHaveLength(2)
     expect(spacers[0]!.style.height).toBe('0px')
     expect(Number.parseFloat(spacers[1]!.style.height)).toBeGreaterThan(0)
+  })
+
+  it('updates measured height from a ResizeObserver border box and re-lays out', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    mockRows(0)
+    const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
+    const observer = TestResizeObserver.instances[0]!
+    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
+    })
+
+    observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
+
+    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
+  })
+
+  it('falls back to the row bounding-box height when a ResizeObserver entry has no border box', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    mockRows(0)
+    const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
+    const observer = TestResizeObserver.instances[0]!
+    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE + 30 : ROW_HEIGHT_ESTIMATE)
+    })
+
+    observer.trigger([resizeEntry(firstRow)])
+
+    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight + 30)
+  })
+
+  it('keeps a known height when ResizeObserver reports zero', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    mockRows(0)
+    const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
+    const observer = TestResizeObserver.instances[0]!
+    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
+    })
+    observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
+    const measuredHeight = Number.parseFloat(trailingSpacer.style.height)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return rect(0, this.dataset.nodeId === 'n550' ? 0 : ROW_HEIGHT_ESTIMATE)
+    })
+
+    observer.trigger([resizeEntry(firstRow, 0)])
+
+    expect(measuredHeight).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
+    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(measuredHeight)
+  })
+
+  it('clears and remeasures heights only when the window width changes', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    mockRows(0)
+    const originalWidth = globalThis.innerWidth
+    const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
+    const observer = TestResizeObserver.instances[0]!
+    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
+    observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
+    const measuredHeight = Number.parseFloat(trailingSpacer.style.height)
+
+    act(() => globalThis.dispatchEvent(new Event('resize')))
+    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(measuredHeight)
+
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: originalWidth + 1 })
+    expect(globalThis.innerWidth).toBe(originalWidth + 1)
+    expect(window.innerWidth).toBe(originalWidth + 1)
+    fireEvent.resize(window)
+    act(() => globalThis.dispatchEvent(new Event('resize')))
+    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight)
+
+    observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 3)])
+
+    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE * 2)
   })
 
   it('mounts the focused row even when it is outside the window', () => {

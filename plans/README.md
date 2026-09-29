@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Infrastructure and Renderer Soundness Review](infrastructure-renderer-soundness.md) | 1 done, 4 tasks ready | I2 — cover windowed list height bookkeeping |
+| [Infrastructure and Renderer Soundness Review](infrastructure-renderer-soundness.md) | 2 done, 3 tasks ready | I3 — decode clipboard hyperlink character references |
 | [Security Hardening Review](security-hardening.md) | 8 tasks ready, none started | SEC1 — ignore the development renderer URL in packaged builds |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
