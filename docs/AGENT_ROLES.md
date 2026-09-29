@@ -53,7 +53,7 @@ Investigates one bounded product hypothesis and proposes evidence and experiment
 
 **Inputs:** relevant sections of `docs/PRODUCT.md` and the `Kind: product` entries of `docs/OPEN_QUESTIONS.md`, the implementation, and usage evidence supplied by the primary role.
 
-A `Kind: technical` entry is out of scope for this role. Such a question is settled by running something — a measurement, a performance guard, a throwaway prototype — and this role has no shell, so its answer would rest on reading the code alone while sounding as confident as a measured one. Route a technical question to a role that can execute, or to its own session.
+A `Kind: technical` entry is out of scope for this role. Such a question is settled by running something — a measurement, a performance guard, a throwaway prototype — and this role has no shell, so its answer would rest on reading the code alone while sounding as confident as a measured one. Route a technical question to an ordinary development session, which has the shell; no read-only role is a substitute.
 
 **Output:** counter-hypotheses, simpler explanations, and conflicts with established product principles; the cheapest experiment capable of disproving or materially changing the hypothesis, with success/disconfirmation criteria stated in advance; claims labeled as repository fact, Product Owner statement, usage evidence, external evidence, or agent inference. Never sets a hypothesis to `Accepted`, `Rejected`, or `Deferred`, and never treats a discovery decision as authorization to implement.
 
