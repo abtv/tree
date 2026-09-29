@@ -22,6 +22,19 @@ Text remains editable inline. The editor also provides Vim-inspired Insert, Norm
 
 The application automatically saves changes.
 
+### 1.1 Product Principles
+
+The product holds four standing commitments. Their details are owned elsewhere; this section records what they are and which one yields when two of them cannot both be satisfied.
+
+* **Durability.** The user's work is never silently lost. Owned by §16 and its save, recovery, and failure behavior.
+* **Privacy.** The user's content stays on their machine, and the application is safe to run without expecting anything to leave it. Owned by [SECURITY.md](SECURITY.md).
+* **Vim fidelity.** Editing text inside a node behaves as Vim does, and every deliberate divergence is recorded with its reason. Owned by §20.2 and [VIM_CONFORMANCE.md](VIM_CONFORMANCE.md).
+* **Responsiveness.** The application feels immediate, and ordinary editing never develops noticeable pauses. Owned by §22.
+
+When two of them conflict, they yield in this order: durability first, then privacy, then Vim fidelity, then responsiveness. A change must not trade a higher commitment for a lower one. Flushing every save to disk before it reports success is an existing example — it spends responsiveness to keep durability, and that is the intended direction.
+
+This order resolves conflicts between the four commitments. It does not rank them against any other requirement in this document, and it does not authorize weakening any of them.
+
 ---
 
 ## 2. Tree Model
