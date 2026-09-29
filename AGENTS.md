@@ -46,7 +46,7 @@ If documentation conflicts with existing code, do not silently choose one. Deter
 
 ## 3. Language
 
-All repository documentation must be written in English.
+Everything written to the repository must be in English.
 
 This includes:
 
@@ -58,8 +58,10 @@ This includes:
 * Architecture Decision Records.
 * Code comments.
 * Agent-facing instructions.
+* Identifiers, test names, and user-visible strings in the source.
+* Commit messages and pull request descriptions.
 
-The Product Owner may communicate with the agent in any language.
+The Product Owner may communicate with the agent in any language, and the agent may answer in that language. The language of the conversation never changes the language of anything the agent writes to the repository.
 
 ---
 
@@ -156,7 +158,7 @@ For a contained change with a clear outcome and one existing owner, make a conci
 
 Keep a temporary working plan at `WORKING_PLAN.md` for a multi-session initiative or a change that crosses several interaction-state owners or process boundaries. It is an implementation contract, not permanent project documentation. Keep it current when authorized scope changes, make it available to any review roles, and delete it before the final commit for that task. Other tasks use a concise plan in the conversation.
 
-For work spanning multiple sessions, keep a durable initiative plan under `plans/` and link it from `plans/README.md`. The initiative plan records the authorized objective, boundaries, ordered logical tasks, acceptance criteria, current status, decisions, and exact next task. It is a coordination record, not a product requirement or authorization to implement unrequested behavior. A request to continue an identified initiative authorizes the next ready task within its existing scope; ask the Product Owner about material choices or scope expansion. Each task uses `WORKING_PLAN.md` for its temporary implementation and validation evidence. Update the initiative plan as part of each completed task's commit so another session can resume from repository state. See `docs/DEVELOPMENT.md` §11 for the format and resume procedure.
+For work spanning multiple sessions, keep a durable initiative plan under `plans/` and link it from `plans/README.md`. The initiative plan records the authorized objective, boundaries, ordered logical tasks, acceptance criteria, current status, decisions, and exact next task. It is a coordination record, not a product requirement or authorization to implement unrequested behavior. A request to continue an initiative authorizes the next ready task within its existing scope; ask the Product Owner about material choices or scope expansion. The request does not have to name the initiative. Resolve it from `plans/README.md`: when exactly one active plan has a next task that is ready, take it; when several do, ask which one before starting; when none does, say so instead of inferring work. State the selected initiative and task in the first reply, before doing the work, so a short or dictated request can be corrected cheaply. Each task uses `WORKING_PLAN.md` for its temporary implementation and validation evidence. Update the initiative plan as part of each completed task's commit so another session can resume from repository state. See `docs/DEVELOPMENT.md` §11 for the format and resume procedure.
 
 A review or report that identified several follow-up fixes is a multi-task outcome even when its tasks are requested one at a time. The session that receives the first cited task captures the complete task list the Product Owner can provide as a plan under `plans/` before implementing that task, marks each task's status as it lands, and keeps the plan until the Product Owner confirms no further tasks remain. Each task in the batch is authorized explicitly, so implementing one cited task does not authorize the others. If the remaining list is unavailable, record the batch with an explicit unverified remainder instead of assuming the cited task is the last one; review tasks must not live only in conversation.
 
@@ -333,6 +335,8 @@ When the Product Owner reports that the most recently committed fix still does n
 ### Session boundaries
 
 A session may cover multiple logical tasks and commits within one Product Owner-authorized outcome. Keep each commit focused and independently validated. Continue to the next authorized task in that outcome when context remains manageable; stop at a completed outcome, a material decision reserved for the Product Owner, or a context limit that warrants a new session. Do not infer authorization for unrelated work from permission to continue the session.
+
+For a multi-session initiative, one task per session is the default: commit it, hand off, and end the session rather than starting the next task, so each session stays short and a later one can run a cheaper model from a small context. Continue within the same session only when the Product Owner asks for that, or when the remaining task is too small to justify a new session.
 
 For a multi-session initiative, commit the updated task status and next task with the completed change. A later session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 

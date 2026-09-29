@@ -235,10 +235,7 @@ A small bounded `fast-check` property over generated text and link ranges is acc
 ## Resume prompt
 
 ```text
-Continue the "Integration Test Gaps" initiative in plans/integration-test-gaps.md.
-Read that plan, AGENTS.md, and docs/DEVELOPMENT.md §9 first, then check git status
-and recent commits against the plan's status column. Implement the single task the
-plan names as next, run its stated validation, and commit it together with the
-plan's status update. If a new test fails against unmodified production code, stop
-and report it as a suspected defect instead of changing production code.
+Continue the planned work.
 ```
+
+`AGENTS.md` §8 and `docs/DEVELOPMENT.md` §11 carry the rest: resolving this plan from the index, reading it and the Git state first, taking its next ready task, running the stated validation, and committing the task with its status update. Each task's *Decision reserved* line carries the stop-on-suspected-defect rule. Name the initiative explicitly when another plan is active at the same time.
