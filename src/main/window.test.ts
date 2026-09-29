@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { Session, WebContents } from 'electron'
 import {
+  configureRendererSessionSecurity,
   configureSingleInstance,
   createWindowWebPreferences,
   isAllowedExternalUrl,
@@ -148,5 +150,101 @@ describe('resolveRendererUrl', () => {
       url: packagedDocumentUrl,
       isDevelopment: false,
     })
+  })
+})
+
+describe('configureRendererSessionSecurity', () => {
+  type RequestFilterListener = (details: { url: string }, callback: (response: { cancel: boolean }) => void) => void
+
+  function createSession(): {
+    session: Pick<
+      Session,
+      'setPermissionRequestHandler' | 'setPermissionCheckHandler' | 'setDevicePermissionHandler' | 'webRequest'
+    >
+    onBeforeRequest: ReturnType<typeof vi.fn<(filter: { urls: string[] }, listener: RequestFilterListener) => void>>
+  } {
+    const onBeforeRequest = vi.fn<(filter: { urls: string[] }, listener: RequestFilterListener) => void>()
+    const session = {
+      setPermissionRequestHandler: vi.fn(),
+      setPermissionCheckHandler: vi.fn(),
+      setDevicePermissionHandler: vi.fn(),
+      webRequest: { onBeforeRequest },
+    } as unknown as Pick<
+      Session,
+      'setPermissionRequestHandler' | 'setPermissionCheckHandler' | 'setDevicePermissionHandler' | 'webRequest'
+    >
+    return { session, onBeforeRequest }
+  }
+
+  it('denies permission requests, checks, and device permission', () => {
+    const { session } = createSession()
+    configureRendererSessionSecurity(session, {
+      url: 'file:///app/renderer/index.html',
+      isDevelopment: false,
+    })
+
+    const requestHandler = vi.mocked(session.setPermissionRequestHandler).mock.calls[0]?.[0]
+    const checkHandler = vi.mocked(session.setPermissionCheckHandler).mock.calls[0]?.[0]
+    const deviceHandler = vi.mocked(session.setDevicePermissionHandler).mock.calls[0]?.[0]
+    const requestCallback = vi.fn()
+
+    requestHandler?.({} as WebContents, 'media', requestCallback, {} as never)
+
+    expect(requestCallback).toHaveBeenCalledWith(false)
+    expect(checkHandler?.(null, 'geolocation', 'https://example.com', {} as never)).toBe(false)
+    expect(deviceHandler?.({} as never)).toBe(false)
+  })
+
+  it('allows local renderer schemes and only allows the resolved development origin', () => {
+    const { session, onBeforeRequest } = createSession()
+    configureRendererSessionSecurity(session, {
+      url: 'http://localhost:5173/',
+      isDevelopment: true,
+    })
+
+    const [filter, listener] = onBeforeRequest.mock.calls[0] ?? []
+    expect(filter).toEqual({ urls: ['<all_urls>'] })
+    expect(listener).toBeTypeOf('function')
+    if (listener === undefined) throw new Error('The request filter was not installed.')
+
+    const decisions: Array<{ url: string; cancel?: boolean }> = []
+    for (const url of [
+      'file:///app/renderer/index.html',
+      'devtools://devtools/bundled/inspector.html',
+      'blob:http://localhost:5173/1234',
+      'data:text/plain,local',
+      'http://localhost:5173/src/main.tsx',
+      'https://example.com/document',
+      'http://localhost:5174/other-origin',
+    ]) {
+      listener({ url } as never, (response) => decisions.push({ url, cancel: response.cancel }))
+    }
+
+    expect(decisions).toEqual([
+      { url: 'file:///app/renderer/index.html', cancel: false },
+      { url: 'devtools://devtools/bundled/inspector.html', cancel: false },
+      { url: 'blob:http://localhost:5173/1234', cancel: false },
+      { url: 'data:text/plain,local', cancel: false },
+      { url: 'http://localhost:5173/src/main.tsx', cancel: false },
+      { url: 'https://example.com/document', cancel: true },
+      { url: 'http://localhost:5174/other-origin', cancel: true },
+    ])
+  })
+
+  it('does not allow a remote origin in packaged mode', () => {
+    const { session, onBeforeRequest } = createSession()
+    configureRendererSessionSecurity(session, {
+      url: 'file:///app/renderer/index.html',
+      isDevelopment: false,
+    })
+
+    const listener = onBeforeRequest.mock.calls[0]?.[1]
+    expect(listener).toBeTypeOf('function')
+    if (listener === undefined) throw new Error('The request filter was not installed.')
+    const callback = vi.fn()
+
+    listener({ url: 'https://example.com/document' } as never, callback)
+
+    expect(callback).toHaveBeenCalledWith({ cancel: true })
   })
 })

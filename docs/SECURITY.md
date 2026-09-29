@@ -13,6 +13,7 @@ The main controls are:
 * **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/main/index.ts`).
 * **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. Renderer navigation is restricted to that resolved document, and external URLs open only through the validated HTTP(S) shell path (`src/main/window.ts`, `src/main/index.ts`).
 * **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/main/ipc-handlers.ts`, `src/main/ipc-security.ts`).
+* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only local schemes and, for an unpackaged development renderer, requests to that renderer's own origin. External links still go to the operating system browser through `shell.openExternal` (`src/main/window.ts`, `src/main/index.ts`).
 * **Validated persistence input.** The save boundary validates the untrusted persisted state, including the depth invariant, without rebuilding the document (`src/domain/document.ts`, `src/main/ipc-security.ts`).
 * **Bounded attachments.** Attachment writes accept only validated PNG data within a bounded payload size and with bounded decoded dimensions (maximum 32767 pixels per side and 64 megapixels total), and the image must decode through the platform decoder before bytes are stored (`src/main/ipc-security.ts`, `src/main/png-decoder.ts`).
 * **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs.
@@ -47,6 +48,7 @@ Every control above has an automated check. The verification map:
 | --- | --- | --- |
 | Renderer isolation | `src/main/window.test.ts` | every `e2e/*.spec.ts` launch |
 | Restricted navigation and external links | `src/main/window.test.ts` | `e2e/csp.spec.ts`, `e2e/hyperlink.spec.ts` |
+| Renderer session permissions and network egress | `src/main/window.test.ts` | `e2e/csp.spec.ts`, `e2e/hyperlink.spec.ts` |
 | Trusted IPC callers and payload validation | `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts` | `e2e/attachment-validation.spec.ts` |
 | Persisted-state validation on save | `src/domain/document.test.ts`, `src/main/ipc-security.test.ts` | `e2e/persistence.spec.ts`, `e2e/persistence-reliability.spec.ts` |
 | Attachment validation and decoding | `src/main/ipc-security.test.ts`, `src/main/png-decoder.test.ts` | `e2e/attachment-validation.spec.ts` |

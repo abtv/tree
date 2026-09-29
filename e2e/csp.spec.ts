@@ -1,4 +1,4 @@
-import { expect, launchTree, test } from './fixtures'
+import { expect, launchTree, node, test, typeInto } from './fixtures'
 
 test.describe('content security policy', () => {
   test('is present and does not block application resources', async ({ userDataDir }) => {
@@ -49,5 +49,47 @@ test.describe('content security policy', () => {
       .toBe(true)
 
     expect(window.url()).toBe(initialUrl)
+  })
+
+  test('blocks external renderer requests while the editor remains usable', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    const result = await app.evaluate(async ({ BrowserWindow, session }) => {
+      const probe = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          session: session.defaultSession,
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      })
+      const requestError = new Promise<string>((resolve) => {
+        session.defaultSession.webRequest.onErrorOccurred({ urls: ['https://example.com/*'] }, (details) => {
+          resolve(details.error)
+        })
+      })
+
+      try {
+        await probe.loadURL('data:text/html,<title>request-probe</title>')
+        const requestResult = await probe.webContents.executeJavaScript(
+          "fetch('https://example.com/', { mode: 'no-cors' }).then(() => 'loaded', () => 'rejected')",
+        )
+        const error = await Promise.race([
+          requestError,
+          new Promise<string>((resolve) => setTimeout(() => resolve('no request error event'), 5000)),
+        ])
+        return { requestResult, error }
+      } finally {
+        session.defaultSession.webRequest.onErrorOccurred({ urls: ['https://example.com/*'] }, null)
+        probe.destroy()
+      }
+    })
+
+    expect(result).toEqual({ requestResult: 'rejected', error: 'net::ERR_BLOCKED_BY_CLIENT' })
+
+    const editor = node(window, 1)
+    await typeInto(editor, 'Still editable')
+    await expect(editor).toHaveValue('Still editable')
   })
 })

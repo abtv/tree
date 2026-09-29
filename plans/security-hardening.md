@@ -42,8 +42,8 @@ boundaries); [`docs/PRODUCT.md`](../docs/PRODUCT.md) §13.2 (editable-node conte
 
 ## State
 
-The review began from a clean worktree at `c8a9834`. SEC1 is now complete and validated; SEC2 is the
-next ready task.
+The review began from a clean worktree at `c8a9834`. SEC1 and SEC2 are complete and validated; SEC3
+is the next ready task.
 
 The review read every file under `src/`, the Electron entry and window configuration, the whole
 preload and IPC surface, the persistence and clipboard infrastructure, the renderer's HTML-producing
@@ -325,7 +325,7 @@ See D4: recording the requirement is in scope for this plan; implementing it is 
 | ID | Outcome and acceptance evidence | Files expected to change | Tier | Status |
 | --- | --- | --- | --- | --- |
 | SEC1 | Ignore `ELECTRON_RENDERER_URL` unless the build is unpackaged, per F1 and D1. Add one exported pure helper to `src/main/window.ts` that takes the packaged flag, the environment value, and the packaged document URL and returns the renderer URL plus whether it is the development one; call it once in `src/main/index.ts` and use its result for `loadURL`/`loadFile`, the navigation guard, and the trusted-caller URL. Acceptance: unit tests that a packaged build returns the packaged document URL and reports "not development" even when the environment variable is set to a remote URL, that an unpackaged build honors it, and that an unpackaged build without it returns the packaged document URL; `src/main/index.ts` reads `process.env['ELECTRON_RENDERER_URL']` exactly once; the end-to-end suite passes unchanged. Update `docs/SECURITY.md` ("Restricted navigation" and "Trusted callers") and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
-| SEC2 | Deny every session permission request and every non-local renderer network request, per F2 and D2. Add one exported function to `src/main/window.ts` that takes a session-like object and the resolved renderer URL from SEC1 and installs: a permission request handler, a permission check handler, and a device permission handler that all deny; and a `webRequest.onBeforeRequest` filter that cancels any request whose URL is not `file:`, `devtools:`, `blob:`, or `data:`, and not same-origin with the renderer URL when that URL is the development one. Call it from `registerReadyServices` in `src/main/index.ts`. Acceptance: unit tests for each handler denying and for the filter allowing local schemes, allowing the development origin only in development, and cancelling `https:`; a new end-to-end assertion that a renderer-initiated request to an external HTTPS origin fails while the application still loads and edits normally; `e2e/hyperlink.spec.ts` still passes, proving `shell.openExternal` is unaffected. Update `docs/SECURITY.md` (new control plus its row in the verification map) and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Ready |
+| SEC2 | Deny every session permission request and every non-local renderer network request, per F2 and D2. Add one exported function to `src/main/window.ts` that takes a session-like object and the resolved renderer URL from SEC1 and installs: a permission request handler, a permission check handler, and a device permission handler that all deny; and a `webRequest.onBeforeRequest` filter that cancels any request whose URL is not `file:`, `devtools:`, `blob:`, or `data:`, and not same-origin with the renderer URL when that URL is the development one. Call it from `registerReadyServices` in `src/main/index.ts`. Acceptance: unit tests for each handler denying and for the filter allowing local schemes, allowing the development origin only in development, and cancelling `https:`; a new end-to-end assertion that a renderer-initiated request to an external HTTPS origin fails while the application still loads and edits normally; `e2e/hyperlink.spec.ts` still passes, proving `shell.openExternal` is unaffected. Update `docs/SECURITY.md` (new control plus its row in the verification map) and `docs/ARCHITECTURE.md` §16. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC3 | Make the save boundary reject the leaf values the rest of the application refuses, per F3. In `src/domain/document-serialization.ts`, apply the shared attachment-identifier character rule in `parseAttachment` and make `parseLinks` throw on a destination that is not `http`/`https` instead of letting `normalizeLinks` filter it. Keep the character rule in one place so `src/main/ipc-security.ts` and `src/infrastructure/main/file-services.ts` cannot drift from it. Acceptance: defect-first unit tests that fail before the change — `validatePersistedState` accepting an attachment identifier containing a path separator, and accepting a `javascript:` link destination — and pass after it; a test that an identifier of the shape the application actually generates is still accepted; a contract test that `tree:save` rejects both payloads; an end-to-end assertion that a document written with such an identifier is refused at the save boundary rather than producing a document whose attachments can never be cleaned up. No `docs/PRODUCT.md` change: this rejects states the application never produces. | `src/domain/document-serialization.ts`, `src/domain/document.test.ts`, `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts`, `e2e/persistence.spec.ts`, `docs/SECURITY.md` | High | Ready |
 | SEC4 | Close the navigation-guard gaps in F4. Install the navigation and window-open guards from `app.on('web-contents-created', …)` so they apply to any web contents, handle `will-frame-navigate` with the same rule as `will-navigate`, and deny `will-attach-webview`. Add `frame-src 'none'`, `child-src 'none'`, `worker-src 'none'`, `media-src 'none'`, and `frame-ancestors 'none'` to the policy in `electron.vite.config.ts`. Acceptance: unit tests for the shared guard predicate applied to a frame navigation and to a webview attach; an extension of `e2e/csp.spec.ts` asserting the new directives are present, that an iframe cannot navigate to an external origin, and that the existing no-violations check still passes on reload. Update `docs/SECURITY.md`. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `electron.vite.config.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md` | High | Ready |
 | SEC5 | Bound the clipboard HTML that `extractClipboardLinks` parses, per F5, and bound the number of links it returns. Prefer removing the backtracking prefix over relying on the bound alone. Acceptance: a test that an adversarial input of the `<a <a <a …` shape returns promptly and yields no links — assert on completion within a generous deterministic budget, not on a tight timing threshold; a test that an oversized HTML flavor is ignored and the paste still delivers its plain text; a test that the link count is capped; every existing case in `src/infrastructure/main/clipboard.test.ts` and `e2e/clipboard.spec.ts` passes unchanged, including hyperlink-preserving copy and paste. No `docs/PRODUCT.md` change: the bounds are not reachable by pasting from an ordinary application. | `src/infrastructure/main/clipboard.ts`, `src/infrastructure/main/clipboard.test.ts` | High | Ready |
@@ -358,24 +358,22 @@ suite must be reported as blocked, not as passed.
 
 ## Next task
 
-SEC2 — deny unnecessary Electron session permissions and outbound renderer requests, following F2 and D2.
+SEC3 — make persisted-state save validation reject invalid attachment identifiers and link destinations, following F3.
 
-Implementation notes for SEC2, so the task does not depend on this plan's authoring session:
+Implementation notes for SEC3, so the task does not depend on this plan's authoring session:
 
-* SEC1 resolves the renderer URL after `app.whenReady()` and stores that one result for window
-  creation and IPC registration. Use that resolved value to determine the development origin allowed
-  by the request filter, as required by D2.
-* Install the permission and network handlers on the renderer's session in
-  `registerReadyServices`; keep the function unit-testable by accepting the narrow session-like
-  interface and resolved renderer URL described in the SEC2 task row.
-* The request filter must allow `file:`, `devtools:`, `blob:`, and `data:` URLs, plus same-origin
-  requests only when SEC1 resolved an unpackaged development URL. It must cancel external
-  `https:` requests in both development and packaged builds.
-* Validation for SEC2 is the High Risk tier (`docs/DEVELOPMENT.md` §9): `npm run check:full`.
-  Commit as `fix(main): block renderer session permissions and egress`, together with this plan's
-  status update for SEC2 (`AGENTS.md` §12).
+* Preserve the existing accepted identifier shape generated by the application and reject path
+  separators or other characters outside `[A-Za-z0-9_-]+` at persisted-state validation.
+* Keep the attachment identifier character rule in one shared implementation used by the domain
+  validator, IPC attachment validation, and file-service path validation.
+* Persisted link validation must reject a non-HTTP(S) destination instead of returning the
+  unchanged object after `normalizeLinks` filters it. Do not change what the application writes.
+* Add the unit, IPC contract, and real Electron save-boundary coverage listed in the SEC3 task row.
+  Validation is High Risk (`docs/DEVELOPMENT.md` §9): `npm run check:full`.
+* Commit as `fix(domain): reject invalid persisted attachment and link values`, together with this
+  plan's status update for SEC3 (`AGENTS.md` §12).
 
-All eight tasks are authorized, with seven remaining `Ready`, so a session may continue to the next
+All eight tasks are authorized, with six remaining `Ready`, so a session may continue to the next
 one in the recommended order after committing the previous task, while context stays manageable
 (`AGENTS.md` §12). A reasonable split is SEC1 and SEC2 in one session, SEC3 and SEC4 in the next,
 then SEC5 through SEC8; judge by remaining context rather than by that split. Mark each task `Done`

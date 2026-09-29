@@ -1,4 +1,4 @@
-import type { WebPreferences } from 'electron'
+import type { Session, WebPreferences } from 'electron'
 
 export interface WindowSurface {
   isDestroyed(): boolean
@@ -66,6 +66,39 @@ export function resolveRendererUrl(
   return {
     url: isDevelopment ? environmentUrl : packagedDocumentUrl,
     isDevelopment,
+  }
+}
+
+export function configureRendererSessionSecurity(
+  session: Pick<
+    Session,
+    'setPermissionRequestHandler' | 'setPermissionCheckHandler' | 'setDevicePermissionHandler' | 'webRequest'
+  >,
+  renderer: ResolvedRendererUrl,
+): void {
+  session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
+  session.setPermissionCheckHandler(() => false)
+  session.setDevicePermissionHandler(() => false)
+  session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, ({ url }, callback) => {
+    callback({ cancel: !isAllowedRendererRequest(url, renderer) })
+  })
+}
+
+function isAllowedRendererRequest(value: string, renderer: ResolvedRendererUrl): boolean {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return false
+  }
+
+  if (['file:', 'devtools:', 'blob:', 'data:'].includes(url.protocol)) return true
+  if (!renderer.isDevelopment) return false
+
+  try {
+    return url.origin === new URL(renderer.url).origin
+  } catch {
+    return false
   }
 }
 

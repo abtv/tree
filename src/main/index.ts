@@ -7,6 +7,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  session,
   shell,
 } from 'electron'
 import { join } from 'node:path'
@@ -26,6 +27,7 @@ import { bootstrapApplication } from './bootstrap'
 import { createPngDecoder } from './png-decoder'
 import {
   configureSingleInstance,
+  configureRendererSessionSecurity,
   createWindowWebPreferences,
   isAllowedExternalUrl,
   isAllowedRendererUrl,
@@ -126,6 +128,7 @@ bootstrapApplication({
       pathToFileURL(packagedRendererPath).toString(),
     )
     renderer = resolvedRenderer
+    configureRendererSessionSecurity(session.defaultSession, resolvedRenderer)
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
     alwaysOnTopStore = createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     registerIpcHandlers({
