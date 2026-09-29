@@ -107,6 +107,32 @@ describe('readClipboard', () => {
     expect(extractClipboardLinks('<a href="https://example.com">missing</a>', 'plain text')).toEqual([])
   })
 
+  it('returns plain text when the HTML clipboard representation exceeds its size bound', async () => {
+    const html = `<a href="https://example.com">link</a>${' '.repeat(1_048_576)}`
+    await expect(
+      readClipboard({
+        read: async () => [],
+        readText: async () => 'link',
+        readHTML: () => html,
+      }),
+    ).resolves.toEqual({ kind: 'text', text: 'link' })
+  })
+
+  it('caps the number of links extracted from clipboard HTML', () => {
+    const linkCount = 105
+    const html = Array.from({ length: linkCount }, (_, index) => `<a href="https://${index}.example">x</a>`).join(' ')
+
+    expect(extractClipboardLinks(html, 'x '.repeat(linkCount))).toHaveLength(100)
+  })
+
+  it('finishes promptly on repeated malformed anchor prefixes', () => {
+    const malformed = '<a '.repeat(10_000)
+    const startedAt = performance.now()
+
+    expect(extractClipboardLinks(malformed, '')).toEqual([])
+    expect(performance.now() - startedAt).toBeLessThan(2_000)
+  }, 5_000)
+
   it('writes both plain text and HTML clipboard representations atomically', async () => {
     const calls: Array<{ text: string; html: string }> = []
     await writeClipboard(

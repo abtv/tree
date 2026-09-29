@@ -15,6 +15,7 @@ import {
   typeInto,
   writeClipboardImage,
   writeClipboardImageAndText,
+  writeClipboardTextAndHtml,
   writeClipboardText,
 } from './fixtures'
 
@@ -44,6 +45,17 @@ test.describe('clipboard', () => {
     await firePaste(node(window, 1))
 
     await expect(node(window, 1)).toHaveValue('abcXYZdef')
+  })
+
+  test('pastes plain text when the HTML clipboard representation is oversized', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const plainText = 'plain clipboard text'
+    const oversizedHtml = `<a href="https://example.com">plain clipboard text</a>${' '.repeat(1_048_576)}`
+
+    await writeClipboardTextAndHtml(app, plainText, oversizedHtml)
+    await firePaste(node(window, 1))
+
+    await expect(node(window, 1)).toHaveValue(plainText)
   })
 
   test('pastes an HTTP URL as a clickable hyperlink', async ({ userDataDir }) => {

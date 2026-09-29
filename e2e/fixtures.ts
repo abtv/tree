@@ -587,6 +587,17 @@ export async function writeClipboardText(app: ElectronApplication, text: string)
   }, text)
 }
 
+export async function writeClipboardTextAndHtml(app: ElectronApplication, text: string, html: string): Promise<void> {
+  await acquireSystemClipboardLock()
+  await app.evaluate(
+    async ({ clipboard, ClipboardItem }, value) => {
+      clipboard.clear()
+      await clipboard.write([new ClipboardItem({ 'text/plain': value.text, 'text/html': value.html })])
+    },
+    { text, html },
+  )
+}
+
 export async function writeClipboardImage(app: ElectronApplication): Promise<void> {
   await acquireSystemClipboardLock()
   await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
