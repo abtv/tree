@@ -49,10 +49,15 @@ export function extractClipboardLinks(html: string, text: string): LinkRange[] {
     anchorsExamined += 1
     const closing = findAnchorTag(html, opening.end, true)
     if (closing === undefined) break
+
+    // The plain (unlinked) text preceding this anchor also occupies `text`, so a duplicate of the
+    // label there must not be mistaken for this anchor's position: raise the floor by its decoded
+    // length before searching, rather than only advancing past a previously found link.
+    searchFrom += decodeHtmlSegment(html, scanFrom, opening.start).length
     scanFrom = closing.end
 
     const url = decodeHtml(readQuotedHref(html.slice(opening.start, opening.end)) ?? '')
-    const label = extractAnchorLabel(html, opening.end, closing.start)
+    const label = decodeHtmlSegment(html, opening.end, closing.start)
     if (label.length === 0) continue
     const start = text.indexOf(label, searchFrom)
     if (start < 0) continue
@@ -150,7 +155,10 @@ function readQuotedHref(openingTag: string): string | undefined {
   return undefined
 }
 
-function extractAnchorLabel(html: string, from: number, to: number): string {
+// Decodes an arbitrary HTML span into the plain text it renders as: entities are unescaped, `<br>`
+// becomes a newline, and any other tag is dropped. Used both for an anchor's label and for the
+// plain text between two anchors, so their decoded lengths stay comparable within `text`.
+function decodeHtmlSegment(html: string, from: number, to: number): string {
   let label = ''
   let cursor = from
   while (cursor < to) {

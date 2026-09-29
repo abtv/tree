@@ -77,9 +77,9 @@ The whole in-process suite is 73 files / 1174 tests in about 4 seconds. The end-
 | T1 | Focused tests for `normalizeCollapsedLocation` and the `EditorStore` restore path | — | Done | Low Risk |
 | T2 | Serialize-and-restore round-trip property in the store property suite | T1 | Done | Low Risk |
 | T3 | Real-boundary restart with an inline-expanded descendant selected | T1 | Ready | Low Risk (end-to-end run required) |
-| T4 | Clipboard rich-copy round-trip contract test | — | Ready | Low Risk |
+| T4 | Clipboard rich-copy round-trip contract test | — | Done | High Risk (production fix separately authorized) |
 
-**Next task: T3 or T4.**
+**Next task: T3.**
 
 Tier note: every task is test-only, so the Low Risk row of `docs/DEVELOPMENT.md` §9 applies — affected type, lint, formatting, and focused test checks. If a task is ever extended to change production code under a separate authorization, it becomes High Risk (persistence, clipboard, or process boundary) and needs `npm run check:full`.
 
@@ -220,6 +220,8 @@ A small bounded `fast-check` property over generated text and link ranges is acc
 * `npm run typecheck`, `npm run lint`, and `npm run format:check:changed` pass.
 
 **Decision reserved.** If case 6 fails against unmodified production code, report it as a suspected defect with the exact input and stop. Do not adjust the assertion to match current behavior.
+
+**Resolution.** Case 6 failed against unmodified production code, as anticipated: `extractClipboardLinks` resolved a link to the first, unlinked occurrence of a repeated label instead of the actually linked one, because `searchFrom` only advanced past a previously *found* link and not past intervening plain text. Reported to the Product Owner, who authorized a production fix outside this plan's test-only scope, landed in a separate commit together with this test. `npm run check:full` passed, including the full end-to-end and performance suites, per the High Risk clipboard tier in `docs/DEVELOPMENT.md` §9.
 
 ---
 
