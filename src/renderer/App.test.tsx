@@ -532,6 +532,119 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
   })
 
+  describe('scroll position', () => {
+    it('aligns the selected row after the initial focus and saves its live position after user input', async () => {
+      const save = vi.fn<EditorServices['save']>(async () => undefined)
+      const store = new EditorStore(
+        {
+          load: async () => ({
+            version: 3,
+            document: { roots: [{ id: 'root', text: 'Root', children: [] }] },
+            location: { currentParentId: null, selectedNodeId: 'root' },
+            view: { expandedIds: [], selectedRowTop: 180 },
+          }),
+          save,
+          readClipboard: async () => ({ kind: 'text', text: '' }),
+          writeAttachment: async () => undefined,
+          cleanupAttachments: async () => undefined,
+        },
+        () => 'unused',
+      )
+      await act(async () => {
+        await store.initialize()
+      })
+      let rowTop = 40
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const top = this.dataset.nodeId === 'root' ? rowTop : 0
+        return { top, bottom: top + 20, height: 20, left: 0, right: 0, width: 0, x: 0, y: top } as DOMRect
+      })
+      const calls: string[] = []
+      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation((...args: unknown[]) => {
+        calls.push(`scrollBy:${String(args[1])}`)
+      })
+      const focus = HTMLElement.prototype.focus
+      vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options) {
+        calls.push('focus')
+        focus.call(this, options)
+      })
+      const noteViewportChange = vi.spyOn(store, 'noteViewportChange')
+
+      renderReact(<App store={store} />)
+      // The row sits 40px from the top after focus; it moves down to its saved 180px.
+      expect(calls.indexOf('focus')).toBeGreaterThanOrEqual(0)
+      expect(calls.indexOf('scrollBy:-140')).toBeGreaterThan(calls.indexOf('focus'))
+      expect(scrollBy).toHaveBeenCalledOnce()
+
+      // Programmatic scrolling before any user input is not a change, and a save keeps the saved value.
+      fireEvent.scroll(window)
+      expect(noteViewportChange).not.toHaveBeenCalled()
+      fireEvent.change(screen.getByRole('textbox', { name: 'Node 1' }), { target: { value: 'Root edited' } })
+      await act(async () => {
+        await store.flushPersistence()
+      })
+      expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ view: { selectedRowTop: 180 } })
+
+      // After user input, scrolling is a change and a save measures the row where it now is.
+      fireEvent.wheel(window)
+      rowTop = 75
+      fireEvent.scroll(window)
+      expect(noteViewportChange).toHaveBeenCalledOnce()
+      await act(async () => {
+        await store.flushPersistence()
+      })
+      expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ view: { selectedRowTop: 75 } })
+      expect(scrollBy).toHaveBeenCalledOnce()
+    })
+
+    it('clamps a saved position to a shorter window so the selected row stays visible', async () => {
+      const save = vi.fn<EditorServices['save']>(async () => undefined)
+      const store = new EditorStore(
+        {
+          load: async () => ({
+            version: 3,
+            document: { roots: [{ id: 'root', text: 'Root', children: [] }] },
+            location: { currentParentId: null, selectedNodeId: 'root' },
+            view: { expandedIds: [], selectedRowTop: 5_000 },
+          }),
+          save,
+          readClipboard: async () => ({ kind: 'text', text: '' }),
+          writeAttachment: async () => undefined,
+          cleanupAttachments: async () => undefined,
+        },
+        () => 'unused',
+      )
+      await act(async () => {
+        await store.initialize()
+      })
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const top = this.dataset.nodeId === 'root' ? 40 : 0
+        return { top, bottom: top + 20, height: 20, left: 0, right: 0, width: 0, x: 0, y: top } as DOMRect
+      })
+      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+
+      renderReact(<App store={store} />)
+      const lowest = window.innerHeight - 20
+      expect(scrollBy).toHaveBeenCalledWith(0, 40 - lowest)
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Node 1' }), { target: { value: 'Root edited' } })
+      await act(async () => {
+        await store.flushPersistence()
+      })
+      expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ view: { selectedRowTop: lowest } })
+    })
+
+    it('does not scroll when no position was saved', async () => {
+      const store = await createSeededStore(
+        { roots: [{ id: 'root', text: 'Root', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+
+      renderReact(<App store={store} />)
+      expect(scrollBy).not.toHaveBeenCalled()
+    })
+  })
+
   describe('inline node expansion', () => {
     async function buildRootWithChild(): Promise<EditorStore> {
       const store = createStore()

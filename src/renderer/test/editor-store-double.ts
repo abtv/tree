@@ -73,6 +73,9 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
           )
         : []
     }),
+    getRestoredSelectedRowTop: vi.fn(() => undefined),
+    registerSelectedRowTopReader: vi.fn(() => () => undefined),
+    noteViewportChange: vi.fn(),
     toggleExpansion: vi.fn(),
     applyFold: vi.fn(),
     registerPendingEditFinisher: vi.fn(() => () => undefined),

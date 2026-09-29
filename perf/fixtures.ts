@@ -13,7 +13,7 @@ export interface Seed {
   document: unknown
   location: unknown
   /** Persisted view state; a seed with one is written as the version 3 schema. */
-  view?: { expandedIds: string[]; scrollTop?: number }
+  view?: { expandedIds: string[]; selectedRowTop?: number }
 }
 
 const launchedApps: ElectronApplication[] = []

@@ -16,7 +16,7 @@ export interface PersistedState {
   version: number
   document: { roots: PersistedNode[] }
   location: { currentParentId: string | null; selectedNodeId: string }
-  view?: { expandedIds: string[]; scrollTop?: number }
+  view?: { expandedIds: string[]; selectedRowTop?: number }
 }
 
 export interface PersistedWindowBounds {

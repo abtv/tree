@@ -10,6 +10,7 @@ import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import { useScrollRestoration } from './use-scroll-restoration'
 import { useLeftCommandKey } from './use-left-command-key'
 import type { VimMode } from './vim-editing'
 
@@ -72,6 +73,8 @@ export function App({ store }: AppProps): React.JSX.Element {
     setNodeVisualSelection,
     onFoldCommand: applyFoldCommand,
   })
+  // Called after the input bindings so the restore aligns the selected row after their initial focus.
+  useScrollRestoration(store, state.status === 'ready')
   const enterNode = useCallback(
     (node: TreeNode): void => {
       // The disclosure control's own mousedown handler calls preventDefault to avoid stealing

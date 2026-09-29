@@ -630,15 +630,15 @@ describe('document operations', () => {
     expect(parsed).toMatchObject({ version: 3, view: { expandedIds: [] } })
   })
 
-  it('persists only expanded ids of nodes the document contains, with the scroll offset', () => {
+  it('persists only expanded ids of nodes the document contains, with the selected row position', () => {
     const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
     const state = serializeState(
       document,
       { currentParentId: null, selectedNodeId: 'child' },
-      { expandedIds: new Set(['deleted', 'root']), scrollTop: 48 },
+      { expandedIds: new Set(['deleted', 'root']), selectedRowTop: 48 },
     )
 
-    expect(state.view).toEqual({ expandedIds: ['root'], scrollTop: 48 })
+    expect(state.view).toEqual({ expandedIds: ['root'], selectedRowTop: 48 })
     expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
     expect(serializeState(document, state.location).view).toEqual({ expandedIds: [] })
   })

@@ -92,12 +92,17 @@ describe('main IPC handlers', () => {
       document: { roots: [{ id: 'root', text: '', children: [{ id: 'child', text: '', children: [] }] }] },
       location: { currentParentId: null, selectedNodeId: 'child' },
     }
-    const state = { ...base, view: { expandedIds: ['root'], scrollTop: 24 } }
+    const state = { ...base, view: { expandedIds: ['root'], selectedRowTop: 24 } }
 
     await handlers.get(ipcChannels.save)!(event, state)
     expect(vi.mocked(fileServices.save).mock.calls[0]![0]).toBe(state)
 
-    for (const view of [undefined, { expandedIds: 'root' }, { expandedIds: [7] }, { expandedIds: [], scrollTop: -5 }]) {
+    for (const view of [
+      undefined,
+      { expandedIds: 'root' },
+      { expandedIds: [7] },
+      { expandedIds: [], selectedRowTop: -5 },
+    ]) {
       await expect(
         Promise.resolve().then(() => handlers.get(ipcChannels.save)!(event, { ...base, view })),
       ).rejects.toThrow()

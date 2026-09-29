@@ -423,7 +423,7 @@ Tests should cover:
 * preserving the tree structure;
 * preserving the current parent;
 * preserving the selected node;
-* preserving remembered inline expansion;
+* preserving remembered inline expansion and the scroll position;
 * schema version handling;
 * attachment references;
 * attachment cleanup where applicable.

@@ -19,7 +19,7 @@ import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 /** The view state to persist; `expandedIds` may hold ids of nodes the document no longer contains. */
 export interface ViewState {
   readonly expandedIds: Iterable<NodeId>
-  readonly scrollTop?: number
+  readonly selectedRowTop?: number
 }
 
 /**
@@ -42,7 +42,7 @@ export function serializeState(
     version: 3,
     document,
     location: { ...location },
-    view: view.scrollTop === undefined ? { expandedIds } : { expandedIds, scrollTop: view.scrollTop },
+    view: view.selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop: view.selectedRowTop },
   }
 }
 
@@ -61,8 +61,8 @@ function assertView(value: Record<string, unknown>): void {
     !isRecord(view) ||
     !Array.isArray(view.expandedIds) ||
     !view.expandedIds.every((id) => typeof id === 'string' && id.length > 0) ||
-    (view.scrollTop !== undefined &&
-      (typeof view.scrollTop !== 'number' || !Number.isFinite(view.scrollTop) || view.scrollTop < 0))
+    (view.selectedRowTop !== undefined &&
+      (typeof view.selectedRowTop !== 'number' || !Number.isFinite(view.selectedRowTop) || view.selectedRowTop < 0))
   ) {
     throw new Error('The saved view state is invalid.')
   }
@@ -163,8 +163,8 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
 function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>): PersistedView {
   if (value.version !== 3 || !isRecord(value.view)) return EMPTY_PERSISTED_VIEW
   const expandedIds = (value.view.expandedIds as string[]).filter((id) => nodeIds.has(id))
-  const scrollTop = value.view.scrollTop
-  return typeof scrollTop === 'number' ? { expandedIds, scrollTop } : { expandedIds }
+  const selectedRowTop = value.view.selectedRowTop
+  return typeof selectedRowTop === 'number' ? { expandedIds, selectedRowTop } : { expandedIds }
 }
 
 export function assertDocument(document: Document): void {

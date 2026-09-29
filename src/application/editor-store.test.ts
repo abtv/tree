@@ -272,6 +272,82 @@ describe('EditorStore', () => {
       expect(rowIds(store)).toEqual(['root', 'other'])
     })
 
+    it('restores the selected row position and saves the live measurement on a viewport change', async () => {
+      const clock = new FakeClock()
+      const services = viewState(
+        nestedDocument,
+        { currentParentId: null, selectedNodeId: 'root' },
+        { expandedIds: [], selectedRowTop: 240 },
+      )
+      const store = new EditorStore(services, ids('unused'), clock)
+      expect(store.getRestoredSelectedRowTop()).toBeUndefined()
+      store.noteViewportChange()
+      await store.initialize()
+      expect(store.getRestoredSelectedRowTop()).toBe(240)
+      await store.flushPersistence()
+      expect(services.saves).toHaveLength(0)
+
+      let measured: number | undefined = 512.6
+      const unregister = store.registerSelectedRowTopReader(() => measured)
+      store.noteViewportChange()
+      expect(services.saves).toHaveLength(0)
+      clock.runAll()
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { expandedIds: [], selectedRowTop: 513 } })
+
+      // A reading with no rendered row, or a non-finite one, keeps the last known value.
+      measured = undefined
+      store.toggleExpansion('root')
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 513 } })
+      measured = Number.NaN
+      store.toggleExpansion('root')
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 513 } })
+
+      unregister()
+      measured = 7
+      store.toggleExpansion('root')
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 513 } })
+      expect(store.getRestoredSelectedRowTop()).toBe(240)
+    })
+
+    it('never postpones an idle save already armed when the user scrolls', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      store.editText('root', 'Root edited')
+      const clearTimeout = vi.spyOn(clock, 'clearTimeout')
+      const setTimeout = vi.spyOn(clock, 'setTimeout')
+
+      store.noteViewportChange()
+      store.noteViewportChange()
+      expect(clearTimeout).not.toHaveBeenCalled()
+      expect(setTimeout).not.toHaveBeenCalled()
+
+      clock.runAll()
+      await store.flushPersistence()
+      expect(services.saves).toHaveLength(1)
+
+      // With nothing armed, a scroll arms the idle save itself.
+      store.noteViewportChange()
+      expect(setTimeout).toHaveBeenCalledOnce()
+    })
+
+    it('omits the selected row position while nothing has measured it', async () => {
+      const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      expect(store.getRestoredSelectedRowTop()).toBeUndefined()
+
+      store.toggleExpansion('root')
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { expandedIds: ['root'] } })
+      expect((services.saves.at(-1) as { view: object }).view).not.toHaveProperty('selectedRowTop')
+    })
+
     it('keeps an undo site displayed after navigation left its branch expanded', async () => {
       const store = new EditorStore(
         loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }),

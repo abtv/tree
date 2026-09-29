@@ -13,7 +13,7 @@ Inline expansion was owned by `App.tsx`, while `NodeList.tsx` separately built t
 
 ## Consequences
 
-- Expansion resets to collapsed whenever the current parent changes and is never persisted or added to undo history.
+- Expansion resets to collapsed whenever the current parent changes and is never persisted or added to undo history. ADR 0017 replaces this consequence: expansion is remembered per node and persisted, and still never enters undo history.
 - Rendering and navigation share one visible-row traversal, cached by document identity, current parent, and expansion identity.
 - ADR 0014 governs renderer-local interaction state; this decision places application-owned product state outside that ADR's scope.
 - The cache retains only the current visible rows and is replaced when its inputs change.

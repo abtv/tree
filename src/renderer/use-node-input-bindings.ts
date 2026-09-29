@@ -68,8 +68,8 @@ interface UseNodeInputBindingsOptions {
   nodeVisualSelection?: { anchorId: string; focusId: string } | undefined
   setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
   /**
-   * Applies a Normal-mode fold key to the transient inline-expansion state. `App.tsx` owns that
-   * state, so the keyboard handler dispatches the command here instead of touching it directly.
+   * Applies a Normal-mode fold key to the inline-expansion state. `EditorStore` owns that state, so
+   * the keyboard handler dispatches the command here instead of touching it directly.
    */
   onFoldCommand?: (command: VimFoldCommand, nodeId: string) => void
 }

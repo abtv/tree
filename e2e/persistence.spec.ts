@@ -22,8 +22,51 @@ import {
   writeClipboardImage,
   writeClipboardText,
 } from './fixtures'
+import type { Page } from '@playwright/test'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+function rowsSeed(count: number, suffix = '') {
+  return {
+    document: {
+      roots: Array.from({ length: count }, (_, index) => ({
+        id: `r${index}`,
+        text: `Row ${index + 1} ${suffix}`.trim(),
+        children: [],
+      })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'r0' },
+  }
+}
+
+/** Scrolls with the mouse wheel, as a user does, in steps the windowed list can follow. */
+async function wheelBy(page: Page, distance: number): Promise<void> {
+  const box = page.viewportSize() ?? { width: 800, height: 600 }
+  await page.mouse.move(box.width / 2, box.height / 2)
+  for (let moved = 0; moved < distance; moved += 1_000) {
+    await page.mouse.wheel(0, Math.min(1_000, distance - moved))
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  }
+}
+
+/** The label of a node row wholly inside the lower two thirds of the window, or '' when none is. */
+function rowInViewport(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const rows = [...document.querySelectorAll<HTMLTextAreaElement>('.node-list textarea')]
+    const row = rows.find((input) => {
+      const { top, bottom } = input.getBoundingClientRect()
+      return top > window.innerHeight / 3 && bottom < window.innerHeight
+    })
+    return row?.getAttribute('aria-label') ?? ''
+  })
+}
+
+function viewportTop(locator: ReturnType<Page['getByRole']>): Promise<number> {
+  return locator.evaluate((element) => {
+    const row = element.closest<HTMLElement>('[data-node-id]') ?? element
+    return Math.round(row.getBoundingClientRect().top)
+  })
+}
 
 function depthSeed(depth: number) {
   const root = { id: 'n0', text: 'Level 1', children: [] as Array<{ id: string; text: string; children: never[] }> }
@@ -178,6 +221,64 @@ test.describe('persistence', () => {
     await expect(parent(second.window)).toHaveValue('Projects')
     await expect(node(second.window, 1)).toHaveValue('Work')
     await expect(node(second.window, 1)).toBeFocused()
+  })
+
+  for (const { name, seed, distance } of [
+    { name: 'a short list', seed: () => rowsSeed(120), distance: 1_200 },
+    { name: 'a windowed list', seed: () => rowsSeed(1_000), distance: 20_000 },
+    // Wrapped rows are much taller than the windowed list's row estimate, so after a relaunch the
+    // page offset of the saved view differs from the one it was saved at.
+    {
+      name: 'a windowed list of wrapped rows',
+      seed: () => rowsSeed(700, 'wrapped words '.repeat(40)),
+      distance: 30_000,
+    },
+  ]) {
+    test(`restores where the selected row sat in the window after two relaunches in ${name}`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, seed())
+      const first = await launchTree(userDataDir)
+      await wheelBy(first.window, distance)
+
+      // Select a row inside the viewport so focusing it does not move the page. A windowed list mounts
+      // the rows for the new offset only after its scroll handler runs.
+      await expect.poll(() => rowInViewport(first.window)).not.toBe('')
+      const label = await rowInViewport(first.window)
+      const selected = (page: Page) => page.getByRole('textbox', { name: label, exact: true })
+      await selected(first.window).click()
+      await expect(selected(first.window)).toBeFocused()
+      const savedTop = await viewportTop(selected(first.window))
+
+      await closeApp(first.app)
+      expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(savedTop)
+
+      // Relaunch twice without touching the page: the view must survive both. Normal mode starts
+      // without the Insert keypress, which as user input would end the restore early.
+      for (let relaunch = 0; relaunch < 2; relaunch += 1) {
+        const next = await launchTree(userDataDir, { initialMode: 'normal' })
+        await expect(selected(next.window)).toBeFocused()
+        await expect.poll(() => viewportTop(selected(next.window))).toBe(savedTop)
+        await closeApp(next.app)
+        expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(savedTop)
+      }
+    })
+  }
+
+  test('shows the selected row at the window edge when scrolling had moved it off-screen', async ({ userDataDir }) => {
+    seedDocument(userDataDir, rowsSeed(120))
+    const first = await launchTree(userDataDir)
+    const firstRow = (page: Page) => page.getByRole('textbox', { name: 'Node 1', exact: true })
+    await expect(firstRow(first.window)).toBeFocused()
+
+    await wheelBy(first.window, 2_000)
+    await expect(firstRow(first.window)).not.toBeInViewport()
+    await closeApp(first.app)
+    expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(0)
+
+    const second = await launchTree(userDataDir)
+    await expect(firstRow(second.window)).toBeFocused()
+    await expect(firstRow(second.window)).toBeInViewport()
   })
 
   test('restores the main window size and position after restart', async ({ userDataDir }) => {

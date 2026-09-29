@@ -32,10 +32,13 @@ export interface Location {
   readonly selectedNodeId: NodeId
 }
 
-/** Persisted view state: remembered expansion choices and the page scroll offset. */
+/**
+ * Persisted view state: remembered expansion choices and where the selected row sits in the window,
+ * as its distance in CSS pixels from the top of the viewport.
+ */
 export interface PersistedView {
   readonly expandedIds: readonly NodeId[]
-  readonly scrollTop?: number
+  readonly selectedRowTop?: number
 }
 
 export interface PersistedEditorState {

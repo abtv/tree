@@ -95,6 +95,17 @@ export class EditorSaveScheduler {
     this.scheduleIdleSave()
   }
 
+  /**
+   * Marks a pending change that must not postpone an idle save already armed for earlier changes.
+   * Continuous input such as scrolling would otherwise keep resetting the timer and hold back a
+   * pending text edit until the input stopped.
+   */
+  public markPersistedChangeWithoutDelay(): void {
+    this.changesPending = true
+    if (this.context.isPersistenceLocked() || this.saveTimer !== undefined) return
+    this.scheduleIdleSave()
+  }
+
   public noteChange(insertedWords: number, saveImmediately: boolean): void {
     if (insertedWords > 0) {
       this.insertedWordsWatermark += insertedWords

@@ -82,6 +82,12 @@ export class EditorStore {
   private readonly pendingEditFinishers = new Set<() => boolean>()
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
+  // Where the selected row sits in the window lives outside the snapshot: it changes on every scroll
+  // frame and no rendered state depends on it. The renderer measures it; the store reads it when it
+  // captures state for a save, so every save carries the live value.
+  private selectedRowTop: number | undefined
+  private restoredSelectedRowTop: number | undefined
+  private readSelectedRowTop: (() => number | undefined) | undefined
   public constructor(
     private readonly services: EditorServices,
     private readonly createId: () => string,
@@ -92,7 +98,12 @@ export class EditorStore {
       currentState: () => {
         const state = this.runtime.snapshot
         if (state.status !== 'ready') return undefined
-        return { document: state.document, location: state.location, view: state.expansion }
+        const measured = this.readSelectedRowTop?.()
+        if (measured !== undefined && Number.isFinite(measured)) this.selectedRowTop = Math.max(0, Math.round(measured))
+        const expandedIds = state.expansion.expandedIds
+        const selectedRowTop = this.selectedRowTop
+        const view = selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop }
+        return { document: state.document, location: state.location, view }
       },
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
       isPersistenceLocked: () => this.isPersistenceLocked(),
@@ -123,6 +134,34 @@ export class EditorStore {
       rows,
     }
     return rows
+  }
+
+  /**
+   * The selected row's distance from the top of the window when the document was saved, for the
+   * renderer to restore at launch (`docs/PRODUCT.md` §16.1).
+   */
+  public getRestoredSelectedRowTop(): number | undefined {
+    return this.restoredSelectedRowTop
+  }
+
+  /**
+   * Registers the renderer's measurement of the selected row's distance from the top of the window.
+   * It is read whenever state is captured for a save; `undefined` keeps the last known value.
+   */
+  public registerSelectedRowTopReader(read: () => number | undefined): () => void {
+    this.readSelectedRowTop = read
+    return () => {
+      if (this.readSelectedRowTop === read) this.readSelectedRowTop = undefined
+    }
+  }
+
+  /**
+   * The user scrolled the page: a pending change. Unlike a selection change it never postpones an
+   * idle save already armed, because scroll events arrive continuously.
+   */
+  public noteViewportChange(): void {
+    if (this.runtime.snapshot.status !== 'ready') return
+    this.saveScheduler.markPersistedChangeWithoutDelay()
   }
 
   public toggleExpansion(nodeId: NodeId): void {
@@ -256,6 +295,8 @@ export class EditorStore {
       }
 
       const parsed = parsePersistedState(loaded)
+      this.selectedRowTop = parsed.view?.selectedRowTop
+      this.restoredSelectedRowTop = parsed.view?.selectedRowTop
       const expansion = expansionFromIds(parsed.view?.expandedIds ?? [])
       const location = normalizeVisibleLocation(parsed.document, parsed.location, (id) => isNodeExpanded(expansion, id))
       this.runtime.snapshot = {

@@ -790,7 +790,10 @@ The following state must be persisted:
 * stable node IDs;
 * the current parent, or the root-level location when there is no current parent;
 * the selected node, including a descendant displayed by inline expansion;
-* each node's remembered inline expansion (§2.4).
+* each node's remembered inline expansion (§2.4);
+* the scroll position, as where the selected node's row sits in the window.
+
+On launch, the application scrolls so the selected node's row sits at the same distance from the top of the window as when the document was saved, or as close to it as a shorter window allows while showing the whole row, and keeps it there while rows and images finish laying out, until the user scrolls, types, or clicks. When scrolling had moved the selected row off-screen, it is shown at the nearest edge of the window instead, so the selected node is always visible at launch. Scrolling by the user is a pending change like a selection change, and every save, including the quit flush, records the position shown at that moment. The scroll position is restored only at launch; navigating within a running session scrolls as before.
 
 The exact text cursor position does not need to be persisted.
 

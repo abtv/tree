@@ -133,8 +133,8 @@ const cases: PersistedStateCase[] = [
     error: 'The saved document has an unsupported format.',
   },
   {
-    name: 'accepts a version three state with expansion and a scroll offset',
-    state: { ...validState, version: 3, view: { expandedIds: ['root'], scrollTop: 120 } },
+    name: 'accepts a version three state with expansion and a selected row position',
+    state: { ...validState, version: 3, view: { expandedIds: ['root'], selectedRowTop: 120 } },
     decision: 'accept',
   },
   {
@@ -155,14 +155,14 @@ const cases: PersistedStateCase[] = [
     error: 'The saved view state is invalid.',
   },
   {
-    name: 'rejects a negative scroll offset',
-    state: { ...validState, version: 3, view: { expandedIds: [], scrollTop: -1 } },
+    name: 'rejects a negative selected row position',
+    state: { ...validState, version: 3, view: { expandedIds: [], selectedRowTop: -1 } },
     decision: 'reject',
     error: 'The saved view state is invalid.',
   },
   {
-    name: 'rejects a non-finite scroll offset',
-    state: { ...validState, version: 3, view: { expandedIds: [], scrollTop: Number.POSITIVE_INFINITY } },
+    name: 'rejects a non-finite selected row position',
+    state: { ...validState, version: 3, view: { expandedIds: [], selectedRowTop: Number.POSITIVE_INFINITY } },
     decision: 'reject',
     error: 'The saved view state is invalid.',
   },

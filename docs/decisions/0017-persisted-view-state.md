@@ -11,7 +11,7 @@ Two storage options were considered: a `view` block inside `document.json`, or a
 
 ## Decision
 
-Persisted view state lives in `document.json` as a `view` block of schema version 3, beside the `location` block that already holds the current parent and selected node. The block holds `expandedIds` and an optional `scrollTop`, the page scroll offset restored at launch. `EditorStore` keeps one per-node expansion set for the whole document and no longer resets it on location changes. An expansion change marks a pending persisted change, exactly as a selection change does; it is never an undo entry.
+Persisted view state lives in `document.json` as a `view` block of schema version 3, beside the `location` block that already holds the current parent and selected node. The block holds `expandedIds` and an optional `selectedRowTop`: the scroll position, stored as the selected row's distance from the top of the window and restored at launch by scrolling that row back to it. A raw page offset was rejected because the windowed list starts each launch with estimated row heights and images load after the first render, so the same offset shows different content. `EditorStore` keeps one per-node expansion set for the whole document and no longer resets it on location changes. An expansion change marks a pending persisted change, exactly as a selection change does; it is never an undo entry.
 
 Serialization writes only ids of nodes the saved document contains. Loading migrates version 1 and 2 files to an empty view, tolerates and drops ids that name no node, and moves a selection hidden by a collapsed ancestor to the nearest displayed ancestor.
 
