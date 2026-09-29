@@ -292,8 +292,10 @@ export function deleteSelectedTransition(
     const destination = nextSibling ?? previousSibling
     if (destination === undefined) throw new Error('A sibling destination was not found.')
     nextLocation = { ...location, selectedNodeId: destination.id }
-  } else if (location.currentParentId !== null) {
-    nextLocation = { ...location, selectedNodeId: location.currentParentId }
+  } else if (selected.parent !== null) {
+    // The real parent is the current parent or a visible ancestor shown by inline expansion (§2.4);
+    // either way the location stays where it is.
+    nextLocation = { ...location, selectedNodeId: selected.parent.id }
   } else {
     nextDocument = ensureRoot(nextDocument, createId())
     nextLocation = { currentParentId: null, selectedNodeId: nextDocument.roots[0]!.id }
@@ -319,9 +321,10 @@ export function deleteEmptySelectedTransition(
     }
   }
   if (selected.parent !== null) {
+    // Only the current parent is entered as a location; a visible ancestor keeps the location unchanged.
     return {
       document: nextDocument,
-      location: { currentParentId: selected.parent.id, selectedNodeId: selected.parent.id },
+      location: { ...location, selectedNodeId: selected.parent.id },
       focus: { nodeId: selected.parent.id, cursor: selected.parent.text.length },
     }
   }

@@ -431,6 +431,8 @@ After deleting a node from the currently displayed level:
 3. If the deleted node was the only node on the current level, return to the parent.
 4. If the deleted node was the only root node, create a new empty root node.
 
+When the deleted node is a visible descendant shown by inline expansion (§2.4) and has no sibling, its parent is selected and the location does not change; deleting a node never enters or leaves a location. The same holds for `dd`.
+
 When inside a parent, `Cmd+Backspace` deletes the currently selected child.
 
 When the editable current parent is focused, `Cmd+Backspace` does nothing. The current parent and its subtree can only be removed by explicitly deleting that node from its displayed parent level.
@@ -449,6 +451,8 @@ After the deletion:
 2. Otherwise, if the current parent exists, select the editable current parent and place the text cursor at the end of its text.
 3. Otherwise, at the root level, select the next root node and place the text cursor at the beginning of its text.
 4. If the deleted node was the only root node, do nothing; the empty root is kept.
+
+When the deleted node is a visible descendant shown by inline expansion (§2.4), rule 2 selects its own parent with the text cursor at the end of its text and leaves the location unchanged. Only an explicit command — `Cmd+.`, `gd`, or the node's enter control — changes the location.
 
 This is an explicit user action. Empty nodes are never deleted automatically.
 

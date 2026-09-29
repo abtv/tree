@@ -279,6 +279,33 @@ describe('editor command transitions', () => {
     ).toBeUndefined()
   })
 
+  it('selects the real parent without changing the location when the only visible descendant is deleted', () => {
+    const location = { currentParentId: null, selectedNodeId: 'alpha1a' }
+    expect(deleteSelectedTransition(nestedDocument, location, () => 'new')).toMatchObject({
+      location: { currentParentId: null, selectedNodeId: 'alpha1' },
+      focus: { nodeId: 'alpha1', cursor: 0 },
+    })
+    expect(
+      deleteSelectedTransition(nestedDocument, { currentParentId: 'alpha', selectedNodeId: 'alpha1a' }, () => 'new'),
+    ).toMatchObject({ location: { currentParentId: 'alpha', selectedNodeId: 'alpha1' } })
+  })
+
+  it('does not enter the parent when Backspace deletes an empty first visible descendant', () => {
+    const empty: Document = {
+      roots: [
+        {
+          id: 'alpha',
+          text: 'Alpha',
+          children: [{ id: 'alpha1', text: 'One', children: [{ id: 'alpha1a', text: '', children: [] }] }],
+        },
+      ],
+    }
+    expect(deleteEmptySelectedTransition(empty, { currentParentId: null, selectedNodeId: 'alpha1a' })).toMatchObject({
+      location: { currentParentId: null, selectedNodeId: 'alpha1' },
+      focus: { nodeId: 'alpha1', cursor: 3 },
+    })
+  })
+
   it('still replaces the only top-level root when it is deleted', () => {
     expect(
       deleteSelectedTransition(
