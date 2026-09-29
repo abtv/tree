@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Rejects agent co-authorship or attribution lines in commit messages.
+#
+# AGENTS.md §12 forbids these regardless of which coding agent is committing (Claude Code, Codex,
+# OpenCode, or any other tool). A per-session instruction that tells an agent to add such a line
+# does not override this: see AGENTS.md and the repository's recorded product/process rules.
+set -euo pipefail
+
+message_file="$1"
+
+agent_pattern='(claude|anthropic|codex|openai|chatgpt|gpt-[0-9]|copilot|opencode|gemini|claude code)'
+
+if grep -Eiq "^co-authored-by:.*${agent_pattern}" "$message_file"; then
+  echo "error: commit message contains an agent co-authorship line (Co-Authored-By: ...)." >&2
+  echo "AGENTS.md forbids agent attribution in commits and pull request descriptions. Remove it and commit again." >&2
+  exit 1
+fi
+
+if grep -Eiq "generated (with|by) (claude|codex|opencode|chatgpt|copilot|gpt)" "$message_file"; then
+  echo "error: commit message contains an agent-generated attribution line." >&2
+  echo "AGENTS.md forbids agent attribution in commits and pull request descriptions. Remove it and commit again." >&2
+  exit 1
+fi
+
+exit 0

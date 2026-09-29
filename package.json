@@ -12,6 +12,7 @@
   },
   "scripts": {
     "postinstall": "install-electron",
+    "prepare": "git config core.hooksPath .githooks",
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "electron-vite build",
