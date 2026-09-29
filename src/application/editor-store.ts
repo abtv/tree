@@ -387,13 +387,20 @@ export class EditorStore {
 
   public moveSelectionBoundary(boundary: 'first' | 'last' | 'parent', cursor: number, count?: number): void {
     const state = this.runtime.ready()
-    const target = moveSelectionBoundaryTransition(state.document, state.location, boundary, cursor, count)
+    const target = moveSelectionBoundaryTransition(
+      state.document,
+      state.location,
+      this.getVisibleRows(),
+      boundary,
+      cursor,
+      count,
+    )
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 
   public moveHorizontal(direction: 'left' | 'right', cursor: number): boolean {
     const state = this.runtime.ready()
-    const target = moveHorizontalTransition(state.document, state.location, direction, cursor)
+    const target = moveHorizontalTransition(state.document, state.location, this.getVisibleRows(), direction, cursor)
     if (target === undefined) return false
     this.selectNode(target.nodeId, target.cursor)
     return true

@@ -2071,6 +2071,79 @@ describe('EditorStore', () => {
     expect(after.document).toBe(before.document)
   })
 
+  it('reaches the location’s last visible row with G and crosses an expanded branch boundary with moveHorizontal', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'Alpha', children: [{ id: 'a1', text: 'Grandchild', children: [] }] },
+              { id: 'b', text: 'Beta', children: [] },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    store.toggleExpansion('a')
+    expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'a1', 'b'])
+
+    // G reaches the location's last visible row (Beta), walking past the expanded branch, not
+    // Alpha's own last real sibling.
+    store.moveSelectionBoundary('last', 99)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { nodeId: 'b', cursor: 4 } })
+
+    // A count of 2 reaches the second visible row (the grandchild), not Alpha's own second sibling.
+    store.moveSelectionBoundary('last', 99, 2)
+    expect(store.getSnapshot()).toMatchObject({
+      location: { selectedNodeId: 'a1' },
+      focus: { nodeId: 'a1', cursor: 10 },
+    })
+
+    // Leaving the branch rightward from its last visible descendant reaches Beta, and entering it
+    // leftward from Beta returns to that same descendant.
+    store.selectNode('a1', 'Grandchild'.length)
+    expect(store.moveHorizontal('right', 'Grandchild'.length)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { cursor: 0 } })
+
+    expect(store.moveHorizontal('left', 0)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      location: { selectedNodeId: 'a1' },
+      focus: { cursor: 'Grandchild'.length },
+    })
+  })
+
+  it('reaches the location’s last visible row with G when the current-parent heading is selected', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Parent',
+            children: [
+              { id: 'a', text: 'Alpha', children: [{ id: 'a1', text: 'Grandchild', children: [] }] },
+              { id: 'b', text: 'Beta', children: [] },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    store.toggleExpansion('a')
+
+    // G from the editable current-parent heading unifies with the general visible-rows path: it
+    // reaches the location's last visible row (Beta), exactly as it did through the old
+    // heading-specific `displayedNodes` branch this task removed.
+    store.moveSelectionBoundary('last', 99)
+    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { nodeId: 'b', cursor: 4 } })
+  })
+
   it('moves horizontally between siblings and from child boundaries to the parent', async () => {
     const services = loadedState(
       {

@@ -189,6 +189,7 @@ export function moveSelectionTransition(
 export function moveSelectionBoundaryTransition(
   document: Document,
   location: Location,
+  visibleRows: readonly VisibleRow[],
   boundary: 'first' | 'last' | 'parent',
   cursor: number,
   count?: number,
@@ -198,23 +199,23 @@ export function moveSelectionBoundaryTransition(
     return { nodeId: parent.id, cursor: Math.min(cursor, parent.text.length) }
   }
   // `gg` always targets the current-parent heading (handled above) or the first top-level root
-  // (below); it is intentionally not generalized to the focused node's own real parent. `G` targets
-  // the focused node's own actual siblings, except when the heading itself is selected.
-  const nodes =
-    boundary === 'last' && location.selectedNodeId !== location.currentParentId
-      ? requireNode(document, location.selectedNodeId).siblings
-      : displayedNodes(document, location.currentParentId)
-  if (nodes.length === 0) return undefined
-  const target =
-    boundary === 'last' ? nodes[Math.min(nodes.length - 1, Math.max(0, (count ?? nodes.length) - 1))] : nodes[0]
+  // (below); it is intentionally not generalized to the focused node's own real parent.
+  if (boundary === 'last') {
+    if (visibleRows.length === 0) return undefined
+    const target = visibleRows[Math.min(visibleRows.length - 1, Math.max(0, (count ?? visibleRows.length) - 1))]!.node
+    const targetCursor = target.attachment !== undefined ? target.text.length : cursor
+    return { nodeId: target.id, cursor: Math.min(targetCursor, target.text.length) }
+  }
+  const nodes = displayedNodes(document, location.currentParentId)
+  const target = nodes[0]
   if (target === undefined) return undefined
-  const targetCursor = boundary === 'last' && target.attachment !== undefined ? target.text.length : cursor
-  return { nodeId: target.id, cursor: Math.min(targetCursor, target.text.length) }
+  return { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 
 export function moveHorizontalTransition(
   document: Document,
   location: Location,
+  visibleRows: readonly VisibleRow[],
   direction: 'left' | 'right',
   cursor: number,
 ): FocusTarget | undefined {
@@ -229,8 +230,10 @@ export function moveHorizontalTransition(
   const selected = requireNode(document, location.selectedNodeId)
   const atBoundary = direction === 'left' ? cursor === 0 : cursor === selected.node.text.length
   if (!atBoundary) return undefined
-  const sibling = selected.siblings[selected.index + (direction === 'left' ? -1 : 1)]
-  if (sibling !== undefined) return { nodeId: sibling.id, cursor: direction === 'left' ? sibling.text.length : 0 }
+  const index = visibleRows.findIndex((row) => row.node.id === location.selectedNodeId)
+  if (index < 0) return undefined
+  const target = visibleRows[index + (direction === 'left' ? -1 : 1)]?.node
+  if (target !== undefined) return { nodeId: target.id, cursor: direction === 'left' ? target.text.length : 0 }
   if (direction === 'left' && selected.parent !== null) {
     return { nodeId: selected.parent.id, cursor: selected.parent.text.length }
   }

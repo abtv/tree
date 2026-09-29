@@ -339,9 +339,7 @@ test.describe('inline node expansion', () => {
     expect(await node(second.window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
 
-  test('keeps gg on the first displayed root while G targets the descendant’s own last real sibling', async ({
-    userDataDir,
-  }) => {
+  test('keeps gg on the first displayed root while G reaches the last visible row', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -355,12 +353,40 @@ test.describe('inline node expansion', () => {
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveValue('Alpha')
 
-    // G targets the descendant's own last real sibling (alpha child two), not the flattened last
-    // visible row (Bravo), which would be wrong since Bravo is alpha's sibling, not alpha1's.
+    // G now reaches the last visible row of the location (Bravo), walking past the expanded branch,
+    // instead of stopping at the descendant's own last real sibling (Alpha child two).
     await node(window, 2).click()
     await window.keyboard.press('G')
+    await expect(node(window, 4)).toBeFocused()
+    await expect(node(window, 4)).toHaveValue('Bravo')
+  })
+
+  test('crosses an expanded branch boundary with ArrowLeft and ArrowRight', async ({ userDataDir }) => {
+    // ArrowLeft/ArrowRight boundary crossing is an Insert-mode arrow-key path (PRODUCT §4.3); Normal
+    // mode's h/l stay within the node's own text (§20.2) and never cross a node boundary.
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir)
+
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+    // Rows: Alpha(1), Alpha child one(2), Alpha grandchild(3), Alpha child two(4), Bravo(5).
+
+    // Leaving the branch rightward from its last visible descendant reaches the row after the whole
+    // branch (Alpha child two), not Alpha child one's own real next sibling — there is none.
+    await node(window, 3).click()
+    await window.keyboard.press('End')
+    await window.keyboard.press('ArrowRight')
+    await expect(node(window, 4)).toBeFocused()
+    expect(await node(window, 4).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
+    // Entering the branch leftward from that row returns to the branch's last visible descendant,
+    // not Alpha child one's own actual sibling head.
+    await window.keyboard.press('Home')
+    await window.keyboard.press('ArrowLeft')
     await expect(node(window, 3)).toBeFocused()
-    await expect(node(window, 3)).toHaveValue('Alpha child two')
+    expect(await node(window, 3).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(
+      'Alpha grandchild'.length,
+    )
   })
 
   test('ends whole-node Visual mode when an ancestor collapses and hides its anchor and focus', async ({
