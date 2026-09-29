@@ -17,12 +17,22 @@ async function chooseEditorMenuItem(app: ElectronApplication, label: string): Pr
       popup: (options: { callback?: () => void }) => void
     }
     menuPrototype.popup = function (options) {
+      ;(globalThis as typeof globalThis & { __lastEditorMenuLabels?: (string | undefined)[] }).__lastEditorMenuLabels =
+        this.items.map((entry) => entry.label)
       const item = this.items.find((entry) => entry.label === requestedLabel)
       if (item === undefined) throw new Error(`Menu item "${requestedLabel}" was not created.`)
       item.click()
       options?.callback?.()
     }
   }, label)
+}
+
+async function lastEditorMenuLabels(app: ElectronApplication): Promise<(string | undefined)[]> {
+  return app.evaluate(
+    () =>
+      (globalThis as typeof globalThis & { __lastEditorMenuLabels?: (string | undefined)[] }).__lastEditorMenuLabels ??
+      [],
+  )
 }
 
 test.describe('editable node context menu', () => {
@@ -41,6 +51,28 @@ test.describe('editable node context menu', () => {
     await chooseEditorMenuItem(app, 'Paste')
     await editor.click({ button: 'right' })
     await expect(editor).toHaveValue('Context menu textpasted')
+    await app.close()
+  })
+
+  test('bounds long selections in the native Look Up menu label', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const selection = 'long selection '.repeat(25)
+    const editor = node(window, 1)
+    await typeInto(editor, selection)
+    await window.keyboard.press('Meta+a')
+    await chooseEditorMenuItem(app, 'Copy')
+    await editor.click({ button: 'right' })
+
+    const labels = await lastEditorMenuLabels(app)
+    expect(labels).toEqual([
+      `Look Up “${'long selection '.repeat(17).slice(0, 255)}…”`,
+      'Search with Google',
+      '',
+      'Cut',
+      'Copy',
+      'Paste',
+      'Select All',
+    ])
     await app.close()
   })
 

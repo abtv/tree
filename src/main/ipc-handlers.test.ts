@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ipcChannels } from '../shared/ipc'
 import type { FileServices } from '../infrastructure/main/file-services'
 import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
+import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 
 const rendererUrl = 'file:///app/out/renderer/index.html'
@@ -127,6 +128,22 @@ describe('main IPC handlers', () => {
 
     await expect(handlers.get(ipcChannels.showEditorContextMenu)!(event, request)).resolves.toBe('copy')
     expect(showEditorContextMenu).toHaveBeenCalledWith(sender, request)
+
+    await handlers.get(ipcChannels.showEditorContextMenu)!(event, {
+      ...request,
+      selectionText: 'x'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS + 10),
+    })
+    expect(showEditorContextMenu).toHaveBeenLastCalledWith(sender, {
+      ...request,
+      selectionText: 'x'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS - 1) + '…',
+    })
+
+    await expect(
+      Promise.resolve().then(() =>
+        handlers.get(ipcChannels.showEditorContextMenu)!(event, { ...request, x: Number.POSITIVE_INFINITY }),
+      ),
+    ).rejects.toThrow('Editor context menu request')
+    expect(showEditorContextMenu).toHaveBeenCalledTimes(2)
   })
 
   it('rejects every channel from an untrusted renderer', async () => {

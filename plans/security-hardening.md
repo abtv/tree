@@ -8,7 +8,7 @@ target. The review was performed in conversation and is not otherwise recorded i
 its complete findings are reproduced below, so no task depends on that conversation.
 
 The Product Owner authorized this plan and authorized implementing all eight tasks it lists. The
-three tasks not yet completed remain `Ready`; nothing further needs to be authorized before starting
+two tasks not yet completed remain `Ready`; nothing further needs to be authorized before starting
 one. That authorization covers these tasks only — it is not authorization for work this plan does
 not list.
 
@@ -42,8 +42,8 @@ boundaries); [`docs/PRODUCT.md`](../docs/PRODUCT.md) §13.2 (editable-node conte
 
 ## State
 
-The review began from a clean worktree at `c8a9834`. SEC1 through SEC5 are complete and validated;
-SEC6 is the next ready task.
+The review began from a clean worktree at `c8a9834`. SEC1 through SEC6 are complete and validated;
+SEC7 is the next ready task.
 
 The review read every file under `src/`, the Electron entry and window configuration, the whole
 preload and IPC surface, the persistence and clipboard infrastructure, the renderer's HTML-producing
@@ -329,7 +329,7 @@ See D4: recording the requirement is in scope for this plan; implementing it is 
 | SEC3 | Make the save boundary reject the leaf values the rest of the application refuses, per F3. In `src/domain/document-serialization.ts`, apply the shared attachment-identifier character rule in `parseAttachment` and make `parseLinks` throw on a destination that is not `http`/`https` instead of letting `normalizeLinks` filter it. Keep the character rule in one place so `src/main/ipc-security.ts` and `src/infrastructure/main/file-services.ts` cannot drift from it. Acceptance: defect-first unit tests that fail before the change — `validatePersistedState` accepting an attachment identifier containing a path separator, and accepting a `javascript:` link destination — and pass after it; a test that an identifier of the shape the application actually generates is still accepted; a property test that generated safe attachment identifiers pass persisted-state validation; a contract test that `tree:save` rejects both payloads; an end-to-end assertion that a document written with such an identifier is refused at the save boundary rather than producing a document whose attachments can never be cleaned up. No `docs/PRODUCT.md` change: this rejects states the application never produces. | `src/domain/document-serialization.ts`, `src/domain/document-serialization.test.ts`, `src/domain/document.property.test.ts`, `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts`, `src/infrastructure/main/file-services.ts`, `e2e/persistence.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC4 | Close the navigation-guard gaps in F4. Install the navigation and window-open guards from `app.on('web-contents-created', …)` so they apply to any web contents, handle `will-frame-navigate` with the same rule as `will-navigate`, deny `will-attach-webview`, and block redirects to any URL other than the resolved renderer document. Add `frame-src 'none'`, `child-src 'none'`, `worker-src 'none'`, `media-src 'none'`, and `frame-ancestors 'none'` to the policy in `electron.vite.config.ts`. Acceptance: unit tests for the shared guard applied to a frame navigation, redirect, and webview attach; an extension of `e2e/csp.spec.ts` asserting the new directives are present, that an iframe cannot navigate to an external origin, and that the existing no-violations check still passes on reload. Update `docs/SECURITY.md`. | `src/main/window.ts`, `src/main/window.test.ts`, `src/main/index.ts`, `electron.vite.config.ts`, `e2e/csp.spec.ts`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md` | High | Done |
 | SEC5 | Bound the clipboard HTML that `extractClipboardLinks` parses, per F5, and bound the number of links it returns. Prefer removing the backtracking prefix over relying on the bound alone. Acceptance: a test that an adversarial input of the `<a <a <a …` shape returns promptly and yields no links — assert on completion within a generous deterministic budget, not on a tight timing threshold; a test that an oversized HTML flavor is ignored and the paste still delivers its plain text through Electron; a test that the link count is capped; every existing case in `src/infrastructure/main/clipboard.test.ts` and `e2e/clipboard.spec.ts` passes unchanged, including hyperlink-preserving copy and paste. No `docs/PRODUCT.md` change: the bounds are not reachable by pasting from an ordinary application. | `src/infrastructure/main/clipboard.ts`, `src/infrastructure/main/clipboard.test.ts`, `e2e/clipboard.spec.ts`, `e2e/fixtures.ts` | High | Done |
-| SEC6 | Bound the editor context-menu request, per F6 and D3. In `validateEditorContextMenuRequest`, require finite coordinates and reject or truncate `selectionText` beyond a stated bound; if truncating, the `Look Up` label ends with an ellipsis and the Google query uses the same bounded text. State the bound in `docs/PRODUCT.md` §13.2 only. Acceptance: unit tests rejecting `NaN` and `Infinity` coordinates and covering the bounded selection text; an end-to-end assertion that the menu still opens with its documented items for an ordinary selection. | `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/editor-context-menu.ts`, `src/main/editor-context-menu.test.ts`, `docs/PRODUCT.md`, `e2e/context-menu.spec.ts` | High | Ready |
+| SEC6 | Bound the editor context-menu request, per F6 and D3. In `validateEditorContextMenuRequest`, require finite coordinates and reject or truncate `selectionText` beyond a stated bound; if truncating, the `Look Up` label ends with an ellipsis and the Google query uses the same bounded text. State the bound in `docs/PRODUCT.md` §13.2 only. Acceptance: unit and IPC contract tests rejecting `NaN` and `Infinity` coordinates and covering normalized bounded selection text; Electron coverage verifies both the ordinary menu items and the truncated Look Up label. | `src/main/ipc-security.ts`, `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts`, `src/main/editor-context-menu.test.ts`, `docs/PRODUCT.md`, `e2e/context-menu.spec.ts` | High | Done |
 | SEC7 | Document the application's network egress, per F7. Add a section to `docs/SECURITY.md` that states the application performs no network requests of its own, sends no telemetry, and stores documents only on the local machine; then enumerate the three user-initiated paths by which content can reach a third party (external link opening, the Google search menu item, macOS Look Up), naming the file and the product requirement for each. Add the spellchecker note: the macOS spellchecker downloads nothing, and a future Windows or Linux build must disable the Hunspell dictionary download before shipping. Acceptance: `npm run check:docs` passes, each stated path is traceable to the named source file, and no product quantity is restated outside `docs/PRODUCT.md`. No source change. | `docs/SECURITY.md` | Minimal | Ready |
 | SEC8 | Record the distribution hardening requirements, per F8 and D4. Add a section to `docs/SECURITY.md` stating that the application is not yet packaged and listing what a distributable build must satisfy before it is handed to anyone: the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`, and `EnableRunAsNode`-adjacent fuses disabled; `OnlyLoadAppFromAsar` and archive integrity validation enabled; the macOS hardened runtime with no `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or `disable-library-validation` entitlement; code signing and notarization; and a note that these defend against a vector that bypasses every renderer-side control in this repository. State explicitly that the toolchain is not chosen and is reserved for the Product Owner. Acceptance: `npm run check:docs` passes; no packaging dependency, script, or configuration file is added. | `docs/SECURITY.md` | Minimal | Ready |
 
@@ -358,21 +358,21 @@ suite must be reported as blocked, not as passed.
 
 ## Next task
 
-SEC6 — bound editor context-menu coordinates and selection text, following F6.
+SEC7 — document the application's network egress, following F7.
 
-Implementation notes for SEC6, so the task does not depend on this plan's authoring session:
+SEC6 validation passed on the completed implementation: `npm run check:full` (typecheck, lint,
+format, documentation and policy checks, 1,174 unit tests, production build, audit, 284 Electron
+end-to-end tests, and 31 performance tests). Focused IPC/context-menu unit tests and the real Electron
+context-menu suite also passed. The context-menu flow was product-verified for ordinary menu items,
+long-selection truncation, and the bounded selection supplied to both native actions. The independent
+review result is recorded in the task handoff/commit.
 
-* Require finite `x`/`y` values and truncate overlong `selectionText` to a bounded prefix that ends
-  with an ellipsis in the native `Look Up` label.
-* Use that same truncated text for the Google search query. Set the character limit as an internal
-  constant and state the numeric value only in `docs/PRODUCT.md` §13.2 (D3).
-* Add unit tests for `NaN`, `Infinity`, and selection truncation; add an Electron assertion that the
-  ordinary-selection menu still opens with its documented items.
-* Validation is High Risk (`docs/DEVELOPMENT.md` §9): `npm run check:full`.
-* Commit as `fix(main): bound context menu requests`, together with this plan's status update for
-  SEC6 (`AGENTS.md` §12).
+SEC7 is documentation-only. Update `docs/SECURITY.md` to enumerate the content-egress paths and
+spellchecker note defined in the task table. Run `npm run format:check:changed` and
+`npm run check:docs`, capture `npm run validation:snapshot`, and commit the documentation with this
+plan's updated status. SEC8 remains Ready after SEC7.
 
-All eight tasks are authorized, with three remaining `Ready`, so a session may continue to the next
+All eight tasks are authorized, with two remaining `Ready`, so a session may continue to the next
 one in the recommended order after committing the previous task, while context stays manageable
 (`AGENTS.md` §12). A reasonable split is SEC1 and SEC2 in one session, SEC3 and SEC4 in the next,
 then SEC5 through SEC8; judge by remaining context rather than by that split. Mark each task `Done`

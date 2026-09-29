@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   MAX_ATTACHMENT_BYTES,
+  MAX_CONTEXT_MENU_SELECTION_CODE_POINTS,
   isTrustedRendererUrl,
   validateAttachmentBytes,
   validateAttachmentId,
   validateAttachmentIds,
   validateClipboardWritePayload,
+  validateEditorContextMenuRequest,
   validatePersistedEditorState,
 } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith, transparentPng } from './png-test-utils'
@@ -39,6 +41,34 @@ describe('IPC security validation', () => {
       html: '<p>text</p>',
     })
     expect(() => validateClipboardWritePayload({ text: 'text' })).toThrow('Clipboard payload')
+  })
+
+  it('requires finite context-menu coordinates and bounds selected text', () => {
+    const request = {
+      x: 4,
+      y: 8,
+      selectionText: 'ordinary selection',
+      canCut: true,
+      canCopy: true,
+      canPaste: false,
+      canSelectAll: true,
+    }
+    expect(validateEditorContextMenuRequest(request)).toEqual(request)
+    expect(() => validateEditorContextMenuRequest({ ...request, x: Number.NaN })).toThrow('Editor context menu request')
+    expect(() => validateEditorContextMenuRequest({ ...request, y: Number.POSITIVE_INFINITY })).toThrow(
+      'Editor context menu request',
+    )
+    expect(() => validateEditorContextMenuRequest({ ...request, x: Number.NEGATIVE_INFINITY })).toThrow(
+      'Editor context menu request',
+    )
+
+    const longSelection = '😀'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS + 20)
+    const bounded = validateEditorContextMenuRequest({ ...request, selectionText: longSelection }).selectionText
+    expect(Array.from(bounded)).toHaveLength(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS)
+    expect(bounded).toBe('😀'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS - 1) + '…')
+    expect(validateEditorContextMenuRequest({ ...request, selectionText: 'x'.repeat(100) }).selectionText).toBe(
+      'x'.repeat(100),
+    )
   })
 
   it('validates attachment IDs and lists', () => {

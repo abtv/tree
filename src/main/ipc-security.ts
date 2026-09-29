@@ -5,6 +5,7 @@ import type { ClipboardWritePayload, EditorContextMenuRequest } from '../shared/
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 export const MAX_ATTACHMENT_DIMENSION = 32_767
 export const MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024
+export const MAX_CONTEXT_MENU_SELECTION_CODE_POINTS = 256
 
 export function isTrustedRendererUrl(value: string | undefined, expected: string): boolean {
   if (value === undefined) return false
@@ -36,7 +37,9 @@ export function validateEditorContextMenuRequest(value: unknown): EditorContextM
   if (
     !isRecord(value) ||
     typeof value.x !== 'number' ||
+    !Number.isFinite(value.x) ||
     typeof value.y !== 'number' ||
+    !Number.isFinite(value.y) ||
     typeof value.selectionText !== 'string' ||
     typeof value.canCut !== 'boolean' ||
     typeof value.canCopy !== 'boolean' ||
@@ -48,12 +51,24 @@ export function validateEditorContextMenuRequest(value: unknown): EditorContextM
   return {
     x: value.x,
     y: value.y,
-    selectionText: value.selectionText,
+    selectionText: truncateContextMenuSelection(value.selectionText),
     canCut: value.canCut,
     canCopy: value.canCopy,
     canPaste: value.canPaste,
     canSelectAll: value.canSelectAll,
   }
+}
+
+function truncateContextMenuSelection(value: string): string {
+  let index = 0
+  let codePoints = 0
+  const prefixLimit = MAX_CONTEXT_MENU_SELECTION_CODE_POINTS - 1
+  while (index < value.length && codePoints < prefixLimit) {
+    const codePoint = value.codePointAt(index)!
+    index += codePoint > 0xffff ? 2 : 1
+    codePoints += 1
+  }
+  return index < value.length ? value.slice(0, index) + '…' : value
 }
 
 export function validateAttachmentId(value: unknown): string {
