@@ -63,7 +63,7 @@ The only per-tool detail that should ever need updating on its own — everythin
 
 | Tool | Provider | Primary role | Planner | Reviewer | Product verifier | Product researcher |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex CLI | OpenAI | `gpt-5.6-luna` (`.codex/config.toml`) | `gpt-5.6-sol`, low effort — cheaper/faster model for a role that doesn't need peak capability | `gpt-5.6-luna`, medium effort | `gpt-5.6-luna`, medium effort | `gpt-5.6-luna`, medium effort |
+| Codex CLI | OpenAI | `gpt-6-luna` (`.codex/config.toml`) | `gpt-6-sol`, low effort — the stronger model for planning, held at low effort to bound its cost | `gpt-6-luna`, medium effort | `gpt-6-luna`, medium effort | `gpt-6-luna`, medium effort |
 | OpenCode | DeepSeek | `deepseek/deepseek-flash` (`opencode.json`) | same model, `reasoningEffort: max` | same model, `reasoningEffort: high` | same model, `reasoningEffort: high` | same model, `reasoningEffort: high` |
 | Claude Code | Anthropic | `sonnet` (`.claude/settings.json` `model`) | `sonnet`, `effort: max` | `sonnet`, `effort: high` | `sonnet`, `effort: high` | `sonnet`, `effort: high` |
 

@@ -1,6 +1,6 @@
 name = "product_researcher"
 description = "Investigates a bounded product hypothesis and proposes evidence and experiments without making product decisions."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 developer_instructions = """
