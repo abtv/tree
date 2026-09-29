@@ -22,7 +22,7 @@ Use [Open Questions](docs/OPEN_QUESTIONS.md) when you are unsure whether a probl
 
 After trying an idea, decide whether to pursue it. An open-question note is not permission to build it. When you want the change, ask the agent for the specific behavior; it will then update Product Requirements and follow the normal development workflow. After using the result, note whether it solved the original problem.
 
-For example, you could say: “I had trouble finding a note today. Record what happened in Product Discovery and suggest a simple way to check whether this keeps happening.” If you later decide you want search, describe how search should work and ask the agent to implement it.
+For example, you could say: “I had trouble finding a note today. Record what happened in Open Questions and suggest a simple way to check whether this keeps happening.” If you later decide you want search, describe how search should work and ask the agent to implement it.
 
 ## Getting Started
 
