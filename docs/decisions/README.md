@@ -19,5 +19,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0013](0013-position-based-multi-edit-text-changes.md) | Position-Based Multi-Edit Text Changes | Accepted | 2026-09-26 |
 | [0014](0014-single-owner-for-renderer-interaction-state.md) | Single Owner for Renderer Interaction State | Accepted | 2026-09-27 |
 | [0015](0015-undo-redo-caret-from-snapshot-comparison.md) | Undo/Redo Caret From Snapshot Comparison | Accepted | 2026-09-28 |
+| [0016](0016-application-owns-inline-expansion.md) | Application Owns Inline Expansion | Accepted | 2026-09-29 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

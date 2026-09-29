@@ -1,6 +1,6 @@
 import type { NodeForest, NodeVisualCommand } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
-import type { NodeFoldCommand } from './expansion-state'
+import type { NodeFoldCommand } from '../application/expansion-state'
 import type { VimMode } from './vim-editing'
 import type { VimCaretState } from './vim-caret-transition'
 import type { VimCommandState } from './vim-command-state'

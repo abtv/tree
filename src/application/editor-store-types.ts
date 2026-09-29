@@ -1,5 +1,6 @@
 import type { AttachmentId, Document, Location, NodeId, PersistedEditorState } from '../domain/document'
 import type { ClipboardPayload, ClipboardWritePayload } from '../shared/ipc'
+import type { ExpansionState } from './expansion-state'
 
 export type ClipboardValue = ClipboardPayload
 
@@ -32,6 +33,7 @@ export type EditorSnapshot =
       location: Location
       focus: FocusIntent
       structuralVersion: number
+      expansion: ExpansionState
       saveError?: string
       operationError?: string
       persistenceLocked?: boolean

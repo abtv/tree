@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
+import { buildVisibleRows, type VisibleRow } from '../application/visible-rows'
 import { NodeRow } from './NodeRow'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { computeListWindow, shouldWindow, WINDOW_OVERSCAN, type ListWindow } from './list-window'
@@ -15,10 +16,10 @@ import {
 } from './node-list-layout'
 import { dropMarkerFor } from './node-drag'
 import { useNodeListDrag } from './use-node-list-drag'
-import { buildVisibleRows } from './visible-tree'
 
 interface NodeListProps {
   nodes: readonly TreeNode[]
+  visibleRows?: readonly VisibleRow[]
   renderInput: (node: TreeNode, label: string) => ReactNode
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
@@ -36,6 +37,7 @@ const NEVER_EXPANDED = (): boolean => false
 
 export function NodeList({
   nodes,
+  visibleRows: suppliedVisibleRows,
   renderInput,
   onActivate,
   onEnter,
@@ -58,7 +60,7 @@ export function NodeList({
   // The rendered, windowed, and measured row list is the flattened projection of `nodes` and every
   // expanded node's descendants (docs/PRODUCT.md §2.4), not `nodes` itself; a collapsed subtree still
   // costs exactly one row here regardless of its own size (`buildVisibleRows`).
-  const visibleRows = useMemo(() => buildVisibleRows(nodes, isExpanded), [nodes, isExpanded])
+  const visibleRows = suppliedVisibleRows ?? buildVisibleRows(nodes, isExpanded)
   const [layoutState, setLayoutState] = useState<LayoutState>(() => ({
     key: `initial:${visibleRows.length}`,
     layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, EMPTY_HEIGHTS) : EMPTY_LAYOUT,

@@ -100,6 +100,64 @@ async function lockEditor(
 }
 
 describe('EditorStore', () => {
+  it('owns transient expansion and memoizes visible rows until document, location, or expansion changes', async () => {
+    const store = new EditorStore(
+      loadedState(
+        {
+          roots: [
+            {
+              id: 'root',
+              text: 'Root',
+              children: [
+                { id: 'child', text: 'Child', children: [{ id: 'grandchild', text: 'Grandchild', children: [] }] },
+              ],
+            },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'root' },
+      ),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    const collapsedRows = store.getVisibleRows()
+    expect(collapsedRows.map((row) => row.node.id)).toEqual(['root'])
+    expect(store.getVisibleRows()).toBe(collapsedRows)
+    store.toggleExpansion('root')
+    const expandedRows = store.getVisibleRows()
+    expect(expandedRows.map((row) => row.node.id)).toEqual(['root', 'child'])
+    expect(expandedRows).not.toBe(collapsedRows)
+    store.selectNode('child', 1)
+    expect(store.getVisibleRows()).toBe(expandedRows)
+    store.editText('child', 'Updated child')
+    const editedRows = store.getVisibleRows()
+    expect(editedRows).not.toBe(expandedRows)
+    store.toggleExpansion('root')
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'ready',
+      location: { selectedNodeId: 'root' },
+      focus: { nodeId: 'root', cursor: 0 },
+    })
+  })
+
+  it('resets expansion when the current parent changes and supports fold commands without persistence', async () => {
+    const store = new EditorStore(
+      loadedState(
+        { roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      ),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    store.applyFold('open', 'root')
+    const expandedRows = store.getVisibleRows()
+    expect(expandedRows.map((row) => row.node.id)).toEqual(['root', 'child'])
+    store.enter()
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', expansion: { expandedIds: new Set() } })
+    expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['child'])
+    expect(store.getVisibleRows()).not.toBe(expandedRows)
+  })
   it('edits a whole-node Visual sibling range in one undo step and rejects paste into a source descendant', async () => {
     const services = loadedState(
       {

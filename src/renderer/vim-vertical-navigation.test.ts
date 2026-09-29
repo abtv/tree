@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReadySnapshot } from '../application/editor-runtime-state'
+import { COLLAPSED_EXPANSION_STATE } from '../application/expansion-state'
 import type { Document, TreeNode } from '../domain/document'
 import { navigateVertically, type VimVerticalNavigationStore } from './vim-vertical-navigation'
 
@@ -22,6 +23,7 @@ function store(
       location: { currentParentId, selectedNodeId },
       focus: { nodeId: selectedNodeId, cursor: 0, token },
       structuralVersion: 0,
+      expansion: COLLAPSED_EXPANSION_STATE,
     },
   }
   return {

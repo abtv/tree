@@ -1,6 +1,9 @@
 import { vi } from 'vitest'
 import type { EditorSnapshot, EditorStore, FocusIntent } from '../../application/editor-store'
 import type { Document, Location } from '../../domain/document'
+import { displayedNodes } from '../../domain/document'
+import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../../application/expansion-state'
+import { buildVisibleRows } from '../../application/visible-rows'
 
 /** The public surface of `EditorStore`, without the class's private branding. */
 export type EditorStorePublic = { [K in keyof EditorStore]: EditorStore[K] }
@@ -22,6 +25,7 @@ export type EditorStoreSnapshotInput =
       location?: Location
       focus?: FocusIntent
       structuralVersion?: number
+      expansion?: import('../../application/expansion-state').ExpansionState
       saveError?: string
       operationError?: string
       persistenceLocked?: boolean
@@ -61,6 +65,16 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
   const double: EditorStorePublic = {
     getSnapshot,
     subscribe: vi.fn(() => () => undefined),
+    getVisibleRows: vi.fn(() => {
+      const value = typeof snapshot === 'function' ? snapshot() : snapshot
+      return value.status === 'ready' && value.document !== undefined && value.location !== undefined
+        ? buildVisibleRows(displayedNodes(value.document, value.location.currentParentId), (id) =>
+            isNodeExpanded(value.expansion ?? COLLAPSED_EXPANSION_STATE, id),
+          )
+        : []
+    }),
+    toggleExpansion: vi.fn(),
+    applyFold: vi.fn(),
     registerPendingEditFinisher: vi.fn(() => () => undefined),
     flushPersistence: vi.fn(async () => {}),
     reportError: vi.fn(),

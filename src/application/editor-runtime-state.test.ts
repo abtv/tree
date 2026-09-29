@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createInitialDocument } from '../domain/document'
+import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 import { EditorRuntimeState } from './editor-runtime-state'
 
 describe('EditorRuntimeState', () => {
@@ -15,6 +16,7 @@ describe('EditorRuntimeState', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
       focus: state.newFocus('root', 0),
       structuralVersion: 0,
+      expansion: COLLAPSED_EXPANSION_STATE,
       operationError: 'old error',
     })
     expect(state.ready().focus.token).toBe(1)

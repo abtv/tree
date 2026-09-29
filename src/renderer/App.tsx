@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
-import { displayedNodes, nodePath, normalizeCollapsedLocation, requireNode, type TreeNode } from '../domain/document'
+import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
+import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../application/expansion-state'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
-import {
-  applyNodeFold,
-  COLLAPSED_EXPANSION_STATE,
-  expandForest,
-  isNodeExpanded,
-  toggleNodeExpansion,
-  type ExpansionState,
-} from './expansion-state'
 import type { VimFoldCommand } from './vim-keyboard-types'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
@@ -31,7 +24,6 @@ export function App({ store }: AppProps): React.JSX.Element {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimMode, setVimMode] = useState<VimMode>('normal')
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
-  const [expansion, setExpansion] = useState<ExpansionState>(COLLAPSED_EXPANSION_STATE)
   const leftCommandKeyPressed = useLeftCommandKey()
   useEffect(() => {
     void window.treeApi
@@ -42,18 +34,11 @@ export function App({ store }: AppProps): React.JSX.Element {
   const focus = state.status === 'ready' ? state.focus : undefined
   const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
-  const currentParentId = state.status === 'ready' ? state.location.currentParentId : null
-  const [expandedForParentId, setExpandedForParentId] = useState(currentParentId)
-  // Inline expansion is transient view state for the current visit to a location
-  // (docs/PRODUCT.md §2.4): every navigation path that changes the current parent — pointer, the
-  // location breadcrumb, `Cmd+.`/`Cmd+,`, `gd`/`Ctrl+o`, and undo/redo — resets it, without needing a
-  // callback threaded through each of those paths individually. Resetting during render (rather than
-  // in an effect) avoids an extra committed render showing the stale expansion for one frame.
-  if (expandedForParentId !== currentParentId) {
-    setExpandedForParentId(currentParentId)
-    setExpansion(COLLAPSED_EXPANSION_STATE)
-  }
-  const isExpanded = useCallback((nodeId: string): boolean => isNodeExpanded(expansion, nodeId), [expansion])
+  const isExpanded = useCallback(
+    (nodeId: string): boolean =>
+      state.status === 'ready' && isNodeExpanded(state.expansion ?? COLLAPSED_EXPANSION_STATE, nodeId),
+    [state],
+  )
   const isImageCaretActive = useCallback(
     (node: TreeNode): boolean =>
       vimMode === 'normal' &&
@@ -70,29 +55,8 @@ export function App({ store }: AppProps): React.JSX.Element {
       store.reportError(error)
     })
   }, [alwaysOnTop, store])
-  // The Vim fold keys dispatch here because this component owns the transient expansion state.
-  // Closing all folds can hide the caret, so it applies the §2.4 collapse rule: the displayed
-  // ancestor-or-self of the hidden caret becomes selected with its caret at the beginning.
   const applyFoldCommand = useCallback(
-    (command: VimFoldCommand, nodeId: string): void => {
-      const before = store.getSnapshot()
-      if (before.status !== 'ready') return
-      if (command === 'close-all') {
-        const normalized = normalizeCollapsedLocation(before.document, before.location)
-        setExpansion(COLLAPSED_EXPANSION_STATE)
-        if (normalized.selectedNodeId !== before.location.selectedNodeId) store.selectNode(normalized.selectedNodeId, 0)
-        return
-      }
-      if (command === 'open-all') {
-        const displayed = displayedNodes(before.document, before.location.currentParentId)
-        setExpansion((previous) => expandForest(previous, displayed))
-        return
-      }
-      // The editable current-parent heading owns no fold: its children are the location itself.
-      if (nodeId === before.location.currentParentId) return
-      const node = requireNode(before.document, nodeId).node
-      setExpansion((previous) => applyNodeFold(previous, command, node))
-    },
+    (command: VimFoldCommand, nodeId: string): void => store.applyFold(command, nodeId),
     [store],
   )
   const { bindings: nodeInputBindings, dragFreeze } = useNodeInputBindings({
@@ -138,12 +102,12 @@ export function App({ store }: AppProps): React.JSX.Element {
   )
   const onToggleExpansion = useCallback(
     (node: TreeNode): void => {
-      const collapsing = isNodeExpanded(expansion, node.id)
+      const before = store.getSnapshot()
+      const collapsing = before.status === 'ready' && isNodeExpanded(before.expansion, node.id)
       if (!collapsing) {
-        setExpansion((previous) => toggleNodeExpansion(previous, node.id))
+        store.toggleExpansion(node.id)
         return
       }
-      const before = store.getSnapshot()
       // Only a strict descendant of the collapsing node is hidden by the collapse; the collapsing
       // node's own row stays visible, and an unrelated row's selection, caret, and focus must stay
       // untouched, so every check below runs against the state from before the collapse.
@@ -154,8 +118,7 @@ export function App({ store }: AppProps): React.JSX.Element {
       // Finish a pending edit session before it is hidden, the same way entering or leaving a node
       // does; an unrelated collapse must not blur the currently focused row.
       if (hidesSelection && document.activeElement instanceof HTMLElement) document.activeElement.blur()
-      setExpansion((previous) => toggleNodeExpansion(previous, node.id))
-      if (hidesSelection) store.selectNode(node.id, 0)
+      store.toggleExpansion(node.id)
       if (
         nodeVisualSelection !== undefined &&
         (isHiddenByCollapse(nodeVisualSelection.anchorId) || isHiddenByCollapse(nodeVisualSelection.focusId))
@@ -164,7 +127,7 @@ export function App({ store }: AppProps): React.JSX.Element {
         setVimMode('normal')
       }
     },
-    [expansion, store, nodeVisualSelection, setNodeVisualSelection, setVimMode],
+    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode],
   )
   const navigateToAncestor = useCallback(
     (parentId: string | null): void => {
@@ -278,6 +241,7 @@ export function App({ store }: AppProps): React.JSX.Element {
           isExpanded={isExpanded}
           locked={persistenceLocked}
           nodes={nodes}
+          visibleRows={store.getVisibleRows()}
           onActivate={activateNode}
           visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
           onEnter={enterNode}

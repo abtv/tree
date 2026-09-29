@@ -1,7 +1,8 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '../domain/document'
-import { buildVisibleRows, siblingBoundaryIndices } from './visible-tree'
+import { buildVisibleRows } from '../application/visible-rows'
+import { siblingBoundaryIndices } from './visible-tree'
 
 interface RawNode {
   children: RawNode[]

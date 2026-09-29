@@ -80,7 +80,7 @@ The application layer may depend on the domain and the renderer may depend on th
 
 ### Performance context
 
-`buildVisibleRows` costs one traversal of the visible rows. Today `NodeList.tsx` runs it once per render inside a `useMemo`. If navigation naively rebuilt it per motion step, a counted motion such as `50j` would pay fifty traversals on an interactive path, which `docs/PRODUCT.md` §22.1 and §22.2 do not permit. The mitigation is stated in T1: the store memoizes one row list, invalidated only when the document object, the current parent, or the expansion set changes, and the renderer consumes that same list instead of building its own. Net effect is one traversal fewer per render, not one more per keystroke.
+`buildVisibleRows` costs one traversal of the visible rows. Today `NodeList.tsx` runs it once per render inside a `useMemo`. If navigation naively rebuilt it per motion step, a counted motion such as `50j` would pay fifty traversals on an interactive path, which `docs/PRODUCT.md` §22.1 and §22.2 do not permit. T1 moves the traversal into an `EditorStore` cache, consumed by rendering; by itself it keeps the current one traversal per render. T2 and T3 then consume the same cached list for navigation, avoiding a second independent traversal or per-step rebuilding.
 
 `perf/expansion.spec.ts` already contains `keeps vertical traversal responsive crossing many expanded branches`, which is the guard for exactly this path. Re-measure it in T2 and T4 on the same machine as its recorded baseline; do not compare across machines.
 
@@ -88,12 +88,12 @@ The application layer may depend on the domain and the renderer may depend on th
 
 | ID | Outcome | Depends on | Status | Validation tier |
 | --- | --- | --- | --- | --- |
-| T1 | The application layer owns inline expansion and the visible-row order, with no user-visible change | — | Ready | Moderate Risk |
-| T2 | `↑`, `↓`, `j`, `k`, and their counted forms move by visible rows | T1 | Planned | Moderate Risk |
+| T1 | The application layer owns inline expansion and the visible-row order, with no user-visible change | — | Complete | Moderate Risk |
+| T2 | `↑`, `↓`, `j`, `k`, and their counted forms move by visible rows | T1 | Ready | Moderate Risk |
 | T3 | `←` and `→` boundary crossings and `G` / `NG` move by visible rows | T2 | Planned | Moderate Risk |
 | T4 | What stays sibling-scoped is recorded; property and performance guards close the initiative | T3 | Planned | Moderate Risk |
 
-**Next task: T1.**
+**Next task: T2.**
 
 Tier note. Every task changes renderer and application behavior within one process, with no persistence, IPC, clipboard, attachment, or native-shortcut boundary, so the Moderate Risk row of `docs/DEVELOPMENT.md` §9 applies: `npm run check`, the affected unit and property tests, and focused end-to-end coverage for every affected requirement. T2 and T3 additionally change shared interaction state, so `AGENTS.md` §13 requires an **independent reviewer** and a **separate product verifier** for them, and `docs/DEVELOPMENT.md` §8 requires a navigation and caret matrix built **before** the implementation. T1 and T4 need the primary agent's own diff review and product verification.
 
@@ -143,7 +143,7 @@ No task in this initiative changes rendered styling, so no task creates or updat
 * `npm run check` passes. Run `e2e/inline-expansion.spec.ts`, `e2e/navigation.spec.ts`, `e2e/vim-navigation-and-visual.spec.ts`, and `e2e/windowed-list.spec.ts` focused.
 * Record every result in the `docs/DEVELOPMENT.md` §9 evidence format. No visual-evidence record is required: no rendered styling changes.
 
-**Performance assessment (`docs/PRODUCT.md` §22.1).** State the three dimensions explicitly in the handoff: no new disk writes or syncs (expansion is never persisted and creates no undo entry); CPU on the interactive path goes **down** by one visible-row traversal per render, because rendering and navigation now share one memoized list; memory adds one cached array of visible rows plus the already-existing expanded-id set, both bounded by the current location's visible row count and both discarded on every location change. No new performance guard is needed in T1; `perf/expansion.spec.ts` must still pass.
+**Performance assessment (`docs/PRODUCT.md` §22.1).** State the three dimensions explicitly in the handoff: no new disk writes or syncs (expansion is never persisted and creates no undo entry); CPU in T1 stays at one visible-row traversal per render, matching the existing renderer computation, while T2 and T3 will reuse that traversal for navigation; memory adds one cached array of visible rows plus the already-existing expanded-id set, both bounded by the current location's visible row count and both discarded on every location change. No new performance guard is needed in T1; `perf/expansion.spec.ts` must still pass.
 
 **Decision reserved.** If moving ownership reveals a real defect in the current behavior — most likely in the interaction between the collapse-hides-caret rule and a pending Insert or Replace session — reproduce it defect-first, report it, and stop. Fixing it is a separate authorization.
 

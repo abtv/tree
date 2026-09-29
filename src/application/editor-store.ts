@@ -1,6 +1,7 @@
 import {
   collectAttachmentIds,
   createInitialDocument,
+  displayedNodes,
   deleteLink,
   editNodeContent,
   isValidLocation,
@@ -54,11 +55,23 @@ import { EditorTextSession } from './editor-text-session'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import type { PersistenceFailureKind } from './persistence-coordinator'
 import { countInsertedWords, countPastedWords } from './save-policy'
+import {
+  applyNodeFold,
+  COLLAPSED_EXPANSION_STATE,
+  expandForest,
+  isNodeExpanded,
+  toggleNodeExpansion,
+  type ExpansionState,
+  type NodeFoldCommand,
+} from './expansion-state'
+import { buildVisibleRows, type VisibleRow } from './visible-rows'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
 export class EditorStore {
+  private visibleRowsCache:
+    { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
   private readonly runtime = new EditorRuntimeState()
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
@@ -84,6 +97,68 @@ export class EditorStore {
   public getSnapshot = this.runtime.getSnapshot
 
   public subscribe = this.runtime.subscribe
+
+  public getVisibleRows(): readonly VisibleRow[] {
+    const state = this.runtime.ready()
+    const cached = this.visibleRowsCache
+    if (
+      cached?.document === state.document &&
+      cached.parentId === state.location.currentParentId &&
+      cached.expansion === state.expansion
+    )
+      return cached.rows
+    const rows = buildVisibleRows(displayedNodes(state.document, state.location.currentParentId), (id) =>
+      isNodeExpanded(state.expansion, id),
+    )
+    this.visibleRowsCache = {
+      document: state.document,
+      parentId: state.location.currentParentId,
+      expansion: state.expansion,
+      rows,
+    }
+    return rows
+  }
+
+  public toggleExpansion(nodeId: NodeId): void {
+    const state = this.runtime.ready()
+    if (nodeId === state.location.currentParentId) return
+    const collapsing = isNodeExpanded(state.expansion, nodeId)
+    const hidesSelection =
+      collapsing &&
+      requireNode(state.document, state.location.selectedNodeId).ancestors.some((ancestor) => ancestor.id === nodeId)
+    const expansion = toggleNodeExpansion(state.expansion, nodeId)
+    if (expansion === state.expansion) return
+    this.runtime.replaceReady({
+      ...state,
+      expansion,
+      ...(hidesSelection
+        ? { location: { ...state.location, selectedNodeId: nodeId }, focus: this.runtime.newFocus(nodeId, 0) }
+        : {}),
+    })
+  }
+
+  public applyFold(command: NodeFoldCommand | 'close-all' | 'open-all', nodeId?: NodeId): void {
+    const state = this.runtime.ready()
+    if (command === 'close-all') {
+      const location = normalizeCollapsedLocation(state.document, state.location)
+      this.runtime.replaceReady({
+        ...state,
+        expansion: COLLAPSED_EXPANSION_STATE,
+        ...(location.selectedNodeId !== state.location.selectedNodeId
+          ? { location, focus: this.runtime.newFocus(location.selectedNodeId, 0) }
+          : {}),
+      })
+      return
+    }
+    if (command === 'open-all') {
+      const expansion = expandForest(state.expansion, displayedNodes(state.document, state.location.currentParentId))
+      if (expansion !== state.expansion) this.runtime.replaceReady({ ...state, expansion })
+      return
+    }
+    if (nodeId === undefined || nodeId === state.location.currentParentId) return
+    const expansion = applyNodeFold(state.expansion, command, requireNode(state.document, nodeId).node)
+    if (expansion !== state.expansion) this.runtime.replaceReady({ ...state, expansion })
+  }
 
   /**
    * Registers a renderer-local pending-edit finisher. `flushPersistence` invokes registered
@@ -153,6 +228,7 @@ export class EditorStore {
           location: { currentParentId: null, selectedNodeId: rootId },
           focus: this.runtime.newFocus(rootId, 0),
           structuralVersion: this.runtime.getStructuralVersion(),
+          expansion: COLLAPSED_EXPANSION_STATE,
         }
         this.runtime.emit()
         this.saveScheduler.requestSave()
@@ -168,6 +244,7 @@ export class EditorStore {
         location,
         focus: this.runtime.newFocus(location.selectedNodeId, 0),
         structuralVersion: this.runtime.getStructuralVersion(),
+        expansion: COLLAPSED_EXPANSION_STATE,
       }
       this.runtime.emit()
       this.queueAttachmentCleanup()

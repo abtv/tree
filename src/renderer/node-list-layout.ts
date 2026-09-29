@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { computeOffsets, ROW_HEIGHT_ESTIMATE, type ListWindow } from './list-window'
-import type { VisibleRow } from './visible-tree'
+import type { VisibleRow } from '../application/visible-rows'
 
 export interface ListLayout {
   offsets: Float64Array

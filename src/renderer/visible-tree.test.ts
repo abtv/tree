@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '../domain/document'
-import { buildVisibleRows, nearestSiblingBoundary, siblingBoundaryIndices, type VisibleRow } from './visible-tree'
+import { buildVisibleRows } from '../application/visible-rows'
+import { nearestSiblingBoundary, siblingBoundaryIndices, type VisibleRow } from './visible-tree'
 
 function node(id: string, children: TreeNode[] = []): TreeNode {
   return { id, text: id, children }
