@@ -289,6 +289,41 @@ test.describe('inline node expansion', () => {
     await expect(second.window.getByRole('button', { name: 'Expand node 1' })).toBeVisible()
   })
 
+  test('normalizes an inline-expanded descendant selected below a non-null current parent after relaunch', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const first = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    await node(first.window, 1).click()
+    await first.window.keyboard.press('Meta+.')
+    await expect(parent(first.window)).toHaveValue('Alpha')
+    expect(await nodeTexts(first.window)).toEqual(['Alpha child one', 'Alpha child two'])
+
+    await first.window.getByRole('button', { name: 'Expand node 1' }).click()
+    expect(await nodeTexts(first.window)).toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
+
+    // Select and edit the inline-expanded grandchild so the persisted location has a non-null
+    // current parent and a selected node several levels below the direct child it should normalize to.
+    await node(first.window, 2).click()
+    await setCursor(node(first.window, 2), 'Alpha grandchild'.length)
+    await typeInto(node(first.window, 2), ' edited')
+
+    await closeApp(first.app)
+    const persisted = readPersisted(userDataDir)
+    expect(persisted.location).toEqual({ currentParentId: 'a', selectedNodeId: 'a1a' })
+
+    const second = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    // docs/PRODUCT.md §2.4: reopening starts collapsed, so the restored caret must land on the
+    // displayed direct child on the path to the persisted descendant, not the descendant itself.
+    await expect(parent(second.window)).toHaveValue('Alpha')
+    expect(await nodeTexts(second.window)).toEqual(['Alpha child one', 'Alpha child two'])
+    await expect(node(second.window, 1)).toHaveValue('Alpha child one')
+    await expect(node(second.window, 1)).toBeFocused()
+    expect(await node(second.window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+  })
+
   test('keeps gg on the first displayed root while G targets the descendant’s own last real sibling', async ({
     userDataDir,
   }) => {
