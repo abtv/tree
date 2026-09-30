@@ -7,6 +7,7 @@ import type { TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler, executeEditorContextMenuCommand } from './editor-input-handlers'
 import type { VimKeyboardState, VimPendingCommand, VimTextCommandState } from './editor-input-handlers'
 import { createEditorStoreDouble } from './test/editor-store-double'
+import { createRealStoreHarness } from './test/real-store-harness'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 import { clearPending } from './vim-command-state'
@@ -108,6 +109,40 @@ function vimHandler(
   }
 }
 
+async function textFixture(node: TreeNode, mode: VimKeyboardState['mode'] = 'normal') {
+  const harness = await createRealStoreHarness({ document: { roots: [node] } })
+  const input = document.createElement('textarea')
+  input.value = node.text
+  const keyboard = vimHandler(harness.store, harness.node(), mode)
+  const caretRequests: number[] = []
+  keyboard.vim.scheduleCaret = (_input, cursor) => {
+    caretRequests.push(cursor)
+  }
+  const press = (...keys: string[]) => {
+    const events: KeyboardEvent<HTMLElement>[] = []
+    for (const key of keys) {
+      const handle = createEditorKeyDownHandler({
+        store: harness.store,
+        node: harness.node(),
+        isComposing: () => false,
+        setSelectAllNodeId: vi.fn(),
+        onPreviewAttachment: vi.fn(),
+        vim: keyboard.vim,
+      })
+      const event = keyEvent(input, key)
+      events.push(event)
+      handle(event)
+      const cursor = input.selectionStart
+      if (input.value !== harness.node().text) {
+        input.value = harness.node().text
+        input.setSelectionRange(cursor, cursor)
+      }
+    }
+    return events
+  }
+  return { ...harness, ...keyboard, input, press, caretRequests }
+}
+
 /**
  * The image caret is owned by the caret authority, so assert the authority's resulting state rather
  * than the `setImageCaret` call that the pre-owner wiring used to emit. `fromFocus` is still a call
@@ -124,30 +159,17 @@ function expectImageCaret(
 }
 
 describe('editor keyboard handler', () => {
-  it('uses word and bracket text objects with operators and character Visual mode', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'one (two three)'
+  it('uses word and bracket text objects with operators and character Visual mode', async () => {
+    const { store, node, input, press, vim } = await textFixture({ id: 'node', text: 'one (two three)', children: [] })
     input.setSelectionRange(6, 6)
-    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
-    handle(keyEvent(input, 'd'))
-    handle(keyEvent(input, 'i'))
-    handle(keyEvent(input, 'w'))
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 5, 8, '')
+    press('d', 'i', 'w')
+    expect(node().text).toBe('one ( three)')
     expect(vim.register.current).toEqual({ kind: 'text', value: 'two' })
-
+    store.undo()
+    expect(node().text).toBe('one (two three)')
+    input.value = node().text
     input.setSelectionRange(6, 6)
-    handle(keyEvent(input, 'v'))
-    const visualHandle = createEditorKeyDownHandler({
-      store,
-      node: { id: 'node', text: input.value, children: [] },
-      isComposing: () => false,
-      setSelectAllNodeId: vi.fn(),
-      onPreviewAttachment: vi.fn(),
-      vim,
-    })
-    visualHandle(keyEvent(input, 'i'))
-    visualHandle(keyEvent(input, '('))
+    press('v', 'i', '(')
     expect(input.selectionStart).toBe(5)
     expect(input.selectionEnd).toBe(14)
   })
@@ -202,22 +224,18 @@ describe('editor keyboard handler', () => {
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
 
-  it('moves and edits in Normal mode without inserting command characters', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'one two'
+  it('moves and edits in Normal mode without inserting command characters', async () => {
+    const { node, input, press, store, vim } = await textFixture({ id: 'node', text: 'one two', children: [] })
     input.setSelectionRange(0, 0)
-    const { handle } = vimHandler(store, { id: 'node', text: 'one two', children: [] })
-
-    const word = keyEvent(input, 'w')
-    handle(word)
+    const [word] = press('w')
     expect(input.selectionStart).toBe(4)
-    expect(word.preventDefault).toHaveBeenCalledOnce()
-
-    const remove = keyEvent(input, 'x')
-    handle(remove)
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 4, 5, '')
-    expect(remove.preventDefault).toHaveBeenCalledOnce()
+    expect(word!.preventDefault).toHaveBeenCalledOnce()
+    const [remove] = press('x')
+    expect(node().text).toBe('one wo')
+    expect(remove!.preventDefault).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
+    store.undo()
+    expect(node().text).toBe('one two')
   })
 
   it('moves onto an attached image after deleting the final text character', () => {
@@ -2240,21 +2258,19 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(3)
   })
 
-  it('supports WORD and backward word-end motions with operators', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'foo.bar  baz qux'
+  it('supports WORD and backward word-end motions with operators', async () => {
+    const { input, press, node, store } = await textFixture({ id: 'node', text: 'foo.bar  baz qux', children: [] })
     input.setSelectionRange(0, 0)
-    const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
-
-    handle(keyEvent(input, 'W'))
+    press('W')
     expect(input.selectionStart).toBe(9)
-    handle(keyEvent(input, 'E'))
+    press('E')
     expect(input.selectionStart).toBe(11)
-    for (const key of ['g', 'e']) handle(keyEvent(input, key))
+    press('g', 'e')
     expect(input.selectionStart).toBe(6)
-    for (const key of ['d', 'W']) handle(keyEvent(input, key))
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 6, 9, '')
+    press('d', 'W')
+    expect(node().text).toBe('foo.babaz qux')
+    store.undo()
+    expect(node().text).toBe('foo.bar  baz qux')
   })
 
   it('repeats and reverses the latest character find', () => {
@@ -2271,71 +2287,77 @@ describe('editor keyboard handler', () => {
     expect(vim.commandState.lastFind).toEqual({ kind: 'f', character: '.' })
   })
 
-  it('changes the whole node with cc and S without deleting its subtree', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'parent'
-    const node: TreeNode = { id: 'node', text: 'parent', children: [{ id: 'child', text: 'child', children: [] }] }
-    const first = vimHandler(store, node)
-    for (const key of ['c', 'c']) first.handle(keyEvent(input, key))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 6, '')
-    expect(store.deleteSelected).not.toHaveBeenCalled()
-    expect(first.vim.mode).toBe('insert')
-
-    const second = vimHandler(store, node)
-    second.handle(keyEvent(input, 'S'))
-    expect(second.vim.mode).toBe('insert')
+  it.each([['c', 'c'], ['S']])('clears text with %j while preserving subtree and metadata', async (...keys) => {
+    const original: TreeNode = {
+      id: 'node',
+      text: 'parent',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [{ id: 'child', text: 'child', children: [] }],
+    }
+    const fixture = await textFixture(original)
+    fixture.press(...keys)
+    expect(fixture.node()).toEqual({ ...original, text: '' })
+    expect(fixture.snapshot().location).toEqual({ currentParentId: null, selectedNodeId: 'node' })
+    expect(fixture.vim.mode).toBe('insert')
+    fixture.store.undo()
+    expect(fixture.node()).toEqual(original)
   })
 
-  it('deletes backward with X, toggles case, and repeats a text register with a count', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'aBcD'
-    input.setSelectionRange(3, 3)
-    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
-
-    for (const key of ['2', 'X']) handle(keyEvent(input, key))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 3, '')
-
-    input.setSelectionRange(0, 0)
-    for (const key of ['3', '~']) handle(keyEvent(input, key))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 3, 'AbC')
-
-    vim.register.current = { kind: 'text', value: 'xy' }
-    input.setSelectionRange(1, 1)
-    for (const key of ['3', 'p']) handle(keyEvent(input, key))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 2, 2, 'xyxyxy')
+  it.each([
+    { keys: ['2', 'X'], cursor: 3, text: 'aD', register: 'Bc' },
+    { keys: ['3', '~'], cursor: 0, text: 'AbCD', register: 'xy' },
+    { keys: ['3', 'p'], cursor: 1, text: 'aBxyxyxycD', register: 'xy' },
+    { keys: ['P'], cursor: 1, text: 'axyBcD', register: 'xy' },
+  ])('applies counted text edit $keys as one undoable change', async ({ keys, cursor, text, register }) => {
+    const fixture = await textFixture({ id: 'node', text: 'aBcD', children: [] })
+    fixture.vim.register.current = { kind: 'text', value: 'xy' }
+    fixture.input.setSelectionRange(cursor, cursor)
+    fixture.press(...keys)
+    expect(fixture.node().text).toBe(text)
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
+    expect(fixture.vim.mode).toBe('normal')
+    fixture.store.undo()
+    expect(fixture.node().text).toBe('aBcD')
+    fixture.store.redo()
+    expect(fixture.node().text).toBe(text)
   })
 
-  it('completes Visual editing, endpoint exchange, case, and text replacement', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'AbCd'
+  it('completes Visual endpoint exchange and lowercase editing', async () => {
+    const { input, press, node, store, vim, caretRequests } = await textFixture(
+      { id: 'node', text: 'AbCd', children: [] },
+      'visual',
+    )
     input.setSelectionRange(0, 2)
-    const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
     vim.commandState.visualAnchor = 0
     vim.commandState.visualFocus = 1
-
-    handle(keyEvent(input, 'o'))
+    press('o')
     expect(vim.commandState.visualAnchor).toBe(1)
     expect(vim.commandState.visualFocus).toBe(0)
-    handle(keyEvent(input, 'u'))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 0, 2, 'ab')
+    press('u')
+    expect(node().text).toBe('abCd')
     expect(vim.mode).toBe('normal')
+    expect(caretRequests.at(-1)).toBe(0)
+    store.undo()
+    expect(node().text).toBe('AbCd')
+  })
 
-    const change = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
-    input.setSelectionRange(1, 3)
-    change.handle(keyEvent(input, 'c'))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 3, '')
-    expect(change.vim.mode).toBe('insert')
-
-    const put = vimHandler(store, { id: 'node', text: input.value, children: [] }, 'visual')
-    put.vim.register.current = { kind: 'text', value: 'ZZ' }
-    input.setSelectionRange(1, 3)
-    put.handle(keyEvent(input, 'p'))
-    expect(store.replaceTextRange).toHaveBeenLastCalledWith('node', 1, 3, 'ZZ')
-    expect(put.vim.register.current).toEqual({ kind: 'text', value: 'ZZ' })
-    expect(put.vim.mode).toBe('normal')
+  it.each([
+    { key: 'c', text: 'Ad', mode: 'insert', register: 'bC' },
+    { key: 'p', text: 'AZZd', mode: 'normal', register: 'ZZ' },
+    { key: 'P', text: 'AZZd', mode: 'normal', register: 'ZZ' },
+    { key: 'U', text: 'ABCd', mode: 'normal', register: 'ZZ' },
+  ])('applies character Visual $key to the selected text', async ({ key, text, mode, register }) => {
+    const fixture = await textFixture({ id: 'node', text: 'AbCd', children: [] }, 'visual')
+    fixture.vim.register.current = { kind: 'text', value: 'ZZ' }
+    fixture.vim.commandState.visualAnchor = 1
+    fixture.vim.commandState.visualFocus = 2
+    fixture.input.setSelectionRange(1, 3)
+    fixture.press(key)
+    expect(fixture.node().text).toBe(text)
+    expect(fixture.vim.mode).toBe(mode)
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
+    fixture.store.undo()
+    expect(fixture.node().text).toBe('AbCd')
   })
 
   it('leaves the caret at the start of a character-wise Visual case range', () => {

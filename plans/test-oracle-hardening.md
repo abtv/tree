@@ -60,8 +60,9 @@ Decisions reserved for the Product Owner:
 | T5 | Command inventory guard for the property generators | T4 | Done |
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
-| T8 | Outcome assertions in the input-handler tests | T7 | Planned |
-| T9 | Requirement traceability check | T8 | Planned |
+| T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
+| T8b | Remaining input-handler outcome assertions | T8a | Planned |
+| T9 | Requirement traceability check | T8b | Planned |
 | T10 | Initiative closure | T1-T9 | Planned |
 
 Order rationale: T1 comes first so that later tasks can show a measured change in mutation score. T2 comes before the new properties so that they are written under the new seed policy. T6 comes after T3-T5 because those tasks kill many survivors on their own. T9 comes after T7-T8 because it adds requirement markers to test files that T7-T8 rewrite.
@@ -251,11 +252,20 @@ Validation: `npm run check` passed at HEAD `9f1e4680795054a85c3c2d94d27926b2c15d
 
 Apply the T7 approach to `src/renderer/editor-input-handlers.test.ts` (259 interaction assertions at baseline). Where a handler is a pure mapping from an event to a command, and the command is itself the contract, an interaction assertion may stay; record the category rather than each line. If the file will not fit in one session, split the work by handler group into T8a and T8b in this plan before continuing.
 
+Split on 2026-09-30 because this file has nearly 3,000 lines:
+
+* **T8a:** migrate text-object deletion, Normal character deletion, WORD operator deletion, whole-text changes, counted backward deletion/case/puts, and character Visual case/change/puts. Use a local fixture over the T7 real store, rebuild the handler from the current node between keys, and synchronize its textarea after document edits. Assert document, register, mode, caret requests, and undo outcomes. Preserve callback mapping tests where the command itself is the contract. Files: `src/renderer/editor-input-handlers.test.ts`, this plan, and the index. Acceptance: migrated scenarios retain their prior coverage and add actual state assertions; count interaction assertions before/after; `npm run check` passes. Validation: Low Risk. No Product Owner decision reserved.
+* **T8b:** review and migrate the remaining navigation, structural, image, session, clipboard, shortcut, surround/repeat, and text tests, including plain-text put ordering, empty-register puts, and Visual case caret destinations. Keep doubles for failure injection and pure callback command contracts, recording retained categories. Files: `src/renderer/editor-input-handlers.test.ts`, possibly `src/renderer/test/real-store-harness.ts`, this plan, and the index. Acceptance: record final assertion count and retained categories; `npm run check` passes. Validation: Low Risk for tests only; any exposed production defect follows the initiative's separate fix and validation rules. Product Owner decisions: any material requirement gap. T9 follows T8b.
+
 Files: `src/renderer/editor-input-handlers.test.ts`, possibly `src/renderer/test/real-store-harness.ts`, this plan.
 
 Acceptance: the plan records the interaction-assertion count before and after, and the categories kept. `npm run check` passes.
 
 Validation tier: Low Risk (`npm run check`).
+
+**T8a result (2026-09-30).** Migrated the named text-operation groups to real-store outcomes, with current-node handler reconstruction and explicit textarea synchronization. Whole-text `cc` and `S` now independently prove subtree and attachment preservation; counted edits and Visual mutations prove actual text, registers, mode, and undo, with counted edits also checking redo. Input-handler cases increased from 176 to 184. Interaction assertion occurrences dropped from 242 to 238 (`rg -c 'toHaveBeenCalled|mock.calls' src/renderer/editor-input-handlers.test.ts`); several removed assertions previously shared one line. T8a keeps native `preventDefault` contracts and whole-node Visual callback mapping contracts. The other double-based groups remain for T8b rather than being declared justified or migrated.
+
+Validation: `npm run check` passed (79 files, 1300 tests, production build, zero audit vulnerabilities). Its source/test snapshot was HEAD `af197b32a321b32053f84c5ffe11a2cac0cc8fd4`, digest `sha256:bf193ab0f0258c90929cef4fc0fe07e56f1ba494a2177be7c7d7edbcc7d08747`. A final test-helper edit retained native-event assertions; affected stages were rerun at digest `sha256:6fafa3e93c0353ab5bb093f5b5d514ab5e3bfae520777e989e61d93e81dc6084`: `npm run typecheck:renderer`, `npx eslint src/renderer/editor-input-handlers.test.ts`, `npx prettier --check src/renderer/editor-input-handlers.test.ts`, and `npx vitest run --coverage` all passed (1300 tests, 4.97 s). Other aggregate stages remain valid. An earlier focused run failed on a new uppercase expectation that incorrectly included an unselected character; corrected before validation. No unresolved failures or exposed production defects. Primary diff review found no meaningful issues. No product decisions or production changes; no rendered inputs changed, so screenshots and E2E reruns were not required. Final documentation edits were checked separately.
 
 ### T9 — Requirement traceability check (W6)
 
@@ -283,7 +293,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, T5, and T7 are done. T8 (outcome assertions for input handlers) is the next ready task. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, T5, T7, and T8a are done. T8b (remaining input-handler outcome assertions) is the next ready task. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 
