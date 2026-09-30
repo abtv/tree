@@ -48,9 +48,7 @@ function sameDocument(a: Document, b: Document): boolean {
 /**
  * Asserts the location the task requires after an undo or redo call that actually restored a
  * history entry. `store.undo()`/`store.redo()` leave the snapshot reference untouched when there is
- * nothing to undo or redo, so `hadEffect` distinguishes that no-op from a real one: with nothing to
- * restore, the store makes no claim about the current, possibly synthetic, selection (for example one
- * `selectDescendant` placed below the currently displayed level without expanding its ancestor).
+ * nothing to undo or redo, so `hadEffect` distinguishes that no-op from a real history restoration.
  */
 function expectRestoredLocation(store: EditorStore, hadEffect: boolean, document: Document, location: Location): void {
   if (!hadEffect) return

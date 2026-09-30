@@ -151,6 +151,8 @@ Visible descendants are ordinary editable nodes: the user can click their text, 
 
 Expansion is view state, not a document edit. It creates no undo entry and never saves by itself. An expansion change is a pending change like a selection change: the idle, volume, and quit triggers in §16.1 save it together with the document. Expansion choices are kept when the location changes: entering a node shows its children with their own remembered expansion, and leaving it or using the location path shows the destination with the choices made there before. Reopening the application restores every remembered choice. If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged. When the application opens with a selected node that a collapsed ancestor hides, for example a document saved before expansion was remembered, the nearest displayed ancestor is selected instead, with its caret at the beginning of its text.
 
+Deleting a node retains its remembered expansion choice, including choices for its descendants. Undoing the deletion restores those choices, so restored nodes keep their previous expansion. These retained choices remain view state and do not become part of document history.
+
 Dragging visible descendants can reorder nodes only among their actual siblings. An expanded view provides no cross-level drop target and cannot change hierarchy by dragging.
 
 ---

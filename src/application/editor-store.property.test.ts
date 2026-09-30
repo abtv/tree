@@ -14,6 +14,7 @@ import {
   isDisplayed,
   materialize,
   type ClipboardRef,
+  type CommandAction,
 } from './test/editor-store-arbitraries'
 import {
   assertDocument,
@@ -23,6 +24,50 @@ import {
   serializeState,
   type TreeNode,
 } from '../domain/document'
+
+type ReadyState = Extract<ReturnType<EditorStore['getSnapshot']>, { status: 'ready' }>
+
+function displayedIn(state: ReadyState, document: ReadyState['document'], nodeId: string): boolean {
+  if (nodeId === state.location.currentParentId) return locateNode(document, nodeId) !== undefined
+  const node = locateNode(document, nodeId)
+  if (node === undefined) return false
+  const parent = state.location.currentParentId
+  const parentIndex = parent === null ? -1 : node.ancestors.findIndex((ancestor) => ancestor.id === parent)
+  if (parent !== null && parentIndex === -1) return false
+  return node.ancestors.slice(parentIndex + 1).every((ancestor) => state.expansion.expandedIds.has(ancestor.id))
+}
+
+/** Check effects against the incoming view, independently of the location chosen by the command. */
+function assertTransition(store: EditorStore, before: ReadyState, action: CommandAction, knownIds: Set<string>): void {
+  assertInvariants(store)
+  const after = store.getSnapshot()
+  if (after.status !== 'ready') return
+  for (const id of allIds(after.document)) knownIds.add(id)
+  for (const id of after.expansion.expandedIds) expect(knownIds.has(id)).toBe(true)
+
+  // Expansion is independent of document history. Deleted nodes retain their choices for undo.
+  if (action.kind !== 'toggleExpansion' && action.kind !== 'foldAll') {
+    expect(after.expansion.expandedIds).toEqual(before.expansion.expandedIds)
+  }
+
+  switch (action.kind) {
+    case 'enter':
+    case 'leave':
+    case 'navigate':
+      return
+    case 'undo':
+    case 'redo':
+      // §10 allows navigation only when displaying the resulting change site requires it.
+      if (!displayedIn(before, after.document, after.location.selectedNodeId)) return
+      break
+    case 'paste':
+    case 'pasteImage':
+      // A paste on the heading can create a sibling outside its current location (§§14–15).
+      if (before.location.selectedNodeId === before.location.currentParentId) return
+      break
+  }
+  expect(after.location.currentParentId).toBe(before.location.currentParentId)
+}
 
 function assertInvariants(store: EditorStore): void {
   const state = store.getSnapshot()
@@ -36,6 +81,7 @@ function assertInvariants(store: EditorStore): void {
   expect(isValidLocation(state.document, state.location)).toBe(true)
   expect(locateNode(state.document, state.location.selectedNodeId)).toBeDefined()
   expect(locateNode(state.document, state.focus.nodeId)).toBeDefined()
+  expect(isDisplayed(store)).toBe(true)
   expect(() => assertDocument(state.document)).not.toThrow()
   expect(() => serializeState(state.document, state.location, state.expansion)).not.toThrow()
 }
@@ -51,11 +97,15 @@ describe('EditorStore invariants under command sequences', () => {
           freshIds(),
         )
         await store.initialize()
+        const knownIds = new Set(allIds(document))
+        assertInvariants(store)
 
         for (const action of commands) {
+          const before = store.getSnapshot()
+          if (before.status !== 'ready') break
           const ran = await applyCommand(store, action, clipboard)
           if (!ran) break
-          assertInvariants(store)
+          assertTransition(store, before, action, knownIds)
         }
       }),
       { numRuns: propertyRuns(500) },
@@ -74,13 +124,17 @@ describe('EditorStore invariants under command sequences', () => {
           freshIds(),
         )
         await store.initialize()
+        const knownIds = new Set(allIds(document))
+        assertInvariants(store)
 
         for (const action of commands) {
+          const before = store.getSnapshot()
+          if (before.status !== 'ready') break
           const ran = await applyCommand(store, action, clipboard, () => {
             exercisedDeepSelection = true
           })
           if (!ran) break
-          assertInvariants(store)
+          assertTransition(store, before, action, knownIds)
         }
 
         const state = store.getSnapshot()
@@ -121,6 +175,62 @@ describe('EditorStore invariants under command sequences', () => {
     // Confirms the property run above actually exercised the branch this task guards, not only the
     // shallow cases already covered by the hand-written store tests.
     expect(exercisedDeepSelection).toBe(true)
+  })
+
+  it('keeps the location and expansion choices through visible descendant deletion, undo, and redo', async () => {
+    await fc.assert(
+      fc.asyncProperty(forest, fc.boolean(), fc.boolean(), async (rawForest, rootLocation, emptyDelete) => {
+        const descendants = materialize(rawForest).roots
+        const document = {
+          roots: [
+            {
+              id: 'view-root',
+              text: 'Root',
+              children: [
+                {
+                  id: 'branch',
+                  text: 'Branch',
+                  children: [{ id: 'leaf', text: '', children: descendants }],
+                },
+              ],
+            },
+          ],
+        }
+        const clipboard: ClipboardRef = { current: { kind: 'text', text: '' } }
+        const store = new EditorStore(
+          createServices(
+            {
+              version: 1,
+              document,
+              location: {
+                currentParentId: rootLocation ? null : 'view-root',
+                selectedNodeId: 'branch',
+              },
+            },
+            () => clipboard.current,
+          ),
+          freshIds(),
+        )
+        await store.initialize()
+        const knownIds = new Set(allIds(document))
+        const run = async (kind: CommandAction['kind']): Promise<void> => {
+          const before = store.getSnapshot()
+          if (before.status !== 'ready') throw new Error('Editor did not initialize')
+          const action = { kind, a: 1, b: 0, text: '' }
+          await applyCommand(store, action, clipboard)
+          assertTransition(store, before, action, knownIds)
+        }
+        await run('foldAll')
+        store.selectNode('leaf', 0)
+        assertInvariants(store)
+        await run(emptyDelete ? 'deleteEmpty' : 'delete')
+        await run('undo')
+        expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'leaf' } })
+        expect(store.getVisibleRows().map((row) => row.node.id)).toContain(descendants[0]!.id)
+        await run('redo')
+      }),
+      { numRuns: propertyRuns(100) },
+    )
   })
 
   it('preserves node ids that survive an operation', () => {

@@ -39,6 +39,7 @@ Decisions reserved for the Product Owner:
 * Mutation testing is not part of `npm run check` or `npm run check:full`. It runs on demand for changed domain and application files and on a weekly schedule. Reason: a full run costs minutes to tens of minutes, far more than the whole unit suite.
 * Property tests use a random seed by default, locally and in pull-request CI. A failure prints its seed and path; the reproduced counterexample becomes a named deterministic test in the same fix, as `src/renderer/vim-mixed-interaction.property.test.ts` already does. Reason: a fixed seed replays the same cases on every run and never explores new ones. The Product Owner may override this default.
 * Requirement traceability is checked at the level of numbered `docs/PRODUCT.md` sections, not individual sentences.
+* T4: the Product Owner chose to retain expansion choices through deletion and undo. Expansion IDs may therefore refer to deleted nodes; the invariant checks that each ID belongs to a node seen in the generated history and that document commands preserve the choices. PRODUCT.md §2.4 records the behavior.
 
 ## Baseline (2026-09-30, commit `9f38b57`)
 
@@ -55,7 +56,7 @@ Decisions reserved for the Product Owner:
 | T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Blocked (Product Owner decision, see T1 findings) |
 | T2 | Property seed and run-count policy with a soak run | — | Done |
 | T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Done |
-| T4 | Location and display invariants checked after every command | T3 | Planned |
+| T4 | Location and display invariants checked after every command | T3 | Done |
 | T5 | Command inventory guard for the property generators | T4 | Planned |
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Planned |
@@ -149,7 +150,7 @@ The structural invariants in `assertInvariants` did not catch the 2026-09-29 loc
 
 * the selected node is displayed: it is the current-parent heading or a visible row (`isDisplayed` is currently checked only after the restore round trip);
 * a command whose effect lies within the displayed location keeps `currentParentId` unchanged, unless the current parent itself was removed;
-* expansion state refers only to nodes the document contains.
+* expansion state refers only to nodes seen in the generated document history, and commands other than explicit expansion/fold commands preserve expansion choices (revised after the Product Owner chose to retain choices through deletion and undo).
 
 Before writing the second invariant, derive from `docs/PRODUCT.md` §§4-8 and §10 which commands may change the current parent, and record the table in this plan. A command whose rule the product document does not determine is a requirement gap: classify it under `AGENTS.md` §5.
 
@@ -158,6 +159,31 @@ Files: `src/application/editor-store.property.test.ts`, `src/application/test/ed
 Acceptance: reverting each of `fix(navigation): keep the location when deleting a visible descendant` and `fix(undo): keep the location when the change site is a visible row` in a scratch worktree makes a new invariant fail. If one does not, strengthen the invariant or the generator until it does, and record the result.
 
 Validation tier: Low Risk (`npm run check`); Moderate Risk for any fix commit.
+
+**Command/location table (derived before implementation, 2026-09-30).**
+
+| Generated command | May change current parent? | PRODUCT.md source |
+| --- | --- | --- |
+| edit | No, including an edit to an unselected node | §2.4 |
+| split | No: sibling creation or first child of the heading | §§2.4, 5.1, 6.1 |
+| delete, deleteEmpty | No: selection returns to a sibling or parent within the location | §§2.4, 8.1, 8.2 |
+| move | No: reorder actual siblings | §§2.4, 11 |
+| enter | Yes, a selected row becomes current parent; heading is a no-op | §6.1 |
+| leave | Yes, one parent level; root is a no-op | §7.1 |
+| up, down, horizontal | No, follow visible rows and heading | §4 |
+| navigate | Yes, explicit ancestor navigation | §2.2 |
+| undo, redo | Only if the resulting change site is outside the old displayed location or that location was removed | §10 |
+| paste, pasteImage | No for visible rows; a sibling created by heading paste is outside the old location | §§13–15 |
+| selectDescendant | No; target a rendered descendant | §2.4 |
+| toggleExpansion, foldAll | No; collapse may select a displayed ancestor | §2.4 |
+
+The invariant checks the resulting history focus against the incoming location and expansion choices, using ancestry rather than the production history-focus function. Heading paste is excluded from location preservation because it can create a sibling outside the current location; display validity and expansion checks still apply. Explicit navigation is also excluded from location preservation. The generator no longer selects hidden descendants: it selects visible descendants beneath the direct sibling level, matching a reachable pointer interaction. Reordering also chooses any visible row, with the destination bounded by its actual sibling list. The serialize/restore property's fixed-seed deep-selection assertion continues to pass.
+
+A targeted property always expands a nested branch, selects its only child, deletes it, undoes, and redoes. Generated subtrees vary the deleted content; both deletion commands and root/nested locations are generated. The restored child's own expansion is checked by displaying its children after undo.
+
+Historical-fix sensitivity in `/private/tmp/tree-t4-oracle`, HEAD `9181bfe` plus the new property/helper changes: `npx vitest run src/application/editor-store.property.test.ts -t 'keeps the location and expansion'` fails at the new location-preservation assertion with each production fix reversed separately. Reversing `95ad2d9` failed after 2 cases (seed `-1656266912`, path `1:0:0:0:0`, Backspace deletion); reversing `38f8685` failed after 1 case (seed `-1561955677`, path `0:0:0:0:0`, undo). Both expected current parent `view-root` and received `branch`. Restoring both fixes passed the same command (100 cases). No scratch changes enter the task commit.
+
+**Result (2026-09-30).** No production defect found. `npm run check` passed (77 files, 1242 tests, 5.33 s coverage suite; zero audit vulnerabilities). `TREE_PROPERTY_RUNS=20 npx vitest run --testTimeout=600000 src/application/editor-store.property.test.ts src/application/editor-store-undo.property.test.ts` passed (8 properties, 31.70 s). The first extended run omitted the soak timeout and timed out in the unchanged save-accounting property at five seconds; the documented soak timeout resolved it. `npx playwright test e2e/inline-expansion.spec.ts --grep 'keeps the location when deleting and undoing' --workers=1` passed (1 real Electron test). Primary diff review found no meaningful issues. The scratch worktree was removed. There are no intentionally unsupported generated command combinations; the table explains the cases exempt from location preservation.
 
 ### T5 — Command inventory guard (W1)
 
@@ -236,7 +262,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2 and T3 are done. T4 (location and display invariants after every command) is the next ready task; T5 follows it. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, and T4 are done. T5 (command inventory guard) is the next ready task. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 

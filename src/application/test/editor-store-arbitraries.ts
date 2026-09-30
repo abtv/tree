@@ -1,5 +1,12 @@
 import fc from 'fast-check'
-import { displayedNodes, isValidLocation, type Document, type Location, type TreeNode } from '../../domain/document'
+import {
+  displayedNodes,
+  isValidLocation,
+  locateNode,
+  type Document,
+  type Location,
+  type TreeNode,
+} from '../../domain/document'
 import type { EditorServices } from '../editor-store'
 import type { EditorStore } from '../editor-store'
 
@@ -142,8 +149,8 @@ export function isDisplayed(store: EditorStore): boolean {
 
 /**
  * Applies one generated command to `store` and reports whether it ran. `onDeepSelection` is
- * notified whenever `selectDescendant` actually moves selection to a descendant below the current
- * displayed level, so a caller can confirm the branch was exercised across a whole property run.
+ * notified whenever `selectDescendant` moves selection to a visible descendant below the current
+ * sibling level, so a caller can confirm the branch was exercised across a whole property run.
  */
 export async function applyCommand(
   store: EditorStore,
@@ -174,11 +181,15 @@ export async function applyCommand(
     case 'deleteEmpty':
       store.deleteEmptySelected()
       break
-    case 'move':
-      if (displayed.length > 0) {
-        store.moveNodeTo(displayed[action.a % displayed.length]!.id, action.b % (displayed.length + 2))
+    case 'move': {
+      const rows = store.getVisibleRows()
+      if (rows.length > 0) {
+        const target = rows[action.a % rows.length]!.node
+        const siblings = locateNode(state.document, target.id)!.siblings
+        store.moveNodeTo(target.id, action.b % (siblings.length + 2))
       }
       break
+    }
     case 'enter':
       store.enter()
       break
@@ -216,12 +227,15 @@ export async function applyCommand(
       break
     case 'selectDescendant': {
       const displayedIds = new Set(displayed.map((node) => node.id))
-      const candidates = nodes.filter(
-        (node) =>
-          node.id !== state.location.currentParentId &&
-          !displayedIds.has(node.id) &&
-          isValidLocation(state.document, { ...state.location, selectedNodeId: node.id }),
-      )
+      const candidates = store
+        .getVisibleRows()
+        .map((row) => row.node)
+        .filter(
+          (node) =>
+            node.id !== state.location.currentParentId &&
+            !displayedIds.has(node.id) &&
+            isValidLocation(state.document, { ...state.location, selectedNodeId: node.id }),
+        )
       if (candidates.length > 0) {
         store.selectNode(candidates[action.a % candidates.length]!.id, 0)
         onDeepSelection?.()
