@@ -108,7 +108,13 @@ export interface VimKeyboardState {
   finishReplace: (input: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
   imageTextCursor: { current: number | undefined }
   getCaretState: (nodeId: string, cursor: number, imageActive: boolean) => VimCaretState
-  applyCaretState: (nodeId: string, state: VimCaretState, fromFocus?: boolean) => void
+  /** Publish the complete Normal intent and project it through the hook's registered input. */
+  applyCaretState: (
+    nodeId: string,
+    state: VimCaretState,
+    fromFocus?: boolean,
+    timing?: 'immediate' | 'after-edit' | 'preserve-selection',
+  ) => void
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
   syncImageCaretToFocus: () => void

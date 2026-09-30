@@ -66,8 +66,8 @@ The established failure class is disagreement between a resolved interaction sta
 | ID | Outcome | Dependencies | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | T1 | Inventory caret writers and investigate Replace discrepancy | None | Complete affected transition matrix; evidence distinguishes reproduced defects, internal discrepancies, and valid mode-specific differences | Done |
-| T2 | Apply resolved Normal caret through one coherent path | T1 | All affected handlers and deferred projections follow the documented ownership contract; original and any newly reproduced defects have failing-before/passing-after regressions | Ready |
-| T3 | Guard real-hook sequences and close the initiative | T2 | Independent expected-state checks exercise the production hook and actions after transitions; required validation/reviews pass; lasting knowledge moved to its owners | Planned |
+| T2 | Apply resolved Normal caret through one coherent path | T1 | All affected handlers and deferred projections follow the documented ownership contract; original and any newly reproduced defects have failing-before/passing-after regressions | Done |
+| T3 | Guard real-hook sequences and close the initiative | T2 | Independent expected-state checks exercise the production hook and actions after transitions; required validation/reviews pass; lasting knowledge moved to its owners | Ready |
 
 Each task gets a current `WORKING_PLAN.md` carrying its inventory and evidence, required clean-context reviews, and a focused commit. Update this plan and index in that commit. Do not combine an unrelated defect or a materially larger refactor into these tasks.
 
@@ -169,6 +169,20 @@ Validation: Moderate Risk, `npm run check`, affected focused unit/property suite
 
 Reserved decisions: product changes or major ownership/process boundaries outside the existing renderer architecture. Ordinary implementation details are autonomous.
 
+#### T2 result (2026-10-01)
+
+`applyCaretState` now publishes the complete resolved Normal caret and projects it through the hook's registered input, with immediate, after-edit, or preserve-selection timing. Motions, vertical same-node/cross-node steps, edits, surround, Visual leave, Insert Escape, and Replace completion use that path. Partial image/return handles delegate to complete publication. Replace stores the resolved cursor and callers no longer retreat the DOM separately. One bounded pending projection carries node, focus token, and revision; native scheduling also records its originating element. Superseded, disconnected, replaced, and wrong-node work is consumed without projection. Mode changes invalidate deferred focus and retain only compatible pending placement. Existing pure transition arithmetic and the shared test harnesses remain unchanged; local handler/property fixtures now implement the complete projection callback contract.
+
+The primary matrix audit reproduced stale focus collapsing a newer same-node pointer selection, and queued Normal focus overwriting a newer Insert append position. New hook regressions fail without the respective revision/mode guard and pass with it. The audit also reproduced a refactor regression when composition start consumed a nonempty terminal Replace buffer: Normal projection moved native cursor 4 to 3. A preserving commit fixes it while retaining Replace mode, with a failing-before/passing-after regression. A native change-command outcome test covers pending insertion placement and actual history. Original upward-image regressions and every T1 Replace case remain passing. No requirement gaps, Product Owner decisions, or new unsupported combinations; native IME remains unit-contract-only under Development §8. T3 still owns the broader bounded production-hook sequences and closure.
+
+Final validation: `npm run check` passed on HEAD `a4e494b1e747810e1e599071519812b27870c5cd` plus runtime snapshot `sha256:05ab5734a058ccf09b5ce7feddd71f17691234e5efd92998114d035c4d55c913`: 81 files, 1,368 tests, 5.51 s coverage, production build, zero audit vulnerabilities, unchanged coverage floors. `npx playwright test` passed all 296 cases in 1.2 minutes on that production build, macOS GUI session with hidden windows. Earlier aggregate and Electron passes were superseded by the final runtime pass. Development failures were a coverage floor after moving a callback, an incorrect undo expectation, and the deliberately reproduced pointer/composition/Insert races; corrected before final validation. Documentation-only completion edits receive scoped formatting and documentation checks without repeating runtime validation.
+
+Visual evidence: inspected the actual synthetic upward-focus screenshot from the final `npx playwright test`, preserved at `/private/tmp/tree-caret-t2-upward.png`: selected upper text/image has the image outline and hidden text caret; the lower image-only neighbor is unoutlined. Also deliberately inspected the matched existing light/dark no-op image baselines in `e2e/vim-editing.spec.ts-snapshots/`; selected image and plain peer are correct. No baseline or styling changes. The original artifact is `test-results/vim-image-caret-Vim-editin-d3be1-oving-up-from-another-image-vim/upward-image-caret.png`; performance runs clear that directory.
+
+Independent reviewer traced the supplied complete change statements, source context, and T1 path matrix, including same-node/clamped and mode/composition paths; no remaining meaningful issues. Separate product verifier reviewed exact projection/focus/pointer/mode excerpts, new tests, and the matrix; no additional meaningful product issues. Its review was bounded to those excerpts, complemented by the primary full diff/path review. Role evidence was supplied directly because the role tools lack filesystem reads and prohibit shell inspection. No production boundary, persistence, or scale-dependent algorithm changed. Publication/projection uses constant-time map access and constant-size state; no additional disk writes/syncs or growing history. Existing Vim/expansion performance guards cover the affected paths.
+
+`npx playwright test -c perf.config.ts perf/vim.spec.ts perf/expansion.spec.ts` passed all 14 cases in 12.2 s on the final production build with visible windows. Ordinary Vim paint p95 was 32.8 ms; counted navigation across 1,100 visible rows remained within the existing guard, and the heap-growth guard passed. This is budget evidence, not a before/after performance improvement claim. `npm run format:check:changed`, `npm run check:docs`, and `git diff --check` passed for the completion edits. No failed or blocked checks remain.
+
 ### T3 — Production-hook sequence guards and closure
 
 Expected files: `src/renderer/use-node-input-bindings.test.tsx` or a dedicated `use-node-input-bindings.property.test.tsx`; `src/renderer/test/real-store-harness.ts` only if necessary; existing `vim-interaction.property.test.ts` / `vim-mixed-interaction.property.test.ts` only to clarify/reuse appropriate independent expectations; focused E2E specs for missing real-renderer boundaries; `docs/DEVELOPMENT.md` §8/12 and `docs/VIM_CONFORMANCE.md`; this plan and index until closure.
@@ -185,10 +199,10 @@ Reserved decisions: any newly exposed material requirement gap or expanded produ
 
 ## Next task and resume prompt
 
-T1 is complete with test and inventory evidence above. T2 is the next ready task: implement coherent Normal caret publication/projection against the T1 matrix. No new user-visible Replace defect was reproduced; treat the raw/resolved cursor mismatch as an internal consistency requirement. Start with repository state, not the earlier conversation; compare this record with commits and any unfinished working plan.
+T1 and T2 are complete with inventory, implementation, and validation evidence above. T3 is the next ready task: add bounded production-hook sequence guards and close the initiative. Start with repository state and preserve T1's matrix plus T2's named pointer, mode, composition, and upward-image regressions. No new product behavior is authorized.
 
 ```text
 Execute the Caret State Consistency initiative in plans/caret-state-consistency.md.
-Start with T2, using T1's writer inventory, transition matrix, and API scope.
+Start with T3, using T1's transition matrix and T2's coherent application path.
 Preserve existing product behavior; reproduce any new defect before fixing it.
 ```

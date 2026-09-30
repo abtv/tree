@@ -4,7 +4,7 @@ import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
 import { clearCommandAssembly, clearPending } from './vim-command-state'
-import { getCaret, getSelectionRange, selectAll, setNormalCaret } from './editor-dom'
+import { getCaret, getSelectionRange, selectAll } from './editor-dom'
 import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 
@@ -168,9 +168,15 @@ export function createEditorKeyDownHandler({
     if (vim !== undefined && vim.mode === 'replace' && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault()
       if (event.key === 'Escape') {
-        const changed = vim.finishReplace(event.currentTarget, true)
+        const committed = vim.finishReplace(event.currentTarget, true)
         vim.setMode('normal')
-        setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - (changed ? 1 : 0)))
+        if (!committed) {
+          const prior = vim.getCaretState(node.id, cursor, node.attachment !== undefined && cursor === node.text.length)
+          vim.applyCaretState(
+            node.id,
+            editCaretTransition(prior, cursor, node.text.length, node.attachment !== undefined),
+          )
+        }
         store.endTextSession()
       } else vim.handleReplaceKey(event.currentTarget, event.key)
       return
@@ -253,7 +259,6 @@ export function createEditorKeyDownHandler({
           node.text.length,
           node.attachment !== undefined,
         )
-        setNormalCaret(input, next.cursor)
         vim.applyCaretState(node.id, next)
         store.endTextSession()
         return
@@ -316,9 +321,8 @@ export function createEditorKeyDownHandler({
     } else if (event.metaKey && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       if (vim?.mode === 'replace') {
-        const changed = vim.finishReplace(event.currentTarget, true)
+        vim.finishReplace(event.currentTarget, true)
         vim.setMode('normal')
-        if (changed) setNormalCaret(event.currentTarget, Math.max(0, getCaret(event.currentTarget) - 1))
       } else if (vim?.mode === 'insert') {
         vim.finishInsert(event.currentTarget)
       }

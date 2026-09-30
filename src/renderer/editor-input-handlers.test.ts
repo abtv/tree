@@ -12,6 +12,7 @@ import type { RealStoreOptions } from './test/real-store-harness'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 import { clearPending } from './vim-command-state'
+import { setNormalCaret } from './editor-dom'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => {
@@ -99,19 +100,29 @@ function vimHandler(
   const onPreviewAttachment = vi.fn()
   const double = createVimKeyboardDouble(node.id, { mode, onPreviewAttachment })
   const { vim } = double
+  let currentInput: HTMLElement | undefined
+  const publish = vim.applyCaretState
+  vim.applyCaretState = vi.fn((id, caret, fromFocus, timing) => {
+    publish(id, caret, fromFocus, timing)
+    if (currentInput !== undefined && timing !== 'preserve-selection') setNormalCaret(currentInput, caret.cursor)
+  })
+  const handle = createEditorKeyDownHandler({
+    store,
+    node,
+    isComposing,
+    setSelectAllNodeId: vi.fn(),
+    onPreviewAttachment,
+    vim,
+  })
   return {
     vim,
     caret: double.caret,
     caretNodeId: double.caretNodeId,
     commandState: double.commandState,
-    handle: createEditorKeyDownHandler({
-      store,
-      node,
-      isComposing,
-      setSelectAllNodeId: vi.fn(),
-      onPreviewAttachment,
-      vim,
-    }),
+    handle: (event: KeyboardEvent<HTMLElement>) => {
+      currentInput = event.currentTarget
+      handle(event)
+    },
     onPreviewAttachment,
   }
 }
@@ -122,6 +133,15 @@ async function textFixture(node: TreeNode, mode: VimKeyboardState['mode'] = 'nor
   input.value = node.text
   const keyboard = vimHandler(harness.store, harness.node(), mode)
   const caretRequests: number[] = []
+  const publish = keyboard.vim.applyCaretState
+  keyboard.vim.applyCaretState = vi.fn((id, caret, fromFocus, timing) => {
+    publish(id, caret, fromFocus, timing)
+    if (timing === 'after-edit') caretRequests.push(caret.cursor)
+    if (timing !== 'preserve-selection') {
+      input.value = harness.node().text
+      setNormalCaret(input, caret.cursor)
+    }
+  })
   keyboard.vim.scheduleCaret = (_input, cursor) => {
     caretRequests.push(cursor)
   }

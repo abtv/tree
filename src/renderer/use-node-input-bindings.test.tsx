@@ -117,6 +117,66 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
 }
 
 describe('useNodeInputBindings', () => {
+  it('projects a native insertion position after a change command edits the text', async () => {
+    const f = await fixture({ document: { roots: [image('one two')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 0))
+    f.press('c')
+    f.press('w')
+    expect(f.node().text).toBe(' two')
+    expect(f.result.current.vimMode).toBe('insert')
+    expect(getCaret(input)).toBe(0)
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    f.type('X two')
+    f.press('Escape')
+    f.press('u')
+    expect(f.node().text).toBe(' two')
+    f.press('u')
+    expect(f.node().text).toBe('one two')
+  })
+
+  it('abandons a queued focus pass after a newer same-node pointer selection', async () => {
+    const tasks: (() => void)[] = []
+    vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 1))
+    expect(tasks.length).toBeGreaterThan(0)
+    input.setSelectionRange(2, 5)
+    act(() => f.bindings().onMouseUp({ currentTarget: input } as never))
+    act(() => tasks.splice(0).forEach((task) => task()))
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(5)
+  })
+
+  it('keeps a newer motion after a queued focus pass on the same token', async () => {
+    const tasks: (() => void)[] = []
+    vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
+    const f = await fixture({ document: { roots: [image('abcdef')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 1))
+    f.press('j')
+    f.press('k')
+    f.press('l')
+    act(() => tasks.splice(0).forEach((task) => task()))
+    expect(getCaret(input)).toBe(2)
+    f.press('x')
+    expect(f.node().text).toBe('abdef')
+  })
+
+  it('keeps the native append position when Insert supersedes queued Normal focus', async () => {
+    const tasks: (() => void)[] = []
+    vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 1))
+    f.press('a')
+    expect(getCaret(input)).toBe(2)
+    act(() => tasks.splice(0).forEach((task) => task()))
+    expect(f.result.current.vimMode).toBe('insert')
+    expect(getCaret(input)).toBe(2)
+  })
+
   it.each([false, true].flatMap((attached) => ['escape', 'undo', 'redo'].map((finish) => ({ attached, finish }))))(
     'keeps the next command aligned when Replace types the existing character: %j',
     async ({ attached, finish }) => {
@@ -941,6 +1001,20 @@ describe('useNodeInputBindings', () => {
     f.press('Escape')
     expect(f.node().text).toBe('abあXd')
     expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it('keeps the native insertion end when composition consumes a typed Replace buffer', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abc')] } })
+    const input = f.input()
+    input.setSelectionRange(3, 3)
+    f.press('R')
+    f.press('X')
+    expect(getCaret(input)).toBe(4)
+    act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+    expect(f.node().text).toBe('abcX')
+    expect(f.result.current.vimMode).toBe('replace')
+    expect(input.selectionStart).toBe(4)
+    expect(input.selectionEnd).toBe(4)
   })
 
   it('registers a pending-edit finisher with the store and unregisters it on unmount', () => {

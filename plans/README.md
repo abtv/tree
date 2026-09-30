@@ -5,6 +5,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 | Initiative | Status | Next task |
 | --- | --- | --- |
 | [Test Oracle Hardening](test-oracle-hardening.md) | Active | No ready task; T1 needs a Product Owner decision (Stryker runner vs Vitest 5). T6 and T10 depend on it |
-| [Caret State Consistency](caret-state-consistency.md) | Active; T1 complete | T2: apply resolved Normal caret through one coherent path |
+| [Caret State Consistency](caret-state-consistency.md) | Active; T1 and T2 complete | T3: add production-hook sequence guards and close the initiative |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

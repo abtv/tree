@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
 import { cloneNode, displayedNodes, linkAtPosition, locateNode, requireNode, type TreeNode } from '../domain/document'
-import { getCaret, getSelectionRange, setCaret, setNormalCaret, setSelectionRange } from './editor-dom'
+import { getCaret, getSelectionRange, setCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
   calculateTextChange,
@@ -72,9 +72,15 @@ function syncImageCaretAtCursor(
   input: HTMLElement,
   cursor: number,
   textLength = node.text.length,
+  timing: 'immediate' | 'after-edit' = 'immediate',
 ): void {
   const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
-  vim.applyCaretState(node.id, editCaretTransition(prior, cursor, textLength, node.attachment !== undefined))
+  vim.applyCaretState(
+    node.id,
+    editCaretTransition(prior, cursor, textLength, node.attachment !== undefined),
+    false,
+    timing,
+  )
 }
 
 export function handleVimKey(
@@ -133,7 +139,6 @@ export function handleVimKey(
       commandState.visualFocus = clamped
       setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
     } else {
-      setNormalCaret(input, clamped)
       syncImageCaretAtCursor(vim, node, input, clamped)
     }
   }
@@ -165,7 +170,6 @@ export function handleVimKey(
   if (event.key === 'Escape') {
     clearCommandAssembly(commandState)
     vim.setMode('normal')
-    setNormalCaret(input, selection.start)
     syncImageCaretAtCursor(vim, node, input, selection.start)
     return handled()
   }
@@ -408,7 +412,6 @@ export function handleVimKey(
       node.text.length,
       node.attachment !== undefined,
     )
-    setNormalCaret(input, next.cursor)
     vim.applyCaretState(node.id, next)
   } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
@@ -471,7 +474,6 @@ export function handleVimKey(
       caret: vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
       direction: event.key === 'j' ? 'down' : 'up',
       count,
-      setCaret: (nextCursor) => setNormalCaret(input, nextCursor),
       applyCaretState: vim.applyCaretState,
     })
   } else if (visual && event.key === 'v') {
@@ -490,7 +492,7 @@ export function handleVimKey(
       store.replaceTextRange(node.id, selection.start, selection.end, '')
       vim.imageTextCursor.current = undefined
       recordRepeatChange(commandState, { kind: 'delete', motion: 'x', count: selection.end - selection.start })
-    } else setNormalCaret(input, selection.start)
+    }
     leaveVisual(
       vim,
       node,
@@ -689,7 +691,7 @@ function applySurround(
   const result = calculateSurround(text, cursor, change)
   if (result === undefined) return undefined
   store.replaceTextRanges(node.id, result.edits)
-  vim.scheduleCaret(input, result.cursor)
+  syncImageCaretAtCursor(vim, node, input, result.cursor, result.nextText.length, 'after-edit')
   recordRepeatChange(vim.commandState, change)
   return { text: result.nextText, cursor: result.cursor }
 }
@@ -732,8 +734,7 @@ function applyTextChange(
   } else {
     const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
     const next = editCaretTransition(prior, result.nextCursor, result.nextText.length, node.attachment !== undefined)
-    vim.scheduleCaret(input, next.cursor)
-    vim.applyCaretState(node.id, next)
+    vim.applyCaretState(node.id, next, false, 'after-edit')
     if (!replay && result.nextText !== node.text) recordRepeatChange(vim.commandState, change)
   }
   return {
@@ -752,8 +753,7 @@ function leaveVisual(
   clearVisualRange(vim.commandState)
   vim.setMode('normal')
   const nextCursor = normalEditCursor(cursor, textLength, node.attachment !== undefined)
-  syncImageCaretAtCursor(vim, node, input, nextCursor, textLength)
-  vim.scheduleCaret(input, nextCursor)
+  syncImageCaretAtCursor(vim, node, input, nextCursor, textLength, 'after-edit')
 }
 
 function applyVisualCase(

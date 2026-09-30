@@ -67,6 +67,11 @@ function assertImageMotionSequence(
   })
   const double = createVimKeyboardDouble(node.id)
   const { vim } = double
+  const publish = vim.applyCaretState
+  vim.applyCaretState = (id, caret, fromFocus, timing) => {
+    publish(id, caret, fromFocus, timing)
+    setNormalCaret(input, caret.cursor)
+  }
   // Production always reaches the handler with the caret authority already holding the focused
   // node, so seed it rather than letting the first motion fall through the unknown-node branch.
   vim.applyCaretState(node.id, {
@@ -264,6 +269,7 @@ function assertSiblingMotionSequence(
       authority.nodeId = nodeId
       authority.caret = caret
       projectImageCaret()
+      setNormalCaret(inputAt(nodeId), caret.cursor)
     },
     setImageCaret: (nodeId, active) => {
       vim.applyCaretState(nodeId, {
@@ -389,6 +395,10 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   const double = createVimKeyboardDouble(node.id, { register: { kind: 'text', value: pastedText } })
   const vim: VimKeyboardState = {
     ...double.vim,
+    applyCaretState: (id, caret, fromFocus, timing) => {
+      double.vim.applyCaretState(id, caret, fromFocus, timing)
+      setNormalCaret(input, caret.cursor)
+    },
     scheduleCaret: vi.fn((target, position) => setNormalCaret(target as HTMLTextAreaElement, position)),
   }
   vim.applyCaretState(node.id, { cursor, imageActive: false })

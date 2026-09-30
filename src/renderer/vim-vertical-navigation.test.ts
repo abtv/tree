@@ -63,7 +63,6 @@ describe('Vim vertical navigation', () => {
       attachment: { id: 'image', mimeType: 'image/png' as const },
     }
     const navigationStore = store({ roots: [current] }, current.id, null)
-    const setCaret = vi.fn()
     const applyCaretState = vi.fn()
 
     navigateVertically({
@@ -72,11 +71,9 @@ describe('Vim vertical navigation', () => {
       caret: { cursor: 1, imageActive: false },
       direction: 'down',
       count: 1,
-      setCaret,
       applyCaretState,
     })
 
-    expect(setCaret).toHaveBeenCalledWith(4)
     expect(applyCaretState).toHaveBeenLastCalledWith('current', {
       cursor: 4,
       imageActive: true,
@@ -89,7 +86,6 @@ describe('Vim vertical navigation', () => {
     const second = node('second', 'abcdef')
     const navigationStore = store({ roots: [first, second] }, first.id, null, ['first'])
     const getSnapshot = vi.spyOn(navigationStore, 'getSnapshot')
-    const setCaret = vi.fn()
     const applyCaretState = vi.fn()
 
     navigateVertically({
@@ -98,7 +94,6 @@ describe('Vim vertical navigation', () => {
       caret: { cursor: 0, imageActive: false },
       direction: 'down',
       count: 2,
-      setCaret,
       applyCaretState,
     })
 
@@ -128,7 +123,6 @@ describe('Vim vertical navigation', () => {
       caret: { cursor: 2, imageActive: false },
       direction: 'down',
       count: 1,
-      setCaret: vi.fn(),
       applyCaretState,
     })
 

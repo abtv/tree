@@ -14,7 +14,6 @@ export interface VimVerticalNavigationOptions {
   caret: VimCaretState
   direction: 'up' | 'down'
   count: number
-  setCaret: (cursor: number) => void
   applyCaretState: (nodeId: string, state: VimCaretState, isFocus?: boolean) => void
 }
 
@@ -25,7 +24,6 @@ export function navigateVertically({
   caret: initialCaret,
   direction,
   count,
-  setCaret,
   applyCaretState,
 }: VimVerticalNavigationOptions): void {
   let currentNode = node
@@ -60,7 +58,6 @@ export function navigateVertically({
       }
       caret = step.caret
       navigationCursor = caret.cursor
-      setCaret(caret.cursor)
       applyCaretState(currentNode.id, caret)
       continue
     }
