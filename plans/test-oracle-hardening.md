@@ -31,7 +31,6 @@ The Product Owner authorized the objective and the creation of this plan on 2026
 
 Decisions reserved for the Product Owner:
 
-* T1: if no released Stryker Vitest runner supports the pinned Vitest version, which alternative to take (wait for a release, change the Vitest version, or another mutation tool).
 * Any material requirement gap that T3 or T4 exposes.
 
 ## Decisions
@@ -39,6 +38,7 @@ Decisions reserved for the Product Owner:
 * Mutation testing is not part of `npm run check` or `npm run check:full`. It runs on demand for changed domain and application files and on a weekly schedule. Reason: a full run costs minutes to tens of minutes, far more than the whole unit suite.
 * Property tests use a random seed by default, locally and in pull-request CI. A failure prints its seed and path; the reproduced counterexample becomes a named deterministic test in the same fix, as `src/renderer/vim-mixed-interaction.property.test.ts` already does. Reason: a fixed seed replays the same cases on every run and never explores new ones. The Product Owner may override this default.
 * Requirement traceability is checked at the level of numbered `docs/PRODUCT.md` sections, not individual sentences.
+* T1: on 2026-10-01 the Product Owner chose to pin `vitest` and `@vitest/coverage-v8` to 4.x so the released Stryker Vitest runner works, and to return to Vitest 5 once a runner release supports it. `docs/DEVELOPMENT.md` §12 records the upgrade condition.
 * T4: the Product Owner chose to retain expansion choices through deletion and undo. Expansion IDs may therefore refer to deleted nodes; the invariant checks that each ID belongs to a node seen in the generated history and that document commands preserve the choices. PRODUCT.md §2.4 records the behavior.
 
 ## Baseline (2026-09-30, commit `9f38b57`)
@@ -47,13 +47,38 @@ Decisions reserved for the Product Owner:
 * `src/renderer/use-node-input-bindings.ts`: branches 73.49%. `src/renderer/use-scroll-restoration.ts`: branches 56.25%.
 * `npm run test:e2e`: 295 tests passed in 1.2 min, 6 local workers.
 * Interaction assertions (`toHaveBeenCalled*` or `mock.calls`): 259 in `src/renderer/editor-input-handlers.test.ts`, 70 in `src/renderer/use-node-input-bindings.test.tsx`, 40 in `src/renderer/NodeList.test.tsx`, 19 in `src/renderer/App.test.tsx`.
-* Mutation score: not measured yet (T1).
+* Mutation score (T1, 2026-10-01, Vitest 4.1.11, `npm run test:mutation -- --force`, 22 min 55 s on the local 9-runner machine): **80.30%** total, 82.81% of covered mutants; 3676 mutants: 2692 killed, 260 timed out, 613 survived, 111 without coverage. Per file (total % / survived):
+
+| File | Score | Survived |
+| --- | --- | --- |
+| `application/editor-clipboard-transitions.ts` | 93.18 | 5 |
+| `application/editor-command-transitions.ts` | 92.66 | 25 |
+| `application/editor-content-changes.ts` | 34.00 | 16 |
+| `application/editor-history.ts` | 88.12 | 9 |
+| `application/editor-node-visual-transitions.ts` | 72.05 | 57 |
+| `application/editor-runtime-state.ts` | 72.50 | 11 |
+| `application/editor-save-scheduler.ts` | 78.85 | 21 |
+| `application/editor-store-types.ts` | 100.00 | 0 |
+| `application/editor-store.ts` | 72.54 | 186 |
+| `application/editor-text-session.ts` | 53.57 | 13 |
+| `application/editor-undo-focus.ts` | 77.61 | 18 |
+| `application/expansion-state.ts` | 97.30 | 2 |
+| `application/persistence-coordinator.ts` | 82.05 | 13 |
+| `application/save-policy.ts` | 83.78 | 12 |
+| `application/visible-rows.ts` | 100.00 | 0 |
+| `domain/document-attachments.ts` | 86.57 | 9 |
+| `domain/document-index.ts` | 97.56 | 0 |
+| `domain/document-links.ts` | 74.39 | 104 |
+| `domain/document-operations.ts` | 76.79 | 101 |
+| `domain/document-serialization.ts` | 96.42 | 11 |
+| `domain/document-types.ts` | 100.00 | 0 |
+| `domain/product-messages.ts` | 100.00 | 0 |
 
 ## Tasks
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Blocked (Product Owner decision, see T1 findings) |
+| T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Done |
 | T2 | Property seed and run-count policy with a soak run | — | Done |
 | T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Done |
 | T4 | Location and display invariants checked after every command | T3 | Done |
@@ -92,11 +117,17 @@ Validation tier: High Risk (dependency and toolchain change): `npm run check:ful
 
 The runner's source handles Vitest up to the 4.1 pool options (`maxWorkers`) and has no 5.x handling. The cause inside the runner is not established: the debug log crashes with "Converting circular structure to JSON". The tooling was reverted; the repository holds no Stryker files or dependencies.
 
-Options for the Product Owner (reserved decision above):
+Options put to the Product Owner (decided on 2026-10-01, see Decisions):
 
 1. Wait for a runner release that supports Vitest 5 (no date known).
 2. Downgrade `vitest` and `@vitest/coverage-v8` to a 4.x version the runner handles. This changes the test toolchain and needs its own validation.
 3. Use another mutation tool. None was evaluated in this session.
+
+**Result (2026-10-01).** The Product Owner chose option 2. `@stryker-mutator/vitest-runner` was still at 10.0.0. `vitest` and `@vitest/coverage-v8` are pinned to 4.1.11 (peer range `vite ^6 || ^7 || ^8`, so `vite` 7.3.6 stays). Under 4.1.11 the unit suite and every coverage floor passed unchanged except `vitest.config.test.ts`: `resolveConfig` from `vitest/node` returns `{ vitestConfig, viteConfig }` in 4.x, so the test reads `vitestConfig.include`/`exclude`; its assertions are unchanged. Stryker core and runner 10.0.0 are pinned. Stryker core pins `typed-rest-client` `~2.3.0`, which pins `qs` 6.15.1 with moderate advisories, so `npm audit` failed; an exact `overrides` entry pins `qs` 6.16.0 (same major; the client is used only by the dashboard reporter, which is not configured). `stryker.config.mjs` mutates domain and application sources except tests and `src/application/test/**`, uses `perTest` coverage and incremental mode under ignored `reports/`, and prints only the score table. `.github/workflows/mutation.yml` runs weekly and on dispatch with a 90-minute limit and uploads `reports/mutation/`; it has not been dispatched yet, which is left to the Product Owner. Usage is in `docs/DEVELOPMENT.md` §12, the workflow in §9, and the override in §15; `opencode.json` allows `npm run test:mutation`.
+
+Smoke check: `npm run test:mutation -- --mutate src/domain/document-links.ts --force` killed 339 of 531 mutants (67.61%), against 0 killed under Vitest 5. The file scored 74.39% in the full run because other tests count there. The full-run baseline is in the Baseline section.
+
+Validation (High Risk, `npm run check:full` on HEAD `f5c0d36` plus this change): every `npm run check` stage passed (82 files, 1374 unit tests, coverage floors unchanged, build, zero audit vulnerabilities); the performance suite passed (32 tests, run separately with `npx playwright test -c perf.config.ts` after the E2E stage stopped the chain). The E2E suite had 274 passed and 22 failed, all `toHaveScreenshot` comparisons off by 1-2% of pixels (glyph edges and image color). They are environmental and unrelated: this change touches no `src/`, `e2e/`, Playwright, Electron, or Vite input, and with the change stashed, a pristine HEAD build failed `attachment-validation.spec.ts:170` and `node-gutter-alignment.spec.ts:65` with the same pixel counts. The baselines date from 2026-09-28 and passed in earlier sessions, so the local display environment changed; the screenshot suite needs a rerun in the usual environment before relying on it.
 
 ### T2 — Property seed and run-count policy (W5)
 
@@ -315,7 +346,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T2, T3, T4, T5, T7, T8a, T8b, and T9 are done. No task is ready: T1 needs the Product Owner's mutation-tooling decision (see the T1 findings). T6 depends on T1, and T10 closure depends on both. After that decision, T1 is the exact next task.
+T1, T2, T3, T4, T5, T7, T8a, T8b, and T9 are done. T6 (surviving-mutant triage and break threshold) is the exact next task; compare against the T1 baseline. T10 closure follows T6.
 
 ## Resume prompt
 

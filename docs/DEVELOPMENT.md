@@ -242,7 +242,7 @@ This runs `npm run check`, the end-to-end suite, and the performance suite. The 
 
 ### GitHub Actions
 
-GitHub Actions runs `npm run check` on Ubuntu and the real Electron end-to-end suite on macOS for every pull request and push to `main`; the Electron suite also supports manual dispatch. The jobs run independently, and superseded runs for the same pull request or branch are canceled. The performance suite runs on a scheduled or manual macOS workflow and is intentionally separate from pull-request validation because its measurements are machine-sensitive and macOS minutes are limited for private repositories. Failed E2E and performance runs upload their available reports and result artifacts.
+GitHub Actions runs `npm run check` on Ubuntu and the real Electron end-to-end suite on macOS for every pull request and push to `main`; the Electron suite also supports manual dispatch. The jobs run independently, and superseded runs for the same pull request or branch are canceled. The performance suite runs on a scheduled or manual macOS workflow and is intentionally separate from pull-request validation because its measurements are machine-sensitive and macOS minutes are limited for private repositories. Failed E2E and performance runs upload their available reports and result artifacts. Mutation testing runs on a weekly or manual Ubuntu workflow, separate from pull-request validation because of its run time (§12).
 
 The Attribution workflow runs `scripts/check-attribution.mjs` on every pull request. It fails the check when the pull request description or any of its commits carries an agent co-authorship or "generated with/by" line, per `AGENTS.md` §12. This is the server-side backstop described in §3; it holds regardless of whether the author's machine had the `commit-msg` hook installed.
 
@@ -416,6 +416,10 @@ Property tests explore with a random seed on every run, locally and in CI, so ea
 
 Write every run count as `propertyRuns(base)` from `src/test/property-runs.ts`. `TREE_PROPERTY_RUNS` multiplies all of them (default 1). `npm run test:property:soak` runs the property files at a factor of 20, and `.github/workflows/property-soak.yml` runs it nightly. A property whose every run builds the typed doubles passes a `maxScale` (`propertyRuns(base, maxScale)`), because Vitest retains every `vi.fn` it creates and thousands of runs exhaust the worker heap; do not create `vi.fn` inside a generated event. A soak failure is a candidate defect: replay it, then fix it under the defect-first workflow.
 
+Mutation testing measures assertion strength, which coverage does not: Stryker changes one expression at a time in `src/domain` and `src/application` and reruns the tests that cover it. A mutant that no test fails on has survived, and the mutation score is the share of mutants the tests detected. `npm run test:mutation` runs the full scope configured in `stryker.config.mjs`; arguments after `--` pass through to Stryker, so a narrower run is `npm run test:mutation -- --mutate src/domain/document-operations.ts`. Runs are incremental: `reports/stryker-incremental.json` lets a later run retest only mutants whose code or covering tests changed, and `--force` retests everything. The console prints the score table; read surviving mutants in `reports/mutation/mutation.html`. A full run takes minutes to tens of minutes, so it is not part of `npm run check` or `npm run check:full`. `.github/workflows/mutation.yml` runs the full scope weekly and on manual dispatch and uploads the HTML report.
+
+When a task changes logic in `src/domain` or `src/application`, run mutation testing on the changed files and read their surviving mutants before handoff. Read the weekly report when the score drops. Treat a survivor as a question about a missing assertion, not a target to chase: kill it with an assertion on behavior, or leave an equivalent mutant (one that cannot change observable behavior) with a Stryker disable comment stating why. The Stryker Vitest runner does not yet work with Vitest 5, which is why `vitest` is pinned to 4.x; upgrade Vitest only together with a runner release that supports the new version, and confirm that a narrow run still kills mutants.
+
 Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
 
 ```bash
@@ -478,6 +482,8 @@ Before adding a new dependency:
 Major dependency changes should be documented and, when appropriate, recorded as an architectural decision.
 
 Direct dependencies are declared with exact versions and no range operators (`docs/decisions/0006-exact-dependency-pinning.md`). Upgrade a dependency by changing its exact version, reinstalling, and running `npm run check:full`; do not widen it to a range.
+
+`package.json` `overrides` pins `qs` to a patched version: `@stryker-mutator/core` pins `typed-rest-client` `~2.3.0`, which pins a `qs` release with known advisories. Remove the override when a Stryker release depends on a patched `typed-rest-client`.
 
 `npm audit` runs as the final step of `npm run check`, so known vulnerabilities are reported before a commit. It requires registry access and fails when offline.
 

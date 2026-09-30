@@ -5,6 +5,8 @@ test-results/
 playwright-report/
 blob-report/
 .tmp/
+reports/
+.stryker-tmp/
 
 *.log
 .DS_Store

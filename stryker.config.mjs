@@ -1,0 +1,17 @@
+// Mutation testing for the domain and application layers. See docs/DEVELOPMENT.md §12.
+/** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
+export default {
+  testRunner: 'vitest',
+  vitest: { configFile: 'vitest.config.ts' },
+  coverageAnalysis: 'perTest',
+  mutate: ['src/domain/**/*.ts', 'src/application/**/*.ts', '!src/**/*.test.ts', '!src/application/test/**'],
+  reporters: ['clear-text', 'progress', 'html', 'json'],
+  // The console shows only the score table; read surviving mutants in the HTML report.
+  clearTextReporter: { reportTests: false, reportMutants: false },
+  htmlReporter: { fileName: 'reports/mutation/mutation.html' },
+  jsonReporter: { fileName: 'reports/mutation/mutation.json' },
+  incremental: true,
+  incrementalFile: 'reports/stryker-incremental.json',
+  tempDirName: '.stryker-tmp',
+  cleanTempDir: 'always',
+}

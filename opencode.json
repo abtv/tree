@@ -137,6 +137,8 @@
           "npm run test:coverage *": "allow",
           "npm run test:property:soak": "allow",
           "npm run test:property:soak *": "allow",
+          "npm run test:mutation": "allow",
+          "npm run test:mutation *": "allow",
           "npm run test:e2e": "allow",
           "npm run test:e2e *": "allow",
           "npm run test:perf": "allow",
