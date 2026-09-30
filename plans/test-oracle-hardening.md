@@ -61,7 +61,7 @@ Decisions reserved for the Product Owner:
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
-| T8b | Remaining input-handler outcome assertions | T8a | Planned |
+| T8b | Remaining input-handler outcome assertions | T8a | Done |
 | T9 | Requirement traceability check | T8b | Planned |
 | T10 | Initiative closure | T1-T9 | Planned |
 
@@ -267,6 +267,20 @@ Validation tier: Low Risk (`npm run check`).
 
 Validation: `npm run check` passed (79 files, 1300 tests, production build, zero audit vulnerabilities). Its source/test snapshot was HEAD `af197b32a321b32053f84c5ffe11a2cac0cc8fd4`, digest `sha256:bf193ab0f0258c90929cef4fc0fe07e56f1ba494a2177be7c7d7edbcc7d08747`. A final test-helper edit retained native-event assertions; affected stages were rerun at digest `sha256:6fafa3e93c0353ab5bb093f5b5d514ab5e3bfae520777e989e61d93e81dc6084`: `npm run typecheck:renderer`, `npx eslint src/renderer/editor-input-handlers.test.ts`, `npx prettier --check src/renderer/editor-input-handlers.test.ts`, and `npx vitest run --coverage` all passed (1300 tests, 4.97 s). Other aggregate stages remain valid. An earlier focused run failed on a new uppercase expectation that incorrectly included an unselected character; corrected before validation. No unresolved failures or exposed production defects. Primary diff review found no meaningful issues. No product decisions or production changes; no rendered inputs changed, so screenshots and E2E reruns were not required. Final documentation edits were checked separately.
 
+**T8b result (2026-09-30).** Migrated the remaining mutating text examples, image deletion/put and cross-node transitions, counted navigation, child and sibling creation, subtree deletion and auto-repeat, counted forest puts, subtree puts, Normal undo/redo, plain clipboard shortcuts, and Replace Cut/Paste interruptions through keyboard and context menu to the T7 real-store harness. Sequences rebuild handlers from the selected snapshot node and refresh textarea text. Assertions cover actual text, tree ordering, fresh IDs, location, focus, registers, mode, explicit caret requests, and undo. Plain-text puts now act on the preceding put's resulting text. Replace Cut/Paste uses a known buffered edit supplied by the session callback; clipboard and separate undo steps prove commit-before-command ordering without reimplementing the renderer session owner. Fake timers own pending save timers. All 184 input-handler cases remain.
+
+Interaction assertion occurrences decreased from **238 to 183**, measured with `rg -c 'toHaveBeenCalled|mock.calls' src/renderer/editor-input-handlers.test.ts` (initiative baseline: 259; T8a start: 242). This is an occurrence count for that expression, not a count of every possible spy assertion spelling. Reviewed and retained categories:
+
+* Native event handling (`preventDefault`), preview callbacks, external link opening, and select-all notifications are themselves contracts.
+* Whole-node Visual, viewport/boundary, fold, structural-repeat, and Insert/Replace callbacks belong to other renderer owners. Their argument forwarding, suppression, and mode effects are the handler contract; these tests do not claim real session or viewport integration. Same-node caret-only tests assert DOM and caret-authority outcomes over an inert store.
+* Session interruption flags and callback-before-command ordering, focus synchronization requests, and text-session boundary notifications remain dispatch contracts. Replace Cut/Paste additionally proves real store and history outcomes.
+* Command assembly clearing and non-dispatch assertions cover composition, bare modifiers, unfinished commands, unsupported commands, empty native selections, and caret-only/image operations. They verify that another owner receives no command.
+* Plain application shortcut/event-to-command mappings retain forwarding assertions. Horizontal movement injects the store's success result to verify native-default handling independently of navigation rules; actual node navigation is covered by the migrated sequences and existing owner tests.
+
+There are no positive mocked text-mutation or subtree-put assertions left. Surround stages in this file occur in command-suppression fixtures; actual surround outcomes remain covered by the existing Vim suites. No production or shared-harness changes, lowered coverage floors, product decisions, or requirement gaps.
+
+Validation: `npm run check` passed on HEAD `a1b3d61fb94d32e1533842d44e2713e5ee11b804` plus test-file SHA-256 `2355e8fa7f2d1d18dfb856be4699651e541424115bb07eb148404c7cd2734ce8`: 79 files, 1300 tests, 4.97 s coverage suite, production build passed, zero audit vulnerabilities. Aggregate coverage: 95.48% statements, 89.78% branches, 96.56% functions, 97.89% lines. Development failures were fixture/expectation mistakes (initial textarea cursor, an absent snapshot field, a callback cursor after real navigation, and an image setup lacking its active-caret class); corrected before the final pass. No exposed production defects or unresolved failures. Primary diff review found no meaningful issues. No rendered inputs changed, so no new screenshot evidence or E2E run was required. Final documentation edits are checked separately and do not invalidate runtime validation.
+
 ### T9 — Requirement traceability check (W6)
 
 * Add `scripts/check-requirement-coverage.mjs` and `npm run check:requirements`, and include it in `npm run check`. It:
@@ -293,7 +307,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, T5, T7, and T8a are done. T8b (remaining input-handler outcome assertions) is the next ready task. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, T5, T7, T8a, and T8b are done. T9 (requirement traceability check) is the next ready task. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 
