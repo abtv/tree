@@ -475,13 +475,17 @@ export function useNodeInputBindings({
       if (input === undefined) return
       input.focus()
       if (latestVimMode.current === 'normal') {
-        const target = normalCaretTarget(nodeTextLength(input), focus.cursor, hasAttachmentCharacter(input))
+        // Vertical navigation may resolve the destination to its image while the store carries
+        // the originating text column. Project the resolved caret, including on the deferred pass.
+        const authority = caretAuthority.current
+        const cursor = authority.nodeId === focus.nodeId ? authority.caret.cursor : focus.cursor
+        const target = normalCaretTarget(nodeTextLength(input), cursor, hasAttachmentCharacter(input))
         const matches =
           input instanceof HTMLTextAreaElement &&
           (target.kind === 'block'
             ? input.selectionStart === target.start && input.selectionEnd === target.end
             : input.selectionStart === target.position && input.selectionEnd === target.position)
-        if (!matches) setNormalCaret(input, focus.cursor)
+        if (!matches) setNormalCaret(input, cursor)
       } else if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
       else setCaret(input, focus.cursor)
     }

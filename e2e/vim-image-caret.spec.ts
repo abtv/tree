@@ -26,6 +26,40 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing prototype', () => {
+  test('opens an image immediately after moving up from another image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'text-image', text: 'Texted', attachment: { id: 'first-image', mimeType: 'image/png' }, children: [] },
+          { id: 'image-only', text: '', attachment: { id: 'second-image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'image-only' },
+    })
+    seedAttachmentImage(userDataDir, 'first-image')
+    seedAttachmentImage(userDataDir, 'second-image')
+    const { window } = await launchTree(userDataDir)
+    await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
+    await node(window, 2).press('k')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveClass(/node-input-image-caret/)
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 6)
+    await window.locator('.node-list').screenshot({ path: test.info().outputPath('upward-image-caret.png') })
+    await node(window, 1).press('Enter')
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+    await window.keyboard.press('Escape')
+    await expect(node(window, 1)).toBeFocused()
+    await node(window, 1).press('Enter')
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+    await window.keyboard.press('Escape')
+    await node(window, 1).press('k')
+    await expect(node(window, 1)).not.toHaveClass(/node-input-image-caret/)
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+    await node(window, 1).press('j')
+    await node(window, 1).press('Enter')
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+  })
+
   test('keeps image-character steps within an expanded row before visible-row motion', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

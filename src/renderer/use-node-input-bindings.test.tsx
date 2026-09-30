@@ -117,6 +117,33 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
 }
 
 describe('useNodeInputBindings', () => {
+  it.each(['', 'xy', 'Longer text'])(
+    'projects the upward image destination from "%s" before Enter and exit',
+    async (text) => {
+      const upper = { ...image('Texted'), id: 'upper' }
+      const lower = { ...image(text), id: 'lower', attachment: { id: 'lower-image', mimeType: 'image/png' as const } }
+      const f = await fixture({
+        document: { roots: [upper, lower] },
+        location: { currentParentId: null, selectedNodeId: 'lower' },
+      })
+      f.input('upper')
+      f.input('lower').focus()
+      if (text !== '') f.press('j')
+      f.press('k')
+      expect(f.result.current.imageCaretNodeId).toBe('upper')
+      expect(getCaret(f.input('upper'))).toBe(upper.text.length)
+      f.press('Enter')
+      expect(f.preview).toHaveBeenCalledWith('image')
+      f.press('k')
+      expect(f.result.current.imageCaretNodeId).toBeUndefined()
+      expect(getCaret(f.input('upper'))).toBe(Math.min(text.length, upper.text.length - 1))
+      f.press('j')
+      expect(getCaret(f.input('upper'))).toBe(upper.text.length)
+      f.press('Enter')
+      expect(f.preview).toHaveBeenCalledTimes(2)
+    },
+  )
+
   it.each([
     ['H', false, 'a'],
     ['M', false, 'b'],
