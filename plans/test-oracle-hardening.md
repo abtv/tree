@@ -57,7 +57,7 @@ Decisions reserved for the Product Owner:
 | T2 | Property seed and run-count policy with a soak run | — | Done |
 | T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Done |
 | T4 | Location and display invariants checked after every command | T3 | Done |
-| T5 | Command inventory guard for the property generators | T4 | Planned |
+| T5 | Command inventory guard for the property generators | T4 | Done |
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Planned |
 | T8 | Outcome assertions in the input-handler tests | T7 | Planned |
@@ -198,6 +198,12 @@ Acceptance: adding an unused public method to `EditorStore` in a scratch change 
 
 Validation tier: Low Risk (`npm run check`).
 
+**Result (2026-09-30).** `editor-store-command-inventory.test.ts` inventories the runtime prototype, filters TypeScript private methods using their declarations, and reads actual `store` calls in `applyCommand` using the TypeScript parser. Every remaining public method must be generated or have an explicit exclusion reason. The guard also rejects stale exclusions, exclusions for generated commands, and empty reasons. Read-only projection calls are not counted as generated commands. Instance fields (`getSnapshot` and `subscribe`) are outside this prototype guard's scope. No generator or production changes were needed.
+
+Vim has no single complete command table: `vim-keyboard-types.ts` describes pending and repeat state as type unions, and `vim-keyboard-handler.ts` dispatches commands through mode-dependent branches. Its `FOLD_COMMANDS` table covers only fold keys. As instructed, no Vim inventory guard or production restructuring was added.
+
+Acceptance: adding the temporary public method `inventoryScratchCommand` made `npx vitest run src/application/editor-store-command-inventory.test.ts` fail with that method named in the missing-method assertion. Removing it restored the exact validated snapshot. `npm run check` passed (78 files, 1243 tests, 4.96 s coverage suite, build passed, zero audit vulnerabilities), on HEAD `a322bada0889992124b85a201db798a6b6cd4be1`, snapshot `sha256:bc8c2bf0cf8c63767d3db866301052b8dc3bebc2b7b45cbd65953090cf48f380`. An initial check failed because filesystem imports lacked Node types in the application TypeScript configuration; raw source imports resolved it without changing configuration. Primary diff review found no meaningful issues. No product behavior changed.
+
 ### T6 — Surviving-mutant triage (W4, W1)
 
 * Run `npm run test:mutation` and compare with the T1 baseline.
@@ -262,7 +268,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, and T4 are done. T5 (command inventory guard) is the next ready task. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, and T5 are done. T7 (real-store harness and outcome assertions for input bindings) is the next ready task. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 
