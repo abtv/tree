@@ -143,7 +143,10 @@ export function moveNodeTransition(
   const located = locateNode(document, nodeId)
   if (located === undefined) return undefined
   const sourceIndex = located.index
-  const destination = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
+  const rawDestination = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
+  // Clamped to the same bounds `moveSibling` applies, so an insertion index past either end of the
+  // sibling list is only treated as a real move when it actually lands somewhere new.
+  const destination = Math.max(0, Math.min(rawDestination, located.siblings.length - 1))
   if (destination === sourceIndex) return undefined
   return {
     document: moveSibling(document, nodeId, destination),

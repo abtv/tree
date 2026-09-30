@@ -439,6 +439,17 @@ describe('editor command transitions', () => {
     ).toBeUndefined()
   })
 
+  it('is a no-op when an out-of-range insertion index clamps back to the source position', () => {
+    // An insertion index far past the end of the sibling list clamps to "after the last sibling",
+    // which is exactly where 'second' already is: nothing should move, and no transition is produced.
+    expect(
+      moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'second' }, 'second', 999),
+    ).toBeUndefined()
+
+    const singleRoot: Document = { roots: [{ id: 'only', text: 'Only', children: [] }] }
+    expect(moveNodeTransition(singleRoot, { currentParentId: null, selectedNodeId: 'only' }, 'only', 2)).toBeUndefined()
+  })
+
   describe('sibling-relative commands at descendant depth (inline expansion)', () => {
     it('moves in both directions through the flattened visible rows', () => {
       const rows = rowsFor(nestedDocument, rootLocation, ['alpha', 'alpha1'])
