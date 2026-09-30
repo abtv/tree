@@ -1,856 +1,582 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, renderHook } from '@testing-library/react'
-import { useState } from 'react'
-import type { SyntheticEvent } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { EditorStore } from '../application/editor-store'
+import { useState, useSyncExternalStore } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import { createEditorStoreDouble } from './test/editor-store-double'
+import { createRealStoreHarness, type RealStoreOptions } from './test/real-store-harness'
 import { useNodeInputBindings } from './use-node-input-bindings'
 import type { VimMode } from './vim-editing'
+import { getCaret, setCaret } from './editor-dom'
 
-afterEach(cleanup)
+beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }))
 
-function createStore(): EditorStore {
-  return createEditorStoreDouble({
-    snapshot: () => ({
-      status: 'ready',
-      document: { roots: [{ id: 'node', text: 'hello', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'node' },
-      focus: { nodeId: 'node', cursor: 3, token: 1 },
-    }),
-    copy: vi.fn(async () => true),
-    cut: vi.fn(async () => true),
-    deleteSelected: vi.fn(),
-    editContent: vi.fn(),
-    editText: vi.fn(),
-    endTextSession: vi.fn(),
-    markNextTextEditStandalone: vi.fn(),
-    paste: vi.fn(async () => {}),
-    replaceTextRange: vi.fn(),
-    reportError: vi.fn(),
-    selectNode: vi.fn(),
-    registerPendingEditFinisher: vi.fn(() => () => undefined),
+afterEach(() => {
+  cleanup()
+  document.body.replaceChildren()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
+
+const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
+const image = (text = 'ab'): TreeNode => ({ ...node('node', text), attachment: { id: 'image', mimeType: 'image/png' } })
+
+async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
+  const harness = await createRealStoreHarness(options)
+  const { store } = harness
+  const preview = vi.fn()
+  const hook = renderHook(() => {
+    const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
+    const [vimMode, setVimMode] = useState<VimMode>(options.mode ?? 'normal')
+    const [selection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
+    const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
+    const binding = useNodeInputBindings({
+      store,
+      selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
+      focus: state.status === 'ready' ? state.focus : undefined,
+      persistenceLocked: state.status === 'ready' && state.persistenceLocked === true,
+      vimMode,
+      setVimMode,
+      nodeVisualSelection: selection,
+      setNodeVisualSelection,
+      setImageCaretNodeId,
+      onPreviewAttachment: preview,
+      onFoldCommand: (command, id) => store.applyFold(command, id),
+    })
+    return { ...binding, vimMode, selection, imageCaretNodeId, setVimMode }
   })
-}
-
-function renderBindings(options: {
-  store: EditorStore
-  selectedNodeId?: string
-  focus?: { nodeId: string; cursor: number; token: number }
-  vimMode?: 'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'
-}) {
-  const onPreviewAttachment = vi.fn()
-  return renderHook(() => useNodeInputBindings({ ...options, onPreviewAttachment }).bindings)
+  const inputs = new Map<string, HTMLTextAreaElement>()
+  const input = (id = harness.snapshot().location.selectedNodeId) => {
+    let element = inputs.get(id)
+    if (element === undefined) {
+      const current = harness.node(id)
+      const row = document.createElement('div')
+      row.className = 'node-row'
+      row.dataset.nodeId = id
+      if (current.attachment !== undefined) row.dataset.hasAttachment = 'true'
+      element = document.createElement('textarea')
+      element.value = current.text
+      row.append(element)
+      document.body.append(row)
+      hook.result.current.bindings(current).inputRef(element)
+      inputs.set(id, element)
+    }
+    return element
+  }
+  const bindings = (id = harness.snapshot().location.selectedNodeId) => hook.result.current.bindings(harness.node(id))
+  const sync = () => {
+    const find = (nodes: readonly TreeNode[], id: string): TreeNode | undefined => {
+      for (const item of nodes) {
+        if (item.id === id) return item
+        const child = find(item.children, id)
+        if (child !== undefined) return child
+      }
+      return undefined
+    }
+    for (const [id, element] of inputs) {
+      // Replace holds its draft in the DOM until the session finishes.
+      if (hook.result.current.vimMode !== 'replace') {
+        const current = find(harness.snapshot().document.roots, id)
+        if (current !== undefined && element.value !== current.text) {
+          const cursor = element.selectionStart
+          element.value = current.text
+          element.setSelectionRange(cursor, cursor)
+        }
+      }
+      element.classList.toggle('node-input-image-caret', hook.result.current.imageCaretNodeId === id)
+    }
+  }
+  const press = (
+    key: string,
+    modifiers: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean } = {},
+    id = harness.snapshot().location.selectedNodeId,
+  ) => {
+    const element = input(id)
+    act(() =>
+      bindings(id).onKeyDown({
+        currentTarget: element,
+        key,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: () => undefined,
+        ...modifiers,
+      } as never),
+    )
+    sync()
+  }
+  const type = (text: string, id = harness.snapshot().location.selectedNodeId) => {
+    const element = input(id)
+    element.value = text
+    element.setSelectionRange(text.length, text.length)
+    act(() => bindings(id).onTextChange({ currentTarget: element } as never))
+  }
+  return { ...harness, ...hook, input, bindings, press, type, sync, preview }
 }
 
 describe('useNodeInputBindings', () => {
-  it('tracks whole-node Visual endpoints and routes a sibling-range yank to a later put', () => {
-    const nodes: TreeNode[] = [
-      { id: 'a', text: 'A', children: [] },
-      { id: 'b', text: 'B', children: [] },
-    ]
-    let selectedNodeId = 'a'
-    let currentParentId: string | null = null
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: nodes },
-        location: { currentParentId, selectedNodeId },
-      }),
-      selectNode: vi.fn((id: string) => {
-        selectedNodeId = id
-      }),
-      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a', 'b'] })),
-      pasteNodeForest: vi.fn(() => true),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
+  it.each([
+    ['H', false, 'a'],
+    ['M', false, 'b'],
+    ['L', false, 'c'],
+    ['d', true, 'c'],
+    ['u', true, 'a'],
+  ] as const)('moves the viewport caret with %s, Ctrl: %s', async (key, ctrlKey, expected) => {
+    const f = await fixture({
+      document: { roots: [node('a', 'Alpha'), node('b', 'Beta'), node('c', 'Gamma'), node('off', 'Offscreen')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
     })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId,
-        vimMode,
-        setVimMode,
-        nodeVisualSelection: selection,
-        setNodeVisualSelection: setSelection,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode, selection }
+    for (const [id, top] of [
+      ['a', 10],
+      ['b', 50],
+      ['c', 90],
+      ['off', -100],
+    ] as const) {
+      const input = f.input(id)
+      vi.spyOn(input.parentElement!, 'getBoundingClientRect').mockReturnValue({ top, bottom: top + 30 } as DOMRect)
+    }
+    f.input('b').setSelectionRange(2, 2)
+    f.press(key, { ctrlKey })
+    expect(f.snapshot().location.selectedNodeId).toBe(expected)
+    expect(f.snapshot().focus).toMatchObject({ nodeId: expected, cursor: 2 })
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it.each(['d', 'u'])('uses the visible edge when Ctrl+%s starts outside the viewport', async (key) => {
+    const f = await fixture({
+      document: { roots: [node('a', 'A'), node('b', 'B'), node('off', 'Off')] },
+      location: { currentParentId: null, selectedNodeId: 'off' },
     })
-    const input = document.createElement('textarea')
-    input.value = 'A'
-    const press = (node: TreeNode, key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
+    for (const [id, top] of [
+      ['a', 10],
+      ['b', 50],
+      ['off', 2000],
+    ] as const) {
+      vi.spyOn(f.input(id).parentElement!, 'getBoundingClientRect').mockReturnValue({
+        top,
+        bottom: top + 30,
+      } as DOMRect)
+    }
+    f.press(key, { ctrlKey: true })
+    expect(f.snapshot().location.selectedNodeId).toBe(key === 'd' ? 'b' : 'a')
+  })
+
+  it('leaves selection unchanged when no rows intersect the viewport', async () => {
+    const f = await fixture()
+    vi.spyOn(f.input().parentElement!, 'getBoundingClientRect').mockReturnValue({ top: 2000, bottom: 2030 } as DOMRect)
+    const before = f.snapshot().focus
+    f.press('H')
+    expect(f.snapshot().focus).toBe(before)
+  })
+
+  it('moves whole-node Visual endpoints to the first and last sibling and keeps their range', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'a'), node('b', 'b'), node('c', 'c')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    f.press('V')
+    f.press('g')
+    f.press('g')
+    expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'a' })
+    f.press('G')
+    expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'c' })
+    f.press('U')
+    expect(f.result.current.selection).toBeUndefined()
+    expect(f.snapshot().focus.nodeId).toBe('b')
+  })
+
+  it.each(['o', 'O'] as const)('repeats sibling opening with %s and captured text', async (key) => {
+    const f = await fixture({ document: { roots: [node('a', 'A')] } })
+    f.press(key)
+    f.type('New')
+    f.press('Escape')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(
+      key === 'o' ? ['A', 'New', 'New'] : ['New', 'New', 'A'],
+    )
+    act(() => f.store.undo())
+    expect(f.snapshot().document.roots).toHaveLength(2)
+  })
+
+  it('repeats subtree and forest puts with fresh identities and repeats structural deletion', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+    f.press('y')
+    f.press('y')
+    f.press('p')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'B', 'C'])
+    expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(5)
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('j')
+    f.press('y')
+    f.press('p')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'B', 'C', 'B', 'B', 'C', 'C'])
+    f.press('d')
+    f.press('d')
+    f.press('.')
+    expect(f.snapshot().document.roots).toHaveLength(7)
+  })
+
+  it('does not repeat a whole-node mutation when its sibling span is unavailable', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'alpha'), node('b', 'beta'), node('c', 'gamma')] } })
+    f.press('V')
+    f.press('j')
+    f.press('U')
+    expect(f.node('a').text).toBe('ALPHA')
+    expect(f.node('b').text).toBe('BETA')
+    act(() => f.store.selectNode('c', 0))
+    const before = f.snapshot().document
+    f.press('.')
+    expect(f.snapshot().document).toBe(before)
+  })
+
+  it('keeps whole-node Visual active when an empty register cannot replace the range', async () => {
+    const f = await fixture()
+    const before = f.snapshot().document
+    f.press('V')
+    f.press('p')
+    expect(f.result.current.vimMode).toBe('visual-node')
+    expect(f.snapshot().document).toBe(before)
+  })
+
+  it('uses boundary motions and folds through the real store', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A', [node('child', 'Child')]), node('b', 'B')] } })
+    f.press('G')
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
+    f.press('g')
+    f.press('g')
+    expect(f.snapshot().location.selectedNodeId).toBe('a')
+    f.press('z')
+    f.press('o')
+    expect(f.store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'child', 'b'])
+    f.press('z')
+    f.press('c')
+    expect(f.store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'b'])
+  })
+
+  it('uses current text and caret for contenteditable input and focus', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'Alpha'), node('b', 'Beta')] }, mode: 'insert' })
+    const input = document.createElement('div')
+    input.contentEditable = 'true'
+    input.tabIndex = 0
+    input.textContent = 'Beta'
+    document.body.append(input)
+    f.bindings('b').inputRef(input)
+    setCaret(input, 2)
+    act(() => f.bindings('b').onFocus({ currentTarget: input } as never))
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'b', cursor: 2 })
+    expect(document.activeElement).toBe(input)
+    expect(getCaret(input)).toBe(2)
+    input.textContent = 'Beta!'
+    setCaret(input, 5)
+    act(() => f.bindings('b').onContentInput({ currentTarget: input } as never))
+    expect(f.node('b').text).toBe('Beta!')
+    expect(getCaret(input)).toBe(5)
+    act(() => f.result.current.setVimMode('normal'))
+    expect(getCaret(input)).toBe(4)
+  })
+
+  it('groups edits before native Cut separately from the following edit', async () => {
+    const f = await fixture({ mode: 'insert' })
+    f.type('helloX')
+    act(() => f.bindings().onCut())
+    f.type('hello')
+    act(() => f.store.undo())
+    expect(f.node().text).toBe('helloX')
+  })
+
+  it.each(['normal', 'insert'] as const)(
+    'updates pointer image state only when mouse-up is in %s mode',
+    async (mode) => {
+      const f = await fixture({ document: { roots: [image()] }, mode })
+      f.input().setSelectionRange(2, 2)
+      act(() => f.bindings().onMouseUp({ currentTarget: f.input() } as never))
+      expect(f.result.current.imageCaretNodeId).toBe(mode === 'normal' ? 'node' : undefined)
+    },
+  )
+
+  it.each(['menu', 'paste'])('reports asynchronous %s failures through the store', async (path) => {
+    const error = new Error('test failure')
+    const f = await fixture({
+      services: {
+        readClipboard: async () => {
+          throw error
+        },
+      },
+    })
+    await act(async () => {
+      if (path === 'menu') {
+        window.treeApi = {
+          showEditorContextMenu: async () => {
+            throw error
+          },
+        } as unknown as Window['treeApi']
+        f.bindings().onContextMenu({
+          currentTarget: f.input(),
+          clientX: 1,
+          clientY: 2,
+          preventDefault: () => undefined,
         } as never)
-      })
-    }
-
-    press(nodes[0]!, 'V')
-    expect(result.current.vimMode).toBe('visual-node')
-    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
-    press(nodes[0]!, 'j')
-    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
-    press(nodes[1]!, 'y')
-    expect(store.applyNodeVisual).toHaveBeenCalledWith('y', 'a', 'b', undefined)
-    expect(result.current.vimMode).toBe('normal')
-    press(nodes[1]!, 'p')
-    expect(store.pasteNodeForest).toHaveBeenCalledWith('b', 'after', { nodes, sourceIds: ['a', 'b'] })
-
-    press(nodes[1]!, 'V')
-    press(nodes[1]!, 'k')
-    press(nodes[0]!, 'o')
-    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
-    press(nodes[1]!, 'c')
-    expect(result.current.vimMode).toBe('insert')
-    input.value = 'Changed'
-    press(nodes[1]!, 'Escape')
-    press(nodes[1]!, '.')
-    expect(store.applyNodeVisual).toHaveBeenLastCalledWith('c', 'a', 'b', undefined, 'Changed')
-
-    currentParentId = 'a'
-    selectedNodeId = 'a'
-    press(nodes[0]!, 'V')
-    expect(result.current.vimMode).toBe('normal')
+      } else f.bindings().onPaste({ currentTarget: f.input(), preventDefault: () => undefined } as never)
+    })
+    expect(f.snapshot().operationError).toBe('test failure')
+    expect(f.node().text).toBe('hello')
   })
 
-  it('resyncs the image caret after a whole-node Visual command keeps the same node selected', () => {
-    const node: TreeNode = { id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
-    let selectedNodeId = 'root'
-    let focus: { nodeId: string; cursor: number; token: number } = { nodeId: 'root', cursor: 0, token: 0 }
-    let focusToken = 0
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [node] },
-        location: { currentParentId: null, selectedNodeId },
-        focus,
-      }),
-      selectNode: vi.fn((id: string, cursor: number) => {
-        selectedNodeId = id
-        focusToken += 1
-        focus = { nodeId: id, cursor, token: focusToken }
-      }),
-      applyNodeVisual: vi.fn(() => {
-        focusToken += 1
-        focus = { nodeId: 'root', cursor: 0, token: focusToken }
-        return { nodes: [node], sourceIds: ['root'] }
-      }),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
+  it('ignores context menus while persistence is locked and tolerates a missing menu API', async () => {
+    const f = await fixture({
+      services: {
+        save: async () => {
+          throw new Error('save failure')
+        },
+      },
     })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId,
-        focus,
-        vimMode,
-        setVimMode,
-        setImageCaretNodeId,
-        nodeVisualSelection: selection,
-        setNodeVisualSelection: setSelection,
-        onPreviewAttachment: vi.fn(),
+    window.treeApi = {} as Window['treeApi']
+    act(() => f.bindings().onContextMenu({ currentTarget: f.input(), preventDefault: () => undefined } as never))
+    f.type('changed')
+    for (let attempt = 0; attempt < 3; attempt += 1)
+      await act(async () => {
+        try {
+          await f.store.flushPersistence()
+        } catch {
+          /* Expected injected save failure. */
+        }
       })
-      return { bindings, vimMode, imageCaretNodeId }
-    })
-    const row = document.createElement('div')
-    row.className = 'node-row'
-    row.dataset.hasAttachment = 'true'
-    const input = document.createElement('textarea')
-    input.value = 'ab'
-    input.setSelectionRange(1, 1)
-    row.append(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('l')
-    expect(result.current.imageCaretNodeId).toBe('root')
-
-    press('V')
-    press('u')
-
-    expect(store.applyNodeVisual).toHaveBeenCalledWith('u', 'root', 'root', undefined)
-    expect(result.current.vimMode).toBe('normal')
-    expect(result.current.imageCaretNodeId).toBeUndefined()
+    expect(f.snapshot().persistenceLocked).toBe(true)
+    const preventDefault = vi.fn()
+    act(() => f.bindings().onContextMenu({ currentTarget: f.input(), preventDefault } as never))
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(f.bindings().disabled).toBe(true)
   })
 
-  it('resyncs the image caret after a Visual Node move clamps at the same node', () => {
-    const node: TreeNode = { id: 'root', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
-    let selectedNodeId = 'root'
-    let focus: { nodeId: string; cursor: number; token: number } = { nodeId: 'root', cursor: 0, token: 0 }
-    let focusToken = 0
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [node] },
-        location: { currentParentId: null, selectedNodeId },
-        focus,
-      }),
-      selectNode: vi.fn((id: string, cursor: number) => {
-        selectedNodeId = id
-        focusToken += 1
-        focus = { nodeId: id, cursor, token: focusToken }
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId,
-        focus,
-        vimMode,
-        setVimMode,
-        setImageCaretNodeId,
-        nodeVisualSelection: selection,
-        setNodeVisualSelection: setSelection,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode, imageCaretNodeId }
-    })
-    const row = document.createElement('div')
-    row.className = 'node-row'
-    row.dataset.hasAttachment = 'true'
-    const input = document.createElement('textarea')
-    input.value = 'ab'
-    input.setSelectionRange(1, 1)
-    row.append(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('l')
-    expect(result.current.imageCaretNodeId).toBe('root')
-
-    press('V')
-    press('j')
-
-    expect(store.selectNode).toHaveBeenCalledWith('root', 0)
-    expect(result.current.imageCaretNodeId).toBeUndefined()
+  it('tracks whole-node Visual endpoints and routes a sibling-range yank to a later put', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+    f.press('V')
+    expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
+    f.press('j')
+    expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
+    f.press('y')
+    expect(f.result.current.vimMode).toBe('normal')
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'A', 'B'])
+    expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(4)
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('k')
+    f.press('o')
+    expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
+    f.press('c')
+    expect(f.result.current.vimMode).toBe('insert')
+    f.type('Changed')
+    f.press('Escape')
+    const changedId = f.node().id
+    act(() => f.store.selectNode(f.snapshot().document.roots[1]!.id, 0))
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['Changed', 'Changed'])
+    expect(f.snapshot().document.roots[0]!.id).toBe(changedId)
+    act(() => f.store.enter())
+    f.press('V')
+    expect(f.result.current.vimMode).toBe('normal')
   })
 
-  it('keeps a non-final image return position across commands without a new focus intent', () => {
-    const node: TreeNode = {
-      id: 'root',
-      text: 'abcd',
-      attachment: { id: 'image', mimeType: 'image/png' },
-      children: [],
-    }
-    let focus = { nodeId: 'root', cursor: 0, token: 1 }
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [node] },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-        focus,
-      }),
-      undo: vi.fn(),
-      redo: vi.fn(),
-      leave: vi.fn(),
-      endTextSession: vi.fn(),
-      selectNode: vi.fn((_id: string, cursor: number) => {
-        focus = { nodeId: 'root', cursor, token: focus.token + 1 }
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      return {
-        bindings: useNodeInputBindings({
-          store,
-          selectedNodeId: 'root',
-          focus,
-          vimMode,
-          setVimMode,
-          setImageCaretNodeId,
-          nodeVisualSelection: selection,
-          setNodeVisualSelection: setSelection,
-          onPreviewAttachment: vi.fn(),
-        }).bindings,
-        vimMode,
-        imageCaretNodeId,
-      }
-    })
-    const row = document.createElement('div')
-    row.className = 'node-row'
-    row.dataset.hasAttachment = 'true'
-    const input = document.createElement('textarea')
-    input.value = node.text
-    input.setSelectionRange(1, 1)
-    row.append(input)
-    const press = (key: string, ctrlKey = false): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-      input.classList.toggle('node-input-image-caret', result.current.imageCaretNodeId === node.id)
-    }
-
-    press('j')
-    expect(result.current.imageCaretNodeId).toBe('root')
-    press('u')
-    press('r', true)
-    press('o', true)
-    press('V')
-    press('Escape')
-    expect(result.current.vimMode).toBe('normal')
-    expect(result.current.imageCaretNodeId).toBe('root')
-    press('k')
-    expect(input.selectionStart).toBe(1)
-    expect(result.current.imageCaretNodeId).toBeUndefined()
-
-    press('j')
-    act(() => {
-      store.selectNode('root', 0)
-      result.current.bindings(node).onKeyDown({
-        currentTarget: input,
-        key: 'u',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    expect(result.current.imageCaretNodeId).toBeUndefined()
+  it('resyncs the image caret after a whole-node Visual command keeps the same node selected', async () => {
+    const f = await fixture({ document: { roots: [image('AB')] } })
+    f.input().setSelectionRange(1, 1)
+    f.press('l')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    f.press('V')
+    f.press('u')
+    expect(f.node().text).toBe('ab')
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'node', cursor: 0 })
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
   })
 
-  it('keeps an explicit image destination when a child-to-parent motion creates a focus intent', () => {
-    const child: TreeNode = { id: 'child', text: 'child', children: [] }
-    const parent: TreeNode = {
-      id: 'parent',
-      text: 'Parent',
-      attachment: { id: 'image', mimeType: 'image/png' },
-      children: [child],
-    }
-    let selectedNodeId = child.id
-    let focus = { nodeId: child.id, cursor: 0, token: 1 }
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [parent] },
-        location: { currentParentId: parent.id, selectedNodeId },
-        focus,
-      }),
-      moveSelection: vi.fn(() => {
-        selectedNodeId = parent.id
-        focus = { nodeId: parent.id, cursor: parent.text.length, token: 2 }
-      }),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result, rerender } = renderHook(() => {
-      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      return {
-        bindings: useNodeInputBindings({
-          store,
-          selectedNodeId,
-          focus,
-          vimMode: 'normal',
-          setImageCaretNodeId,
-          onPreviewAttachment: vi.fn(),
-        }).bindings,
-        imageCaretNodeId,
-      }
-    })
-    const input = document.createElement('textarea')
-    input.value = child.text
-    act(() => {
-      result.current.bindings(child).onKeyDown({
-        currentTarget: input,
-        key: 'k',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    rerender()
-
-    expect(store.moveSelection).toHaveBeenCalledWith('up', child.text.length)
-    expect(result.current.imageCaretNodeId).toBe(parent.id)
+  it('resyncs the image caret after a Visual Node move clamps at the same node', async () => {
+    const f = await fixture({ document: { roots: [image()] } })
+    f.input().setSelectionRange(1, 1)
+    f.press('l')
+    f.press('V')
+    f.press('j')
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'node', cursor: 0 })
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
   })
 
-  it('captures opened child text for structural dot repeat', () => {
-    const store = createEditorStoreDouble({
-      createChild: vi.fn(() => true),
-      createChildWithText: vi.fn(),
-      createSibling: vi.fn(() => true),
-      createSiblingWithText: vi.fn(),
-      endTextSession: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'A', children: [] }] },
-        location: { currentParentId: 'a', selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'A'
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings({ id: 'a', text: input.value, children: [] }).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    press('o')
-    expect(result.current.vimMode).toBe('insert')
-    input.value = 'Opened'
-    press('Escape')
-    press('.')
-    expect(store.createChildWithText).toHaveBeenCalledWith('Opened')
+  it('keeps a non-final image return position across commands without a new focus intent', async () => {
+    const f = await fixture({ document: { roots: [image('abcd')] } })
+    f.input().setSelectionRange(1, 1)
+    f.press('j')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    const focus = f.snapshot().focus
+    f.press('u')
+    f.press('r', { ctrlKey: true })
+    f.press('o', { ctrlKey: true })
+    f.press('V')
+    f.press('Escape')
+    expect(f.snapshot().focus).toEqual(focus)
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    f.press('k')
+    expect(f.input().selectionStart).toBe(1)
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    f.press('j')
+    act(() => f.store.selectNode('node', 0))
+    f.press('u')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
   })
 
-  it('captures a plain Insert session when blur leaves the node selected', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRange: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
+  it('keeps an explicit image destination when a child-to-parent motion creates a focus intent', async () => {
+    const parent = { ...image('Parent'), id: 'parent', children: [node('child', 'child')] }
+    const f = await fixture({
+      document: { roots: [parent] },
+      location: { currentParentId: 'parent', selectedNodeId: 'child' },
     })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const node: TreeNode = { id: 'a', text: 'a', children: [] }
-    const input = document.createElement('textarea')
-    input.value = 'a'
-    result.current.bindings(node).inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    press('i')
-    expect(result.current.vimMode).toBe('insert')
-    input.value = 'aX'
-    act(() => result.current.bindings(node).onBlur())
-    expect(result.current.vimMode).toBe('insert')
-    press('Escape')
-    press('.')
-    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
+    f.press('k')
+    expect(f.snapshot().location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'parent', cursor: 'child'.length })
+    expect(f.result.current.imageCaretNodeId).toBe('parent')
   })
 
-  it('captures a plain Insert session across a node change but does not replay it on a different node', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRange: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
+  it.each(['Escape', 'blur'])('captures opened child text for structural dot repeat after %s', async (finish) => {
+    const f = await fixture({
+      document: { roots: [node('a', 'A')] },
+      location: { currentParentId: 'a', selectedNodeId: 'a' },
     })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const nodeA: TreeNode = { id: 'a', text: 'a', children: [] }
-    const nodeB: TreeNode = { id: 'b', text: 'b', children: [] }
-    const inputA = document.createElement('textarea')
-    inputA.value = 'a'
-    const inputB = document.createElement('textarea')
-    inputB.value = 'b'
-    result.current.bindings(nodeA).inputRef(inputA)
-    result.current.bindings(nodeB).inputRef(inputB)
-    const pressOn = (node: TreeNode, input: HTMLElement, key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    pressOn(nodeA, inputA, 'i')
-    expect(result.current.vimMode).toBe('insert')
-    inputA.value = 'aX'
-    // Focus moves to a different node's own input with no intervening Escape (mirroring Enter
-    // while still in Insert mode, or clicking directly into another row). The dot-repeat diff is
-    // still captured (against node A), but must not later replay onto node B.
-    act(() => result.current.bindings(nodeA).onBlur())
-    expect(result.current.vimMode).toBe('insert')
-    pressOn(nodeB, inputB, 'Escape')
-    pressOn(nodeB, inputB, '.')
-    expect(store.replaceTextRange).not.toHaveBeenCalled()
+    f.input('a')
+    f.press('o')
+    const childId = f.node().id
+    expect(f.result.current.vimMode).toBe('insert')
+    act(() => f.bindings('a').onBlur())
+    f.type('Opened')
+    if (finish === 'blur') act(() => f.bindings(childId).onBlur())
+    f.press('Escape')
+    f.press('.')
+    expect(f.node('a').children.map((item) => item.text)).toEqual(['Opened'])
+    expect(f.node(childId).children.map((item) => item.text)).toEqual(['Opened'])
+    expect(f.node().id).not.toBe(childId)
   })
 
-  it('replays a plain Insert session once the user returns to the node it was captured on', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRange: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const nodeA: TreeNode = { id: 'a', text: 'a', children: [] }
-    const nodeB: TreeNode = { id: 'b', text: 'b', children: [] }
-    const inputA = document.createElement('textarea')
-    inputA.value = 'a'
-    const inputB = document.createElement('textarea')
-    inputB.value = 'b'
-    result.current.bindings(nodeA).inputRef(inputA)
-    result.current.bindings(nodeB).inputRef(inputB)
-    const pressOn = (node: TreeNode, input: HTMLElement, key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    pressOn(nodeA, inputA, 'i')
-    inputA.value = 'aX'
-    // Focus crosses to node B with no intervening Escape, same as the discard case above, but the
-    // user then returns to node A (e.g. navigates back) without starting a fresh Insert session
-    // there. The captured diff's node ID still matches, so `.` must replay it.
-    act(() => result.current.bindings(nodeA).onBlur())
-    pressOn(nodeB, inputB, 'Escape')
-    pressOn(nodeA, inputA, '.')
-    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
-    expect((store.replaceTextRange as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe('a')
+  it.each(['blur', 'pointer'])('captures a plain Insert session when %s leaves the node selected', async (finish) => {
+    const f = await fixture({ document: { roots: [node('a', 'a')] } })
+    f.press('i')
+    f.type('aX')
+    if (finish === 'blur') act(() => f.bindings().onBlur())
+    else act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
+    expect(f.result.current.vimMode).toBe('insert')
+    f.press('Escape')
+    f.press('.')
+    expect(f.node('a').text).toBe('aXX')
   })
 
-  it('captures a plain Insert session when a same-node pointer click commits it', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRange: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'a', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const node: TreeNode = { id: 'a', text: 'a', children: [] }
-    const input = document.createElement('textarea')
-    input.value = 'a'
-    result.current.bindings(node).inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    press('i')
-    input.value = 'aX'
-    act(() => result.current.bindings(node).onMouseDown({ currentTarget: input, button: 0 } as never))
-    press('Escape')
-    press('.')
-    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
-  })
+  it.each([false, true])(
+    'captures Insert across a node change; replay on the original node: %s',
+    async (returnToOriginal) => {
+      const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'b')] } })
+      f.press('i')
+      f.type('aX')
+      act(() => f.bindings('a').onBlur())
+      act(() => f.store.selectNode('b', 0))
+      f.press('Escape')
+      if (returnToOriginal) act(() => f.store.selectNode('a', 1))
+      f.press('.')
+      expect(f.node('a').text).toBe(returnToOriginal ? 'aXX' : 'aX')
+      expect(f.node('b').text).toBe('b')
+    },
+  )
 
-  it('captures opened child text for structural dot repeat after blur ends the session', () => {
-    // 'o' creates a new sibling and immediately moves focus onto it, which blurs the originating
-    // node as an incidental side effect before any text is typed. Model that with two distinct
-    // tracked nodes (as real node creation always produces a new id) so the structural session is
-    // only finished by a later blur on the node it actually ends up focused on.
-    const store = createEditorStoreDouble({
-      createChild: vi.fn(() => true),
-      createChildWithText: vi.fn(),
-      createSibling: vi.fn(() => true),
-      createSiblingWithText: vi.fn(),
-      endTextSession: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'A', children: [] }] },
-        location: { currentParentId: 'a', selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const nodeA: TreeNode = { id: 'a', text: 'A', children: [] }
-    const nodeB: TreeNode = { id: 'b', text: '', children: [] }
-    const inputA = document.createElement('textarea')
-    inputA.value = 'A'
-    const inputB = document.createElement('textarea')
-    result.current.bindings(nodeA).inputRef(inputA)
-    result.current.bindings(nodeB).inputRef(inputB)
-
-    act(() => {
-      result.current.bindings(nodeA).onKeyDown({
-        currentTarget: inputA,
-        key: 'o',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    expect(result.current.vimMode).toBe('insert')
-    act(() => result.current.bindings(nodeA).onBlur())
-    expect(result.current.vimMode).toBe('insert')
-
-    inputB.value = 'Opened'
-    act(() => result.current.bindings(nodeB).onBlur())
-
-    act(() => {
-      result.current.bindings(nodeB).onKeyDown({
-        currentTarget: inputB,
-        key: 'Escape',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    act(() => {
-      result.current.bindings(nodeB).onKeyDown({
-        currentTarget: inputB,
-        key: '.',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    expect(store.createChildWithText).toHaveBeenCalledWith('Opened')
-  })
-
-  it('edits content on content change using the node links, defaulting to none', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
+  it('edits content using existing links and defaults to no links for plain text', async () => {
     const text = 'https://example.test'
     const links = [{ start: 0, end: text.length, url: text }]
-    const linkedNode: TreeNode = { id: 'node', text, links, children: [] }
+    const f = await fixture({ document: { roots: [{ ...node('node', text), links }] }, mode: 'insert' })
     const input = document.createElement('div')
     input.textContent = text
-
-    result.current(linkedNode).onContentChange({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.editContent).toHaveBeenCalledWith('node', text, links, false)
-
+    act(() => f.bindings().onContentChange({ currentTarget: input } as never))
+    expect(f.node()).toMatchObject({ text, links })
     input.textContent = 'x'
-    const plainNode: TreeNode = { id: 'node', text: 'x', children: [] }
-    result.current(plainNode).onContentChange({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.editContent).toHaveBeenLastCalledWith('node', 'x', [], false)
+    act(() => f.bindings().onContentChange({ currentTarget: input } as never))
+    expect(f.node().text).toBe('x')
+    expect(f.node().links ?? []).toEqual([])
   })
 
-  it('reuses a pending link draft while its text still matches the edited node', () => {
-    const store = createStore()
-    const original = 'see https://example.test'
-    const edited = 'see https//example.test'
-    const linked: TreeNode = {
-      id: 'node',
-      text: original,
-      links: [{ start: 4, end: original.length, url: original.slice(4) }],
-      children: [],
-    }
-    let node: TreeNode = linked
-    const { result, rerender } = renderHook(
-      () => useNodeInputBindings({ store, selectedNodeId: 'node', onPreviewAttachment: vi.fn() }).bindings,
-    )
+  it('reuses a pending link draft while its text still matches the edited node', async () => {
+    const original = 'see https://example.test',
+      edited = 'see https//example.test'
+    const links = [{ start: 4, end: original.length, url: original.slice(4) }]
+    const f = await fixture({ document: { roots: [{ ...node('node', original), links }] }, mode: 'insert' })
     const input = document.createElement('div')
     input.textContent = edited
-    result.current(node).onContentInput({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.editContent).toHaveBeenLastCalledWith('node', edited, [], false)
-
-    node = { id: 'node', text: edited, links: [], children: [] }
-    rerender()
+    act(() => f.bindings().onContentInput({ currentTarget: input } as never))
+    expect(f.node().text).toBe(edited)
+    expect(f.node().links ?? []).toEqual([])
     input.textContent = original
-    result.current(node).onContentInput({ currentTarget: input } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.editContent).toHaveBeenLastCalledWith(
-      'node',
-      original,
-      [{ start: 4, end: original.length, url: original.slice(4) }],
-      false,
-    )
+    act(() => f.bindings().onContentInput({ currentTarget: input } as never))
+    expect(f.node()).toMatchObject({ text: original, links })
   })
 
-  it('uses Cmd+click to request opening the edited link', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const url = 'https://example.test'
-    const node: TreeNode = { id: 'node', text: url, links: [{ start: 0, end: url.length, url }], children: [] }
+  it('uses Cmd+click to request opening the edited link', async () => {
+    const f = await fixture(),
+      url = 'https://example.test'
     const input = document.createElement('div')
     input.innerHTML = `<a href="${url}">${url}</a>`
-    const link = input.querySelector('a')!
-    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
-    const preventDefault = vi.fn()
-    const event = (metaKey: boolean) =>
-      ({ target: link, currentTarget: input, metaKey, preventDefault }) as unknown as Parameters<
-        ReturnType<typeof result.current>['onClick']
-      >[0]
-
-    result.current(node).onClick(event(false))
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null),
+      preventDefault = vi.fn()
+    const event = (metaKey: boolean) => ({ target: input.firstChild, currentTarget: input, metaKey, preventDefault })
+    f.bindings().onClick(event(false) as never)
     expect(open).not.toHaveBeenCalled()
-    result.current(node).onClick(event(true))
+    f.bindings().onClick(event(true) as never)
     expect(open).toHaveBeenCalledWith(url, '_blank')
     expect(preventDefault).toHaveBeenCalledTimes(2)
-    open.mockRestore()
+    f.bindings().onClick({ ...event(true), target: document.createElement('a') } as never)
+    f.bindings().onClick({ ...event(true), target: input } as never)
+    expect(open).toHaveBeenCalledTimes(1)
   })
 
-  it('ends the text session only for non-collapsed selections', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const bindings = result.current({ id: 'node', text: '', children: [] })
+  it.each(['textarea', 'contenteditable'])(
+    'ends the text session only for non-collapsed %s selections',
+    async (kind) => {
+      const f = await fixture({ mode: 'insert' })
+      const input = kind === 'textarea' ? f.input() : document.createElement('div')
+      if (kind === 'contenteditable') {
+        input.textContent = 'hello'
+        document.body.append(input)
+      }
+      const select = (start: number, end: number) => {
+        if (input instanceof HTMLTextAreaElement) input.setSelectionRange(start, end)
+        else {
+          const range = document.createRange()
+          range.setStart(input.firstChild!, start)
+          range.setEnd(input.firstChild!, end)
+          getSelection()!.removeAllRanges()
+          getSelection()!.addRange(range)
+        }
+        act(() => f.bindings().onSelect({ currentTarget: input } as never))
+      }
+      f.type('helloX')
+      select(1, 1)
+      f.type('helloXY')
+      act(() => f.store.undo())
+      expect(f.node().text).toBe('hello')
+      f.type('helloX')
+      select(0, 2)
+      f.type('helloXY')
+      act(() => f.store.undo())
+      expect(f.node().text).toBe('helloX')
+    },
+  )
 
-    const textarea = document.createElement('textarea') as HTMLTextAreaElement
-    textarea.value = 'ab'
-    textarea.setSelectionRange(0, 2)
-    bindings.onSelect({ currentTarget: textarea } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.endTextSession).toHaveBeenCalledTimes(1)
-
-    textarea.setSelectionRange(1, 1)
-    bindings.onSelect({ currentTarget: textarea } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.endTextSession).toHaveBeenCalledTimes(1)
-
-    const div = document.createElement('div')
-    const collapsed = vi.spyOn(globalThis, 'getSelection').mockReturnValue({ isCollapsed: true } as Selection)
-    bindings.onSelect({ currentTarget: div } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.endTextSession).toHaveBeenCalledTimes(1)
-
-    collapsed.mockReturnValue({ isCollapsed: false } as Selection)
-    bindings.onSelect({ currentTarget: div } as unknown as SyntheticEvent<HTMLElement>)
-    expect(store.endTextSession).toHaveBeenCalledTimes(2)
-    collapsed.mockRestore()
-  })
-
-  it('opens the native editor menu with the current selection', async () => {
-    const store = createStore()
-    const showEditorContextMenu = vi.fn(async () => 'copy' as const)
+  it('opens the native editor menu with the current selection and copies that text', async () => {
+    const f = await fixture(),
+      showEditorContextMenu = vi.fn(async () => 'copy' as const)
     window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const bindings = result.current({ id: 'node', text: 'hello', children: [] })
-    const textarea = document.createElement('textarea')
-    textarea.value = 'hello'
-    textarea.setSelectionRange(1, 4)
+    f.input().setSelectionRange(1, 4)
     const preventDefault = vi.fn()
-
-    bindings.onContextMenu({ currentTarget: textarea, clientX: 10, clientY: 20, preventDefault } as never)
-    await Promise.resolve()
-
+    await act(async () => {
+      f.bindings().onContextMenu({ currentTarget: f.input(), clientX: 10, clientY: 20, preventDefault } as never)
+    })
     expect(preventDefault).toHaveBeenCalledOnce()
     expect(showEditorContextMenu).toHaveBeenCalledWith({
       x: 10,
@@ -861,1593 +587,609 @@ describe('useNodeInputBindings', () => {
       canPaste: true,
       canSelectAll: true,
     })
-    expect(store.copy).toHaveBeenCalledWith('node', 1, 4)
+    expect(f.clipboard.written).toEqual({ text: 'ell', html: 'ell' })
   })
 
-  it('commits a pending Replace session before the native onPaste fallback', () => {
-    const store = createStore()
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'abcd'
-    input.setSelectionRange(2, 2)
-    result.current.bindings.inputRef(input)
-    const press = (key: string, options: { metaKey?: boolean } = {}): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: options.metaKey ?? false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    press('R')
-    press('X')
-    expect(result.current.vimMode).toBe('replace')
-
-    act(() => {
-      result.current.bindings.onPaste({ currentTarget: input, preventDefault: vi.fn() } as never)
-    })
-
-    expect(result.current.vimMode).toBe('normal')
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
-    expect(vi.mocked(store.replaceTextRange).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(store.paste).mock.invocationCallOrder[0]!,
-    )
-  })
-
-  it('commits a pending Replace session before the context-menu Paste', async () => {
-    const store = createStore()
-    const showEditorContextMenu = vi.fn(async () => 'paste' as const)
-    window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'abcd'
-    input.setSelectionRange(2, 2)
-    result.current.bindings.inputRef(input)
-    const press = (key: string, options: { metaKey?: boolean } = {}): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: options.metaKey ?? false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    press('R')
-    press('X')
-    expect(result.current.vimMode).toBe('replace')
-
+  it.each(['native', 'menu'])('commits pending Replace before %s Paste', async (path) => {
+    const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
+    f.clipboard.current = { kind: 'text', text: '!' }
+    f.input().setSelectionRange(2, 2)
+    f.press('R')
+    f.press('X')
     await act(async () => {
-      result.current.bindings.onContextMenu({
-        currentTarget: input,
-        clientX: 1,
-        clientY: 2,
-        preventDefault: vi.fn(),
-      } as never)
-      await Promise.resolve()
-    })
-
-    expect(result.current.vimMode).toBe('normal')
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
-    expect(vi.mocked(store.replaceTextRange).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(store.paste).mock.invocationCallOrder[0]!,
-    )
-  })
-
-  it('keeps the selection through a right-click commit so the context-menu Cut removes it', async () => {
-    const store = createStore()
-    const showEditorContextMenu = vi.fn(async () => 'cut' as const)
-    window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'abcd'
-    input.setSelectionRange(2, 2)
-    result.current.bindings.inputRef(input)
-    const press = (key: string, options: { metaKey?: boolean } = {}): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: options.metaKey ?? false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
+      if (path === 'native')
+        f.bindings().onPaste({ currentTarget: f.input(), preventDefault: () => undefined } as never)
+      else {
+        window.treeApi = { showEditorContextMenu: async () => 'paste' } as unknown as Window['treeApi']
+        f.bindings().onContextMenu({
+          currentTarget: f.input(),
+          clientX: 1,
+          clientY: 2,
+          preventDefault: () => undefined,
         } as never)
-      })
-    }
-    press('R')
-    press('X')
-    press('a', { metaKey: true })
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(4)
-
-    act(() => {
-      result.current.bindings.onMouseDown({ currentTarget: input, button: 2, preventDefault: vi.fn() } as never)
-    })
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(4)
-
-    await act(async () => {
-      result.current.bindings.onContextMenu({
-        currentTarget: input,
-        clientX: 1,
-        clientY: 2,
-        preventDefault: vi.fn(),
-      } as never)
-      await Promise.resolve()
-    })
-
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
-    expect(store.cut).toHaveBeenCalledWith('node', 0, 4)
-    expect(result.current.vimMode).toBe('normal')
-  })
-
-  it('commits a pending Replace session exactly once when the store re-enters the finish path', () => {
-    const node: TreeNode = { id: 'a', text: 'ab', children: [] }
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRange: vi.fn(() => {
-        // A store side effect that synchronously re-enters the finish path must not be able to
-        // commit the Replace session a second time; the session is consumed before this call.
-        result.current.bindings.onBlur()
-      }),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [node] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'ab'
-    input.setSelectionRange(2, 2)
-    result.current.bindings.inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('R')
-    press('X')
-    press('Escape')
-
-    expect(store.replaceTextRange).toHaveBeenCalledTimes(1)
-    expect(store.replaceTextRange).toHaveBeenCalledWith('a', 2, 2, 'X')
-    expect(result.current.vimMode).toBe('normal')
-  })
-
-  it('reads the register written directly by the keyboard handler through the shared owner', () => {
-    const nodes: TreeNode[] = [
-      { id: 'a', text: 'A', children: [] },
-      { id: 'b', text: 'B', children: [] },
-    ]
-    let selectedNodeId = 'a'
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: nodes },
-        location: { currentParentId: null, selectedNodeId },
-      }),
-      selectNode: vi.fn((id: string) => {
-        selectedNodeId = id
-      }),
-      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      return {
-        bindings: useNodeInputBindings({
-          store,
-          selectedNodeId,
-          vimMode,
-          setVimMode,
-          nodeVisualSelection: selection,
-          setNodeVisualSelection: setSelection,
-          onPreviewAttachment: vi.fn(),
-        }).bindings,
       }
     })
-    const input = document.createElement('textarea')
-    input.value = 'A'
-    const press = (node: TreeNode, key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
+    expect(f.node().text).toBe('abX!d')
+    expect(f.result.current.vimMode).toBe('normal')
+    act(() => f.store.undo())
+    expect(f.node().text).toBe('abXd')
+    act(() => f.store.undo())
+    expect(f.node().text).toBe('abcd')
+  })
+
+  it('keeps selection through right-click commit so context-menu Cut removes it', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
+    window.treeApi = { showEditorContextMenu: async () => 'cut' } as unknown as Window['treeApi']
+    f.input().setSelectionRange(2, 2)
+    f.press('R')
+    f.press('X')
+    f.press('a', { metaKey: true })
+    expect([f.input().selectionStart, f.input().selectionEnd]).toEqual([0, 4])
+    act(() =>
+      f.bindings().onMouseDown({ currentTarget: f.input(), button: 2, preventDefault: () => undefined } as never),
+    )
+    expect([f.input().selectionStart, f.input().selectionEnd]).toEqual([0, 4])
+    await act(async () => {
+      f.bindings().onContextMenu({
+        currentTarget: f.input(),
+        clientX: 1,
+        clientY: 2,
+        preventDefault: () => undefined,
+      } as never)
+    })
+    expect(f.node().text).toBe('')
+    expect(f.clipboard.written?.text).toBe('abXd')
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it('commits a pending Replace session exactly once when the store re-enters the finish path', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'ab')] } })
+    f.input().setSelectionRange(2, 2)
+    f.press('R')
+    f.press('X')
+    // A real store notification can synchronously blur while the first commit is on the stack.
+    const unregister = f.store.subscribe(() => f.bindings().onBlur())
+    f.press('Escape')
+    unregister()
+    expect(f.node().text).toBe('abX')
+    expect(f.result.current.vimMode).toBe('normal')
+    act(() => f.store.undo())
+    expect(f.node().text).toBe('ab')
+    act(() => f.store.undo())
+    expect(f.node().text).toBe('ab')
+  })
+
+  it('reads the register written directly by the keyboard handler through the shared owner', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+    f.press('y')
+    f.press('y')
+    f.press('V')
+    f.press('j')
+    f.press('d')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['C'])
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['C', 'A', 'B'])
+  })
+
+  it('uses the keyboard subtree register to replace a whole-node Visual range', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('j')
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A'])
+    expect(f.node().id).not.toBe('a')
+    expect(f.result.current.vimMode).toBe('normal')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A'])
+  })
+
+  it('captures structural and Replace sessions from a contenteditable input', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A')] } })
+    f.press('o')
+    const openedId = f.node().id
+    const input = document.createElement('div')
+    input.contentEditable = 'true'
+    input.tabIndex = 0
+    input.textContent = 'Opened'
+    document.body.append(input)
+    f.bindings(openedId).inputRef(input)
+    act(() => f.bindings(openedId).onContentInput({ currentTarget: input } as never))
+    setCaret(input, 6)
+    const press = (key: string) =>
+      act(() =>
+        f.bindings().onKeyDown({
           currentTarget: input,
           key,
           metaKey: false,
           ctrlKey: false,
           altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
+          preventDefault: () => undefined,
+        } as never),
+      )
+    press('Escape')
+    press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'Opened', 'Opened'])
+    const repeatedId = f.node().id
+    f.bindings(repeatedId).inputRef(input)
+    setCaret(input, 0)
+    press('R')
+    act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+    input.textContent = 'あOpened'
+    act(() => f.bindings().onContentInput({ currentTarget: input } as never))
+    setCaret(input, 1)
+    act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
+    press('X')
+    press('Escape')
+    expect(f.node().text).toBe('あXpened')
+    expect(f.result.current.vimMode).toBe('normal')
+  })
 
-    press(nodes[0]!, 'y')
-    press(nodes[0]!, 'y')
-    press(nodes[0]!, 'V')
-    press(nodes[0]!, 'j')
-    press(nodes[1]!, 'd')
-
-    expect(store.applyNodeVisual).toHaveBeenCalledWith('d', 'a', 'b', {
-      nodes: [{ id: 'a', text: 'A', children: [] }],
-      sourceIds: ['a'],
+  it('requests the native menu for a contenteditable selection and copies its linked text', async () => {
+    const url = 'https://example.test'
+    const f = await fixture({
+      document: { roots: [{ ...node('node', url), links: [{ start: 0, end: url.length, url }] }] },
     })
+    const input = document.createElement('div')
+    input.contentEditable = 'true'
+    input.textContent = url
+    document.body.append(input)
+    const range = document.createRange()
+    range.selectNodeContents(input)
+    getSelection()!.removeAllRanges()
+    getSelection()!.addRange(range)
+    const showEditorContextMenu = vi.fn(async () => 'copy' as const)
+    window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
+    await act(async () =>
+      f
+        .bindings()
+        .onContextMenu({ currentTarget: input, clientX: 1, clientY: 2, preventDefault: () => undefined } as never),
+    )
+    expect(showEditorContextMenu).toHaveBeenCalledWith({
+      x: 1,
+      y: 2,
+      selectionText: url,
+      canCut: true,
+      canCopy: true,
+      canPaste: true,
+      canSelectAll: true,
+    })
+    expect(f.clipboard.written).toEqual({ text: url, html: `<a href="${url}">${url}</a>` })
+    act(() => f.store.createSibling('after'))
+    await act(async () => f.store.paste(f.node().id, 0))
+    expect(f.node()).toMatchObject({ text: url, links: [{ start: 0, end: url.length, url }] })
   })
 
-  it('prevents a secondary-button press from changing the text selection', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const bindings = result.current({ id: 'node', text: 'hello', children: [] })
-    const preventDefault = vi.fn()
-
-    bindings.onMouseDown({ button: 2, preventDefault } as never)
-
-    expect(preventDefault).toHaveBeenCalledOnce()
-  })
-
-  it('keeps the primary-button press available for normal caret and text selection', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const bindings = result.current({ id: 'node', text: 'hello', children: [] })
-    const preventDefault = vi.fn()
-
-    bindings.onMouseDown({ button: 0, preventDefault } as never)
-
-    expect(preventDefault).not.toHaveBeenCalled()
+  it.each([0, 2])('preserves the expected native pointer behavior for button %s', async (button) => {
+    const f = await fixture(),
+      preventDefault = vi.fn()
+    act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button, preventDefault } as never))
+    expect(preventDefault).toHaveBeenCalledTimes(button === 2 ? 1 : 0)
   })
 
   it('ignores focus intents for nodes that are not registered', async () => {
-    const store = createStore()
-    const { result } = renderHook(
-      () =>
-        useNodeInputBindings({
-          store,
-          selectedNodeId: 'node',
-          focus: { nodeId: 'missing', cursor: 0, token: 1 },
-          onPreviewAttachment: vi.fn(),
-        }).bindings,
-    )
-    await Promise.resolve()
-
-    expect(result.current({ id: 'node', text: '', children: [] })).toBeDefined()
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+    const input = f.input('a')
+    input.focus()
+    act(() => f.store.selectNode('b', 0))
+    await act(async () => {})
+    expect(document.activeElement).toBe(input)
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
   })
 
-  it('focuses the registered input and positions the caret for the requested node', () => {
-    const store = createStore()
-    const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
-    const { result, rerender } = renderHook(
-      () =>
-        useNodeInputBindings({ store, selectedNodeId: 'node', focus: holder.focus, onPreviewAttachment: vi.fn() })
-          .bindings,
-    )
-    const textarea = document.createElement('textarea')
-    textarea.value = 'hello'
-    document.body.append(textarea)
-    result.current({ id: 'node', text: 'hello', children: [] }).inputRef(textarea)
-
-    holder.focus = { nodeId: 'node', cursor: 3, token: 1 }
-    rerender()
-
-    expect(textarea.selectionStart).toBe(3)
+  it.each(['insert', 'normal'] as const)('focuses registered inputs with the %s caret', async (mode) => {
+    const f = await fixture({ mode }),
+      input = f.input()
+    act(() => f.store.selectNode('node', 3))
+    await act(async () => {})
+    expect(document.activeElement).toBe(input)
+    expect([input.selectionStart, input.selectionEnd]).toEqual(mode === 'normal' ? [3, 4] : [3, 3])
   })
 
-  it('keeps a block selection when Normal mode focuses another node', () => {
-    const store = createStore()
-    const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
-    const { result, rerender } = renderHook(
-      () =>
-        useNodeInputBindings({
-          store,
-          selectedNodeId: 'node',
-          focus: holder.focus,
-          onPreviewAttachment: vi.fn(),
-          vimMode: 'normal',
-        }).bindings,
-    )
-    const textarea = document.createElement('textarea')
-    textarea.value = 'hello'
-    document.body.append(textarea)
-    result.current({ id: 'node', text: 'hello', children: [] }).inputRef(textarea)
-
-    holder.focus = { nodeId: 'node', cursor: 3, token: 1 }
-    rerender()
-
-    expect(textarea.selectionStart).toBe(3)
-    expect(textarea.selectionEnd).toBe(4)
+  it('collapses the Normal caret on an attached node at its terminal image position', async () => {
+    const f = await fixture({ document: { roots: [image('hello')] } }),
+      input = f.input()
+    act(() => f.store.selectNode('node', 5))
+    expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    act(() => f.bindings().onFocus({ currentTarget: input } as never))
+    expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
   })
 
-  it('collapses the Normal caret on an attached node at its terminal image position', () => {
-    const store = createStore()
-    const holder: { focus: { nodeId: string; cursor: number; token: number } | undefined } = { focus: undefined }
-    const { result, rerender } = renderHook(
-      () =>
-        useNodeInputBindings({
-          store,
-          selectedNodeId: 'node',
-          focus: holder.focus,
-          onPreviewAttachment: vi.fn(),
-          vimMode: 'normal',
-        }).bindings,
-    )
-    const row = document.createElement('div')
-    row.className = 'node-row'
-    row.dataset.hasAttachment = 'true'
-    const textarea = document.createElement('textarea')
-    textarea.value = 'hello'
-    row.append(textarea)
-    document.body.append(row)
-    result.current({ id: 'node', text: 'hello', children: [] }).inputRef(textarea)
-
-    holder.focus = { nodeId: 'node', cursor: 5, token: 1 }
-    rerender()
-
-    expect(textarea.selectionStart).toBe(5)
-    expect(textarea.selectionEnd).toBe(5)
+  it('clears an unfinished Vim operator on blur and composition start', async () => {
+    const f = await fixture(),
+      before = f.snapshot().document
+    f.press('d')
+    act(() => f.bindings().onBlur())
+    f.press('d')
+    expect(f.snapshot().document).toEqual(before)
+    act(() => f.bindings().onCompositionStart({ currentTarget: f.input() } as never))
+    f.press('d')
+    expect(f.snapshot().document).toEqual(before)
+    act(() => f.bindings().onCompositionEnd({ currentTarget: f.input() } as never))
+    f.press('d')
+    expect(f.snapshot().document).toEqual(before)
   })
 
-  it('clears an unfinished Vim operator on blur and composition start', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node', vimMode: 'normal' })
-    const node: TreeNode = { id: 'node', text: 'text', children: [] }
-    const input = document.createElement('textarea')
-    input.value = 'text'
-    const pressD = (): void => {
-      result.current(node).onKeyDown({
-        currentTarget: input,
-        key: 'd',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    }
-
-    pressD()
-    result.current(node).onBlur()
-    pressD()
-    expect(store.deleteSelected).not.toHaveBeenCalled()
-
-    result.current(node).onCompositionStart({ currentTarget: input } as never)
-    pressD()
-    expect(store.deleteSelected).not.toHaveBeenCalled()
+  it('overwrites and appends in Replace mode, then commits one repeatable range edit', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
+    f.input().setSelectionRange(2, 2)
+    f.press('R')
+    f.press('X')
+    f.press('Y')
+    f.press('Z')
+    expect(f.input().value).toBe('abXYZ')
+    expect(f.node().text).toBe('abcd')
+    f.press('Backspace')
+    expect(f.input().value).toBe('abXY')
+    f.press('Escape')
+    expect(f.node().text).toBe('abXY')
+    expect(f.result.current.vimMode).toBe('normal')
+    act(() => f.store.undo())
+    expect(f.node().text).toBe('abcd')
+    act(() => f.store.redo())
+    f.input().setSelectionRange(0, 0)
+    f.press('.')
+    expect(f.node().text).toBe('XYXY')
   })
 
-  it('overwrites and appends in Replace mode, then commits one repeatable range edit', () => {
-    const store = createStore()
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        onPreviewAttachment: vi.fn(),
-        vimMode,
-        setVimMode,
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = node.text
-    input.setSelectionRange(2, 2)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('R')
-    expect(result.current.vimMode).toBe('replace')
-    press('X')
-    press('Y')
-    press('Z')
-    expect(input.value).toBe('abXYZ')
-    press('Backspace')
-    expect(input.value).toBe('abXY')
-    press('Escape')
-
-    expect(result.current.vimMode).toBe('normal')
-    expect(store.replaceTextRange).toHaveBeenCalledOnce()
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 4, 'XY')
-  })
-
-  it('resumes Replace mode after native text composition', () => {
-    const store = createStore()
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        onPreviewAttachment: vi.fn(),
-        vimMode,
-        setVimMode,
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = node.text
-    input.setSelectionRange(2, 2)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('R')
-    act(() => result.current.bindings.onCompositionStart({ currentTarget: input } as never))
-    input.value = 'abあcd'
-    input.setSelectionRange(3, 3)
-    act(() => result.current.bindings.onCompositionEnd({ currentTarget: input } as never))
-    press('X')
-    press('Escape')
-
-    expect(result.current.vimMode).toBe('normal')
-    expect(store.replaceTextRange).toHaveBeenCalledOnce()
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 3, 4, 'X')
+  it('resumes Replace mode after native text composition', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
+    f.input().setSelectionRange(2, 2)
+    f.press('R')
+    act(() => f.bindings().onCompositionStart({ currentTarget: f.input() } as never))
+    f.type('abあcd')
+    f.input().setSelectionRange(3, 3)
+    act(() => f.bindings().onCompositionEnd({ currentTarget: f.input() } as never))
+    f.press('X')
+    f.press('Escape')
+    expect(f.node().text).toBe('abあXd')
+    expect(f.result.current.vimMode).toBe('normal')
   })
 
   it('registers a pending-edit finisher with the store and unregisters it on unmount', () => {
     const unregister = vi.fn()
-    let registeredFinish: (() => boolean) | undefined
-    const registerPendingEditFinisher = vi.fn((finish: () => boolean) => {
-      registeredFinish = finish
+    let finish: (() => boolean) | undefined
+    const registerPendingEditFinisher = vi.fn((callback: () => boolean) => {
+      finish = callback
       return unregister
     })
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'node', text: 'abcd', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'node' },
-      }),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher,
-    })
-
-    const { unmount } = renderHook(() => useNodeInputBindings({ store, onPreviewAttachment: vi.fn() }))
-
+    const store = createEditorStoreDouble({ registerPendingEditFinisher })
+    const { unmount } = renderHook(() => useNodeInputBindings({ store, onPreviewAttachment: () => undefined }))
     expect(registerPendingEditFinisher).toHaveBeenCalledOnce()
-    expect(registeredFinish).toBeTypeOf('function')
+    expect(finish).toBeTypeOf('function')
     unmount()
     expect(unregister).toHaveBeenCalledOnce()
   })
 
-  it('commits a pending Replace session when the shutdown finisher runs and consumes it once', () => {
-    let finish: (() => boolean) | undefined
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'node', text: 'abcd', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'node' },
-      }),
-      replaceTextRange: vi.fn(),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn((registered: () => boolean) => {
-        finish = registered
-        return () => undefined
-      }),
-    })
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        onPreviewAttachment: vi.fn(),
-        vimMode,
-        setVimMode,
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'abcd'
-    input.setSelectionRange(2, 2)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
+  it.each([false, true])('flushes a Replace session once, with typed content: %s', async (typed) => {
+    const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
+    f.input().setSelectionRange(2, 2)
+    f.press('R')
+    if (typed) f.press('X')
+    await act(async () => f.store.flushPersistence())
+    expect(f.node().text).toBe(typed ? 'abXd' : 'abcd')
+    expect(f.result.current.vimMode).toBe('normal')
+    if (typed) {
+      expect(f.input().value).toBe('abXd')
+      expect(f.input().selectionStart).toBe(3)
     }
-
-    press('R')
-    press('X')
-    expect(input.value).toBe('abXd')
-
-    act(() => finish?.())
-
-    expect(store.replaceTextRange).toHaveBeenCalledOnce()
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 3, 'X')
-    expect(result.current.vimMode).toBe('normal')
-    expect(input.value).toBe('abXd')
-    expect(input.selectionStart).toBe(3)
-
-    act(() => finish?.())
-    expect(store.replaceTextRange).toHaveBeenCalledOnce()
+    if (typed) expect(f.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'abXd' }] } })
+    const before = f.snapshot().document
+    await act(async () => f.store.flushPersistence())
+    expect(f.snapshot().document).toBe(before)
+    if (typed) {
+      act(() => f.store.undo())
+      expect(f.node().text).toBe('abcd')
+    }
   })
 
-  it('returns an empty Replace session to Normal without a store edit when the shutdown finisher runs', () => {
-    let finish: (() => boolean) | undefined
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'node', text: 'abcd', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'node' },
-      }),
-      replaceTextRange: vi.fn(),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn((registered: () => boolean) => {
-        finish = registered
-        return () => undefined
-      }),
-    })
-    const node: TreeNode = { id: 'node', text: 'abcd', children: [] }
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        onPreviewAttachment: vi.fn(),
-        vimMode,
-        setVimMode,
-      }).bindings(node)
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    input.value = 'abcd'
-    input.setSelectionRange(2, 2)
-    act(() => {
-      result.current.bindings.onKeyDown({
-        currentTarget: input,
-        key: 'R',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    expect(result.current.vimMode).toBe('replace')
+  it.each(['blur', 'pointer'])(
+    'activates image caret when Replace commits at its terminal position through %s',
+    async (path) => {
+      const f = await fixture({ document: { roots: [image()] } })
+      f.input().setSelectionRange(2, 2)
+      f.press('R')
+      f.press('X')
+      act(() => {
+        if (path === 'blur') f.bindings().onBlur()
+        else f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never)
+      })
+      expect(f.node().text).toBe('abX')
+      expect(f.result.current.imageCaretNodeId).toBe('node')
+    },
+  )
 
-    act(() => finish?.())
-
-    expect(store.replaceTextRange).not.toHaveBeenCalled()
-    expect(result.current.vimMode).toBe('normal')
+  it.each([
+    ['foo bar', 0, ['y', 's', 'i', 'w', '"'], '"foo" bar'],
+    ['say "hi" now', 5, ['d', 's', '"'], 'say hi now'],
+    ['say "hi" now', 5, ['c', 's', '"', ')'], 'say (hi) now'],
+    ['  foo', 3, ['y', 's', 's', ')'], '  (foo)'],
+  ] as const)('applies surround commands as one undoable edit: %s', async (text, cursor, keys, expected) => {
+    const f = await fixture({ document: { roots: [node('a', text)] } })
+    f.input().setSelectionRange(cursor, cursor)
+    for (const key of keys) f.press(key)
+    expect(f.node().text).toBe(expected)
+    act(() => f.store.undo())
+    expect(f.node().text).toBe(text)
   })
 
-  it('activates the image caret when a Replace session commits on blur at the terminal position', () => {
-    const node: TreeNode = { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [node] },
-        location: { currentParentId: null, selectedNodeId: 'node' },
-      }),
-      replaceTextRange: vi.fn(),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        onPreviewAttachment: vi.fn(),
-        vimMode,
-        setVimMode,
-        setImageCaretNodeId,
-      }).bindings(node)
-      return { bindings, vimMode, imageCaretNodeId }
-    })
-    const input = document.createElement('textarea')
-    input.value = node.text
-    input.setSelectionRange(2, 2)
-    result.current.bindings.inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('R')
-    expect(result.current.vimMode).toBe('replace')
-    press('X')
-    expect(input.value).toBe('abX')
-
-    act(() => result.current.bindings.onBlur())
-
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, 'X')
-    expect(result.current.imageCaretNodeId).toBe('node')
+  it('repeats surround at the new word rather than fixed offsets', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'one two')] } })
+    f.input().setSelectionRange(0, 0)
+    for (const key of ['y', 's', 'i', 'w', ']']) f.press(key)
+    f.input().setSelectionRange(6, 6)
+    f.press('.')
+    expect(f.node().text).toBe('[one] [two]')
   })
 
-  it('activates the image caret when a same-node pointer click commits a Replace session at the terminal position', () => {
-    const node: TreeNode = { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [node] },
-        location: { currentParentId: null, selectedNodeId: 'node' },
-      }),
-      replaceTextRange: vi.fn(),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-      const bindings = useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        onPreviewAttachment: vi.fn(),
-        vimMode,
-        setVimMode,
-        setImageCaretNodeId,
-      }).bindings(node)
-      return { bindings, vimMode, imageCaretNodeId }
-    })
-    const input = document.createElement('textarea')
-    input.value = node.text
-    input.setSelectionRange(2, 2)
-    result.current.bindings.inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings.onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('R')
-    press('X')
-    expect(input.value).toBe('abX')
-
-    act(() => result.current.bindings.onMouseDown({ currentTarget: input, button: 0 } as never))
-
-    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, 'X')
-    expect(result.current.imageCaretNodeId).toBe('node')
+  it.each([
+    ['2', 'y', 's', 's', ')'],
+    ['y', 's', 'i', 'w', 'z'],
+    ['d', 's', '"'],
+    ['d', 's', 'w'],
+  ])('leaves text unchanged for unsupported surround sequence %j', async (...keys) => {
+    const f = await fixture(),
+      before = f.snapshot().document
+    f.input().setSelectionRange(0, 0)
+    for (const key of keys) f.press(key)
+    expect(f.snapshot().document).toBe(before)
   })
 
-  it('applies surround commands as one edit and repeats them with dot', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRanges: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    document.body.append(input)
-    const press = (key: string, cursor?: number): void => {
-      if (cursor !== undefined) input.setSelectionRange(cursor, cursor)
-      act(() => {
-        result.current.bindings({ id: 'a', text: input.value, children: [] }).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    input.value = 'foo bar'
-    press('y', 0)
-    press('s')
-    press('i')
-    press('w')
-    press('"')
-    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
-      { start: 0, end: 0, inserted: '"' },
-      { start: 3, end: 3, inserted: '"' },
-    ])
-
-    input.value = 'say "hi" now'
-    press('d', 5)
-    press('s')
-    press('"')
-    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
-      { start: 4, end: 5, inserted: '' },
-      { start: 7, end: 8, inserted: '' },
-    ])
-
-    press('c', 5)
-    press('s')
-    press('"')
-    press(')')
-    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
-      { start: 4, end: 5, inserted: '(' },
-      { start: 7, end: 8, inserted: ')' },
-    ])
-
-    input.value = '  foo'
-    press('y', 3)
-    press('s')
-    press('s')
-    press(')')
-    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
-      { start: 2, end: 2, inserted: '(' },
-      { start: 5, end: 5, inserted: ')' },
-    ])
-
-    // A repeat re-derives the range at the caret rather than replaying fixed offsets.
-    input.value = 'one two'
-    press('y', 0)
-    press('s')
-    press('i')
-    press('w')
-    press(']')
-    press('.', 4)
-    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
-      { start: 4, end: 4, inserted: '[' },
-      { start: 7, end: 7, inserted: ']' },
-    ])
-
-    // yss takes no count, following the cc and S whole-node precedent.
-    const before = (store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length
-    press('2', 0)
-    press('y')
-    press('s')
-    press('s')
-    press(')')
-    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
-
-    // An unsupported delimiter key makes no change.
-    press('y', 0)
-    press('s')
-    press('i')
-    press('w')
-    press('z')
-    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
-
-    // A target with no enclosing pair makes no change.
-    press('d', 0)
-    press('s')
-    press('"')
-    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
-
-    // `dsw` must not be read as "delete surrounding word".
-    press('d', 0)
-    press('s')
-    press('w')
-    expect((store.replaceTextRanges as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before)
-    input.remove()
-  })
-
-  it('leaves an image-only node untouched by every surround command', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRanges: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: '', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const imageOnly: TreeNode = {
-      id: 'a',
-      text: '',
-      attachment: { id: 'attachment-1', mimeType: 'image/png' },
-      children: [],
-    }
-    const input = document.createElement('textarea')
-    document.body.append(input)
-    input.value = ''
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(imageOnly).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
+  it('leaves an image-only node untouched by every surround command', async () => {
+    const f = await fixture({ document: { roots: [image('')] } }),
+      before = f.snapshot().document
     for (const sequence of [
       ['y', 's', 'i', 'w', ')'],
       ['y', 's', 's', ')'],
       ['d', 's', ')'],
       ['c', 's', ')', '"'],
     ]) {
-      for (const key of sequence) press(key)
-      expect(store.replaceTextRanges).not.toHaveBeenCalled()
+      for (const key of sequence) f.press(key)
+      expect(f.snapshot().document).toBe(before)
     }
-    expect(result.current.vimMode).toBe('normal')
-    input.remove()
+    expect(f.result.current.vimMode).toBe('normal')
   })
 
-  it('surrounds a character-wise Visual selection with S and returns to Normal mode', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRanges: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const input = document.createElement('textarea')
-    document.body.append(input)
-    input.value = 'foo bar'
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings({ id: 'a', text: input.value, children: [] }).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-    input.setSelectionRange(0, 0)
-    press('v')
-    press('l')
-    press('l')
-    expect(result.current.vimMode).toBe('visual')
-
-    // An unsupported delimiter changes nothing and keeps the selection so it can be retyped.
-    press('S')
-    press('z')
-    expect(store.replaceTextRanges).not.toHaveBeenCalled()
-    expect(result.current.vimMode).toBe('visual')
-
-    press('S')
-    press('}')
-    expect(store.replaceTextRanges).toHaveBeenLastCalledWith('a', [
-      { start: 0, end: 0, inserted: '{' },
-      { start: 3, end: 3, inserted: '}' },
-    ])
-    expect(result.current.vimMode).toBe('normal')
-    input.remove()
+  it('surrounds character Visual selection with S and returns to Normal mode', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'foo bar')] } })
+    f.input().setSelectionRange(0, 0)
+    f.press('v')
+    f.press('l')
+    f.press('l')
+    f.press('S')
+    f.press('z')
+    expect(f.node().text).toBe('foo bar')
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([f.input().selectionStart, f.input().selectionEnd]).toEqual([0, 3])
+    f.press('S')
+    f.press('}')
+    expect(f.node().text).toBe('{foo} bar')
+    expect(f.result.current.vimMode).toBe('normal')
   })
 
-  it('clears a character Visual selection on a pointer press and re-anchors at the pointer', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      replaceTextRanges: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'foo bar', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const node: TreeNode = { id: 'a', text: 'foo bar', children: [] }
-    const input = document.createElement('textarea')
-    document.body.append(input)
-    input.value = 'foo bar'
-    result.current.bindings(node).inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    input.setSelectionRange(0, 0)
-    press('v')
-    expect(result.current.vimMode).toBe('visual')
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(1)
-
-    // A pointer press clears the Visual endpoints while character Visual mode stays active, so
-    // the next motion must anchor at the pointer position rather than a stale anchor.
-    input.setSelectionRange(3, 3)
-    act(() => result.current.bindings(node).onMouseDown({ currentTarget: input, button: 0 } as never))
-
-    press('l')
-    expect(result.current.vimMode).toBe('visual')
-    expect(input.selectionStart).toBe(3)
-    expect(input.selectionEnd).toBe(5)
-    input.remove()
-  })
-
-  it('clears the whole-node Visual g prefix when a whole-node command exits', () => {
-    const nodes: TreeNode[] = [
-      { id: 'a', text: 'A', children: [] },
-      { id: 'b', text: 'B', children: [] },
-    ]
-    const store = createEditorStoreDouble({
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: nodes },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      selectNode: vi.fn(),
-      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
-      deleteSelected: vi.fn(() => false),
-      enter: vi.fn(),
-      endTextSession: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        nodeVisualSelection: selection,
-        setNodeVisualSelection: setSelection,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode, selection }
-    })
-    const node = nodes[0]!
-    const input = document.createElement('textarea')
-    input.value = 'A'
-    result.current.bindings(node).inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    press('V')
-    press('g')
-    press('y')
-    expect(result.current.vimMode).toBe('normal')
-    expect(result.current.selection).toBeUndefined()
-    press('d')
-    press('d')
-    expect(store.enter).not.toHaveBeenCalled()
-    expect(store.deleteSelected).toHaveBeenCalledOnce()
-  })
-
-  it('anchors the next character Visual motion at the reached caret after Cmd+.', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      enter: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const node: TreeNode = { id: 'a', text: 'Alpha', children: [] }
-    const input = document.createElement('textarea')
-    document.body.append(input)
-    input.value = 'Alpha'
-    result.current.bindings(node).inputRef(input)
-    const press = (key: string, metaKey = false): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    input.setSelectionRange(0, 0)
-    press('v')
-    press('l')
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(2)
-
-    // The focus-changing shortcut drops the endpoints while Visual mode stays active, so the next
-    // motion must anchor at the reached caret instead of the previous focus position.
-    press('.', true)
-    expect(result.current.vimMode).toBe('visual')
-    press('l')
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(2)
-    input.remove()
-  })
-
-  it('clears character Visual endpoints when blur ends the session and re-anchors the next motion', () => {
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode }
-    })
-    const node: TreeNode = { id: 'a', text: 'Alpha', children: [] }
-    const input = document.createElement('textarea')
-    document.body.append(input)
-    input.value = 'Alpha'
-    result.current.bindings(node).inputRef(input)
-    const press = (key: string): void => {
-      act(() => {
-        result.current.bindings(node).onKeyDown({
-          currentTarget: input,
-          key,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: false,
-          preventDefault: vi.fn(),
-        } as never)
-      })
-    }
-
-    input.setSelectionRange(0, 0)
-    press('v')
-    press('l')
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(2)
-
-    // A blur (a pointer navigation such as a breadcrumb or enter-control click) drops the
-    // endpoints while Visual mode stays active, so the next motion must anchor at the caret.
-    act(() => {
-      result.current.bindings(node).onBlur()
-    })
-    expect(result.current.vimMode).toBe('visual')
-    press('l')
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe(2)
-    input.remove()
-  })
-
-  it('keeps whole-node Visual mode active when a range move blurs the previous input', () => {
-    const nodes: TreeNode[] = [
-      { id: 'a', text: 'A', children: [] },
-      { id: 'b', text: 'B', children: [] },
-    ]
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: nodes },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      }),
-      selectNode: vi.fn(),
-      applyNodeVisual: vi.fn(() => ({ nodes, sourceIds: ['a'] })),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const { result } = renderHook(() => {
-      const [vimMode, setVimMode] = useState<VimMode>('normal')
-      const [selection, setSelection] = useState<{ anchorId: string; focusId: string }>()
-      const { bindings } = useNodeInputBindings({
-        store,
-        selectedNodeId: 'a',
-        vimMode,
-        setVimMode,
-        nodeVisualSelection: selection,
-        setNodeVisualSelection: setSelection,
-        onPreviewAttachment: vi.fn(),
-      })
-      return { bindings, vimMode, selection }
-    })
-    const node = nodes[0]!
-    const input = document.createElement('textarea')
-    input.value = 'A'
-    result.current.bindings(node).inputRef(input)
-    act(() => {
-      result.current.bindings(node).onKeyDown({
-        currentTarget: input,
-        key: 'V',
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault: vi.fn(),
-      } as never)
-    })
-    expect(result.current.vimMode).toBe('visual-node')
-    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
-
-    // Extending the range moves focus between node inputs, so the previous input blurs on every
-    // move; that blur must not exit whole-node Visual mode or clear its range.
-    act(() => {
-      result.current.bindings(node).onBlur()
-    })
-    expect(result.current.vimMode).toBe('visual-node')
-    expect(result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
-  })
-
-  it('keeps a multi-character selection when a resize notification arrives in Normal mode', () => {
-    const callbacks: ResizeObserverCallback[] = []
-    class TestResizeObserver {
-      constructor(callback: ResizeObserverCallback) {
-        callbacks.push(callback)
+  it.each(['pointer', 'blur', 'enter'])(
+    'clears character Visual endpoints through %s and re-anchors the next motion',
+    async (path) => {
+      const f = await fixture({ document: { roots: [node('a', 'Alpha')] } })
+      f.input().setSelectionRange(0, 0)
+      f.press('v')
+      if (path === 'pointer') {
+        f.input().setSelectionRange(3, 3)
+        act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
+      } else if (path === 'blur') {
+        act(() => f.bindings().onBlur())
+        f.input().setSelectionRange(0, 0)
+      } else {
+        f.press('.', { metaKey: true })
+        expect(f.snapshot().location.currentParentId).toBe('a')
+        f.input('a').setSelectionRange(0, 0)
       }
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
-    }
-    vi.stubGlobal('ResizeObserver', TestResizeObserver)
-    try {
-      const store = createEditorStoreDouble({
-        endTextSession: vi.fn(),
-        snapshot: () => ({
-          status: 'ready',
-          document: { roots: [{ id: 'a', text: 'Alpha', children: [] }] },
-          location: { currentParentId: null, selectedNodeId: 'a' },
-        }),
-        registerPendingEditFinisher: vi.fn(() => () => undefined),
-      })
-      const { result } = renderHook(() => {
-        const [vimMode, setVimMode] = useState<VimMode>('normal')
-        const { bindings } = useNodeInputBindings({
-          store,
-          selectedNodeId: 'a',
-          vimMode,
-          setVimMode,
-          onPreviewAttachment: vi.fn(),
-        })
-        return { bindings, vimMode }
-      })
-      const node: TreeNode = { id: 'a', text: 'Alpha', children: [] }
-      const input = document.createElement('textarea')
-      document.body.append(input)
-      input.value = 'Alpha'
-      input.focus()
-      result.current.bindings(node).inputRef(input)
-      input.setSelectionRange(0, input.value.length)
-      const notifyResize = (): void => {
-        for (const callback of callbacks) {
-          callback([{ target: input } as unknown as ResizeObserverEntry], {} as ResizeObserver)
+      f.press('l', {}, 'a')
+      expect(f.result.current.vimMode).toBe('visual')
+      expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual(path === 'pointer' ? [3, 5] : [0, 2])
+    },
+  )
+
+  it('clears the whole-node Visual g prefix when a whole-node command exits', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+    f.press('V')
+    f.press('g')
+    f.press('y')
+    expect(f.result.current.selection).toBeUndefined()
+    f.press('d')
+    f.press('d')
+    expect(f.snapshot().location.currentParentId).toBeNull()
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['b'])
+  })
+
+  it('keeps whole-node Visual active when a range move blurs the previous input', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+    f.input('a')
+    f.input('b')
+    f.press('V')
+    f.press('j')
+    act(() => f.bindings('a').onBlur())
+    expect(f.result.current.vimMode).toBe('visual-node')
+    expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
+  })
+
+  it('keeps a multi-character selection when a resize notification arrives in Normal mode', async () => {
+    let callback: ResizeObserverCallback | undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: ResizeObserverCallback) {
+          callback = cb
         }
-      }
-
-      // A wrapped-row resize must not collapse the deliberate full-text selection to a block caret.
-      act(notifyResize)
-      expect(input.selectionStart).toBe(0)
-      expect(input.selectionEnd).toBe(input.value.length)
-
-      // A collapsed caret is still normalized to the one-character Normal block.
-      input.setSelectionRange(1, 1)
-      act(notifyResize)
-      expect(input.selectionStart).toBe(1)
-      expect(input.selectionEnd).toBe(2)
-      input.remove()
-    } finally {
-      vi.unstubAllGlobals()
-    }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
+    const notify = () =>
+      act(() => callback?.([{ target: input } as unknown as ResizeObserverEntry], {} as ResizeObserver))
+    input.setSelectionRange(0, input.value.length)
+    notify()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 5])
+    input.setSelectionRange(1, 1)
+    notify()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 2])
+    act(() => f.result.current.setVimMode('insert'))
+    input.setSelectionRange(2, 2)
+    notify()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+    f.bindings().inputRef(null)
   })
 
-  it('marks a deliberate multi-character selection and clears the mark at the block caret', () => {
-    const store = createStore()
-    const { result } = renderBindings({ store, selectedNodeId: 'node' })
-    const node: TreeNode = { id: 'node', text: 'hello', children: [] }
-    const input = document.createElement('textarea')
-    input.value = node.text
-    document.body.append(input)
+  it('marks deliberate multi-character selection and clears the mark at the block caret', async () => {
+    const f = await fixture(),
+      input = f.input()
     input.focus()
-    act(() => result.current(node).inputRef(input))
-
-    act(() => {
-      input.setSelectionRange(0, input.value.length)
-      document.dispatchEvent(new Event('selectionchange'))
-    })
-    expect(input.classList.contains('node-input-text-selected')).toBe(true)
-
-    act(() => {
-      input.setSelectionRange(2, 2)
-      document.dispatchEvent(new Event('selectionchange'))
-    })
-    expect(input.classList.contains('node-input-text-selected')).toBe(false)
-
-    act(() => {
-      input.setSelectionRange(1, 2)
-      document.dispatchEvent(new Event('selectionchange'))
-    })
-    expect(input.classList.contains('node-input-text-selected')).toBe(false)
-    input.remove()
+    for (const [start, end, expected] of [
+      [0, 5, true],
+      [2, 2, false],
+      [1, 2, false],
+    ] as const) {
+      act(() => {
+        input.setSelectionRange(start, end)
+        document.dispatchEvent(new Event('selectionchange'))
+      })
+      expect(input.classList.contains('node-input-text-selected')).toBe(expected)
+    }
   })
 })
 
 describe('drag caret freeze', () => {
-  const node: TreeNode = { id: 'node', text: 'hello', children: [] }
-
-  function renderFreeze(options: { vimMode?: VimMode; setVimMode?: (mode: VimMode) => void } = {}) {
-    const store = createStore()
-    return renderHook(() =>
-      useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        vimMode: options.vimMode ?? 'normal',
-        setVimMode: options.setVimMode ?? vi.fn(),
-        onPreviewAttachment: vi.fn(),
-      }),
-    )
-  }
-
-  function focusedInput(result: {
-    current: { bindings: (node: TreeNode) => { inputRef: (input: HTMLElement | null) => void } }
-  }) {
-    const input = document.createElement('textarea')
-    input.value = node.text
-    document.body.append(input)
-    result.current.bindings(node).inputRef(input)
+  it('collapses a transient selection and restores focus and the captured caret on release', async () => {
+    const f = await fixture(),
+      input = f.input()
     input.focus()
-    return input
-  }
-
-  it('collapses a transient selection and blurs the source input when the freeze begins', () => {
-    const { result } = renderFreeze()
-    const input = focusedInput(result)
     input.setSelectionRange(1, 3)
-
-    act(() => result.current.dragFreeze.begin('node', 7))
-
+    act(() => f.result.current.dragFreeze.begin('node', 7))
     expect(document.activeElement).not.toBe(input)
-    expect(input.selectionStart).toBe(1)
-    expect(input.selectionEnd).toBe(1)
-    input.remove()
-  })
-
-  it('restores focus and the captured caret when the frozen pointer is released', () => {
-    const { result } = renderFreeze()
-    const input = focusedInput(result)
-    input.setSelectionRange(1, 3)
-    act(() => result.current.dragFreeze.begin('node', 7))
-
-    act(() => result.current.dragFreeze.end(7))
-
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1])
+    act(() => f.result.current.dragFreeze.end(7))
     expect(document.activeElement).toBe(input)
-    expect(input.selectionStart).toBe(1)
-    expect(input.selectionEnd).toBe(1)
-    input.remove()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1])
   })
 
-  it('ignores a release for a different pointer and restores exactly once for its own pointer', () => {
-    const { result } = renderFreeze()
-    const input = focusedInput(result)
+  it('ignores other pointers and restores exactly once for its own pointer', async () => {
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
     input.setSelectionRange(2, 2)
-    act(() => result.current.dragFreeze.begin('node', 7))
-
-    act(() => result.current.dragFreeze.end(8))
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.result.current.dragFreeze.end(8))
     expect(document.activeElement).not.toBe(input)
-
-    act(() => result.current.dragFreeze.end(7))
+    act(() => f.result.current.dragFreeze.end(7))
     expect(document.activeElement).toBe(input)
-    expect(input.selectionStart).toBe(2)
-
-    act(() => result.current.dragFreeze.end(7))
-    expect(document.activeElement).toBe(input)
-    expect(input.selectionStart).toBe(2)
-    input.remove()
+    input.setSelectionRange(3, 3)
+    act(() => f.result.current.dragFreeze.end(7))
+    expect(input.selectionStart).toBe(3)
   })
 
-  it('releases any freeze when no pointer is given', () => {
-    const { result } = renderFreeze()
-    const input = focusedInput(result)
-    act(() => result.current.dragFreeze.begin('node', 7))
-
-    act(() => result.current.dragFreeze.end())
-
-    expect(document.activeElement).toBe(input)
-    input.remove()
-  })
-
-  it('restores the caret when the frozen pointer is cancelled', () => {
-    const { result } = renderFreeze()
-    const input = focusedInput(result)
+  it.each(['unspecified', 'cancel', 'up'])('restores the caret on %s release', async (path) => {
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
     input.setSelectionRange(2, 2)
-    act(() => result.current.dragFreeze.begin('node', 7))
-
-    act(() => fireEvent.pointerCancel(window, { pointerId: 7 }))
-
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => {
+      if (path === 'unspecified') f.result.current.dragFreeze.end()
+      else if (path === 'cancel') fireEvent.pointerCancel(window, { pointerId: 7 })
+      else fireEvent.pointerUp(window, { pointerId: 7 })
+    })
     expect(document.activeElement).toBe(input)
     expect(input.selectionStart).toBe(2)
-    input.remove()
   })
 
-  it('leaves a frozen caret unrestored on unmount', () => {
-    const { result, unmount } = renderFreeze()
-    const input = focusedInput(result)
-    act(() => result.current.dragFreeze.begin('node', 7))
-
-    unmount()
-
+  it('leaves a frozen caret unrestored on unmount', async () => {
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    f.unmount()
+    fireEvent.pointerUp(window, { pointerId: 7 })
     expect(document.activeElement).not.toBe(input)
-    input.remove()
   })
 
-  it('does not touch the caret when the source input is not the active element', () => {
-    const { result } = renderFreeze()
-    const input = document.createElement('textarea')
-    input.value = node.text
-    document.body.append(input)
-    result.current.bindings(node).inputRef(input)
+  it('does not touch the caret when the source is not active or is missing', async () => {
+    const f = await fixture(),
+      input = f.input()
     input.setSelectionRange(1, 3)
-
-    act(() => result.current.dragFreeze.begin('node', 7))
-    act(() => result.current.dragFreeze.end(7))
-
+    act(() => f.result.current.dragFreeze.begin('missing', 7))
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.result.current.dragFreeze.end(7))
     expect(document.activeElement).not.toBe(input)
-    expect(input.selectionStart).toBe(1)
-    expect(input.selectionEnd).toBe(3)
-    input.remove()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3])
   })
 
-  it('writes no mode or image-caret state of its own', () => {
-    const setVimMode = vi.fn()
-    const { result } = renderFreeze({ setVimMode })
-    const input = focusedInput(result)
-
-    act(() => result.current.dragFreeze.begin('node', 7))
-    act(() => result.current.dragFreeze.end(7))
-
-    expect(setVimMode).not.toHaveBeenCalled()
-    input.remove()
+  it('replaces an old freeze for a new pointer and tolerates an unregistered source', async () => {
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    input.focus()
+    input.setSelectionRange(3, 3)
+    act(() => f.result.current.dragFreeze.begin('node', 8))
+    fireEvent.pointerUp(window, { pointerId: 7 })
+    expect(document.activeElement).not.toBe(input)
+    act(() => f.bindings().inputRef(null))
+    act(() => f.result.current.dragFreeze.end(8))
+    expect(document.activeElement).not.toBe(input)
   })
 
-  it('keeps the existing Replace-to-Normal blur transition exactly once', () => {
-    const setVimMode = vi.fn()
-    const { result } = renderFreeze({ vimMode: 'replace', setVimMode })
-    const input = focusedInput(result)
-
-    act(() => result.current.dragFreeze.begin('node', 7))
-    // In production the input's React onBlur runs when begin blurs it; this harness has no React
-    // input, so it invokes the same binding the existing tests use.
-    act(() => result.current.bindings(node).onBlur())
-    act(() => result.current.dragFreeze.end(7))
-
-    expect(setVimMode).toHaveBeenCalledTimes(1)
-    expect(setVimMode).toHaveBeenCalledWith('normal')
+  it.each(['normal', 'replace'] as const)('preserves the %s mode contract through freeze and blur', async (mode) => {
+    const f = await fixture({ mode }),
+      input = f.input()
+    input.focus()
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.bindings().onBlur())
+    act(() => f.result.current.dragFreeze.end(7))
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
     expect(document.activeElement).toBe(input)
-    input.remove()
   })
 
-  it('restores a collapsed caret in a contenteditable input', () => {
-    const { result } = renderFreeze()
-    const input = document.createElement('div')
-    input.className = 'node-input'
+  it('restores a collapsed caret in a contenteditable input', async () => {
+    const f = await fixture(),
+      input = document.createElement('div')
     input.contentEditable = 'true'
     input.tabIndex = 0
-    input.textContent = node.text
+    input.textContent = 'hello'
     document.body.append(input)
-    result.current.bindings(node).inputRef(input)
+    f.bindings().inputRef(input)
     input.focus()
-
-    const selection = globalThis.getSelection()
-    const text = input.firstChild
-    if (selection === null || text === null) throw new Error('The editable text was not rendered.')
-    const range = document.createRange()
-    range.setStart(text, 1)
-    range.setEnd(text, 3)
+    const selection = getSelection()!,
+      range = document.createRange()
+    range.setStart(input.firstChild!, 1)
+    range.setEnd(input.firstChild!, 3)
     selection.removeAllRanges()
     selection.addRange(range)
-
-    act(() => result.current.dragFreeze.begin('node', 7))
+    act(() => f.result.current.dragFreeze.begin('node', 7))
     expect(document.activeElement).not.toBe(input)
-
-    act(() => result.current.dragFreeze.end(7))
+    act(() => f.result.current.dragFreeze.end(7))
     expect(document.activeElement).toBe(input)
     expect(selection.isCollapsed).toBe(true)
     expect(selection.anchorOffset).toBe(1)
-    input.remove()
   })
 
-  it('restores the caret across an attached image without rewriting the image indicator', () => {
-    const imageNode: TreeNode = {
-      id: 'node',
-      text: 'hello',
-      attachment: { id: 'a', mimeType: 'image/png' },
-      children: [],
-    }
-    let focus = { nodeId: 'node', cursor: 5, token: 1 }
-    const store = createEditorStoreDouble({
-      endTextSession: vi.fn(),
-      snapshot: () => ({
-        status: 'ready',
-        document: { roots: [imageNode] },
-        location: { currentParentId: null, selectedNodeId: 'node' },
-        focus,
-      }),
-      selectNode: vi.fn(),
-      registerPendingEditFinisher: vi.fn(() => () => undefined),
-    })
-    const setImageCaretNodeId = vi.fn()
-    const { result, rerender } = renderHook(() =>
-      useNodeInputBindings({
-        store,
-        selectedNodeId: 'node',
-        focus,
-        vimMode: 'normal',
-        setImageCaretNodeId,
-        onPreviewAttachment: vi.fn(),
-      }),
-    )
-    const row = document.createElement('div')
-    row.className = 'node-row'
-    row.dataset.hasAttachment = 'true'
-    const input = document.createElement('textarea')
-    input.value = imageNode.text
-    row.append(input)
-    document.body.append(row)
-    result.current.bindings(imageNode).inputRef(input)
-
-    focus = { nodeId: 'node', cursor: 5, token: 2 }
-    rerender()
-    expect(setImageCaretNodeId).toHaveBeenCalledWith('node')
-    setImageCaretNodeId.mockClear()
-
-    act(() => result.current.dragFreeze.begin('node', 7))
-    act(() => result.current.dragFreeze.end(7))
-
-    expect(setImageCaretNodeId).not.toHaveBeenCalled()
-    expect(input.selectionStart).toBe(5)
-    expect(input.selectionEnd).toBe(5)
-    row.remove()
+  it('restores the caret across an attached image without rewriting the image indicator', async () => {
+    const f = await fixture({ document: { roots: [image('hello')] } }),
+      input = f.input()
+    act(() => f.store.selectNode('node', 5))
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.result.current.dragFreeze.end(7))
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
   })
 })

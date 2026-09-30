@@ -59,7 +59,7 @@ Decisions reserved for the Product Owner:
 | T4 | Location and display invariants checked after every command | T3 | Done |
 | T5 | Command inventory guard for the property generators | T4 | Done |
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
-| T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Planned |
+| T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8 | Outcome assertions in the input-handler tests | T7 | Planned |
 | T9 | Requirement traceability check | T8 | Planned |
 | T10 | Initiative closure | T1-T9 | Planned |
@@ -232,6 +232,21 @@ Acceptance: the interaction-assertion count in `use-node-input-bindings.test.tsx
 
 Validation tier: Low Risk (`npm run check`).
 
+**Result (2026-09-30).** Added `src/renderer/test/real-store-harness.ts`, reusing the application property-test services and ID generator. It serializes its fixture through the production serializer, supplies observable clipboard writes and attachment bytes, converts clipboard HTML with the production link extractor, and skips IDs already in the fixture. Service and clock overrides support failure injection. The input-bindings fixture subscribes to the real store and supplies current snapshot nodes, with explicit DOM events and fake save timers. All earlier scenario families remain: whole-node and character Visual endpoints/registers, Insert capture across blur/pointer/node changes, structural repeat, Replace composition/commit/reentrancy/flush, image caret, focus, links, context menus, selection grouping, resize, and drag freeze. Store-call assertions became resulting text/tree/location/focus/mode assertions, with undo and redo checking edit grouping where appropriate. New cases cover viewport motions, structural put/delete repeat, unavailable Visual spans, contenteditable sessions, clipboard link round trips, pointer release/replacement, asynchronous errors, and persistence-lock menu behavior.
+
+The file now runs 91 cases (56 at T7 start). The interaction-assertion count is 11, down from 60 in the task-start file (`git show HEAD:src/renderer/use-node-input-bindings.test.tsx | rg -c 'toHaveBeenCalled|mock.calls'` before this commit); the initiative baseline recorded 70. Every remaining occurrence has a contract reason:
+
+* Locked-menu test: `preventDefault` is not called, preserving native behavior while locked (one assertion).
+* Cmd-click test: `window.open` is absent without Cmd, receives the URL with Cmd, and is called only once after unrelated/outside targets (three assertions); `preventDefault` runs for both link clicks (one assertion). These calls are the external-open and native-event contracts.
+* Textarea context-menu test: `preventDefault` runs once and the native API receives coordinates, selection, and availability (two assertions).
+* Contenteditable context-menu test: the native API receives its actual selected text and availability (one assertion); clipboard content and link-preserving paste are asserted as outcomes.
+* Pointer-button test: `preventDefault` runs only for the secondary button (one assertion).
+* Pending-edit-finisher lifecycle test: registration and unregistration each occur once (two assertions). This is the sole remaining `createEditorStoreDouble` use; callback ownership is the contract.
+
+Added 14 scroll-restoration cases for ready gating, one-time startup alignment, layout realignment, row/window clamping, heading selection, missing-row measurement, all four user-input interruption events, user-scroll save accounting, absent observer, and cleanup. Hook coverage (statements / branches / functions / lines) is input bindings **95.63 / 89.04 / 94.18 / 98.52%**, up from **86.16 / 73.49 / 84.88 / 91.47%** at T7 start, and scroll restoration **98.30 / 90.62 / 100 / 100%** (baseline branches 56.25%). Floors are respectively **95 / 88.5 / 93.5 / 98** and **98 / 90 / 99 / 99**. Remaining coverage gaps include optional no-op callbacks and defensive non-ready/missing-DOM branches; these are not claims of complete branch coverage.
+
+Validation: `npm run check` passed at HEAD `9f1e4680795054a85c3c2d94d27926b2c15dd041`, snapshot `sha256:260d19ddf5b22cecf99cceedfcde086231796c26d1f8752fb9fcd51b6e5e8af6`: 79 files, 1292 tests, 4.99 s coverage suite, production build passed, zero audit vulnerabilities. Earlier development checks exposed fixture/schema/expectation/type issues and a formatting failure; all were corrected before that pass. Documentation-only completion edits require formatting and documentation checks without repeating runtime validation. Primary diff review found no meaningful issues. No production, product, or architecture changes and no Product Owner decisions were made. No rendered inputs changed, so new screenshot evidence was not required; these jsdom tests complement the existing Electron tests.
+
 ### T8 — Outcome assertions for input handlers (W3)
 
 Apply the T7 approach to `src/renderer/editor-input-handlers.test.ts` (259 interaction assertions at baseline). Where a handler is a pure mapping from an event to a command, and the command is itself the contract, an interaction assertion may stay; record the category rather than each line. If the file will not fit in one session, split the work by handler group into T8a and T8b in this plan before continuing.
@@ -268,7 +283,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, and T5 are done. T7 (real-store harness and outcome assertions for input bindings) is the next ready task. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, T5, and T7 are done. T8 (outcome assertions for input handlers) is the next ready task. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 
