@@ -1560,6 +1560,24 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ text: 'abcXYZdef' }] } })
   })
 
+  it('does not record a history entry for pasting empty clipboard text', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'abc', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    services.readClipboard = async () => ({ kind: 'text', text: '' })
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+
+    store.editText('root', 'abcd')
+    store.endTextSession()
+    await store.paste('root', 4)
+
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abcd' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+  })
+
   it('stores a valid pasted URL as a link and leaves an invalid URL as text', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: '', children: [] }] },

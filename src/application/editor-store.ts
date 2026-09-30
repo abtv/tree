@@ -784,6 +784,9 @@ export class EditorStore {
       return
     }
 
+    if (clipboard.text === '' && (clipboard.links === undefined || clipboard.links.length === 0)) {
+      return
+    }
     const transition = textPasteTransition(current.document, current.location, nodeId, cursor, clipboard, (count) =>
       Array.from({ length: count }, () => this.createId()),
     )
