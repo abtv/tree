@@ -54,7 +54,7 @@ Decisions reserved for the Product Owner:
 | --- | --- | --- | --- |
 | T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Blocked (Product Owner decision, see T1 findings) |
 | T2 | Property seed and run-count policy with a soak run | — | Done |
-| T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Ready |
+| T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Done |
 | T4 | Location and display invariants checked after every command | T3 | Planned |
 | T5 | Command inventory guard for the property generators | T4 | Planned |
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
@@ -131,6 +131,17 @@ Files: `src/application/test/editor-store-arbitraries.ts` (new), `src/applicatio
 Acceptance: the properties pass, or each failure is fixed defect-first with a named regression test. Checking out `fix(undo): keep the location when the change site is a visible row` reverted in a scratch worktree makes at least one property fail; record the result. `git log --grep` finds the commit.
 
 Validation tier: Low Risk for tests only (`npm run check`); Moderate Risk for any fix commit.
+
+**Result (2026-09-30).** Shared generators and fakes moved to `src/application/test/editor-store-arbitraries.ts` (`forest`, `deepForest`, `command`, `materialize`, `createServices`, `applyCommand`, plus `allNodes`/`allIds`/`firstLocation`/`freshIds`/`isDisplayed`, needed by both property files and moved for the same reason). `editor-store-undo.property.test.ts` drives undo and redo itself, so its generated sequence excludes the `'undo'`/`'redo'` command kinds. One property covers all four required assertions: after every generated command it probes with one `undo()` then one `redo()` (a pairing that is idempotent on the accumulated history, so it can run after every command without disturbing the sequence still to come) and checks the reached document against what the command should have changed; after the whole sequence it performs `commands.length` undos then the same number of redos and checks the document is restored. Location validity and display are asserted only when `undo()`/`redo()` actually altered the snapshot (reference-compared): a no-op call (nothing left to undo or redo) makes no claim about a selection a prior synthetic `selectDescendant` may have left outside the displayed rows, which is unrelated to what this property tests.
+
+The property found two defects, both fixed defect-first with a named regression test proving the failure and passing after the fix, and both verified as real by tracing the reachable product scenario, not only the fuzz counterexample:
+
+* `moveNodeTransition` compared the unclamped destination index to the source index to decide whether a move was a no-op, while `moveSibling` clamps it to the sibling list's bounds. An insertion index that clamps back to the source position (for example dropping the only sibling in a list "after the last sibling", or dropping any last-positioned sibling past the end of the list) still passed the unclamped check and pushed a history entry for a document that did not change. Fixed by clamping the destination the same way `moveSibling` does before comparing it to the source index. Regression test: `src/application/editor-command-transitions.test.ts` ("is a no-op when an out-of-range insertion index clamps back to the source position").
+* `pasteFromClipboard`'s single-line text branch called `applyStructural` unconditionally, so pasting empty clipboard text (no selection to copy) pushed a history entry though `pasteText` leaves the node's content unchanged. Fixed with an early return when the clipboard text is empty and carries no links. Regression test: `src/application/editor-store.test.ts` ("does not record a history entry for pasting empty clipboard text").
+
+Both fixes are Moderate Risk (domain/application behavior within one process). Validation: `npm run check` (1241 tests, coverage unchanged at the reported thresholds) passed; the focused E2E specs for the affected requirements (`drag-and-drop.spec.ts`, `clipboard.spec.ts`, `undo-sessions.spec.ts`, `history.spec.ts`, 39 tests) passed unchanged. The new property passed 300 runs by default and was additionally run at `TREE_PROPERTY_RUNS=30` (9000 runs) with no failures.
+
+Checking out `fix(undo): keep the location when the change site is a visible row` (`38f8685`) reverted in a scratch worktree did not fail this task's own property (it only checks that undo/redo reach *a* valid, displayed location, not which one — the exact-location invariant is T4's `currentParentId` rule). It did fail, as the acceptance criterion requires: the pre-existing `editor-undo-focus.property.test.ts` ("always reports a valid, displayable location whose focus is the selected node") and three scenarios in `editor-store.test.ts`'s `remembered expansion` suite. `git log --grep` finds the commit.
 
 ### T4 — Location and display invariants after every command (W1)
 
@@ -225,7 +236,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2 is done. T3 (undo and redo semantics property) is the next ready task; T4 and T5 follow it. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2 and T3 are done. T4 (location and display invariants after every command) is the next ready task; T5 follows it. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 

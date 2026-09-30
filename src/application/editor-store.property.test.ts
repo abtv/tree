@@ -3,145 +3,26 @@ import { describe, expect, it } from 'vitest'
 import { propertyRuns } from '../test/property-runs'
 import { EditorStore, type EditorServices } from './editor-store'
 import {
+  allIds,
+  applyCommand,
+  command,
+  createServices,
+  deepForest,
+  firstLocation,
+  forest,
+  freshIds,
+  isDisplayed,
+  materialize,
+  type ClipboardRef,
+} from './test/editor-store-arbitraries'
+import {
   assertDocument,
   cloneNode,
-  displayedNodes,
   isValidLocation,
   locateNode,
   serializeState,
-  type Document,
-  type Location,
   type TreeNode,
 } from '../domain/document'
-
-interface RawNode {
-  text: string
-  hasAttachment: boolean
-  children: RawNode[]
-}
-
-function rawNode(depth: number): fc.Arbitrary<RawNode> {
-  if (depth === 0) {
-    return fc.record<RawNode>({ text: fc.string(), hasAttachment: fc.boolean(), children: fc.constant<RawNode[]>([]) })
-  }
-  return fc.record<RawNode>({
-    text: fc.string(),
-    hasAttachment: fc.boolean(),
-    children: fc.array(rawNode(depth - 1), { maxLength: 2 }),
-  })
-}
-
-const forest = fc.array(rawNode(1), { minLength: 1, maxLength: 3 })
-
-const deepForest = fc.array(rawNode(2), { minLength: 1, maxLength: 3 })
-
-const command = fc.record({
-  kind: fc.constantFrom(
-    'edit',
-    'split',
-    'delete',
-    'deleteEmpty',
-    'move',
-    'enter',
-    'leave',
-    'up',
-    'down',
-    'horizontal',
-    'navigate',
-    'undo',
-    'redo',
-    'paste',
-    'pasteImage',
-    'selectDescendant',
-    'toggleExpansion',
-    'foldAll',
-  ),
-  a: fc.nat({ max: 1_000 }),
-  b: fc.nat({ max: 1_000 }),
-  text: fc.string(),
-})
-
-type CommandAction = {
-  kind:
-    | 'edit'
-    | 'split'
-    | 'delete'
-    | 'deleteEmpty'
-    | 'move'
-    | 'enter'
-    | 'leave'
-    | 'up'
-    | 'down'
-    | 'horizontal'
-    | 'navigate'
-    | 'undo'
-    | 'redo'
-    | 'paste'
-    | 'pasteImage'
-    | 'selectDescendant'
-    | 'toggleExpansion'
-    | 'foldAll'
-  a: number
-  b: number
-  text: string
-}
-
-type ClipboardRef = { current: { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array } }
-
-function freshIds(prefix = 'x'): () => string {
-  let counter = 0
-  return () => `${prefix}${counter++}`
-}
-
-function materialize(rawForest: RawNode[]): Document {
-  let counter = 0
-  const build = (raw: RawNode): TreeNode => {
-    const id = `n${counter++}`
-    return {
-      id,
-      text: raw.text,
-      ...(raw.hasAttachment ? { attachment: { id: `a${id}`, mimeType: 'image/png' as const } } : {}),
-      children: raw.children.map(build),
-    }
-  }
-  return { roots: rawForest.map(build) }
-}
-
-function allNodes(document: Document): TreeNode[] {
-  const nodes: TreeNode[] = []
-  const visit = (node: TreeNode): void => {
-    nodes.push(node)
-    node.children.forEach(visit)
-  }
-  document.roots.forEach(visit)
-  return nodes
-}
-
-function allIds(document: Document): string[] {
-  return allNodes(document).map((node) => node.id)
-}
-
-function firstLocation(document: Document): Location {
-  const root = document.roots[0]!
-  return { currentParentId: null, selectedNodeId: root.id }
-}
-
-function createServices(
-  loadValue: unknown | null,
-  clipboard: () => { kind: 'text'; text: string } | { kind: 'image'; png: Uint8Array },
-): EditorServices & { saves: unknown[] } {
-  const saves: unknown[] = []
-  return {
-    saves,
-    load: async () => loadValue,
-    save: async (state) => {
-      saves.push(state)
-    },
-    readClipboard: async () => clipboard(),
-    writeAttachment: async () => undefined,
-    cleanupAttachments: async () => undefined,
-  }
-}
 
 function assertInvariants(store: EditorStore): void {
   const state = store.getSnapshot()
@@ -157,115 +38,6 @@ function assertInvariants(store: EditorStore): void {
   expect(locateNode(state.document, state.focus.nodeId)).toBeDefined()
   expect(() => assertDocument(state.document)).not.toThrow()
   expect(() => serializeState(state.document, state.location, state.expansion)).not.toThrow()
-}
-
-/** Whether the selected node is the heading or one of the location's visible rows. */
-function isDisplayed(store: EditorStore): boolean {
-  const state = store.getSnapshot()
-  if (state.status !== 'ready') return false
-  const selected = state.location.selectedNodeId
-  return selected === state.location.currentParentId || store.getVisibleRows().some((row) => row.node.id === selected)
-}
-
-/**
- * Applies one generated command to `store` and reports whether it ran. `onDeepSelection` is
- * notified whenever `selectDescendant` actually moves selection to a descendant below the current
- * displayed level, so a caller can confirm the branch was exercised across a whole property run.
- */
-async function applyCommand(
-  store: EditorStore,
-  action: CommandAction,
-  clipboard: ClipboardRef,
-  onDeepSelection?: () => void,
-): Promise<boolean> {
-  const state = store.getSnapshot()
-  if (state.status !== 'ready') {
-    return false
-  }
-
-  const nodes = allNodes(state.document)
-  const displayed = displayedNodes(state.document, state.location.currentParentId)
-
-  switch (action.kind) {
-    case 'edit':
-      if (nodes.length > 0) {
-        store.editText(nodes[action.a % nodes.length]!.id, action.text)
-      }
-      break
-    case 'split':
-      store.createSiblingOrFirstChild(action.a % 30)
-      break
-    case 'delete':
-      store.deleteSelected()
-      break
-    case 'deleteEmpty':
-      store.deleteEmptySelected()
-      break
-    case 'move':
-      if (displayed.length > 0) {
-        store.moveNodeTo(displayed[action.a % displayed.length]!.id, action.b % (displayed.length + 2))
-      }
-      break
-    case 'enter':
-      store.enter()
-      break
-    case 'leave':
-      store.leave()
-      break
-    case 'up':
-      store.moveSelection('up', action.a % 10)
-      break
-    case 'down':
-      store.moveSelection('down', action.a % 10)
-      break
-    case 'horizontal':
-      store.moveHorizontal(action.a % 2 === 0 ? 'left' : 'right', action.b % 30)
-      break
-    case 'navigate':
-      store.navigateToAncestor(action.a % 2 === 0 ? null : state.location.currentParentId)
-      break
-    case 'undo':
-      store.undo()
-      break
-    case 'redo':
-      store.redo()
-      break
-    case 'paste':
-      clipboard.current =
-        action.a % 2 === 0
-          ? { kind: 'text', text: action.text }
-          : { kind: 'text', text: `${action.text}\n${action.text}` }
-      await store.paste(state.location.selectedNodeId, action.b % 30)
-      break
-    case 'pasteImage':
-      clipboard.current = { kind: 'image', png: new Uint8Array([action.a % 256]) }
-      await store.paste(state.location.selectedNodeId, action.b % 30)
-      break
-    case 'selectDescendant': {
-      const displayedIds = new Set(displayed.map((node) => node.id))
-      const candidates = nodes.filter(
-        (node) =>
-          node.id !== state.location.currentParentId &&
-          !displayedIds.has(node.id) &&
-          isValidLocation(state.document, { ...state.location, selectedNodeId: node.id }),
-      )
-      if (candidates.length > 0) {
-        store.selectNode(candidates[action.a % candidates.length]!.id, 0)
-        onDeepSelection?.()
-      }
-      break
-    }
-    case 'toggleExpansion': {
-      const rows = store.getVisibleRows().filter((row) => row.node.children.length > 0)
-      if (rows.length > 0) store.toggleExpansion(rows[action.a % rows.length]!.node.id)
-      break
-    }
-    case 'foldAll':
-      store.applyFold(action.a % 2 === 0 ? 'close-all' : 'open-all')
-      break
-  }
-
-  return true
 }
 
 describe('EditorStore invariants under command sequences', () => {

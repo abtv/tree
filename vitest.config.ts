@@ -67,6 +67,7 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'src/**/*.d.ts',
         'src/renderer/test/**',
+        'src/application/test/**',
         'src/test/**',
         'src/main/index.ts',
         'src/renderer/main.tsx',
