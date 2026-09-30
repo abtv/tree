@@ -691,7 +691,15 @@ function applySurround(
   const result = calculateSurround(text, cursor, change)
   if (result === undefined) return undefined
   store.replaceTextRanges(node.id, result.edits)
-  syncImageCaretAtCursor(vim, node, input, result.cursor, result.nextText.length, 'after-edit')
+  // An unchanged text produces no store update and no render to consume deferred work.
+  syncImageCaretAtCursor(
+    vim,
+    node,
+    input,
+    result.cursor,
+    result.nextText.length,
+    result.nextText === text ? 'immediate' : 'after-edit',
+  )
   recordRepeatChange(vim.commandState, change)
   return { text: result.nextText, cursor: result.cursor }
 }
@@ -734,7 +742,8 @@ function applyTextChange(
   } else {
     const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
     const next = editCaretTransition(prior, result.nextCursor, result.nextText.length, node.attachment !== undefined)
-    vim.applyCaretState(node.id, next, false, 'after-edit')
+    // An unchanged text produces no store update and no render to consume deferred work.
+    vim.applyCaretState(node.id, next, false, result.nextText === node.text ? 'immediate' : 'after-edit')
     if (!replay && result.nextText !== node.text) recordRepeatChange(vim.commandState, change)
   }
   return {

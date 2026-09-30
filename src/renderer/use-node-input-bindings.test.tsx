@@ -135,6 +135,34 @@ describe('useNodeInputBindings', () => {
     expect(f.node().text).toBe('one two')
   })
 
+  // Found by the production-hook sequence property: replacing characters with themselves leaves the
+  // text unchanged, so no render follows to project the advanced Normal caret.
+  it.each([false, true])(
+    'advances the caret after replacing characters with themselves, attached: %s',
+    async (attached) => {
+      const f = await fixture({ document: { roots: [attached ? image('qqqqq') : node('node', 'qqqqq')] } })
+      f.input().setSelectionRange(0, 0)
+      f.press('2')
+      f.press('r')
+      f.press('q')
+      expect(f.node().text).toBe('qqqqq')
+      expect(getCaret(f.input())).toBe(1)
+      f.press('x')
+      expect(f.node().text).toBe('qqqq')
+      expect(getCaret(f.input())).toBe(1)
+    },
+  )
+
+  it('moves the caret to the surround start when changing a pair to itself leaves the text unchanged', async () => {
+    const f = await fixture({ document: { roots: [node('node', '"abc" x')] } })
+    f.input().setSelectionRange(2, 2)
+    for (const key of ['c', 's', '"', '"']) f.press(key)
+    expect(f.node().text).toBe('"abc" x')
+    expect(getCaret(f.input())).toBe(0)
+    f.press('x')
+    expect(f.node().text).toBe('abc" x')
+  })
+
   it('abandons a queued focus pass after a newer same-node pointer selection', async () => {
     const tasks: (() => void)[] = []
     vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
