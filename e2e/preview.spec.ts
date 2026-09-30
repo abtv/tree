@@ -1,6 +1,7 @@
 import { expect, firePaste, launchTree, node, test, writeClipboardImageSized } from './fixtures'
 
 test.describe('image presentation and preview', () => {
+  // @requirement PRODUCT.md §17.1
   test('scales a large inline image down to fit 200x200 while preserving aspect ratio', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 

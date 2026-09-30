@@ -11,6 +11,7 @@ function Exploding(): React.JSX.Element {
   throw new Error('render exploded')
 }
 
+// @requirement PRODUCT.md §21
 describe('ErrorBoundary', () => {
   it('renders its children when no error occurs', () => {
     render(

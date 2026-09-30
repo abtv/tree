@@ -60,6 +60,7 @@ describe('EditorHistory', () => {
     expect(initial.roots[0]!.text).toBe('Before')
   })
 
+  // @requirement PRODUCT.md §10
   it('bounds retained entries to the history limit, discarding the oldest', () => {
     const history = new EditorHistory()
     for (let index = 0; index <= HISTORY_LIMIT; index += 1) {

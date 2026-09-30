@@ -1183,6 +1183,7 @@ describe('EditorStore', () => {
     vi.useRealTimers()
   })
 
+  // @requirement PRODUCT.md §12
   it('uses image clipboard data in preference to text and keeps it undoable', async () => {
     const services = createServices({ kind: 'image', png: new Uint8Array([1, 2]) })
     const store = new EditorStore(services, ids('root', 'image'))
@@ -1240,6 +1241,7 @@ describe('EditorStore', () => {
     expect(state.document.roots[0]!.text).toBe('copy me')
   })
 
+  // @requirement PRODUCT.md §13.1
   it('does not remove text when the target content changes during the clipboard write', async () => {
     let release: (() => void) | undefined
     const services = loadedState(
@@ -1450,6 +1452,7 @@ describe('EditorStore', () => {
     expect(state.document.roots[0]!.attachment).toBeUndefined()
   })
 
+  // @requirement PRODUCT.md §15
   it('creates a following sibling when image paste targets a node with an image', async () => {
     const store = new EditorStore(
       createServices({ kind: 'image', png: new Uint8Array([1]) }),
@@ -1546,6 +1549,7 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
   })
 
+  // @requirement PRODUCT.md §13
   it('pastes plain text at the cursor', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: 'abcdef', children: [] }] },
@@ -2669,6 +2673,7 @@ describe('EditorStore', () => {
     expect(restored.status === 'ready' && restored.document.roots[0]!.attachment?.id).toBe('image')
   })
 
+  // @requirement PRODUCT.md §17
   it('retains attachments reachable only through undo history during cleanup', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: '', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }] },
@@ -2711,6 +2716,8 @@ describe('EditorStore', () => {
     expect(cleanups.at(-1)).not.toContain('image')
   })
 
+  // @requirement PRODUCT.md §16
+  // @requirement PRODUCT.md §16.1
   it('does not save on every keystroke and saves when ten words have been inserted', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))
@@ -3203,6 +3210,7 @@ describe('EditorStore', () => {
     expect(services.saves).toHaveLength(1)
   })
 
+  // @requirement PRODUCT.md §16.2
   it('locks the editor after three consecutive failed save attempts and stops retrying', async () => {
     const clock = new FakeClock()
     const { store, attempts } = await lockEditor(clock)

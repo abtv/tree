@@ -1,6 +1,7 @@
 import { expect, launchTree, node, parent, test } from './fixtures'
 
 test.describe('location path overflow', () => {
+  // @requirement PRODUCT.md §2.2
   test('preserves short segments while truncating long ones', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const shortRoot = 'Test'

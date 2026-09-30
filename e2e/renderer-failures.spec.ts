@@ -11,6 +11,7 @@ import {
 } from './fixtures'
 
 test.describe('unexpected renderer errors', () => {
+  // @requirement PRODUCT.md §21
   test('shows the fallback and reloads the last saved document', async ({ userDataDir }) => {
     // Quit flushes the document deterministically, so the last saved document is a known baseline.
     const first = await launchTree(userDataDir)

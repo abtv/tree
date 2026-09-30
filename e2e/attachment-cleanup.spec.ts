@@ -41,6 +41,7 @@ function readCleanupCount(app: ElectronApplication): Promise<number> {
 }
 
 test.describe('attachment cleanup', () => {
+  // @requirement PRODUCT.md §17
   test('retains a deleted image while a recovery generation references it and removes it afterwards', async ({
     userDataDir,
   }) => {

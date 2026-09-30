@@ -44,6 +44,7 @@ describe('collapseNode', () => {
     expect(collapseNode(COLLAPSED_EXPANSION_STATE, 'a')).toBe(COLLAPSED_EXPANSION_STATE)
   })
 
+  // @requirement PRODUCT.md §2.4
   it('retains a descendant choice across a collapse/expand round trip', () => {
     // Collapsing an ancestor only removes the ancestor's own id: the child's choice is untouched, so
     // expanding the ancestor again immediately restores the nested expansion, per PRODUCT.md §2.4.

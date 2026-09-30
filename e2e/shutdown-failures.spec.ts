@@ -103,6 +103,7 @@ test.describe('shutdown failure handling', () => {
     await closed
   })
 
+  // @requirement PRODUCT.md §9.2
   test('flushes pending changes and quits when the window is closed', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)

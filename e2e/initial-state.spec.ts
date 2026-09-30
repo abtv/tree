@@ -1,6 +1,9 @@
 import { documentPath, expect, launchTree, node, test, tryReadPersisted } from './fixtures'
 
 test.describe('initial state', () => {
+  // @requirement PRODUCT.md §3
+  // @requirement PRODUCT.md §19
+  // @requirement PRODUCT.md §20.3
   test('first launch creates one empty focused root that is persisted', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

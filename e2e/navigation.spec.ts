@@ -1,6 +1,8 @@
 import { expect, firePaste, launchTree, node, parent, test, typeInto, writeClipboardText } from './fixtures'
 
 test.describe('navigation', () => {
+  // @requirement PRODUCT.md §4.1
+  // @requirement PRODUCT.md §4.2
   test('arrow keys move selection between siblings', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -132,6 +134,7 @@ test.describe('navigation', () => {
     ).toEqual({ anchorNodeIsLinkText: true, anchorOffset: 14, collapsed: true })
   })
 
+  // @requirement PRODUCT.md §4.3
   test('moves left and right across sibling and parent boundaries', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -173,6 +176,9 @@ test.describe('navigation', () => {
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
 
+  // @requirement PRODUCT.md §2
+  // @requirement PRODUCT.md §6.1
+  // @requirement PRODUCT.md §20
   test('entering a childless node keeps the cursor in the current parent and Enter creates a first child', async ({
     userDataDir,
   }) => {
@@ -192,6 +198,7 @@ test.describe('navigation', () => {
     await expect(node(window, 1)).toHaveValue('Work')
   })
 
+  // @requirement PRODUCT.md §7.1
   test('leaving a node restores the parent level and selects the node that was entered', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

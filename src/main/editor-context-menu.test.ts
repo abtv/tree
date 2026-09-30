@@ -33,6 +33,7 @@ function createHarness() {
   }
 }
 
+// @requirement PRODUCT.md §13.2
 describe('editor context menu', () => {
   it('builds the native editing menu and resolves the selected command', async () => {
     const harness = createHarness()

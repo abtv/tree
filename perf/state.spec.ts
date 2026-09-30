@@ -75,6 +75,7 @@ async function readProbe(app: Awaited<ReturnType<typeof launchTree>>['app']): Pr
   })
 }
 
+// @requirement PRODUCT.md §22.1
 test.describe('state and persistence work', () => {
   test('fresh application process footprint', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)

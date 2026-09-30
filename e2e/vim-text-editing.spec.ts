@@ -56,6 +56,7 @@ test.describe('Vim editing prototype', () => {
     await expect(editor).toHaveValue('one  "four"')
   })
 
+  // @requirement PRODUCT.md §20.2
   test('switches modes and applies Normal-mode motions and edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

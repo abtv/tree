@@ -35,6 +35,7 @@ async function lastEditorMenuLabels(app: ElectronApplication): Promise<(string |
   )
 }
 
+// @requirement PRODUCT.md §13.2
 test.describe('editable node context menu', () => {
   test('routes Copy and Paste through the editor store path', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)

@@ -138,6 +138,7 @@ describe('document operations', () => {
     expect(source.id).toBe('source')
   })
 
+  // @requirement PRODUCT.md §5.1
   it('keeps an image on the first part when splitting a node', () => {
     const base = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
     const document: Document = { roots: base.roots.map((node) => ({ ...node, text: 'Current' })) }
@@ -150,6 +151,7 @@ describe('document operations', () => {
     ])
   })
 
+  // @requirement PRODUCT.md §14
   it('moves an image to the final node of multiline paste', () => {
     const base = attachImage(createInitialDocument('a'), 'a', { id: 'image', mimeType: 'image/png' })
     const document: Document = { roots: base.roots.map((node) => ({ ...node, text: 'abcdef' })) }
@@ -163,6 +165,8 @@ describe('document operations', () => {
     ])
   })
 
+  // @requirement PRODUCT.md §11
+  // @requirement PRODUCT.md §18
   it('moves a complete subtree without changing its identity', () => {
     const base = createFirstChild(createInitialDocument('a'), 'a', 'child')
     const document: Document = { roots: [...base.roots, { id: 'b', text: 'B', children: [] }] }
@@ -246,6 +250,7 @@ describe('document operations', () => {
     expect(result.roots).toEqual([])
   })
 
+  // @requirement PRODUCT.md §2.3
   it('accepts exactly the maximum depth and rejects the next level', () => {
     const depth = MAX_DOCUMENT_DEPTH
     const rooted = (count: number): Document => {

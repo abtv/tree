@@ -130,6 +130,7 @@ function overDepthPasteSeed() {
 test.describe('persistence', () => {
   configureHiddenParallelTests()
 
+  // @requirement PRODUCT.md §2.3
   test('rejects a child below level 20 without changing the editor or persisted bytes', async ({ userDataDir }) => {
     seedDocument(userDataDir, depthSeed(20))
     const before = readFileSync(`${userDataDir}/data/document.json`)
@@ -200,6 +201,9 @@ test.describe('persistence', () => {
     await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, { timeout: 15_000 }).toBe(text)
   })
 
+  // @requirement PRODUCT.md §16
+  // @requirement PRODUCT.md §16.1
+  // @requirement PRODUCT.md §18
   test('restores the document, current parent, and selected node after restart', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
 

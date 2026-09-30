@@ -48,6 +48,7 @@ test.describe('drag and drop', () => {
     expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
   })
 
+  // @requirement PRODUCT.md §11
   test('reorders a focused sibling after holding the pointer and moving across a target', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     await seedSiblings(window)

@@ -120,6 +120,7 @@ test.describe('windowed node list', () => {
     await expect(row(window, 41)).toHaveValue(/y/)
   })
 
+  // @requirement PRODUCT.md §20.1
   test('dragging near the window edge auto-scrolls to an off-screen position', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))
     const { window } = await launchTree(userDataDir)

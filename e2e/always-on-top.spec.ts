@@ -1,6 +1,7 @@
 import { closeApp, expect, launchTree, test } from './fixtures'
 
 test.describe('always-on-top window', () => {
+  // @requirement PRODUCT.md §2.2
   test('toggles the native window flag and restores it after restart', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
     const toggle = first.window.getByRole('button', { name: 'Pin window on top' })

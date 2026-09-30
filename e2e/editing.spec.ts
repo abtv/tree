@@ -229,6 +229,7 @@ test.describe('creating nodes with Enter', () => {
     await expect(node(window, 1)).toHaveValue('Child')
   })
 
+  // @requirement PRODUCT.md §5.1
   test('Enter in the middle splits the text at the cursor', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

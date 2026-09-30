@@ -56,6 +56,7 @@ function wideNestedSeed(topCount: number, expandedCount: number): { document: un
   }
 }
 
+// @requirement PRODUCT.md §2.4
 test.describe('inline node expansion', () => {
   test('expands and collapses a node’s children inline without entering it or moving the caret', async ({
     userDataDir,

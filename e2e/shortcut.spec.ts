@@ -1,6 +1,7 @@
 import { expect, launchTree, node, test, typeInto } from './fixtures'
 
 test.describe('Cmd+0', () => {
+  // @requirement PRODUCT.md §9
   test('is registered globally and preserves the document and selection', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { shortcut: 'real' })
 
@@ -21,6 +22,7 @@ test.describe('Cmd+0', () => {
 })
 
 test.describe('Cmd+Q', () => {
+  // @requirement PRODUCT.md §9.1
   test('quits the application from an editable node', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { shortcut: 'real' })
     const closed = new Promise<void>((resolve) => app.once('close', resolve))

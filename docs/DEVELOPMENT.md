@@ -224,10 +224,11 @@ It should run:
 2. linting;
 3. formatting check (`prettier --check`);
 4. documentation governance (`npm run check:docs`);
-5. OpenCode permission checks (`npm run check:opencode`);
-6. tests with coverage enforcement;
-7. production build;
-8. dependency audit (`npm audit`).
+5. requirement traceability (`npm run check:requirements`);
+6. OpenCode permission checks (`npm run check:opencode`);
+7. tests with coverage enforcement;
+8. production build;
+9. dependency audit (`npm audit`).
 
 The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents (including active initiative plans) resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
@@ -378,6 +379,24 @@ In particular, domain tests should cover:
 * serialization and deserialization.
 
 Tests should verify behavior rather than implementation details.
+
+Requirement traceability uses a standalone comment directly above a test or suite:
+
+```typescript
+// @requirement PRODUCT.md §13.1
+```
+
+`npm run check:requirements` scans `src/**/*.test.*`, `e2e/**/*.ts`, and `perf/**/*.ts`.
+It requires a marker for every numbered leaf section of `docs/PRODUCT.md` and for
+parents with their own text; unnumbered subheadings belong to the nearest numbered
+section. It rejects unknown section numbers and malformed markers. The checker
+owns explicit exemptions with reasons for overview and product governance prose,
+and a boundary-section list derived from `AGENTS.md` §9. Boundary sections also
+require a marker under `e2e/`; a unit or performance marker cannot replace it.
+Review the boundary list when adding or changing requirements. Section-level
+traceability locates executable evidence; it does not prove that every sentence
+has an assertion. Add markers only to tests that exercise the cited behavior and
+review their assertions against the requirements when behavior changes.
 
 A refactoring that preserves behavior should not require unnecessary test changes.
 

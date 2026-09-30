@@ -36,6 +36,7 @@ async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
 }
 
 test.describe('clipboard', () => {
+  // @requirement PRODUCT.md §13
   test('pastes plain text at the cursor', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
@@ -102,6 +103,7 @@ test.describe('clipboard', () => {
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
   })
 
+  // @requirement PRODUCT.md §13.1
   test('cuts a hyperlink and pastes it into another node with its link preserved', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const first = node(window, 1)
@@ -233,6 +235,7 @@ test.describe('clipboard', () => {
     )
   })
 
+  // @requirement PRODUCT.md §14
   test('pastes multiline text as separate nodes', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
@@ -256,6 +259,7 @@ test.describe('clipboard', () => {
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
   })
 
+  // @requirement PRODUCT.md §12
   test('prefers the image representation over text', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
@@ -266,6 +270,7 @@ test.describe('clipboard', () => {
     await expect(node(window, 1)).toHaveValue('')
   })
 
+  // @requirement PRODUCT.md §15
   test('pasting an image onto a node that already has one creates a sibling', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 

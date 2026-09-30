@@ -207,6 +207,7 @@ describe('NodeList', () => {
     expect(onEnter).toHaveBeenLastCalledWith(nodes[0])
   })
 
+  // @requirement PRODUCT.md §2.1
   it('marks only the row whose node contains the caret', () => {
     const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
     const list = [parentNode, ...nodes]
@@ -813,6 +814,7 @@ describe('NodeList drag interaction', () => {
   })
 })
 
+// @requirement PRODUCT.md §20.1
 describe('NodeList windowing', () => {
   function renderList(count: number, focusedNodeId?: string): ReturnType<typeof render> {
     return renderRows({ focusedNodeId, list: buildNodes(count) })

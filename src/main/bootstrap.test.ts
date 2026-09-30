@@ -59,6 +59,7 @@ describe('bootstrapApplication', () => {
     expect(dependencies.createMainWindow).not.toHaveBeenCalled()
   })
 
+  // @requirement PRODUCT.md §9
   it('registers services, shortcut, menu, and the initial window after readiness', async () => {
     const { dependencies } = createHarness()
 
@@ -70,6 +71,7 @@ describe('bootstrapApplication', () => {
     expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
   })
 
+  // @requirement PRODUCT.md §9.1
   it('routes application-menu quit through the application lifecycle', async () => {
     const { app, dependencies } = createHarness()
 
@@ -102,6 +104,7 @@ describe('bootstrapApplication', () => {
     expect(registerReadyServices).toHaveBeenCalledOnce()
   })
 
+  // @requirement PRODUCT.md §9.2
   it('quits and prevents the close when the main window is closed', async () => {
     const { app, windowListeners } = createHarness()
 

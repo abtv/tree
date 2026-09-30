@@ -27,6 +27,7 @@
     "validation:snapshot": "node scripts/validation-snapshot.mjs",
     "retire:file": "node scripts/retire-file.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:requirements": "node scripts/check-requirement-coverage.mjs",
     "check:opencode": "node scripts/check-opencode-permissions.mjs",
     "changelog": "node scripts/changelog.mjs --write",
     "doctor": "node scripts/doctor.mjs",
@@ -37,7 +38,7 @@
     "test:property:soak": "TREE_PROPERTY_RUNS=20 NODE_OPTIONS=--max-old-space-size=4096 vitest run --testTimeout=600000 .property.test.ts",
     "test:e2e": "npm run build && playwright test",
     "test:perf": "npm run build && playwright test -c perf.config.ts",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:opencode && npm run test:coverage && npm run build && npm run audit",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:requirements && npm run check:opencode && npm run test:coverage && npm run build && npm run audit",
     "check:full": "npm run check && playwright test && playwright test -c perf.config.ts"
   },
   "dependencies": {

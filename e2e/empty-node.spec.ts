@@ -31,6 +31,8 @@ test.describe('Backspace on empty nodes', () => {
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
   })
 
+  // @requirement PRODUCT.md §8.2
+  // @requirement PRODUCT.md §19
   test('keeps the only root when Backspace is pressed', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

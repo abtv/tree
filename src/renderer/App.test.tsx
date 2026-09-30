@@ -141,6 +141,8 @@ describe('App', () => {
     expect(root).toHaveClass('node-input-empty')
   })
 
+  // @requirement PRODUCT.md §3
+  // @requirement PRODUCT.md §20
   it('renders the initial editable root and splits it with Enter', async () => {
     const store = createStore()
     await act(async () => {
@@ -212,6 +214,7 @@ describe('App', () => {
     expect(root).toHaveValue('Fir')
   })
 
+  // @requirement PRODUCT.md §17.1
   it('opens the image preview with Cmd+Enter and closes it on Escape, restoring focus', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
     await act(async () => {
@@ -476,6 +479,7 @@ describe('App', () => {
     expect((newEditor as HTMLTextAreaElement).selectionStart).toBe(0)
   })
 
+  // @requirement PRODUCT.md §2
   it('renders and edits the current parent after entering an empty node', async () => {
     const store = createStore()
     await act(async () => {

@@ -260,6 +260,7 @@ test.describe('Vim interactions at scale', () => {
     await session.detach()
   })
 
+  // @requirement PRODUCT.md §22.2
   test('ordinary Vim editing keeps repeated key-to-paint latency low', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(100))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

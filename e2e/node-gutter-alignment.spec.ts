@@ -61,6 +61,7 @@ function gutterAlignment(window: Page, rowIndex: number): Promise<GutterAlignmen
 }
 
 test.describe('node gutter alignment', () => {
+  // @requirement PRODUCT.md §2.1
   test('centers the bullet and disclosure triangle on the first line of node text', async ({ userDataDir }) => {
     seedDocument(userDataDir, seed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

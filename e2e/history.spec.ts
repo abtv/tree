@@ -42,6 +42,8 @@ test.describe('undo and redo', () => {
     await expect(node(window, 1)).toHaveValue('A')
   })
 
+  // @requirement PRODUCT.md §10
+  // @requirement PRODUCT.md §18
   test('keeps node IDs stable across undo and redo', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

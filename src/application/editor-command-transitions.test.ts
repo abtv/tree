@@ -123,6 +123,9 @@ describe('editor command transitions', () => {
     expect(() => assertDocument(accepted.document)).not.toThrow()
   })
 
+  // @requirement PRODUCT.md §4.1
+  // @requirement PRODUCT.md §4.2
+  // @requirement PRODUCT.md §4.3
   it('resolves vertical and horizontal navigation targets without changing the document', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
 
@@ -207,6 +210,9 @@ describe('editor command transitions', () => {
     ).toEqual({ nodeId: 'last', cursor: 4 })
   })
 
+  // @requirement PRODUCT.md §2.2
+  // @requirement PRODUCT.md §6.1
+  // @requirement PRODUCT.md §7.1
   it('resolves entering, leaving, and ancestor navigation locations with a beginning cursor', () => {
     expect(enterTransition(document, { currentParentId: null, selectedNodeId: 'root' })).toEqual({
       location: { currentParentId: 'root', selectedNodeId: 'first' },
@@ -224,6 +230,7 @@ describe('editor command transitions', () => {
     )
   })
 
+  // @requirement PRODUCT.md §8.1
   it('selects the next sibling when deleting a displayed node', () => {
     const transition = deleteSelectedTransition(
       document,
@@ -319,6 +326,8 @@ describe('editor command transitions', () => {
     })
   })
 
+  // @requirement PRODUCT.md §8.2
+  // @requirement PRODUCT.md §19
   it('uses the empty-node Backspace destinations and preserves the only root', () => {
     const empty = {
       roots: [

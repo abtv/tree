@@ -62,7 +62,7 @@ Decisions reserved for the Product Owner:
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
 | T8b | Remaining input-handler outcome assertions | T8a | Done |
-| T9 | Requirement traceability check | T8b | Planned |
+| T9 | Requirement traceability check | T8b | Done |
 | T10 | Initiative closure | T1-T9 | Planned |
 
 Order rationale: T1 comes first so that later tasks can show a measured change in mutation score. T2 comes before the new properties so that they are written under the new seed policy. T6 comes after T3-T5 because those tasks kill many survivors on their own. T9 comes after T7-T8 because it adds requirement markers to test files that T7-T8 rewrite.
@@ -299,6 +299,14 @@ Acceptance: `npm run check:requirements` passes. Removing one marker in a scratc
 
 Validation tier: Low Risk (`npm run check`). If new E2E tests are added, also run the affected E2E specs.
 
+**T9 result (2026-09-30).** Added `scripts/check-requirement-coverage.mjs`, its tests, and `npm run check:requirements` to the standard check. It parses numbered leaves and parents with their own text, conservatively treating nonempty own text as normative. Unnumbered subheadings remain part of their nearest numbered owner; fenced headings and comment metadata are ignored. It rejects unknown/malformed markers, duplicate or absent section inventories, and stale exemptions/boundary entries. TypeScript parses actual comment ranges so marker examples in strings, templates, or block comments do not count. Explicit exemptions cover §1 overview, §1.1 product priorities/governance, and §1.2 exploratory governance. The boundary list follows AGENTS.md §9, with 23 sections requiring E2E markers.
+
+Mapped all **40** required numbered sections to existing tests, including unit rule evidence and real-boundary evidence. The only section without explicit dedicated evidence was §20.4: added `src/renderer/styles.test.ts` to guard against stylesheet keyframes, animations, and transitions that delay interaction feedback. Existing interaction tests cover immediate command outcomes. This establishes section-level traceability, not sentence-level assertion completeness. No T9b split was needed. Added scoped OpenCode allowances for the newly documented command and documented markers and limitations in Development §§9 and 12.
+
+Acceptance: removing the sole §20.4 marker made `npm run check:requirements` fail naming §20.4. Renaming the heading to §20.5 made it fail with unknown §20.4 and missing §20.5. Both scratch edits were restored. Focused script/stylesheet tests passed (12 tests), including proof that unit/performance markers cannot replace E2E markers for boundary sections.
+
+Validation: `npm run check` passed on HEAD `6f619fd25c5de3f9bccae1ee6246f4f45038833a`, snapshot `sha256:b9aa7d8db231dac77412ff1c603aad9ae2b6b53ed471ac7b5122e0f0a225eac3`: 81 files, 1312 tests, 5.38 s coverage suite, production build passed, zero audit vulnerabilities. Aggregate coverage: 95.52% statements, 89.81% branches, 96.56% functions, 97.89% lines. The initial aggregate attempt failed because the new documented command lacked an OpenCode allowance; corrected before the final pass. No unresolved failures, production/architecture changes, or product decisions. Primary diff review found no meaningful issues. E2E/performance edits are marker comments only; rendered inputs did not change, so no new E2E run or screenshots were required. Final documentation-only edits passed `npm run format:check:changed`, `npm run check:docs`, and `npm run check:opencode`; runtime validation remains valid.
+
 ### T10 — Closure
 
 Record the final measurements (mutation score, test counts, suite durations, coverage) in the closure handoff. Confirm that `docs/DEVELOPMENT.md` §12 holds everything lasting from this plan. Remove this plan and its row in `plans/README.md`.
@@ -307,7 +315,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2, T3, T4, T5, T7, T8a, and T8b are done. T9 (requirement traceability check) is the next ready task. T6 stays blocked until T1 is resolved.
+T2, T3, T4, T5, T7, T8a, T8b, and T9 are done. No task is ready: T1 needs the Product Owner's mutation-tooling decision (see the T1 findings). T6 depends on T1, and T10 closure depends on both. After that decision, T1 is the exact next task.
 
 ## Resume prompt
 
