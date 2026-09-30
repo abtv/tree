@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent } from 'react'
 import fc from 'fast-check'
+import { propertyRuns } from '../test/property-runs'
 import { describe, expect, it } from 'vitest'
 import { EditorStore, type EditorServices } from '../application/editor-store'
 import { requireNode, type Document, type TreeNode } from '../domain/document'
@@ -416,7 +417,7 @@ describe('mixed Vim event sequences against an independent model', () => {
     )
   })
 
-  it('matches the model after every event with a fixed, replayable seed', async () => {
+  it('matches the model after every event', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.array(fc.record({ text: fc.string({ maxLength: 5 }), image: fc.boolean() }), { minLength: 1, maxLength: 4 }),
@@ -425,7 +426,7 @@ describe('mixed Vim event sequences against an independent model', () => {
         fc.array(eventArbitrary, { minLength: 1, maxLength: 22 }),
         assertSequence,
       ),
-      { seed: 711_207, numRuns: 80, endOnFailure: true },
+      { numRuns: propertyRuns(80), endOnFailure: true },
     )
   })
 })

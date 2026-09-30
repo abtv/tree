@@ -2,6 +2,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { isHttpUrl, replaceLinkedTextRanges, type LinkedTextEdit } from './document-links'
 import type { LinkRange } from './document-types'
+import { propertyRuns } from '../test/property-runs'
 
 /** Apply disjoint edits independently of the implementation under test. */
 function referenceText(text: string, edits: readonly LinkedTextEdit[]): string {
@@ -51,7 +52,7 @@ describe('replaceLinkedTextRanges invariants', () => {
           previousEnd = current.end
         }
       }),
-      { numRuns: 300 },
+      { numRuns: propertyRuns(300) },
     )
   })
 
@@ -77,7 +78,7 @@ describe('replaceLinkedTextRanges invariants', () => {
           expect(result.links).toEqual([{ start: start + 1, end: end + 1, url }])
         },
       ),
-      { numRuns: 200 },
+      { numRuns: propertyRuns(200) },
     )
   })
 })

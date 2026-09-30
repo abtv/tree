@@ -3,6 +3,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
+    setupFiles: ['src/test/fast-check-setup.ts'],
     exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts', 'test-results/**'],
     css: { include: [/styles\.css/] },
     coverage: {
@@ -66,6 +67,7 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'src/**/*.d.ts',
         'src/renderer/test/**',
+        'src/test/**',
         'src/main/index.ts',
         'src/renderer/main.tsx',
       ],

@@ -393,6 +393,10 @@ Per-file floors for the renderer interaction-state owners and their projection p
 
 Property-based tests using `fast-check` cover domain invariants and `EditorStore` command sequences. They run as part of `npm test` and are written as `*.property.test.ts` files. The rules for when to add one are in `AGENTS.md` §9.
 
+Property tests explore with a random seed on every run, locally and in CI, so each run can find a counterexample that an earlier run did not. A failure prints its seed and path. Replay it exactly with `FC_SEED=<seed> FC_PATH=<path> npx vitest run <file>`; `src/test/fast-check-setup.ts` applies both variables through `fc.configureGlobal`. A fixed seed on one property is allowed only when the test asserts that a branch was reached, and needs a comment saying so. Turn every reproduced counterexample into a named deterministic test in the same commit as the fix, as `vim-mixed-interaction.property.test.ts` does.
+
+Write every run count as `propertyRuns(base)` from `src/test/property-runs.ts`. `TREE_PROPERTY_RUNS` multiplies all of them (default 1). `npm run test:property:soak` runs the property files at a factor of 20, and `.github/workflows/property-soak.yml` runs it nightly. A property whose every run builds the typed doubles passes a `maxScale` (`propertyRuns(base, maxScale)`), because Vitest retains every `vi.fn` it creates and thousands of runs exhaust the worker heap; do not create `vi.fn` inside a generated event. A soak failure is a candidate defect: replay it, then fix it under the defect-first workflow.
+
 Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
 
 ```bash

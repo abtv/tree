@@ -1,5 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
+import { propertyRuns } from '../test/property-runs'
 import { EditorStore, type EditorServices } from './editor-store'
 import {
   assertDocument,
@@ -285,7 +286,7 @@ describe('EditorStore invariants under command sequences', () => {
           assertInvariants(store)
         }
       }),
-      { numRuns: 500 },
+      { numRuns: propertyRuns(500) },
     )
   })
 
@@ -340,7 +341,9 @@ describe('EditorStore invariants under command sequences', () => {
         expect(isDisplayed(restoredStore)).toBe(true)
         if (isDisplayed(store)) expect(restored.location.selectedNodeId).toBe(state.location.selectedNodeId)
       }),
-      { seed: 20_260_929, numRuns: 300 },
+      // Fixed seed on purpose: the assertion below needs this run to reach a deep selection, and a
+      // random seed cannot promise that. Replaying FC_SEED does not override an explicit seed.
+      { seed: 20_260_929, numRuns: propertyRuns(300) },
     )
 
     // Confirms the property run above actually exercised the branch this task guards, not only the
@@ -389,7 +392,7 @@ describe('EditorStore invariants under command sequences', () => {
           expect(state.focus).toMatchObject({ nodeId: 'created', cursor: 0 })
         }
       }),
-      { numRuns: 100 },
+      { numRuns: propertyRuns(100) },
     )
   })
 
@@ -444,7 +447,7 @@ describe('EditorStore invariants under command sequences', () => {
           assertInvariants(store)
         },
       ),
-      { numRuns: 200 },
+      { numRuns: propertyRuns(200) },
     )
   })
 })
@@ -589,7 +592,7 @@ describe('EditorStore save accounting', () => {
         await tick()
         expect(saves.length).toBe(started)
       }),
-      { numRuns: 200 },
+      { numRuns: propertyRuns(200) },
     )
   })
 })

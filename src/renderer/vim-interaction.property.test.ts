@@ -10,6 +10,7 @@ import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { setNormalCaret } from './editor-dom'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { createEditorStoreDouble } from './test/editor-store-double'
+import { propertyRuns } from '../test/property-runs'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 
@@ -20,6 +21,9 @@ interface MotionCommand {
   count: number
 }
 
+/** Each run builds the typed store and Vim doubles (dozens of `vi.fn`), so the soak factor is capped. */
+const MOCK_HEAVY_MAX_SCALE = 4
+
 function keyEvent(input: HTMLTextAreaElement, key: string): KeyboardEvent<HTMLElement> {
   return {
     currentTarget: input,
@@ -28,7 +32,9 @@ function keyEvent(input: HTMLTextAreaElement, key: string): KeyboardEvent<HTMLEl
     metaKey: false,
     altKey: false,
     shiftKey: false,
-    preventDefault: vi.fn(),
+    // A plain function, not `vi.fn()`: Vitest retains every mock it creates, and a soak run builds
+    // hundreds of thousands of events.
+    preventDefault: () => {},
   } as unknown as KeyboardEvent<HTMLElement>
 }
 
@@ -466,7 +472,7 @@ describe('generated Vim image-caret interaction sequences', () => {
           assertImageMotionSequence(textLength, hasAttachment, Math.min(arbitraryCursor, maximum), commands)
         },
       ),
-      { numRuns: 250 },
+      { numRuns: propertyRuns(250, MOCK_HEAVY_MAX_SCALE) },
     )
   })
 
@@ -487,7 +493,7 @@ describe('generated Vim image-caret interaction sequences', () => {
           assertSiblingMotionSequence(specifications, index, Math.min(arbitraryCursor, maximum), commands)
         },
       ),
-      { numRuns: 150 },
+      { numRuns: propertyRuns(150, MOCK_HEAVY_MAX_SCALE) },
     )
   })
 
@@ -524,7 +530,7 @@ describe('generated Vim image-caret interaction sequences', () => {
           expect(actual).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
         },
       ),
-      { numRuns: 250 },
+      { numRuns: propertyRuns(250) },
     )
   })
 
@@ -538,7 +544,7 @@ describe('generated Vim image-caret interaction sequences', () => {
           assertImagePutReturnSequence(text, arbitraryCursor % (text.length - 1), pastedText)
         },
       ),
-      { numRuns: 150 },
+      { numRuns: propertyRuns(150, MOCK_HEAVY_MAX_SCALE) },
     )
   })
 })

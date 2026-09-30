@@ -53,8 +53,8 @@ Decisions reserved for the Product Owner:
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | T1 | Mutation testing tooling, usage documentation, and a baseline score | — | Blocked (Product Owner decision, see T1 findings) |
-| T2 | Property seed and run-count policy with a soak run | — | Ready |
-| T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Planned |
+| T2 | Property seed and run-count policy with a soak run | — | Done |
+| T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Ready |
 | T4 | Location and display invariants checked after every command | T3 | Planned |
 | T5 | Command inventory guard for the property generators | T4 | Planned |
 | T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
@@ -111,6 +111,8 @@ Files: `vitest.config.ts`, a new setup file and helper under `src/test/` (exclud
 Acceptance: 20 consecutive local `npm test` runs with random seeds pass. Any failure is a found defect: fix it under the defect-first workflow and keep the counterexample as a named test. `FC_SEED` and `FC_PATH` replay a failure deterministically, demonstrated once by forcing a failure locally and not committing it. The plan records the suite duration before and after.
 
 Validation tier: Low Risk (tests and validation tooling): `npm run check`.
+
+**Result (2026-09-30).** Seeds are random except `editor-store.property.test.ts`'s round-trip property, which keeps its fixed seed because it asserts `exercisedDeepSelection`. `vim-mixed-interaction.property.test.ts` lost its fixed seed; its counterexample from seed 711207 is already a named test. 20 consecutive `npx vitest run` runs with random seeds passed (1238 tests each, 4.07-4.95 s, rising over the loop; the pre-change figure is the 4.9 s coverage run in the Baseline, not a same-mode measurement). `FC_SEED` and `FC_PATH` replay was shown with a scratch failing test, not committed. `npm run test:property:soak` passes: 16 files, 81 tests, 30 s. The soak exposed a test-resource limit, not a product defect: `vim-interaction.property.test.ts` builds dozens of `vi.fn` per run and Vitest retains them, so at 20 times the run count the worker ran out of heap. The `keyEvent` mock became a plain function and the three double-based properties cap the factor at 4 (`propertyRuns(base, maxScale)`). The `document.property.test.ts` properties at 25 and 50 runs now run 100.
 
 ### T3 — Undo and redo semantics property (W2)
 
@@ -223,7 +225,7 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1 is blocked on a Product Owner decision (see the T1 findings). T2 has no dependency on T1 and is the next ready task once the Product Owner chooses to proceed without mutation testing first. T3-T5 depend only on T2. T6 stays blocked until T1 is resolved.
+T1 is blocked on a Product Owner decision (see the T1 findings). T2 is done. T3 (undo and redo semantics property) is the next ready task; T4 and T5 follow it. T6 stays blocked until T1 is resolved.
 
 ## Resume prompt
 

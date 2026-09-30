@@ -1,5 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
+import { propertyRuns } from '../test/property-runs'
 import {
   assertDocument,
   attachImage,
@@ -587,7 +588,7 @@ describe('document invariants', () => {
           }
         }
       }),
-      { numRuns: 25 },
+      { numRuns: propertyRuns(100) },
     )
   })
 
@@ -628,7 +629,7 @@ describe('document invariants', () => {
           expect([...collectAttachmentIds(result)].sort()).toEqual(reference(result))
         }
       }),
-      { numRuns: 25 },
+      { numRuns: propertyRuns(100) },
     )
   })
 
@@ -671,7 +672,7 @@ describe('document invariants', () => {
           expect([...attachmentSummary(result).entries()].sort()).toEqual(reference(result))
         }
       }),
-      { numRuns: 25 },
+      { numRuns: propertyRuns(100) },
     )
   })
 
@@ -693,7 +694,7 @@ describe('document invariants', () => {
         expect(allIds(next).length).toBe(new Set(allIds(next)).size)
         assertDocument(next)
       }),
-      { numRuns: 50 },
+      { numRuns: propertyRuns(100) },
     )
   })
 
@@ -760,7 +761,7 @@ describe('document invariants', () => {
           expect(locateNode(result, 'not-a-node')).toBeUndefined()
         }
       }),
-      { numRuns: 25 },
+      { numRuns: propertyRuns(100) },
     )
   })
 
@@ -829,7 +830,7 @@ describe('document invariants', () => {
           expectLinksAligned(ranges.text, ranges.links)
         },
       ),
-      { numRuns: 200 },
+      { numRuns: propertyRuns(200) },
     )
   })
 })
