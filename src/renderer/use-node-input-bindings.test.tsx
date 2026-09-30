@@ -90,7 +90,7 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
   }
   const press = (
     key: string,
-    modifiers: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean } = {},
+    modifiers: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean } = {},
     id = harness.snapshot().location.selectedNodeId,
   ) => {
     const element = input(id)
@@ -117,6 +117,73 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
 }
 
 describe('useNodeInputBindings', () => {
+  it.each([false, true].flatMap((attached) => ['escape', 'undo', 'redo'].map((finish) => ({ attached, finish }))))(
+    'keeps the next command aligned when Replace types the existing character: %j',
+    async ({ attached, finish }) => {
+      const f = await fixture({ document: { roots: [attached ? image('abcd') : node('node', 'abcd')] } })
+      f.input().setSelectionRange(2, 2)
+      f.press('R')
+      f.press('c')
+      if (finish === 'escape') f.press('Escape')
+      else f.press('z', { metaKey: true, shiftKey: finish === 'redo' })
+      expect(f.node().text).toBe('abcd')
+      expect(f.result.current.vimMode).toBe('normal')
+      expect(getCaret(f.input())).toBe(2)
+      f.press('x')
+      expect(f.node().text).toBe('abd')
+    },
+  )
+
+  it.each(
+    [false, true].flatMap((attached) =>
+      [0, 2, 4].flatMap((cursor) =>
+        [false, true].flatMap((typed) =>
+          ['escape', 'undo', 'redo'].map((finish) => ({ attached, cursor, typed, finish })),
+        ),
+      ),
+    ),
+  )('uses the resolved Replace destination for the next edit: %j', async ({ attached, cursor, typed, finish }) => {
+    const f = await fixture({ document: { roots: [attached ? image('abcd') : node('node', 'abcd')] } })
+    f.input().setSelectionRange(cursor, cursor)
+    f.press('R')
+    if (typed) f.press('X')
+    if (finish === 'escape') f.press('Escape')
+    else f.press('z', { metaKey: true, shiftKey: finish === 'redo' })
+    const committed = typed ? 'abcd'.slice(0, cursor) + 'X' + 'abcd'.slice(cursor + 1) : 'abcd'
+    const expectedText = finish === 'undo' ? 'abcd' : committed
+    // A fresh Replace commit clears redo. Undo restores the edit's start; Escape and the
+    // unavailable redo retreat a changed session, while an empty session keeps its position.
+    const expectedCursor = Math.min(cursor, attached ? expectedText.length : expectedText.length - 1)
+    expect(f.node().text).toBe(expectedText)
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(getCaret(f.input())).toBe(expectedCursor)
+    f.press('x')
+    expect(f.node().text).toBe(expectedText.slice(0, expectedCursor) + expectedText.slice(expectedCursor + 1))
+  })
+
+  it.each([false, true].flatMap((typed) => ['escape', 'undo', 'redo'].map((finish) => ({ typed, finish }))))(
+    'uses the image-only Replace destination for the next command: %j',
+    async ({ typed, finish }) => {
+      const f = await fixture({ document: { roots: [image('')] } })
+      f.press('R')
+      if (typed) f.press('X')
+      if (finish === 'escape') f.press('Escape')
+      else f.press('z', { metaKey: true, shiftKey: finish === 'redo' })
+      const text = typed && finish !== 'undo' ? 'X' : ''
+      expect(f.node().text).toBe(text)
+      expect(f.result.current.vimMode).toBe('normal')
+      expect(getCaret(f.input())).toBe(0)
+      if (text === '') {
+        f.press('Enter')
+        expect(f.preview).toHaveBeenCalledWith('image')
+      } else {
+        f.press('x')
+        expect(f.node().text).toBe('')
+        expect(f.node().attachment?.id).toBe('image')
+      }
+    },
+  )
+
   it.each(['', 'xy', 'Longer text'])(
     'projects the upward image destination from "%s" before Enter and exit',
     async (text) => {
