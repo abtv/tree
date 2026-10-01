@@ -319,6 +319,7 @@ export function replaceSiblingRange(
   if (wouldExceedMaximumDepth(document, nodeId, replacements)) {
     throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
   }
+  // Stryker disable next-line ArithmeticOperator: Increasing the bound cannot change the result; slice and splice both clamp at the end of the same sibling array.
   const boundedCount = Math.max(0, Math.min(count, located.siblings.length - located.index))
   const removed = located.siblings.slice(located.index, located.index + boundedCount)
   const siblings = located.siblings.slice()
@@ -527,6 +528,8 @@ function clamp(value: number, min: number, max: number): number {
 
 function snapToCodePoint(text: string, cursor: number): number {
   const position = clamp(cursor, 0, text.length)
+  // Always-true and inclusive endpoint guards are equivalent; keep their mutators enabled because other replacements remove valid surrogate snapping.
+  // Stryker disable next-line LogicalOperator: Replacing && with || only adds endpoints, where charCodeAt returns NaN for the missing neighbor and cannot snap.
   if (position > 0 && position < text.length) {
     const before = text.charCodeAt(position - 1)
     const after = text.charCodeAt(position)

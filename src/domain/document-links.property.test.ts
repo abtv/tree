@@ -38,6 +38,47 @@ const scenario = fc
   })
 
 describe('replaceLinkedTextRanges invariants', () => {
+  it('preserves every link between disjoint edits to the surrounding ordinary text', () => {
+    fc.assert(
+      fc.property(
+        fc.webUrl().filter(isHttpUrl),
+        fc.webUrl().filter(isHttpUrl),
+        fc.string({ maxLength: 12 }),
+        fc.string({ maxLength: 12 }),
+        (first, second, prefix, suffix) => {
+          const text = `old ${first} ${second} end`
+          const firstStart = 4
+          const secondStart = firstStart + first.length + 1
+          const result = replaceLinkedTextRanges(
+            text,
+            [
+              { start: firstStart, end: firstStart + first.length, url: first },
+              { start: secondStart, end: secondStart + second.length, url: second },
+            ],
+            [
+              { start: text.length - 3, end: text.length, inserted: suffix },
+              { start: 0, end: 3, inserted: prefix },
+            ],
+          )
+          expect(result.text).toBe(`${prefix} ${first} ${second} ${suffix}`)
+          // Surrounding text is separated by spaces, so these two original ranges
+          // stay links regardless of whether either replacement also forms a URL.
+          expect(result.links).toEqual(
+            expect.arrayContaining([
+              { start: prefix.length + 1, end: prefix.length + 1 + first.length, url: first },
+              {
+                start: prefix.length + first.length + 2,
+                end: prefix.length + first.length + 2 + second.length,
+                url: second,
+              },
+            ]),
+          )
+        },
+      ),
+      { numRuns: propertyRuns(100) },
+    )
+  })
+
   it('produces the referenced text and only well-formed, ordered links', () => {
     fc.assert(
       fc.property(scenario, ({ text, link, edits }) => {

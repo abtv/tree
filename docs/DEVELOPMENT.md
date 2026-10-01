@@ -420,6 +420,14 @@ Mutation testing measures assertion strength, which coverage does not: Stryker c
 
 When a task changes logic in `src/domain` or `src/application`, run mutation testing on the changed files and read their surviving mutants before handoff. Read the weekly report when the score drops. Treat a survivor as a question about a missing assertion, not a target to chase: kill it with an assertion on behavior, or leave an equivalent mutant (one that cannot change observable behavior) with a Stryker disable comment stating why. The Stryker Vitest runner does not yet work with Vitest 5, which is why `vitest` is pinned to 4.x; upgrade Vitest only together with a runner release that supports the new version, and confirm that a narrow run still kills mutants.
 
+Run ordinary Vitest validation after Stryker has finished and removed its sandbox.
+The temporary `.stryker-tmp/` tree contains copied and mutated tests, which the
+normal test configuration can collect while it exists. Read a mutant against the
+source recorded in its report, and confirm its exact expression before manually
+replaying it. Suppress a mutator only when every replacement it produces at that
+expression is equivalent. If one replacement is meaningful, keep the mutator
+enabled and explain the equivalent survivor in a source comment.
+
 Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
 
 ```bash

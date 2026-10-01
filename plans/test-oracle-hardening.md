@@ -83,7 +83,9 @@ Decisions reserved for the Product Owner:
 | T3 | Undo and redo semantics property over real `EditorStore` commands | T2 | Done |
 | T4 | Location and display invariants checked after every command | T3 | Done |
 | T5 | Command inventory guard for the property generators | T4 | Done |
-| T6 | Surviving-mutant triage in domain and application, then a break threshold | T1, T5 | Planned |
+| T6a1 | Domain content, hyperlink, retention, and traversal assertions | T1, T5 | Done |
+| T6a2 | Remaining domain survivor classification and assertions | T6a1 | Planned |
+| T6b | Application surviving-mutant triage and break threshold | T6a2 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
 | T8b | Remaining input-handler outcome assertions | T8a | Done |
@@ -238,6 +240,54 @@ Acceptance: adding the temporary public method `inventoryScratchCommand` made `n
 
 ### T6 — Surviving-mutant triage (W4, W1)
 
+Split on 2026-10-01 because the baseline has 225 domain survivors and 388
+application survivors, exceeding one session of behavioral triage:
+
+* **T6a:** inspect domain survivors, starting with `document-operations.ts`, add
+  behavioral assertions in domain tests, and document proven equivalents. Files:
+  `src/domain/*.test.ts`, equivalent comments in domain sources if justified,
+  this plan, and the index. Acceptance: record before/after per-file domain
+  scores and survivor dispositions; `npm run check` passes. Validation: Low
+  Risk for tests and comments; exposed defects need separate fix validation.
+  Product Owner decisions: material requirement gaps.
+* **T6b:** inspect application survivors in the priority order below, add
+  behavioral assertions, measure the full score, and set the break threshold.
+  Files: application tests, equivalent comments if justified,
+  `stryker.config.mjs`, Development §12, this plan, and the index. Acceptance:
+  record before/after scores, explain remaining survivors, set the threshold,
+  and pass `npm run check`. Validation: Low Risk for tests/configuration;
+  exposed defects need separate fix validation. Product Owner decisions:
+  material requirement gaps. T10 follows T6b.
+
+T6a is further divided after the first measured domain pass on 2026-10-01:
+
+* **T6a1:** add outcome assertions for clone content, deletion link offsets,
+  multiline rich paste, surrogate boundaries, visible-location normalization,
+  link creation and draft recovery, malformed saved fields, and propagated
+  attachment summaries. Add a traversal-count guard for summary queries and a
+  property for links between disjoint edits. Files: domain tests, narrowly
+  justified equivalent comments in `document-operations.ts`, Development §12,
+  this plan and the index. Acceptance: all new cases pass, full mutation report
+  records per-file measurements, and `npm run check` passes. Low Risk; no product
+  decision reserved unless a test exposes a material gap.
+* **T6a2:** finish the remaining domain inventory before application triage.
+  Read the current report against its recorded source, regenerate it if absent,
+  and classify every surviving and uncovered domain mutant. Prioritize
+  `document-operations.ts` (link filters, no-op ranges, attachment/index cache
+  propagation), then `document-links.ts` (prefix/suffix bounds, draft projection,
+  token recognition and disjoint-range remapping), `document-serialization.ts`
+  (redundant validation guards versus allocation-only build flags), and
+  `document-attachments.ts` (summary caching). Files: the corresponding domain
+  tests and property tests, equivalent comments in their source owners,
+  Development §12 if needed, this plan and the index. Acceptance: meaningful
+  survivors have behavioral or traversal-cost assertions; proven equivalents
+  have source rationale without suppressing meaningful replacements of the
+  same mutator; remaining unsupported/internal defensive branches are named
+  explicitly; per-file scores and `npm run check` are recorded. Low Risk for
+  tests/comments; exposed production defects require separate fixes and their
+  applicable validation. Product Owner decision: any material requirement gap.
+  T6b follows T6a2; the final break threshold still belongs to T6b.
+
 * Run `npm run test:mutation` and compare with the T1 baseline.
 * Kill survivors in this order: `src/domain/document-operations.ts`, `src/application/editor-command-transitions.ts`, `src/application/editor-history.ts`, `src/application/editor-store.ts`, `src/application/persistence-coordinator.ts`, `src/application/editor-save-scheduler.ts`, then the rest.
 * Kill each survivor with an assertion on behavior, not on implementation. Mark an equivalent mutant with a Stryker disable comment that states why it is equivalent.
@@ -249,6 +299,77 @@ Files: tests in `src/domain/` and `src/application/`, `stryker.config.mjs`, `doc
 Acceptance: the plan records the score per file before and after. The break threshold is set. `npm run check` passes.
 
 Validation tier: Low Risk (`npm run check`); Moderate Risk for any fix commit.
+
+**T6a1 result (2026-10-01).** Added independent content and
+range outcomes for deep clone content, fresh IDs, deletion of adjacent hyperlinks,
+repeated-URL deletion, rich multiline paste, complete links through splits,
+surrogate extremes, and visible selection below a current parent at depth two.
+Link tests cover creation flags, edits at both endpoints, unrelated draft shifts,
+scheme insertion, disjoint edit ordering, newline ranges, and independently
+invalid bounds. A new property preserves both links between disjoint surrounding
+edits. Saved-state tests independently reject malformed node fields, expansion
+IDs, non-PNG references, and empty documents, while preserving accepted views
+and locations. Summary tests check occurrence counts, sharing, and zero added
+traversal of untouched nodes after membership-changing operations. All fixtures
+are synthetic; no production behavior or product decisions changed.
+
+Final `npm run test:mutation` completed in **2m54s** at HEAD
+`1b3527972080f5f3cbd55268840566f7e2d71adc` with the final source/test inputs
+identified by `sha256:98c2527d879a2d76a64c693cb12f2bab1153d0e89ce69ea4e19d533da072a2ba`
+(subsequent edits before the run were documentation only). Its incremental report
+reused 3386 results and retested 288 mutants. Full score is **84.46%**, compared
+with T1 **80.30%**; 3003 killed, 100 timed out, 493 survived, 78 uncovered, and two
+equivalent mutants ignored. This session's initial run scored 80.28%, with 623
+survivors. The domain score rose from **82.16% to 92.03%**, with **235 to 105**
+survivors. Application results are retained unchanged for T6b.
+
+| Domain file | T1 score / survived | T6a1 score / survived |
+| --- | --- | --- |
+| `document-attachments.ts` | 86.57 / 9 | 94.03 / 4 |
+| `document-index.ts` | 97.56 / 0 | 97.56 / 0 |
+| `document-links.ts` | 74.39 / 104 | 88.70 / 54 |
+| `document-operations.ts` | 76.79 / 101 | 91.24 / 33 |
+| `document-serialization.ts` | 96.42 / 11 | 96.14 / 14 |
+| `document-types.ts` | 100 / 0 | 100 / 0 |
+| `product-messages.ts` | 100 / 0 | 100 / 0 |
+
+Serialization's detected kills increased from 307 to 341 while timed-out mutants
+fell from 43 to 8; the small score drop is recorded, not hidden by exclusions.
+Timeouts and random property exploration can change dispositions across runs.
+The two ignored mutants are the oversized sibling-count bound (both array
+operations already clamp) and the surrogate endpoint guard's `&&` to `||`
+replacement (a missing neighbor returns NaN). Equality and conditional mutators
+stay enabled because their other replacements are meaningful.
+
+**Outstanding domain inventory for T6a2:** 33 operation survivors and 11 uncovered
+mutants; 54 link survivors and six uncovered; 14 serialization survivors; four
+attachment survivors; and two uncovered index mutants. These are not all declared
+equivalent. T6a2 must finish their individual dispositions and source rationale.
+Known categories include redundant normalization/validation guards, allocation
+and index-cache propagation, and invalid/internal defensive paths. The retained
+report is ignored local evidence under `reports/mutation/`; regenerate it when
+unavailable. The break threshold remains unset until T6b's final full measurement.
+
+Development §12 now records sequential normal validation after sandbox cleanup,
+checking a mutant's exact recorded expression, and avoiding a mutator exclusion
+that also hides meaningful replacements. One standard-check attempt during a
+mutation run failed by collecting sandbox copies, including Playwright files;
+that attempt is invalid validation. A manual `selectedFound = true` scratch edit
+failed the existing missing-node test and was restored; it did not demonstrate a
+runner defect, since the reported survivor changed the separate redundant
+`currentParentFound` flag. No scratch changes remain.
+
+Validation: `npm run check` passed on HEAD
+`1b3527972080f5f3cbd55268840566f7e2d71adc`, snapshot
+`sha256:fa8c4beb7b338041be5c231cee1cc6909eb153887c0cf3936ba942d3040c60a8`:
+84 files, 1421 tests (47 more than task-start HEAD), 11.61 s coverage suite,
+production build, and zero audit vulnerabilities. Aggregate coverage is
+95.65% statements / 90.26% branches / 96.67% functions / 97.96% lines.
+The final standard check ran after sandbox cleanup. No unresolved suite failures.
+Primary diff review found no meaningful issues after narrowing equivalent-mutator
+exclusions. Runtime inputs and rendered states did not change; no E2E or screenshot
+rerun was required at Low Risk. Final plan completion edits are documentation only
+and are checked separately; they do not invalidate runtime validation.
 
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
@@ -346,7 +467,10 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1, T2, T3, T4, T5, T7, T8a, T8b, and T9 are done. T6 (surviving-mutant triage and break threshold) is the exact next task; compare against the T1 baseline. T10 closure follows T6.
+T1, T2, T3, T4, T5, T6a1, T7, T8a, T8b, and T9 are done.
+T6a2 (remaining domain survivor classification and assertions) is the exact next
+Ready task. Its inventory is recorded with the T6a1 result. T6b application triage
+and the break threshold follow T6a2; T10 closure follows T6b.
 
 ## Resume prompt
 
