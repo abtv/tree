@@ -91,7 +91,7 @@ Decisions reserved for the Product Owner:
 | T6b2b2 | EditorStore navigation and structural command survivor triage | T6b2b1 | Done |
 | T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Done |
 | T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Done |
-| T6b3 | Persistence and save-policy survivor triage | T6b2c | Planned |
+| T6b3 | Persistence and save-policy survivor triage | T6b2c | Done |
 | T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
@@ -806,6 +806,35 @@ Final `npm run test:mutation -- --concurrency 4 --mutate src/application/editor-
 
 Validation: `npm run check` passed on the same snapshot: 85 files, **1558** tests (15 added), build, zero audit vulnerabilities, all governance stages. Coverage **96.19 / 91.13 / 96.78 / 98.08%**. The new block passed on its first run. Primary diff review found no meaningful issues. No executable behavior or rendering change, so no E2E, visual inspection, performance suite or independent review role was required.
 
+**T6b3 result (2026-10-01).** Added 12 scheduler cases in the new `editor-save-scheduler.test.ts` (a manual clock drives idle saves, immediate saves, the volume trigger, failure accounting and cleanup retries), four new and one strengthened coordinator cases, three policy cases and one store case. Task-start HEAD `d940cf357d278c31910dee3a4c746e99ea18e870` (author `abtv`, 2026-10-01, `test(application): strengthen lifecycle and persistence wiring mutation assertions`); none of the three source files changed after the retained report was written. The report's JSON could not be parsed by `jq` (invalid surrogate escape), so the survivors were listed by running Stryker with a scratchpad config that sets `clearTextReporter.reportMutants`; that config is not committed and the project config is unchanged. Of 44 surviving/uncovered mutants at task start, 25 are killed and 19 remain:
+
+| Owner and expression | Disposition and evidence |
+| --- | --- |
+| Scheduler: `registerSaveFailure` counting a non-save failure | Killed: three non-save failures never reach the limit, three save failures do. |
+| Scheduler: word-volume guard `insertedWords > 0` (two mutants) | Killed: after a failed ten-word save, a change without inserted words does not save immediately and is saved at the idle interval (PRODUCT.md §16.1: only inserted words count toward the volume threshold). |
+| Scheduler: `requestPolicySave` pending guard, timer clear and reset (seven mutants) | Killed: no save without a pending change; an immediate save cancels the armed idle save and clears the handle, so a later change arms a fresh one. |
+| Scheduler: idle and cleanup-retry timer replacement (seven mutants) | Killed: a later change postpones the idle save; a later retry replaces the earlier one. |
+| Scheduler: `clearTimeout(undefined)` guards in `cancelSaveTimer`, `requestPolicySave`, `scheduleIdleSave` and `scheduleCleanupRetry`, and the `&& saveTimer !== undefined` operand of the new retry guard | Equivalent: clearing an unarmed timer is a no-op, and a pending change with no armed timer (a locked editor) defers the retried cleanup anyway. Source comment added. |
+| Scheduler: `handleDocumentSaved` missing-watermark guard | Internal defense: the coordinator captures a save before acknowledging it. Source comment added. |
+| Coordinator: `discardPendingSaves` request reset, `flush` cleanup retry (six mutants), missing state guard, `requestAttachmentCleanup` retry flag after a failed cleanup | Killed: no extra result after a discarded save, an idle flush does nothing, a plain flush retries a failed or deferred cleanup without a save, and a missing state reports nothing. |
+| Coordinator: initial `requested`, `workQueued` guard and its assignment | Equivalent through the public API: the saveQueue keeps runs serialized, so a missing guard only chains empty continuations. Source comment added. |
+| Policy: CRLF normalization, longer replacement, repeated word (three mutants) | Killed. |
+| Policy: loop bound `<=`, equality guard, `min` bound, prefix-loop guards, suffix bound on `next` (four mutants), `prefix === 0` operand, lone-CR normalization | Equivalent: the prefix loop stops at the first missing or differing character, an undefined neighbour counts as whitespace, and the suffix bound on `next` matters only when the inserted text is already empty. Source comment added. |
+
+**Defect found and fixed (separate commit).** `scheduleCleanupRetry` replaced the armed idle-save timer. A change typed while an attachment cleanup was failing therefore lost its idle save: the retried cleanup deferred itself because changes were pending, and nothing re-armed the save until the next edit or quit. This broke the idle trigger of PRODUCT.md §16.1. Reproduced first through the real store (`editor-store.test.ts`, "saves a change typed during a failing cleanup at the idle interval, not only at the next edit") and through the scheduler (`editor-save-scheduler.test.ts`, "still saves pending changes at the idle interval when a cleanup retry is scheduled meanwhile"). Both failed before the fix and pass after; both failed again with only the production edit stashed. The fix returns early when a change is pending and a timer is armed: the idle save runs, and the coordinator keeps the failed cleanup requested, so that save retries it. No product behavior was decided: §16.1 already requires the idle save.
+
+Final `npm run test:mutation -- --concurrency 4 --mutate <the three files>` took 55 s at HEAD `d940cf3` plus `sha256:36c8d7098125553c28301ce164a39fba5e549b683a36d9d79044be3851bff9f1` (`npm run validation:snapshot`, one untracked file):
+
+| Application file | T6b2c score / survived / uncovered | T6b3 score / survived / uncovered |
+| --- | --- | --- |
+| `editor-save-scheduler.ts` | 81.73 / 18 / 1 | 94.50 / 6 / 0 |
+| `persistence-coordinator.ts` | 83.33 / 12 / 1 | 96.15 / 3 / 0 |
+| `save-policy.ts` | 82.43 / 13 / 0 | 86.49 / 10 / 0 |
+
+Full score rose from **91.07% to 91.87%** (3317 killed, 63 timeouts, 241 survived, 58 uncovered); application is **89.59%** with 177 survivors and 44 uncovered. The measured sources predate the explanatory comments added afterwards, which changed no executable line.
+
+Validation: `npm run check` passed on the same snapshot: 86 files, **1578** tests (20 added, 1558 at task start), build, zero audit vulnerabilities, all governance stages. Coverage **96.23 / 91.24 / 96.78 / 98.08%**. The first standard check failed only on Prettier formatting of the new test file, corrected before the passing run. No unresolved failures or blocked validation. The change touches persistence timing, so it is Moderate Risk; the affected persistence and idle-save behavior has real-store coverage, and the store-level test above exercises the real boundary wiring between coordinator and scheduler. No E2E, visual or performance run was required and none was made; those remain at their previous results.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -909,10 +938,12 @@ T6b2b1 (EditorStore direct editing and text replacement survivor triage) is done
 T6b2b2 (EditorStore navigation and structural command survivor triage) is done.
 T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is done.
 T6b2c (EditorStore lifecycle and persistence wiring triage) is done.
-T6b3 (persistence and save-policy survivor triage: `persistence-coordinator.ts`,
-`editor-save-scheduler.ts`, `save-policy.ts`) is the exact next Ready task; T6b4 follows, with the
-break threshold. The current report has 204 application survivors and 46 uncovered mutants;
-regenerate it if missing and inspect its recorded source. T10 closure follows T6b4.
+T6b3 (persistence and save-policy survivor triage) is done, and fixed one defect in
+`scheduleCleanupRetry`. T6b4 (remaining application collaborators and the break threshold) is the
+exact next Ready task. The current report has 177 application survivors and 44 uncovered mutants;
+regenerate it if missing and inspect its recorded source. T6b4 must also inspect the domain
+survivors listed after T6b1 (`document-operations.ts` IDs 2908, 2955, 3099 and the visible-row
+IDs 2150 and 2151). T10 closure follows T6b4.
 
 ## Resume prompt
 

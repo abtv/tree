@@ -24,6 +24,10 @@ export type PersistenceFailureKind = 'save' | 'cleanup'
 
 export class PersistenceCoordinator {
   private saveQueue: Promise<void> = Promise.resolve()
+  // Mutation triage: the initial `requested` value and the `workQueued` guard are equivalent through
+  // the public API. No work runs before a request sets `requested`, and without the guard an extra
+  // request only chains an empty continuation behind the running one, because the saveQueue keeps
+  // the runs serialized and the running loop already consumes the new request.
   private workQueued = false
   private requested = false
   private saveRequested = false

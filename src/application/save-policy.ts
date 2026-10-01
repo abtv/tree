@@ -9,6 +9,7 @@ function isWhitespace(character: string | undefined): boolean {
 
 function countWordStarts(text: string, preceding: string | undefined): number {
   let count = 0
+  // Reading one index past the end yields undefined, which counts as whitespace, so `<=` is equivalent.
   for (let index = 0; index < text.length; index += 1) {
     const current = text[index]!
     if (isWhitespace(current)) continue
@@ -18,6 +19,10 @@ function countWordStarts(text: string, preceding: string | undefined): number {
   return count
 }
 
+// Mutation triage: the guards below that survive are equivalent. The equality guard only skips work
+// (identical strings leave `inserted` empty), the prefix loop stops at the first missing or differing
+// character whichever length bounds it, `next[-1]` is undefined like the explicit `prefix === 0` case,
+// and the suffix bound on `next` only matters once `inserted` is already empty.
 export function countInsertedWords(previous: string, next: string): number {
   if (previous === next) return 0
   let prefix = 0
@@ -36,6 +41,7 @@ export function countInsertedWords(previous: string, next: string): number {
 }
 
 export function countPastedWords(pasted: string, preceding: string | undefined): number {
+  // A lone CR is whitespace like a line break, so normalizing only CRLF would count the same words.
   const lines = pasted.replace(/\r\n?/g, '\n').split('\n')
   let count = 0
   for (let index = 0; index < lines.length; index += 1) {

@@ -312,6 +312,7 @@ describe('PersistenceCoordinator', () => {
         }),
     )
     const cleanupAttachments = vi.fn(async () => undefined)
+    const onResult = vi.fn()
     const coordinator = new PersistenceCoordinator(
       { save, cleanupAttachments },
       {
@@ -320,7 +321,7 @@ describe('PersistenceCoordinator', () => {
         hasPendingDocumentChanges: () => false,
         onSaveCaptured: vi.fn(),
         onDocumentSaved: vi.fn(),
-        onResult: vi.fn(),
+        onResult,
       },
     )
 
@@ -333,5 +334,117 @@ describe('PersistenceCoordinator', () => {
 
     expect(save).toHaveBeenCalledOnce()
     expect(cleanupAttachments).not.toHaveBeenCalled()
+    expect(onResult).toHaveBeenCalledOnce()
+  })
+
+  it('does no work and reports no result when flushed while idle', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => undefined)
+    const currentState = vi.fn(() => state)
+    const onResult = vi.fn()
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
+        onResult,
+      },
+    )
+
+    await expect(coordinator.flush()).resolves.toBeUndefined()
+
+    expect(currentState).not.toHaveBeenCalled()
+    expect(save).not.toHaveBeenCalled()
+    expect(cleanupAttachments).not.toHaveBeenCalled()
+    expect(onResult).not.toHaveBeenCalled()
+  })
+
+  it('retries a failed cleanup on the next flush without a new request or a document save', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => undefined).mockRejectedValueOnce(new Error('cleanup failed'))
+    const onResult = vi.fn()
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
+        onResult,
+      },
+    )
+
+    coordinator.requestAttachmentCleanup()
+    await expect(coordinator.flush()).rejects.toThrow('cleanup failed')
+    await expect(coordinator.flush()).resolves.toBeUndefined()
+
+    expect(cleanupAttachments).toHaveBeenCalledTimes(2)
+    expect(save).not.toHaveBeenCalled()
+    expect(onResult).toHaveBeenLastCalledWith(undefined)
+  })
+
+  it('runs a cleanup deferred by pending document changes on the next flush once they are saved', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => undefined)
+    let pending = true
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => pending,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
+        onResult: vi.fn(),
+      },
+    )
+
+    coordinator.requestAttachmentCleanup()
+    await coordinator.flush()
+    expect(cleanupAttachments).not.toHaveBeenCalled()
+
+    pending = false
+    await coordinator.flush()
+
+    expect(cleanupAttachments).toHaveBeenCalledOnce()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('skips the work, and reports nothing, while there is no state to persist', async () => {
+    const save = vi.fn(async () => undefined)
+    const cleanupAttachments = vi.fn(async () => undefined)
+    const onSaveCaptured = vi.fn()
+    const onResult = vi.fn()
+    let available = false
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => (available ? state : undefined),
+        referencedAttachmentIds: () => [],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured,
+        onDocumentSaved: vi.fn(),
+        onResult,
+      },
+    )
+
+    coordinator.requestSave()
+    coordinator.requestAttachmentCleanup()
+    await expect(coordinator.flush()).resolves.toBeUndefined()
+
+    expect(save).not.toHaveBeenCalled()
+    expect(cleanupAttachments).not.toHaveBeenCalled()
+    expect(onSaveCaptured).not.toHaveBeenCalled()
+    expect(onResult).not.toHaveBeenCalled()
+
+    available = true
+    coordinator.requestSave()
+    await coordinator.flush()
+    expect(save).toHaveBeenCalledOnce()
+    expect(onResult).toHaveBeenLastCalledWith(undefined)
   })
 })

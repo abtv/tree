@@ -38,6 +38,15 @@ describe('countInsertedWords', () => {
   it('counts words inserted in the middle of existing text', () => {
     expect(countInsertedWords('hello world', 'hello brave world')).toBe(1)
   })
+
+  it('counts every word of a longer replacement of the old text', () => {
+    expect(countInsertedWords('cat', 'dog and bird')).toBe(3)
+    expect(countInsertedWords('hello world', 'hello big wide')).toBe(2)
+  })
+
+  it('counts a word repeated after text that already ends with it', () => {
+    expect(countInsertedWords('ab', 'ab ab')).toBe(1)
+  })
 })
 
 describe('countPastedWords', () => {
@@ -56,5 +65,9 @@ describe('countPastedWords', () => {
   it('counts each pasted line independently', () => {
     expect(countPastedWords('a\nb c', undefined)).toBe(3)
     expect(countPastedWords('one\ntwo', 'x')).toBe(1)
+  })
+
+  it('treats CRLF and lone CR as line breaks between words', () => {
+    expect(countPastedWords('one\r\ntwo\rthree', undefined)).toBe(3)
   })
 })
