@@ -29,6 +29,7 @@ export function clipboardSelectionTransition(
   const to = Math.min(node.text.length, Math.max(start, end))
   if (from === to) return undefined
   const text = node.text.slice(from, to)
+  // A bogus fallback entry has no numeric range, so the range filter drops it like an absent array.
   const links = (node.links ?? [])
     .filter((link) => link.start >= from && link.end <= to)
     .map((link) => ({ ...link, start: link.start - from, end: link.end - from }))
@@ -56,6 +57,7 @@ export function textPasteTransition(
   return {
     document: pasteMultilineText(document, nodeId, cursor, lines, ids, clipboard.links),
     location: locationForSiblingOf(document, nodeId, finalNodeId, location),
+    // `split` always returns at least one line, so the empty fallback only satisfies the type.
     focus: { nodeId: finalNodeId, cursor: (lines.at(-1) ?? '').length },
   }
 }

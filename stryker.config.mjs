@@ -10,6 +10,8 @@ export default {
   clearTextReporter: { reportTests: false, reportMutants: false },
   htmlReporter: { fileName: 'reports/mutation/mutation.html' },
   jsonReporter: { fileName: 'reports/mutation/mutation.json' },
+  // The full-run score was 94.97% when this threshold was set; the margin absorbs timeout and random-seed noise.
+  thresholds: { high: 95, low: 90, break: 93 },
   incremental: true,
   incrementalFile: 'reports/stryker-incremental.json',
   tempDirName: '.stryker-tmp',

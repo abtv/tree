@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Test Oracle Hardening](test-oracle-hardening.md) | Active | T6b4b remaining application helpers, domain leftovers and break threshold is ready; T10 follows |
+| [Test Oracle Hardening](test-oracle-hardening.md) | Active | T10 closure is ready |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

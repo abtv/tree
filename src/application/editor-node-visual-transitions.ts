@@ -86,6 +86,7 @@ export function nodeVisualTransition(
   const start = Math.min(anchor, focus)
   const selected = siblings.slice(start, Math.max(anchor, focus) + 1)
   const first = selected[0]
+  // Defensive: the anchor and focus indexes are both valid here, so the range is never empty.
   if (first === undefined) return { kind: 'none' }
   const register = { nodes: selected.map(cloneNode), sourceIds: selected.map((node) => node.id) }
   if (command === 'y') return { kind: 'yank', register }
@@ -93,6 +94,8 @@ export function nodeVisualTransition(
   if ((command === 'p' || command === 'P') && (source === undefined || source.nodes.length === 0)) {
     return { kind: 'none' }
   }
+  // `source` is always defined for a put here: the guard above already returned for an absent one,
+  // so the optional chaining and the empty fallback only satisfy the type.
   if (
     (command === 'p' || command === 'P') &&
     isPasteIntoSourceDescendant(document, first.id, source?.sourceIds ?? [])
@@ -114,6 +117,7 @@ export function nodeVisualTransition(
       if (text !== node.text) changed = true
       let originalOffset = 0
       let nextOffset = 0
+      // A node without links maps no ranges; a bogus fallback entry would be dropped by `normalizeLinks`.
       const mappedLinks = (node.links ?? []).map((link) => {
         nextOffset += changeCase(node.text.slice(originalOffset, link.start)).length
         const start = nextOffset

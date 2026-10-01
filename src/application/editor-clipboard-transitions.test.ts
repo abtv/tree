@@ -30,6 +30,43 @@ describe('editor clipboard transitions', () => {
     expect(clipboardSelectionTransition(document, 'root', 0, 0)).toBeUndefined()
   })
 
+  it('turns copied line breaks into <br> and escapes quotes in text and link targets', () => {
+    const document: Document = {
+      roots: [
+        {
+          id: 'root',
+          text: 'say "hi"\nnext',
+          links: [{ start: 0, end: 3, url: 'https://example.com/?q="x"' }],
+          children: [],
+        },
+      ],
+    }
+    expect(clipboardSelectionTransition(document, 'root', 0, 13)?.payload).toEqual({
+      text: 'say "hi"\nnext',
+      html: '<a href="https://example.com/?q=&quot;x&quot;">say</a> &quot;hi&quot;<br>next',
+    })
+  })
+
+  it('selects the last created node when a paste creates three or more', () => {
+    const document: Document = { roots: [{ id: 'root', text: 'abcdef', children: [] }] }
+    const transition = textPasteTransition(
+      document,
+      { currentParentId: null, selectedNodeId: 'root' },
+      'root',
+      3,
+      { kind: 'text', text: 'one\ntwo\nthree\nfour' },
+      () => ['n1', 'n2', 'n3'],
+    )
+    expect(transition.document.roots.map((node) => [node.id, node.text])).toEqual([
+      ['root', 'abcone'],
+      ['n1', 'two'],
+      ['n2', 'three'],
+      ['n3', 'fourdef'],
+    ])
+    expect(transition.location.selectedNodeId).toBe('n3')
+    expect(transition.focus).toEqual({ nodeId: 'n3', cursor: 4 })
+  })
+
   it('inserts a single pasted text value and positions focus after it', () => {
     const document: Document = { roots: [{ id: 'root', text: 'abcdef', children: [] }] }
     expect(
@@ -101,6 +138,12 @@ describe('editor clipboard transitions', () => {
       () => 'sibling',
     )
     expect(sibling.document.roots.map((node) => node.id)).toEqual(['empty', 'occupied', 'sibling'])
+    expect(sibling.document.roots[2]).toEqual({
+      id: 'sibling',
+      text: '',
+      attachment: { id: 'new', mimeType: 'image/png' },
+      children: [],
+    })
     expect(sibling.location).toEqual({ currentParentId: null, selectedNodeId: 'sibling' })
     expect(sibling.focus).toEqual({ nodeId: 'sibling', cursor: 0 })
   })

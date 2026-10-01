@@ -93,7 +93,7 @@ Decisions reserved for the Product Owner:
 | T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Done |
 | T6b3 | Persistence and save-policy survivor triage | T6b2c | Done |
 | T6b4a | Content, runtime-state, text-session, undo-focus and visible-row helpers | T6b3 | Done |
-| T6b4b | Remaining application helpers, domain leftovers and break threshold | T6b4a | Planned |
+| T6b4b | Remaining application helpers, domain leftovers and break threshold | T6b4a | Done |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
 | T8b | Remaining input-handler outcome assertions | T8a | Done |
@@ -858,6 +858,16 @@ Measured with `npx stryker run --force --mutate <comma-separated files>`: a repe
 
 Application score rose from **89.59% to 92.93%** (134 survivors, 16 uncovered). Validation: `npm run check` passed (build, governance stages, zero audit vulnerabilities; coverage 96.41 / 91.52 / 97.00 / 98.19%). Low Risk; no E2E, visual or performance run was required and none was made.
 
+**T6b4b result (2026-10-02).** The retained report predated T6b4a, so it was regenerated with the scratchpad `reportMutants` config (full incremental run, task-start HEAD `9126d70`, score **93.80%**: 198 survived, 30 uncovered). Only two files held meaningful survivors; the rest were already explained in source comments by T6a2, T6b1-T6b3 and T6b4a.
+
+* `editor-node-visual-transitions.ts` (80.35% → **97.38%**, 4+3 → 3+3): 19 new cases in `editor-node-visual-transitions.test.ts` assert outcomes over a four-sibling list: forest placement before/after the target, unknown anchor/focus (including the last-sibling anchor, where an unchecked `-1` focus still slices a non-empty range) and `canMutate`, `p`/`P` without or with an empty register, rejection for a source descendant and over-depth for both `p` and `P` while other commands are not rejected, `cleanup` per command, the selection that replaces a deleted range (next sibling, else previous), `c`/`s` typed node, `p`/`P` fresh IDs, and case changes keeping IDs, attachments and children without empty `links`. The three remaining survivors and three uncovered mutants are equivalent or defensive and now say so in source: the empty-range guard after valid indexes, the `source?.` chaining and `[]` fallback behind the earlier absent-register return, and the empty `links` fallback that `normalizeLinks` discards.
+* `editor-clipboard-transitions.ts` (93.18% → **97.73%**, 5+1 → 1+1): two new cases assert `<br>` for copied line breaks, `&quot;` escaping in text and link targets, and the last node of a paste that creates three or more; one existing case now also asserts the empty text of an image-paste sibling. Remaining: the `links ?? []` fallback (the range filter drops a bogus entry) and the `lines.at(-1) ?? ''` fallback (`split` never returns an empty array); both explained in source.
+* `editor-command-transitions.ts`, `editor-history.ts`, `save-policy.ts`, `editor-store.ts`, `editor-save-scheduler.ts`, `persistence-coordinator.ts`, `expansion-state.ts`, `editor-undo-focus.ts`, `editor-runtime-state.ts`, `editor-content-changes.ts` and the domain files (`document-operations.ts` 24+8, `document-links.ts`, `document-index.ts`, `document-serialization.ts`, `document-attachments.ts`): unchanged this task. Each survivor was read against the source and already carries a comment stating why it is equivalent or defensive (T6a2: 53 equivalents, 7 internal defenses, 14 uncovered fallbacks; T6b1-T6b3). The three operation IDs named in the plan (2908, 2955, 3099) were not looked up by ID; the operations survivors were re-read by expression and none lacked a rationale or a meaningful assertion. The one case intentionally not declared equivalent stays the native multi-site overlap guard in `document-links.ts` (T6a2).
+
+Full `npm run test:mutation` at the task-end snapshot: **94.97%** total (95.65% of covered mutants), 3433 killed, 61 timed out, 159 survived, 26 uncovered; application **94.96%**, domain **94.99%**. Initiative baseline (T1): 80.30%. The run reused 3443 of 3681 results and took 1 min; a second run confirmed `thresholds.break`. `stryker.config.mjs` now sets `thresholds: { high: 95, low: 90, break: 93 }`; the margin below 94.97% covers the timeout and random-seed variation seen between runs (T6a1 saw about one point on one file). Development §12 records the threshold and the rule to raise it only after a higher measured full run, never lower it to pass.
+
+No product decision, requirement gap, production defect, mutation exclusion, lowered coverage floor or performance change. Only tests, explanatory source comments, `stryker.config.mjs` and Development §12 changed. The weekly workflow has still not been dispatched; whether it passes with the new threshold on Ubuntu is not verified.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -963,14 +973,8 @@ T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is done.
 T6b2c (EditorStore lifecycle and persistence wiring triage) is done.
 T6b3 (persistence and save-policy survivor triage) is done, and fixed one defect in
 `scheduleCleanupRetry`. T6b4a (content, runtime-state, text-session, undo-focus and visible-row
-helpers) is done. T6b4b is the exact next Ready task: classify the survivors left in
-`editor-node-visual-transitions.ts` (38 survived, 7 uncovered), `editor-clipboard-transitions.ts`,
-`editor-command-transitions.ts`, `editor-history.ts`, the residual `editor-store.ts` and
-`save-policy.ts` mutants, and the domain survivors listed after T6b1 (`document-operations.ts` IDs
-2908, 2955, 3099). Then run the full `npm run test:mutation`, set `thresholds.break` in
-`stryker.config.mjs` just below the achieved score, and document it in Development §12. Regenerate
-the report if missing and inspect its recorded source; split further if the inventory does not fit.
-T10 closure follows T6b4b.
+helpers) is done. T6b4b (visual and clipboard transitions, remaining dispositions, break threshold
+93 at a full score of 94.97%) is done. T10 closure is the exact next Ready task.
 
 ## Resume prompt
 
