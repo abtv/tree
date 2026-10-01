@@ -32,7 +32,7 @@ Decisions reserved for the Product Owner: none known. Ask if a task reveals a ma
 | --- | --- | --- | --- | --- |
 | B1 | Executable check of `VIM_CONFORMANCE.md` test citations; stale citations repaired | — | Low Risk | Complete |
 | C1 | Fix-history script and its handoff line | — | Low Risk | Complete |
-| A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Planned |
+| A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Complete |
 | A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Planned |
 | A3 | Survivor triage: caret and session owner modules | A2 | Low Risk (Moderate for a fix commit) | Planned |
 | A4 | Survivor triage: drag and list modules; add the renderer modules to the mutation scope; close the batch | A3 | Low Risk | Planned |
@@ -118,6 +118,25 @@ Acceptance: the baseline table is recorded and the run completed. If Stryker can
 
 Validation: Minimal Risk (plan update only): `npm run format:check:changed` and `npm run check:docs`.
 
+**A1 result (2026-10-02).** Command `npm run test:mutation -- --mutate <the twelve paths> --force` completed in **4m43s** at `HEAD` `25b23bb`. Stryker instrumented 2089 mutants in the twelve files and retested all of them. The report's aggregate score of **90.46%** is not the A1 measurement: the report retains the earlier domain/application results and mixes them with the freshly tested renderer mutants, and Stryker therefore exited nonzero against the 93 break threshold. The renderer group it measured is **82.53% total (84.47% of covered), 1683 killed, 41 timed out, 317 survived, 48 uncovered**. No test or configuration changed; `.stryker-tmp/` was removed before any later command.
+
+| Renderer module | Score total % | Score covered % | Killed | Timed out | Survived | Uncovered | Mutants |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `vim-editing.ts` | 74.45 | 79.02 | 416 | 21 | 116 | 34 | 587 |
+| `vim-text-commands.ts` | 81.39 | 83.52 | 443 | 3 | 88 | 14 | 548 |
+| `vim-surround.ts` | 75.37 | 75.37 | 101 | 0 | 33 | 0 | 134 |
+| `vim-caret-transition.ts` | 96.27 | 96.27 | 155 | 0 | 6 | 0 | 161 |
+| `vim-vertical-navigation.ts` | 82.95 | 82.95 | 107 | 0 | 22 | 0 | 129 |
+| `vim-command-state.ts` | 100.00 | 100.00 | 32 | 0 | 0 | 0 | 32 |
+| `vim-edit-session.ts` | 90.15 | 90.15 | 113 | 6 | 13 | 0 | 132 |
+| `link-caret.ts` | 100.00 | 100.00 | 28 | 0 | 0 | 0 | 28 |
+| `drag-caret-freeze.ts` | 100.00 | 100.00 | 13 | 0 | 0 | 0 | 13 |
+| `node-drag.ts` | 87.63 | 87.63 | 170 | 0 | 24 | 0 | 194 |
+| `visible-tree.ts` | 97.44 | 97.44 | 36 | 2 | 1 | 0 | 39 |
+| `list-window.ts` | 84.78 | 84.78 | 69 | 9 | 14 | 0 | 92 |
+
+The weakest modules are `vim-editing.ts`, `vim-surround.ts`, and `vim-text-commands.ts` (A2), followed by `vim-vertical-navigation.ts`, `vim-edit-session.ts`, and `link-caret.ts` (A3), then `node-drag.ts` and `list-window.ts` (A4). Eight modules score at or above 90, so A4's combined full-scope check is the open risk and remains reserved for the Product Owner if the combined score stays below 93.
+
 ### A2, A3, A4 — Survivor triage
 
 Each task reads the surviving mutants for its modules in `reports/mutation/mutation.html` after a narrow run (`npm run test:mutation -- --mutate <its modules>`), and treats each survivor as a question about a missing assertion, following `docs/DEVELOPMENT.md` §12: kill it with an assertion on behavior in the module's colocated test, or leave an equivalent mutant with a Stryker disable comment stating why. When a survivor reveals a real defect, fix it defect-first in a separate commit. Record per-file score before and after in this plan.
@@ -140,7 +159,7 @@ Validation: Low Risk (tests): affected focused tests and `npm run check`. A defe
 
 ## Next task and resume prompt
 
-A1 is the next ready task. B1 and C1 are complete.
+A2 is the next ready task. B1, C1, and A1 are complete.
 
 ```text
 Continue the Harness Audit Follow-ups plan in plans/harness-audit-follow-ups.md: execute the next ready task.
