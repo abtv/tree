@@ -349,6 +349,8 @@ export class EditorStore {
       return
     }
     if (!this.textSession.isActive(nodeId)) {
+      // begin replaces the active node and scheduleBoundary clears the old timer;
+      // ending here also makes that session transition explicit before history capture.
       this.textSession.end()
       if (this.history.begin(state.document)) this.queueAttachmentCleanup()
       this.textSession.begin(nodeId)
@@ -365,7 +367,11 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
+    // With no stored links, reconciliation rejects malformed fallback entries as well
+    // as an empty array; only normalized ranges can survive into the document.
     const replacement = replaceLinkedText(node.text, node.links ?? [], start, end, text)
+    // markNextEditStandalone also ends the session. Both calls express the boundary;
+    // removing only this end call does not change the resulting history.
     this.endTextSession()
     this.textSession.markNextEditStandalone()
     this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
@@ -376,8 +382,12 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const node = requireNode(state.document, nodeId).node
+    // Like the single-range path, an absent link list produces no retained ranges
+    // even if a fallback entry fails normalization.
     const replacement = replaceLinkedTextRanges(node.text, node.links ?? [], edits)
     if (replacement.text === node.text) return
+    // markNextEditStandalone ends the session too; the no-change guard above must
+    // keep ongoing direct typing grouped instead of introducing this boundary.
     this.endTextSession()
     this.textSession.markNextEditStandalone()
     this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
@@ -387,8 +397,12 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const linkStart = requireNode(state.document, nodeId).node.links?.find((link) => link.end === cursor)?.start
+    // Without this early return, deleteLink's identical lookup returns undefined
+    // and the next guard still reports false without publishing a change.
     if (linkStart === undefined) return false
     const next = deleteLink(state.document, nodeId, cursor)
+    // The synchronous lookup above and deleteLink use the same link-end predicate
+    // on the same immutable document. Undefined is therefore an internal defense.
     if (next === undefined) return false
     this.endTextSession()
     this.applyStructural(next, state.location, this.runtime.newFocus(nodeId, linkStart))

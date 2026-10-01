@@ -3238,6 +3238,193 @@ describe('EditorStore', () => {
     expect(services.saves).toHaveLength(1)
   })
 
+  // @requirement PRODUCT.md §10
+  it('ends a direct typing session after five seconds without a text change', async () => {
+    vi.useFakeTimers()
+    try {
+      const store = new EditorStore(createServices(), ids('root'))
+      await store.initialize()
+      store.editText('root', 'a')
+      await vi.advanceTimersByTimeAsync(4_000)
+      store.editText('root', 'ab')
+      await vi.advanceTimersByTimeAsync(4_000)
+      store.editText('root', 'abc')
+      await vi.advanceTimersByTimeAsync(5_000)
+      store.editText('root', 'abcd')
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // @requirement PRODUCT.md §10
+  it.each(['single', 'disjoint'] as const)('keeps a %s replacement separate from following typing', async (kind) => {
+    const store = new EditorStore(createServices(), ids('root'), new FakeClock())
+    await store.initialize()
+    store.editText('root', 'abc')
+    if (kind === 'single') store.replaceTextRange('root', 1, 2, 'X')
+    else store.replaceTextRanges('root', [{ start: 1, end: 2, inserted: 'X' }])
+    store.editText('root', 'aXcd')
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'aXc' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+    store.redo()
+    store.redo()
+    store.redo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'aXcd' }] } })
+  })
+
+  // @requirement PRODUCT.md §10
+  it('keeps an unchanged disjoint replacement inside the ongoing typing session', async () => {
+    const store = new EditorStore(createServices(), ids('root'), new FakeClock())
+    await store.initialize()
+    store.editText('root', 'abc')
+    store.replaceTextRanges('root', [{ start: 1, end: 2, inserted: 'b' }])
+    store.editText('root', 'abcd')
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+    store.redo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abcd' }] } })
+  })
+
+  // @requirement PRODUCT.md §13.1
+  it.each([undefined, [{ start: 0, end: 19, url: 'https://example.com' }]])(
+    'returns false without changing the typing session when no link ends at the caret (%j)',
+    async (links) => {
+      const text = links === undefined ? 'plain' : 'https://example.com'
+      const store = new EditorStore(
+        loadedState(
+          { roots: [{ id: 'root', text, ...(links === undefined ? {} : { links }), children: [] }] },
+          { currentParentId: null, selectedNodeId: 'root' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      store.editContent('root', `${text}A`, links ?? [], false)
+      const before = store.getSnapshot()
+      expect(store.deleteLink('root', 2)).toBe(false)
+      expect(store.getSnapshot()).toBe(before)
+      store.editContent('root', `${text}AB`, links ?? [], false)
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text }] } })
+    },
+  )
+
+  // @requirement PRODUCT.md §10
+  it('records link deletion separately from typing before and after it', async () => {
+    const url = 'https://example.com'
+    const links = [{ start: 0, end: url.length, url }]
+    const store = new EditorStore(
+      loadedState(
+        { roots: [{ id: 'root', text: url, links, children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      ),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    store.editContent('root', `${url}A`, links, false)
+    expect(store.deleteLink('root', url.length)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ text: 'A' }] },
+      focus: { nodeId: 'root', cursor: 0 },
+    })
+    store.editText('root', 'AB')
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'A' }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: `${url}A`, links }] } })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: url, links }] } })
+  })
+
+  // @requirement PRODUCT.md §16.2
+  it.each(['single', 'disjoint'] as const)(
+    'rejects a locked %s replacement without isolating the next edit after recovery',
+    async (kind) => {
+      const { store, services } = await lockEditor(new FakeClock())
+      const before = store.getSnapshot()
+      expect(before).toMatchObject({ status: 'ready', persistenceLocked: true })
+      if (kind === 'single') store.replaceTextRange('root', 0, 3, 'changed')
+      else store.replaceTextRanges('root', [{ start: 0, end: 3, inserted: 'changed' }])
+      expect(store.getSnapshot()).toBe(before)
+      services.save = async () => undefined
+      await store.flushPersistence()
+      store.editText('root', 'recovered')
+      store.editText('root', 'recovered typing')
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({
+        document: { roots: [{ text: 'one two three four five six seven eight nine ten' }] },
+      })
+    },
+  )
+
+  // @requirement PRODUCT.md §13.1
+  it('deletes the link ending at the caret when another link precedes it', async () => {
+    const first = 'https://example.com'
+    const second = 'https://other.test'
+    const start = first.length + 3
+    const store = new EditorStore(
+      loadedState(
+        {
+          roots: [
+            {
+              id: 'root',
+              text: `A${first} B${second}C`,
+              links: [
+                { start: 1, end: first.length + 1, url: first },
+                { start, end: start + second.length, url: second },
+              ],
+              children: [],
+            },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'root' },
+      ),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    expect(store.deleteLink('root', start + second.length)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ text: `A${first} BC`, links: [{ start: 1, end: first.length + 1, url: first }] }] },
+      focus: { nodeId: 'root', cursor: start },
+    })
+  })
+
+  // @requirement PRODUCT.md §16.2
+  it('returns false for a complete link deletion while saving is locked', async () => {
+    const url = 'https://example.com'
+    const links = [{ start: 0, end: url.length, url }]
+    const services = loadedState(
+      { roots: [{ id: 'root', text: url, links, children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const clock = new FakeClock()
+    const store = new EditorStore(services, ids('unused'), clock)
+    await store.initialize()
+    services.save = async () => {
+      throw new Error('disk full')
+    }
+    store.editContent('root', `${url} one two three four five six seven eight nine ten`, links, false)
+    await tick()
+    clock.runAll()
+    await tick()
+    clock.runAll()
+    await tick()
+    const before = store.getSnapshot()
+    expect(before).toMatchObject({ status: 'ready', persistenceLocked: true })
+    expect(store.deleteLink('root', url.length)).toBe(false)
+    expect(store.getSnapshot()).toBe(before)
+  })
+
   it('replaces one linked character while keeping the link destination aligned', async () => {
     const url = 'https://example.com'
     const services = loadedState(

@@ -87,8 +87,10 @@ Decisions reserved for the Product Owner:
 | T6a2 | Remaining domain survivor classification and assertions | T6a1 | Done |
 | T6b1 | Command transition and history survivor triage | T6a2 | Done |
 | T6b2a | EditorStore view-state survivor triage | T6b1 | Done |
-| T6b2b | EditorStore editing and clipboard survivor triage | T6b2a | Planned |
-| T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b | Planned |
+| T6b2b1 | EditorStore direct editing and text replacement survivor triage | T6b2a | Done |
+| T6b2b2 | EditorStore navigation and structural command survivor triage | T6b2b1 | Planned |
+| T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Planned |
+| T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Planned |
 | T6b3 | Persistence and save-policy survivor triage | T6b2c | Planned |
 | T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
@@ -325,6 +327,17 @@ reserved for the Product Owner.
   Any material requirement gap is reserved for the Product Owner; production
   defects require separate defect-first fixes. No requirement gap was found in
   T6b2a's PRODUCT.md §§2.4 and 16.1 requirements.
+  Split T6b2b on 2026-10-01 at HEAD `a0fac5a`: the matching retained report
+  contains 133 surviving/uncovered mutants across several independent owners.
+  **T6b2b1** owns `editContent`, `replaceTextRange`, `replaceTextRanges` and
+  `deleteLink` (20 mutants, original lines 343-397). **T6b2b2** owns navigation,
+  creation, subtree/forest paste, visual commands, deletion and reordering
+  (original lines 442-743). **T6b2b3** owns asynchronous copy/cut/paste,
+  `trackEdit`, undo/redo and history restoration (original lines 398-441 and
+  744-850). Each inherits the files, acceptance and Low Risk validation above;
+  split the remaining inventories further if their meaningful assertions will
+  not fit one session. All material requirements remain reserved for the Product
+  Owner. T6b2b1 depends on PRODUCT.md §§10, 13.1 and 16.2; no gap identified.
 * **T6b3:** persistence and save helpers. Files: tests and source comments for
   `persistence-coordinator.ts`, `editor-save-scheduler.ts`, `save-policy.ts`,
   this plan and index. Acceptance: classify their remaining mutants and assert
@@ -631,6 +644,59 @@ or rendering change; no E2E, visual inspection, performance suite or independent
 review role was required at Low Risk. Completion edits affect documentation only
 and receive separate documentation checks.
 
+**T6b2b1 result (2026-10-01).** Added 11 synthetic cases for the five-second
+typing boundary, standalone replacements followed by typing, unchanged disjoint
+edits preserving a session, missing-link returns, deletion of the second of two
+links with the correct caret, deletion separated from preceding/following typing,
+and locked replacements with recovery and locked complete-link deletion. Only
+tests and explanatory source comments changed. No product decision, requirement
+gap, production defect, mutation exclusion or performance change (disk writes,
+interactive CPU and memory are unchanged).
+
+Task-start HEAD `a0fac5a2496e72821b42d0987d203ebf79a4bff4` was authored by
+`abtv` on 2026-10-01, `test(application): strengthen EditorStore view-state
+mutation assertions`. The initial report matched the source. All 20 initial
+mutants have dispositions; IDs remain stable in the final matching report:
+
+| Expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Idle session timer; locked single/disjoint replacement; unchanged disjoint edit guard; standalone multi-edit boundary | 1232, 1236, 1244, 1248, 1251 | All five killed by undo outcomes, including after successful persistence recovery. |
+| Locked link deletion return/guard; missing-link optional access/return; matching the second link; ending typing before deletion | 1255, 1256, 1257, 1258, 1260, 1266, 1271 | All seven killed by return, document, caret and undo outcomes. |
+| End before beginning another node's direct session | 1224 | Equivalent: begin replaces the active node and scheduleBoundary clears its prior timer. Survived the first run; timed out in the final run, which does not establish an assertion kill. |
+| Default empty links changed to a string entry | 1238, 1246 | Equivalent: reconciliation/normalization drops the malformed entry; the absent stored link list still retains no ranges. Actual valid stored-link paths remain tested. |
+| Explicit end before markNextEditStandalone | 1239, 1250 | Equivalent: marking standalone ends the session itself. |
+| Missing-link early guard removed | 1264 | Equivalent output: the same lookup inside domain deleteLink returns undefined and the following guard returns false. It adds one bounded lookup, with no tree traversal or published change. |
+| Domain deleteLink result guard | 1268, 1270 | Internal defense: the preceding synchronous lookup already found the same link on the immutable document. Removing the guard survives; its false return is uncovered because the branch is unreachable through supported store operations. |
+
+Final `npm run test:mutation` passed in **7m32s**, reusing 2720 results and
+retesting 954 mutants. Tested HEAD `a0fac5a` plus snapshot
+`sha256:2c38918eae0259779d008e7ea9504c2f0e8e27c16ab4ebf6be9b764a558f08f5`
+from `npm run validation:snapshot`. All 12 meaningful targeted mutants are
+`Killed`. Store score rose from **74.32% to 77.19%** (532 to 543 killed,
+12 to 22 timeouts, 173 to 154 survivors, 15 to 13 uncovered). Text-session score
+rose from **53.57% to 75.00%**, with 13 to seven survivors. Full score rose
+from **86.80% to 87.72%**: 3132 killed, 91 timeouts, 380 survivors, 71 uncovered
+and two ignored. Application score is **81.82%**, with 328 survivors and 57
+uncovered. Timeout changes contribute to these scores; the 12 targeted kills
+are independently confirmed assertion failures. T6b4 must reconcile the final
+full inventory, including domain and helper timeout changes.
+
+The first 6m37s mutation run killed 11 targeted mutants; reviewing its survivors
+identified the two-link caret assertion needed for 1260. The initial standard
+check passed 1482 tests but preceded that assertion and is not final acceptance
+evidence. Final Low Risk `npm run check` passed on the same runtime snapshot:
+84 files, **1483 tests** (11 added), **9.79s** coverage suite, successful build,
+zero audit vulnerabilities and all governance stages. Coverage: **95.86 /
+90.59 / 96.67 / 97.99%** (statements / branches / functions / lines).
+The final focused `npx vitest run src/application/editor-store.test.ts` passed
+160 cases and is subsumed by the standard check. An initial new assertion
+expected an empty links field that the domain omits; corrected before the first
+mutation run. No unresolved failures or blocked validation. Primary diff review
+found no meaningful issues. No executable source or rendering change; no E2E,
+visual inspection, performance suite or independent review role was required.
+Completion documentation edits receive separate formatting and documentation
+checks. The next task is T6b2b2; its larger inventory warrants a fresh session.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -730,9 +796,10 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 T1, T2, T3, T4, T5, T6a1, T6a2, T7, T8a, T8b, and T9 are done.
 T6b1 (command transition and history survivor triage) is done.
 T6b2a (EditorStore view-state survivor triage) is done.
-T6b2b (EditorStore editing and clipboard survivor triage) is the exact next Ready
-task; T6b2c, T6b3 and T6b4 follow, with the break threshold in T6b4. The current full
-report has 356 application survivors and 59 uncovered mutants; regenerate it
+T6b2b1 (EditorStore direct editing and text replacement survivor triage) is done.
+T6b2b2 (EditorStore navigation and structural command survivor triage) is the
+exact next Ready task; T6b2b3, T6b2c, T6b3 and T6b4 follow, with the break threshold
+in T6b4. The current full report has 328 application survivors and 57 uncovered mutants; regenerate it
 if missing and inspect its recorded source. T10 closure follows T6b4.
 
 ## Resume prompt
