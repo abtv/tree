@@ -433,6 +433,9 @@ export class EditorStore {
     const operation = (async (): Promise<void> => {
       await this.services.writeClipboard!(transition.payload)
       if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) return
+      // A selected node always exists in a ready document: every command and history restore
+      // normalizes the location. Reaching this guard would need an inconsistent snapshot, so
+      // it is an internal defense and no supported input exercises it.
       const current = locateNode(this.runtime.snapshot.document, nodeId)?.node
       if (current === undefined) return
       if (!sameNodeContent(current, expectedContent)) {
@@ -819,6 +822,8 @@ export class EditorStore {
       return
     }
 
+    // Link ranges must be non-empty and lie inside the text, so empty text with a nonempty link
+    // list is not a supported clipboard value; the list check is equivalent to the empty-list check.
     if (clipboard.text === '' && (clipboard.links === undefined || clipboard.links.length === 0)) {
       return
     }
@@ -827,6 +832,7 @@ export class EditorStore {
     )
     const node = requireNode(current.document, nodeId).node
     const position = Math.max(0, Math.min(cursor, node.text.length))
+    // At position 0 the index -1 also reads as undefined, so the position guard only documents intent.
     const insertedWords = countPastedWords(clipboard.text, position > 0 ? node.text[position - 1] : undefined)
     this.applyStructural(
       transition.document,
@@ -848,6 +854,9 @@ export class EditorStore {
   }
 
   public redo(): void {
+    // A redo entry exists only after an undo, which ended the session, and any edit that could
+    // restart one first begins a history entry that discards the redo branch. The session is
+    // therefore already closed here; the call states the boundary and removing it changes nothing.
     this.endTextSession()
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return

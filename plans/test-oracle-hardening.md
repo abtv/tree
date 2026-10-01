@@ -89,7 +89,7 @@ Decisions reserved for the Product Owner:
 | T6b2a | EditorStore view-state survivor triage | T6b1 | Done |
 | T6b2b1 | EditorStore direct editing and text replacement survivor triage | T6b2a | Done |
 | T6b2b2 | EditorStore navigation and structural command survivor triage | T6b2b1 | Done |
-| T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Planned |
+| T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Done |
 | T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Planned |
 | T6b3 | Persistence and save-policy survivor triage | T6b2c | Planned |
 | T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
@@ -761,6 +761,27 @@ inspection, performance suite or independent review role was required.
 Completion documentation receives separate formatting and documentation checks.
 The next task is T6b2b3; continue it in a fresh session.
 
+**T6b2b3 result (2026-10-01).** Added 24 cases in a `clipboard and history outcomes` block of `editor-store.test.ts`. They cover empty and writer-less copy/cut, locked cut result, a failed copy/cut not blocking a later paste, a paste waiting for a later clipboard write after an earlier one finishes, cut/paste/image paste finishing after a failed reload, paste before ready, paste ending typing, attachment retention during an attachment write, immediate save after image paste, empty text with an empty link list, pasted-word accounting at the cursor boundaries, undo ending typing, saves and cleanup after undo/redo, locked redo, and undo without a locatable change site. Only tests and explanatory source comments changed. No product decision, requirement gap, production defect, mutation exclusion or performance change.
+
+Task-start HEAD `c6956e2470adb772132b3ccb30a95029ce5e2878` (authored by `abtv`, 2026-10-01, `test(application): strengthen navigation and structural mutation assertions`); the retained report matched its source apart from comment lines. The task covers `copy`/`cut`, `paste`/`pasteFromClipboard`, `undo`/`redo` and `applyHistoryState`; `applyStructural` onward belongs to T6b2c. All **44** initial mutants have dispositions (IDs from the retained report):
+
+| Expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Copy/cut guards, locked-cut result, pending-operation clearing | 1278, 1285-1288, 1292, 1295, 1296, 1298, 1323-1326 | All killed by writer-present empty selection, writer-less cut, locked cut result, failed-operation recovery and overlapping-write ordering. |
+| Cut/paste finishing after a failed reload | 1306, 1570, 1588 | Killed: the non-ready check is the only guard before reading `location`. |
+| Paste not-ready error, typing boundary, attachment retention, immediate save, empty-links guard | 1565, 1566, 1583, 1595, 1609, 1610 | All killed. |
+| Pasted-word position clamp and previous character, word accounting call | 1615, 1616, 1618, 1620, 1621, 1623 | All killed by joined-word pastes at the end, past the end and inside a word, and a ten-word immediate save. |
+| Undo/redo typing boundary, saves, cleanup, locked redo | 1625, 1632, 1633, 1637, 1642, 1643 | All killed. |
+| `applyHistoryState` fallback location and focus | 1647, 1648, 1650, 1651 | Killed by typing and deleting a character in one session, which leaves no locatable change site. |
+| Selected node missing after the cut write | 1311, 1313 | Internal defense: location normalization keeps the selected node in the document. Source comment added. |
+| Empty text with a nonempty link list | 1605 | Equivalent for supported clipboard values: link ranges must be non-empty and inside the text. Source comment added. |
+| Previous-character position guard at 0 | 1617, 1619 | Equivalent: index -1 reads as undefined. Source comment added. |
+| `redo` session end | 1635 | Equivalent: a redo entry exists only after an undo ended the session, and any edit that restarts one discards the redo branch. Source comment added. |
+
+Final `npm run test:mutation -- --concurrency 4` took **7m41s**, retesting 879 mutants, at HEAD `c6956e2` plus `sha256:5d41ad4ba7a39f14049db5d9b5161a1db5ad3000f2e3d1452880561a2ce3fbfc` (`npm run validation:snapshot`). The report left exactly the six equivalents/defenses above in the range; 38 of 44 are killed. Store score rose from **83.33% to 88.93%** (603 to 643 killed, 116 to 79 survivors, six to two uncovered). Full score rose from **89.06% to 90.20%**: 3254 killed, 60 timeouts, 300 survived, 60 uncovered. Application is **86.69%**; domain **94.99%**. Timeout dispositions elsewhere vary with load and are left for T6b4.
+
+Validation: `npm run check` passed on the same snapshot: 85 files, **1543** tests (24 added), 8.96 s coverage suite, build, zero audit vulnerabilities, all governance stages. Coverage **96.12 / 91.05 / 96.78 / 98.08%**. The new block passed on its first run. Primary diff review found no meaningful issues. No executable behavior or rendering change, so no E2E, visual inspection, performance suite or independent review role was required.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -862,10 +883,12 @@ T6b1 (command transition and history survivor triage) is done.
 T6b2a (EditorStore view-state survivor triage) is done.
 T6b2b1 (EditorStore direct editing and text replacement survivor triage) is done.
 T6b2b2 (EditorStore navigation and structural command survivor triage) is done.
-T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is the
-exact next Ready task; T6b2c, T6b3 and T6b4 follow, with the break threshold
-in T6b4. The current full report has 274 application survivors and 50 uncovered mutants; regenerate it
-if missing and inspect its recorded source. T10 closure follows T6b4.
+T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is done.
+T6b2c (EditorStore lifecycle and persistence wiring triage, from `applyStructural` onward plus
+pending-edit registration, initialization and flushing) is the exact next Ready task; T6b3 and
+T6b4 follow, with the break threshold in T6b4. The current full report has 236 application
+survivors and 46 uncovered mutants; regenerate it if missing and inspect its recorded source.
+T10 closure follows T6b4.
 
 ## Resume prompt
 

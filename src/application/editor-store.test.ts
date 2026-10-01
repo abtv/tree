@@ -4251,4 +4251,379 @@ describe('EditorStore', () => {
     )
     expect(snapshot.focus.nodeId).toBe('root')
   })
+
+  describe('clipboard and history outcomes', () => {
+    const rootAt = { currentParentId: null, selectedNodeId: 'root' }
+
+    function gate(): { promise: Promise<void>; open: () => void } {
+      let open!: () => void
+      const promise = new Promise<void>((resolve) => {
+        open = resolve
+      })
+      return { promise, open }
+    }
+
+    function textState(text: string): EditorServices & { saves: unknown[] } {
+      return loadedState({ roots: [{ id: 'root', text, children: [] }] }, rootAt)
+    }
+
+    function rootText(store: EditorStore): string | undefined {
+      const state = store.getSnapshot()
+      return state.status === 'ready' ? state.document.roots[0]!.text : undefined
+    }
+
+    it('writes nothing for an empty copy or cut selection even when a clipboard writer exists', async () => {
+      const services = textState('copy me')
+      const writes: unknown[] = []
+      services.writeClipboard = async (payload) => {
+        writes.push(payload)
+      }
+      const store = new EditorStore(services, ids('unused'))
+      await store.initialize()
+
+      await expect(store.copy('root', 2, 2)).resolves.toBe(false)
+      await expect(store.cut('root', 2, 2)).resolves.toBe(false)
+
+      expect(writes).toEqual([])
+      expect(rootText(store)).toBe('copy me')
+    })
+
+    it('refuses a cut without a clipboard writer and leaves the text and history unchanged', async () => {
+      const store = new EditorStore(textState('copy me'), ids('unused'))
+      await store.initialize()
+
+      await expect(store.cut('root', 0, 4)).resolves.toBe(false)
+
+      expect(rootText(store)).toBe('copy me')
+      store.undo()
+      expect(rootText(store)).toBe('copy me')
+    })
+
+    it('reports a locked cut as not performed without writing the clipboard', async () => {
+      const { store, services } = await lockEditor(new FakeClock())
+      const writes: unknown[] = []
+      services.writeClipboard = async (payload) => {
+        writes.push(payload)
+      }
+      const before = store.getSnapshot()
+
+      await expect(store.cut('root', 0, 3)).resolves.toBe(false)
+
+      expect(writes).toEqual([])
+      expect(store.getSnapshot()).toBe(before)
+    })
+
+    it.each(['copy', 'cut'] as const)('does not make a later paste inherit a failed %s', async (kind) => {
+      const services = textState('abcd')
+      services.writeClipboard = async () => {
+        throw new Error('clipboard unavailable')
+      }
+      services.readClipboard = async () => ({ kind: 'text', text: 'X' })
+      const store = new EditorStore(services, ids('unused'))
+      await store.initialize()
+
+      const failed = kind === 'copy' ? store.copy('root', 0, 2) : store.cut('root', 0, 2)
+      await expect(failed).rejects.toThrow('clipboard unavailable')
+      await expect(store.paste('root', 4)).resolves.toBeUndefined()
+
+      expect(rootText(store)).toBe('abcdX')
+    })
+
+    it.each(['copy', 'cut'] as const)(
+      'keeps a paste waiting for a later clipboard write after an earlier %s finishes',
+      async (first) => {
+        const services = textState('abcd')
+        const gates = [gate(), gate()]
+        let writes = 0
+        services.writeClipboard = () => gates[writes++]!.promise
+        let reads = 0
+        services.readClipboard = async () => {
+          reads += 1
+          return { kind: 'text', text: 'X' }
+        }
+        const store = new EditorStore(services, ids('unused'))
+        await store.initialize()
+
+        const earlier = first === 'copy' ? store.copy('root', 0, 1) : store.cut('root', 0, 1)
+        const later = store.copy('root', 1, 2)
+        gates[0]!.open()
+        await earlier
+        const paste = store.paste('root', 0)
+        await tick()
+        expect(reads).toBe(0)
+
+        gates[1]!.open()
+        await later
+        await paste
+        expect(reads).toBe(1)
+        expect(rootText(store)).toBe(first === 'copy' ? 'Xabcd' : 'Xbcd')
+      },
+    )
+
+    it.each(['cut', 'clipboard read', 'attachment write'] as const)(
+      'ignores a %s that finishes after the editor failed to reload',
+      async (stage) => {
+        const services = textState('abcd')
+        const release = gate()
+        if (stage === 'cut') services.writeClipboard = () => release.promise
+        else if (stage === 'clipboard read') {
+          services.readClipboard = async () => {
+            await release.promise
+            return { kind: 'text', text: 'X' }
+          }
+        } else {
+          services.readClipboard = async () => ({ kind: 'image', png: new Uint8Array([1]) })
+          services.writeAttachment = () => release.promise
+        }
+        const store = new EditorStore(services, ids('image'))
+        await store.initialize()
+        const operation = stage === 'cut' ? store.cut('root', 0, 2) : store.paste('root', 0)
+        await tick()
+
+        services.load = async () => {
+          throw new Error('reload failed')
+        }
+        await store.initialize()
+        release.open()
+
+        await expect(operation).resolves.toBe(stage === 'cut' ? true : undefined)
+        expect(store.getSnapshot()).toEqual({ status: 'error', message: 'reload failed' })
+      },
+    )
+
+    it('rejects a paste before the editor is ready without reading the clipboard', async () => {
+      const services = textState('abcd')
+      let reads = 0
+      services.readClipboard = async () => {
+        reads += 1
+        return { kind: 'text', text: 'X' }
+      }
+      const store = new EditorStore(services, ids('unused'))
+
+      await expect(store.paste('root', 0)).rejects.toThrow('The editor is not ready.')
+
+      expect(reads).toBe(0)
+    })
+
+    it('ends direct typing before a paste so later typing is a separate undo step', async () => {
+      const services = textState('')
+      services.readClipboard = async () => ({ kind: 'text', text: 'X' })
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+
+      store.editText('root', 'ab')
+      await store.paste('root', 2)
+      store.editText('root', 'abXc')
+
+      const texts: Array<string | undefined> = []
+      for (let step = 0; step < 3; step += 1) {
+        store.undo()
+        texts.push(rootText(store))
+      }
+      expect(texts).toEqual(['abX', 'ab', ''])
+    })
+
+    it('keeps an attachment that is still being written out of an attachment cleanup', async () => {
+      const clock = new FakeClock()
+      const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+      const cleanups: string[][] = []
+      services.cleanupAttachments = async (referencedIds) => {
+        cleanups.push([...referencedIds])
+      }
+      const release = gate()
+      let writing = false
+      services.writeAttachment = () => {
+        writing = true
+        return release.promise
+      }
+      const store = new EditorStore(services, ids('root', 'image'), clock)
+      await store.initialize()
+      store.editText('root', 'a')
+      store.endTextSession()
+      await store.flushPersistence()
+      cleanups.length = 0
+
+      const pasting = store.paste('root', 0)
+      await vi.waitFor(() => expect(writing).toBe(true))
+      store.undo()
+      clock.runAll()
+      await tick()
+      expect(cleanups).toHaveLength(1)
+      expect(cleanups[0]).toContain('image')
+
+      release.open()
+      await pasting
+    })
+
+    it('saves an image paste immediately without waiting for the idle timer', async () => {
+      const services = textState('')
+      services.readClipboard = async () => ({ kind: 'image', png: new Uint8Array([1]) })
+      const store = new EditorStore(services, ids('image'), new FakeClock())
+      await store.initialize()
+      await store.flushPersistence()
+      services.saves.length = 0
+
+      await store.paste('root', 0)
+      await tick()
+
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ document: { roots: [{ attachment: { id: 'image' } }] } })
+    })
+
+    it('does not record a history entry for empty clipboard text with an empty link list', async () => {
+      const services = textState('abc')
+      services.readClipboard = async () => ({ kind: 'text', text: '', links: [] })
+      const store = new EditorStore(services, ids('unused'))
+      await store.initialize()
+
+      store.editText('root', 'abcd')
+      store.endTextSession()
+      await store.paste('root', 4)
+      store.undo()
+
+      expect(rootText(store)).toBe('abc')
+    })
+
+    it.each([
+      { where: 'at the end of a word', text: 'abc', cursor: 3 },
+      { where: 'past the end of a word', text: 'abc', cursor: 100 },
+      { where: 'inside a word before a space', text: 'ab ', cursor: 1 },
+    ])('does not count a pasted first word that continues a word $where', async ({ text, cursor }) => {
+      const services = textState(text)
+      services.readClipboard = async () => ({ kind: 'text', text: 'w w w w w w w w w w' })
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      await store.flushPersistence()
+      services.saves.length = 0
+
+      await store.paste('root', cursor)
+      await tick()
+
+      expect(services.saves).toEqual([])
+    })
+
+    it('saves immediately when a paste inserts ten new words', async () => {
+      const services = textState('')
+      services.readClipboard = async () => ({ kind: 'text', text: 'w w w w w w w w w w' })
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      await store.flushPersistence()
+      services.saves.length = 0
+
+      await store.paste('root', 0)
+      await tick()
+
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ document: { roots: [{ text: 'w w w w w w w w w w' }] } })
+    })
+
+    it('ends direct typing when undoing so the next edit is a separate undo step', async () => {
+      const store = new EditorStore(textState(''), ids('unused'), new FakeClock())
+      await store.initialize()
+
+      store.editText('root', 'a')
+      store.undo()
+      store.editText('root', 'b')
+      store.undo()
+
+      expect(rootText(store)).toBe('')
+    })
+
+    it('schedules a save after undo and after redo', async () => {
+      const clock = new FakeClock()
+      const services = textState('')
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      store.editText('root', 'a')
+      store.endTextSession()
+      await store.flushPersistence()
+      services.saves.length = 0
+
+      store.undo()
+      clock.runAll()
+      await tick()
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ document: { roots: [{ text: '' }] } })
+
+      store.redo()
+      clock.runAll()
+      await tick()
+      expect(services.saves).toHaveLength(2)
+      expect(services.saves[1]).toMatchObject({ document: { roots: [{ text: 'a' }] } })
+    })
+
+    it('queues attachment cleanup after undo and after redo', async () => {
+      const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+      const cleanups: string[][] = []
+      services.cleanupAttachments = async (referencedIds) => {
+        cleanups.push([...referencedIds])
+      }
+      const store = new EditorStore(services, ids('root', 'image'))
+      await store.initialize()
+      await store.paste('root', 0)
+      await store.flushPersistence()
+      const before = cleanups.length
+
+      store.undo()
+      await store.flushPersistence()
+      expect(cleanups).toHaveLength(before + 1)
+      expect(cleanups.at(-1)).toContain('image')
+
+      store.redo()
+      await store.flushPersistence()
+      expect(cleanups).toHaveLength(before + 2)
+      expect(cleanups.at(-1)).toContain('image')
+    })
+
+    it('does not redo while persistence is locked', async () => {
+      const clock = new FakeClock()
+      const services = textState('')
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      store.editText('root', 'one')
+      store.endTextSession()
+      await store.flushPersistence()
+      store.undo()
+      services.save = async () => {
+        throw new Error('disk full')
+      }
+      const isLocked = (): boolean => {
+        const state = store.getSnapshot()
+        return state.status === 'ready' && state.persistenceLocked === true
+      }
+      for (let attempt = 0; attempt < 8 && !isLocked(); attempt += 1) {
+        store.selectNode('root', 0)
+        clock.runAll()
+        await tick()
+      }
+      expect(isLocked()).toBe(true)
+      const before = store.getSnapshot()
+
+      store.redo()
+
+      expect(store.getSnapshot()).toBe(before)
+      expect(rootText(store)).toBe('')
+    })
+
+    it('keeps the selected visible row with the caret at its start when undo finds no change site', async () => {
+      const services = loadedState(
+        { roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'child', text: '', children: [] }] }] },
+        { currentParentId: null, selectedNodeId: 'parent' },
+      )
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      store.toggleExpansion('parent')
+      store.selectNode('child', 0)
+      store.editText('child', 'x')
+      store.editText('child', '')
+
+      store.undo()
+
+      expect(store.getSnapshot()).toMatchObject({
+        document: { roots: [{ children: [{ id: 'child', text: '' }] }] },
+        location: { currentParentId: null, selectedNodeId: 'child' },
+        focus: { nodeId: 'child', cursor: 0 },
+      })
+    })
+  })
 })
