@@ -34,12 +34,14 @@ export class EditorRuntimeState {
     const previous = this.snapshot
     if (changedStructure) this.structuralVersion += 1
     const next = { ...state, structuralVersion: this.structuralVersion }
+    // Both branches install the same snapshot; the delete only drops an explicit `operationError: undefined` key.
     if (next.operationError === undefined) {
       this.snapshot = next
     } else {
       delete next.operationError
       this.snapshot = next
     }
+    // The status operand only narrows the type: a loading snapshot has no document, so releasing `undefined` is a no-op.
     if (previous.status === 'ready' && previous.document !== this.snapshot.document) {
       releaseNodeIndex(previous.document)
     }

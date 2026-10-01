@@ -92,7 +92,8 @@ Decisions reserved for the Product Owner:
 | T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Done |
 | T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Done |
 | T6b3 | Persistence and save-policy survivor triage | T6b2c | Done |
-| T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
+| T6b4a | Content, runtime-state, text-session, undo-focus and visible-row helpers | T6b3 | Done |
+| T6b4b | Remaining application helpers, domain leftovers and break threshold | T6b4a | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
 | T8b | Remaining input-handler outcome assertions | T8a | Done |
@@ -835,6 +836,28 @@ Full score rose from **91.07% to 91.87%** (3317 killed, 63 timeouts, 241 survive
 
 Validation: `npm run check` passed on the same snapshot: 86 files, **1578** tests (20 added, 1558 at task start), build, zero audit vulnerabilities, all governance stages. Coverage **96.23 / 91.24 / 96.78 / 98.08%**. The first standard check failed only on Prettier formatting of the new test file, corrected before the passing run. No unresolved failures or blocked validation. The change touches persistence timing, so it is Moderate Risk; the affected persistence and idle-save behavior has real-store coverage, and the store-level test above exercises the real boundary wiring between coordinator and scheduler. No E2E, visual or performance run was required and none was made; those remain at their previous results.
 
+**T6b4 split (2026-10-02).** The remaining inventory (about 175 survivors and 44 uncovered mutants at task start, report at HEAD `5c2878c`) did not fit one session. **T6b4a** took five small helpers; **T6b4b** keeps the rest and the break threshold. The report was regenerated with the scratchpad `reportMutants` config described under T6b3.
+
+**T6b4a result (2026-10-02).** Added 17 cases in the new `editor-content-changes.test.ts`, seven in the new `editor-text-session.test.ts`, three index-release cases in `editor-runtime-state.test.ts`, eight link-only cases in `editor-undo-focus.test.ts` and one in `visible-rows.test.ts`. Index release is observed through the identity of the `Map` that `buildNodeIndex` returns; the text session through a manual clock. Only tests and explanatory source comments changed: no product decision, requirement gap, production defect, mutation exclusion or performance change.
+
+Dispositions of what remains (all in the final report, comments added in source):
+
+* `editor-runtime-state.ts` (2): the `operationError` branch installs the same snapshot either way, and the `status === 'ready'` operand only narrows the type because releasing `undefined` is a no-op. Equivalent.
+* `editor-undo-focus.ts` (11): the three `before === after` fast paths and the `from === to` skip give the same result without them (cost only); the `located === undefined` defense and the `currentParentId === null` start (`indexOfId` returns -1, so the start is 0 either way) are internal; the `commonPrefixLength` bound only stops a scan that an `undefined` read would stop anyway.
+* `editor-content-changes.ts` (1): the surviving mutant is one residual `nodeContent` copy mutation, to be rechecked in T6b4b with the full report.
+
+Measured with `npx stryker run --force --mutate <comma-separated files>`: a repeated `--mutate` flag silently keeps only the last file, which made a first measurement look unchanged; use one comma-separated list.
+
+| Application file | Task start score / survived / uncovered | T6b4a score / survived / uncovered |
+| --- | --- | --- |
+| `editor-content-changes.ts` | 36.00 / 15 / 17 | 98.00 / 1 / 0 |
+| `editor-runtime-state.ts` | 72.50 / 11 / 0 | 95.00 / 2 / 0 |
+| `editor-text-session.ts` | 75.00 / 7 / 0 | 100.00 / 0 / 0 |
+| `editor-undo-focus.ts` | 75.37 / 21 / 12 | 91.79 / 10 / 1 |
+| `visible-rows.ts` | 86.67 / 2 / 0 | 100.00 / 0 / 0 |
+
+Application score rose from **89.59% to 92.93%** (134 survivors, 16 uncovered). Validation: `npm run check` passed (build, governance stages, zero audit vulnerabilities; coverage 96.41 / 91.52 / 97.00 / 98.19%). Low Risk; no E2E, visual or performance run was required and none was made.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -939,11 +962,15 @@ T6b2b2 (EditorStore navigation and structural command survivor triage) is done.
 T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is done.
 T6b2c (EditorStore lifecycle and persistence wiring triage) is done.
 T6b3 (persistence and save-policy survivor triage) is done, and fixed one defect in
-`scheduleCleanupRetry`. T6b4 (remaining application collaborators and the break threshold) is the
-exact next Ready task. The current report has 177 application survivors and 44 uncovered mutants;
-regenerate it if missing and inspect its recorded source. T6b4 must also inspect the domain
-survivors listed after T6b1 (`document-operations.ts` IDs 2908, 2955, 3099 and the visible-row
-IDs 2150 and 2151). T10 closure follows T6b4.
+`scheduleCleanupRetry`. T6b4a (content, runtime-state, text-session, undo-focus and visible-row
+helpers) is done. T6b4b is the exact next Ready task: classify the survivors left in
+`editor-node-visual-transitions.ts` (38 survived, 7 uncovered), `editor-clipboard-transitions.ts`,
+`editor-command-transitions.ts`, `editor-history.ts`, the residual `editor-store.ts` and
+`save-policy.ts` mutants, and the domain survivors listed after T6b1 (`document-operations.ts` IDs
+2908, 2955, 3099). Then run the full `npm run test:mutation`, set `thresholds.break` in
+`stryker.config.mjs` just below the achieved score, and document it in Development §12. Regenerate
+the report if missing and inspect its recorded source; split further if the inventory does not fit.
+T10 closure follows T6b4b.
 
 ## Resume prompt
 

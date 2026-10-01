@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createInitialDocument } from '../domain/document'
+import { buildNodeIndex, createInitialDocument } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 import { EditorRuntimeState } from './editor-runtime-state'
 
@@ -29,5 +29,49 @@ describe('EditorRuntimeState', () => {
     unsubscribe()
     state.emit()
     expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  describe('releasing the node index of a replaced document', () => {
+    function readyState(document = createInitialDocument('root')): EditorRuntimeState {
+      const state = new EditorRuntimeState()
+      state.replaceReady({
+        status: 'ready',
+        document,
+        location: { currentParentId: null, selectedNodeId: 'root' },
+        focus: state.newFocus('root', 0),
+        structuralVersion: 0,
+        expansion: COLLAPSED_EXPANSION_STATE,
+      })
+      return state
+    }
+
+    it('drops the index of the previous document when the document changes', () => {
+      const state = readyState()
+      const previous = state.ready().document
+      const cached = buildNodeIndex(previous)
+
+      state.replaceReady({ ...state.ready(), document: createInitialDocument('other') })
+
+      expect(buildNodeIndex(previous)).not.toBe(cached)
+    })
+
+    it('keeps the index when the same document is replaced by a new snapshot', () => {
+      const state = readyState()
+      const current = state.ready().document
+      const cached = buildNodeIndex(current)
+
+      state.replaceReady({ ...state.ready(), focus: state.newFocus('root', 1) })
+
+      expect(buildNodeIndex(current)).toBe(cached)
+    })
+
+    it('does not touch the index of a document installed from the loading state', () => {
+      const document = createInitialDocument('root')
+      const cached = buildNodeIndex(document)
+
+      readyState(document)
+
+      expect(buildNodeIndex(document)).toBe(cached)
+    })
   })
 })

@@ -64,6 +64,47 @@ describe('locateChangeSite', () => {
     ).toEqual({ nodeId: 'a', parentId: null, cursor: 0 })
   })
 
+  describe('link-only changes', () => {
+    const first: LinkRange = { start: 1, end: 3, url: 'https://example.com/' }
+    const second: LinkRange = { start: 5, end: 7, url: 'https://example.org/' }
+    const site = (before: LinkRange[] | undefined, after: LinkRange[] | undefined) =>
+      locateChangeSite(
+        tree(node('a', '0123456789', [], before === undefined ? {} : { links: before })),
+        tree(node('a', '0123456789', [], after === undefined ? {} : { links: after })),
+      )
+
+    it('reports the earlier start when only the start moved', () => {
+      expect(site([first], [{ ...first, start: 2 }])?.cursor).toBe(1)
+      expect(site([{ ...first, start: 2 }], [first])?.cursor).toBe(1)
+    })
+
+    it('reports the start when only the end moved', () => {
+      expect(site([first], [{ ...first, end: 4 }])?.cursor).toBe(1)
+    })
+
+    it('reports the start when only the URL changed', () => {
+      expect(site([first], [{ ...first, url: 'https://example.net/' }])?.cursor).toBe(1)
+    })
+
+    it('skips ranges that are equal and reports the first range that differs', () => {
+      expect(site([first, second], [first, { ...second, end: 8 }])).toEqual({ nodeId: 'a', parentId: null, cursor: 5 })
+    })
+
+    it('reports no site for ranges equal in value but not in reference', () => {
+      expect(site([first, second], [{ ...first }, { ...second }])).toBeUndefined()
+    })
+
+    it('reports the start of a range added after the shared ranges', () => {
+      expect(site([first], [first, second])?.cursor).toBe(5)
+      expect(site(undefined, [second])?.cursor).toBe(5)
+    })
+
+    it('reports the start of a range removed after the shared ranges', () => {
+      expect(site([first, second], [first])?.cursor).toBe(5)
+      expect(site([second], undefined)?.cursor).toBe(5)
+    })
+  })
+
   it('locates a change inside a child and reports its parent', () => {
     const before = tree(node('root', 'Root', [node('a', 'one'), node('b', 'two')]))
     const after = tree(node('root', 'Root', [node('a', 'one'), node('b', 'tXo')]))

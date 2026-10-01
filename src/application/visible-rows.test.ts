@@ -24,4 +24,13 @@ describe('buildVisibleRows', () => {
     expect(buildVisibleRows(nodes, (id) => id === 'a1')).toHaveLength(1)
     expect(buildVisibleRows([], () => true)).toEqual([])
   })
+
+  it('does not ask whether a leaf is expanded', () => {
+    const asked: string[] = []
+    buildVisibleRows([node('leaf'), node('parent', [node('child')])], (id) => {
+      asked.push(id)
+      return false
+    })
+    expect(asked).toEqual(['parent'])
+  })
 })

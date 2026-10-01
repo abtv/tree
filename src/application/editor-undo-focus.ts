@@ -60,7 +60,9 @@ function isVisibleInLocation(
   isExpanded: (nodeId: NodeId) => boolean,
 ): boolean {
   const located = locateNode(document, nodeId)
+  // Internal defense: the change site is always a node of `after`, so it is always located.
   if (located === undefined) return false
+  // At the root level (`currentParentId === null`) `indexOfId` returns -1, so the start is 0 either way.
   const start = location.currentParentId === null ? 0 : indexOfId(located.ancestors, location.currentParentId) + 1
   if (start === 0 && location.currentParentId !== null) return false
   return located.ancestors.slice(start).every((ancestor) => isExpanded(ancestor.id))
@@ -125,6 +127,8 @@ function positionalChangeSite(
 function commonPrefixLength(before: string, after: string): number {
   const shared = Math.min(before.length, after.length)
   let index = 0
+  // Callers pass different texts of unequal content, and an out-of-range read is undefined, which
+  // never equals a character, so the bound only stops the scan early.
   while (index < shared && before[index] === after[index]) index += 1
   return index
 }
