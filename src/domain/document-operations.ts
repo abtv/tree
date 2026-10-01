@@ -71,6 +71,8 @@ function copyToRoot(document: Document, located: LocatedNode, nextSiblings: Tree
   for (let index = located.ancestors.length - 2; index >= 0; index -= 1) {
     const ancestor = located.ancestors[index]!
     const childIndex = ancestor.children.indexOf(located.ancestors[index + 1]!)
+    // requireNode derives this path from the same immutable tree; these missing-slot
+    // errors defend inconsistent internal paths, not reachable document commands.
     if (childIndex < 0) throw new Error(`Node ${located.node.id} does not exist.`)
     const children = ancestor.children.slice()
     children[childIndex] = replacement
@@ -149,11 +151,14 @@ export function normalizeVisibleLocation(
   isExpanded: (nodeId: NodeId) => boolean,
 ): Location {
   const selected = requireNode(document, location.selectedNodeId)
+  // Omitting the heading fast path still returns it through the parentDepth === -1 guard.
   if (selected.node.id === location.currentParentId) return location
   const parentDepth =
+    // Looking for a null ancestor ID also gives -1, so omitting only this null branch agrees.
     location.currentParentId === null
       ? -1
       : selected.ancestors.findIndex((ancestor) => ancestor.id === location.currentParentId)
+  // A non-ancestor parent is an invalid location, rejected before normal product callers enter here.
   if (location.currentParentId !== null && parentDepth === -1) return location
   for (let index = parentDepth + 1; index < selected.ancestors.length; index += 1) {
     const ancestor = selected.ancestors[index]!
@@ -163,6 +168,7 @@ export function normalizeVisibleLocation(
 }
 
 export function editNodeText(document: Document, nodeId: NodeId, text: string): Document {
+  // A non-range element added to this empty array is discarded by normalizeLinks.
   return editNodeContent(document, nodeId, text, [])
 }
 
@@ -190,6 +196,9 @@ export function deleteLink(document: Document, nodeId: NodeId, cursor: number): 
   if (link === undefined) return undefined
   const text = `${located.node.text.slice(0, link.start)}${located.node.text.slice(link.end)}`
   const links = normalizeLinks(
+    // Without the filter, the removed range becomes empty and normalization drops it.
+    // The fallback array is unreachable once a link was found. For normalized disjoint
+    // ranges, no other link ends at the deleted link's end, so >= versus > also agrees.
     (located.node.links ?? [])
       .filter((candidate) => candidate !== link)
       .map((candidate) => ({
@@ -210,6 +219,8 @@ export function removeTextRange(document: Document, nodeId: NodeId, start: numbe
   const from = snapToCodePoint(located.node.text, Math.min(start, end))
   const to = snapToCodePoint(located.node.text, Math.max(start, end))
   let replacement: TreeNode = { ...located.node }
+  // For a zero-width range, the normal content path returns the same normalized content;
+  // only allocation differs. Empty fallback junk is filtered out before normalization.
   if (from !== to) {
     const text = `${located.node.text.slice(0, from)}${located.node.text.slice(to)}`
     replacement = contentReplacement(
@@ -221,6 +232,7 @@ export function removeTextRange(document: Document, nodeId: NodeId, start: numbe
           .map((link) => ({
             ...link,
             start: link.start >= to ? link.start - (to - from) : link.start,
+            // A retained nonempty link ending at to can only precede a zero-width edit.
             end: link.end >= to ? link.end - (to - from) : link.end,
           })),
         text,
@@ -246,6 +258,7 @@ export function insertSiblingAfter(
   siblings.splice(located.index + 1, 0, {
     id: newNodeId,
     text,
+    // isHttpUrl rejects empty text independently; removing just the length check is equivalent.
     ...(text.length > 0 && isHttpUrl(text) ? { links: [{ start: 0, end: text.length, url: text }] } : {}),
     ...(attachment === undefined ? {} : { attachment }),
     children: [],
@@ -387,6 +400,7 @@ export function splitNode(document: Document, nodeId: NodeId, cursor: number, ne
   const located = requireNode(document, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)
   const suffix = located.node.text.slice(position)
+  // Empty fallback junk lacks offsets and is discarded by both splitLinks filters.
   const links = splitLinks(located.node.links ?? [], position)
   const original = contentReplacement(
     located.node,
@@ -421,6 +435,7 @@ export function moveSibling(document: Document, nodeId: NodeId, destinationIndex
   const located = requireNode(document, nodeId)
   const siblings = located.siblings.slice()
   const [node] = siblings.splice(located.index, 1)
+  // requireNode proves that this slot exists in the same immutable siblings array.
   if (node === undefined) {
     throw new Error(`Node ${nodeId} could not be moved.`)
   }
@@ -470,6 +485,8 @@ export function pasteMultilineText(
   const attachment = located.node.attachment
   const links = splitLinks(located.node.links ?? [], position)
 
+  // Validated line/ID counts and dense split lines make the missing-line fallbacks
+  // unreachable. Empty fallback link junk is discarded by splitLinks' range filters.
   const original = contentReplacement(
     located.node,
     `${prefix}${lines[0] ?? ''}`,

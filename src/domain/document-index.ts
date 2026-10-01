@@ -51,10 +51,12 @@ export function releaseNodeIndex(document: Document): void {
 
 export function locateNode(document: Document, id: NodeId): LocatedNode | undefined {
   const index = indexInfoFor(document)
+  // Without this fast rejection a missing ID still returns undefined at the node guard below.
   if (!index.parent.has(id)) return undefined
 
   const pathIds: NodeId[] = []
   let cursor: NodeId | null | undefined = id
+  // The initial ID is a string and every subsequent cursor uses ?? null, never undefined.
   while (cursor !== null && cursor !== undefined) {
     pathIds.push(cursor)
     cursor = index.parent.get(cursor) ?? null
@@ -63,10 +65,14 @@ export function locateNode(document: Document, id: NodeId): LocatedNode | undefi
 
   const ancestors: TreeNode[] = []
   let parent: TreeNode | null = null
+  // An inclusive upper bound is equivalent: the final valid iteration returns before it.
   for (let position = 0; position < pathIds.length; position += 1) {
     const pathId = pathIds[position]!
     const siblings: readonly TreeNode[] = parent === null ? document.roots : parent.children
     const siblingIndex = index.siblingIndex.get(pathId)
+    // These guards defend against an inconsistent derived index. With immutable input and
+    // the index built/shared only for identical tree membership, each path ID has its slot.
+    // Missing IDs are rejected above; reading siblings[undefined] also yields undefined.
     const node = siblingIndex === undefined ? undefined : siblings[siblingIndex]
     if (node === undefined || node.id !== pathId) return undefined
     if (position === pathIds.length - 1) {

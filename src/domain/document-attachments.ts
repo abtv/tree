@@ -3,6 +3,8 @@ import type { AttachmentId, AttachmentSummary, Document, TreeNode } from './docu
 const attachmentIdPattern = /^[A-Za-z0-9_-]+$/
 
 export function isValidAttachmentId(value: string): boolean {
+  // The regex's + also rejects empty IDs; removing only the length guard is equivalent.
+  // Keep the mutators enabled because rejecting nonempty IDs is meaningful.
   return value.length > 0 && attachmentIdPattern.test(value)
 }
 

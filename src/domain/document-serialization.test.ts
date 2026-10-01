@@ -332,6 +332,40 @@ describe('persisted state validator conformance', () => {
     expect(() => parsePersistedState(state)).toThrow('The saved document location does not match its tree.')
   })
 
+  it('omits absent optional fields when loading saved nodes and views', () => {
+    const parsed = parsePersistedState({ ...validState, version: 3, view: { expandedIds: [] } })
+    expect(parsed.view).not.toHaveProperty('selectedRowTop')
+    expect(parsed.document.roots[0]).not.toHaveProperty('attachment')
+    expect(parsed.document.roots[0]).not.toHaveProperty('links')
+  })
+
+  it.each([1, 2])('ignores view fields from schema version %i', (version) => {
+    expect(
+      parsePersistedState({ ...validState, version, view: { expandedIds: ['root'], selectedRowTop: 120 } }).view,
+    ).toEqual({ expandedIds: [] })
+  })
+
+  it('validates node text without rereading it to construct unused copies', () => {
+    let reads = 0
+    const document = {
+      roots: [
+        {
+          id: 'root',
+          get text() {
+            reads += 1
+            return ''
+          },
+          children: [],
+        },
+      ],
+    }
+    expect(validatePersistedState({ ...validState, document }).document).toBe(document)
+    expect(reads).toBe(2) // Type validation and link validation each need the text.
+    reads = 0
+    assertDocument(document)
+    expect(reads).toBe(2)
+  })
+
   it('rejects an empty root array with the exact empty-document error', () => {
     expect(() => validatePersistedState({ ...validState, document: { roots: [] } })).toThrow(
       'The saved document must contain at least one root node.',
@@ -344,6 +378,12 @@ describe('persisted state validator conformance', () => {
       document: { roots: [{ ...validState.document.roots[0]!, children: [{ id: 'child', text: '', children: [] }] }] },
       location: { currentParentId: 'root', selectedNodeId: 'root' },
     }
+    expect(validatePersistedState(state)).toBe(state)
+    expect(parsePersistedState(state).location).toEqual(state.location)
+  })
+
+  it('accepts selecting the parent heading when it is the only node', () => {
+    const state = { ...validState, location: { currentParentId: 'root', selectedNodeId: 'root' } }
     expect(validatePersistedState(state)).toBe(state)
     expect(parsePersistedState(state).location).toEqual(state.location)
   })

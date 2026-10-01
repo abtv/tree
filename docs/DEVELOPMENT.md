@@ -428,6 +428,13 @@ replaying it. Suppress a mutator only when every replacement it produces at that
 expression is equivalent. If one replacement is meaningful, keep the mutator
 enabled and explain the equivalent survivor in a source comment.
 
+Preserve expression grouping when replaying a mutant. Stryker replaces a syntax
+node, so a nested `a && b` changed to `a || b` inside `(a && b) && c` becomes
+`(a || b) && c`. Pasting the report's replacement as raw text without parentheses
+would instead test `a || (b && c)`, a different program. A passing synthetic search
+is evidence about its cases, not proof of equivalence; use the recorded invariants
+to justify an equivalent disposition and name unsupported inputs separately.
+
 Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
 
 ```bash

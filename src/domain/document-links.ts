@@ -4,6 +4,8 @@ export function isHttpUrl(value: string): boolean {
   if (/\s/.test(value)) return false
   try {
     const url = new URL(value)
+    // URL construction already rejects HTTP(S) URLs without a host. Removing just
+    // this host-length guard is equivalent; changing protocol acceptance is not.
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.length > 0
   } catch {
     return false
@@ -21,6 +23,7 @@ export function normalizeLinks(
       const validUrl = isHttpUrl(link.url)
       if (rejectInvalidUrls && !validUrl) throw new Error('Saved link URLs must use HTTP or HTTPS.')
       return (
+        // The overlap check below also rejects negative starts, even without this bound.
         link.start >= 0 &&
         link.end > link.start &&
         link.end <= text.length &&
@@ -51,6 +54,9 @@ export function reconcileLinkTextEdit(
   if (text === nextText)
     return { links: normalizeLinks(links, text), createsNewLink: false, ...(draft === undefined ? {} : { draft }) }
   let start = 0
+  // For unequal strings, character comparison stops at the shorter string's end.
+  // Removing/inclusively extending just these bounds, or changing their nested &&
+  // to ||, is equivalent. The character comparison still rejects the first unequal pair.
   while (start < text.length && start < nextText.length && text[start] === nextText[start]) start += 1
   let oldEnd = text.length
   let newEnd = nextText.length
@@ -59,9 +65,13 @@ export function reconcileLinkTextEdit(
     newEnd -= 1
   }
   const delta = nextText.length - text.length
+  // At the only use below, containment plus link.end === start implies oldEnd === start;
+  // forcing this flag true is equivalent, whereas false loses whitespace append handling.
   const isPureAppend = start === oldEnd
   const insertedIntroducesWhitespace = /\s/.test(nextText.slice(start, newEnd))
   const editedLink = [...links, ...(draft === undefined ? [] : [draft])].find((link) => {
+    // start <= oldEnd, so the final start <= link.end guard follows from oldEnd <= link.end.
+    // A malformed element in an otherwise empty fallback array cannot pass the first bound.
     if (!(link.start <= start && oldEnd <= link.end && start <= link.end)) return false
     // A pure append exactly at a link's end that starts with whitespace begins new, unrelated
     // text rather than extending the link; leave the link untouched instead of absorbing it.
@@ -69,6 +79,8 @@ export function reconcileLinkTextEdit(
     return true
   })
   const retained = links
+    // This filter matters for edits spanning more than one range. Native reconciliation
+    // models one contiguous edit; callers with disjoint edits use replaceLinkedTextRanges.
     .filter((link) => link !== editedLink && (link.end <= start || link.start >= oldEnd))
     .map((link) => (link.start >= oldEnd ? { ...link, start: link.start + delta, end: link.end + delta } : { ...link }))
   if (editedLink !== undefined) {
@@ -87,10 +99,14 @@ export function reconcileLinkTextEdit(
   }
   let tokenStart = Math.min(start, nextText.length)
   let tokenEnd = Math.min(newEnd, nextText.length)
+  // The loop bounds make both indexed characters present; their ?? fallbacks are defensive.
   while (tokenStart > 0 && !/\s/.test(nextText[tokenStart - 1] ?? '')) tokenStart -= 1
   while (tokenEnd < nextText.length && !/\s/.test(nextText[tokenEnd] ?? '')) tokenEnd += 1
   const candidate = nextText.slice(tokenStart, tokenEnd)
   if (isHttpUrl(candidate)) {
+    // Token endpoints are a whitespace boundary or a string endpoint. A nonempty
+    // matching URL cannot be immediately adjacent across that boundary, so strict
+    // versus inclusive comparisons here agree for normalized links.
     const untouched = retained.filter((link) => link.end <= tokenStart || link.start >= tokenEnd)
     return {
       links: normalizeLinks([...untouched, { start: tokenStart, end: tokenEnd, url: candidate }], nextText),
@@ -126,6 +142,8 @@ export function insertLinks(
           .filter((link) => insertedText.slice(link.start, link.end) === link.url)
           .map((link) => ({ ...link, start: link.start + position, end: link.end + position }))
   const shifted: LinkRange[] = []
+  // A malformed element inserted into either empty array above is removed by normalization:
+  // it has no numeric range. Also, normalization rechecks URLs even without the inner guard.
   for (const link of links) {
     if (link.start < position && position < link.end) {
       // A paste strictly inside a link mirrors typing: the destination follows the new covered
@@ -205,11 +223,16 @@ export function replaceLinkedTextRanges(
     let delta = 0
     for (const edit of ordered) {
       if (edit.end > offset) break
+      // For a retained link, relaxing either equality alone is equivalent. start === offset
+      // implies end === offset here; a nonempty edit ending at the link's end splits it
+      // and is removed before remapping. Other changes still affect endpoint insertions.
       if (isEnd && edit.start === offset && edit.end === offset) continue
       delta += edit.inserted.length - (edit.end - edit.start)
     }
     return offset + delta
   }
+  // Always choosing the replacement branch is equivalent: when start === end its two
+  // comparisons are exactly the insertion predicate. The reverse change is meaningful.
   const splitsLink = (link: LinkRange, edit: { start: number; end: number }): boolean =>
     edit.start === edit.end
       ? link.start < edit.start && edit.start < link.end
@@ -222,6 +245,7 @@ export function replaceLinkedTextRanges(
   for (const placement of placements) {
     let tokenStart = placement.start
     let tokenEnd = placement.end
+    // Placements are within nextText, so these bounded lookups never need the ?? fallbacks.
     while (tokenStart > 0 && !/\s/.test(nextText[tokenStart - 1] ?? '')) tokenStart -= 1
     while (tokenEnd < nextText.length && !/\s/.test(nextText[tokenEnd] ?? '')) tokenEnd += 1
     const candidate = nextText.slice(tokenStart, tokenEnd)
@@ -229,6 +253,8 @@ export function replaceLinkedTextRanges(
     if (retained.some((link) => link.start === tokenStart && link.end === tokenEnd)) continue
     created.push({ start: tokenStart, end: tokenEnd, url: candidate })
   }
+  // As above, recognized token endpoints exclude adjacent normalized links. Strict
+  // versus inclusive bounds agree; removing the whole filter does change overlapping URLs.
   const untouched = retained.filter((link) =>
     created.every((candidate) => link.end <= candidate.start || link.start >= candidate.end),
   )
@@ -241,6 +267,8 @@ export function replaceLinkedTextRanges(
 
 export function linksForLine(links: readonly LinkRange[] | undefined, lines: string[], lineIndex: number): LinkRange[] {
   if (links === undefined) return []
+  // Production callers pass dense split lines and a valid lineIndex. Missing-line
+  // fallbacks defend unsupported sparse/out-of-range input, rather than a product state.
   let lineStart = 0
   for (let index = 0; index < lineIndex; index += 1) lineStart += (lines[index] ?? '').length + 1
   const lineEnd = lineStart + (lines[lineIndex] ?? '').length

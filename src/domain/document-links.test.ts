@@ -13,6 +13,149 @@ describe('link normalization and edit outcomes', () => {
   const url = 'https://a.test'
   const link = { start: 0, end: url.length, url }
 
+  it('does not create a link from an unchanged unlinked URL', () => {
+    expect(reconcileLinkTextEdit(url, [], url)).toEqual({ links: [], createsNewLink: false })
+  })
+
+  it('keeps an appended word separate even when it shares the URL suffix', () => {
+    const original = `${url}/aaa`
+    const range = { start: 0, end: original.length, url: original }
+    expect(reconcileLinkTextEdit(original, [range], `${original} ba`)).toEqual({
+      links: [range],
+      createsNewLink: false,
+    })
+  })
+
+  it('keeps URL recovery after a middle replacement even when its tail repeats', () => {
+    expect(reconcileLinkTextEdit(url, [link], 'https://a.tesa bt')).toEqual({
+      links: [],
+      createsNewLink: false,
+      draft: { start: 0, end: 17, url: 'https://a.tesa bt' },
+    })
+    expect(reconcileLinkTextEdit(`${url} z`, [link], 'https://a.tz')).toEqual({
+      links: [{ start: 0, end: 12, url: 'https://a.tz' }],
+      createsNewLink: true,
+    })
+    expect(reconcileLinkTextEdit(`${url} z`, [link], 'https://a.taz')).toEqual({
+      links: [{ start: 0, end: 13, url: 'https://a.taz' }],
+      createsNewLink: true,
+    })
+  })
+
+  it('extends the recognized URL when deleting a separator after an existing link', () => {
+    expect(reconcileLinkTextEdit(`${url} z`, [link], `${url}z`)).toEqual({
+      links: [{ start: 0, end: url.length + 1, url: `${url}z` }],
+      createsNewLink: true,
+    })
+  })
+
+  it('preserves a draft before a deletion whose repeated suffix matches its last characters', () => {
+    const draft = { start: 0, end: 3, url: 'baa' }
+    expect(
+      reconcileLinkTextEdit(`baaaa ${url}`, [{ ...link, start: 6, end: 6 + url.length }], `baa ${url}`, draft),
+    ).toEqual({
+      links: [{ ...link, start: 4, end: 4 + url.length }],
+      draft,
+      createsNewLink: false,
+    })
+  })
+
+  it('rebuilds links touched by disjoint replacements and insertions', () => {
+    const text = `${url} tail`
+    for (const edit of [
+      { start: 0, end: url.length, inserted: 'https://b.test' },
+      { start: 9, end: 9, inserted: 'b' },
+      { start: 8, end: 9, inserted: 'b' },
+    ]) {
+      const result = replaceLinkedTextRanges(
+        text,
+        [link],
+        [edit, { start: text.length, end: text.length, inserted: '!' }],
+      )
+      const expectedUrl = url.slice(0, edit.start) + edit.inserted + url.slice(edit.end)
+      expect(result).toEqual({
+        text: `${expectedUrl} tail!`,
+        links: [{ start: 0, end: expectedUrl.length, url: expectedUrl }],
+        createsNewLink: true,
+      })
+    }
+  })
+
+  it('preserves absence of draft metadata on unchanged and ordinary edits', () => {
+    expect(reconcileLinkTextEdit('abc', [], 'abc')).not.toHaveProperty('draft')
+    expect(reconcileLinkTextEdit('abc', [], 'abcd')).not.toHaveProperty('draft')
+  })
+
+  it('retains a draft without reinterpreting an unchanged invalid token', () => {
+    const draft = { start: 0, end: 3, url: 'bad' }
+    expect(reconcileLinkTextEdit('bad', [], 'bad', draft)).toEqual({ links: [], draft, createsNewLink: false })
+  })
+
+  it('keeps the unchanged suffix out of a newly typed URL', () => {
+    expect(reconcileLinkTextEdit('a.test tail', [], 'https://a.test tail')).toEqual({
+      links: [link],
+      createsNewLink: true,
+    })
+  })
+
+  it('replaces a whitespace-containing link edit without treating it as an append', () => {
+    expect(reconcileLinkTextEdit(`${url} tail`, [link], 'https://a.tes words tail')).toEqual({
+      links: [],
+      draft: { start: 0, end: 19, url: 'https://a.tes words' },
+      createsNewLink: false,
+    })
+  })
+
+  it('drops intersected drafts and shifts drafts after an adjacent deletion', () => {
+    const draft = { start: 2, end: 5, url: 'bad' }
+    expect(reconcileLinkTextEdit('x bad z', [], 'Xad z', draft)).toEqual({ links: [], createsNewLink: false })
+    expect(reconcileLinkTextEdit('x bad z', [], 'x!bad z', draft)).toEqual({ links: [], draft, createsNewLink: false })
+    expect(reconcileLinkTextEdit('x bad z', [], 'xbad z', draft)).toEqual({
+      links: [],
+      draft: { start: 1, end: 4, url: 'bad' },
+      createsNewLink: false,
+    })
+  })
+
+  it('leaves a draft unchanged when replacing text immediately after it', () => {
+    const draft = { start: 2, end: 5, url: 'bad' }
+    expect(reconcileLinkTextEdit('x bad z', [], 'x bad!z', draft)).toEqual({ links: [], draft, createsNewLink: false })
+  })
+
+  it('recognizes a larger URL instead of retaining the old link it absorbs', () => {
+    const text = `https://b.test/${url}`
+    const start = text.indexOf(url)
+    expect(reconcileLinkTextEdit(text, [{ ...link, start, end: text.length }], `https://c.test/${url}`)).toEqual({
+      links: [{ start: 0, end: text.length, url: `https://c.test/${url}` }],
+      createsNewLink: true,
+    })
+  })
+
+  it('recognizes larger URL tokens formed by insertion at either link endpoint', () => {
+    const other = 'https://b.test'
+    for (const edits of [
+      [{ start: 0, end: 0, inserted: other }],
+      [{ start: url.length, end: url.length, inserted: other }],
+    ]) {
+      const result = replaceLinkedTextRanges(url, [link], edits)
+      expect(result.links).toEqual([{ start: 0, end: url.length + other.length, url: result.text }])
+      expect(result.createsNewLink).toBe(true)
+    }
+  })
+
+  it('reports no new link for rejected overlapping edits', () => {
+    expect(
+      replaceLinkedTextRanges(
+        url,
+        [link],
+        [
+          { start: 0, end: 4, inserted: '' },
+          { start: 2, end: 5, inserted: '' },
+        ],
+      ),
+    ).toEqual({ text: url, links: [link], createsNewLink: false })
+  })
+
   it('keeps link edits at the first character and at a middle-node endpoint distinct from new link creation', () => {
     expect(reconcileLinkTextEdit(url, [link], 'Https://a.test')).toEqual({
       links: [{ ...link, url: 'Https://a.test' }],

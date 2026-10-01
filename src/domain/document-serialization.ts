@@ -57,6 +57,7 @@ function isSupportedVersion(version: unknown): version is 1 | 2 | 3 {
 function assertView(value: Record<string, unknown>): void {
   if (value.version !== 3) return
   const view = value.view
+  // Number.isFinite already rejects non-numbers; removing only typeof is equivalent.
   if (
     !isRecord(view) ||
     !Array.isArray(view.expandedIds) ||
@@ -80,6 +81,7 @@ export function validatePersistedState(value: unknown): PersistedEditorState {
   assertView(value)
 
   const roots = value.document.roots
+  // walkNodes repeats this array check with the same error before reading any root.
   if (!Array.isArray(roots)) {
     throw new Error('Node children must be an array.')
   }
@@ -87,6 +89,8 @@ export function validatePersistedState(value: unknown): PersistedEditorState {
   const selectedNodeId = value.location.selectedNodeId
   const parentOf = new Map<NodeId, NodeId | null>()
   let selectedFound = false
+  // Parent membership is a fast rejection. Even if this flag/check is bypassed,
+  // the selected node's validated parent chain cannot reach a missing/unrelated ID.
   let currentParentFound = false
   walkNodes(roots, new Set(), false, (id, parentId) => {
     parentOf.set(id, parentId)
@@ -121,6 +125,7 @@ function isLocationReachable(
   if (currentParentId === null) return true
   if (!currentParentFound) return false
   let cursor: NodeId | null | undefined = selectedNodeId
+  // The first cursor is a validated string; subsequent cursors use ?? null, never undefined.
   while (cursor !== null && cursor !== undefined) {
     if (cursor === currentParentId) return true
     cursor = parentOf.get(cursor) ?? null

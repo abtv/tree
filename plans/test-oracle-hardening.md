@@ -84,7 +84,7 @@ Decisions reserved for the Product Owner:
 | T4 | Location and display invariants checked after every command | T3 | Done |
 | T5 | Command inventory guard for the property generators | T4 | Done |
 | T6a1 | Domain content, hyperlink, retention, and traversal assertions | T1, T5 | Done |
-| T6a2 | Remaining domain survivor classification and assertions | T6a1 | Planned |
+| T6a2 | Remaining domain survivor classification and assertions | T6a1 | Done |
 | T6b | Application surviving-mutant triage and break threshold | T6a2 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
@@ -371,6 +371,97 @@ exclusions. Runtime inputs and rendered states did not change; no E2E or screens
 rerun was required at Low Risk. Final plan completion edits are documentation only
 and are checked separately; they do not invalidate runtime validation.
 
+**T6a2 result (2026-10-01).** Added 27 domain cases, including a generated
+draft/URL offset property. Assertions cover URL sibling metadata, removal of
+links inside a larger deleted interval, optional field absence, overlapping and
+adjacent draft edits, repeated-prefix/suffix edits, token growth after separator
+removal, disjoint link replacements, schema migration with extraneous old view
+fields, a sole-node parent heading, seeded empty summaries, warm index reuse and
+validation without constructing unused node copies. No runtime behavior changes,
+new mutation exclusions, lowered coverage floors or product decisions.
+
+The retained T6a1 report matched all domain sources at task-start HEAD
+`2bc84db1d635362eb7e5dc386259f1f9ecfb6405` (authored by `abtv`,
+2026-10-01, `test(domain): strengthen content and attachment outcome assertions`).
+Every initial survivor/uncovered mutant and nine newly exposed survivors was
+classified. IDs below refer to that report and were retained by the incremental
+runs; the expression/function and rationale identify them independently of IDs.
+
+| Owner and expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Attachments: empty summary seed | 2168, 2169 | Killed by zero-traversal queries of a seeded fixture. |
+| Attachments: nonempty ID guard | 2163, 2164 | Equivalent: the regex also rejects the empty string. Other replacements stay enabled. |
+| Index: `requireNode` missing-node error | 2306, 2308 | Previously uncovered; killed by the exact error assertion. |
+| Index: missing-ID fast rejection, undefined cursor, inclusive loop end, undefined slot conditional | 2263, 2269, 2278, 2286 | Newly surviving instead of timing out. Equivalent on immutable valid documents: the later guard returns undefined for a missing ID; cursors use `?? null`; the last iteration returns; derived path slots exist. |
+| Index: absent/mismatched node guard | 2289, 2290, 2291, 2293 | Newly surviving instead of timing out. Internal defense against corrupted/shared-inconsistently indexes, outside the immutable-tree invariant. Retained and explained in source. |
+| Operations: initial seed, shared indexes, range filter, sibling URL/plain metadata and absent attachments | 2852, 2991, 3026, 3039, 3043, 3066, 3075, 3076, 3079, 3080, 3081, 3082, 3084, 3250, 3307, 3318 | Killed by content, absent-property and zero-extra-traversal assertions. 3080–3082 were uncovered; 2991 newly survived an intermediate run. |
+| Operations: heading fast path and null parent branch | 2960, 2963 | Equivalent: the next guard returns the same heading; searching for null in string ancestor IDs also returns -1. |
+| Operations: empty link arrays in text edit, range removal and splits | 2989, 3041, 3217, 3268 | Equivalent: the injected string has no numeric range and is discarded by normalization/split filtering. |
+| Operations: deleted-link filter and inclusive end comparisons | 3005, 3009, 3022, 3062 | Equivalent for normalized disjoint links: a deleted link becomes empty; another link cannot share its end; a retained range ending at a zero-width edit shifts by zero. |
+| Operations: zero-width deletion branch and sibling nonempty text guard | 3032, 3077, 3078 | Equivalent normalized content; allocation differs for the no-op. `isHttpUrl` independently rejects empty strings. |
+| Operations: surrogate endpoint guards | 3333, 3336, 3337, 3339, 3340 | Equivalent: a missing neighbor produces NaN and cannot pass surrogate comparisons. Meaningful guard replacements remain enabled. |
+| Operations: missing ancestor slot, invalid parent location and missing moved node | 2900, 2971, 3237 | Internal defenses: `requireNode` derives slots from the same immutable tree; normal callers validate locations. No malformed state is invented to raise the score. |
+| Operations: missing-slot errors, deleted-link fallback, moved-node errors and missing paste lines | 2904, 2912, 3007, 3239, 3241, 3271, 3273, 3284 | Uncovered defensive paths: located slots exist; a found link rules out absent links; dense lines and validated line/ID counts rule out missing lines. Sparse arrays and invalid internal paths remain unsupported. |
+| Links: unchanged edit, optional draft absence, suffix bounds/comparison, containment, token overlap, draft remapping, overlap rejection, split filtering and candidate deduplication | 2383, 2388, 2406, 2407, 2408, 2409, 2411, 2412, 2414, 2445, 2532, 2534, 2552, 2555, 2558, 2562, 2570, 2665, 2693, 2694, 2696, 2698, 2707, 2715, 2718, 2719, 2757, 2758, 2760, 2764, 2768 | Killed by the independent outcomes and generated repeated-text draft property. |
+| Links: host length and negative start guards | 2326, 2327, 2352 | Equivalent: URL construction already rejects hostless HTTP(S) URLs; the overlap pass also rejects negative starts. |
+| Links: prefix bounds, including nested logical OR | 2393, 2394, 2395, 2396, 2398, 2399 | Equivalent for unequal strings: character comparison stops when one string ends. AST grouping preserves comparison under the nested OR mutation. |
+| Links: pure append flag, final containment guard and empty arrays | 2422, 2448, 2431, 2580, 2591 | Equivalent: containment and the end/start equality imply pure append; `start <= oldEnd <= link.end`; malformed array junk fails range bounds. |
+| Links: candidate strict endpoints and URL guard inside insertion | 2538, 2541, 2608, 2772, 2775 | Equivalent normalized output: recognized token boundaries are whitespace/string endpoints, preventing adjacent complete URL ranges; normalization revalidates inserted URLs. |
+| Links: endpoint remapping equalities and insertion/replacement predicate | 2685, 2687, 2695 | Equivalent for retained links: `edit.end <= offset` makes a start equality imply the end equality; a nonempty edit ending at a retained link's end would split it first. For zero-width edits the replacement predicate equals the insertion predicate. |
+| Links: native retained-range overlap guard | 2468 | Retained, **not declared equivalent** for arbitrary multi-site before/after changes. Native reconciliation models one contiguous edit. Disjoint edits use `replaceLinkedTextRanges`, whose independent tests preserve intervening URLs. Removing this guard can retain an unchanged embedded URL in a broad diff spanning edits on both sides; this unsupported input is named separately from equivalents. |
+| Links: missing-character and missing-line fallbacks | 2516, 2526, 2735, 2745, 2795, 2798 | Uncovered: character loop bounds prevent missing lookups; production line callers supply dense split arrays and valid indices. Sparse/out-of-range line input remains unsupported. |
+| Serialization: unused output construction, parent recognition, old-schema view and optional properties | 3463, 3472, 3578, 3579, 3584, 3603, 3676 | Killed by bounded field-read, sole-heading, migration and absent-property assertions. |
+| Serialization: row-position type guard, roots array guard, parent-found fast rejection and undefined cursor | 3428, 3456, 3457, 3461, 3470, 3513, 3519 | Equivalent: `Number.isFinite` rejects non-numbers; `walkNodes` repeats the same array error; the selected ancestry cannot reach a missing parent even with the flag/check bypassed; cursors use `?? null`. |
+
+All **58** mutants targeted by new assertions above are reported `Killed`,
+including the five initially uncovered cases and the later index-sharing survivor.
+The remaining inventory is **53** equivalents under the stated invariants,
+**seven** internal defenses, **one** unsupported native multi-site overlap case,
+and **14** uncovered defensive fallbacks. Source comments state the rationale;
+no new mutator is suppressed, so meaningful replacements at the same expressions
+stay active. The two T6a1 exclusions remain unchanged.
+
+Final `npm run test:mutation` passed in **1m09s**, reusing 3505 results and
+retesting 169 mutants. Source/test inputs: HEAD
+`2bc84db1d635362eb7e5dc386259f1f9ecfb6405`, snapshot
+`sha256:a1f030f7bac014f712c21625f09813d121b993bff446da5d0a767a649cc8e668`.
+Subsequent edits are documentation and a wording-only correction to a test name;
+assertions and runtime sources are unchanged. All recorded domain sources match
+the final files. Full score **85.71%** (3069 killed, 80 timeout, 452 survived,
+73 uncovered, two ignored); domain **95.18%**, versus T6a1 **92.03%**.
+
+| Domain file | T6a1 score / survived / uncovered | T6a2 score / survived / uncovered |
+| --- | --- | --- |
+| `document-attachments.ts` | 94.03 / 4 / 0 | 97.01 / 2 / 0 |
+| `document-index.ts` | 97.56 / 0 / 2 | 90.24 / 8 / 0 |
+| `document-links.ts` | 88.70 / 54 / 6 | 94.54 / 23 / 6 |
+| `document-operations.ts` | 91.24 / 33 / 11 | 94.22 / 21 / 8 |
+| `document-serialization.ts` | 96.14 / 14 / 0 | 98.07 / 7 / 0 |
+| `document-types.ts` | 100 / 0 / 0 | 100 / 0 / 0 |
+| `product-messages.ts` | 100 / 0 / 0 | 100 / 0 / 0 |
+
+The index score decrease records eight former timeouts now surviving, not lost
+assertions. Application triage remains T6b: its final count is 391 survivors
+(three undo-focus timeouts now survive), with no application edits. Timeout
+dispositions vary with load. An initial raw-text synthetic replay overstated the
+prefix OR mutant because it lost AST grouping; inspection of Stryker's logical
+mutator corrected the rationale before final measurement. Development §12 now
+records that replay rule. The sole development failure was an incorrect new
+draft endpoint expectation (18 rather than 19), corrected before passing runs.
+Focused `npx vitest run src/domain` passed at **209** cases. Final `npm run check`
+passed at HEAD `2bc84db1d635362eb7e5dc386259f1f9ecfb6405`, snapshot
+`sha256:836c1ef548b05eb499f5d3a701c9df0957dc81ed878a270c0d7723b01f736270`:
+84 files, **1448** tests (27 added), **5.26s** coverage suite, successful
+production build and zero audit vulnerabilities. Aggregate coverage is
+**95.67 / 90.31 / 96.67 / 97.99%** (statements / branches / functions / lines).
+This pass follows the test-name correction; an earlier standard pass also
+succeeded. Normal validation ran after mutation sandbox cleanup. Primary diff
+review found no meaningful issues after correcting the prefix-mutant rationale
+and test-title wording. No exposed production defects or unresolved failures.
+No runtime or rendered inputs changed, so E2E, performance runs and new
+screenshots were not required for this Low Risk task. Final completion edits
+are documentation only and checked separately; runtime results remain valid.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -467,10 +558,11 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 ## Next task
 
-T1, T2, T3, T4, T5, T6a1, T7, T8a, T8b, and T9 are done.
-T6a2 (remaining domain survivor classification and assertions) is the exact next
-Ready task. Its inventory is recorded with the T6a1 result. T6b application triage
-and the break threshold follow T6a2; T10 closure follows T6b.
+T1, T2, T3, T4, T5, T6a1, T6a2, T7, T8a, T8b, and T9 are done.
+T6b (application survivor triage and the break threshold) is the exact next Ready
+task. The current full report has 391 application survivors and 59 uncovered
+mutants; regenerate it if missing and inspect its recorded source. T10 closure
+follows T6b.
 
 ## Resume prompt
 

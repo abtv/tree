@@ -10,6 +10,7 @@ import {
   deleteNode,
   editNodeText,
   ensureRoot,
+  insertSiblingAfter,
   insertSubtreeSibling,
   moveSibling,
   pasteMultilineText,
@@ -27,6 +28,37 @@ const url = 'https://a.test'
 const link = { start: 0, end: url.length, url }
 
 describe('document operation content and retention outcomes', () => {
+  it('creates URL siblings with complete metadata and plain siblings without optional fields', () => {
+    const document = createInitialDocument('root')
+    expect(insertSiblingAfter(document, 'root', 'linked', url, attachment).roots[1]).toEqual({
+      id: 'linked',
+      text: url,
+      links: [link],
+      attachment,
+      children: [],
+    })
+    expect(insertSiblingAfter(document, 'root', 'plain', 'ordinary').roots[1]).toEqual({
+      id: 'plain',
+      text: 'ordinary',
+      children: [],
+    })
+    expect(insertSiblingAfter(document, 'root', 'plain', 'ordinary').roots[1]).not.toHaveProperty('attachment')
+  })
+
+  it('does not retain a deleted link over identical text after a larger range removal', () => {
+    const document: Document = { roots: [{ id: 'root', text: `${url} ${url}`, links: [link], children: [] }] }
+    expect(removeTextRange(document, 'root', 0, url.length + 1).roots[0]).toEqual({
+      id: 'root',
+      text: url,
+      children: [],
+    })
+  })
+
+  it('leaves images absent from every node in an image-free multiline paste', () => {
+    const result = pasteMultilineText(createInitialDocument('root'), 'root', 0, ['a', 'b', 'c'], ['b', 'c'])
+    for (const node of result.roots) expect(node).not.toHaveProperty('attachment')
+  })
+
   it('normalizes a hidden selection beneath a current parent at depth two', () => {
     const document: Document = {
       roots: [

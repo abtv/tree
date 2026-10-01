@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { isHttpUrl, replaceLinkedTextRanges, type LinkedTextEdit } from './document-links'
+import { isHttpUrl, reconcileLinkTextEdit, replaceLinkedTextRanges, type LinkedTextEdit } from './document-links'
 import type { LinkRange } from './document-types'
 import { propertyRuns } from '../test/property-runs'
 
@@ -38,6 +38,34 @@ const scenario = fc
   })
 
 describe('replaceLinkedTextRanges invariants', () => {
+  it('keeps drafts before deletions of repeated text and shifts the following URL exactly', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 12 }),
+        fc.integer({ min: 1, max: 12 }),
+        fc.webUrl().filter(isHttpUrl),
+        (kept, removed, url) => {
+          const prefix = `b${'a'.repeat(kept)}`
+          const draft = { start: 0, end: prefix.length, url: prefix }
+          const start = prefix.length + removed + 1
+          expect(
+            reconcileLinkTextEdit(
+              `${prefix}${'a'.repeat(removed)} ${url}`,
+              [{ start, end: start + url.length, url }],
+              `${prefix} ${url}`,
+              draft,
+            ),
+          ).toEqual({
+            links: [{ start: prefix.length + 1, end: prefix.length + 1 + url.length, url }],
+            draft,
+            createsNewLink: false,
+          })
+        },
+      ),
+      { numRuns: propertyRuns(100) },
+    )
+  })
+
   it('preserves every link between disjoint edits to the surrounding ordinary text', () => {
     fc.assert(
       fc.property(
