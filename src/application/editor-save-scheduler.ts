@@ -65,6 +65,9 @@ export class EditorSaveScheduler {
     this.persistence.discardPendingSaves()
   }
 
+  // Mutation triage: guards that only skip `clearTimeout(undefined)` are equivalent, because clearing
+  // an unarmed timer is a no-op. A pending change with no armed timer (a locked editor) defers the
+  // cleanup retry anyway, so returning early in `scheduleCleanupRetry` is equivalent there too.
   public cancelSaveTimer(): void {
     if (this.saveTimer !== undefined) {
       this.clock.clearTimeout(this.saveTimer)
@@ -138,6 +141,10 @@ export class EditorSaveScheduler {
   }
 
   public scheduleCleanupRetry(): void {
+    // A pending change already has its idle save armed. The coordinator keeps the failed cleanup
+    // requested, so that save retries it, and replacing the timer would postpone a save that
+    // PRODUCT.md §16.1 requires at the idle interval.
+    if (this.changesPending && this.saveTimer !== undefined) return
     if (this.saveTimer !== undefined) this.clock.clearTimeout(this.saveTimer)
     this.saveTimer = this.clock.setTimeout(() => {
       this.saveTimer = undefined
@@ -150,6 +157,7 @@ export class EditorSaveScheduler {
   }
 
   private handleDocumentSaved(): void {
+    // The coordinator always captures a save before acknowledging it, so this guard is an internal defense.
     if (this.pendingSaveWatermark === undefined) return
     this.savedWordsWatermark = Math.max(this.savedWordsWatermark, this.pendingSaveWatermark)
     this.pendingSaveWatermark = undefined

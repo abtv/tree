@@ -4034,6 +4034,33 @@ describe('EditorStore', () => {
     expect(recovered.status === 'ready' && recovered.saveError).toBeUndefined()
   })
 
+  // @requirement PRODUCT.md §16.1
+  // @requirement PRODUCT.md §16.2
+  it('saves a change typed during a failing cleanup at the idle interval, not only at the next edit', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const clock = new FakeClock()
+    let failCleanup!: (error: Error) => void
+    services.cleanupAttachments = () =>
+      new Promise<void>((_resolve, reject) => {
+        failCleanup = reject
+      })
+    const store = new EditorStore(services, ids('unused'), clock)
+    await store.initialize()
+    await tick()
+
+    store.editText('root', 'typed while cleanup runs')
+    failCleanup(new Error('cleanup failed'))
+    await tick()
+    clock.runAll()
+    await tick()
+
+    expect(services.saves).toHaveLength(1)
+    expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'cleanup failed' })
+  })
+
   it('attempts a save on flush while locked and unlocks after success', async () => {
     const clock = new FakeClock()
     const { store, services } = await lockEditor(clock)
