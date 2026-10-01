@@ -86,8 +86,10 @@ Decisions reserved for the Product Owner:
 | T6a1 | Domain content, hyperlink, retention, and traversal assertions | T1, T5 | Done |
 | T6a2 | Remaining domain survivor classification and assertions | T6a1 | Done |
 | T6b1 | Command transition and history survivor triage | T6a2 | Done |
-| T6b2 | EditorStore survivor triage | T6b1 | Planned |
-| T6b3 | Persistence and save-policy survivor triage | T6b2 | Planned |
+| T6b2a | EditorStore view-state survivor triage | T6b1 | Done |
+| T6b2b | EditorStore editing and clipboard survivor triage | T6b2a | Planned |
+| T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b | Planned |
+| T6b3 | Persistence and save-policy survivor triage | T6b2c | Planned |
 | T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
@@ -309,6 +311,20 @@ reserved for the Product Owner.
   Acceptance: classify all store surviving/uncovered mutants, add outcome and
   bounded-cost assertions where required. Task-start report has 186 survivors
   and 15 uncovered mutants; split further before implementation if needed.
+  Split on 2026-10-01 after confirming the retained report matches HEAD
+  `1921c0f`: **T6b2a** covers constructor view capture, visible-row caching,
+  row-position readers, viewport changes and folding (source lines 98-220).
+  **T6b2b** covers editing, navigation, clipboard, visual commands and undo/redo
+  (lines 343-849). **T6b2c** covers pending-edit registration, initialization,
+  flushing and persistence-result wiring (lines 222-342 and 851-end).
+  Each task owns tests and explanatory comments in the files above, this plan
+  and index; it classifies every surviving/uncovered mutant in its source range,
+  adds independent outcome or bounded-cost assertions, measures before/after
+  mutation results and runs `npm run check` at Low Risk. Source ranges refer to
+  the retained report and method names remain authoritative after line shifts.
+  Any material requirement gap is reserved for the Product Owner; production
+  defects require separate defect-first fixes. No requirement gap was found in
+  T6b2a's PRODUCT.md §§2.4 and 16.1 requirements.
 * **T6b3:** persistence and save helpers. Files: tests and source comments for
   `persistence-coordinator.ts`, `editor-save-scheduler.ts`, `save-policy.ts`,
   this plan and index. Acceptance: classify their remaining mutants and assert
@@ -562,6 +578,59 @@ inputs did not change, so no new E2E, performance or screenshot run was required
 Final completion edits affect only plan documentation and are checked separately.
 The exact next task is T6b2; its larger inventory warrants a fresh session.
 
+**T6b2a result (2026-10-01).** Split T6b2 before implementation because its
+201 surviving/uncovered mutants span distinct view, editing and lifecycle owners.
+Added eight synthetic cases for current-parent cache invalidation, stale reader
+disposal, caret preservation in unrelated branches, heading guards, distant
+ancestor collapse, open-all, idempotent folds and idle saves. A deterministic
+child-read counter guards root-level close-all against whole-tree traversal.
+Runtime behavior, disk writes, interactive CPU and memory are unchanged; only
+tests and explanatory source comments changed. No product decision, requirement
+gap, production defect or new mutation exclusion.
+
+All 18 initial view-state survivors are classified below. IDs refer to the
+retained incremental report; method and expression identify each disposition.
+Task-start HEAD was `1921c0f03af454597bf3d0ce0f6ae21a2b7e151f` (author `abtv`,
+2026-10-01, `test(application): strengthen command and history mutation assertions`).
+The initial and final recorded source both match their corresponding store files.
+
+| Expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Reader disposal, heading guard, collapse predicate and ancestor search, fold no-op guards, unchanged selection focus, persisted fold changes | 1034, 1045, 1049, 1050, 1052, 1073, 1078, 1082, 1089, 1093, 1097, 1102 | All 12 killed by independent state and save outcomes. |
+| Root close-all fast path | 1070 | Killed by zero descendant reads after initialization; output-only assertions previously missed the extra tree walk. |
+| State capture ready guard | 997 | Internal defense: normal store paths cannot request a document save before ready. Keep the guard; the private scheduler callback is not a supported public API. |
+| Measurement undefined guard | 1004 | Equivalent: Number.isFinite(undefined) is false; the explicit guard also narrows the TypeScript type. |
+| Omitted position versus an undefined position property | 1008 | Equivalent persisted data: JSON omits the undefined key. No requirement distinguishes these transient service-object shapes. |
+| Toggle expansion no-op guard | 1056 | Equivalent: toggleNodeExpansion always adds or removes its ID and returns a new identity. |
+| Close-all expansion callback | 1075 | Equivalent: every fold within the current location has been closed, so a false/undefined query yields the same nearest displayed selection; retained choices outside this location cannot hide its rows. |
+
+Final `npm run test:mutation` passed in **7m46s**, reusing 2620 results and
+retesting 1054 mutants. Snapshot: HEAD `1921c0f`,
+`sha256:15c006a910a261aad74237d36d465ea973dfcb83f50d68a4c944cca81db7062c`.
+All 13 targeted mutants are `Killed`; four equivalents and one internal defense
+remain in this scope, with no uncovered mutants. EditorStore score rose from
+**72.54% to 74.32%**, survivors **186 to 173**, uncovered unchanged at **15**.
+Full score rose from **86.20% to 86.80%**: 3113 killed, 76 timeouts, 412 survivors,
+73 uncovered and two ignored. Application score is **80.41%**, with 356 survivors
+and 59 uncovered. Retesting outside this task also changes timeout dispositions;
+T6b4 must reconcile its final full inventory rather than reuse old counts.
+The earlier 7m10s mutation pass lacked the final traversal guard and comments;
+only the final measurement above is acceptance evidence.
+
+Low Risk validation: `npm run check` passed on HEAD `1921c0f`, snapshot
+`sha256:ab05216d67ecfa45b481b3f152c020d8da2ab1eeb65e6f5311a90df285539301`:
+84 files, **1472 tests** (eight added), **5.90s** coverage suite, successful build,
+zero audit vulnerabilities and all governance checks. Coverage: **95.79 / 90.51 /
+96.67 / 97.99%** (statements / branches / functions / lines). The first standard
+check failed type checking because new assertions accessed ready snapshot fields
+without narrowing the union; explicit ready-state type assertions and a type-only
+import fixed it. These annotations erase during transpilation, so they do not
+invalidate the mutation-tested runtime assertions. No unresolved or blocked
+validation. Primary diff review found no meaningful issues. No executable source
+or rendering change; no E2E, visual inspection, performance suite or independent
+review role was required at Low Risk. Completion edits affect documentation only
+and receive separate documentation checks.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -660,9 +729,10 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 
 T1, T2, T3, T4, T5, T6a1, T6a2, T7, T8a, T8b, and T9 are done.
 T6b1 (command transition and history survivor triage) is done.
-T6b2 (EditorStore survivor triage) is the exact next Ready task; T6b3 and T6b4
-follow, with the break threshold in T6b4. The current full
-report has 370 application survivors and 59 uncovered mutants; regenerate it
+T6b2a (EditorStore view-state survivor triage) is done.
+T6b2b (EditorStore editing and clipboard survivor triage) is the exact next Ready
+task; T6b2c, T6b3 and T6b4 follow, with the break threshold in T6b4. The current full
+report has 356 application survivors and 59 uncovered mutants; regenerate it
 if missing and inspect its recorded source. T10 closure follows T6b4.
 
 ## Resume prompt

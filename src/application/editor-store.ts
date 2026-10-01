@@ -97,11 +97,15 @@ export class EditorStore {
     this.saveScheduler = new EditorSaveScheduler(services, clock, {
       currentState: () => {
         const state = this.runtime.snapshot
+        // Normal callers request saves only after initialization; retain this guard for
+        // unavailable state rather than exposing the scheduler's callback publicly.
         if (state.status !== 'ready') return undefined
         const measured = this.readSelectedRowTop?.()
+        // Number.isFinite(undefined) is false too; the explicit check narrows the type.
         if (measured !== undefined && Number.isFinite(measured)) this.selectedRowTop = Math.max(0, Math.round(measured))
         const expandedIds = state.expansion.expandedIds
         const selectedRowTop = this.selectedRowTop
+        // JSON persistence omits an undefined position even if the key is present.
         const view = selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop }
         return { document: state.document, location: state.location, view }
       },
@@ -172,6 +176,8 @@ export class EditorStore {
       collapsing &&
       requireNode(state.document, state.location.selectedNodeId).ancestors.some((ancestor) => ancestor.id === nodeId)
     const expansion = toggleNodeExpansion(state.expansion, nodeId)
+    // A toggle currently always changes identity; keep the no-change guard consistent
+    // with the other fold operations if the expansion helper acquires a no-op case.
     if (expansion === state.expansion) return
     this.runtime.replaceReady({
       ...state,
@@ -193,6 +199,8 @@ export class EditorStore {
           ? COLLAPSED_EXPANSION_STATE
           : collapseForest(state.expansion, displayedNodes(state.document, state.location.currentParentId))
       if (expansion === state.expansion) return
+      // Every fold in this location is now closed. Returning false for every
+      // expansion query yields the same selection; choices outside it cannot hide rows here.
       const location = normalizeVisibleLocation(state.document, state.location, (id) => isNodeExpanded(expansion, id))
       this.runtime.replaceReady({
         ...state,

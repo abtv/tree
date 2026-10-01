@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Test Oracle Hardening](test-oracle-hardening.md) | Active | T6b2 EditorStore survivor triage is ready; T6b3, T6b4 and T10 follow |
+| [Test Oracle Hardening](test-oracle-hardening.md) | Active | T6b2b EditorStore editing and clipboard triage is ready; T6b2c, T6b3, T6b4 and T10 follow |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

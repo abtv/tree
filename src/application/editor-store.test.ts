@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from './editor-store'
+import type { ReadySnapshot } from './editor-runtime-state'
 import {
   displayedNodes,
   MAX_DOCUMENT_DEPTH,
@@ -170,6 +171,175 @@ describe('EditorStore', () => {
     function rowIds(store: EditorStore): string[] {
       return store.getVisibleRows().map((row) => row.node.id)
     }
+
+    it('invalidates cached rows when only the current parent changes', async () => {
+      const store = new EditorStore(
+        viewState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }, { expandedIds: ['root'] }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = store.getSnapshot() as ReadySnapshot
+      expect(rowIds(store)).toEqual(['root', 'child', 'other'])
+      store.enter()
+      expect((store.getSnapshot() as ReadySnapshot).document).toBe(before.document)
+      expect((store.getSnapshot() as ReadySnapshot).expansion).toBe(before.expansion)
+      expect(rowIds(store)).toEqual(['child'])
+    })
+
+    it('keeps a newer row measurement reader when the old registration is disposed', async () => {
+      const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      const disposeOld = store.registerSelectedRowTopReader(() => 100)
+      const disposeNew = store.registerSelectedRowTopReader(() => 321.4)
+      disposeOld()
+      store.noteViewportChange()
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 321 } })
+      disposeNew()
+    })
+
+    // @requirement PRODUCT.md §2.4
+    it('preserves the caret when expanding the selected row or collapsing another branch', async () => {
+      const services = viewState(
+        nestedDocument,
+        { currentParentId: null, selectedNodeId: 'child' },
+        { expandedIds: ['root', 'other'] },
+      )
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      store.selectNode('child', 3)
+      const before = store.getSnapshot() as ReadySnapshot
+      store.toggleExpansion('child')
+      expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
+      expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
+      store.toggleExpansion('other')
+      expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
+      expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+    })
+
+    it('ignores fold requests for the current heading and requests without a node', async () => {
+      const services = viewState(
+        nestedDocument,
+        { currentParentId: 'root', selectedNodeId: 'child' },
+        { expandedIds: ['root'] },
+      )
+      const clock = new FakeClock()
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      const before = store.getSnapshot()
+      store.toggleExpansion('root')
+      store.applyFold('open', 'root')
+      store.applyFold('open')
+      expect(store.getSnapshot()).toBe(before)
+      clock.runAll()
+      await store.flushPersistence()
+      expect(services.saves).toEqual([])
+    })
+
+    it('collapses a distant ancestor onto its own row and preserves nested expansion choices', async () => {
+      const store = new EditorStore(
+        viewState(
+          nestedDocument,
+          { currentParentId: null, selectedNodeId: 'grandchild' },
+          { expandedIds: ['root', 'child'] },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      store.toggleExpansion('root')
+      expect(rowIds(store)).toEqual(['root', 'other'])
+      expect(store.getSnapshot()).toMatchObject({
+        location: { selectedNodeId: 'root' },
+        focus: { nodeId: 'root', cursor: 0 },
+      })
+      store.toggleExpansion('root')
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+    })
+
+    it('opens all descendants and saves the view on idle without moving the caret', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      store.selectNode('root', 2)
+      await store.flushPersistence()
+      services.saves.length = 0
+      const before = store.getSnapshot() as ReadySnapshot
+      store.applyFold('open-all')
+      expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'leaf', 'other', 'other-child'])
+      expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
+      expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
+      expect(services.saves).toEqual([])
+      clock.runAll()
+      await tick()
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ view: { expandedIds: ['root', 'child', 'grandchild', 'other'] } })
+      const opened = store.getSnapshot()
+      store.applyFold('open-all')
+      expect(store.getSnapshot()).toBe(opened)
+      await store.flushPersistence()
+      expect(services.saves).toHaveLength(1)
+    })
+
+    it('closes root folds without traversing descendants', async () => {
+      const store = new EditorStore(
+        viewState(
+          nestedDocument,
+          { currentParentId: null, selectedNodeId: 'root' },
+          { expandedIds: ['root', 'child'] },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      // Initialization has already indexed this document. Count subsequent tree reads,
+      // independently of elapsed time, to guard the root-level constant-cost path.
+      const root = (store.getSnapshot() as ReadySnapshot).document.roots[0]!
+      const children = root.children
+      const readChildren = vi.fn(() => children)
+      Object.defineProperty(root, 'children', { configurable: true, get: readChildren })
+      try {
+        store.applyFold('close-all')
+        expect(readChildren).not.toHaveBeenCalled()
+        expect([...(store.getSnapshot() as ReadySnapshot).expansion.expandedIds]).toEqual([])
+      } finally {
+        Object.defineProperty(root, 'children', { configurable: true, value: children })
+      }
+    })
+
+    it('keeps the caret and snapshot for already closed folds, and saves a single fold on idle', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      store.selectNode('root', 2)
+      await store.flushPersistence()
+      services.saves.length = 0
+      const before = store.getSnapshot() as ReadySnapshot
+      store.applyFold('close-all')
+      store.applyFold('close', 'root')
+      expect(store.getSnapshot()).toBe(before)
+      store.applyFold('open', 'root')
+      expect(rowIds(store)).toEqual(['root', 'child', 'other'])
+      clock.runAll()
+      await tick()
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ view: { expandedIds: ['root'] } })
+      const opened = store.getSnapshot()
+      store.applyFold('open', 'root')
+      expect(store.getSnapshot()).toBe(opened)
+      store.applyFold('close-all')
+      expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
+      expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
+      clock.runAll()
+      await tick()
+      expect(services.saves).toHaveLength(2)
+      expect(services.saves[1]).toMatchObject({ view: { expandedIds: [] } })
+    })
 
     it('keeps each node’s expansion across entering, leaving, and breadcrumb navigation', async () => {
       const store = new EditorStore(
