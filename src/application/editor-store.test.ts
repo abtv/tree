@@ -80,8 +80,15 @@ function tick(): Promise<void> {
 
 async function lockEditor(
   clock: FakeClock,
+  roots?: TreeNode[],
 ): Promise<{ store: EditorStore; services: EditorServices & { saves: unknown[] }; attempts: () => number }> {
   const services = createServices()
+  if (roots !== undefined)
+    services.load = async () => ({
+      version: 1,
+      document: { roots },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
   let attempts = 0
   const store = new EditorStore(services, ids('root'), clock)
   await store.initialize()
@@ -101,6 +108,345 @@ async function lockEditor(
 }
 
 describe('EditorStore', () => {
+  // @requirement PRODUCT.md §10
+  // @requirement PRODUCT.md §16.1
+  describe('navigation command outcomes', () => {
+    const document = {
+      roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }],
+    }
+
+    it.each(['enter', 'leave', 'ancestor'] as const)(
+      'saves the %s location on idle and advances the displayed-list version',
+      async (command) => {
+        const clock = new FakeClock()
+        const services = loadedState(document, {
+          currentParentId: command === 'enter' ? null : 'root',
+          selectedNodeId: command === 'enter' ? 'root' : 'child',
+        })
+        const store = new EditorStore(services, ids('unused'), clock)
+        await store.initialize()
+        const version = (store.getSnapshot() as ReadySnapshot).structuralVersion
+        if (command === 'ancestor') store.navigateToAncestor(null)
+        else store[command]()
+        const expectedLocation =
+          command === 'enter'
+            ? { currentParentId: 'root', selectedNodeId: 'child' }
+            : { currentParentId: null, selectedNodeId: 'root' }
+        expect(store.getSnapshot()).toMatchObject({
+          document,
+          location: expectedLocation,
+          focus: { nodeId: expectedLocation.selectedNodeId, cursor: 0 },
+        })
+        expect((store.getSnapshot() as ReadySnapshot).structuralVersion).toBe(version + 1)
+        expect(services.saves).toEqual([])
+        clock.runAll()
+        await tick()
+        expect(services.saves).toHaveLength(1)
+        expect(services.saves[0]).toMatchObject({ document, location: expectedLocation })
+      },
+    )
+
+    it.each(['enter', 'leave', 'ancestor'] as const)(
+      'ends typing when %s keeps the same node focused',
+      async (command) => {
+        const services = loadedState(
+          { roots: [{ id: 'root', text: 'Root', children: [] }] },
+          { currentParentId: command === 'enter' ? null : 'root', selectedNodeId: 'root' },
+        )
+        const store = new EditorStore(services, ids('unused'), new FakeClock())
+        await store.initialize()
+        store.editText('root', 'Root first')
+        if (command === 'ancestor') store.navigateToAncestor(null)
+        else store[command]()
+        store.editText('root', 'Root second')
+        store.undo()
+        expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: 'Root first' }] } })
+        store.undo()
+        expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: 'Root' }] } })
+      },
+    )
+
+    it('ignores a last-row boundary inside a childless current parent', async () => {
+      const store = new EditorStore(
+        loadedState(
+          { roots: [{ id: 'root', text: 'Root', children: [] }] },
+          { currentParentId: 'root', selectedNodeId: 'root' },
+        ),
+        ids('unused'),
+      )
+      await store.initialize()
+      const before = store.getSnapshot()
+      store.moveSelectionBoundary('last', 2)
+      expect(store.getSnapshot()).toBe(before)
+    })
+  })
+
+  // @requirement PRODUCT.md §16.2
+  describe('locked structural commands', () => {
+    const source: TreeNode = { id: 'source', text: 'Source', children: [] }
+    it.each([
+      ['split', (store: EditorStore) => store.createSiblingOrFirstChild(1)],
+      ['child', (store: EditorStore) => store.createChild(), false],
+      ['sibling with text', (store: EditorStore) => store.createSiblingWithText('after', 'Inserted')],
+      ['child with text', (store: EditorStore) => store.createChildWithText('Inserted')],
+      ['delete', (store: EditorStore) => store.deleteSelected(), false],
+      ['subtree put', (store: EditorStore) => store.pasteSubtree('root', 'after', source), false],
+      ['empty deletion', (store: EditorStore) => store.deleteEmptySelected()],
+      ['reorder', (store: EditorStore) => store.moveNodeTo('root', 2)],
+    ] as const)('preserves state for %s and permits it after recovery', async (_name, command, result?: false) => {
+      const clock = new FakeClock()
+      const { store, services } = await lockEditor(clock)
+      const before = store.getSnapshot()
+      expect(command(store)).toBe(result)
+      expect(store.getSnapshot()).toBe(before)
+      services.save = async (state) => {
+        services.saves.push(state)
+      }
+      await store.flushPersistence()
+      expect((store.getSnapshot() as ReadySnapshot).persistenceLocked).toBeUndefined()
+      // Make empty deletion and reordering real mutations, rather than no-op defenses.
+      store.createSibling('after')
+      expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'id-2' } })
+      store.selectNode('root', 0)
+      store.editText('root', '')
+      const recovered = store.getSnapshot()
+      command(store)
+      expect(store.getSnapshot()).not.toBe(recovered)
+    })
+  })
+
+  // @requirement PRODUCT.md §16.2
+  it.each(['empty deletion', 'reorder'] as const)('blocks an available %s while locked', async (command) => {
+    const { store } = await lockEditor(new FakeClock(), [
+      { id: 'root', text: '', children: [] },
+      { id: 'empty', text: '', children: [] },
+    ])
+    store.selectNode('empty', 0)
+    const before = store.getSnapshot()
+    if (command === 'empty deletion') store.deleteEmptySelected()
+    else store.moveNodeTo('empty', 0)
+    expect(store.getSnapshot()).toBe(before)
+  })
+
+  // @requirement PRODUCT.md §16.1
+  // @requirement PRODUCT.md §20.2
+  describe('text-bearing structural creation', () => {
+    // Opaque text may equal a mutation placeholder; it must still be inserted and counted.
+    it.each(['sibling', 'child'] as const)('inserts and counts literal diagnostic text in a %s', async (kind) => {
+      const services = loadedState(
+        { roots: [{ id: 'root', text: '', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const store = new EditorStore(services, ids('created'), new FakeClock())
+      await store.initialize()
+      const text = 'Stryker was here!'
+      if (kind === 'sibling') store.createSiblingWithText('after', text)
+      else store.createChildWithText(text)
+      const created = store.getSnapshot() as ReadySnapshot
+      const node = kind === 'sibling' ? created.document.roots[1] : created.document.roots[0]?.children[0]
+      expect(node?.text).toBe(text)
+      await tick()
+      expect(services.saves).toEqual([])
+      store.editText('created', `${text} four five six seven eight nine ten`)
+      await tick()
+      expect(services.saves).toHaveLength(1)
+    })
+
+    it.each(['sibling', 'child'] as const)('counts words in a new %s toward the next volume save', async (kind) => {
+      const services = loadedState(
+        { roots: [{ id: 'root', text: '', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const store = new EditorStore(services, ids('created'), new FakeClock())
+      await store.initialize()
+      const text = 'Some words are inserted into a new node here!'
+      if (kind === 'sibling') store.createSiblingWithText('after', text)
+      else store.createChildWithText(text)
+      await tick()
+      expect(services.saves).toEqual([])
+      expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'created', cursor: text.length } })
+      store.editText('created', `${text} ten`)
+      await tick()
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ location: { selectedNodeId: 'created' } })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'created' } })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: '', children: [] }] } })
+    })
+  })
+
+  // @requirement PRODUCT.md §20.2
+  it('does not fabricate source provenance for a subtree put with opaque ancestor IDs', async () => {
+    const store = new EditorStore(
+      loadedState(
+        {
+          roots: [
+            { id: 'Stryker was here', text: 'Ancestor', children: [{ id: 'target', text: 'Target', children: [] }] },
+          ],
+        },
+        { currentParentId: 'Stryker was here', selectedNodeId: 'target' },
+      ),
+      ids('copy'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    expect(store.pasteSubtree('target', 'after', { id: 'unrelated', text: 'Copy', children: [] })).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ children: [{ id: 'target' }, { id: 'copy', text: 'Copy' }] }] },
+      location: { selectedNodeId: 'copy' },
+    })
+  })
+
+  // @requirement PRODUCT.md §16.2
+  it('does not queue attachment cleanup for a locked empty-node deletion', async () => {
+    const { store, services } = await lockEditor(new FakeClock(), [
+      { id: 'root', text: '', children: [] },
+      { id: 'empty', text: '', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+    ])
+    const cleanups: string[][] = []
+    services.cleanupAttachments = async (ids) => {
+      cleanups.push(ids)
+    }
+    store.selectNode('empty', 0)
+    store.deleteEmptySelected()
+    services.save = async (state) => {
+      services.saves.push(state)
+    }
+    await store.flushPersistence()
+    expect(cleanups).toEqual([])
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root' }, { id: 'empty' }] } })
+  })
+
+  // @requirement PRODUCT.md §20.2
+  it.each(['subtree', 'forest'] as const)('reports a source-descendant %s put independently', async (kind) => {
+    const source: TreeNode = { id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }
+    const store = new EditorStore(
+      loadedState({ roots: [source] }, { currentParentId: 'root', selectedNodeId: 'child' }),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    const before = store.getSnapshot()
+    const result =
+      kind === 'subtree'
+        ? store.pasteSubtree('child', 'after', source, ['root'])
+        : store.pasteNodeForest('child', 'after', { nodes: [source], sourceIds: ['root'] })
+    expect(result).toBe(false)
+    expect(store.getSnapshot()).toMatchObject({
+      operationError: 'Cannot paste a node into one of its descendants.',
+    })
+    const after = store.getSnapshot() as ReadySnapshot
+    expect(after.document).toBe((before as ReadySnapshot).document)
+    expect(after.location).toEqual((before as ReadySnapshot).location)
+    expect(after.focus).toEqual((before as ReadySnapshot).focus)
+    store.undo()
+    expect((store.getSnapshot() as ReadySnapshot).document).toBe(after.document)
+  })
+
+  // @requirement PRODUCT.md §11
+  it('starts at zero when reordering a node other than the focused node', async () => {
+    const store = new EditorStore(
+      loadedState(
+        {
+          roots: [
+            { id: 'a', text: 'Alpha', children: [] },
+            { id: 'b', text: 'Beta', children: [] },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'a' },
+      ),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    store.selectNode('a', 3)
+    store.moveNodeTo('b', 0)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'b' }, { id: 'a' }] },
+      location: { selectedNodeId: 'b' },
+      focus: { nodeId: 'b', cursor: 0 },
+    })
+  })
+
+  // @requirement PRODUCT.md §10
+  it.each(['case', 'reorder'] as const)(
+    'ends typing before a %s command that keeps the edited node',
+    async (command) => {
+      const store = new EditorStore(
+        loadedState(
+          {
+            roots: [
+              { id: 'root', text: 'Initial', children: [] },
+              { id: 'other', text: 'Other', children: [] },
+            ],
+          },
+          { currentParentId: null, selectedNodeId: 'root' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      store.editText('root', 'Typed')
+      if (command === 'case') store.applyNodeVisual('U', 'root', 'root')
+      else store.moveSelectedTo(2)
+      const afterCommand = (store.getSnapshot() as ReadySnapshot).document
+      store.editText('root', 'Following')
+      store.undo()
+      expect((store.getSnapshot() as ReadySnapshot).document).toEqual(afterCommand)
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({
+        document: { roots: [{ id: 'root', text: 'Typed' }, { id: 'other' }] },
+      })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({
+        document: { roots: [{ id: 'root', text: 'Initial' }, { id: 'other' }] },
+      })
+    },
+  )
+
+  // @requirement PRODUCT.md §17
+  // @requirement PRODUCT.md §10
+  it.each(['visual deletion', 'empty deletion', 'case'] as const)(
+    'performs only the required attachment cleanup after %s',
+    async (command) => {
+      const services = loadedState(
+        {
+          roots: [
+            {
+              id: 'root',
+              text: command === 'empty deletion' ? '' : 'Root',
+              attachment: { id: 'image', mimeType: 'image/png' },
+              children: [],
+            },
+            { id: 'other', text: 'Other', children: [] },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const events: unknown[] = []
+      services.save = async () => {
+        events.push('save')
+      }
+      services.cleanupAttachments = async (ids) => {
+        events.push([...ids].sort())
+      }
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      await store.flushPersistence()
+      events.length = 0
+      if (command === 'visual deletion') store.applyNodeVisual('d', 'root', 'root')
+      else if (command === 'empty deletion') store.deleteEmptySelected()
+      else store.applyNodeVisual('U', 'root', 'root')
+      await store.flushPersistence()
+      expect(events).toEqual(command === 'case' ? ['save'] : ['save', ['image']])
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({
+        document: { roots: [{ id: 'root', attachment: { id: 'image' } }, { id: 'other' }] },
+      })
+    },
+  )
+
   it('owns expansion and memoizes visible rows until document, location, or expansion changes', async () => {
     const store = new EditorStore(
       loadedState(
@@ -775,93 +1121,100 @@ describe('EditorStore', () => {
     expect(snapshot.document.roots[0]?.links).toEqual([{ start: 3, end: 3 + url.length, url: 'HTTPS://EXAMPLE.COM' }])
   })
 
-  it('reports maximum depth without changing editor state, history, IDs, or persistence', async () => {
-    const deepest: TreeNode = {
-      id: `n${MAX_DOCUMENT_DEPTH - 1}`,
-      text: `node-${MAX_DOCUMENT_DEPTH - 1}`,
-      children: [],
-    }
-    let root: TreeNode = deepest
-    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
-      root = { id: `n${index}`, text: index === 0 ? 'root' : `node-${index}`, children: [root] }
-    }
-    const services = loadedState({ roots: [root] }, { currentParentId: deepest.id, selectedNodeId: deepest.id })
-    const createId = vi.fn(() => 'must-not-be-consumed')
-    const store = new EditorStore(services, createId)
-    await store.initialize()
-    const before = store.getSnapshot()
-    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+  it.each(['split', 'child', 'child with text'] as const)(
+    'reports maximum depth for %s without changing state',
+    async (command) => {
+      const deepest: TreeNode = {
+        id: `n${MAX_DOCUMENT_DEPTH - 1}`,
+        text: `node-${MAX_DOCUMENT_DEPTH - 1}`,
+        children: [],
+      }
+      let root: TreeNode = deepest
+      for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+        root = { id: `n${index}`, text: index === 0 ? 'root' : `node-${index}`, children: [root] }
+      }
+      const services = loadedState({ roots: [root] }, { currentParentId: deepest.id, selectedNodeId: deepest.id })
+      const createId = vi.fn(() => 'must-not-be-consumed')
+      const store = new EditorStore(services, createId)
+      await store.initialize()
+      const before = store.getSnapshot()
+      if (before.status !== 'ready') throw new Error('Expected a ready editor.')
 
-    store.createSiblingOrFirstChild(0)
-    expect(store.createChild()).toBe(false)
+      if (command === 'split') store.createSiblingOrFirstChild(0)
+      else if (command === 'child') expect(store.createChild()).toBe(false)
+      else store.createChildWithText('Inserted')
 
-    const after = store.getSnapshot()
-    expect(after).toMatchObject({
-      status: 'ready',
-      location: { currentParentId: deepest.id, selectedNodeId: deepest.id },
-      operationError: 'Nodes cannot be nested deeper than 20 levels.',
-    })
-    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
-    expect(after.document).toEqual(before.document)
-    expect(after.focus).toEqual(before.focus)
-    expect(createId).not.toHaveBeenCalled()
-    expect(services.saves).toEqual([])
+      const after = store.getSnapshot()
+      expect(after).toMatchObject({
+        status: 'ready',
+        location: { currentParentId: deepest.id, selectedNodeId: deepest.id },
+        operationError: 'Nodes cannot be nested deeper than 20 levels.',
+      })
+      if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+      expect(after.document).toEqual(before.document)
+      expect(after.focus).toEqual(before.focus)
+      expect(createId).not.toHaveBeenCalled()
+      expect(services.saves).toEqual([])
 
-    store.undo()
-    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
-  })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
+    },
+  )
 
-  it('rejects an over-depth subtree or forest paste without changing state, history, or persistence', async () => {
-    const deepest: TreeNode = {
-      id: `n${MAX_DOCUMENT_DEPTH - 1}`,
-      text: `node-${MAX_DOCUMENT_DEPTH - 1}`,
-      children: [],
-    }
-    let root: TreeNode = deepest
-    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
-      root = { id: `n${index}`, text: index === 0 ? 'root' : `node-${index}`, children: [root] }
-    }
-    const services = loadedState(
-      { roots: [root] },
-      { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
-    )
-    const createId = vi.fn(() => 'must-not-be-consumed')
-    const store = new EditorStore(services, createId)
-    await store.initialize()
-    const before = store.getSnapshot()
-    if (before.status !== 'ready') throw new Error('Expected a ready editor.')
-    const source: TreeNode = {
-      id: 'source',
-      text: 'Source',
-      children: [{ id: 'source-child', text: 'Child', children: [] }],
-    }
-    const forest = { nodes: [source], sourceIds: ['source'] }
+  it.each(['subtree', 'forest', 'visual'] as const)(
+    'rejects an over-depth %s paste without changing state',
+    async (command) => {
+      const deepest: TreeNode = {
+        id: `n${MAX_DOCUMENT_DEPTH - 1}`,
+        text: `node-${MAX_DOCUMENT_DEPTH - 1}`,
+        children: [],
+      }
+      let root: TreeNode = deepest
+      for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+        root = { id: `n${index}`, text: index === 0 ? 'root' : `node-${index}`, children: [root] }
+      }
+      const services = loadedState(
+        { roots: [root] },
+        { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
+      )
+      const createId = vi.fn(() => 'must-not-be-consumed')
+      const store = new EditorStore(services, createId)
+      await store.initialize()
+      const before = store.getSnapshot()
+      if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+      const source: TreeNode = {
+        id: 'source',
+        text: 'Source',
+        children: [{ id: 'source-child', text: 'Child', children: [] }],
+      }
+      const forest = { nodes: [source], sourceIds: ['source'] }
 
-    expect(store.pasteSubtree(deepest.id, 'after', source, ['source'])).toBe(false)
-    expect(store.pasteNodeForest(deepest.id, 'after', forest)).toBe(false)
-    expect(store.applyNodeVisual('p', deepest.id, deepest.id, forest)).toBeUndefined()
+      if (command === 'subtree') expect(store.pasteSubtree(deepest.id, 'after', source, ['source'])).toBe(false)
+      else if (command === 'forest') expect(store.pasteNodeForest(deepest.id, 'after', forest)).toBe(false)
+      else expect(store.applyNodeVisual('p', deepest.id, deepest.id, forest)).toBeUndefined()
 
-    const after = store.getSnapshot()
-    expect(after).toMatchObject({
-      status: 'ready',
-      location: { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
-      operationError: MAX_DOCUMENT_DEPTH_ERROR,
-    })
-    if (after.status !== 'ready') throw new Error('Expected a ready editor.')
-    expect(after.document).toEqual(before.document)
-    expect(after.focus).toEqual(before.focus)
-    expect(createId).not.toHaveBeenCalled()
-    expect(services.saves).toEqual([])
+      const after = store.getSnapshot()
+      expect(after).toMatchObject({
+        status: 'ready',
+        location: { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
+        operationError: MAX_DOCUMENT_DEPTH_ERROR,
+      })
+      if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+      expect(after.document).toEqual(before.document)
+      expect(after.focus).toEqual(before.focus)
+      expect(createId).not.toHaveBeenCalled()
+      expect(services.saves).toEqual([])
 
-    store.undo()
-    expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
+      store.undo()
+      expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
 
-    // The document is still valid, so a later change saves normally instead of failing on the
-    // over-depth document the rejected paste must never create.
-    expect(store.createSibling('after')).toBe(true)
-    await store.flushPersistence()
-    expect(services.saves).toHaveLength(1)
-  })
+      // The document is still valid, so a later change saves normally instead of failing on the
+      // over-depth document the rejected paste must never create.
+      expect(store.createSibling('after')).toBe(true)
+      await store.flushPersistence()
+      expect(services.saves).toHaveLength(1)
+    },
+  )
 
   it('advances the structural version for displayed-list changes but not for text edits or selection', async () => {
     const services = loadedState(

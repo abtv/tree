@@ -88,7 +88,7 @@ Decisions reserved for the Product Owner:
 | T6b1 | Command transition and history survivor triage | T6a2 | Done |
 | T6b2a | EditorStore view-state survivor triage | T6b1 | Done |
 | T6b2b1 | EditorStore direct editing and text replacement survivor triage | T6b2a | Done |
-| T6b2b2 | EditorStore navigation and structural command survivor triage | T6b2b1 | Planned |
+| T6b2b2 | EditorStore navigation and structural command survivor triage | T6b2b1 | Done |
 | T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Planned |
 | T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Planned |
 | T6b3 | Persistence and save-policy survivor triage | T6b2c | Planned |
@@ -697,6 +697,70 @@ visual inspection, performance suite or independent review role was required.
 Completion documentation edits receive separate formatting and documentation
 checks. The next task is T6b2b2; its larger inventory warrants a fresh session.
 
+**T6b2b2 result (2026-10-01).** Added 36 cases for navigation idle saves and
+displayed-list versions, same-node navigation typing boundaries, unavailable
+last-row motion, locked command results and recovery, inserted-word accounting
+for text-bearing creation, independent depth and source-descendant rejection
+errors, opaque text and node IDs, reorder caret placement and typing boundaries,
+and attachment cleanup scheduling and undo retention. Depth and paste rejection
+tests now assert each command independently so an earlier error cannot mask a
+later missing error. `editor-store-reorder-cost.test.ts` guards zero transition
+builds while locked and one after recovery, alongside real store state outcomes.
+Only tests and explanatory source comments changed. No product decision,
+requirement gap, production defect, mutation exclusion or performance change:
+disk writes, interactive CPU and memory behavior are unchanged.
+
+Task-start HEAD `18823db536965984011279ab6769f49ff6cbb4f2` was authored by
+`abtv` on 2026-10-01, `test(application): strengthen direct editing mutation
+assertions`. The retained report matched its source. All 69 initial mutants
+have dispositions and retain their IDs in the final matching report:
+
+| Expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Unavailable last-row target; navigation typing boundaries, structural versions and idle saves | 1337, 1352, 1356, 1361, 1364, 1365, 1370, 1373, 1374 | All nine killed by focus/snapshot, undo and saved-location outcomes. |
+| Creation locking and individual depth-rejection errors | 1377, 1383, 1395, 1396, 1402, 1409, 1426, 1428, 1430, 1431, 1432 | All eleven killed by return/state/ID consumption after recovery and independent error assertions. |
+| Text-bearing creation content and word-volume accounting | 1413, 1418, 1419, 1420, 1422, 1423, 1436, 1441, 1442, 1443, 1445, 1446 | All twelve killed. Arbitrary text is inserted and counted, including literal diagnostic text; nine inserted words plus one trigger exactly one save. |
+| Delete/put locking, default provenance, source-descendant rejection and independent paste errors | 1449, 1450, 1459, 1462, 1463, 1469, 1470, 1472, 1473, 1480, 1500, 1507, 1524 | All thirteen killed by state, return, opaque-ID, recovery and error outcomes. |
+| Retained-ID typing boundaries, required cleanup, locked allocation avoidance and reorder caret | 1529, 1531, 1532, 1533, 1536, 1542, 1547, 1548, 1554 | All nine killed. Cleanup follows a save, preserves undo references, and does not run for case conversion or a locked deletion; locked reorder does not build a transition. |
+| Typing boundaries where creation/put focuses a fresh ID or deletion removes the edited ID | 1384, 1390, 1404, 1415, 1438, 1455, 1482, 1509, 1540 | Equivalent for supported product input: the next edit targets a different ID, or intervening selection/undo ends typing. Direct edits of a nonselected node are outside that input flow. Source rationale is at `endTextSession`; retained-ID case conversion and reordering have explicit undo assertions. |
+| Empty creation edit; malformed default link entries | 1411, 1434; 1414, 1437 | Equivalent: editing the fresh empty node to empty text is an identity operation; domain normalization drops malformed links. The literal empty-text comparisons remain enabled because other replacements are meaningful and killed. |
+| Empty-text word accounting guard always true | 1417, 1440 | Equivalent: `noteChange(0, false)` repeats the pending/idle marking already performed synchronously by `applyStructural`. Nonzero counting and immediate-save replacements are killed. |
+
+Final `npm run test:mutation -- --concurrency 4` produced the complete report in
+approximately **4m28s**, reusing 3545 results and retesting 129 mutants. The server
+restarted after the last progress output; recovery checked the completed JSON
+and incremental reports, matching source, unchanged validation snapshot and
+removed sandbox instead of rerunning the work. Tested HEAD `18823db` plus
+`sha256:c4111d028123f44a49a368d17b8090fc727b06d420c873f011bd9208c4170c76`
+from `npm run validation:snapshot`. All **54 meaningful targeted mutants are
+Killed**, with **15 equivalent survivors**, no targeted timeouts or uncovered
+mutants, and no missing IDs. Store score rose from **77.19% to 83.33%**:
+543 to 603 killed, 22 to seven timeouts, 154 to 116 survivors and 13 to six
+uncovered. Node-visual transition score rose from **72.05% to 80.35%**, with
+57 to 38 survivors. Full score rose from **87.72% to 89.06%**: 3212 killed,
+60 timeouts, 338 survivors, 64 uncovered and two ignored. Application score is
+**84.70%**, with 274 survivors and 50 uncovered. Aggregate changes include
+retested timeout outcomes; the 54 targeted kills are independently confirmed
+assertion failures. T6b4 must reconcile remaining domain/helper timeout changes.
+
+Earlier full passes identified missing same-node, cleanup and literal-input
+assertions. Type checking caught two test declaration issues, corrected before
+the accepted run. Primary review also identified the cost of the locked reorder
+transition despite its redundant publication guard; the separate allocation
+test kills that survivor. Final Low Risk `npm run check` passed on the same
+runtime snapshot: **85 files, 1519 tests**, **6.07s** coverage suite, successful
+build, zero audit vulnerabilities and all governance stages. Coverage:
+**96.06 / 90.85 / 96.67 / 98.08%** (statements / branches / functions / lines).
+The focused `npx vitest run src/application/editor-store.test.ts
+src/application/editor-store-reorder-cost.test.ts` passed 196 cases and is
+subsumed by the standard check. No unresolved failures or blocked validation.
+Primary diff review found no remaining meaningful issues. The affected
+navigation/focus inventory is covered; no new unsupported product combination
+was introduced. No executable behavior or rendering change, so no E2E, visual
+inspection, performance suite or independent review role was required.
+Completion documentation receives separate formatting and documentation checks.
+The next task is T6b2b3; continue it in a fresh session.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -797,9 +861,10 @@ T1, T2, T3, T4, T5, T6a1, T6a2, T7, T8a, T8b, and T9 are done.
 T6b1 (command transition and history survivor triage) is done.
 T6b2a (EditorStore view-state survivor triage) is done.
 T6b2b1 (EditorStore direct editing and text replacement survivor triage) is done.
-T6b2b2 (EditorStore navigation and structural command survivor triage) is the
-exact next Ready task; T6b2b3, T6b2c, T6b3 and T6b4 follow, with the break threshold
-in T6b4. The current full report has 328 application survivors and 57 uncovered mutants; regenerate it
+T6b2b2 (EditorStore navigation and structural command survivor triage) is done.
+T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is the
+exact next Ready task; T6b2c, T6b3 and T6b4 follow, with the break threshold
+in T6b4. The current full report has 274 application survivors and 50 uncovered mutants; regenerate it
 if missing and inspect its recorded source. T10 closure follows T6b4.
 
 ## Resume prompt

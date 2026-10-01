@@ -455,6 +455,10 @@ export class EditorStore {
   }
 
   public endTextSession(): void {
+    // Structural commands close typing explicitly. For commands that focus a fresh ID
+    // (creation/put) or remove the edited ID (deletion), the next supported typing
+    // event also begins a new session: its node differs, and selection ends typing.
+    // Case conversion and reordering retain IDs, so their explicit boundary matters.
     this.textSession.end()
   }
 
@@ -587,10 +591,13 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const transition = createSiblingTransition(state.document, state.location, position, this.createId)
+    // Editing the freshly created empty node to empty text is an identity operation;
+    // malformed default link entries are discarded by domain normalization.
     const document =
       text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
     this.endTextSession()
     this.applyStructural(document, transition.location, this.runtime.newFocus(transition.focus.nodeId, text.length))
+    // For empty text, noteChange(0, false) only repeats applyStructural's pending idle save.
     if (text !== '') this.noteChange(countInsertedWords('', text), false)
   }
 
@@ -602,10 +609,13 @@ export class EditorStore {
       this.reportError(new Error(transition.message))
       return
     }
+    // As for sibling creation, editing the fresh empty node to empty text is an identity;
+    // normalization also drops malformed default link entries.
     const document =
       text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
     this.endTextSession()
     this.applyStructural(document, transition.location, this.runtime.newFocus(transition.focus.nodeId, text.length))
+    // Empty text adds no words; applyStructural already marks the change pending.
     if (text !== '') this.noteChange(countInsertedWords('', text), false)
   }
 
@@ -743,6 +753,9 @@ export class EditorStore {
 
   public moveNodeTo(nodeId: NodeId, insertionIndex: number): void {
     const state = this.runtime.ready()
+    // applyStructural also blocks publication while locked, but this early guard avoids
+    // building and allocating a reordered document before reaching that second guard.
+    // Keep both guards: a locked command must avoid transition work as well as publication.
     if (this.isPersistenceLocked()) return
     const cursor = state.focus.nodeId === nodeId ? state.focus.cursor : 0
     const transition = moveNodeTransition(state.document, state.location, nodeId, insertionIndex, cursor)
