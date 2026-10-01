@@ -4626,4 +4626,346 @@ describe('EditorStore', () => {
       })
     })
   })
+
+  describe('lifecycle and persistence wiring outcomes', () => {
+    const rootAt = { currentParentId: null, selectedNodeId: 'root' }
+
+    type Snapshot = ReturnType<EditorStore['getSnapshot']>
+
+    function recordEmissions(store: EditorStore): Snapshot[] {
+      const seen: Snapshot[] = []
+      store.subscribe(() => {
+        seen.push(store.getSnapshot())
+      })
+      return seen
+    }
+
+    function textState(text: string): EditorServices & { saves: unknown[] } {
+      return loadedState({ roots: [{ id: 'root', text, children: [] }] }, rootAt)
+    }
+
+    function rootText(store: EditorStore): string | undefined {
+      const state = store.getSnapshot()
+      return state.status === 'ready' ? state.document.roots[0]!.text : undefined
+    }
+
+    async function failSavesUntilLocked(store: EditorStore, clock: FakeClock): Promise<void> {
+      const isLocked = (): boolean => {
+        const state = store.getSnapshot()
+        return state.status === 'ready' && state.persistenceLocked === true
+      }
+      for (let attempt = 0; attempt < 8 && !isLocked(); attempt += 1) {
+        store.selectNode('root', 0)
+        clock.runAll()
+        await tick()
+      }
+      expect(isLocked()).toBe(true)
+    }
+
+    it('commits a pending-edit finisher before the save that an earlier pending change requests', async () => {
+      const services = createServices()
+      const store = new EditorStore(services, ids('root'), new FakeClock())
+      await store.initialize()
+      await store.flushPersistence()
+      services.saves.length = 0
+      store.editText('root', 'a')
+      let committed = false
+      store.registerPendingEditFinisher(() => {
+        if (committed) return false
+        committed = true
+        store.editText('root', 'ab')
+        return true
+      })
+
+      await store.flushPersistence()
+
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ document: { roots: [{ text: 'ab' }] } })
+    })
+
+    it('keeps flushing until a clipboard edit that starts during the flush save has been saved', async () => {
+      const { services, pending } = deferredSaveServices()
+      const readGate = { open: () => {} }
+      const readBlocked = new Promise<void>((resolve) => {
+        readGate.open = resolve
+      })
+      services.readClipboard = async () => {
+        await readBlocked
+        return { kind: 'text', text: 'pasted' }
+      }
+      const store = new EditorStore(services, ids('unused'))
+      await store.initialize()
+      store.editText('root', 'before')
+      let flushed = false
+      const flush = store.flushPersistence().then(() => {
+        flushed = true
+      })
+      await vi.waitFor(() => expect(pending).toHaveLength(1))
+      const paste = store.paste('root', 6)
+
+      pending[0]!.resolve()
+      await tick()
+      expect(flushed).toBe(false)
+
+      readGate.open()
+      await paste
+      await vi.waitFor(() => expect(pending).toHaveLength(2))
+      pending[1]!.resolve()
+      await flush
+      expect(flushed).toBe(true)
+      expect(services.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'beforepasted' }] } })
+    })
+
+    it('does not invoke pending-edit finishers before the store is ready and still completes the flush', async () => {
+      const store = new EditorStore(createServices(), ids('root'))
+      const finish = vi.fn(() => true)
+      store.registerPendingEditFinisher(finish)
+
+      await store.flushPersistence()
+
+      expect(finish).not.toHaveBeenCalled()
+      expect(store.getSnapshot()).toEqual({ status: 'loading' })
+    })
+
+    it('ignores a reported error before the store is ready and publishes it once afterwards', async () => {
+      const store = new EditorStore(createServices(), ids('root'))
+      const seen = recordEmissions(store)
+      const before = store.getSnapshot()
+
+      store.reportError(new Error('too early'))
+
+      expect(store.getSnapshot()).toBe(before)
+      expect(seen).toEqual([])
+
+      await store.initialize()
+      seen.length = 0
+      store.reportError(new Error('clipboard unavailable'))
+
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toMatchObject({ status: 'ready', operationError: 'clipboard unavailable' })
+    })
+
+    it('publishes the quit prompt and its dismissal once each and ignores repeats', async () => {
+      const { store } = await lockEditor(new FakeClock())
+      const seen = recordEmissions(store)
+
+      store.dismissQuitWithoutSavingPrompt()
+      expect(seen).toEqual([])
+
+      store.requestQuitWithoutSavingPrompt()
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toMatchObject({ quitWithoutSavingPrompt: true })
+      const shown = store.getSnapshot()
+
+      store.requestQuitWithoutSavingPrompt()
+      expect(seen).toHaveLength(1)
+      expect(store.getSnapshot()).toBe(shown)
+
+      store.dismissQuitWithoutSavingPrompt()
+      expect(seen).toHaveLength(2)
+      expect(seen[1]).not.toHaveProperty('quitWithoutSavingPrompt')
+      const dismissed = store.getSnapshot()
+
+      store.dismissQuitWithoutSavingPrompt()
+      expect(seen).toHaveLength(2)
+      expect(store.getSnapshot()).toBe(dismissed)
+    })
+
+    it('publishes exactly one ready snapshot for a fresh document', async () => {
+      const store = new EditorStore(createServices(), ids('root'))
+      const seen = recordEmissions(store)
+
+      await store.initialize()
+      await tick()
+
+      expect(seen.map((snapshot) => snapshot.status)).toEqual(['ready'])
+    })
+
+    it('publishes exactly one ready snapshot for a saved document', async () => {
+      const store = new EditorStore(textState('saved'), ids('unused'))
+      const seen = recordEmissions(store)
+
+      await store.initialize()
+      await tick()
+
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toMatchObject({ status: 'ready', document: { roots: [{ text: 'saved' }] } })
+    })
+
+    it('publishes exactly one error snapshot when loading fails', async () => {
+      const services = createServices()
+      services.load = async () => {
+        throw new Error('unreadable')
+      }
+      const store = new EditorStore(services, ids('root'))
+      const seen = recordEmissions(store)
+
+      await store.initialize()
+      await tick()
+
+      expect(seen).toEqual([{ status: 'error', message: 'unreadable' }])
+    })
+
+    it('ends typing when the same node is selected again', async () => {
+      const store = new EditorStore(textState(''), ids('unused'), new FakeClock())
+      await store.initialize()
+
+      store.editText('root', 'x')
+      store.selectNode('root', 1)
+      store.editText('root', 'xy')
+      store.undo()
+
+      expect(rootText(store)).toBe('x')
+    })
+
+    it('saves the selected node after the idle delay', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(
+        {
+          roots: [
+            { id: 'root', text: '', children: [] },
+            { id: 'other', text: '', children: [] },
+          ],
+        },
+        rootAt,
+      )
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      await store.flushPersistence()
+      expect(services.saves).toEqual([])
+
+      store.selectNode('other', 0)
+      clock.runAll()
+      await tick()
+
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({ location: { selectedNodeId: 'other' } })
+    })
+
+    it('discards a cut that finishes after persistence locked', async () => {
+      const clock = new FakeClock()
+      const services = textState('one two three')
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      let open!: () => void
+      const written = new Promise<void>((resolve) => {
+        open = resolve
+      })
+      services.writeClipboard = async () => written
+      services.save = async () => {
+        throw new Error('disk full')
+      }
+      const cut = store.cut('root', 0, 3)
+
+      await failSavesUntilLocked(store, clock)
+      open()
+      await cut
+
+      expect(rootText(store)).toBe('one two three')
+    })
+
+    it('discards a text paste that finishes after persistence locked', async () => {
+      const clock = new FakeClock()
+      const services = textState('one two three')
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      let open!: () => void
+      const read = new Promise<void>((resolve) => {
+        open = resolve
+      })
+      services.readClipboard = async () => {
+        await read
+        return { kind: 'text', text: 'pasted ' }
+      }
+      services.save = async () => {
+        throw new Error('disk full')
+      }
+      const paste = store.paste('root', 0)
+
+      await failSavesUntilLocked(store, clock)
+      open()
+      await paste
+
+      expect(rootText(store)).toBe('one two three')
+    })
+
+    it('cleans up attachments that only a redo branch discarded by a structural command held', async () => {
+      const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+      const cleanups: string[][] = []
+      services.cleanupAttachments = async (referencedIds) => {
+        cleanups.push([...referencedIds])
+      }
+      const store = new EditorStore(services, ids('root', 'image', 'sibling'))
+      await store.initialize()
+      await store.paste('root', 0)
+      await store.flushPersistence()
+      store.undo()
+      await store.flushPersistence()
+      expect(cleanups.at(-1)).toContain('image')
+
+      cleanups.length = 0
+      store.createSibling('after')
+      await store.flushPersistence()
+
+      expect(cleanups).toHaveLength(1)
+      expect(cleanups.at(-1)).not.toContain('image')
+    })
+
+    it('publishes a recovery only when a successful save clears a previous failure', async () => {
+      const clock = new FakeClock()
+      const services = createServices()
+      const store = new EditorStore(services, ids('root'), clock)
+      await store.initialize()
+      await store.flushPersistence()
+      store.editText('root', 'a')
+      const seen = recordEmissions(store)
+
+      await store.flushPersistence()
+      expect(seen).toEqual([])
+
+      services.save = async () => {
+        throw new Error('disk full')
+      }
+      store.editText('root', 'ab')
+      seen.length = 0
+      clock.runAll()
+      await tick()
+      expect(store.getSnapshot()).toMatchObject({ saveError: 'disk full' })
+      seen.length = 0
+
+      services.save = async (state) => {
+        services.saves.push(state)
+      }
+      clock.runAll()
+      await tick()
+
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).not.toHaveProperty('saveError')
+      expect(store.getSnapshot()).not.toHaveProperty('saveError')
+    })
+
+    it('stops retrying a failing attachment cleanup after three consecutive failures', async () => {
+      const clock = new FakeClock()
+      const services = createServices()
+      let attempts = 0
+      services.cleanupAttachments = async () => {
+        attempts += 1
+        throw new Error('cleanup failed')
+      }
+      const store = new EditorStore(services, ids('root'), clock)
+      const seen = recordEmissions(store)
+      await store.initialize()
+      await tick()
+      expect(attempts).toBe(1)
+
+      for (let round = 0; round < 5; round += 1) {
+        clock.runAll()
+        await tick()
+      }
+
+      expect(attempts).toBe(3)
+      expect(seen).toHaveLength(4)
+      expect(seen.slice(1)).toEqual(Array(3).fill(expect.objectContaining({ saveError: 'cleanup failed' })))
+    })
+  })
 })

@@ -249,6 +249,7 @@ export class EditorStore {
     do {
       this.finishPendingEdits()
       await Promise.all(this.pendingEdits)
+      // requestImmediateSave returns early without pending changes, so this guard only avoids the call.
       if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave()
       await this.saveScheduler.flush()
       committed = this.finishPendingEdits()
@@ -268,6 +269,8 @@ export class EditorStore {
     this.runtime.emit()
   }
 
+  // The ready checks in the two prompt methods are redundant: only a ready snapshot can carry
+  // persistenceLocked or quitWithoutSavingPrompt, so the flag checks alone return for any other status.
   public requestQuitWithoutSavingPrompt(): void {
     if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.persistenceLocked !== true) return
     if (this.runtime.snapshot.quitWithoutSavingPrompt === true) return
@@ -303,6 +306,8 @@ export class EditorStore {
       }
 
       const parsed = parsePersistedState(loaded)
+      // parsePersistedState always supplies a view, so the optional access and the empty-list
+      // fallback below are defenses for the optional type only; no supported input reaches them.
       this.selectedRowTop = parsed.view?.selectedRowTop
       this.restoredSelectedRowTop = parsed.view?.selectedRowTop
       const expansion = expansionFromIds(parsed.view?.expandedIds ?? [])
@@ -338,6 +343,7 @@ export class EditorStore {
   }
 
   public editText(nodeId: NodeId, text: string): void {
+    // A malformed entry in place of the empty list is dropped by normalization, so it is equivalent.
     this.editContent(nodeId, text, [], false)
   }
 
@@ -913,6 +919,8 @@ export class EditorStore {
 
   private referencedAttachmentIds(): Set<AttachmentId> {
     const ids = new Set<AttachmentId>()
+    // The coordinator asks for referenced IDs only after it captured a ready state, and a store never
+    // leaves ready, so the else branch is an internal defense.
     if (this.runtime.snapshot.status === 'ready') {
       collectAttachmentIds(this.runtime.snapshot.document).forEach((id) => ids.add(id))
     }
@@ -922,9 +930,13 @@ export class EditorStore {
   }
 
   private handlePersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void {
+    // Results arrive only for a state the coordinator captured while ready, and a store never leaves
+    // ready, so this guard is an internal defense.
     if (this.runtime.snapshot.status !== 'ready') return
     if (error === undefined) {
       this.saveScheduler.resetFailures()
+      // Locking and the quit prompt both follow a failure that set saveError, and only this success
+      // path clears any of the three, so the saveError check alone decides whether to publish.
       const changed =
         this.runtime.snapshot.saveError !== undefined ||
         this.runtime.snapshot.persistenceLocked === true ||
@@ -957,6 +969,7 @@ export class EditorStore {
   }
 
   private isPersistenceLocked(): boolean {
+    // Only a ready snapshot has persistenceLocked, so the status check is redundant.
     return this.runtime.snapshot.status === 'ready' && this.runtime.snapshot.persistenceLocked === true
   }
 }

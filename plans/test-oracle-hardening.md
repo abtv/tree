@@ -90,7 +90,7 @@ Decisions reserved for the Product Owner:
 | T6b2b1 | EditorStore direct editing and text replacement survivor triage | T6b2a | Done |
 | T6b2b2 | EditorStore navigation and structural command survivor triage | T6b2b1 | Done |
 | T6b2b3 | EditorStore asynchronous clipboard and history survivor triage | T6b2b2 | Done |
-| T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Planned |
+| T6b2c | EditorStore lifecycle and persistence wiring triage | T6b2b3 | Done |
 | T6b3 | Persistence and save-policy survivor triage | T6b2c | Planned |
 | T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
@@ -782,6 +782,30 @@ Final `npm run test:mutation -- --concurrency 4` took **7m41s**, retesting 879 m
 
 Validation: `npm run check` passed on the same snapshot: 85 files, **1543** tests (24 added), 8.96 s coverage suite, build, zero audit vulnerabilities, all governance stages. Coverage **96.12 / 91.05 / 96.78 / 98.08%**. The new block passed on its first run. Primary diff review found no meaningful issues. No executable behavior or rendering change, so no E2E, visual inspection, performance suite or independent review role was required.
 
+**T6b2c result (2026-10-01).** Added 15 cases in a `lifecycle and persistence wiring outcomes` block of `editor-store.test.ts`. They cover a pending-edit finisher committing before the save an earlier change requests, a flush waiting for a clipboard edit started during its save, finishers skipped and the flush completing before ready, `reportError` before and after ready, quit-prompt publication and repeats, exactly one emission per initialization outcome (fresh, saved, failed load), typing ended and an idle save scheduled by `selectNode`, a cut and a text paste finishing after persistence locked, cleanup after a redo branch is discarded by a structural command, recovery published only when a success clears a failure, and the three-failure cleanup retry cap with each failure published. Only tests and explanatory source comments changed. No product decision, requirement gap, production defect, mutation exclusion or performance change.
+
+Task-start HEAD `0f0a08ce1727f547232baffed73c5777433a7d38` (author `abtv`, 2026-10-01, `test(application): strengthen clipboard and history mutation assertions`); the retained report matched its source. Of the 47 mutants in the range, IDs from that report:
+
+| Expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Flush: first finisher pass, pending-edit loop condition, not-ready guard | 1112, 1120, 1127 | Killed by save-count, early-completion and uncalled-finisher assertions. |
+| Flush: not-ready/locked return value | 1130 | Detected only by non-termination: the mutant makes the flush loop forever, so Stryker reports a timeout. The test that a pre-ready flush completes is the regression guard. |
+| `reportError` guard and emission; prompt repeat guards; dismissal of an absent prompt | 1138, 1142, 1154, 1156, 1162, 1163, 1167 | All killed by snapshot-identity and emission-count assertions. |
+| Initialization emissions (fresh, saved, failed) | 1181, 1192, 1197 | All killed. |
+| `selectNode` typing boundary and idle save | 1204, 1208 | Both killed. |
+| Cut/paste finishing after a lock; discarded redo branch via a structural command | 1657, 1660 | Both killed. |
+| Success clearing a failure; emission when nothing changed; cleanup retry cap and failure emission | 1694-1700, 1708, 1709, 1710, 1717, 1720 | All killed. |
+| Redundant `hasPendingChanges` guard | 1113 | Equivalent: `requestImmediateSave` returns early without pending changes. |
+| Ready checks in the quit-prompt methods and `isPersistenceLocked` | 1147, 1164, 1736 | Equivalent: only a ready snapshot carries the flags. |
+| `parsed.view` optional access and empty-list fallback | 1184, 1185, 1187, 1188 | Equivalent or unreachable: `parsePersistedState` always supplies a view. |
+| `editText` default links as a string entry | 1211 | Equivalent: normalization drops the malformed entry (as 1238/1246 in T6b2b1). |
+| Locked and prompt operands of the recovery check | 1701-1706 | Equivalent: locking and the prompt follow a failure that set `saveError`, and only the success path clears them. |
+| Ready checks in `referencedAttachmentIds` and `handlePersistenceResult` | 1674, 1686 | Internal defenses: the coordinator reaches both only after capturing a ready state, and a store never leaves ready. |
+
+Final `npm run test:mutation -- --concurrency 4 --mutate src/application/editor-store.ts` took **1m23s** at HEAD `0f0a08c` plus `sha256:8de71ff43e92d6f948f0e4a01d090fbfc141d47d283838d4c5793f77b910eb9e` (`npm run validation:snapshot`). Store score rose from **88.93% to 93.31%**: 643 to 671 killed, 79 to 47 survivors, uncovered two. Full score is **91.07%** (3282 killed, 64 timeouts, 268 survived, 60 uncovered); application **88.20%** with 204 survivors and 46 uncovered; domain **94.99%**. The ten timeouts in the flush and result-handling range are mutants that loop or hang; they count as detected, not as assertion kills. Remaining store survivors in this range are the equivalents and defenses above.
+
+Validation: `npm run check` passed on the same snapshot: 85 files, **1558** tests (15 added), build, zero audit vulnerabilities, all governance stages. Coverage **96.19 / 91.13 / 96.78 / 98.08%**. The new block passed on its first run. Primary diff review found no meaningful issues. No executable behavior or rendering change, so no E2E, visual inspection, performance suite or independent review role was required.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -884,11 +908,11 @@ T6b2a (EditorStore view-state survivor triage) is done.
 T6b2b1 (EditorStore direct editing and text replacement survivor triage) is done.
 T6b2b2 (EditorStore navigation and structural command survivor triage) is done.
 T6b2b3 (EditorStore asynchronous clipboard and history survivor triage) is done.
-T6b2c (EditorStore lifecycle and persistence wiring triage, from `applyStructural` onward plus
-pending-edit registration, initialization and flushing) is the exact next Ready task; T6b3 and
-T6b4 follow, with the break threshold in T6b4. The current full report has 236 application
-survivors and 46 uncovered mutants; regenerate it if missing and inspect its recorded source.
-T10 closure follows T6b4.
+T6b2c (EditorStore lifecycle and persistence wiring triage) is done.
+T6b3 (persistence and save-policy survivor triage: `persistence-coordinator.ts`,
+`editor-save-scheduler.ts`, `save-policy.ts`) is the exact next Ready task; T6b4 follows, with the
+break threshold. The current report has 204 application survivors and 46 uncovered mutants;
+regenerate it if missing and inspect its recorded source. T10 closure follows T6b4.
 
 ## Resume prompt
 
