@@ -3,9 +3,13 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  conformanceCitationMatches,
+  extractTestTitles,
   findBrokenLinks,
   findBrokenReferences,
   findProductQuantityRestatements,
+  findStaleConformanceCitations,
+  parseConformanceCitations,
   runChecks,
   validateAdr,
   validateAdrIndex,
@@ -107,6 +111,109 @@ describe('findProductQuantityRestatements', () => {
   })
 })
 
+describe('conformanceCitationMatches', () => {
+  it('matches an exact title or a title the citation begins', () => {
+    expect(conformanceCitationMatches('runs', 'runs')).toBe(true)
+    expect(conformanceCitationMatches('switches modes', 'switches modes and applies edits')).toBe(true)
+    expect(conformanceCitationMatches('switches edits', 'switches modes and applies edits')).toBe(false)
+  })
+
+  it('treats placeholders as wildcards on either side', () => {
+    expect(conformanceCitationMatches('reports asynchronous %s failures', 'reports asynchronous $path failures')).toBe(
+      true,
+    )
+    expect(
+      conformanceCitationMatches(
+        'clears character Visual endpoints through %s and re-anchors the next motion',
+        'clears character Visual endpoints through blur and re-anchors the next motion',
+      ),
+    ).toBe(true)
+    expect(
+      conformanceCitationMatches(
+        'clears a Normal-mode command before Cmd+.',
+        'clears a Normal-mode command before $name',
+      ),
+    ).toBe(true)
+  })
+
+  it('normalizes straight and curly apostrophes', () => {
+    expect(
+      conformanceCitationMatches(
+        'restores a different image’s saved position',
+        "restores a different image's saved position after G",
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('extractTestTitles', () => {
+  it('extracts describe, it, test, test.describe, and .each titles', () => {
+    const source = `
+      describe('outer', () => {})
+      test.describe('group', () => {
+        test('a test', () => {})
+        it.each(['a', 'b'])('runs %s', () => {})
+        it.only('only the test', () => {})
+        test.describe.configure({ mode: 'parallel' })
+      })
+    `
+    expect(extractTestTitles(source)).toEqual(['outer', 'group', 'a test', 'runs %s', 'only the test'])
+  })
+})
+
+describe('parseConformanceCitations', () => {
+  it('attributes names to the nearest preceding path in the same cell', () => {
+    const content = '| row | `e2e/a.spec.ts`: “one”, “two”; `src/b.test.ts`: “three” | “not a citation” |'
+    expect(parseConformanceCitations(content)).toEqual({
+      citedPaths: ['e2e/a.spec.ts', 'src/b.test.ts'],
+      citations: [
+        { path: 'e2e/a.spec.ts', name: 'one' },
+        { path: 'e2e/a.spec.ts', name: 'two' },
+        { path: 'src/b.test.ts', name: 'three' },
+      ],
+    })
+  })
+})
+
+describe('findStaleConformanceCitations', () => {
+  function createFixture(files) {
+    const root = createTemporaryRoot()
+    for (const [relativePath, content] of Object.entries(files)) writeFile(root, relativePath, content)
+    return root
+  }
+
+  it('accepts a matching title, an .each placeholder, and an apostrophe variant', () => {
+    const root = createFixture({
+      'src/x.test.ts': [
+        "it('matches exactly', () => {})",
+        "it.each(['a'])('reports %s failures', () => {})",
+        'it("restores a different image\'s saved position after G", () => {})',
+      ].join('\n'),
+    })
+    const content =
+      '| Product | `src/x.test.ts`: “matches exactly”, “reports %s failures”, “restores a different image’s saved position” |'
+    expect(findStaleConformanceCitations({ content, rootDirectory: root })).toEqual([])
+  })
+
+  it('reports a renamed test and a missing file', () => {
+    const root = createFixture({ 'src/x.test.ts': "it('new name', () => {})" })
+    const content = '| Product | `src/x.test.ts`: “old name”; `src/gone.test.ts`: “anything” |'
+    expect(findStaleConformanceCitations({ content, rootDirectory: root })).toEqual([
+      expect.stringContaining('cited path not found: src/gone.test.ts'),
+      expect.stringContaining('no test titled "old name" in src/x.test.ts'),
+    ])
+  })
+
+  it('ignores curly-quoted prose that no cited path introduces', () => {
+    const root = createFixture({ 'src/x.test.ts': "it('real title', () => {})" })
+    const content = [
+      'The introduction says “Covered” without citing a path.',
+      '| Product | `src/x.test.ts`: “real title” | “stray” |',
+    ].join('\n')
+    expect(findStaleConformanceCitations({ content, rootDirectory: root })).toEqual([])
+  })
+})
+
 describe('validateWorkflowOwnership', () => {
   const validAgents =
     '# Agents\n<!-- workflow-policy-owner -->\n<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->\n'
@@ -200,6 +307,15 @@ describe('runChecks', () => {
     writeFile(root, 'docs/OPEN_QUESTIONS.md', '# Questions\n> This document is non-normative.\n')
     const result = runChecks({ rootDirectory: root })
     expect(result.issues).toEqual([])
+    expect(result.liveDocumentCount).toBe(1)
+  })
+
+  it('checks Vim conformance citations as a live document', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'docs/VIM_CONFORMANCE.md', '| Product | `src/x.test.ts`: “missing name” |\n')
+    writeFile(root, 'src/x.test.ts', "it('present name', () => {})\n")
+    const result = runChecks({ rootDirectory: root })
+    expect(result.issues).toEqual([expect.stringContaining('no test titled "missing name"')])
     expect(result.liveDocumentCount).toBe(1)
   })
 })

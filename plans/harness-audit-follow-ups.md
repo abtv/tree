@@ -30,7 +30,7 @@ Decisions reserved for the Product Owner: none known. Ask if a task reveals a ma
 
 | ID | Outcome | Depends on | Validation tier | Status |
 | --- | --- | --- | --- | --- |
-| B1 | Executable check of `VIM_CONFORMANCE.md` test citations; stale citations repaired | — | Low Risk | Ready |
+| B1 | Executable check of `VIM_CONFORMANCE.md` test citations; stale citations repaired | — | Low Risk | Complete |
 | C1 | Fix-history script and its handoff line | — | Low Risk | Planned |
 | A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Planned |
 | A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Planned |
@@ -46,7 +46,7 @@ The renderer modules in scope for A are the twelve modules with no React, DOM, o
 Add a check that every test name cited in `docs/VIM_CONFORMANCE.md` names an existing test or suite in the file it is cited under, and repair the citations that fail it.
 
 * Citation format in the matrix: a backticked repository path followed by a colon and one or more names in curly quotes, for example `` `e2e/vim-text-editing.spec.ts`: “I enters Insert mode”, “A enters Insert mode” ``. A name belongs to the nearest preceding backticked path in the same table cell. Curly-quoted text not preceded by a path (for example “Covered” in the introduction) is not a citation.
-* A citation matches when the cited file contains a `describe`, `it`, or `test` title (including `.each`, `.only`-free forms, and `test.describe`) equal to the name. Titles from `.each` contain placeholders such as `$name`, `$command`, `$keys`, or `%s`; treat each placeholder as matching any non-empty text. Normalize straight and curly apostrophes before comparing.
+* A citation matches when the cited file contains a `describe`, `it`, or `test` title (including modifier forms such as `.each`, `.only`, and `test.describe`) that begins with the name: the matrix names each test by its leading phrase, so the name is a prefix of the title rather than always the full title. A name that is neither equal to nor a prefix of any title is stale. Titles from `.each` contain placeholders such as `$name`, `$command`, `$keys`, or `%s`; treat each placeholder on either side as matching any non-empty text, so a citation may name a concrete substitution of an `.each` title. Normalize straight and curly apostrophes before comparing.
 * Report every failing citation with its file and name, and exit nonzero. Report a cited path that does not exist.
 * Implement it as an exported, unit-tested function in `scripts/check-docs.mjs` (which `npm run check:docs` already runs inside `npm run check`), with tests in `scripts/check-docs.test.mjs`. A separate script is acceptable only if the parsing makes `check-docs.mjs` hard to read; then add it to `npm run check` and `opencode.json` the same way `check:requirements` is.
 * Repair each failing citation: cite the test that now covers the row under its current name, or remove the citation. If a row would be left with no real-Electron evidence that `docs/DEVELOPMENT.md` §8 requires, record that in the handoff rather than inventing a test.
@@ -112,7 +112,7 @@ Validation: Low Risk (tests): affected focused tests and `npm run check`. A defe
 
 ## Next task and resume prompt
 
-B1 is the next ready task. No task of this plan has started.
+C1 is the next ready task. B1 is complete.
 
 ```text
 Continue the Harness Audit Follow-ups plan in plans/harness-audit-follow-ups.md: execute the next ready task.

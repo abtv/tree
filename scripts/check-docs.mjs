@@ -97,6 +97,242 @@ export function findProductQuantityRestatements({ content, displayPath }) {
   return issues
 }
 
+const CONFORMANCE_DOCUMENT = 'docs/VIM_CONFORMANCE.md'
+const CONFORMANCE_CITED_PATH = /^(?:src|e2e)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs)$/
+const CONFORMANCE_PLACEHOLDER = /\$[A-Za-z_]\w*|%[a-zA-Z]/g
+const TEST_KEYWORD = /(?<![\w$.])(describe|it|test)\b/g
+
+function normalizeConformanceText(value) {
+  return value.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"')
+}
+
+function tokenizeConformancePattern(value) {
+  const units = []
+  let lastIndex = 0
+  CONFORMANCE_PLACEHOLDER.lastIndex = 0
+  let match
+  const pushLiteral = (text) => {
+    for (const char of text) units.push(char)
+  }
+  while ((match = CONFORMANCE_PLACEHOLDER.exec(value)) !== null) {
+    pushLiteral(value.slice(lastIndex, match.index))
+    units.push(null)
+    lastIndex = match.index + match[0].length
+  }
+  pushLiteral(value.slice(lastIndex))
+  return units
+}
+
+function matchConformanceUnits(nameUnits, titleUnits, nameIndex = 0, titleIndex = 0) {
+  if (nameIndex === nameUnits.length) return true
+  if (titleIndex === titleUnits.length) return false
+  const nameUnit = nameUnits[nameIndex]
+  const titleUnit = titleUnits[titleIndex]
+  if (nameUnit !== null && titleUnit !== null) {
+    return nameUnit === titleUnit && matchConformanceUnits(nameUnits, titleUnits, nameIndex + 1, titleIndex + 1)
+  }
+  if (nameUnit === null) {
+    for (let take = 1; titleIndex + take <= titleUnits.length; take += 1) {
+      if (matchConformanceUnits(nameUnits, titleUnits, nameIndex + 1, titleIndex + take)) return true
+    }
+    if (titleUnit !== null) return false
+  }
+  if (titleUnit === null) {
+    for (let take = 1; nameIndex + take <= nameUnits.length; take += 1) {
+      if (matchConformanceUnits(nameUnits, titleUnits, nameIndex + take, titleIndex + 1)) return true
+    }
+  }
+  return false
+}
+
+export function conformanceCitationMatches(name, title) {
+  return matchConformanceUnits(
+    tokenizeConformancePattern(normalizeConformanceText(name)),
+    tokenizeConformancePattern(normalizeConformanceText(title)),
+  )
+}
+
+export function parseConformanceCitations(content) {
+  const citedPaths = []
+  const citations = []
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('|')) continue
+    for (const cell of trimmed.split('|')) {
+      let currentPath
+      for (const match of cell.matchAll(/`([^`]+)`|“([^”]+)”/g)) {
+        if (match[1] !== undefined) {
+          if (CONFORMANCE_CITED_PATH.test(match[1])) {
+            currentPath = match[1]
+            if (!citedPaths.includes(currentPath)) citedPaths.push(currentPath)
+          }
+        } else if (currentPath !== undefined) {
+          citations.push({ path: currentPath, name: match[2] })
+        }
+      }
+    }
+  }
+  return { citedPaths, citations }
+}
+
+function skipTrivia(source, index) {
+  let current = index
+  for (;;) {
+    const char = source[current]
+    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+      current += 1
+      continue
+    }
+    if (char === '/' && (source[current + 1] === '/' || source[current + 1] === '*')) {
+      current = skipComment(source, current)
+      continue
+    }
+    return current
+  }
+}
+
+function skipComment(source, index) {
+  if (source[index + 1] === '/') {
+    const end = source.indexOf('\n', index)
+    return end === -1 ? source.length : end + 1
+  }
+  const end = source.indexOf('*/', index + 2)
+  return end === -1 ? source.length : end + 2
+}
+
+function skipQuoted(source, quoteIndex) {
+  const quote = source[quoteIndex]
+  let index = quoteIndex + 1
+  while (index < source.length) {
+    const char = source[index]
+    if (char === '\\') {
+      index += 2
+      continue
+    }
+    if (char === quote) return index + 1
+    index += 1
+  }
+  return index
+}
+
+function skipTemplateLiteral(source, backtickIndex) {
+  let index = backtickIndex + 1
+  while (index < source.length) {
+    const char = source[index]
+    if (char === '\\') {
+      index += 2
+      continue
+    }
+    if (char === '`') return index + 1
+    if (char === '$' && source[index + 1] === '{') {
+      index = skipBalanced(source, index + 1)
+      continue
+    }
+    index += 1
+  }
+  return index
+}
+
+const CLOSING_BRACKETS = { '(': ')', '[': ']', '{': '}' }
+
+function skipBalanced(source, openIndex) {
+  const stack = []
+  let index = openIndex
+  while (index < source.length) {
+    const char = source[index]
+    if (char === '"' || char === "'") {
+      index = skipQuoted(source, index)
+      continue
+    }
+    if (char === '`') {
+      index = skipTemplateLiteral(source, index)
+      continue
+    }
+    if (char === '/' && (source[index + 1] === '/' || source[index + 1] === '*')) {
+      index = skipComment(source, index)
+      continue
+    }
+    if (char === '(' || char === '[' || char === '{') {
+      stack.push(CLOSING_BRACKETS[char])
+      index += 1
+      continue
+    }
+    if (char === ')' || char === ']' || char === '}') {
+      stack.pop()
+      index += 1
+      if (stack.length === 0) return index
+      continue
+    }
+    index += 1
+  }
+  return index
+}
+
+function readStringLiteral(source, index) {
+  const quote = source[index]
+  if (quote === '`') {
+    return source.slice(index + 1, skipTemplateLiteral(source, index) - 1)
+  }
+  if (quote !== "'" && quote !== '"') return undefined
+  const end = skipQuoted(source, index)
+  return source.slice(index + 1, end - 1).replace(/\\(['"\\])/g, '$1')
+}
+
+export function extractTestTitles(source) {
+  const titles = []
+  TEST_KEYWORD.lastIndex = 0
+  let match
+  while ((match = TEST_KEYWORD.exec(source)) !== null) {
+    let index = match.index + match[1].length
+    for (;;) {
+      const dotIndex = skipTrivia(source, index)
+      if (source[dotIndex] !== '.') break
+      const identifier = /^[A-Za-z_$][\w$]*/.exec(source.slice(dotIndex + 1))
+      if (identifier === null) break
+      index = dotIndex + 1 + identifier[0].length
+      const afterIdentifier = skipTrivia(source, index)
+      if (identifier[0] === 'each' && source[afterIdentifier] === '(') {
+        index = skipBalanced(source, afterIdentifier)
+      } else if (identifier[0] === 'each' && source[afterIdentifier] === '`') {
+        index = skipTemplateLiteral(source, afterIdentifier)
+      }
+    }
+    const call = skipTrivia(source, index)
+    if (source[call] !== '(') continue
+    const title = readStringLiteral(source, skipTrivia(source, call + 1))
+    if (title !== undefined) titles.push(title)
+  }
+  return titles
+}
+
+export function findStaleConformanceCitations({
+  content,
+  rootDirectory,
+  displayPath = CONFORMANCE_DOCUMENT,
+  readFile = (filePath) => readFileSync(filePath, 'utf8'),
+  exists = existsSync,
+} = {}) {
+  const { citedPaths, citations } = parseConformanceCitations(content)
+  const issues = []
+  const titlesByPath = new Map()
+  for (const citedPath of citedPaths) {
+    const filePath = join(rootDirectory, citedPath)
+    if (!exists(filePath)) {
+      issues.push(`${displayPath}: cited path not found: ${citedPath}`)
+      continue
+    }
+    titlesByPath.set(citedPath, extractTestTitles(readFile(filePath)))
+  }
+  for (const citation of citations) {
+    const titles = titlesByPath.get(citation.path)
+    if (titles === undefined) continue
+    if (!titles.some((title) => conformanceCitationMatches(citation.name, title))) {
+      issues.push(`${displayPath}: no test titled "${citation.name}" in ${citation.path}`)
+    }
+  }
+  return issues
+}
+
 export function validateWorkflowOwnership({ agentContent, developmentContent }) {
   const issues = []
   const count = (content, marker) => content.split(marker).length - 1
@@ -142,7 +378,14 @@ function collectLiveDocuments(rootDirectory) {
     if (existsSync(filePath)) documents.add(filePath)
   }
   for (const name of ['README.md', 'AGENTS.md', 'SECURITY.md']) addIfPresent(join(rootDirectory, name))
-  for (const name of ['PRODUCT.md', 'OPEN_QUESTIONS.md', 'ARCHITECTURE.md', 'DEVELOPMENT.md', 'SECURITY.md']) {
+  for (const name of [
+    'PRODUCT.md',
+    'OPEN_QUESTIONS.md',
+    'ARCHITECTURE.md',
+    'DEVELOPMENT.md',
+    'SECURITY.md',
+    'VIM_CONFORMANCE.md',
+  ]) {
     addIfPresent(join(rootDirectory, 'docs', name))
   }
   const decisions = join(rootDirectory, 'docs', 'decisions')
@@ -208,6 +451,9 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     }
     if (displayPath === 'docs/OPEN_QUESTIONS.md') {
       issues.push(...validateOpenQuestions({ content, displayPath }))
+    }
+    if (displayPath === CONFORMANCE_DOCUMENT) {
+      issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))
     }
   }
   const agentPath = join(rootDirectory, 'AGENTS.md')
