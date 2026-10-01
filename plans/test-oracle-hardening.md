@@ -85,7 +85,10 @@ Decisions reserved for the Product Owner:
 | T5 | Command inventory guard for the property generators | T4 | Done |
 | T6a1 | Domain content, hyperlink, retention, and traversal assertions | T1, T5 | Done |
 | T6a2 | Remaining domain survivor classification and assertions | T6a1 | Done |
-| T6b | Application surviving-mutant triage and break threshold | T6a2 | Planned |
+| T6b1 | Command transition and history survivor triage | T6a2 | Done |
+| T6b2 | EditorStore survivor triage | T6b1 | Planned |
+| T6b3 | Persistence and save-policy survivor triage | T6b2 | Planned |
+| T6b4 | Remaining application helpers and break threshold | T6b3 | Planned |
 | T7 | Real-store test harness and outcome assertions in the input-bindings tests | T3 | Done |
 | T8a | Text-operation outcome assertions in the input-handler tests | T7 | Done |
 | T8b | Remaining input-handler outcome assertions | T8a | Done |
@@ -288,6 +291,37 @@ T6a is further divided after the first measured domain pass on 2026-10-01:
   applicable validation. Product Owner decision: any material requirement gap.
   T6b follows T6a2; the final break threshold still belongs to T6b.
 
+T6b is further divided on 2026-10-01: its retained report has 391 application
+survivors and 59 uncovered mutants, too many for one session of individual triage.
+Each task reads the report against its recorded source, regenerates it when
+missing, records dispositions and before/after scores, and runs `npm run check`
+at Low Risk for tests/comments/configuration. Any exposed production defect needs
+a separate fix and applicable validation; material requirement gaps remain
+reserved for the Product Owner.
+
+* **T6b1:** command transitions and history. Files:
+  `src/application/editor-command-transitions.test.ts`, `editor-history.test.ts`,
+  source comments in their owners, this plan and index. Acceptance: classify all
+  27 transition and 12 history surviving/uncovered mutants in the current report;
+  add outcomes for meaningful survivors and explain equivalents/defenses.
+* **T6b2:** EditorStore. Files: `src/application/editor-store.test.ts`, relevant
+  store property tests and comments in `editor-store.ts`, this plan and index.
+  Acceptance: classify all store surviving/uncovered mutants, add outcome and
+  bounded-cost assertions where required. Task-start report has 186 survivors
+  and 15 uncovered mutants; split further before implementation if needed.
+* **T6b3:** persistence and save helpers. Files: tests and source comments for
+  `persistence-coordinator.ts`, `editor-save-scheduler.ts`, `save-policy.ts`,
+  this plan and index. Acceptance: classify their remaining mutants and assert
+  observable scheduling, retention, retry and save-accounting behavior.
+* **T6b4:** remaining application collaborators. Files: application tests and
+  source comments for clipboard/content/visual/runtime/text-session/undo-focus/
+  expansion/visible-row helpers and store types, `stryker.config.mjs`,
+  Development §12, this plan and index. Acceptance: complete remaining individual
+  dispositions, reconcile any domain survivors newly exposed by timeout changes,
+  measure full scores, and set `thresholds.break` just below the
+  achieved full score. Split further if inventory cannot fit in one session.
+  T10 follows this task.
+
 * Run `npm run test:mutation` and compare with the T1 baseline.
 * Kill survivors in this order: `src/domain/document-operations.ts`, `src/application/editor-command-transitions.ts`, `src/application/editor-history.ts`, `src/application/editor-store.ts`, `src/application/persistence-coordinator.ts`, `src/application/editor-save-scheduler.ts`, then the rest.
 * Kill each survivor with an assertion on behavior, not on implementation. Mark an equivalent mutant with a Stryker disable comment that states why it is equivalent.
@@ -462,6 +496,72 @@ No runtime or rendered inputs changed, so E2E, performance runs and new
 screenshots were not required for this Low Risk task. Final completion edits
 are documentation only and checked separately; runtime results remain valid.
 
+**T6b1 result (2026-10-01).** Added 16 application cases and strengthened subtree
+paste location/focus assertions. New outcomes cover missing drag sources,
+unchanged insertion slots, heading and final-row caret boundaries, horizontal
+text movement, missing visible-row selections, empty boundary targets, ancestor
+rejection, valid undo locations, nearest surviving ancestors, root fallback,
+opaque IDs and full history-stack transfers with attachment reachability. No
+production behavior, architecture or product decisions changed. No requirement
+gap or exposed production defect; no additional mutation exclusions.
+
+The retained T6a2 report matched both source owners at task-start HEAD
+`78c0dc3b3602f9a638a39f948382867259c51a42` (author `abtv`, 2026-10-01,
+`test(domain): complete mutation survivor triage`). Every one of their 39 initial
+surviving/uncovered mutants is classified below. IDs refer to the incremental
+report; expressions and owner names identify dispositions independently of IDs.
+
+| Owner and expression | Mutant IDs | Disposition and evidence |
+| --- | --- | --- |
+| Command transitions: paste location, missing drag source, insertion direction/equality, heading/end caret, missing row, empty first/last targets, horizontal boundary, heading enter and invalid ancestor | 109, 158, 160, 162, 192, 202, 267, 280, 292, 293, 294, 297, 306, 320, 350, 383, 384, 385 | All 18 killed by independent transition outcomes. |
+| Command transitions: missing inserted ID and missing deletion destination | 103, 415 | Defensive guards: cloning always requests a root ID; the enclosing sibling branch guarantees a destination. Retained and explained in source. |
+| Command transitions: adjacent row optional access and missing-target guard | 237, 245 | Equivalent for dense visible rows: first/last branches prevent out-of-bounds lookup. Sparse visible rows are unsupported. |
+| Command transitions: same-parent ancestor guard, container path index and missing path successor | 369, 374, 392 | Equivalent: same-parent requests also fail the later missing-successor guard; searching string IDs for null returns -1; a real ancestor/container has a successor. |
+| Command transitions: defensive error messages | 106, 418 | Uncovered: valid cloning and sibling selection cannot reach their errors. |
+| History: full-stack equality, fabricated ancestor candidate, reversed ancestor order and root location object | 538, 550, 599, 600, 614 | All five killed. Full-stack transfers retain every snapshot and attachment; root fallback uses the first root even when another valid opaque ID matches the mutation placeholder. |
+| History: stack overflow guards | 537, 549 | Equivalent through the public API: begin bounds total retained entries and clears redo; undo/redo transfer one entry within that total. Changing > to >= is meaningful and killed. |
+| History: null-parent lookup fast path | 594 | Equivalent: null cannot match a valid string node ID, so the lookup still returns undefined. |
+| History: missing restored root | 610 | Internal defense: retained editor documents always have a root. Empty internal snapshots remain unsupported. |
+| History: overflow release bodies and missing-root error message | 540, 552, 613 | Uncovered under the bounded-history and nonempty-document invariants above. |
+
+Final `npm run test:mutation` passed in **1m05s**, reusing 3584 results and
+retesting 90 mutants. Snapshot: HEAD
+`78c0dc3b3602f9a638a39f948382867259c51a42`,
+`sha256:e7297a869750f803fcab49a299e42f81be2124d01f9efc0254c0ca3bbb23f53e`.
+Both recorded source owners match the final files. All **23** targeted mutants
+are `Killed`. Remaining in these owners: eight equivalents, three internal
+defenses and five uncovered defensive paths. No meaningful survivor remains
+unclassified in this task's scope.
+
+| Application file | T6a2 score / survived / uncovered | T6b1 score / survived / uncovered |
+| --- | --- | --- |
+| `editor-command-transitions.ts` | 92.66 / 25 / 2 | 97.55 / 7 / 2 |
+| `editor-history.ts` | 88.12 / 9 / 3 | 93.07 / 4 / 3 |
+
+Full score increased from **85.71% to 86.20%**: 3092 killed, 75 timeouts,
+434 survivors, 73 uncovered and two ignored. Application score is **79.75%**,
+with 370 survivors and 59 uncovered. Three domain-operation and two visible-row
+mutants previously timed out and now survive; this load-sensitive variation is
+retained in the report, not hidden. T6b4 must inspect the visible-row survivors
+and reconcile the final full inventory before setting the break threshold. The
+new domain dispositions to inspect are `document-operations.ts` IDs 2908
+(missing root slot guard), 2955 (`isValidLocation` missing-parent guard set true,
+a meaningful assertion candidate) and 3099 (sibling-insertion summary inheritance).
+Their source owners are unchanged in this task. Visible-row IDs 2150 and 2151
+remove the nonempty-child check; assess expansion-query cost as well as output.
+
+Low Risk validation: `npm run check` passed on the same snapshot after mutation
+sandbox cleanup: 84 files, **1464 tests** (16 added), **6.25s** coverage suite,
+successful build and zero audit vulnerabilities. Coverage: **95.73 / 90.39 /
+96.67 / 97.99%** (statements / branches / functions / lines). The earlier
+focused `npx vitest run src/application/editor-command-transitions.test.ts
+src/application/editor-history.test.ts` passed 47 cases before the final five
+cases were added; the standard pass subsumes it. No failed or blocked validation.
+Primary diff review found no meaningful issues. Runtime behavior and rendered
+inputs did not change, so no new E2E, performance or screenshot run was required.
+Final completion edits affect only plan documentation and are checked separately.
+The exact next task is T6b2; its larger inventory warrants a fresh session.
+
 ### T7 — Real-store harness and outcome assertions for input bindings (W3)
 
 * Add `src/renderer/test/real-store-harness.ts`: a real `EditorStore` over in-memory services (load, save, clipboard, attachments). Reuse the fakes from `src/application/test/editor-store-arbitraries.ts` rather than writing a second copy.
@@ -559,10 +659,11 @@ Validation tier: Minimal Risk (`npm run format:check:changed`, `npm run check:do
 ## Next task
 
 T1, T2, T3, T4, T5, T6a1, T6a2, T7, T8a, T8b, and T9 are done.
-T6b (application survivor triage and the break threshold) is the exact next Ready
-task. The current full report has 391 application survivors and 59 uncovered
-mutants; regenerate it if missing and inspect its recorded source. T10 closure
-follows T6b.
+T6b1 (command transition and history survivor triage) is done.
+T6b2 (EditorStore survivor triage) is the exact next Ready task; T6b3 and T6b4
+follow, with the break threshold in T6b4. The current full
+report has 370 application survivors and 59 uncovered mutants; regenerate it
+if missing and inspect its recorded source. T10 closure follows T6b4.
 
 ## Resume prompt
 

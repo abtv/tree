@@ -40,6 +40,8 @@ export class EditorHistory {
     if (previous === undefined) return undefined
     this.release(previous)
     this.future.push(this.retain(document))
+    // begin bounds past + future; undo transfers one entry without changing that total.
+    // The overflow body is unreachable through the public API, but >= would evict a valid entry.
     if (this.future.length > HISTORY_LIMIT) this.release(this.future.shift()!)
     return { document: previous.document, location: reconcileLocation(previous.document, document, location) }
   }
@@ -49,6 +51,7 @@ export class EditorHistory {
     if (next === undefined) return undefined
     this.release(next)
     this.past.push(this.retain(document))
+    // Like undo, redo transfers an entry within the already bounded total.
     if (this.past.length > HISTORY_LIMIT) this.release(this.past.shift()!)
     return { document: next.document, location: reconcileLocation(next.document, document, location) }
   }
@@ -91,11 +94,14 @@ export class EditorHistory {
 function reconcileLocation(document: Document, previousDocument: Document, previousLocation: Location): Location {
   if (isValidLocation(document, previousLocation)) return previousLocation
 
+  // A lookup of null also returns undefined because valid node IDs are strings;
+  // bypassing this container fast path changes lookup work, not the resulting location.
   const current =
     previousLocation.currentParentId === null
       ? undefined
       : locateNode(previousDocument, previousLocation.currentParentId)
   const candidates =
+    // The document container has no node ancestors; its fallback is the first root.
     current === undefined ? [] : [...current.ancestors.map((node) => node.id), current.node.id].reverse()
   for (const candidate of candidates) {
     if (locateNode(document, candidate) !== undefined) {
@@ -103,6 +109,7 @@ function reconcileLocation(document: Document, previousDocument: Document, previ
     }
   }
   const root = document.roots[0]
+  // Every retained editor document has a root; this error only defends invalid internal snapshots.
   if (root === undefined) throw new Error('An undo state must contain a root node.')
   return { currentParentId: null, selectedNodeId: root.id }
 }

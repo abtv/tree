@@ -239,4 +239,102 @@ describe('EditorHistory', () => {
       location: { currentParentId: 'root', selectedNodeId: 'root' },
     })
   })
+
+  it('preserves a valid location and selection away from the first root', () => {
+    const history = new EditorHistory()
+    const before: Document = {
+      roots: [
+        { id: 'first', text: 'First', children: [] },
+        { id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Before', children: [] }] },
+      ],
+    }
+    const after = editNodeText(before, 'child', 'After')
+    const selectedChild = { currentParentId: 'parent', selectedNodeId: 'child' }
+    history.begin(before)
+    expect(history.undo(after, selectedChild)).toEqual({ document: before, location: selectedChild })
+    const selectedRoot = { currentParentId: null, selectedNodeId: 'parent' }
+    expect(history.redo(before, selectedRoot)).toEqual({ document: after, location: selectedRoot })
+  })
+
+  it('reconciles a removed parent to the closest surviving ancestor rather than the outermost', () => {
+    const history = new EditorHistory()
+    const before: Document = {
+      roots: [{ id: 'root', text: '', children: [{ id: 'middle', text: '', children: [] }] }],
+    }
+    const after: Document = {
+      roots: [
+        {
+          id: 'root',
+          text: '',
+          children: [
+            {
+              id: 'middle',
+              text: '',
+              children: [{ id: 'removed', text: '', children: [] }],
+            },
+          ],
+        },
+      ],
+    }
+    history.begin(before)
+    expect(history.undo(after, { currentParentId: 'removed', selectedNodeId: 'removed' })).toEqual({
+      document: before,
+      location: { currentParentId: 'middle', selectedNodeId: 'middle' },
+    })
+  })
+
+  it('falls back to the first root when no ancestor survives', () => {
+    const history = new EditorHistory()
+    const before = root('Restored')
+    const after: Document = { roots: [{ id: 'removed', text: '', children: [] }] }
+    history.begin(before)
+    expect(history.undo(after, { currentParentId: 'removed', selectedNodeId: 'removed' })).toEqual({
+      document: before,
+      location,
+    })
+  })
+
+  it('falls back to the first root from the container without inventing an ancestor ID', () => {
+    const history = new EditorHistory()
+    const before: Document = {
+      roots: [
+        { id: 'first', text: 'First', children: [] },
+        // IDs are opaque strings: a mutation tool's placeholder is also a valid node ID.
+        { id: 'Stryker was here', text: 'Second', children: [] },
+      ],
+    }
+    const after: Document = { roots: [{ id: 'removed', text: '', children: [] }] }
+    history.begin(before)
+    expect(history.undo(after, { currentParentId: null, selectedNodeId: 'removed' })).toEqual({
+      document: before,
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+  })
+
+  it('keeps every entry and attachment when transferring a full history between stacks', () => {
+    const history = new EditorHistory()
+    const snapshots = Array.from({ length: HISTORY_LIMIT + 1 }, (_, index) => attached(`image-${index}`))
+    for (const snapshot of snapshots.slice(0, HISTORY_LIMIT)) history.begin(snapshot)
+    let current = snapshots[HISTORY_LIMIT]!
+    for (let index = HISTORY_LIMIT - 1; index >= 0; index -= 1) {
+      const previous = history.undo(current, location)
+      expect(previous?.document).toBe(snapshots[index])
+      current = previous!.document
+    }
+    expect(history.undo(current, location)).toBeUndefined()
+    expect([...history.documents()]).toHaveLength(HISTORY_LIMIT)
+    expect([...history.attachmentIds()].sort()).toEqual(
+      Array.from({ length: HISTORY_LIMIT }, (_, index) => `image-${index + 1}`).sort(),
+    )
+    for (let index = 1; index <= HISTORY_LIMIT; index += 1) {
+      const next = history.redo(current, location)
+      expect(next?.document).toBe(snapshots[index])
+      current = next!.document
+    }
+    expect(history.redo(current, location)).toBeUndefined()
+    expect([...history.documents()]).toHaveLength(HISTORY_LIMIT)
+    expect([...history.attachmentIds()].sort()).toEqual(
+      Array.from({ length: HISTORY_LIMIT }, (_, index) => `image-${index}`).sort(),
+    )
+  })
 })

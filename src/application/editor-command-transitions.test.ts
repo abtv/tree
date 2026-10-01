@@ -270,10 +270,12 @@ describe('editor command transitions', () => {
     if (!('document' in after) || !('document' in before)) throw new Error('Expected accepted transitions.')
 
     expect(after.document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'copy', 'second'])
-    expect(after.location.selectedNodeId).toBe('copy')
+    expect(after.location).toEqual({ currentParentId: 'root', selectedNodeId: 'copy' })
+    expect(after.focus).toEqual({ nodeId: 'copy', cursor: 0 })
     expect(after.document.roots[0]!.children[1]!.children[0]!.id).toBe('copy-child')
     expect(before.document.roots[0]!.children.map((node) => node.id)).toEqual(['before-copy', 'first', 'second'])
-    expect(before.location.selectedNodeId).toBe('before-copy')
+    expect(before.location).toEqual({ currentParentId: 'root', selectedNodeId: 'before-copy' })
+    expect(before.focus).toEqual({ nodeId: 'before-copy', cursor: 0 })
     expect(before.document.roots[0]!.children[0]!.children[0]!.id).toBe('before-child')
   })
 
@@ -457,6 +459,76 @@ describe('editor command transitions', () => {
 
     const singleRoot: Document = { roots: [{ id: 'only', text: 'Only', children: [] }] }
     expect(moveNodeTransition(singleRoot, { currentParentId: null, selectedNodeId: 'only' }, 'only', 2)).toBeUndefined()
+  })
+
+  it('ignores a drag source that no longer exists', () => {
+    expect(
+      moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'missing', 1),
+    ).toBeUndefined()
+  })
+
+  it('keeps a drag at its source insertion slot unchanged', () => {
+    expect(
+      moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'second' }, 'second', 1),
+    ).toBeUndefined()
+  })
+
+  it('does not route horizontal text movement from a heading to its child', () => {
+    const heading = { currentParentId: 'root', selectedNodeId: 'root' }
+    const rows = rowsFor(document, heading)
+    expect(moveHorizontalTransition(document, heading, rows, 'left', 4)).toBeUndefined()
+    expect(moveHorizontalTransition(document, heading, rows, 'right', 2)).toBeUndefined()
+    expect(moveHorizontalTransition(document, heading, rows, 'right', 4)).toEqual({ nodeId: 'first', cursor: 0 })
+  })
+
+  it('moves the caret within a heading or final row when vertical navigation has no adjacent row', () => {
+    const heading = { currentParentId: 'second', selectedNodeId: 'second' }
+    expect(moveSelectionTransition(document, heading, [], 'up', 3)).toEqual({ nodeId: 'second', cursor: 0 })
+    expect(moveSelectionTransition(document, heading, [], 'down', 3)).toEqual({ nodeId: 'second', cursor: 6 })
+    expect(moveSelectionTransition(document, heading, [], 'down', 6)).toBeUndefined()
+    const final = { currentParentId: 'root', selectedNodeId: 'second' }
+    expect(moveSelectionTransition(document, final, rowsFor(document, final), 'down', 2)).toEqual({
+      nodeId: 'second',
+      cursor: 6,
+    })
+  })
+
+  it('does not enter an already selected heading even when it has children', () => {
+    expect(enterTransition(document, { currentParentId: 'root', selectedNodeId: 'root' })).toBeUndefined()
+  })
+
+  it('ignores horizontal navigation from a node absent from the visible rows', () => {
+    const location = { currentParentId: 'root', selectedNodeId: 'second' }
+    const rows = rowsFor(document, location).slice(0, 1)
+    expect(moveHorizontalTransition(document, location, rows, 'left', 0)).toBeUndefined()
+  })
+
+  it('keeps a leftward text motion inside a child when the caret is not at its beginning', () => {
+    const location = { currentParentId: 'root', selectedNodeId: 'second' }
+    expect(moveHorizontalTransition(document, location, rowsFor(document, location), 'left', 2)).toBeUndefined()
+  })
+
+  it('ignores downward movement from a node absent from the visible rows', () => {
+    const location = { currentParentId: 'root', selectedNodeId: 'missing' }
+    expect(moveSelectionTransition(document, location, rowsFor(document, location), 'down', 2)).toBeUndefined()
+  })
+
+  it('leaves an empty heading without a last-row boundary target', () => {
+    const location = { currentParentId: 'second', selectedNodeId: 'second' }
+    expect(moveSelectionBoundaryTransition(document, location, [], 'last', 0)).toBeUndefined()
+    expect(moveSelectionBoundaryTransition(document, location, [], 'first', 0)).toBeUndefined()
+  })
+
+  it('rejects ancestor navigation to an unrelated or missing node', () => {
+    const location = { currentParentId: 'root', selectedNodeId: 'first' }
+    expect(ancestorNavigationTransition(document, location, 'other-root')).toBeUndefined()
+    expect(ancestorNavigationTransition(document, location, 'missing')).toBeUndefined()
+  })
+
+  it('does not navigate to an ancestor from the document container', () => {
+    expect(
+      ancestorNavigationTransition(document, { currentParentId: null, selectedNodeId: 'root' }, 'root'),
+    ).toBeUndefined()
   })
 
   describe('sibling-relative commands at descendant depth (inline expansion)', () => {

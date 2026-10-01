@@ -58,6 +58,8 @@ export function pasteSubtreeTransition(
     if (insertedId === undefined) insertedId = id
     return id
   })
+  // insertSubtreeSibling clones a nonempty subtree and calls createId for its root.
+  // This guard is defensive against a broken collaborator, not a reachable paste outcome.
   if (insertedId === undefined) throw new Error('Subtree paste did not create a sibling.')
   return {
     document: nextDocument,
@@ -186,6 +188,7 @@ export function moveSelectionTransition(
     return cursor === node.text.length ? undefined : { nodeId: node.id, cursor: node.text.length }
   }
   const target = visibleRows[index + (direction === 'up' ? -1 : 1)]?.node
+  // Dense visible rows and the first/last-row branches above guarantee this slot exists.
   return target === undefined ? undefined : { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
 
@@ -269,8 +272,11 @@ export function ancestorNavigationTransition(
 ): LocationTransition | undefined {
   if (parentId === location.currentParentId || location.currentParentId === null) return undefined
   const path = nodePath(document, location.currentParentId)
+  // Searching for null gives the same -1 as the container fast path: node IDs are strings.
   const parentIndex = parentId === null ? -1 : path.findIndex((node) => node.id === parentId)
   const selected = path[parentIndex + 1]
+  // A same-parent request resolves to the last path entry, so its successor is absent.
+  // For a real ancestor or the container, the successor always exists in this dense path.
   if ((parentIndex === -1 && parentId !== null) || selected === undefined) return undefined
   return {
     location: { currentParentId: parentId, selectedNodeId: selected.id },
@@ -293,6 +299,7 @@ export function deleteSelectedTransition(
 
   if (nextSibling !== undefined || previousSibling !== undefined) {
     const destination = nextSibling ?? previousSibling
+    // The enclosing branch guarantees at least one sibling; ?? therefore finds a destination.
     if (destination === undefined) throw new Error('A sibling destination was not found.')
     nextLocation = { ...location, selectedNodeId: destination.id }
   } else if (selected.parent !== null) {
