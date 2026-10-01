@@ -107,6 +107,10 @@ const developCases = {
     // Guardrailed deletion of one tracked file; the script enforces the path checks.
     'npm run retire:file -- e2e/vim-editing.spec.ts',
     'npm run retire:file -- src/renderer/editor-dom.ts 2>&1',
+    // Fix-history signal for a defect fix; see AGENTS.md §12 and docs/DEVELOPMENT.md §10.
+    'npm run fix:history',
+    'npm run fix:history 2>&1',
+    'npm run fix:history -- --since 2026-09-13 --until 2026-09-28 src/renderer/vim-text-commands.ts',
     'npm audit --omit=dev',
     'rm WORKING_PLAN.md',
     'rm -f WORKING_PLAN.md',
@@ -209,6 +213,7 @@ const developCases = {
     'npm run format:check:changed-extra',
     'npm run validation:snapshot-extra',
     'npm run retire:file-extra',
+    'npm run fix:history-extra',
     'FOO=1 npm run validation:snapshot',
     'TREE_E2E_VISIBLE=1 npm run format:check:changed',
     'unzip archive.zip',

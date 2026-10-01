@@ -26,6 +26,7 @@
     "format:check:changed": "node scripts/check-format-changed.mjs",
     "validation:snapshot": "node scripts/validation-snapshot.mjs",
     "retire:file": "node scripts/retire-file.mjs",
+    "fix:history": "node scripts/fix-history.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:requirements": "node scripts/check-requirement-coverage.mjs",
     "check:opencode": "node scripts/check-opencode-permissions.mjs",

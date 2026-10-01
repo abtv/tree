@@ -31,7 +31,7 @@ Decisions reserved for the Product Owner: none known. Ask if a task reveals a ma
 | ID | Outcome | Depends on | Validation tier | Status |
 | --- | --- | --- | --- | --- |
 | B1 | Executable check of `VIM_CONFORMANCE.md` test citations; stale citations repaired | — | Low Risk | Complete |
-| C1 | Fix-history script and its handoff line | — | Low Risk | Planned |
+| C1 | Fix-history script and its handoff line | — | Low Risk | Complete |
 | A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Planned |
 | A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Planned |
 | A3 | Survivor triage: caret and session owner modules | A2 | Low Risk (Moderate for a fix commit) | Planned |
@@ -76,6 +76,34 @@ Acceptance: unit tests against a temporary Git repository cover the window bound
 
 Validation: Low Risk with validation tooling and agent policy changed, so `npm run check` (which includes `check:opencode`).
 
+Recorded acceptance output (2026-10-02, `HEAD` `8fb5fe8`, `npm run fix:history -- --since 2026-09-13 --until 2026-09-28 src/renderer/use-node-input-bindings.ts`), showing the 2026-09-26/27 Vim caret fixes and the signal line:
+
+```text
+Fix history for 2026-09-13 to 2026-09-28
+src/renderer/use-node-input-bindings.ts
+  be7eb3a 2026-09-27 fix(renderer): commit a pending Replace edit before the shutdown flush
+  b4f5d35 2026-09-27 fix(renderer): resolve editing state before cut, paste, and select all
+  cfcd9ac 2026-09-27 fix(renderer): clear pending commands and whole-node Visual on focus-changing commands
+  73c070f 2026-09-27 fix(renderer): clear stale Visual state on mode exit and focus changes
+  15be9e7 2026-09-27 fix(vim): unify Insert and Replace session completion across triggers
+  4a11d8a 2026-09-27 fix(vim): flush Replace edits before history shortcuts
+  49c79e7 2026-09-27 fix(vim): preserve image caret across no-op focus transitions
+  6df0ac1 2026-09-27 fix(vim): resync image caret when store.enter() paths keep the same node
+  1a87568 2026-09-26 fix(vim): resync image caret after undo, redo, and leave
+  1025282 2026-09-26 fix(vim): keep image caret synchronized across navigation
+  c2e74ea 2026-09-26 fix(vim): restore text position after image navigation
+  8af9c30 2026-09-26 fix(vim): support counts for node commands
+  a3cb1b6 2026-09-26 fix(vim): open child nodes with o
+  158258e 2026-09-26 fix(vim): preserve normal mode during node drag
+  37be2ef 2026-09-25 fix(vim): position hyperlink carets on wrapped lines
+  76ff511 2026-09-25 fix(vim): clear link carets when focus changes
+  59da5c3 2026-09-22 fix(vim): preserve normal caret across focus changes
+  f9d7997 2026-09-20 fix(renderer): preserve selection on secondary click
+  65a7949 2026-09-13 Fix selection highlight for hyperlinks
+
+Possible shared design cause: src/renderer/use-node-input-bindings.ts each have 3 or more fix commits in the window. Consider a structural initiative under AGENTS.md §8, or state why none is needed.
+```
+
 ### A1 — Renderer mutation baseline
 
 Measure the twelve modules without changing configuration.
@@ -112,7 +140,7 @@ Validation: Low Risk (tests): affected focused tests and `npm run check`. A defe
 
 ## Next task and resume prompt
 
-C1 is the next ready task. B1 is complete.
+A1 is the next ready task. B1 and C1 are complete.
 
 ```text
 Continue the Harness Audit Follow-ups plan in plans/harness-audit-follow-ups.md: execute the next ready task.

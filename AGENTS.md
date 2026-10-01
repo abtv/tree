@@ -384,6 +384,7 @@ For a multi-session initiative, commit the updated task status and next task wit
 Before ending a session or authorized outcome, provide an explicit handoff that states:
 
 * what was completed;
+* for a defect fix, the output of `npm run fix:history`, and, when it reports a possible shared cause, a proposed structural initiative under §8 or a stated reason why none is needed;
 * every product decision made on the Product Owner's behalf under §5, with the recorded principle each one followed;
 * which validation passed;
 * which validation failed or was blocked;

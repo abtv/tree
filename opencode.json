@@ -122,6 +122,8 @@
           "npm run validation:snapshot *": "allow",
           "npm run retire:file": "allow",
           "npm run retire:file *": "allow",
+          "npm run fix:history": "allow",
+          "npm run fix:history *": "allow",
           "npm run changelog": "allow",
           "npm run changelog *": "allow",
           "npm run doctor": "allow",
