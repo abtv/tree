@@ -25,6 +25,7 @@ export function siblingBoundaryIndices(rows: readonly VisibleRow[], parentId: st
     while (index < rows.length && rows[index]!.depth > childDepth) index += 1
     lastBlockEnd = index
   }
+  // Mutation triage: a found child always ends its block at an index of at least 1, so `> 0` is equivalent.
   if (lastBlockEnd >= 0) boundaries.push(lastBlockEnd)
   return boundaries
 }

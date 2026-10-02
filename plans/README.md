@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Harness Audit Follow-ups](harness-audit-follow-ups.md) | Active | A4: drag and list survivor triage, scope extension, and batch close |
+| [Harness Audit Follow-ups](harness-audit-follow-ups.md) | Active | None ready; remove the plan once the Product Owner confirms no further tasks remain |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

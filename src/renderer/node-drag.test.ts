@@ -153,6 +153,35 @@ describe('insertionIndexAtPoint', () => {
     expect(insertionIndexAtPoint(regions, 14870)).toBe(551)
     expect(insertionIndexAtPoint(regions, 20000)).toBe(551)
   })
+
+  it('maps a point exactly on the bottom edge of a row above a gap to the position after that row', () => {
+    const regions = [
+      { index: 0, top: 0, bottom: 27 },
+      { index: 36, top: 972, bottom: 999 },
+      { index: 550, top: 14850, bottom: 14877 },
+    ]
+    expect(insertionIndexAtPoint(regions, 27)).toBe(1)
+    expect(insertionIndexAtPoint(regions, 999)).toBe(37)
+  })
+
+  it('maps a gap to the position after the lowest row above it in any region order', () => {
+    const regions = [
+      { index: 550, top: 14850, bottom: 14877 },
+      { index: 36, top: 972, bottom: 999 },
+      { index: 0, top: 0, bottom: 27 },
+    ]
+    expect(insertionIndexAtPoint(regions, 500)).toBe(1)
+    expect(insertionIndexAtPoint(regions, 10000)).toBe(37)
+    expect(
+      insertionIndexAtPoint(
+        [
+          { index: 36, top: 972, bottom: 999 },
+          { index: 0, top: 0, bottom: 27 },
+        ],
+        10000,
+      ),
+    ).toBe(37)
+  })
 })
 
 describe('shouldCommitMove', () => {
@@ -190,5 +219,22 @@ describe('dropMarkerFor', () => {
     expect(dropMarkerFor(551, 600, [0, 1, 2, 550])).toEqual({ index: 550, before: false })
     expect(dropMarkerFor(550, 600, [0, 1, 2, 550])).toEqual({ index: 550, before: true })
     expect(dropMarkerFor(1, 600, [2, 3, 4])).toBeUndefined()
+  })
+
+  it('marks the lowest mounted row above the target in any mounted order', () => {
+    expect(dropMarkerFor(5, 600, [4, 3, 2])).toEqual({ index: 4, before: false })
+    expect(dropMarkerFor(5, 600, [3, 4, 2])).toEqual({ index: 4, before: false })
+  })
+
+  it('marks the end of a windowed list after its last mounted row, never before a row past the end', () => {
+    expect(dropMarkerFor(4, 4, [2, 3])).toEqual({ index: 3, before: false })
+    expect(dropMarkerFor(4, 4, [2, 3, 4])).toEqual({ index: 3, before: false })
+  })
+
+  it('keeps an idle gesture identity for stale pointer events', () => {
+    const idleWithSource: NodeDragState = { phase: 'idle', source }
+    expect(nodeDragReducer(idleWithSource, { type: 'release', pointerId: source.pointerId })).toBe(idleWithSource)
+    expect(nodeDragReducer(idleWithSource, { type: 'cancel' })).toBe(idleWithSource)
+    expect(resolveNodeDrag(idleWithSource, { locked: true, sourceAvailable: false })).toBe(idleWithSource)
   })
 })

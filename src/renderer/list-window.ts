@@ -52,6 +52,8 @@ export function computeListWindow({
   overscan,
   focusedIndex,
 }: ListWindowOptions): ListWindow {
+  // Mutation triage: for an empty list the code below also yields `{ start: 0, end: 0 }` with no pinned
+  // row, and the binary searches never return more than `count`, so the upper clamp bounds are redundant.
   if (count <= 0) return { start: 0, end: 0, pinnedIndex: undefined }
   const clampedStart = Math.max(0, viewportStart)
   const clampedEnd = Math.max(0, viewportEnd)
@@ -59,6 +61,7 @@ export function computeListWindow({
   const lastVisible = clamp(lowerBound(offsets, count, clampedEnd) - 1, 0, count - 1)
   const start = Math.max(0, firstVisible - overscan)
   const end = Math.min(count, lastVisible + 1 + overscan)
+  // Mutation triage: `undefined >= 0` is false, so the explicit `undefined` check is redundant.
   const pinnedIndex =
     focusedIndex !== undefined &&
     focusedIndex >= 0 &&

@@ -35,7 +35,7 @@ Decisions reserved for the Product Owner: none known. Ask if a task reveals a ma
 | A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Complete |
 | A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Complete |
 | A3 | Survivor triage: caret and session owner modules | A2 | Low Risk (Moderate for a fix commit) | Complete |
-| A4 | Survivor triage: drag and list modules; add the renderer modules to the mutation scope; close the batch | A3 | Low Risk | Planned |
+| A4 | Survivor triage: drag and list modules; add the renderer modules to the mutation scope; close the batch | A3 | Low Risk | Complete (plan removal awaits Product Owner confirmation) |
 
 Order rationale: B1 and C1 are small and independent and repair or prevent current harness drift, so they go first. A1-A4 are sequential because each triage task reads the A1 baseline and A4 changes the shared configuration only after the score is high enough not to break the weekly run.
 
@@ -160,6 +160,21 @@ The tests added are in `vim-vertical-navigation.test.ts` (not-ready store, count
 
 Observation for the Product Owner (not a task): those unreachable branches in `vim-vertical-navigation.ts` are dead code under the current types, so removing them would be a behavior-neutral simplification. This batch does not authorize it. Validation: the three colocated test files passed, and `npm run check` passed end to end (1719 tests) with no coverage floor change. The narrow run's combined score was 93.64, above the 93 break threshold, with the other renderer modules still at their A1 or A2 values.
 
+**A4 result (2026-10-02).** Narrow runs at `HEAD` `7ac8470` plus the A4 working tree. Test additions and `// Mutation triage` comments only; no production behavior changed and no defect was found. `drag-caret-freeze.ts` already scored 100. All 18 remaining survivors are equivalent mutants, each explained in a source comment: the optional chains on `source` (defined in every non-idle phase), the tie and edge comparisons in `insertionIndexAtPoint` (a bottom edge reaches the same index through the next row or the gap rule), the redundant empty-list guard and upper clamps in `computeListWindow`, the redundant `focusedIndex !== undefined` check, the tie comparison in `dropMarkerFor`, and `lastBlockEnd >= 0` in `siblingBoundaryIndices`.
+
+| Module | A1 total % / covered % | After total % / covered % | A1 survived → after |
+| --- | --- | --- | --- |
+| `node-drag.ts` | 87.63 / 87.63 | 93.81 / 93.81 | 24 → 12 |
+| `list-window.ts` | 84.78 / 84.78 | 94.57 / 94.57 | 14 → 5 |
+| `visible-tree.ts` | 97.44 / 97.44 | 97.44 / 97.44 | 1 → 1 |
+| `drag-caret-freeze.ts` | 100 / 100 | 100 / 100 | 0 → 0 |
+
+The tests added are in `list-window.test.ts` (`autoScrollStep` margins, which had no unit test, and pinned-row window edges) and `node-drag.test.ts` (bottom-edge and region-order gap cases, mounted-order and end-of-list drop markers, idle-state identity).
+
+**Batch close (2026-10-02).** The twelve renderer modules are added to `mutate` in `stryker.config.mjs`. Full run `npm run test:mutation -- --force`: **93.86% total (94.88% of covered)**, 5288 killed, 126 timed out, 292 survived, 62 uncovered, **15m22s**, so the 90-minute limit in `.github/workflows/mutation.yml` needs no change, and `thresholds.break` stays 93 because the margin is under one point and timeout classification moves a module by a few points (`vim-surround.ts` scored 83.58 in this run against 92.31 in its narrow run). `docs/DEVELOPMENT.md` §12 names the renderer modules. An earlier full run was stopped by a 10-minute tool timeout at 85% and discarded. Validation: the five colocated test files passed (59 tests); `npm run check` is recorded in the handoff.
+
+Open item for the Product Owner: say whether any further tasks remain. If none, the next session removes this plan and its index row (`AGENTS.md` §8). Items D and E from the unverified remainder stay untracked.
+
 ### A2, A3, A4 — Survivor triage
 
 Each task reads the surviving mutants for its modules in `reports/mutation/mutation.html` after a narrow run (`npm run test:mutation -- --mutate <its modules>`), and treats each survivor as a question about a missing assertion, following `docs/DEVELOPMENT.md` §12: kill it with an assertion on behavior in the module's colocated test, or leave an equivalent mutant with a Stryker disable comment stating why. When a survivor reveals a real defect, fix it defect-first in a separate commit. Record per-file score before and after in this plan.
@@ -182,8 +197,4 @@ Validation: Low Risk (tests): affected focused tests and `npm run check`. A defe
 
 ## Next task and resume prompt
 
-A4 is the next ready task. B1, C1, A1, A2, and A3 are complete.
-
-```text
-Continue the Harness Audit Follow-ups plan in plans/harness-audit-follow-ups.md: execute the next ready task.
-```
+All tasks (B1, C1, A1-A4) are complete. No task is ready. The only remaining step is removing this plan and its index row once the Product Owner confirms no further tasks remain.

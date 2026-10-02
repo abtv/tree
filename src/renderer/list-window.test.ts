@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  autoScrollStep,
   computeListWindow,
   computeOffsets,
+  EDGE_SCROLL_MARGIN,
+  EDGE_SCROLL_STEP,
   ROW_HEIGHT_ESTIMATE,
   shouldWindow,
   WINDOW_OVERSCAN,
@@ -14,6 +17,23 @@ describe('shouldWindow', () => {
   it('windows only above the threshold', () => {
     expect(shouldWindow(WINDOWING_THRESHOLD)).toBe(false)
     expect(shouldWindow(WINDOWING_THRESHOLD + 1)).toBe(true)
+  })
+})
+
+describe('autoScrollStep', () => {
+  const viewportHeight = 800
+
+  it('scrolls up inside the top margin and down inside the bottom margin', () => {
+    expect(autoScrollStep(0, viewportHeight)).toBe(-EDGE_SCROLL_STEP)
+    expect(autoScrollStep(EDGE_SCROLL_MARGIN - 1, viewportHeight)).toBe(-EDGE_SCROLL_STEP)
+    expect(autoScrollStep(viewportHeight, viewportHeight)).toBe(EDGE_SCROLL_STEP)
+    expect(autoScrollStep(viewportHeight - EDGE_SCROLL_MARGIN + 1, viewportHeight)).toBe(EDGE_SCROLL_STEP)
+  })
+
+  it('does not scroll exactly on a margin line or between the margins', () => {
+    expect(autoScrollStep(EDGE_SCROLL_MARGIN, viewportHeight)).toBe(0)
+    expect(autoScrollStep(viewportHeight - EDGE_SCROLL_MARGIN, viewportHeight)).toBe(0)
+    expect(autoScrollStep(viewportHeight / 2, viewportHeight)).toBe(0)
   })
 })
 
@@ -163,6 +183,25 @@ describe('computeListWindow', () => {
       focusedIndex: 1,
     })
     expect(inside.pinnedIndex).toBeUndefined()
+  })
+
+  it('pins a focused row exactly one row outside either window edge and not on the edges', () => {
+    const offsets = computeOffsets(uniform(600)).offsets
+    const options = {
+      count: 600,
+      offsets,
+      viewportStart: ROW_HEIGHT_ESTIMATE * 100,
+      viewportEnd: ROW_HEIGHT_ESTIMATE * 102,
+      overscan: 0,
+    }
+    const pinned = (focusedIndex: number): number | undefined =>
+      computeListWindow({ ...options, focusedIndex }).pinnedIndex
+    expect(pinned(100)).toBeUndefined()
+    expect(pinned(101)).toBeUndefined()
+    expect(pinned(99)).toBe(99)
+    expect(pinned(102)).toBe(102)
+    expect(pinned(0)).toBe(0)
+    expect(pinned(599)).toBe(599)
   })
 
   it('ignores an out-of-range focused index', () => {

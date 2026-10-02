@@ -35,6 +35,8 @@ export function nodeDragReducer(state: NodeDragState, action: NodeDragAction): N
       if (action.button !== 0 || !action.isPrimary || action.pointerType !== 'mouse') return state
       return { phase: 'pending', source: action.source }
     case 'hold':
+      // Mutation triage: `source` is defined in every non-idle phase, so the optional chain here and in
+      // `release` only guards a state the reducer never produces.
       if (state.phase !== 'pending' || state.source?.pointerId !== action.pointerId) return state
       return { phase: 'dragging', source: state.source }
     case 'release':
@@ -76,6 +78,11 @@ export function insertionIndexAtPoint(regions: readonly NodeDropRegion[], pointe
   let topmost = regions[0]!
   let bottommost = regions[0]!
   let previous: NodeDropRegion | undefined
+  // Mutation triage: the remaining survivors in this function are equivalent for rows with a positive
+  // height and distinct tops, bottoms, and indices. A point on a row's bottom edge falls to the next row's
+  // top edge or to the gap rule, and both give `index + 1`; a point above every row, or on the last row's
+  // bottom edge, reaches the same index through the `previous` rule; `previous` is always defined once a
+  // point is not above the topmost row and inside no row; ties between regions cannot occur.
   for (const region of regions) {
     if (pointerY >= region.top && pointerY < region.bottom) {
       const middle = region.top + (region.bottom - region.top) / 2
@@ -116,6 +123,7 @@ export function dropMarkerFor(
   }
   let beforeIndex: number | undefined
   let afterIndex: number | undefined
+  // Mutation triage: mounted indices are distinct, so `>` and `>=` select the same row.
   for (const index of mountedIndices) {
     if (index === dropIndex && index < count) beforeIndex = index
     else if (index < dropIndex && (afterIndex === undefined || index > afterIndex)) afterIndex = index
