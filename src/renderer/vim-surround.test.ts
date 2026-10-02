@@ -64,6 +64,24 @@ describe('Vim surround edits', () => {
     expect(apply('a ( b ) c', surroundDeleteEdits('a ( b ) c', 4, ')', 1))).toBe('a  b  c')
   })
 
+  it('deletes a compact bracket pair whether the target uses either delimiter', () => {
+    expect(apply('a(b)c', surroundDeleteEdits('a(b)c', 2, '(', 1))).toBe('abc')
+    expect(apply('a(b)c', surroundDeleteEdits('a(b)c', 3, ')', 1))).toBe('abc')
+  })
+
+  it('wraps and changes using the backtick delimiter', () => {
+    expect(apply('x y', surroundWrapEdits(0, 1, '`'))).toBe('`x` y')
+    expect(apply('`x`', surroundChangeEdits('`x`', 1, '`', ')', 1))).toBe('(x)')
+  })
+
+  it('wraps with the single-quote delimiter', () => {
+    expect(apply('x y', surroundWrapEdits(0, 1, "'"))).toBe("'x' y")
+  })
+
+  it('keeps the trimmed inner range when changing a padded pair', () => {
+    expect(apply('a(b )c', surroundChangeEdits('a(b )c', 2, '(', ')', 1))).toBe('a(b)c')
+  })
+
   it('changes one pair into another and honors the replacement padding', () => {
     expect(apply('say "hi" now', surroundChangeEdits('say "hi" now', 5, '"', ')', 1))).toBe('say (hi) now')
     expect(apply('say "hi" now', surroundChangeEdits('say "hi" now', 5, '"', '(', 1))).toBe('say ( hi ) now')

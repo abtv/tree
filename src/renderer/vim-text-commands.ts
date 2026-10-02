@@ -23,6 +23,8 @@ import type { VimFindCommand } from './vim-keyboard-types'
 import type { VimSurroundChange, VimTextChange } from './vim-keyboard-types'
 import { vimPastePosition } from './vim-editing'
 
+// Mutation triage: `Number('')` is `0`, which the surrounding `Math.max(1, ...)` raises to `1`, so
+// both the empty-string test and its forced-false branch are equivalent to the literal `1`.
 export function parseCount(value: string): number {
   return value === '' ? 1 : Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Number(value)))
 }
@@ -106,6 +108,7 @@ export function textMotion(
       else if (motion === 'E') target = moveWORDEnd(text, target)
       else if (motion === 'ge') target = moveWordEndBackward(text, target)
       else if (motion === 'W') target = moveWORDForward(text, target)
+      // Mutation triage: only `w` reaches this arm, so forcing `motion === 'w'` true is equivalent.
       else if (motion === 'w' && changeWord && /\S/u.test(text[cursor] ?? '') && index === count - 1)
         target = currentWordEnd(text, target)
       else target = moveWordForward(text, target)
@@ -115,12 +118,15 @@ export function textMotion(
     end = Math.max(cursor, target)
     if (motion === 'e' || motion === 'E' || (motion === 'w' && changeWord && /\S/u.test(text[cursor] ?? '')))
       end = Math.min(length, end + 1)
+    // Mutation triage: a motion is at most two characters, so removing the `^` anchor cannot make a
+    // non-find motion match `[fFtT].`.
   } else if (/^[fFtT]./u.test(motion)) {
     const kind = motion[0]
     const found = findCharacter(
       text,
       cursor,
       motion.slice(1),
+      // Mutation triage: `findCharacter` treats any direction other than `'forward'` as backward.
       kind === 'f' || kind === 't' ? 'forward' : 'backward',
       count,
     )
@@ -147,6 +153,8 @@ export function transformCase(text: string, mode: 'toggle' | 'lower' | 'upper'):
   ).join('')
 }
 
+// Mutation triage: the two prefix bounds are redundant with each other, and a forced-true or
+// inclusive bound still stops when `before[start]` and `after[start]` differ or one is undefined.
 export function textDifference(before: string, after: string): { start: number; end: number; inserted: string } {
   let start = 0
   while (start < before.length && start < after.length && before[start] === after[start]) start += 1
@@ -180,6 +188,7 @@ export function calculateTextChange(
 ): CalculatedTextChange | undefined {
   let start = cursor
   let end = cursor
+  // Mutation triage: every branch that reads `inserted` assigns it first, so the initializer is dead.
   let inserted = ''
   let nextCursor = cursor
   if (change.kind === 'delete' || change.kind === 'change' || change.kind === 'yank') {
@@ -215,6 +224,7 @@ export function calculateTextChange(
     end = Math.min(text.length, cursor + change.replaced)
     inserted = change.text
     nextCursor = cursor + Math.max(0, inserted.length - 1)
+    // Mutation triage: `case` is the last arm of an exhaustive union, so only `case` reaches it.
   } else if (change.kind === 'case') {
     end = Math.min(text.length, cursor + change.count)
     if (start === end) return undefined
@@ -225,6 +235,8 @@ export function calculateTextChange(
     start !== end && (change.kind === 'delete' || change.kind === 'change' || change.kind === 'substitute')
       ? text.slice(start, end)
       : undefined
+  // Mutation triage: this OR is evaluated only once `replay` is true, and callers set `replay` only
+  // for insert/change/substitute, so forcing one disjunct true cannot change a replay.
   if (replay && (change.kind === 'insert' || change.kind === 'change' || change.kind === 'substitute')) {
     const baseline = text.slice(0, start) + text.slice(end)
     const position = Math.max(0, Math.min(start + (change.insertOffset ?? 0), baseline.length))
@@ -245,6 +257,7 @@ export function calculateTextChange(
     inserted,
     nextText: text.slice(0, start) + inserted + text.slice(end),
     nextCursor,
+    // Mutation triage: spreading `{ registerText: undefined }` is the same for every value reader.
     ...(registerText === undefined ? {} : { registerText }),
   }
 }

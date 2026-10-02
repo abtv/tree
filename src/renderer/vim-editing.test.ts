@@ -3,6 +3,7 @@ import {
   currentWordEnd,
   findCharacter,
   firstNonWhitespace,
+  imageTextReturnCursor,
   moveWORDBackward,
   moveWORDEnd,
   moveWORDForward,
@@ -211,5 +212,142 @@ describe('Vim image caret cursor rule', () => {
 
   it('is never active without an attachment, regardless of cursor', () => {
     expect(isImageCaretCursor(false, 2, 2)).toBe(false)
+  })
+})
+
+describe('Vim image text return cursor', () => {
+  it('has no return position for an image-only node', () => {
+    expect(imageTextReturnCursor(0, 3, 0)).toBeUndefined()
+  })
+
+  it('records the final text character reached by a counted motion', () => {
+    expect(imageTextReturnCursor(0, 1, 5)).toBe(0)
+    expect(imageTextReturnCursor(2, 3, 10)).toBe(4)
+    expect(imageTextReturnCursor(8, 5, 10)).toBe(9)
+  })
+})
+
+describe('Vim word motions at boundaries', () => {
+  it('moves across whitespace runs and stops at the next word start', () => {
+    expect(moveWordForward('one  two', 0)).toBe(5)
+    expect(moveWordForward('one  two', 3)).toBe(5)
+    expect(moveWordForward('one  two', 5)).toBe(8)
+    expect(moveWordForward('a b', 0)).toBe(2)
+    expect(moveWordForward('one', 2)).toBe(3)
+    expect(moveWordForward('', 0)).toBe(0)
+    expect(moveWordBackward('one  two', 8)).toBe(5)
+    expect(moveWordBackward('one  two', 3)).toBe(0)
+    expect(moveWordBackward('', 0)).toBe(0)
+  })
+
+  it('moves to word ends, including across whitespace and the empty node', () => {
+    expect(moveWordEnd('one two', 0)).toBe(2)
+    expect(moveWordEnd('one two', 3)).toBe(6)
+    expect(moveWordEnd('one ', 0)).toBe(2)
+    expect(moveWordEnd('one  ', 2)).toBe(4)
+    expect(moveWordEnd('', 0)).toBe(0)
+  })
+
+  it('moves by whitespace-delimited WORDs at boundaries', () => {
+    expect(moveWORDForward('foo  bar', 3)).toBe(5)
+    expect(moveWORDForward('foo', 3)).toBe(3)
+    expect(moveWORDBackward('foo  bar', 5)).toBe(0)
+    expect(moveWORDBackward('', 0)).toBe(0)
+    expect(moveWORDEnd('foo.bar  baz', 9)).toBe(11)
+    expect(moveWORDEnd('', 0)).toBe(0)
+    expect(moveWordEndBackward('one two', 0)).toBe(0)
+    expect(moveWordEndBackward('', 0)).toBe(0)
+    expect(moveWordEndBackward('one two', 4)).toBe(2)
+  })
+
+  it('finds the current word end and handles the empty node', () => {
+    expect(currentWordEnd('foo.bar', 3)).toBe(3)
+    expect(currentWordEnd('', 0)).toBe(0)
+  })
+
+  it('finds a counted character and returns the cursor for a zero count', () => {
+    expect(findCharacter('abc', 1, 'x', 'forward', 0)).toBe(1)
+  })
+})
+
+describe('Vim text-object boundaries', () => {
+  it('selects around a WORD run and extends over following whitespace', () => {
+    expect(textObjectRange('one.two  three', 1, 'a', 'W')).toEqual({ start: 0, end: 9 })
+  })
+
+  it('selects words, whitespace runs and counts without leaving the node', () => {
+    expect(textObjectRange('one  two', 1, 'i', 'w')).toEqual({ start: 0, end: 3 })
+    expect(textObjectRange('one  two', 3, 'a', 'w')).toEqual({ start: 3, end: 5 })
+    expect(textObjectRange('  ', 1, 'i', 'w')).toEqual({ start: 0, end: 2 })
+    expect(textObjectRange('one', 0, 'a', 'w')).toEqual({ start: 0, end: 3 })
+    expect(textObjectRange('one two', 0, 'i', 'w', 5)).toEqual({ start: 0, end: 7 })
+  })
+
+  it('honors backslash parity before a quote delimiter', () => {
+    expect(textObjectRange('a\\"b"c', 3, 'i', '"')).toBeUndefined()
+    expect(textObjectRange('a\\\\"b"c', 4, 'i', '"')).toEqual({ start: 4, end: 5 })
+    expect(textObjectRange('\\"x"', 2, 'i', '"')).toBeUndefined()
+  })
+
+  it('treats the opening and closing bracket positions as inside the pair', () => {
+    expect(textObjectRange('a(b)c', 1, 'i', '(')).toEqual({ start: 2, end: 3 })
+    expect(textObjectRange('a(b)c', 3, 'i', '(')).toEqual({ start: 2, end: 3 })
+    expect(textObjectRange('a(b)c', 1, 'a', '(')).toEqual({ start: 1, end: 4 })
+  })
+
+  it('selects both bracket delimiters from either side', () => {
+    expect(textObjectRange('a<b>', 2, 'i', '<')).toEqual({ start: 2, end: 3 })
+    expect(textObjectRange('a<b>', 2, 'a', '<')).toEqual({ start: 1, end: 4 })
+    expect(textObjectRange('a<b>', 2, 'i', '>')).toEqual({ start: 2, end: 3 })
+  })
+
+  it('selects a quote pair when the cursor sits on either delimiter', () => {
+    expect(textObjectRange('"x"', 0, 'i', '"')).toEqual({ start: 1, end: 2 })
+    expect(textObjectRange('"x"', 2, 'i', '"')).toEqual({ start: 1, end: 2 })
+  })
+
+  it('does not select a quote pair from outside it', () => {
+    expect(textObjectRange('x"a"', 0, 'i', '"')).toBeUndefined()
+    expect(textObjectRange('"x" a', 4, 'i', '"')).toBeUndefined()
+    expect(textObjectRange('a "x"', 0, 'i', '"')).toBeUndefined()
+  })
+
+  it('ignores a quote object when the count is not one', () => {
+    expect(textObjectRange('"a" "b"', 5, 'i', '"', 2)).toBeUndefined()
+  })
+
+  it('extends a count across a following punctuation run and spaces', () => {
+    expect(textObjectRange('one.two', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 4 })
+    expect(textObjectRange('one.', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 4 })
+    expect(textObjectRange('one two.three', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 7 })
+  })
+})
+
+describe('Vim word motions at clamped boundaries', () => {
+  it('clamps a cursor beyond the text for the end motions', () => {
+    expect(moveWordEnd('one two', 99)).toBe(6)
+    expect(moveWORDEnd('one two', 99)).toBe(6)
+    expect(currentWordEnd('ab', 99)).toBe(1)
+    expect(moveWordEndBackward('ab', 5)).toBe(0)
+  })
+
+  it('does not move a backward word motion below the start', () => {
+    expect(moveWordBackward('  a', 2)).toBe(0)
+    expect(moveWordBackward('  ', 2)).toBe(0)
+    expect(moveWORDBackward('  ', 2)).toBe(0)
+    expect(moveWordBackward('ab', 5)).toBe(2)
+  })
+
+  it('advances to the end of the next WORD run and stops at a non-space', () => {
+    expect(moveWORDForward('foo  bar', 3)).toBe(5)
+    expect(moveWORDEnd('   ab', 0)).toBe(4)
+    expect(moveWORDEnd('  a b', 0)).toBe(2)
+    expect(moveWORDEnd('a b', 0)).toBe(2)
+    expect(moveWordEnd('one  two three', 3)).toBe(7)
+  })
+
+  it('finds the current word end at punctuation, counts and the terminal character', () => {
+    expect(currentWordEnd('foo.bar', 0)).toBe(2)
+    expect(currentWordEnd('.', 0)).toBe(0)
   })
 })

@@ -33,7 +33,7 @@ Decisions reserved for the Product Owner: none known. Ask if a task reveals a ma
 | B1 | Executable check of `VIM_CONFORMANCE.md` test citations; stale citations repaired | — | Low Risk | Complete |
 | C1 | Fix-history script and its handoff line | — | Low Risk | Complete |
 | A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Complete |
-| A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Planned |
+| A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Complete |
 | A3 | Survivor triage: caret and session owner modules | A2 | Low Risk (Moderate for a fix commit) | Planned |
 | A4 | Survivor triage: drag and list modules; add the renderer modules to the mutation scope; close the batch | A3 | Low Risk | Planned |
 
@@ -137,6 +137,16 @@ Validation: Minimal Risk (plan update only): `npm run format:check:changed` and 
 
 The weakest modules are `vim-editing.ts`, `vim-surround.ts`, and `vim-text-commands.ts` (A2), followed by `vim-vertical-navigation.ts`, `vim-edit-session.ts`, and `link-caret.ts` (A3), then `node-drag.ts` and `list-window.ts` (A4). Eight modules score at or above 90, so A4's combined full-scope check is the open risk and remains reserved for the Product Owner if the combined score stays below 93.
 
+**A2 result (2026-10-02).** Narrow runs of `npm run test:mutation -- --mutate src/renderer/vim-editing.ts,src/renderer/vim-text-commands.ts,src/renderer/vim-surround.ts --force` at `HEAD` `9503347`. Test additions only; no production behavior changed and no defect was found. The remaining survivors are equivalent mutants, each explained at its expression by a `// Mutation triage` comment in the source; the modules' uncovered mutants are `?? ''` fallbacks that no reachable input takes and are left as observed.
+
+| Module | A1 total % / covered % | After total % / covered % | A1 survived → after | A1 uncovered → after |
+| --- | --- | --- | --- | --- |
+| `vim-editing.ts` | 74.45 / 79.02 | 83.48 / 88.13 | 116 → 66 | 34 → 31 |
+| `vim-text-commands.ts` | 81.39 / 83.52 | 96.90 / 97.79 | 88 → 12 | 14 → 5 |
+| `vim-surround.ts` | 75.37 / 75.37 | 92.54 / 92.54 | 33 → 10 | 0 → 0 |
+
+Run-to-run timeout classification moves a few mutants between killed and survived, so the A1 and after columns are not compared mutant for mutant. The tests added are in `vim-editing.test.ts` (motion boundaries, text-object count/whitespace/quote/bracket cases, clamp overshoot, out-of-range cursors) and `vim-text-commands.test.ts` (key classification, every motion arm, every `calculateTextChange` kind and its replay path, `textDifference` splits); `vim-surround.test.ts` adds the compact-delimiter, backtick, single-quote, and padded-change cases. Validation: the three colocated test files and `vim-editing.property.test.ts` passed (103 tests), and `npm run check` passed end to end with no coverage floor change. The mutation result predates the non-executable `// Mutation triage` comments, which cannot change it.
+
 ### A2, A3, A4 — Survivor triage
 
 Each task reads the surviving mutants for its modules in `reports/mutation/mutation.html` after a narrow run (`npm run test:mutation -- --mutate <its modules>`), and treats each survivor as a question about a missing assertion, following `docs/DEVELOPMENT.md` §12: kill it with an assertion on behavior in the module's colocated test, or leave an equivalent mutant with a Stryker disable comment stating why. When a survivor reveals a real defect, fix it defect-first in a separate commit. Record per-file score before and after in this plan.
@@ -159,7 +169,7 @@ Validation: Low Risk (tests): affected focused tests and `npm run check`. A defe
 
 ## Next task and resume prompt
 
-A2 is the next ready task. B1, C1, and A1 are complete.
+A3 is the next ready task. B1, C1, A1, and A2 are complete.
 
 ```text
 Continue the Harness Audit Follow-ups plan in plans/harness-audit-follow-ups.md: execute the next ready task.

@@ -29,6 +29,7 @@ export function surroundDelimiterKey(key: string): string | undefined {
 
 export function surroundPair(key: string): VimSurroundPair | undefined {
   const resolved = surroundDelimiterKey(key)
+  // Mutation triage: indexing `PAIRS` with `undefined` is `undefined` just like the guard's result.
   return resolved === undefined ? undefined : PAIRS[resolved]
 }
 
@@ -71,6 +72,7 @@ export function surroundWrapEdits(start: number, end: number, key: string): VimS
 
 /** The whole-node range used by `yss`, which ignores leading whitespace as Vim's line range does. */
 export function surroundLineRange(text: string): { start: number; end: number } {
+  // Mutation triage: `firstNonWhitespace('')` is `0`, so the empty-text guard is redundant.
   return { start: text.length === 0 ? 0 : firstNonWhitespace(text), end: text.length }
 }
 
@@ -81,9 +83,12 @@ interface SurroundTarget {
 
 function locateTarget(text: string, cursor: number, key: string, count: number): SurroundTarget | undefined {
   const resolved = surroundDelimiterKey(key)
+  // Mutation triage: an unresolved key also makes both `textObjectRange` lookups undefined.
   if (resolved === undefined) return undefined
+  // Mutation triage: any modifier other than `'a'` is the inner form, so replacing `'i'` is a no-op.
   const around = textObjectRange(text, cursor, 'a', resolved, count)
   const inner = textObjectRange(text, cursor, 'i', resolved, count)
+  // Mutation triage: around and inner come from the same match, so they are undefined together.
   if (around === undefined || inner === undefined) return undefined
   return { around, inner }
 }
@@ -93,9 +98,13 @@ function locateTarget(text: string, cursor: number, key: string, count: number):
  * bracket, mirroring how that key pads the inside when it is used as a replacement.
  */
 function trimmedInner(text: string, target: SurroundTarget, key: string): { start: number; end: number } {
+  // Mutation triage: `surroundDelimiterKey` returns only opening brackets (all truthy) or
+  // `undefined`, and `padsInside` accepts only opening brackets, so `??` and `&&` agree.
   const resolved = surroundDelimiterKey(key) ?? key
   if (!padsInside(resolved)) return target.inner
   const start = text[target.inner.start] === ' ' ? target.inner.start + 1 : target.inner.start
+  // Mutation triage: forcing or widening this guard can only drop one padding space that the
+  // disjoint surrounding edit already consumes, so the produced text is unchanged.
   const end = target.inner.end > start && text[target.inner.end - 1] === ' ' ? target.inner.end - 1 : target.inner.end
   return { start, end }
 }

@@ -19,6 +19,9 @@ export function imageTextReturnCursor(cursor: number, count: number, textLength:
 
 type CharacterClass = 'space' | 'word' | 'punctuation'
 
+// Mutation triage: only the `'space'` label is compared outside this function; `'word'` and
+// `'punctuation'` only have to differ from it and from each other, so replacing a label with the
+// empty string cannot change a motion or text-object result.
 function characterClass(character: string): CharacterClass {
   if (/\s/u.test(character)) return 'space'
   if (/[\p{L}\p{N}_]/u.test(character)) return 'word'
@@ -42,6 +45,8 @@ export function textObjectRange(
   if (text.length === 0 || count < 1) return undefined
   const position = Math.max(0, Math.min(cursor, text.length - 1))
   if (object === 'w' || object === 'W') {
+    // Mutation triage: as in `characterClass`, the `'space'`/`'WORD'` labels only separate
+    // whitespace from non-whitespace; the around-extension below re-tests whitespace directly.
     const classify = (character: string): string =>
       object === 'W' ? (/\s/u.test(character) ? 'space' : 'WORD') : characterClass(character)
     const kind = classify(text[position] ?? '')
@@ -49,6 +54,8 @@ export function textObjectRange(
     let end = position + 1
     while (start > 0 && classify(text[start - 1] ?? '') === kind) start -= 1
     while (end < text.length && classify(text[end] ?? '') === kind) end += 1
+    // Mutation triage: `end` never exceeds `text.length` here, so an inclusive bound or forced-true
+    // guard reads only the empty string at `text[text.length]`, which cannot extend a run.
     for (let index = 1; index < count; index += 1) {
       if (end >= text.length) break
       const nextKind = classify(text[end] ?? '')
@@ -58,6 +65,8 @@ export function textObjectRange(
         while (end < text.length && classify(text[end] ?? '') === following) end += 1
       }
     }
+    // Mutation triage: forcing this guard true only enters whitespace re-tests that the characters
+    // already decide, and the inclusive bounds read an undefined non-space neighbor at the node edge.
     if (modifier === 'a' && kind !== 'space') {
       if (end < text.length && /\s/u.test(text[end] ?? '')) {
         while (end < text.length && /\s/u.test(text[end] ?? '')) end += 1
@@ -67,6 +76,9 @@ export function textObjectRange(
     }
     return { start, end }
   }
+  // Mutation triage: bounds that read one past the end see a non-quote character; the backslash
+  // accumulator's sign does not change its parity; and a missing pair falls through to `undefined`
+  // whether or not the explicit guards run.
   if (object === '"' || object === "'" || object === '`') {
     const delimiters: number[] = []
     for (let index = 0; index < text.length; index += 1) {
@@ -83,6 +95,9 @@ export function textObjectRange(
     }
     return undefined
   }
+  // Mutation triage: a stray close pops an injected or empty stack element, whose numeric
+  // comparison is false; past-end reads cannot equal a bracket; and the redundant open guard is
+  // covered by that numeric comparison.
   const pair = PAIRS[object]
   if (pair === undefined) return undefined
   const openCharacter = '([{<'.includes(object) ? object : pair
@@ -101,6 +116,8 @@ export function textObjectRange(
   return modifier === 'a' ? match : { start: match.start + 1, end: match.end - 1 }
 }
 
+// Mutation triage: entering the run on whitespace consumes the same run before the whitespace
+// skip, and an inclusive or forced-true bound reads the empty string at the node edge.
 export function moveWordForward(text: string, cursor: number): number {
   let next = Math.max(0, Math.min(cursor, text.length))
   if (next < text.length && characterClass(text[next] ?? '') !== 'space') {
@@ -119,6 +136,9 @@ export function moveWordBackward(text: string, cursor: number): number {
   return next
 }
 
+// Mutation triage: an over-extended clamp is corrected by the terminal guard below; entering the
+// space skip from a non-space reaches the same run end; and inclusive bounds read the empty string
+// at the node edge.
 export function moveWordEnd(text: string, cursor: number): number {
   if (text.length === 0) return 0
   let next = Math.max(0, Math.min(cursor, text.length - 1))
@@ -130,6 +150,8 @@ export function moveWordEnd(text: string, cursor: number): number {
   return next
 }
 
+// Mutation triage: as in `moveWordForward`, forcing the whitespace skip true reads only the node
+// edge, where the empty string is not whitespace.
 export function moveWORDForward(text: string, cursor: number): number {
   let next = Math.max(0, Math.min(cursor, text.length))
   while (next < text.length && !/\s/u.test(text[next] ?? '')) next += 1
@@ -144,6 +166,9 @@ export function moveWORDBackward(text: string, cursor: number): number {
   return next
 }
 
+// Mutation triage: an over-extended clamp falls through to the terminal guard; forcing the
+// non-whitespace test true lets the following run scan reach the same WORD end; and inclusive
+// bounds read the empty string at the node edge.
 export function moveWORDEnd(text: string, cursor: number): number {
   if (text.length === 0) return 0
   let next = Math.max(0, Math.min(cursor, text.length - 1))
@@ -154,6 +179,8 @@ export function moveWORDEnd(text: string, cursor: number): number {
   return next
 }
 
+// Mutation triage: the empty-text and non-positive-cursor guards both return `0` on their own, and
+// the inclusive scan bounds stop at the same non-matching or out-of-range character.
 export function moveWordEndBackward(text: string, cursor: number): number {
   if (text.length === 0 || cursor <= 0) return 0
   let next = Math.min(cursor - 1, text.length - 1)
@@ -165,6 +192,7 @@ export function moveWordEndBackward(text: string, cursor: number): number {
   return Math.max(0, next)
 }
 
+// Mutation triage: the empty-text guard returns `0`, and the unguarded path also returns `0`.
 export function currentWordEnd(text: string, cursor: number): number {
   if (text.length === 0) return 0
   let next = Math.max(0, Math.min(cursor, text.length - 1))
