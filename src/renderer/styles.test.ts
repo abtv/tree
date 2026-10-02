@@ -43,6 +43,37 @@ it('shows the text-editing cursor only over a focused node editor', () => {
   }
 })
 
+// docs/ARCHITECTURE.md: every color is a custom property declared once per appearance, so rules
+// cannot drift apart by repeating a value.
+it('declares color values only as custom properties', () => {
+  const sheet = document.createElement('style')
+  sheet.textContent = styles
+  document.head.append(sheet)
+  try {
+    const literals: string[] = []
+    const inspect = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        if ('style' in rule) {
+          const { selectorText, style } = rule as CSSStyleRule
+          for (const property of Array.from(style)) {
+            if (property.startsWith('--')) continue
+            const value = style.getPropertyValue(property)
+            if (/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i.test(value)) {
+              literals.push(`${selectorText} { ${property}: ${value} }`)
+            }
+          }
+        }
+        if ('cssRules' in rule) inspect((rule as CSSGroupingRule).cssRules)
+      }
+    }
+    expect(sheet.sheet).not.toBeNull()
+    inspect(sheet.sheet!.cssRules)
+    expect(literals).toEqual([])
+  } finally {
+    sheet.remove()
+  }
+})
+
 // @requirement PRODUCT.md §20.4
 it('keeps application styles free of animations and transitions that delay interaction feedback', () => {
   const sheet = document.createElement('style')
