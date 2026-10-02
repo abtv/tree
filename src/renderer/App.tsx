@@ -5,6 +5,7 @@ import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../application/expans
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 import type { VimFoldCommand } from './vim-keyboard-types'
+import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
@@ -198,13 +199,7 @@ export function App({ store }: AppProps): React.JSX.Element {
 
   return (
     <main className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}>
-      <LocationBar
-        path={path}
-        currentParentId={state.location.currentParentId}
-        onNavigate={navigateToAncestor}
-        alwaysOnTop={alwaysOnTop}
-        onToggleAlwaysOnTop={toggleAlwaysOnTop}
-      />
+      <LocationBar path={path} currentParentId={state.location.currentParentId} onNavigate={navigateToAncestor} />
       <div className={SCROLL_VIEWPORT_CLASS}>
         <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
           {currentParent === undefined ? null : (
@@ -270,6 +265,7 @@ export function App({ store }: AppProps): React.JSX.Element {
         </section>
       </div>
       <footer className="status-bar">
+        <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
         <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
           {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
         </div>

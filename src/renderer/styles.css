@@ -175,6 +175,34 @@ textarea {
   outline-offset: 3px;
 }
 
+.status-tooltip-anchor {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin-right: 10px;
+}
+
+/* Opens above the status bar and ends at the toggle's right edge, so it stays inside the window. */
+.status-tooltip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 10;
+  padding: 3px 7px;
+  border-radius: 3px;
+  color: var(--color-white);
+  background: var(--color-mode-background);
+  font: 500 11px/14px 'JetBrains Mono';
+  pointer-events: none;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.status-tooltip-anchor:hover .status-tooltip,
+.status-tooltip-anchor:has(:focus-visible) .status-tooltip {
+  visibility: visible;
+}
+
 .always-on-top-toggle {
   display: inline-flex;
   flex: 0 0 auto;
@@ -182,7 +210,6 @@ textarea {
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin-left: auto;
   padding: 2px;
   border: 0;
   border-radius: 4px;

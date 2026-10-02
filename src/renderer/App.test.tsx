@@ -1233,7 +1233,7 @@ describe('App', () => {
     expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(0)
   })
 
-  it('toggles the always-on-top setting from the location toolbar', async () => {
+  it('toggles the always-on-top setting from the status bar', async () => {
     const store = createStore()
     await act(async () => {
       await store.initialize()
@@ -1242,14 +1242,15 @@ describe('App', () => {
     render(<App store={store} />)
 
     const toggle = await screen.findByRole('button', { name: 'Pin window on top' })
-    expect(toggle).toHaveAttribute('title', 'Pin window on top')
+    expect(toggle.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Pin window on top')
+    expect(toggle.closest('footer.status-bar')).not.toBeNull()
+    expect(toggle.closest('.location-bar')).toBeNull()
+    expect(toggle.parentElement?.nextElementSibling).toBe(screen.getByLabelText('Vim mode'))
     fireEvent.click(toggle)
 
     expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
-    expect(await screen.findByRole('button', { name: 'Unpin window from top' })).toHaveAttribute(
-      'title',
-      'Unpin window from top',
-    )
+    const unpin = await screen.findByRole('button', { name: 'Unpin window from top' })
+    expect(unpin.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Unpin window from top')
   })
 
   it('reorders siblings through a press-and-hold drag over the editable surface', async () => {
