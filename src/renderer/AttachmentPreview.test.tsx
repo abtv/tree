@@ -53,6 +53,30 @@ describe('AttachmentImage', () => {
     expect(revoke).toHaveBeenCalledWith(createdObjectUrl)
   })
 
+  it('reserves the rendered size of a loaded image from the first render of a remount', async () => {
+    const first = render(<AttachmentImage attachmentId="sized-image" onOpen={() => undefined} />)
+    const image = await screen.findByAltText('Attached image')
+    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 400 })
+    Object.defineProperty(image, 'naturalHeight', { configurable: true, value: 300 })
+    fireEvent.load(image)
+    first.unmount()
+
+    const { container } = render(<AttachmentImage attachmentId="sized-image" onOpen={() => undefined} />)
+    const placeholder = container.querySelector<HTMLElement>('.attachment-placeholder')
+    expect(placeholder).not.toBeNull()
+    expect(placeholder).toHaveStyle({ width: '200px', height: '150px' })
+
+    const remounted = await screen.findByAltText('Attached image')
+    expect(remounted).toHaveAttribute('width', '200')
+    expect(remounted).toHaveAttribute('height', '150')
+    expect(container.querySelector('.attachment-placeholder')).toBeNull()
+  })
+
+  it('reserves no space for an image whose size has not been measured', () => {
+    const { container } = render(<AttachmentImage attachmentId="unmeasured-image" onOpen={() => undefined} />)
+    expect(container.querySelector('.attachment-placeholder')).toBeNull()
+  })
+
   it('reports missing attachment bytes', async () => {
     mockTreeApi({ readAttachment: async () => null })
     render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)

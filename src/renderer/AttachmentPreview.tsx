@@ -7,6 +7,24 @@ type AttachmentState =
   | { attachmentId: string; status: 'ready'; url: string }
   | { attachmentId: string; status: 'error' }
 
+const MAX_IMAGE_SIDE = 200 // Keep in sync with `.attachment-image` in styles.css.
+const MAX_REMEMBERED_SIZES = 1024
+
+// The box each attachment image occupied the last time it loaded, as two numbers per attachment.
+const renderedSizes = new Map<string, { width: number; height: number }>()
+
+function rememberRenderedSize(attachmentId: string, image: HTMLImageElement): void {
+  const { naturalWidth, naturalHeight } = image
+  if (naturalWidth === 0 || naturalHeight === 0) return
+  const scale = Math.min(1, MAX_IMAGE_SIDE / naturalWidth, MAX_IMAGE_SIDE / naturalHeight)
+  renderedSizes.delete(attachmentId)
+  renderedSizes.set(attachmentId, {
+    width: Math.round(naturalWidth * scale),
+    height: Math.round(naturalHeight * scale),
+  })
+  if (renderedSizes.size > MAX_REMEMBERED_SIZES) renderedSizes.delete(renderedSizes.keys().next().value!)
+}
+
 function useAttachmentImage(attachmentId: string): {
   state: AttachmentState
   onImageError: () => void
@@ -72,7 +90,12 @@ export function AttachmentImage({
   imageCaretActive?: boolean
 }): React.JSX.Element | null {
   const { state, onImageError } = useAttachmentImage(attachmentId)
-  if (state.status === 'loading') return null
+  const size = renderedSizes.get(attachmentId)
+  if (state.status === 'loading') {
+    // Leaving a node remounts its rows. Reserving the size the image had last time keeps the rows
+    // below it from shifting when the bytes arrive.
+    return size === undefined ? null : <span aria-hidden="true" className="attachment-placeholder" style={size} />
+  }
   if (state.status === 'error') return <ImageErrorMessage />
   return (
     <button
@@ -88,7 +111,14 @@ export function AttachmentImage({
       }}
       type="button"
     >
-      <img className="attachment-image" src={state.url} alt="Attached image" onError={onImageError} />
+      <img
+        className="attachment-image"
+        src={state.url}
+        alt="Attached image"
+        {...size}
+        onError={onImageError}
+        onLoad={(event) => rememberRenderedSize(attachmentId, event.currentTarget)}
+      />
     </button>
   )
 }

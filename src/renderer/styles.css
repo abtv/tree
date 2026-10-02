@@ -668,6 +668,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   border-radius: 3px;
 }
 
+.attachment-placeholder {
+  display: block;
+  margin: 6px;
+}
+
 .attachment-error {
   width: fit-content;
   margin: 6px;
