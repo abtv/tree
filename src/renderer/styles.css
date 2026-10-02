@@ -465,16 +465,24 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   caret-color: transparent;
 }
 
+/* A fixed row below the scrolling content area, so the content and its scrollbar end above it. */
+.status-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  height: 27px;
+  padding: 0 12px;
+  border-top: 1px solid var(--color-location-border);
+  background: var(--color-background);
+}
+
 .vim-mode {
-  position: fixed;
-  right: 12px;
-  bottom: 10px;
-  z-index: 20;
   border-radius: 3px;
   padding: 3px 7px;
   color: var(--color-white);
   background: var(--color-mode-background);
-  font: 600 11px/1.2 'JetBrains Mono';
+  font: 600 11px/14px 'JetBrains Mono';
   letter-spacing: 0.04em;
 }
 

@@ -69,7 +69,8 @@ test.describe('compact layout density', () => {
     expect(first.height).toBeCloseTo(25, 0)
     expect(first.top - bar.bottom).toBeCloseTo(48, 0)
 
-    await expect(node(window, 14)).toBeInViewport({ ratio: 1 })
+    // The 27px status bar at the bottom takes the space of one row.
+    await expect(node(window, 13)).toBeInViewport({ ratio: 1 })
     expect(await window.evaluate(() => document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true)
 
     await setMainWindowBounds(app, { width: 1200 })

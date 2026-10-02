@@ -41,4 +41,29 @@ test.describe('sticky location toolbar', () => {
     const windowWidth = await page.evaluate(() => document.documentElement.clientWidth)
     expect(barRight).toBe(windowWidth)
   })
+
+  // @requirement PRODUCT.md §20.2
+  test('keeps the status bar with the mode indicator below the scrolling content', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 200 }, (_, index) => ({ id: `r${index}`, text: `Root ${index}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'r0' },
+    })
+    const { window: page } = await launchTree(userDataDir)
+    await page.evaluate(() => {
+      document.querySelector('.scroll-viewport')?.scrollTo(0, 1500)
+    })
+
+    const status = await page.locator('.status-bar').boundingBox()
+    const viewport = await page.locator('.scroll-viewport').boundingBox()
+    const indicator = await page.getByLabel('Vim mode').boundingBox()
+    const innerHeight = await page.evaluate(() => window.innerHeight)
+    expect(status).not.toBeNull()
+    expect(status!.y + status!.height).toBe(innerHeight)
+    // The content area ends exactly where the status bar begins, so its scrollbar never reaches it.
+    expect(viewport!.y + viewport!.height).toBe(status!.y)
+    expect(indicator!.y).toBeGreaterThanOrEqual(status!.y)
+    expect(indicator!.y + indicator!.height).toBeLessThanOrEqual(status!.y + status!.height)
+  })
 })

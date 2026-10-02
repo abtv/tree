@@ -207,9 +207,6 @@ export function App({ store }: AppProps): React.JSX.Element {
       />
       <div className={SCROLL_VIEWPORT_CLASS}>
         <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
-          <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
-            {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
-          </div>
           {currentParent === undefined ? null : (
             <section
               aria-label="Current parent"
@@ -272,6 +269,11 @@ export function App({ store }: AppProps): React.JSX.Element {
           ) : null}
         </section>
       </div>
+      <footer className="status-bar">
+        <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
+          {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
+        </div>
+      </footer>
       {state.quitWithoutSavingPrompt === true ? (
         <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />
       ) : null}

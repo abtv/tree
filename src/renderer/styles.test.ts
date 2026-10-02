@@ -12,6 +12,10 @@ it('keeps the location toolbar outside the scrolling content area, with an opaqu
   const viewport = /\.scroll-viewport\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
   expect(viewport).toMatch(/overflow-y:\s*auto/)
   expect(viewport).toMatch(/min-height:\s*0/)
+  const status = /\.status-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(status).toMatch(/flex:\s*0 0 auto/)
+  expect(status).toMatch(/background:\s*var\(--color-background\)/)
+  expect(/\.vim-mode\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '').not.toMatch(/position:\s*fixed/)
 })
 
 // @requirement PRODUCT.md §20.4
