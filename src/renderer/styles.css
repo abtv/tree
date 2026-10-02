@@ -49,10 +49,14 @@
   box-sizing: border-box;
 }
 
+/* The browser's `auto` cursor turns into the text-editing I-beam over any text. Only focused node
+   editors are editable text, so every element inherits the arrow and `.node-input:focus` alone
+   opts back into the I-beam. */
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  cursor: default;
 }
 
 button,
@@ -279,7 +283,6 @@ textarea {
   min-height: 25px;
   margin-left: calc(28px + var(--row-depth, 0) * 20px);
   padding-left: 21px;
-  cursor: default;
 }
 
 .node-row-image-only {
@@ -522,7 +525,6 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .vim-mode {
   margin-right: auto;
-  cursor: default;
   border-radius: 3px;
   padding: 3px 7px;
   color: var(--color-white);

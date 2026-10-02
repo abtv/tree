@@ -18,6 +18,31 @@ it('keeps the location toolbar outside the scrolling content area, with an opaqu
   expect(/\.vim-mode\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '').not.toMatch(/position:\s*fixed/)
 })
 
+// @requirement PRODUCT.md §20
+it('shows the text-editing cursor only over a focused node editor', () => {
+  const sheet = document.createElement('style')
+  sheet.textContent = styles
+  document.head.append(sheet)
+  try {
+    const textCursorSelectors: string[] = []
+    const inspect = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        if ('style' in rule) {
+          const { selectorText, style } = rule as CSSStyleRule
+          if (selectorText === 'body') expect(style.getPropertyValue('cursor')).toBe('default')
+          if (/^(?:auto|text)$/.test(style.getPropertyValue('cursor'))) textCursorSelectors.push(selectorText)
+        }
+        if ('cssRules' in rule) inspect((rule as CSSGroupingRule).cssRules)
+      }
+    }
+    expect(sheet.sheet).not.toBeNull()
+    inspect(sheet.sheet!.cssRules)
+    expect(textCursorSelectors).toEqual(['.node-input:focus'])
+  } finally {
+    sheet.remove()
+  }
+})
+
 // @requirement PRODUCT.md §20.4
 it('keeps application styles free of animations and transitions that delay interaction feedback', () => {
   const sheet = document.createElement('style')
