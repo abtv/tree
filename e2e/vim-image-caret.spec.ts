@@ -25,7 +25,7 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
   writeFileSync(attachmentPath(userDataDir, attachmentId), attachmentImageBytes)
 }
 
-test.describe('Vim editing prototype', () => {
+test.describe('Vim editing: image caret', () => {
   test('opens an image immediately after moving up from another image', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

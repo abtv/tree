@@ -28,7 +28,7 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
   writeFileSync(attachmentPath(userDataDir, attachmentId), attachmentImageBytes)
 }
 
-test.describe('Vim editing prototype', () => {
+test.describe('Vim editing: text editing', () => {
   test('uses word, quote, and bracket text objects in Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one (two) "three"', children: [] }] },

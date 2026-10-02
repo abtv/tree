@@ -34,7 +34,7 @@ async function dragSelect(window: Page, field: ReturnType<typeof node>, fromX: n
   await window.mouse.up()
 }
 
-test.describe('Vim editing prototype', () => {
+test.describe('Vim editing: navigation and Visual modes', () => {
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
