@@ -1,7 +1,17 @@
-// @editing-modes: pending
-import { expect, firePaste, launchTree, node, test, typeInto, writeClipboardImageSized } from './fixtures'
+// @editing-modes: both
+import {
+  describeForEachEditingMode,
+  expect,
+  firePaste,
+  launchTree,
+  node,
+  setCursor,
+  test,
+  typeInto,
+  writeClipboardImageSized,
+} from './fixtures'
 
-test.describe('image presentation and preview', () => {
+test.describe('inline image presentation (mode-independent)', () => {
   // @requirement PRODUCT.md §17.1
   test('scales a large inline image down to fit 200x200 while preserving aspect ratio', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
@@ -30,7 +40,9 @@ test.describe('image presentation and preview', () => {
     expect(box!.width).toBeLessThanOrEqual(100)
     expect(box!.height).toBeLessThanOrEqual(50)
   })
+})
 
+describeForEachEditingMode('image preview', () => {
   test('opens the preview by clicking the image and closes it with the button', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
@@ -75,8 +87,53 @@ test.describe('image presentation and preview', () => {
     await expect(dialog).toBeHidden()
   })
 
+  test('opens the preview with Cmd+Enter', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await writeClipboardImageSized(app, 400, 200)
+    await firePaste(node(window, 1))
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+    await node(window, 1).focus()
+    await window.keyboard.press('Meta+Enter')
+
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+  })
+})
+
+test.describe('image preview (mode-independent)', () => {
+  test('keeps keyboard focus inside the preview', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await writeClipboardImageSized(app, 400, 200)
+    await firePaste(node(window, 1))
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+
+    const close = window.getByRole('button', { name: 'Close image preview' })
+    await expect(close).toBeFocused()
+    await window.keyboard.press('Tab')
+    await expect(close).toBeFocused()
+    await window.keyboard.press('Shift+Tab')
+    await expect(close).toBeFocused()
+  })
+
+  test('does not upscale a small image in the preview', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await writeClipboardImageSized(app, 100, 50)
+    await firePaste(node(window, 1))
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+
+    const preview = window.getByAltText('Attached image preview')
+    await expect(preview).toBeVisible()
+    const box = await preview.boundingBox()
+    expect(box!.width).toBeLessThanOrEqual(100)
+    expect(box!.height).toBeLessThanOrEqual(50)
+  })
+})
+
+test.describe('image preview (Vim editing only)', () => {
   test('returns Normal-mode keys to the editor after a mouse click closes the preview', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     const first = node(window, 1)
     await typeInto(first, 'test')
     await first.press('Escape')
@@ -96,45 +153,47 @@ test.describe('image presentation and preview', () => {
     await window.keyboard.press('k')
     await expect(first).toBeFocused()
   })
+})
 
-  test('keeps keyboard focus inside the preview', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
+test.describe('image preview focus return in standard editing', () => {
+  test.use({ editingMode: 'standard' })
 
-    await writeClipboardImageSized(app, 400, 200)
-    await firePaste(node(window, 1))
-    await window.getByRole('button', { name: 'Open image preview' }).click()
+  for (const close of ['button', 'Escape', 'click'] as const) {
+    // @requirement PRODUCT.md §17.1
+    test(`returns focus and the caret to the editor after closing with ${close}`, async ({ userDataDir }) => {
+      const { app, window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
+      await typeInto(editor, 'ab')
+      await writeClipboardImageSized(app, 80, 80)
+      await firePaste(editor)
+      await expect(window.getByAltText('Attached image')).toBeVisible()
+      await editor.focus()
+      await setCursor(editor, 1)
+      expect(
+        await editor.evaluate((element) => [
+          (element as HTMLTextAreaElement).selectionStart,
+          (element as HTMLTextAreaElement).selectionEnd,
+        ]),
+      ).toEqual([1, 1])
 
-    const close = window.getByRole('button', { name: 'Close image preview' })
-    await expect(close).toBeFocused()
-    await window.keyboard.press('Tab')
-    await expect(close).toBeFocused()
-    await window.keyboard.press('Shift+Tab')
-    await expect(close).toBeFocused()
-  })
+      await window.getByRole('button', { name: 'Open image preview' }).click()
+      const dialog = window.getByRole('dialog', { name: 'Image preview' })
+      await expect(dialog).toBeVisible()
 
-  test('opens the preview with Cmd+Enter', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
+      if (close === 'button') await window.getByRole('button', { name: 'Close image preview' }).click()
+      else if (close === 'Escape') await window.keyboard.press('Escape')
+      else await window.mouse.click(5, 300)
+      await expect(dialog).toBeHidden()
 
-    await writeClipboardImageSized(app, 400, 200)
-    await firePaste(node(window, 1))
-    await expect(window.getByAltText('Attached image')).toBeVisible()
-    await node(window, 1).focus()
-    await window.keyboard.press('Meta+Enter')
-
-    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
-  })
-
-  test('does not upscale a small image in the preview', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
-
-    await writeClipboardImageSized(app, 100, 50)
-    await firePaste(node(window, 1))
-    await window.getByRole('button', { name: 'Open image preview' }).click()
-
-    const preview = window.getByAltText('Attached image preview')
-    await expect(preview).toBeVisible()
-    const box = await preview.boundingBox()
-    expect(box!.width).toBeLessThanOrEqual(100)
-    expect(box!.height).toBeLessThanOrEqual(50)
-  })
+      await expect(editor).toBeFocused()
+      expect(
+        await editor.evaluate((element) => [
+          (element as HTMLTextAreaElement).selectionStart,
+          (element as HTMLTextAreaElement).selectionEnd,
+        ]),
+      ).toEqual([1, 1])
+      await window.keyboard.type('X')
+      await expect(editor).toHaveValue('aXb')
+    })
+  }
 })

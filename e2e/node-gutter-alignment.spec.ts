@@ -1,6 +1,15 @@
-// @editing-modes: pending
+// @editing-modes: both
 import type { Page } from '@playwright/test'
-import { expect, firePaste, launchTree, node, seedDocument, test, writeClipboardImageSized } from './fixtures'
+import {
+  describeForEachEditingMode,
+  expect,
+  firePaste,
+  launchTree,
+  node,
+  seedDocument,
+  test,
+  writeClipboardImageSized,
+} from './fixtures'
 
 function seed(): { document: unknown; location: unknown } {
   return {
@@ -75,7 +84,7 @@ function gutterAlignment(window: Page, rowIndex: number): Promise<GutterAlignmen
     })
 }
 
-test.describe('node gutter alignment', () => {
+describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
   // @requirement PRODUCT.md §2.1
   test('centers the bullet and disclosure triangle on the first line of node text', async ({ userDataDir }) => {
     seedDocument(userDataDir, seed())
@@ -86,7 +95,7 @@ test.describe('node gutter alignment', () => {
     expect(Math.abs(leaf.enterControlCenter - leaf.textCenter)).toBeLessThanOrEqual(1)
     expect(leaf.focusMarkerCenter).not.toBeNull()
     expect(Math.abs((leaf.focusMarkerCenter as number) - leaf.enterControlCenter)).toBeLessThanOrEqual(1)
-    await expect(window.locator('.node-list')).toHaveScreenshot('node-focus-marker-alignment.png')
+    await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('node-focus-marker-alignment.png'))
 
     await window.locator('.node-row').nth(1).click()
     const unfocused = await gutterAlignment(window, 0)
@@ -125,7 +134,9 @@ test.describe('node gutter alignment', () => {
     )
     expect((await gutterAlignment(window, 1)).focusMarkerCenter).toBeNull()
   })
+})
 
+test.describe('node gutter alignment (Vim editing only)', () => {
   // @requirement PRODUCT.md §2.1
   test('keeps the gutter of an image-only row at the single-line text position', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -137,7 +148,11 @@ test.describe('node gutter alignment', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'text' },
     })
-    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    // Normal mode collapses the focused image-only editor to its single line, which is the state
+    // whose gutter must sit beside the image's top edge. In Insert mode or standard editing the
+    // focused empty editor shows a normal-height insertion line above the image (PRODUCT.md §2.1),
+    // so that relationship does not apply there.
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     const editor = node(window, 2)
     await editor.focus()
     await writeClipboardImageSized(app, 80, 80)
