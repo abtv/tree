@@ -262,6 +262,8 @@ For a change that can alter rendered pixels — including stylesheet, layout, ty
 
 Treat visual requirements in `docs/PRODUCT.md` as hard acceptance criteria. When a requirement specifies relative placement or alignment, add a real-renderer geometry assertion for that relationship where practical; a screenshot baseline alone can preserve an already-misaligned result. For focus or selection indicators, cover the selected row, an unfocused neighbor, and focus moving between them when the state persists across rows.
 
+For changes to appearance, window creation, renderer loading or reloading, or closing, check the absence of contrasting flashes required by `docs/PRODUCT.md` §20.5. Follow the lifecycle verification procedure in `docs/DEVELOPMENT.md` §9; a screenshot of the fully loaded editor does not verify a transient startup or closing state.
+
 Add or update a deterministic screenshot regression test when practical. Its baseline must be deliberately inspected; accepting a generated image without inspection is not verification. For interactions such as rich text, test both the rendered state and the relevant behavior matrix (for example mode changes, selection, and pointer interaction) so a visual fix cannot silently break the interaction.
 
 Committed screenshots, fixtures, and other visual-regression artifacts must contain only synthetic data. Do not include personal, confidential, or otherwise sensitive information in them.

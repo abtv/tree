@@ -1014,7 +1014,7 @@ This does not govern motion the application does not itself decide to add: nativ
 
 The application follows the operating system's light or dark appearance and has no setting of its own for it. Switching the system appearance restyles the open window immediately.
 
-The native window background matches the document surface from window creation through closing, including after a system appearance change, so loading or tearing down the renderer does not expose a contrasting background.
+The application must not show unintended flashes of a contrasting background during startup, renderer loading or reloading, closing, or system appearance changes. In dark appearance, even a brief white or light-background flash is a visual defect. This applies to the whole application window, including the native surface before the renderer paints and while it is torn down. The native window background matches the document surface from window creation through closing, including after a system appearance change.
 
 The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors. In the dark appearance the text of a node is colored by its depth below the current parent: the current parent's children use the first of eight colors, their expanded children the second, and so on in order. Rows nested deeper than the eighth level use the ordinary text color. The light appearance does not color text by depth. The depth color gives way to the selection highlight, so a selected row keeps the highlight's text color.
 
