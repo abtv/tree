@@ -92,5 +92,22 @@ test.describe('node gutter alignment', () => {
     const wrapped = await gutterAlignment(window, 2)
     expect(Math.abs(wrapped.enterControlCenter - wrapped.textCenter)).toBeLessThanOrEqual(1)
     expect(Math.abs((wrapped.triangleCenter as number) - wrapped.textCenter)).toBeLessThanOrEqual(1)
+
+    // An inline-expanded child row is indented by depth; its gutter and focus marker must stay on
+    // the first text line there too.
+    await window.locator('.node-row').nth(1).locator('.node-disclosure-triangle').click()
+    await expect(window.locator('.node-row').nth(2).locator('.node-input')).toHaveText('Child')
+    const child = await gutterAlignment(window, 2)
+    expect(child.triangleCenter).toBeNull()
+    expect(child.focusMarkerCenter).toBeNull()
+    expect(Math.abs(child.enterControlCenter - child.textCenter)).toBeLessThanOrEqual(1)
+
+    await window.locator('.node-row').nth(2).click()
+    const focusedChild = await gutterAlignment(window, 2)
+    expect(focusedChild.focusMarkerCenter).not.toBeNull()
+    expect(Math.abs((focusedChild.focusMarkerCenter as number) - focusedChild.enterControlCenter)).toBeLessThanOrEqual(
+      1,
+    )
+    expect((await gutterAlignment(window, 1)).focusMarkerCenter).toBeNull()
   })
 })
