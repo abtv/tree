@@ -1435,6 +1435,44 @@ describe('editor keyboard handler', () => {
     else expect(input.selectionEnd).toBe(input.value.length)
   })
 
+  it('toggles the selected node fold on Cmd+E and clears a pending Normal-mode command', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+    handle(keyEvent(input, 'd'))
+
+    handle(keyEvent(input, 'e', { metaKey: true }))
+
+    expect(store.applyFold).toHaveBeenCalledExactlyOnceWith('toggle', 'node')
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(vim.mode).toBe('normal')
+  })
+
+  it('toggles the fold on Cmd+E without leaving Insert mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+
+    handle(keyEvent(input, 'e', { metaKey: true }))
+
+    expect(store.applyFold).toHaveBeenCalledExactlyOnceWith('toggle', 'node')
+    expect(vim.mode).toBe('insert')
+  })
+
+  it('ignores Cmd+Shift+E and plain e as fold toggles', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
+
+    handle(keyEvent(input, 'e', { metaKey: true, shiftKey: true }))
+    handle(keyEvent(input, 'e'))
+
+    expect(store.applyFold).not.toHaveBeenCalled()
+  })
+
   it('clears a Normal-mode g prefix before Cmd+.', () => {
     const store = createStore()
     const input = document.createElement('textarea')

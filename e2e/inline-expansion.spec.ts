@@ -224,6 +224,34 @@ test.describe('inline node expansion', () => {
     ])
   })
 
+  test('toggles the selected node fold with Cmd+E in Normal and Insert mode without moving the caret', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await node(window, 1).focus()
+
+    await window.keyboard.press('Meta+e')
+    await expect(node(window, 2)).toHaveValue('Alpha child one')
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('Meta+e')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+    await expect(node(window, 1)).toBeFocused()
+
+    // A leaf has no fold, so Cmd+E does nothing there.
+    await node(window, 2).focus()
+    await window.keyboard.press('Meta+e')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
+    // Insert mode keeps typing after the toggle.
+    await node(window, 1).focus()
+    await window.keyboard.press('i')
+    await window.keyboard.press('Meta+e')
+    await window.keyboard.type('X')
+    await expect(node(window, 1)).toHaveValue('XAlpha')
+    await expect(node(window, 2)).toHaveValue('Alpha child one')
+  })
+
   test('leaves the caret unchanged when collapsing a branch that does not contain it', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

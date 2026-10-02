@@ -309,6 +309,12 @@ export function createEditorKeyDownHandler({
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.enter()
       vim?.syncImageCaretToFocus()
+    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
+      // Toggles the selected node's own fold like `za`. The caret and the Insert session are
+      // untouched, so only the unfinished command assembly clears.
+      event.preventDefault()
+      clearCommandAssemblyBeforeCommand(vim)
+      store.applyFold('toggle', node.id)
     } else if (event.metaKey && event.key === ',') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
