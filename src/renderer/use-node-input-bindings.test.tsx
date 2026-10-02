@@ -3,6 +3,7 @@
 import { act, cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { useState, useSyncExternalStore } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { createRealStoreHarness, type RealStoreOptions } from './test/real-store-harness'
@@ -1259,6 +1260,95 @@ describe('useNodeInputBindings', () => {
       })
       expect(input.classList.contains('node-input-text-selected')).toBe(expected)
     }
+  })
+})
+
+describe('Vim editing switch', () => {
+  it('switches without a focused editor using the store caret', async () => {
+    const f = await fixture({ document: { roots: [image('abc')] } })
+    act(() => f.store.selectNode('node', 3))
+    act(() => f.result.current.setVimEditing(true))
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+
+    act(() => f.result.current.setVimEditing(false))
+
+    expect(f.result.current.vimMode).toBe('insert')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('moves a focused image caret to the end of the text when Vim editing is disabled', async () => {
+    const f = await fixture({ document: { roots: [image('ab')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 0))
+    act(() => input.focus())
+    f.press('$')
+    f.press('l')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+
+    act(() => f.result.current.setVimEditing(false))
+    f.sync()
+
+    expect(f.result.current.vimMode).toBe('insert')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('finishes a structural Insert session when Vim editing is disabled', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abc')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 0))
+    act(() => input.focus())
+    f.press('o')
+    expect(f.result.current.vimMode).toBe('insert')
+    const opened = f.snapshot().location.selectedNodeId
+    f.type('new', opened)
+    act(() => f.input(opened).focus())
+
+    act(() => f.result.current.setVimEditing(false))
+    act(() => f.result.current.setVimEditing(true))
+    act(() => f.store.selectNode(opened, 0))
+    f.press('.', {}, opened)
+
+    // The finished `o` session is the repeatable change, so `.` opens another sibling with its text.
+    expect(f.snapshot().document.roots.map((root) => root.text)).toEqual(['abc', 'new', 'new'])
+  })
+
+  it('keeps a multi-character selection when Vim editing is enabled', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] }, mode: 'insert' })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 0))
+    act(() => input.focus())
+    input.setSelectionRange(1, 4)
+
+    act(() => f.result.current.setVimEditing(true))
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4])
+  })
+
+  it('changes only the mode while the document is still loading', () => {
+    const store = new EditorStore(
+      {
+        load: async () => null,
+        save: async () => undefined,
+        readClipboard: async () => ({ kind: 'text', text: '' }),
+        writeAttachment: async () => undefined,
+        cleanupAttachments: async () => undefined,
+      },
+      () => 'node',
+    )
+    const hook = renderHook(() => {
+      const [vimMode, setVimMode] = useState<VimMode>('normal')
+      return { ...useNodeInputBindings({ store, onPreviewAttachment: vi.fn(), vimMode, setVimMode }), vimMode }
+    })
+
+    act(() => hook.result.current.setVimEditing(false))
+    expect(hook.result.current.vimMode).toBe('insert')
+    act(() => hook.result.current.setVimEditing(true))
+    expect(hook.result.current.vimMode).toBe('normal')
   })
 })
 

@@ -24,6 +24,8 @@ export const treeApi: TreeApi = {
   showEditorContextMenu: (request) => ipcRenderer.invoke(ipcChannels.showEditorContextMenu, request),
   getAlwaysOnTop: () => ipcRenderer.invoke(ipcChannels.getAlwaysOnTop),
   setAlwaysOnTop: (alwaysOnTop) => ipcRenderer.invoke(ipcChannels.setAlwaysOnTop, alwaysOnTop),
+  getVimEnabled: () => ipcRenderer.invoke(ipcChannels.getVimEnabled),
+  setVimEnabled: (vimEnabled) => ipcRenderer.invoke(ipcChannels.setVimEnabled, vimEnabled),
 }
 
 contextBridge.exposeInMainWorld('treeApi', treeApi)

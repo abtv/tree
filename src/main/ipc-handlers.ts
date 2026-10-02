@@ -35,6 +35,8 @@ export interface IpcHandlerDependencies {
   showEditorContextMenu?: (sender: WebContents, request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
   getAlwaysOnTop: () => boolean
   setAlwaysOnTop: (alwaysOnTop: boolean) => void
+  getVimEnabled: () => boolean
+  setVimEnabled: (vimEnabled: boolean) => void
 }
 
 export function registerIpcHandlers({
@@ -48,6 +50,8 @@ export function registerIpcHandlers({
   showEditorContextMenu,
   getAlwaysOnTop,
   setAlwaysOnTop,
+  getVimEnabled,
+  setVimEnabled,
 }: IpcHandlerDependencies): void {
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
@@ -108,5 +112,14 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     if (typeof value !== 'boolean') throw new Error('Invalid always-on-top setting.')
     setAlwaysOnTop(value)
+  })
+  ipcMain.handle(ipcChannels.getVimEnabled, (event) => {
+    requireTrustedRenderer(event)
+    return getVimEnabled()
+  })
+  ipcMain.handle(ipcChannels.setVimEnabled, (event, value) => {
+    requireTrustedRenderer(event)
+    if (typeof value !== 'boolean') throw new Error('Invalid Vim editing setting.')
+    setVimEnabled(value)
   })
 }

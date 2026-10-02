@@ -6,6 +6,7 @@ import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 import type { VimFoldCommand } from './vim-keyboard-types'
 import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
+import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
@@ -18,14 +19,17 @@ import type { VimMode } from './vim-editing'
 
 interface AppProps {
   store: EditorStore
+  /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
+  initialVimEnabled: boolean
 }
 
-export function App({ store }: AppProps): React.JSX.Element {
+export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
-  const [vimMode, setVimMode] = useState<VimMode>('normal')
+  const [vimEnabled, setVimEnabled] = useState(initialVimEnabled)
+  const [vimMode, setVimMode] = useState<VimMode>(initialVimEnabled ? 'normal' : 'insert')
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
   const leftCommandKeyPressed = useLeftCommandKey()
   useEffect(() => {
@@ -62,12 +66,17 @@ export function App({ store }: AppProps): React.JSX.Element {
     (command: VimFoldCommand, nodeId: string): void => store.applyFold(command, nodeId),
     [store],
   )
-  const { bindings: nodeInputBindings, dragFreeze } = useNodeInputBindings({
+  const {
+    bindings: nodeInputBindings,
+    dragFreeze,
+    setVimEditing,
+  } = useNodeInputBindings({
     store,
     selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
     persistenceLocked,
+    vimEnabled,
     vimMode,
     setVimMode,
     setImageCaretNodeId,
@@ -75,6 +84,13 @@ export function App({ store }: AppProps): React.JSX.Element {
     setNodeVisualSelection,
     onFoldCommand: applyFoldCommand,
   })
+  const toggleVimEnabled = useCallback((): void => {
+    const nextValue = !vimEnabled
+    setVimEditing(nextValue)
+    setVimEnabled(nextValue)
+    // The editing mode already changed for this session; a failed write only loses the saved choice.
+    void window.treeApi.setVimEnabled(nextValue).catch((error: unknown) => store.reportError(error))
+  }, [vimEnabled, setVimEditing, store])
   // Called after the input bindings so the restore aligns the selected row after their initial focus.
   useScrollRestoration(store, state.status === 'ready')
   const enterNode = useCallback(
@@ -265,10 +281,13 @@ export function App({ store }: AppProps): React.JSX.Element {
         </section>
       </div>
       <footer className="status-bar">
+        <VimToggle vimEnabled={vimEnabled} onToggle={toggleVimEnabled} />
         <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
-        <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
-          {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
-        </div>
+        {vimEnabled ? (
+          <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
+            {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
+          </div>
+        ) : null}
       </footer>
       {state.quitWithoutSavingPrompt === true ? (
         <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />

@@ -1,3 +1,5 @@
+import { StatusToggle } from './StatusToggle'
+
 export function AlwaysOnTopToggle({
   alwaysOnTop,
   onToggle,
@@ -5,23 +7,15 @@ export function AlwaysOnTopToggle({
   alwaysOnTop: boolean
   onToggle: () => void
 }): React.JSX.Element {
-  const label = alwaysOnTop ? 'Unpin window from top' : 'Pin window on top'
-  // Electron does not show native `title` tooltips here, so the label is rendered as a CSS tooltip.
   return (
-    <span className="status-tooltip-anchor">
-      <button
-        aria-pressed={alwaysOnTop}
-        aria-label={label}
-        className={alwaysOnTop ? 'always-on-top-toggle always-on-top-toggle-active' : 'always-on-top-toggle'}
-        onClick={onToggle}
-        type="button"
-      >
-        <PinIcon />
-      </button>
-      <span aria-hidden="true" className="status-tooltip">
-        {label}
-      </span>
-    </span>
+    <StatusToggle
+      active={alwaysOnTop}
+      className="always-on-top-toggle"
+      label={alwaysOnTop ? 'Unpin window from top' : 'Pin window on top'}
+      onToggle={onToggle}
+    >
+      <PinIcon />
+    </StatusToggle>
   )
 }
 

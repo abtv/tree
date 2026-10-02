@@ -19,6 +19,8 @@ describe('renderer Electron services', () => {
     cleanupAttachments: vi.fn(async () => undefined),
     getAlwaysOnTop: vi.fn(async () => false),
     setAlwaysOnTop: vi.fn(async () => undefined),
+    getVimEnabled: vi.fn(async () => false),
+    setVimEnabled: vi.fn(async () => undefined),
   }
 
   beforeEach(() => {

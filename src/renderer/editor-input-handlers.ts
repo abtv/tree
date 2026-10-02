@@ -135,7 +135,8 @@ export interface EditorKeyboardHandlerDependencies {
   isComposing: () => boolean
   setSelectAllNodeId: (nodeId: string | undefined) => void
   onPreviewAttachment: (attachmentId: string) => void
-  vim?: VimKeyboardState
+  /** Absent while Vim editing is disabled: every key then takes the standard editing path. */
+  vim?: VimKeyboardState | undefined
 }
 
 export function createEditorKeyDownHandler({

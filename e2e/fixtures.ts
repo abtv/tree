@@ -297,10 +297,17 @@ export async function launchTree(
     windows?: WindowMode
     shortcut?: ShortcutMode
     initialMode?: 'normal' | 'insert'
+    /**
+     * The Vim editing preference written before launch. Most specs were written for Vim editing, so
+     * it defaults to enabled; `'saved'` leaves whatever an earlier launch (or nothing) persisted.
+     */
+    vimPreference?: boolean | 'saved'
   } = {},
 ): Promise<Launched> {
   await closeTrackedApps()
   await cleanupStaleElectronProcesses(userDataMarker)
+  const vimPreference = options.vimPreference ?? true
+  if (vimPreference !== 'saved') writeVimPreference(userDataDir, vimPreference)
   const windowMode = options.windows ?? ambientWindowMode()
   const shortcutMode = options.shortcut ?? ambientShortcutMode()
   let app: ElectronApplication
@@ -328,8 +335,12 @@ export async function launchTree(
     await assertShortcutMode(app, shortcutMode)
     if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
     // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
-    // Vim tests opt into the real Normal-mode startup state.
-    if (options.expectReady !== false && options.initialMode !== 'normal') {
+    // Vim tests opt into the real Normal-mode startup state. Standard editing has no modes.
+    if (
+      options.expectReady !== false &&
+      options.initialMode !== 'normal' &&
+      (await window.getByLabel('Vim mode').count()) > 0
+    ) {
       await window.keyboard.press('i')
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     }
@@ -510,6 +521,21 @@ export function documentPath(userDataDir: string): string {
 
 export function windowBoundsPath(userDataDir: string): string {
   return join(userDataDir, 'data', 'window-bounds.json')
+}
+
+export function vimPreferencePath(userDataDir: string): string {
+  return join(userDataDir, 'data', 'vim-enabled.json')
+}
+
+export function writeVimPreference(userDataDir: string, enabled: boolean): void {
+  mkdirSync(join(userDataDir, 'data'), { recursive: true })
+  writeFileSync(vimPreferencePath(userDataDir), JSON.stringify(enabled))
+}
+
+export function readVimPreference(userDataDir: string): unknown {
+  return existsSync(vimPreferencePath(userDataDir))
+    ? JSON.parse(readFileSync(vimPreferencePath(userDataDir), 'utf8'))
+    : undefined
 }
 
 export function readWindowBounds(userDataDir: string): PersistedWindowBounds {

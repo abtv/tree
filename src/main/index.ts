@@ -16,9 +16,9 @@ import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
 import {
   createDebouncedWindowBoundsSaver,
-  createAlwaysOnTopStore,
+  createBooleanPreferenceStore,
   createWindowBoundsStore,
-  type AlwaysOnTopStore,
+  type BooleanPreferenceStore,
   type WindowBounds,
 } from '../infrastructure/main/window-state'
 import { registerIpcHandlers } from './ipc-handlers'
@@ -37,7 +37,7 @@ import {
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
-let alwaysOnTopStore: AlwaysOnTopStore | null = null
+let alwaysOnTopStore: BooleanPreferenceStore | null = null
 const packagedRendererPath = join(__dirname, '../renderer/index.html')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 
@@ -62,7 +62,7 @@ function createMainWindow(): void {
   if (resolvedRenderer === null) throw new Error('Renderer URL was not resolved before creating the window.')
   const windowBoundsStore = createWindowBoundsStore(join(app.getPath('userData'), 'data', 'window-bounds.json'))
   const windowAlwaysOnTopStore =
-    alwaysOnTopStore ?? createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
+    alwaysOnTopStore ?? createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
   const savedBounds = windowBoundsStore.load()
   const windowBounds = createDebouncedWindowBoundsSaver(windowBoundsStore)
   const window = new BrowserWindow({
@@ -123,7 +123,8 @@ bootstrapApplication({
         .catch((error: unknown) => reportMainProcessError('Could not open external link', error))
     })
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
-    alwaysOnTopStore = createAlwaysOnTopStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
+    alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
+    const vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
     registerIpcHandlers({
       ipcMain,
       rendererUrl: resolvedRenderer.url,
@@ -152,6 +153,8 @@ bootstrapApplication({
         mainWindow?.setAlwaysOnTop(value)
         alwaysOnTopStore?.save(value)
       },
+      getVimEnabled: () => vimEnabledStore.load(),
+      setVimEnabled: (value) => vimEnabledStore.save(value),
     })
   },
   registerShortcut: (surface) => globalShortcut.register('CommandOrControl+0', surface),

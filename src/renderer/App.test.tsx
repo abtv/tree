@@ -33,6 +33,8 @@ beforeEach(() => {
     cleanupAttachments: async () => undefined,
     getAlwaysOnTop: async () => false,
     setAlwaysOnTop: async () => undefined,
+    getVimEnabled: async () => true,
+    setVimEnabled: async () => undefined,
   }
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:test' })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined })
@@ -132,7 +134,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
 
     expect(screen.getByText('NORMAL')).toBeInTheDocument()
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
@@ -148,7 +150,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(root, { target: { value: 'Current' } })
@@ -164,7 +166,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'A' } })
@@ -181,7 +183,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(root, { target: { value: 'F' } })
@@ -200,7 +202,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(root, { target: { value: 'Fir' } })
@@ -223,7 +225,7 @@ describe('App', () => {
     await act(async () => {
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
     await screen.findByRole('button', { name: 'Open image preview' })
 
@@ -241,7 +243,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     const input = screen.getByRole('textbox', { name: 'Node 1' })
     expect(input).toHaveClass('node-input-empty', 'node-input-image-only')
@@ -270,7 +272,7 @@ describe('App', () => {
     await act(async () => {
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open image preview' }))
     expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
@@ -289,7 +291,7 @@ describe('App', () => {
     await act(async () => {
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
     await screen.findByRole('button', { name: 'Open image preview' })
     fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
@@ -306,7 +308,7 @@ describe('App', () => {
     await act(async () => {
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
     const parent = screen.getByRole('textbox', { name: 'Current parent' })
@@ -322,7 +324,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'Enter', metaKey: true })
 
@@ -335,7 +337,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     const link = screen.getByRole('link', { name: 'https://example.com' })
     expect(link).toHaveAttribute('href', 'https://example.com')
@@ -349,7 +351,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     const editor = screen.getByRole('textbox', { name: 'Node 1' })
     await act(async () => {
@@ -369,7 +371,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const editor = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLDivElement
     const link = screen.getByRole('link', { name: 'https://example.com' })
 
@@ -389,7 +391,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     const editor = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLDivElement
     const addedText = document.createTextNode('x')
@@ -414,7 +416,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const editor = screen.getByRole('textbox', { name: 'Node 1' })
 
     fireEvent.focus(editor)
@@ -442,7 +444,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const editor = screen.getByRole('textbox', { name: 'Node 1' })
 
     await act(async () => {
@@ -464,7 +466,7 @@ describe('App', () => {
       await store.initialize()
       await store.paste('root', 0)
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const editor = screen.getByRole('textbox', { name: 'Node 1' })
 
     await act(async () => {
@@ -485,7 +487,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
 
     const parent = screen.getByRole('textbox', { name: 'Current parent' })
@@ -500,7 +502,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const before = store.getSnapshot()
     if (before.status !== 'ready') throw new Error('The editor is not ready.')
     const button = screen.getByRole('button', { name: 'Enter node 1' })
@@ -522,7 +524,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
@@ -575,7 +577,7 @@ describe('App', () => {
       })
       const noteViewportChange = vi.spyOn(store, 'noteViewportChange')
 
-      renderReact(<App store={store} />)
+      renderReact(<App initialVimEnabled store={store} />)
       // The row sits 40px from the top after focus; it moves down to its saved 180px.
       expect(calls.indexOf('focus')).toBeGreaterThanOrEqual(0)
       expect(calls.indexOf('scrollBy:-140')).toBeGreaterThan(calls.indexOf('focus'))
@@ -630,7 +632,7 @@ describe('App', () => {
       })
       const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
 
-      renderReact(<App store={store} />)
+      renderReact(<App initialVimEnabled store={store} />)
       const lowest = window.innerHeight - 20
       expect(scrollBy).toHaveBeenCalledWith(0, 40 - lowest)
 
@@ -648,7 +650,7 @@ describe('App', () => {
       )
       const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
 
-      renderReact(<App store={store} />)
+      renderReact(<App initialVimEnabled store={store} />)
       expect(scrollBy).not.toHaveBeenCalled()
     })
   })
@@ -659,7 +661,7 @@ describe('App', () => {
       await act(async () => {
         await store.initialize()
       })
-      render(<App store={store} />)
+      render(<App initialVimEnabled store={store} />)
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
@@ -789,7 +791,7 @@ describe('App', () => {
 
     async function renderNested(): Promise<EditorStore> {
       const store = await createSeededStore(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
-      renderReact(<App store={store} />)
+      renderReact(<App initialVimEnabled store={store} />)
       return store
     }
 
@@ -892,7 +894,7 @@ describe('App', () => {
         },
         { currentParentId: null, selectedNodeId: 'root' },
       )
-      renderReact(<App store={store} />)
+      renderReact(<App initialVimEnabled store={store} />)
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
       fold(alpha, 'a')
       const child = screen.getByRole('textbox', { name: 'Node 2' })
@@ -953,7 +955,7 @@ describe('App', () => {
     it('creates no undo entry or document edit when expanding inline, and saves the expansion', async () => {
       const save = vi.fn<EditorServices['save']>(async () => undefined)
       const store = await createSeededStore(nestedDocument, { currentParentId: null, selectedNodeId: 'root' }, save)
-      renderReact(<App store={store} />)
+      renderReact(<App initialVimEnabled store={store} />)
       const alpha = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
       const beforeEdit = readySnapshot(store)
 
@@ -1002,7 +1004,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Node 1' }), { target: { value: 'Projects' } })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
@@ -1028,7 +1030,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' })
 
     fireEvent.change(root, { target: { value: 'Root' } })
@@ -1054,7 +1056,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'Project' } })
     input.focus()
@@ -1073,7 +1075,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(2, 2)
@@ -1096,7 +1098,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(2, 2)
@@ -1119,7 +1121,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(2, 2)
@@ -1140,7 +1142,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(0, 0)
@@ -1166,7 +1168,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(root, { target: { value: 'A' } })
     root.focus()
@@ -1189,7 +1191,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' })
     fireEvent.change(input, { target: { value: 'Root' } })
     input.focus()
@@ -1210,7 +1212,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' })
     fireEvent.change(root, { target: { value: 'Root' } })
     fireEvent.keyDown(root, { key: '.', metaKey: true })
@@ -1239,7 +1241,7 @@ describe('App', () => {
       await store.initialize()
     })
     const setAlwaysOnTop = vi.spyOn(window.treeApi, 'setAlwaysOnTop')
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     const toggle = await screen.findByRole('button', { name: 'Pin window on top' })
     expect(toggle.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Pin window on top')
@@ -1253,12 +1255,156 @@ describe('App', () => {
     expect(unpin.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Unpin window from top')
   })
 
+  describe('Vim editing toggle', () => {
+    async function seededRoot(text: string): Promise<EditorStore> {
+      return createSeededStore(
+        { roots: [{ id: 'root', text, children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+    }
+
+    function rootText(store: EditorStore): string | undefined {
+      const state = store.getSnapshot()
+      return state.status === 'ready' ? state.document.roots[0]?.text : undefined
+    }
+
+    // @requirement PRODUCT.md §20.2
+    it('starts as a standard editor without the Vim mode indicator when Vim editing is disabled', async () => {
+      const store = await seededRoot('abc')
+      renderReact(<App initialVimEnabled={false} store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
+      const toggle = screen.getByRole('button', { name: 'Enable Vim editing' })
+      expect(toggle).toHaveAttribute('aria-pressed', 'false')
+      expect(toggle).toHaveTextContent('VIM')
+      expect(toggle.parentElement?.nextElementSibling).toBe(
+        screen.getByRole('button', { name: 'Pin window on top' }).parentElement,
+      )
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
+      root.focus()
+      root.setSelectionRange(1, 1)
+      // Vim keys and Escape reach native text entry instead of running Vim commands.
+      expect(fireEvent.keyDown(root, { key: 'x' })).toBe(true)
+      expect(fireEvent.keyDown(root, { key: 'Escape' })).toBe(true)
+      expect(fireEvent.keyDown(root, { key: 'd', ctrlKey: true })).toBe(true)
+      expect(rootText(store)).toBe('abc')
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
+      fireEvent.keyDown(root, { key: 'Enter' })
+      expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('a')
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('bc')
+    })
+
+    // @requirement PRODUCT.md §20.2
+    it('enables Vim editing in Normal mode, saves the choice, and keeps editor focus', async () => {
+      const store = await seededRoot('abc')
+      const setVimEnabled = vi.spyOn(window.treeApi, 'setVimEnabled')
+      renderReact(<App initialVimEnabled={false} store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      root.focus()
+      root.setSelectionRange(1, 1)
+
+      const toggle = screen.getByRole('button', { name: 'Enable Vim editing' })
+      expect(fireEvent.mouseDown(toggle)).toBe(false)
+      fireEvent.click(toggle)
+
+      expect(setVimEnabled).toHaveBeenCalledWith(true)
+      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+      expect(screen.getByRole('button', { name: 'Disable Vim editing' })).toHaveAttribute('aria-pressed', 'true')
+      expect(document.activeElement).toBe(root)
+      expect([root.selectionStart, root.selectionEnd]).toEqual([1, 2])
+      fireEvent.keyDown(root, { key: 'x' })
+      expect(rootText(store)).toBe('ac')
+    })
+
+    // @requirement PRODUCT.md §20.2
+    it('commits a pending replacement as one edit when Vim editing is disabled', async () => {
+      const store = await seededRoot('abc')
+      const setVimEnabled = vi.spyOn(window.treeApi, 'setVimEnabled')
+      renderReact(<App initialVimEnabled store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      root.focus()
+      root.setSelectionRange(0, 1)
+      fireEvent.keyDown(root, { key: 'R' })
+      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('REPLACE')
+      fireEvent.keyDown(root, { key: 'X' })
+      expect(rootText(store)).toBe('abc')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+
+      expect(setVimEnabled).toHaveBeenCalledWith(false)
+      expect(rootText(store)).toBe('Xbc')
+      expect(root).toHaveValue('Xbc')
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
+      act(() => store.undo())
+      expect(rootText(store)).toBe('abc')
+    })
+
+    // @requirement PRODUCT.md §20.2
+    it('drops a whole-node Visual range and an unfinished command when Vim editing is disabled', async () => {
+      const store = await seededRoot('abc')
+      renderReact(<App initialVimEnabled store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      root.focus()
+      fireEvent.keyDown(root, { key: 'V' })
+      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
+      expect(document.querySelector('.node-row-visual-selected')).not.toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+      expect(document.querySelector('.node-row-visual-selected')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+
+      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+      fireEvent.keyDown(root, { key: 'd' })
+      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+      // A `d` left pending before the switch would turn this `d` into `dd` and delete the node.
+      fireEvent.keyDown(root, { key: 'd' })
+      expect(rootText(store)).toBe('abc')
+    })
+
+    // @requirement PRODUCT.md §2.1
+    // @requirement PRODUCT.md §20.2
+    it('moves between the image caret and the Insert presentation when Vim editing switches', async () => {
+      const store = await createSeededStore(
+        { roots: [{ id: 'root', text: '', attachment: { id: 'root-image', mimeType: 'image/png' }, children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      renderReact(<App initialVimEnabled={false} store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' })
+      act(() => root.focus())
+      expect(root).not.toHaveClass('node-input-image-caret')
+      expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+      expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-image-caret')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+      expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-image-caret')
+      expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
+    })
+
+    it('keeps the switched mode and reports an error when saving the choice fails', async () => {
+      const store = await seededRoot('abc')
+      const reportError = vi.spyOn(store, 'reportError')
+      vi.spyOn(window.treeApi, 'setVimEnabled').mockRejectedValue(new Error('write failed'))
+      renderReact(<App initialVimEnabled={false} store={store} />)
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+        await Promise.resolve()
+      })
+
+      expect(reportError).toHaveBeenCalledWith(new Error('write failed'))
+      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+    })
+  })
+
   it('reorders siblings through a press-and-hold drag over the editable surface', async () => {
     const store = createStore()
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -1295,7 +1441,7 @@ describe('App', () => {
 
   it('does not arm a drag while the editor is persistence-locked', async () => {
     const store = await createLockedStore()
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     mockAppRowRects()
     vi.useFakeTimers()
     const row = document.querySelector('.node-row')
@@ -1323,7 +1469,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'Alpha' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -1373,7 +1519,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'Alpha' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -1413,7 +1559,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'Alpha' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -1461,7 +1607,7 @@ describe('App', () => {
   })
 
   it('shows a loading state before the document is ready', () => {
-    render(<App store={createStore()} />)
+    render(<App initialVimEnabled store={createStore()} />)
     expect(screen.getByText('Loading document…')).toBeInTheDocument()
   })
 
@@ -1480,7 +1626,7 @@ describe('App', () => {
       await store.initialize()
     })
 
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('boom')
   })
@@ -1492,7 +1638,7 @@ describe('App', () => {
     })
 
     store.reportError(new Error('attachment cleanup failed'))
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('Operation failed: attachment cleanup failed')
   })
@@ -1515,14 +1661,14 @@ describe('App', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
 
     expect(screen.getByRole('status')).toHaveTextContent('Changes could not be saved: disk full')
   })
 
   it('disables editing and shows the lock message after three failed saves', async () => {
     const store = await createLockedStore()
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', persistenceLocked: true })
@@ -1538,7 +1684,7 @@ describe('App', () => {
 
   it('traps focus, cancels with Escape, and confirms quitting without saving while locked', async () => {
     const store = await createLockedStore()
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const quitWithoutSaving = vi.spyOn(window.treeApi, 'quitWithoutSaving')
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     input.focus()
@@ -1569,7 +1715,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -1585,7 +1731,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
 
     fireEvent.compositionStart(node)
@@ -1602,7 +1748,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(node, { target: { value: 'a' } })
@@ -1618,7 +1764,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'ab' } })
@@ -1635,7 +1781,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
@@ -1653,7 +1799,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
     fireEvent.change(first, { target: { value: 'A' } })
@@ -1676,7 +1822,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    renderReact(<App store={store} />)
+    renderReact(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(root, { target: { value: 'abcd' } })
     root.setSelectionRange(2, 2)
@@ -1701,7 +1847,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const quit = vi.spyOn(window.treeApi, 'quit')
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'q', metaKey: true })
@@ -1715,7 +1861,7 @@ describe('App', () => {
     await act(async () => {
       await store.initialize()
     })
-    render(<App store={store} />)
+    render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })

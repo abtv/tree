@@ -16,9 +16,10 @@ export interface WindowBoundsStore {
   save(bounds: WindowBounds): void
 }
 
-export interface AlwaysOnTopStore {
+/** One user preference stored as a boolean file; an absent or malformed file reads as `false`. */
+export interface BooleanPreferenceStore {
   load(): boolean
-  save(alwaysOnTop: boolean): void
+  save(value: boolean): void
 }
 
 export interface BoundsTimers {
@@ -105,7 +106,7 @@ export function createWindowBoundsStore(path: string): WindowBoundsStore {
   }
 }
 
-export function createAlwaysOnTopStore(path: string): AlwaysOnTopStore {
+export function createBooleanPreferenceStore(path: string): BooleanPreferenceStore {
   return {
     load: () => {
       try {
@@ -115,12 +116,12 @@ export function createAlwaysOnTopStore(path: string): AlwaysOnTopStore {
         return false
       }
     },
-    save: (alwaysOnTop) => {
+    save: (value) => {
       try {
         mkdirSync(dirname(path), { recursive: true })
-        writeFileSync(path, JSON.stringify(alwaysOnTop))
+        writeFileSync(path, JSON.stringify(value))
       } catch {
-        // Window-state persistence is opportunistic and must not interrupt window lifecycle events.
+        // Preference persistence is opportunistic and must not interrupt window lifecycle events.
       }
     },
   }

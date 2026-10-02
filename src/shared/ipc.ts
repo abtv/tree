@@ -14,6 +14,8 @@ export const ipcChannels = {
   showEditorContextMenu: 'tree:show-editor-context-menu',
   getAlwaysOnTop: 'tree:get-always-on-top',
   setAlwaysOnTop: 'tree:set-always-on-top',
+  getVimEnabled: 'tree:get-vim-enabled',
+  setVimEnabled: 'tree:set-vim-enabled',
 } as const
 
 export type ClipboardPayload =
@@ -51,4 +53,6 @@ export interface TreeApi {
   showEditorContextMenu?: (request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
   getAlwaysOnTop(): Promise<boolean>
   setAlwaysOnTop(alwaysOnTop: boolean): Promise<void>
+  getVimEnabled(): Promise<boolean>
+  setVimEnabled(vimEnabled: boolean): Promise<void>
 }

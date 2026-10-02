@@ -61,6 +61,8 @@ describe('preload bridge', () => {
     await treeApi.cleanupAttachments(['attachment-1'])
     await treeApi.getAlwaysOnTop()
     await treeApi.setAlwaysOnTop(true)
+    await treeApi.getVimEnabled()
+    await treeApi.setVimEnabled(true)
 
     expect(mocks.invoke.mock.calls).toEqual([
       [ipcChannels.load],
@@ -72,6 +74,8 @@ describe('preload bridge', () => {
       [ipcChannels.cleanupAttachments, ['attachment-1']],
       [ipcChannels.getAlwaysOnTop],
       [ipcChannels.setAlwaysOnTop, true],
+      [ipcChannels.getVimEnabled],
+      [ipcChannels.setVimEnabled, true],
     ])
   })
 

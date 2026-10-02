@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
   createDebouncedWindowBoundsSaver,
-  createAlwaysOnTopStore,
+  createBooleanPreferenceStore,
   createWindowBoundsStore,
   isValidWindowBounds,
   type WindowBounds,
@@ -52,10 +52,10 @@ describe('createWindowBoundsStore', () => {
   })
 })
 
-describe('createAlwaysOnTopStore', () => {
+describe('createBooleanPreferenceStore', () => {
   it('saves and loads the setting', () => {
     const path = createPath().replace('window-bounds.json', 'window-always-on-top.json')
-    const store = createAlwaysOnTopStore(path)
+    const store = createBooleanPreferenceStore(path)
 
     expect(store.load()).toBe(false)
     store.save(true)
@@ -64,8 +64,8 @@ describe('createAlwaysOnTopStore', () => {
   })
 
   it('defaults malformed settings to false', () => {
-    const path = createPath().replace('window-bounds.json', 'window-always-on-top.json')
-    const store = createAlwaysOnTopStore(path)
+    const path = createPath().replace('window-bounds.json', 'vim-enabled.json')
+    const store = createBooleanPreferenceStore(path)
 
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, JSON.stringify('yes'))

@@ -16,10 +16,16 @@ if (!rootElement) {
 const store = new EditorStore(createElectronEditorServices(), () => crypto.randomUUID())
 startRendererLifecycle(store, window.treeApi)
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <App store={store} />
-    </ErrorBoundary>
-  </StrictMode>,
-)
+// An unreadable preference falls back to the first-run default, standard (non-Vim) editing.
+void window.treeApi
+  .getVimEnabled()
+  .catch(() => false)
+  .then((initialVimEnabled) => {
+    createRoot(rootElement).render(
+      <StrictMode>
+        <ErrorBoundary>
+          <App initialVimEnabled={initialVimEnabled} store={store} />
+        </ErrorBoundary>
+      </StrictMode>,
+    )
+  })

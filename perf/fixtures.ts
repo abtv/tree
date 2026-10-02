@@ -61,6 +61,9 @@ export async function launchTree(
 ): Promise<Launched> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   await cleanupStaleElectronProcesses('tree-perf-')
+  // The guarded interactions and their baselines are Vim editing sequences, so Vim editing is enabled.
+  mkdirSync(join(userDataDir, 'data'), { recursive: true })
+  writeFileSync(join(userDataDir, 'data', 'vim-enabled.json'), 'true')
   let app: ElectronApplication
   try {
     app = await electron.launch({

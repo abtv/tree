@@ -6,7 +6,7 @@ test.describe('always-on-top window', () => {
     const first = await launchTree(userDataDir)
     const toggle = first.window.getByRole('button', { name: 'Pin window on top' })
 
-    const tooltip = first.window.locator('.status-tooltip')
+    const tooltip = first.window.locator('.status-tooltip-anchor', { has: toggle }).locator('.status-tooltip')
     await expect(tooltip).toBeHidden()
     await toggle.hover()
     await expect(tooltip).toBeVisible()

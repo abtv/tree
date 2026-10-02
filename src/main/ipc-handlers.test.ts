@@ -34,6 +34,8 @@ function createHarness() {
   const showEditorContextMenu = vi.fn(async () => 'copy' as const)
   const getAlwaysOnTop = vi.fn(() => false)
   const setAlwaysOnTop = vi.fn()
+  const getVimEnabled = vi.fn(() => true)
+  const setVimEnabled = vi.fn()
   const decodePng = vi.fn(decodePngWithZlib)
   registerIpcHandlers({
     ipcMain,
@@ -46,6 +48,8 @@ function createHarness() {
     showEditorContextMenu,
     getAlwaysOnTop,
     setAlwaysOnTop,
+    getVimEnabled,
+    setVimEnabled,
   })
   return {
     handlers,
@@ -57,6 +61,8 @@ function createHarness() {
     showEditorContextMenu,
     getAlwaysOnTop,
     setAlwaysOnTop,
+    getVimEnabled,
+    setVimEnabled,
   }
 }
 
@@ -208,6 +214,21 @@ describe('main IPC handlers', () => {
     await expect(
       Promise.resolve().then(() => handlers.get(ipcChannels.setAlwaysOnTop)!(event, 'true')),
     ).rejects.toThrow('Invalid always-on-top setting.')
+  })
+
+  it('reads and validates Vim editing changes through the trusted renderer contract', async () => {
+    const { handlers, getVimEnabled, setVimEnabled } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(handlers.get(ipcChannels.getVimEnabled)!(event)).toBe(true)
+    await handlers.get(ipcChannels.setVimEnabled)!(event, false)
+
+    expect(getVimEnabled).toHaveBeenCalledOnce()
+    expect(setVimEnabled).toHaveBeenCalledWith(false)
+    await expect(Promise.resolve().then(() => handlers.get(ipcChannels.setVimEnabled)!(event, 1))).rejects.toThrow(
+      'Invalid Vim editing setting.',
+    )
+    expect(setVimEnabled).toHaveBeenCalledOnce()
   })
 
   it('quits without saving through the handshake', async () => {

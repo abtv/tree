@@ -160,7 +160,8 @@ textarea {
   color: var(--color-hover-text);
 }
 
-.always-on-top-toggle:hover {
+.always-on-top-toggle:hover,
+.vim-toggle:hover {
   color: var(--color-toggle-hover-text);
 }
 
@@ -170,7 +171,8 @@ textarea {
   outline-offset: 3px;
 }
 
-.always-on-top-toggle:focus-visible {
+.always-on-top-toggle:focus-visible,
+.vim-toggle:focus-visible {
   outline: 1px solid var(--color-toggle-focus-outline);
   outline-offset: 3px;
 }
@@ -180,6 +182,11 @@ textarea {
   display: inline-flex;
   flex: 0 0 auto;
   margin-right: 10px;
+}
+
+/* The pin ends the status bar while Vim editing is disabled and its mode indicator is absent. */
+.status-tooltip-anchor:last-child {
+  margin-right: 0;
 }
 
 /* Opens above the status bar and ends at the toggle's right edge, so it stays inside the window. */
@@ -203,7 +210,8 @@ textarea {
   visibility: visible;
 }
 
-.always-on-top-toggle {
+.always-on-top-toggle,
+.vim-toggle {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -228,7 +236,15 @@ textarea {
   stroke-width: 1.5;
 }
 
-.always-on-top-toggle-active {
+.vim-toggle {
+  width: auto;
+  padding: 2px 5px;
+  font: 600 11px/14px 'JetBrains Mono';
+  letter-spacing: 0.04em;
+}
+
+.always-on-top-toggle-active,
+.vim-toggle-active {
   background: var(--color-toggle-active-background);
   color: var(--color-ink);
 }
