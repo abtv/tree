@@ -660,3 +660,27 @@ test.describe('inline node expansion (Vim editing only)', () => {
     expect(await nodeTexts(window)).toEqual(['Charlie', 'Alpha', 'Bravo'])
   })
 })
+
+// @requirement PRODUCT.md §20.5
+test.describe('appearance colors by depth', () => {
+  test('colors node text by depth in the dark appearance only', async ({ userDataDir }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+    // Rows: Alpha(1), Alpha child one(2), Alpha grandchild(3), Alpha child two(4), Bravo(5).
+    const colors = async (): Promise<string[]> =>
+      Promise.all([1, 2, 3, 5].map((index) => node(window, index).evaluate((el) => getComputedStyle(el).color)))
+
+    await window.emulateMedia({ colorScheme: 'dark' })
+    expect(await colors()).toEqual([
+      'rgb(223, 175, 143)',
+      'rgb(240, 223, 175)',
+      'rgb(140, 208, 211)',
+      'rgb(223, 175, 143)',
+    ])
+
+    await window.emulateMedia({ colorScheme: 'light' })
+    expect(new Set(await colors()).size).toBe(1)
+  })
+})

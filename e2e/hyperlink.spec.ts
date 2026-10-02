@@ -40,7 +40,7 @@ describeForEachEditingMode('external hyperlinks', ({ screenshotName }) => {
     await editor.screenshot({ path: testInfo.outputPath('editable-link-light.png') })
     await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-light.png'))
     await window.emulateMedia({ colorScheme: 'dark' })
-    await expect(editor.getByRole('link')).toHaveCSS('color', 'rgb(115, 183, 255)')
+    await expect(editor.getByRole('link')).toHaveCSS('color', 'rgb(140, 208, 211)')
     await editor.screenshot({ path: testInfo.outputPath('editable-link-dark.png') })
     await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-dark.png'))
   })

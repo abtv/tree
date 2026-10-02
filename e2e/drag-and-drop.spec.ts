@@ -459,7 +459,7 @@ test.describe('text selection highlight in standard editing', () => {
     await expect(editor).toHaveScreenshot('standard-text-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
     await expect(editor).toHaveScreenshot('standard-text-selection-dark.png')
     await window.emulateMedia({ colorScheme: 'light' })
   })

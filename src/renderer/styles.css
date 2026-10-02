@@ -766,22 +766,70 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 @media (prefers-color-scheme: dark) {
+  /* Dark palette adapted from the Zenburn Emacs port, zenburn-emacs
+     (https://github.com/bbatsov/zenburn-emacs). Node text takes one accent color per depth
+     below the current parent, in the manner of Org-mode headline levels (docs/PRODUCT.md §20.5). */
   :root {
-    --color-text: #e5e7e8;
-    --color-background: #1e2022;
-    --color-shell-text: #a5adb2;
-    --color-secondary: #a5adb2;
-    --color-location-separator: #687177;
-    --color-location-border: #303438;
-    --color-hover-text: #e5e7e8;
-    --color-link: #73b7ff;
-    --color-caret: #fff;
-    --color-gutter-mark: #c3c8cb;
-    --color-disclosure-background: #4b5155;
-    --color-disclosure-hover-background: #5b6368;
-    --color-drag-highlight: #303438;
-    --highlight-background: #4a4023;
-    --highlight-foreground: #f5e9b7;
+    --color-text: #dcdccc;
+    --color-background: #3f3f3f;
+    --color-shell-text: #9f9f8f;
+    --color-secondary: #9f9f8f;
+    --color-location-separator: #656555;
+    --color-location-border: #2b2b2b;
+    --color-hover-text: #f0f0e0;
+    --color-link: #8cd0d3;
+    --color-caret: #dcdccc;
+    --color-gutter-mark: #9f9f8f;
+    --color-disclosure-background: #4f4f4f;
+    --color-disclosure-hover-background: #5f5f5f;
+    --color-drag-highlight: #4f4f4f;
+    --highlight-background: #2b2b2b;
+    --highlight-foreground: #f0dfaf;
+    --color-level-0: #dfaf8f;
+    --color-level-1: #f0dfaf;
+    --color-level-2: #8cd0d3;
+    --color-level-3: #8fb28f;
+    --color-level-4: #dc8cc3;
+    --color-level-5: #cc9393;
+    --color-level-6: #93e0e3;
+    --color-level-7: #7cb8bb;
+  }
+
+  :where(.node-row[data-depth='0']) {
+    color: var(--color-level-0);
+  }
+  :where(.node-row[data-depth='1']) {
+    color: var(--color-level-1);
+  }
+  :where(.node-row[data-depth='2']) {
+    color: var(--color-level-2);
+  }
+  :where(.node-row[data-depth='3']) {
+    color: var(--color-level-3);
+  }
+  :where(.node-row[data-depth='4']) {
+    color: var(--color-level-4);
+  }
+  :where(.node-row[data-depth='5']) {
+    color: var(--color-level-5);
+  }
+  :where(.node-row[data-depth='6']) {
+    color: var(--color-level-6);
+  }
+  :where(.node-row[data-depth='7']) {
+    color: var(--color-level-7);
+  }
+
+  /* The block caret and Normal-mode selection default to the light-appearance ink pair, which
+     would be invisible on the Zenburn surface. */
+  .vim-state-normal .node-input::selection,
+  .vim-state-normal .node-input *::selection {
+    color: var(--color-background);
+    background: var(--color-caret);
+  }
+
+  .vim-state-normal .node-input.node-input-empty:focus {
+    caret-color: var(--color-caret);
   }
 
   .node-input:focus {

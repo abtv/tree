@@ -1010,6 +1010,12 @@ This deepens the Responsiveness commitment in §1.1: even a smooth, well-perform
 
 This does not govern motion the application does not itself decide to add: native macOS window chrome, and scrolling driven directly by continuous user input, such as the page's own scroll position or the drag auto-scroll in §11 and §20.1, whose motion is the direct feedback of an ongoing input rather than a transition inserted after an action completes.
 
+### 20.5 Appearance
+
+The application follows the operating system's light or dark appearance and has no setting of its own for it. Switching the system appearance restyles the open window immediately.
+
+The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors. In the dark appearance the text of a node is colored by its depth below the current parent: the current parent's children use the first of eight colors, their expanded children the second, and so on in order. Rows nested deeper than the eighth level use the ordinary text color. The light appearance does not color text by depth. The depth color gives way to the selection highlight, so a selected row keeps the highlight's text color.
+
 ---
 
 ## 21. Unexpected Renderer Errors

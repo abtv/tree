@@ -59,6 +59,7 @@ export const NodeRow = memo(function NodeRow({
   return (
     <div
       className={className}
+      data-depth={depth}
       data-has-attachment={node.attachment !== undefined}
       data-node-id={node.id}
       data-node-index={index}

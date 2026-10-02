@@ -515,7 +515,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(first).toHaveScreenshot('vim-normal-text-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
-    expect(await selectionColors(first)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
     await expect(first).toHaveScreenshot('vim-normal-text-selection-dark.png')
     await window.emulateMedia({ colorScheme: 'light' })
 
@@ -666,9 +666,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::selection').backgroundColor,
         ),
       )
-      .toBe('rgb(55, 63, 67)')
-    expect(await selectionColors(link)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+      .toBe('rgb(220, 220, 204)')
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(220, 220, 204)', color: 'rgb(63, 63, 63)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(220, 220, 204)', color: 'rgb(63, 63, 63)' })
     await expect(editor).toHaveScreenshot('vim-normal-link-character-dark.png')
   })
 
@@ -730,8 +730,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(editor).toHaveScreenshot('vim-visual-link-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
-    expect(await selectionColors(link)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
     await expect(editor).toHaveScreenshot('vim-visual-link-selection-dark.png')
   })
 
@@ -771,8 +771,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
-    expect(await selectionColors(link)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
     await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-dark.png')
   })
 
