@@ -1,7 +1,7 @@
-// @editing-modes: pending
-import { expect, launchTree, node, parent, test, typeInto } from './fixtures'
+// @editing-modes: both
+import { describeForEachEditingMode, expect, launchTree, node, parent, test, typeInto } from './fixtures'
 
-test.describe('deleting nodes', () => {
+describeForEachEditingMode('deleting nodes', () => {
   // @requirement PRODUCT.md §8.1
   test('deleting a middle sibling selects the next sibling', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)

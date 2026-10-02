@@ -1,6 +1,7 @@
-// @editing-modes: pending
+// @editing-modes: both
 import {
   configureHiddenParallelTests,
+  describeForEachEditingMode,
   expect,
   firePaste,
   launchTree,
@@ -10,7 +11,7 @@ import {
   writeClipboardText,
 } from './fixtures'
 
-test.describe('text edit sessions', () => {
+describeForEachEditingMode('text edit sessions', () => {
   configureHiddenParallelTests()
 
   test('starts a new undo entry after five seconds without a text change', async ({ userDataDir }) => {
@@ -79,5 +80,40 @@ test.describe('text edit sessions', () => {
 
     await window.keyboard.press('Meta+z')
     await expect(node(window, 2)).toHaveValue('')
+  })
+})
+
+test.describe('Escape in standard editing', () => {
+  test.use({ editingMode: 'standard' })
+
+  test('leaves the text, caret, selection, and undo grouping unchanged', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const selection = () =>
+      editor.evaluate((element) => [
+        (element as HTMLTextAreaElement).selectionStart,
+        (element as HTMLTextAreaElement).selectionEnd,
+      ])
+
+    await typeInto(editor, 'ab')
+    await window.keyboard.press('ArrowLeft')
+    await window.keyboard.press('Escape')
+    await expect(editor).toBeFocused()
+    await expect(editor).toHaveValue('ab')
+    expect(await selection()).toEqual([1, 1])
+
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.press('Escape')
+    await expect(editor).toBeFocused()
+    expect(await selection()).toEqual([0, 2])
+
+    // Escape does not end the text session, so the edits before and after it undo together.
+    await window.keyboard.press('End')
+    await window.keyboard.type('c')
+    await window.keyboard.press('Escape')
+    await window.keyboard.type('d')
+    await expect(editor).toHaveValue('abcd')
+    await window.keyboard.press('Meta+z')
+    await expect(editor).toHaveValue('ab')
   })
 })

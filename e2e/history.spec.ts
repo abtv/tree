@@ -1,7 +1,8 @@
-// @editing-modes: pending
+// @editing-modes: both
 import { existsSync } from 'node:fs'
 import {
   attachmentPath,
+  describeForEachEditingMode,
   dragRow,
   expect,
   firePaste,
@@ -17,7 +18,7 @@ import {
   writeClipboardText,
 } from './fixtures'
 
-test.describe('undo and redo', () => {
+describeForEachEditingMode('undo and redo', () => {
   test('undoes and redoes a text edit', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -43,22 +44,6 @@ test.describe('undo and redo', () => {
     await expect(node(window, 1)).toHaveValue('A')
   })
 
-  // @requirement PRODUCT.md §10
-  // @requirement PRODUCT.md §18
-  test('keeps node IDs stable across undo and redo', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-
-    await typeInto(node(window, 1), 'A')
-    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBeTruthy()
-    const rootId = readPersisted(userDataDir).document.roots[0]!.id
-
-    await window.keyboard.press('Enter')
-    await window.keyboard.press('Meta+z')
-    await window.keyboard.press('Meta+Shift+z')
-
-    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBe(rootId)
-  })
-
   test('undoes and redoes a split', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -75,6 +60,25 @@ test.describe('undo and redo', () => {
     await window.keyboard.press('Meta+Shift+z')
     await expect(node(window, 1)).toHaveValue('Cur')
     await expect(node(window, 2)).toHaveValue('rent')
+  })
+})
+
+// The tests below do not pass through an editing-mode divergence, so they run once.
+test.describe('undo and redo (mode-independent)', () => {
+  // @requirement PRODUCT.md §10
+  // @requirement PRODUCT.md §18
+  test('keeps node IDs stable across undo and redo', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'A')
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBeTruthy()
+    const rootId = readPersisted(userDataDir).document.roots[0]!.id
+
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Meta+z')
+    await window.keyboard.press('Meta+Shift+z')
+
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBe(rootId)
   })
 
   test('undoes and redoes node and subtree deletion with stable IDs', async ({ userDataDir }) => {

@@ -1,7 +1,7 @@
-// @editing-modes: pending
-import { expect, launchTree, node, parent, test, typeInto } from './fixtures'
+// @editing-modes: both
+import { describeForEachEditingMode, expect, launchTree, node, parent, test, typeInto } from './fixtures'
 
-test.describe('Backspace on empty nodes', () => {
+describeForEachEditingMode('Backspace on empty nodes', () => {
   test('deletes an empty node and focuses the previous sibling at the end', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

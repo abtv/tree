@@ -1,9 +1,10 @@
-// @editing-modes: pending
+// @editing-modes: both
 import type { ElectronApplication } from '@playwright/test'
 import {
   allowRendererError,
   attachmentFiles,
   clickApplicationMenuQuit,
+  describeForEachEditingMode,
   expect,
   firePaste,
   launchTree,
@@ -36,7 +37,7 @@ async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
   })
 }
 
-test.describe('clipboard', () => {
+describeForEachEditingMode('clipboard (paste at the cursor)', () => {
   // @requirement PRODUCT.md §13
   test('pastes plain text at the cursor', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
@@ -48,7 +49,10 @@ test.describe('clipboard', () => {
 
     await expect(node(window, 1)).toHaveValue('abcXYZdef')
   })
+})
 
+// The tests below do not pass through an editing-mode divergence, so they run once.
+test.describe('clipboard (mode-independent)', () => {
   test('pastes plain text when the HTML clipboard representation is oversized', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const plainText = 'plain clipboard text'
@@ -103,7 +107,9 @@ test.describe('clipboard', () => {
     await expect(window.getByRole('link')).toHaveCount(2)
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
   })
+})
 
+describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
   // @requirement PRODUCT.md §13.1
   test('cuts a hyperlink and pastes it into another node with its link preserved', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
@@ -235,7 +241,9 @@ test.describe('clipboard', () => {
       'https://example.cox',
     )
   })
+})
 
+test.describe('clipboard (mode-independent, second part)', () => {
   // @requirement PRODUCT.md §14
   test('pastes multiline text as separate nodes', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)

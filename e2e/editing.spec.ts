@@ -1,5 +1,6 @@
-// @editing-modes: pending
+// @editing-modes: both
 import {
+  describeForEachEditingMode,
   expect,
   firePaste,
   launchTree,
@@ -12,7 +13,7 @@ import {
   writeClipboardText,
 } from './fixtures'
 
-test.describe('creating nodes with Enter', () => {
+describeForEachEditingMode('creating nodes with Enter', () => {
   test('Cmd+A selects all text in a link-free node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

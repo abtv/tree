@@ -1,5 +1,6 @@
-// @editing-modes: pending
+// @editing-modes: both
 import {
+  describeForEachEditingMode,
   expect,
   firePaste,
   launchTree,
@@ -37,7 +38,7 @@ async function lastEditorMenuLabels(app: ElectronApplication): Promise<(string |
 }
 
 // @requirement PRODUCT.md §13.2
-test.describe('editable node context menu', () => {
+describeForEachEditingMode('editable node context menu', () => {
   test('routes Copy and Paste through the editor store path', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await lockSystemClipboard()
@@ -53,28 +54,6 @@ test.describe('editable node context menu', () => {
     await chooseEditorMenuItem(app, 'Paste')
     await editor.click({ button: 'right' })
     await expect(editor).toHaveValue('Context menu textpasted')
-    await app.close()
-  })
-
-  test('bounds long selections in the native Look Up menu label', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
-    const selection = 'long selection '.repeat(25)
-    const editor = node(window, 1)
-    await typeInto(editor, selection)
-    await window.keyboard.press('Meta+a')
-    await chooseEditorMenuItem(app, 'Copy')
-    await editor.click({ button: 'right' })
-
-    const labels = await lastEditorMenuLabels(app)
-    expect(labels).toEqual([
-      `Look Up “${'long selection '.repeat(17).slice(0, 255)}…”`,
-      'Search with Google',
-      '',
-      'Cut',
-      'Copy',
-      'Paste',
-      'Select All',
-    ])
     await app.close()
   })
 
@@ -116,6 +95,32 @@ test.describe('editable node context menu', () => {
     await window.getByRole('button', { name: 'Enter node 4' }).click({ button: 'right' })
 
     await expect.poll(() => window.evaluate(() => document.defaultView?.getSelection()?.toString() ?? '')).toBe('')
+    await app.close()
+  })
+})
+
+// The menu label does not pass through an editing-mode divergence, so this test runs once.
+// @requirement PRODUCT.md §13.2
+test.describe('editable node context menu (mode-independent)', () => {
+  test('bounds long selections in the native Look Up menu label', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const selection = 'long selection '.repeat(25)
+    const editor = node(window, 1)
+    await typeInto(editor, selection)
+    await window.keyboard.press('Meta+a')
+    await chooseEditorMenuItem(app, 'Copy')
+    await editor.click({ button: 'right' })
+
+    const labels = await lastEditorMenuLabels(app)
+    expect(labels).toEqual([
+      `Look Up “${'long selection '.repeat(17).slice(0, 255)}…”`,
+      'Search with Google',
+      '',
+      'Cut',
+      'Copy',
+      'Paste',
+      'Select All',
+    ])
     await app.close()
   })
 })
