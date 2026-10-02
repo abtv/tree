@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { EditorStore } from '../application/editor-store'
+import { onViewportScroll, scrollViewportBy, viewportBounds, viewportContent } from './scroll-viewport'
 
 const USER_INPUT_EVENTS = ['wheel', 'keydown', 'pointerdown', 'touchstart'] as const
 
@@ -20,13 +21,14 @@ function selectedRowElement(store: EditorStore): HTMLElement | undefined {
  */
 function clampRowTop(row: HTMLElement, top: number): number {
   const { height } = row.getBoundingClientRect()
-  const lowest = Math.max(0, globalThis.innerHeight - Math.min(height, globalThis.innerHeight))
-  return Math.min(Math.max(top, 0), lowest)
+  const viewport = viewportBounds()
+  const lowest = Math.max(viewport.top, viewport.bottom - Math.min(height, viewport.bottom - viewport.top))
+  return Math.min(Math.max(top, viewport.top), lowest)
 }
 
-/** Scrolls the page so the row sits at the clamped target distance from the top of the window. */
+/** Scrolls the content so the row sits at the clamped target distance from the top of the window. */
 function alignRow(row: HTMLElement, target: number): void {
-  globalThis.scrollBy(0, row.getBoundingClientRect().top - clampRowTop(row, target))
+  scrollViewportBy(row.getBoundingClientRect().top - clampRowTop(row, target))
 }
 
 /**
@@ -73,10 +75,10 @@ export function useScrollRestoration(store: EditorStore, ready: boolean): void {
       if (userActive) store.noteViewportChange()
     }
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(realign)
-    observer?.observe(document.documentElement)
+    observer?.observe(viewportContent())
     for (const type of USER_INPUT_EVENTS)
       globalThis.addEventListener(type, onUserInput, { capture: true, passive: true })
-    globalThis.addEventListener('scroll', onScroll, { passive: true })
+    const unsubscribeScroll = onViewportScroll(onScroll)
     const unregister = store.registerSelectedRowTopReader(() => {
       const row = selectedRowElement(store)
       if (row === undefined) return pendingTop.current
@@ -85,7 +87,7 @@ export function useScrollRestoration(store: EditorStore, ready: boolean): void {
     return () => {
       observer?.disconnect()
       for (const type of USER_INPUT_EVENTS) globalThis.removeEventListener(type, onUserInput, { capture: true })
-      globalThis.removeEventListener('scroll', onScroll)
+      unsubscribeScroll()
       unregister()
     }
   }, [ready, store])

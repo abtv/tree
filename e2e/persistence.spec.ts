@@ -277,8 +277,13 @@ test.describe('persistence', () => {
 
     await wheelBy(first.window, 2_000)
     await expect(firstRow(first.window)).not.toBeInViewport()
+    const contentTop = await first.window.evaluate(
+      () => document.querySelector('.scroll-viewport')?.getBoundingClientRect().top ?? 0,
+    )
     await closeApp(first.app)
-    expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(0)
+    // The nearest edge is the top of the content area, directly below the toolbar.
+    expect(contentTop).toBeGreaterThan(0)
+    expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(contentTop)
 
     const second = await launchTree(userDataDir)
     await expect(firstRow(second.window)).toBeFocused()

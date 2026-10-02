@@ -15,6 +15,7 @@ import {
   type LayoutState,
 } from './node-list-layout'
 import { dropMarkerFor } from './node-drag'
+import { onViewportScroll, viewportBounds } from './scroll-viewport'
 import { useNodeListDrag } from './use-node-list-drag'
 
 interface NodeListProps {
@@ -135,7 +136,7 @@ export function NodeList({
     if (element === null) return
     const { top } = element.getBoundingClientRect()
     const start = Math.max(0, -top)
-    const end = Math.max(0, globalThis.innerHeight - top)
+    const end = Math.max(0, viewportBounds().bottom - top)
     setViewport((previous) => (previous.start === start && previous.end === end ? previous : { start, end }))
   }, [])
 
@@ -146,10 +147,10 @@ export function NodeList({
   useEffect(() => {
     if (!windowed) return undefined
     const onScroll = (): void => updateViewport()
-    globalThis.addEventListener('scroll', onScroll, { passive: true })
+    const unsubscribe = onViewportScroll(onScroll)
     globalThis.addEventListener('resize', onScroll)
     return () => {
-      globalThis.removeEventListener('scroll', onScroll)
+      unsubscribe()
       globalThis.removeEventListener('resize', onScroll)
     }
   }, [updateViewport, windowed])

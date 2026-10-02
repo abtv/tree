@@ -559,6 +559,8 @@ describe('App', () => {
       })
       let rowTop = 40
       vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('scroll-viewport'))
+          return { top: 0, bottom: window.innerHeight, height: window.innerHeight } as DOMRect
         const top = this.dataset.nodeId === 'root' ? rowTop : 0
         return { top, bottom: top + 20, height: 20, left: 0, right: 0, width: 0, x: 0, y: top } as DOMRect
       })
@@ -621,6 +623,8 @@ describe('App', () => {
         await store.initialize()
       })
       vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('scroll-viewport'))
+          return { top: 0, bottom: window.innerHeight, height: window.innerHeight } as DOMRect
         const top = this.dataset.nodeId === 'root' ? 40 : 0
         return { top, bottom: top + 20, height: 20, left: 0, right: 0, width: 0, x: 0, y: top } as DOMRect
       })

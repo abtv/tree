@@ -21,6 +21,7 @@ import {
 } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
+import { viewportBounds } from './scroll-viewport'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
   beginStructuralChildOpen,
@@ -455,9 +456,10 @@ export function useNodeInputBindings({
 
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number): void => {
+      const viewport = viewportBounds()
       const visibleRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
         const bounds = row.getBoundingClientRect()
-        return bounds.top < globalThis.innerHeight && bounds.bottom > 0
+        return bounds.top < viewport.bottom && bounds.bottom > viewport.top
       })
       if (visibleRows.length === 0) return
       const currentIndex = visibleRows.findIndex((row) => row.dataset.nodeId === nodeId)

@@ -10,6 +10,7 @@ import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import { SCROLL_VIEWPORT_CLASS } from './scroll-viewport'
 import { useScrollRestoration } from './use-scroll-restoration'
 import { useLeftCommandKey } from './use-left-command-key'
 import type { VimMode } from './vim-editing'
@@ -204,71 +205,73 @@ export function App({ store }: AppProps): React.JSX.Element {
         alwaysOnTop={alwaysOnTop}
         onToggleAlwaysOnTop={toggleAlwaysOnTop}
       />
-      <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
-        <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
-          {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
-        </div>
-        {currentParent === undefined ? null : (
-          <section
-            aria-label="Current parent"
-            className="current-parent"
-            data-has-attachment={currentParent.attachment !== undefined}
-            onClick={(event) => {
-              if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
-              const target = event.target
-              if (target instanceof Element && target.closest('.node-input, .attachment-button, a, button') !== null)
-                return
-              activateNode(currentParent)
-            }}
-          >
-            <NodeInput
-              imageCaretActive={isImageCaretActive(currentParent)}
-              imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
-              node={currentParent}
-              label="Current parent"
-              parent
-              {...nodeInputBindings(currentParent)}
-            />
-            {currentParent.attachment === undefined ? null : (
-              <AttachmentImage
-                attachmentId={currentParent.attachment.id}
+      <div className={SCROLL_VIEWPORT_CLASS}>
+        <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
+          <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
+            {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
+          </div>
+          {currentParent === undefined ? null : (
+            <section
+              aria-label="Current parent"
+              className="current-parent"
+              data-has-attachment={currentParent.attachment !== undefined}
+              onClick={(event) => {
+                if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
+                const target = event.target
+                if (target instanceof Element && target.closest('.node-input, .attachment-button, a, button') !== null)
+                  return
+                activateNode(currentParent)
+              }}
+            >
+              <NodeInput
                 imageCaretActive={isImageCaretActive(currentParent)}
-                onOpen={setPreviewAttachmentId}
+                imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
+                node={currentParent}
+                label="Current parent"
+                parent
+                {...nodeInputBindings(currentParent)}
               />
-            )}
-          </section>
-        )}
-        <NodeList
-          dragFreeze={dragFreeze}
-          focusedNodeId={focus?.nodeId}
-          isExpanded={isExpanded}
-          locked={persistenceLocked}
-          nodes={nodes}
-          visibleRows={store.getVisibleRows()}
-          onActivate={activateNode}
-          visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
-          onEnter={enterNode}
-          onMove={moveNode}
-          onToggleExpansion={onToggleExpansion}
-          renderInput={renderInput}
-          structuralVersion={state.structuralVersion}
-        />
-        {state.saveError === undefined ? null : (
-          <p className="save-error" role="status">
-            {SAVE_ERROR_PREFIX} {state.saveError}
-          </p>
-        )}
-        {state.operationError === undefined ? null : (
-          <p className="save-error" role="alert">
-            {OPERATION_ERROR_PREFIX} {state.operationError}
-          </p>
-        )}
-        {persistenceLocked ? (
-          <p className="save-error persistence-locked" role="alert">
-            {SAVE_LOCKED_MESSAGE}
-          </p>
-        ) : null}
-      </section>
+              {currentParent.attachment === undefined ? null : (
+                <AttachmentImage
+                  attachmentId={currentParent.attachment.id}
+                  imageCaretActive={isImageCaretActive(currentParent)}
+                  onOpen={setPreviewAttachmentId}
+                />
+              )}
+            </section>
+          )}
+          <NodeList
+            dragFreeze={dragFreeze}
+            focusedNodeId={focus?.nodeId}
+            isExpanded={isExpanded}
+            locked={persistenceLocked}
+            nodes={nodes}
+            visibleRows={store.getVisibleRows()}
+            onActivate={activateNode}
+            visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
+            onEnter={enterNode}
+            onMove={moveNode}
+            onToggleExpansion={onToggleExpansion}
+            renderInput={renderInput}
+            structuralVersion={state.structuralVersion}
+          />
+          {state.saveError === undefined ? null : (
+            <p className="save-error" role="status">
+              {SAVE_ERROR_PREFIX} {state.saveError}
+            </p>
+          )}
+          {state.operationError === undefined ? null : (
+            <p className="save-error" role="alert">
+              {OPERATION_ERROR_PREFIX} {state.operationError}
+            </p>
+          )}
+          {persistenceLocked ? (
+            <p className="save-error persistence-locked" role="alert">
+              {SAVE_LOCKED_MESSAGE}
+            </p>
+          ) : null}
+        </section>
+      </div>
       {state.quitWithoutSavingPrompt === true ? (
         <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />
       ) : null}

@@ -61,21 +61,29 @@ textarea {
   font: inherit;
 }
 
-.app-shell,
-.tree-app {
-  min-height: 100vh;
-}
-
 .app-shell {
   display: grid;
+  min-height: 100vh;
   place-items: center;
   color: var(--color-shell-text);
 }
 
+/* The toolbar is a fixed row above the scrolling content area, so the scrollbar starts below it. */
+.tree-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.scroll-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .location-bar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  flex: 0 0 auto;
   background: var(--color-background);
   display: flex;
   align-items: center;

@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, 
 import type { TreeNode } from '../domain/document'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { autoScrollStep } from './list-window'
+import { scrollViewportBy, viewportBounds } from './scroll-viewport'
 import {
   HOLD_ACTIVATION_MS,
   IDLE_NODE_DRAG,
@@ -105,7 +106,7 @@ export function useNodeListDrag({
     const direction = autoScrollDirection
     let frame = 0
     function step(): void {
-      globalThis.scrollBy(0, direction)
+      scrollViewportBy(direction)
       frame = globalThis.requestAnimationFrame(step)
     }
     frame = globalThis.requestAnimationFrame(step)
@@ -223,7 +224,10 @@ export function useNodeListDrag({
     pointerYRef.current = event.clientY
     const raw = computeInsertionIndex(event.clientY)
     setDropIndex(raw === undefined ? undefined : snapToRealParentBoundary(raw, resolved.source.nodeId))
-    if (windowed) setAutoScrollDirection(autoScrollStep(event.clientY, globalThis.innerHeight))
+    if (windowed) {
+      const { top, bottom } = viewportBounds()
+      setAutoScrollDirection(autoScrollStep(event.clientY - top, bottom - top))
+    }
   }
 
   const onListPointerUp = (event: ReactPointerEvent<HTMLElement>): void => {

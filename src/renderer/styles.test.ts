@@ -3,11 +3,15 @@ import { expect, it } from 'vitest'
 import styles from './styles.css?raw'
 
 // @requirement PRODUCT.md §2.2
-it('pins the location toolbar to the top with an opaque background', () => {
-  const rule = /\.location-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
-  expect(rule).toMatch(/position:\s*sticky/)
-  expect(rule).toMatch(/top:\s*0/)
-  expect(rule).toMatch(/background:\s*var\(--color-background\)/)
+it('keeps the location toolbar outside the scrolling content area, with an opaque background', () => {
+  const bar = /\.location-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(bar).toMatch(/flex:\s*0 0 auto/)
+  expect(bar).toMatch(/background:\s*var\(--color-background\)/)
+  const app = /\.tree-app\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(app).toMatch(/height:\s*100vh/)
+  const viewport = /\.scroll-viewport\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(viewport).toMatch(/overflow-y:\s*auto/)
+  expect(viewport).toMatch(/min-height:\s*0/)
 })
 
 // @requirement PRODUCT.md §20.4

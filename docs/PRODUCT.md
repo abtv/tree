@@ -124,7 +124,7 @@ When navigation moves to an ancestor through the location path, the direct child
 
 The location toolbar is confined to a single line. When space is limited, shorter segments are preserved and longer segments are truncated first. A truncated segment ends with an ellipsis; its full text remains available as a tooltip. The toolbar never causes the window to scroll horizontally, regardless of path depth or segment length.
 
-The toolbar is sticky: it stays fixed at the top of the window while the content scrolls beneath it, and the content never shows through it.
+The toolbar is sticky: it stays fixed at the top of the window while the content scrolls beneath it, and the content never shows through it. The scrollbar belongs to the content area below the toolbar and never overlaps the toolbar.
 
 The toolbar also contains a pin toggle to the right of the location path. When enabled, the application window stays above other application windows, including after another application receives focus. The setting persists across application restarts. The toggle has a tooltip and a visually distinct active state. macOS may still impose limitations for some fullscreen Spaces.
 
@@ -801,7 +801,7 @@ The following state must be persisted:
 * each node's remembered inline expansion (§2.4);
 * the scroll position, as where the selected node's row sits in the window.
 
-On launch, the application scrolls so the selected node's row sits at the same distance from the top of the window as when the document was saved, or as close to it as a shorter window allows while showing the whole row, and keeps it there while rows and images finish laying out, until the user scrolls, types, or clicks. When scrolling had moved the selected row off-screen, it is shown at the nearest edge of the window instead, so the selected node is always visible at launch. Scrolling by the user is a pending change like a selection change, and every save, including the quit flush, records the position shown at that moment. The scroll position is restored only at launch; navigating within a running session scrolls as before.
+On launch, the application scrolls so the selected node's row sits at the same distance from the top of the window as when the document was saved, or as close to it as a shorter window allows while showing the whole row, and keeps it there while rows and images finish laying out, until the user scrolls, types, or clicks. When scrolling had moved the selected row off-screen, it is shown at the nearest edge of the visible content area instead (below the toolbar at the top), so the selected node is always visible at launch. Scrolling by the user is a pending change like a selection change, and every save, including the quit flush, records the position shown at that moment. The scroll position is restored only at launch; navigating within a running session scrolls as before.
 
 The exact text cursor position does not need to be persisted.
 
