@@ -107,7 +107,7 @@ The first child is separated from the current-parent heading by the same compact
 At the root level, the first root node is positioned at the same height as the first child below a single-line current parent, so both levels share the same vertical rhythm.
 
 An attached image is displayed beneath its node's text and aligned with that node's text column.
-When a node has an image but no text, its empty text editor remains keyboard-editable but occupies no visible row in Normal mode; the image begins at the node's text column. Clicking the blank portion of the node row focuses its text editor. In Insert mode, and always while Vim editing is disabled, the focused empty editor displays a normal-height insertion line and caret until text is entered or Insert mode ends. The same presentation applies when the node is shown as the current parent.
+When a node has an image but no text, its empty text editor remains keyboard-editable but occupies no visible row in Normal mode; the image begins at the node's text column. Clicking the blank portion of the node row focuses its text editor. While the image-only row shows no text line, its bullet and selected-node focus indication keep the vertical position they have on a single-line text row, which places them beside the top edge of the image. In Insert mode, and always while Vim editing is disabled, the focused empty editor displays a normal-height insertion line and caret until text is entered or Insert mode ends. The same presentation applies when the node is shown as the current parent.
 In Normal mode, the image can be the active character after the node's text; the image is visibly marked while active. For an image-only node, the image is its sole character.
 
 ### 2.2 Location Path

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { expect, launchTree, seedDocument, test } from './fixtures'
+import { expect, firePaste, launchTree, node, seedDocument, test, writeClipboardImageSized } from './fixtures'
 
 function seed(): { document: unknown; location: unknown } {
   return {
@@ -23,6 +23,9 @@ function seed(): { document: unknown; location: unknown } {
 }
 
 interface GutterAlignment {
+  rowTop: number
+  imageTop: number | null
+  imageCenter: number | null
   textCenter: number
   enterControlCenter: number
   triangleCenter: number | null
@@ -56,7 +59,18 @@ function gutterAlignment(window: Page, rowIndex: number): Promise<GutterAlignmen
       const focusMarkerRect = focusMarker instanceof HTMLElement ? focusMarker.getBoundingClientRect() : null
       const focusMarkerCenter = focusMarkerRect === null ? null : focusMarkerRect.top + focusMarkerRect.height / 2
 
-      return { textCenter, enterControlCenter, triangleCenter, focusMarkerCenter }
+      const image = row.querySelector('img')
+      const imageRect = image instanceof HTMLElement ? image.getBoundingClientRect() : null
+
+      return {
+        rowTop: row.getBoundingClientRect().top,
+        imageTop: imageRect === null ? null : imageRect.top,
+        imageCenter: imageRect === null ? null : imageRect.top + imageRect.height / 2,
+        textCenter,
+        enterControlCenter,
+        triangleCenter,
+        focusMarkerCenter,
+      }
     })
 }
 
@@ -109,5 +123,40 @@ test.describe('node gutter alignment', () => {
       1,
     )
     expect((await gutterAlignment(window, 1)).focusMarkerCenter).toBeNull()
+  })
+
+  // @requirement PRODUCT.md §2.1
+  test('keeps the gutter of an image-only row at the single-line text position', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'text', text: 'Text', children: [] },
+          { id: 'image', text: '', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'text' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = node(window, 2)
+    await editor.focus()
+    await writeClipboardImageSized(app, 80, 80)
+    await firePaste(editor)
+    await expect(window.locator('.node-row').nth(1)).toHaveClass(/node-row-image-only/)
+
+    await editor.focus()
+    const text = await gutterAlignment(window, 0)
+    const imageOnly = await gutterAlignment(window, 1)
+    expect(text.focusMarkerCenter).toBeNull()
+    expect(imageOnly.focusMarkerCenter).not.toBeNull()
+
+    // Same offset from the row top as a single-line text row, for the bullet and the focus marker.
+    const textOffset = text.enterControlCenter - text.rowTop
+    expect(Math.abs(imageOnly.enterControlCenter - imageOnly.rowTop - textOffset)).toBeLessThanOrEqual(1)
+    expect(Math.abs((imageOnly.focusMarkerCenter as number) - imageOnly.enterControlCenter)).toBeLessThanOrEqual(1)
+
+    // That position sits beside the image's top edge: within the image, above its middle.
+    const imageTop = imageOnly.imageTop as number
+    expect(imageOnly.enterControlCenter).toBeGreaterThanOrEqual(imageTop)
+    expect(imageOnly.enterControlCenter).toBeLessThan(imageOnly.imageCenter as number)
   })
 })
