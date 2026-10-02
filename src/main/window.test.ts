@@ -5,12 +5,38 @@ import {
   configureRendererSessionSecurity,
   configureSingleInstance,
   createWindowWebPreferences,
+  followWindowAppearance,
   isAllowedExternalUrl,
   isAllowedRendererUrl,
   reportMainProcessError,
   resolveRendererUrl,
   surfaceWindow,
+  windowBackgroundColor,
 } from './window'
+
+describe('window appearance', () => {
+  it('uses the document surface for both appearances', () => {
+    expect(windowBackgroundColor(true)).toBe('#3f3f3f')
+    expect(windowBackgroundColor(false)).toBe('#ffffff')
+  })
+
+  it('updates the native background and removes its listener when the window closes', () => {
+    const theme = { shouldUseDarkColors: true, on: vi.fn(), removeListener: vi.fn() }
+    const window = { setBackgroundColor: vi.fn(), once: vi.fn() }
+    followWindowAppearance(window as never, theme as never)
+    const update = theme.on.mock.calls[0]![1] as () => void
+    const closed = window.once.mock.calls[0]![1] as () => void
+    expect(theme.on).toHaveBeenCalledWith('updated', update)
+    update()
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#3f3f3f')
+    theme.shouldUseDarkColors = false
+    update()
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#ffffff')
+    expect(window.once).toHaveBeenCalledWith('closed', closed)
+    closed()
+    expect(theme.removeListener).toHaveBeenCalledWith('updated', update)
+  })
+})
 
 describe('createWindowWebPreferences', () => {
   it('isolates the renderer with the secure Electron settings', () => {

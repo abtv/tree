@@ -1,7 +1,24 @@
-const { ipcMain } = require('electron')
+const { app, ipcMain, nativeTheme } = require('electron')
 const { join } = require('node:path')
 const { enableHiddenWindows } = require('./hidden-windows.cjs')
 const { enableShortcutStub } = require('./shortcut-stub.cjs')
+
+const appearance = process.argv.find((argument) => argument.startsWith('--tree-test-appearance='))?.split('=')[1]
+if (appearance === 'dark' || appearance === 'light') {
+  nativeTheme.themeSource = appearance
+  globalThis.__treeWindowBackgrounds = []
+  app.on('browser-window-created', (_event, window) => {
+    // Electron emits this event inside its constructor, before applying options.
+    // Sample after the synchronous constructor completes, before renderer readiness.
+    queueMicrotask(() => {
+      globalThis.__treeWindowBackgrounds.push({ phase: 'created', color: window.getBackgroundColor().toLowerCase() })
+    })
+    window.on('close', () => {
+      globalThis.__treeWindowBackgrounds.push({ phase: 'close', color: window.getBackgroundColor() })
+      console.log(`[tree-test-close-background] ${window.getBackgroundColor().toLowerCase()}`)
+    })
+  })
+}
 
 const handlers = new Map()
 const originalHandle = ipcMain.handle.bind(ipcMain)

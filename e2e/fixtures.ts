@@ -334,6 +334,7 @@ export async function launchTree(
     windows?: WindowMode
     shortcut?: ShortcutMode
     initialMode?: 'normal' | 'insert'
+    appearance?: 'light' | 'dark'
     /**
      * The Vim editing preference written before launch. It defaults to the test's `editingMode`
      * (Vim editing unless `describeForEachEditingMode` selected standard editing); `'saved'` leaves
@@ -351,7 +352,11 @@ export async function launchTree(
   let app: ElectronApplication
   try {
     app = await electron.launch({
-      args: [`--user-data-dir=${userDataDir}`, join(process.cwd(), 'e2e', 'electron-entry.cjs')],
+      args: [
+        `--user-data-dir=${userDataDir}`,
+        join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+        ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
+      ],
       cwd: process.cwd(),
       env: launchEnvironment(windowMode, shortcutMode),
     })

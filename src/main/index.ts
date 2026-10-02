@@ -7,6 +7,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   session,
   shell,
 } from 'electron'
@@ -30,9 +31,11 @@ import {
   configureRendererSessionSecurity,
   configureWebContentsSecurity,
   createWindowWebPreferences,
+  followWindowAppearance,
   reportMainProcessError,
   resolveRendererUrl,
   surfaceWindow,
+  windowBackgroundColor,
 } from './window'
 
 let mainWindow: BrowserWindow | null = null
@@ -70,9 +73,11 @@ function createMainWindow(): void {
     minWidth: 640,
     minHeight: 480,
     title: 'Tree',
+    backgroundColor: windowBackgroundColor(nativeTheme.shouldUseDarkColors),
     webPreferences: createWindowWebPreferences(join(__dirname, '../preload/index.js')),
   })
   window.setAlwaysOnTop(windowAlwaysOnTopStore.load())
+  followWindowAppearance(window, nativeTheme)
   mainWindow = window
   const saveWindowBounds = (): void => {
     const { x, y, width, height } = window.getBounds()

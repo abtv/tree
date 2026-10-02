@@ -1,4 +1,18 @@
-import type { App, Session, WebContents, WebPreferences } from 'electron'
+import type { App, BrowserWindow, NativeTheme, Session, WebContents, WebPreferences } from 'electron'
+
+// Match the document surface in styles.css before the renderer exists and after it is torn down.
+export function windowBackgroundColor(dark: boolean): string {
+  return dark ? '#3f3f3f' : '#ffffff'
+}
+
+export function followWindowAppearance(
+  window: Pick<BrowserWindow, 'setBackgroundColor' | 'once'>,
+  theme: Pick<NativeTheme, 'shouldUseDarkColors' | 'on' | 'removeListener'>,
+): void {
+  const update = (): void => window.setBackgroundColor(windowBackgroundColor(theme.shouldUseDarkColors))
+  theme.on('updated', update)
+  window.once('closed', () => theme.removeListener('updated', update))
+}
 
 export interface WindowSurface {
   isDestroyed(): boolean
