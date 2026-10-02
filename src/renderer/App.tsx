@@ -281,13 +281,13 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
         </section>
       </div>
       <footer className="status-bar">
-        <VimToggle vimEnabled={vimEnabled} onToggle={toggleVimEnabled} />
-        <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
         {vimEnabled ? (
           <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
             {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
           </div>
         ) : null}
+        <VimToggle vimEnabled={vimEnabled} onToggle={toggleVimEnabled} />
+        <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
       </footer>
       {state.quitWithoutSavingPrompt === true ? (
         <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />

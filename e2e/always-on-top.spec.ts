@@ -23,7 +23,10 @@ test.describe('always-on-top window', () => {
     const indicatorBox = await first.window.getByLabel('Vim mode').boundingBox()
     expect(toggleBox!.y).toBeGreaterThanOrEqual(statusBox!.y)
     expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(statusBox!.y + statusBox!.height)
-    expect(toggleBox!.x + toggleBox!.width).toBeLessThanOrEqual(indicatorBox!.x)
+    // The Vim mode indicator is at the left end; the pin ends the status bar at the right.
+    expect(indicatorBox!.x - statusBox!.x).toBeLessThanOrEqual(13)
+    expect(indicatorBox!.x + indicatorBox!.width).toBeLessThanOrEqual(toggleBox!.x)
+    expect(statusBox!.x + statusBox!.width - (toggleBox!.x + toggleBox!.width)).toBeLessThanOrEqual(13)
     await toggle.click()
     await expect(first.window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
     await expect

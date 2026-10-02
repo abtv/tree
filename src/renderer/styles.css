@@ -521,6 +521,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 .vim-mode {
+  margin-right: auto;
   border-radius: 3px;
   padding: 3px 7px;
   color: var(--color-white);

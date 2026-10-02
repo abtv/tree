@@ -1247,7 +1247,8 @@ describe('App', () => {
     expect(toggle.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Pin window on top')
     expect(toggle.closest('footer.status-bar')).not.toBeNull()
     expect(toggle.closest('.location-bar')).toBeNull()
-    expect(toggle.parentElement?.nextElementSibling).toBe(screen.getByLabelText('Vim mode'))
+    expect(toggle.closest('footer.status-bar')?.firstElementChild).toBe(screen.getByLabelText('Vim mode'))
+    expect(toggle.closest('footer.status-bar')?.lastElementChild).toBe(toggle.parentElement)
     fireEvent.click(toggle)
 
     expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
