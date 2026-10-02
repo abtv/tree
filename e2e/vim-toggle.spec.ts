@@ -110,6 +110,29 @@ test.describe('Vim editing toggle', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Xbc')
   })
 
+  // @requirement PRODUCT.md §20.5
+  test('uses the Zenburn palette for every dark Vim mode indicator', async ({ userDataDir }) => {
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { vimPreference: true, initialMode: 'normal' })
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await window.mouse.move(5, 5)
+    const indicator = window.getByLabel('Vim mode')
+    const states = [
+      { label: 'NORMAL', keys: [], color: 'rgb(143, 178, 143)' },
+      { label: 'INSERT', keys: ['i'], color: 'rgb(140, 208, 211)' },
+      { label: 'VISUAL', keys: ['Escape', 'v'], color: 'rgb(240, 223, 175)' },
+      { label: 'VISUAL NODE', keys: ['Escape', 'V'], color: 'rgb(240, 223, 175)' },
+      { label: 'REPLACE', keys: ['Escape', 'R'], color: 'rgb(204, 147, 147)' },
+    ]
+    for (const { label, keys, color } of states) {
+      for (const key of keys) await window.keyboard.press(key)
+      await expect(indicator).toHaveText(label)
+      await expect(indicator).toHaveCSS('background-color', 'rgb(43, 43, 43)')
+      await expect(indicator).toHaveCSS('color', color)
+      await expect(indicator).toHaveScreenshot(`vim-mode-${label.toLowerCase().replaceAll(' ', '-')}-dark.png`)
+    }
+  })
+
   test('renders the status bar toggle in both states and appearances', async ({ userDataDir }) => {
     seedDocument(userDataDir, seed)
     const { window } = await launchTree(userDataDir, { vimPreference: false })
