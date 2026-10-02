@@ -496,6 +496,15 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: var(--highlight-background);
 }
 
+/* Vim Insert mode and standard editing (which shares it) show the normal thin caret, so a
+   multi-character selection there is an ordinary character selection and uses the shared highlight
+   pair rather than the system default. */
+.vim-state-insert .node-input::selection,
+.vim-state-insert .node-input *::selection {
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
+}
+
 .vim-state-visual .node-input::selection,
 .vim-state-visual .node-input *::selection {
   color: var(--highlight-foreground);

@@ -32,6 +32,12 @@ async function rowBox(
   return box
 }
 
+const selectionColors = (field: ReturnType<typeof node>) =>
+  field.evaluate((element) => {
+    const style = element.ownerDocument.defaultView?.getComputedStyle(element, '::selection')
+    return { background: style?.backgroundColor, color: style?.color }
+  })
+
 test.describe('drag and drop', () => {
   test('places the caret on a quick click without reordering', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
@@ -411,5 +417,42 @@ test.describe('drag and drop', () => {
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
+  })
+})
+
+test.describe('text selection highlight in standard editing', () => {
+  test.use({ editingMode: 'standard' })
+
+  // @requirement PRODUCT.md §20.2
+  test('renders a multi-character text selection with the shared highlight pair in both appearances', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'first', text: 'With images', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    const box = await editor.boundingBox()
+    if (box === null) throw new Error('The node was not rendered.')
+    const y = box.y + box.height / 2
+    await window.mouse.move(box.x + 6, y)
+    await window.mouse.down()
+    await window.mouse.move(box.x + 70, y, { steps: 8 })
+    await window.mouse.up()
+
+    expect(
+      await editor.evaluate(
+        (element) => (element as HTMLTextAreaElement).selectionEnd - (element as HTMLTextAreaElement).selectionStart,
+      ),
+    ).toBeGreaterThan(1)
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    await expect(editor).toHaveScreenshot('standard-text-selection-light.png')
+
+    await window.emulateMedia({ colorScheme: 'dark' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(74, 64, 35)', color: 'rgb(245, 233, 183)' })
+    await expect(editor).toHaveScreenshot('standard-text-selection-dark.png')
+    await window.emulateMedia({ colorScheme: 'light' })
   })
 })
