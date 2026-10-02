@@ -56,6 +56,22 @@ describe('Vim caret transitions', () => {
     })
   })
 
+  it('crosses to another node at the caret position unless leaving an image downward', () => {
+    expect(verticalCaretTransition({ cursor: 2, imageActive: false }, 'down', 5, false, true)).toEqual({
+      caret: { cursor: 2, imageActive: false },
+      crossNode: true,
+      focusCursor: 2,
+    })
+    expect(verticalCaretTransition({ cursor: 2, imageActive: false }, 'up', 5, true, true).focusCursor).toBe(2)
+  })
+
+  it('clamps a stale image return position to the last text character on exit', () => {
+    expect(sameNodeImageTransition({ cursor: 3, imageActive: true, imageTextReturnCursor: 9 }, 'exit', 3)).toEqual({
+      cursor: 2,
+      imageActive: false,
+    })
+  })
+
   it('preserves an image-only caret and return position at vertical no-op boundaries', () => {
     const image = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
     const step = verticalCaretTransition(image, 'down', 3, true, false)

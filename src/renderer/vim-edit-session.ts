@@ -11,6 +11,8 @@ export interface VimTextDiff {
 /** The minimal insert/delete diff between an Insert session's baseline and its final text. */
 export function diffTypedText(baseline: string, finalText: string, position: number): VimTextDiff {
   let prefix = 0
+  // Mutation triage: an index past either string reads `undefined` against a defined character, so the
+  // element comparison already stops the loop and every bound here is redundant.
   while (prefix < baseline.length && prefix < finalText.length && baseline[prefix] === finalText[prefix]) prefix += 1
   let suffix = 0
   while (
@@ -117,6 +119,8 @@ export function applyReplaceKey(
   if (key === 'Backspace') session.typed = session.typed.slice(0, -1)
   else if (key.length === 1) session.typed += key
   else return undefined
+  // Mutation triage: a larger bound only matters once it exceeds the remaining baseline, where
+  // `slice` past the end is already empty, so the working text is unchanged.
   const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
   return {
     workingText:

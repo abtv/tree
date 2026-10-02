@@ -64,9 +64,14 @@ export function navigateVertically({
 
     const focusCursor = index === 0 ? step.focusCursor : navigationCursor
     store.moveSelection(direction, focusCursor)
+    // Mutation triage: an upward crossing with the image active only happens for an image-only node,
+    // whose cursor is already `0`, so resetting the navigation cursor for both directions is a no-op.
     if (index === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
     const after = store.getSnapshot()
     if (after.status !== 'ready') break
+    // Mutation triage: a ready snapshot always carries `focus` and `document` (see `EditorSnapshot`),
+    // so the optional chains, the `focus === undefined` clause, and the `document` guard below are
+    // defensive and unreachable; changing them cannot alter a result.
     if (
       (after.focus !== undefined && after.focus.token === before.focus?.token) ||
       (after.focus === undefined &&

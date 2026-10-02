@@ -34,7 +34,7 @@ Decisions reserved for the Product Owner: none known. Ask if a task reveals a ma
 | C1 | Fix-history script and its handoff line | — | Low Risk | Complete |
 | A1 | Mutation baseline for the pure renderer modules | — | Minimal Risk | Complete |
 | A2 | Survivor triage: Vim text-command modules | A1 | Low Risk (Moderate for a fix commit) | Complete |
-| A3 | Survivor triage: caret and session owner modules | A2 | Low Risk (Moderate for a fix commit) | Planned |
+| A3 | Survivor triage: caret and session owner modules | A2 | Low Risk (Moderate for a fix commit) | Complete |
 | A4 | Survivor triage: drag and list modules; add the renderer modules to the mutation scope; close the batch | A3 | Low Risk | Planned |
 
 Order rationale: B1 and C1 are small and independent and repair or prevent current harness drift, so they go first. A1-A4 are sequential because each triage task reads the A1 baseline and A4 changes the shared configuration only after the score is high enough not to break the weekly run.
@@ -147,6 +147,19 @@ The weakest modules are `vim-editing.ts`, `vim-surround.ts`, and `vim-text-comma
 
 Run-to-run timeout classification moves a few mutants between killed and survived, so the A1 and after columns are not compared mutant for mutant. The tests added are in `vim-editing.test.ts` (motion boundaries, text-object count/whitespace/quote/bracket cases, clamp overshoot, out-of-range cursors) and `vim-text-commands.test.ts` (key classification, every motion arm, every `calculateTextChange` kind and its replay path, `textDifference` splits); `vim-surround.test.ts` adds the compact-delimiter, backtick, single-quote, and padded-change cases. Validation: the three colocated test files and `vim-editing.property.test.ts` passed (103 tests), and `npm run check` passed end to end with no coverage floor change. The mutation result predates the non-executable `// Mutation triage` comments, which cannot change it.
 
+**A3 result (2026-10-02).** Narrow runs of `npm run test:mutation -- --mutate <the five A3 modules> --force` at `HEAD` `eb1328a`. Test additions only; no production behavior changed and no defect was found. The remaining survivors are equivalent mutants, each explained at its expression by a `// Mutation triage` comment in the source. `vim-command-state.ts` and `link-caret.ts` already scored 100 and needed nothing.
+
+| Module | A1 total % / covered % | After total % / covered % | A1 survived → after |
+| --- | --- | --- | --- |
+| `vim-vertical-navigation.ts` | 82.95 / 82.95 | 94.57 / 94.57 | 22 → 7 |
+| `vim-edit-session.ts` | 90.15 / 90.15 | 95.45 / 95.45 | 13 → 6 |
+| `vim-caret-transition.ts` | 96.27 / 96.27 | 96.89 / 96.89 | 6 → 5 |
+| `vim-command-state.ts`, `link-caret.ts` | 100 / 100 | 100 / 100 | 0 → 0 |
+
+The tests added are in `vim-vertical-navigation.test.ts` (not-ready store, counted boundary step, heading and missing-selection crossing rules, counted column carry-over including the image reset, same-token no-op, store-not-ready after a move, same-node refocus, and the store-focused cursor taking precedence), `vim-caret-transition.test.ts` (vertical crossing column and a stale return cursor clamp), and `vim-edit-session.test.ts` (suffix and prefix overlap in `diffTypedText`). Three groups of survivors are equivalent for a stated reason: bounds that the element comparison in `diffTypedText` already enforces, the `'exit'` action literal that any non-`'enter'` value reproduces, and the `focus === undefined` and `document === undefined` branches of `navigateVertically`, which `EditorSnapshot` makes unreachable for a ready snapshot.
+
+Observation for the Product Owner (not a task): those unreachable branches in `vim-vertical-navigation.ts` are dead code under the current types, so removing them would be a behavior-neutral simplification. This batch does not authorize it. Validation: the three colocated test files passed, and `npm run check` passed end to end (1719 tests) with no coverage floor change. The narrow run's combined score was 93.64, above the 93 break threshold, with the other renderer modules still at their A1 or A2 values.
+
 ### A2, A3, A4 — Survivor triage
 
 Each task reads the surviving mutants for its modules in `reports/mutation/mutation.html` after a narrow run (`npm run test:mutation -- --mutate <its modules>`), and treats each survivor as a question about a missing assertion, following `docs/DEVELOPMENT.md` §12: kill it with an assertion on behavior in the module's colocated test, or leave an equivalent mutant with a Stryker disable comment stating why. When a survivor reveals a real defect, fix it defect-first in a separate commit. Record per-file score before and after in this plan.
@@ -169,7 +182,7 @@ Validation: Low Risk (tests): affected focused tests and `npm run check`. A defe
 
 ## Next task and resume prompt
 
-A3 is the next ready task. B1, C1, A1, and A2 are complete.
+A4 is the next ready task. B1, C1, A1, A2, and A3 are complete.
 
 ```text
 Continue the Harness Audit Follow-ups plan in plans/harness-audit-follow-ups.md: execute the next ready task.

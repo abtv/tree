@@ -35,6 +35,12 @@ describe('diffTypedText', () => {
     expect(diffTypedText('abc', 'xyz', 0)).toEqual({ insertedText: 'xyz', insertOffset: 0, deleteCount: 3 })
   })
 
+  it('never lets the matched suffix overlap the matched prefix', () => {
+    expect(diffTypedText('aa', 'aaa', 1)).toEqual({ insertedText: 'a', insertOffset: 1, deleteCount: 0 })
+    expect(diffTypedText('aaa', 'aa', 1)).toEqual({ insertedText: '', insertOffset: 1, deleteCount: 1 })
+    expect(diffTypedText('abab', 'ababab', 2)).toEqual({ insertedText: 'ab', insertOffset: 2, deleteCount: 0 })
+  })
+
   it('handles an empty baseline as a pure insertion', () => {
     expect(diffTypedText('', 'new', 0)).toEqual({ insertedText: 'new', insertOffset: 0, deleteCount: 0 })
   })

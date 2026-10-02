@@ -26,10 +26,13 @@ export function verticalCaretTransition(
     return { caret, crossNode: false, focusCursor: caret.cursor }
   }
   if (direction === 'up' && hasAttachment && state.imageActive && textLength > 0) {
+    // Mutation triage: any action other than `'enter'` is the exit form, so replacing `'exit'` is a no-op.
     const caret = sameNodeImageTransition(state, 'exit', textLength)
     return { caret, crossNode: false, focusCursor: caret.cursor }
   }
   if (!canCrossNode) return { caret: state, crossNode: false, focusCursor: state.cursor }
+  // Mutation triage: an upward crossing with the image active only happens for an image-only node,
+  // whose cursor is already `0`, so applying the image reset to both directions gives the same result.
   return {
     caret: state,
     crossNode: true,
@@ -79,6 +82,7 @@ export function sameNodeImageTransition(
       imageTextReturnCursor: textLength > 0 ? Math.max(0, Math.min(entryCursor, textLength - 1)) : undefined,
     }
   }
+  // Mutation triage: the fallback `textLength - 1` is clamped by the same bound, so widening it is a no-op.
   return {
     cursor: Math.max(0, Math.min(state.imageTextReturnCursor ?? textLength - 1, textLength - 1)),
     imageActive: false,
@@ -114,6 +118,7 @@ export function horizontalCaretTransition(
   hasAttachment: boolean,
 ): VimCaretState {
   if (direction === 'left' && state.imageActive && hasAttachment && textLength > 0) {
+    // Mutation triage: any action other than `'enter'` is the exit form, so replacing `'exit'` is a no-op.
     const exited = sameNodeImageTransition(state, 'exit', textLength)
     return {
       cursor: Math.max(0, exited.cursor - (count - 1)),
@@ -125,6 +130,8 @@ export function horizontalCaretTransition(
   const imageActive = hasAttachment && cursor === textLength
   if (!imageActive) return { cursor, imageActive: false }
   if (state.imageActive) return { cursor, imageActive: true, imageTextReturnCursor: state.imageTextReturnCursor }
+  // Mutation triage: a leftward move can reach the image only from a cursor past the text, which a
+  // text caret never holds, so computing the entry cursor for both directions gives the same result.
   return sameNodeImageTransition(
     state,
     'enter',
