@@ -65,5 +65,7 @@ test.describe('sticky location toolbar', () => {
     expect(viewport!.y + viewport!.height).toBe(status!.y)
     expect(indicator!.y).toBeGreaterThanOrEqual(status!.y)
     expect(indicator!.y + indicator!.height).toBeLessThanOrEqual(status!.y + status!.height)
+    // The indicator is not editable text, so the pointer over it must not become the text-editing I-beam.
+    await expect(page.getByLabel('Vim mode')).toHaveCSS('cursor', 'default')
   })
 })
