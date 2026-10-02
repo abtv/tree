@@ -4,10 +4,9 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-// The categories are defined in plans/editing-mode-test-parity.md until that plan closes, then in
-// docs/DEVELOPMENT.md §8. `pending` marks a spec that has not yet been converted to `both`; the
-// initiative's last task removes it.
-export const CATEGORIES = new Set(['both', 'vim', 'independent', 'explicit', 'pending'])
+// The categories are defined in docs/DEVELOPMENT.md §8. Every category is final: a spec whose
+// behavior can differ between the editing modes must be converted to `both` rather than parked.
+export const CATEGORIES = new Set(['both', 'vim', 'independent', 'explicit'])
 
 export const EXPLICIT_FILES = new Set(['e2e/vim-toggle.spec.ts'])
 

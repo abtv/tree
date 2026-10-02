@@ -1423,6 +1423,91 @@ describe('App', () => {
     })
   })
 
+  // Standard editing is Vim Insert without the Vim key handler, so it shares Insert's key routes
+  // but not the Vim-only pre-resolution. These counterparts cover the divergences a jsdom render can
+  // observe; pointer and rendered-caret differences (D4, D5) and the status-bar layout (D6, covered
+  // by the toggle block above) are exercised by the both-mode end-to-end specs.
+  describe('standard editing counterparts', () => {
+    // @requirement PRODUCT.md §20.2
+    it('starts in Insert mode with the caret when Vim editing is disabled', async () => {
+      const store = createStore()
+      await act(async () => {
+        await store.initialize()
+      })
+      renderReact(<App initialVimEnabled={false} store={store} />)
+
+      expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      root.focus()
+      expect(root.selectionStart).toBe(0)
+      expect(root.selectionEnd).toBe(0)
+    })
+
+    // @requirement PRODUCT.md §20.2
+    it('leaves the text and undo grouping unchanged on Escape when Vim editing is disabled', async () => {
+      const store = createStore()
+      await act(async () => {
+        await store.initialize()
+      })
+      renderReact(<App initialVimEnabled={false} store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
+      fireEvent.change(root, { target: { value: 'F' } })
+      await act(async () => undefined)
+      fireEvent.select(root)
+      fireEvent.change(root, { target: { value: 'Fi' } })
+      fireEvent.change(root, { target: { value: 'Fir' } })
+
+      // Vim leaves Insert on Escape and ends the text session; standard editing leaves the native
+      // key alone, so the session survives and the next Cmd+Z still undoes the whole run.
+      expect(fireEvent.keyDown(root, { key: 'Escape' })).toBe(true)
+      fireEvent.keyDown(root, { key: 'z', metaKey: true })
+      expect(root).toHaveValue('')
+    })
+
+    // @requirement PRODUCT.md §17.1
+    it('opens and closes the image preview from a text caret when Vim editing is disabled', async () => {
+      const store = createStore({ kind: 'image', png: attachmentBytes })
+      await act(async () => {
+        await store.initialize()
+      })
+      await act(async () => {
+        await store.paste('root', 0)
+      })
+      renderReact(<App initialVimEnabled={false} store={store} />)
+      const node = screen.getByRole('textbox', { name: 'Node 1' })
+      await screen.findByRole('button', { name: 'Open image preview' })
+
+      fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
+      expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
+      expect(node).toHaveFocus()
+    })
+
+    // @requirement PRODUCT.md §20.2
+    it('routes Cmd+Backspace and Cmd+Z through the store when Vim editing is disabled', async () => {
+      const store = await createSeededStore(
+        {
+          roots: [
+            { id: 'root', text: 'alpha', children: [] },
+            { id: 'sibling', text: 'beta', children: [] },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'sibling' },
+      )
+      renderReact(<App initialVimEnabled={false} store={store} />)
+
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 2' }), { key: 'Backspace', metaKey: true })
+      expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
+
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'z', metaKey: true })
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('beta')
+    })
+  })
+
   it('reorders siblings through a press-and-hold drag over the editable surface', async () => {
     const store = createStore()
     await act(async () => {

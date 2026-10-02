@@ -57,13 +57,15 @@ async function closeTrackedApps(): Promise<void> {
 
 export async function launchTree(
   userDataDir: string,
-  options: { memoryProbe?: boolean; initialMode?: 'normal' | 'insert' } = {},
+  options: { memoryProbe?: boolean; initialMode?: 'normal' | 'insert'; vimEnabled?: boolean } = {},
 ): Promise<Launched> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
   await cleanupStaleElectronProcesses('tree-perf-')
-  // The guarded interactions and their baselines are Vim editing sequences, so Vim editing is enabled.
+  // Most guarded interactions and their baselines are Vim editing sequences, so Vim editing is the
+  // default; a standard-editing scenario passes `vimEnabled: false`.
+  const vimEnabled = options.vimEnabled ?? true
   mkdirSync(join(userDataDir, 'data'), { recursive: true })
-  writeFileSync(join(userDataDir, 'data', 'vim-enabled.json'), 'true')
+  writeFileSync(join(userDataDir, 'data', 'vim-enabled.json'), vimEnabled ? 'true' : 'false')
   let app: ElectronApplication
   try {
     app = await electron.launch({
@@ -93,7 +95,7 @@ export async function launchTree(
     await observeSaveErrors(app, window)
     await expect(window.locator('main.tree-app')).toBeVisible()
     await expect(window.getByRole('textbox').first()).toBeVisible()
-    if (options.initialMode !== 'normal') {
+    if (vimEnabled && options.initialMode !== 'normal') {
       await window.keyboard.press('i')
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     }

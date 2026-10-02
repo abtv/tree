@@ -73,6 +73,7 @@ async function assertHookSequence(
       selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
       focus: state.status === 'ready' ? state.focus : undefined,
       persistenceLocked: state.status === 'ready' && state.persistenceLocked === true,
+      vimEnabled: true,
       vimMode,
       setVimMode,
       nodeVisualSelection: selection,

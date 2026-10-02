@@ -20,10 +20,9 @@ describe('editing-mode categories', () => {
       spec('e2e/a.spec.ts', 'both', "describeForEachEditingMode('a', () => {})\n"),
       spec('e2e/b.spec.ts', 'vim'),
       spec('e2e/c.spec.ts', 'independent'),
-      spec('e2e/d.spec.ts', 'pending'),
       spec('e2e/vim-toggle.spec.ts', 'explicit'),
     ]
-    expect(checkEditingModes({ files })).toEqual({ issues: [], specCount: 5 })
+    expect(checkEditingModes({ files })).toEqual({ issues: [], specCount: 4 })
   })
 
   it('fails a spec with a missing, misplaced, or malformed category line', () => {
@@ -38,9 +37,12 @@ describe('editing-mode categories', () => {
     )
   })
 
-  it('fails an unknown category', () => {
+  it('fails an unknown category and rejects the retired pending category', () => {
     expect(checkEditingModes({ files: [spec('e2e/a.spec.ts', 'both-modes')] }).issues).toEqual([
       'e2e/a.spec.ts: unknown editing-mode category "both-modes"',
+    ])
+    expect(checkEditingModes({ files: [spec('e2e/a.spec.ts', 'pending')] }).issues).toEqual([
+      'e2e/a.spec.ts: unknown editing-mode category "pending"',
     ])
   })
 

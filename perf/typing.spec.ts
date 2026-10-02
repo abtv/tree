@@ -15,9 +15,15 @@ function summarize(samples: number[]): { median: number; p95: number; max: numbe
   return { median: at(0.5), p95: at(0.95), max: sorted[sorted.length - 1]! }
 }
 
-async function measureTyping(userDataDir: string, scenario: string, seed: Seed, target: TypingTarget): Promise<number> {
+async function measureTyping(
+  userDataDir: string,
+  scenario: string,
+  seed: Seed,
+  target: TypingTarget,
+  vimEnabled = true,
+): Promise<number> {
   seedDocument(userDataDir, seed)
-  const { window } = await launchTree(userDataDir)
+  const { window } = await launchTree(userDataDir, { vimEnabled })
   const expected = window.getByRole('textbox', { name: target.label, exact: true })
   const parentHeading =
     target.parentLabel === undefined
@@ -107,6 +113,22 @@ test.describe('typing latency', () => {
       parentLabel: 'Current parent',
     })
     expect(typingMs).toBeLessThan(2_000)
+  })
+
+  // @requirement PRODUCT.md §22.1
+  test('wide-10000-standard', async ({ userDataDir }) => {
+    const typingMs = await measureTyping(
+      userDataDir,
+      'wide-10000-standard',
+      wideSeed(10_000),
+      {
+        label: 'Node 1',
+        initialText: 'Child 0',
+        parentLabel: 'Current parent',
+      },
+      false,
+    )
+    expect(typingMs).toBeLessThan(8_000)
   })
 
   test('large-10000', async ({ userDataDir }) => {

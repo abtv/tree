@@ -67,7 +67,7 @@ interface UseNodeInputBindingsOptions {
    * Whether Vim editing is enabled. While it is disabled the renderer Vim mode stays `insert` and
    * keys bypass Vim interpretation entirely, so the editor behaves as a standard text editor.
    */
-  vimEnabled?: boolean
+  vimEnabled: boolean
   vimMode?: VimMode
   setVimMode?: (mode: VimMode) => void
   setImageCaretNodeId?: (nodeId: string | undefined) => void
@@ -96,7 +96,7 @@ export function useNodeInputBindings({
   focus,
   onPreviewAttachment,
   persistenceLocked = false,
-  vimEnabled = true,
+  vimEnabled,
   vimMode = 'insert',
   setVimMode = () => undefined,
   setImageCaretNodeId = () => undefined,

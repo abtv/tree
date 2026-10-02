@@ -24,7 +24,7 @@ afterEach(() => {
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const image = (text = 'ab'): TreeNode => ({ ...node('node', text), attachment: { id: 'image', mimeType: 'image/png' } })
 
-async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
+async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?: boolean } = {}) {
   const harness = await createRealStoreHarness(options)
   const { store } = harness
   const preview = vi.fn()
@@ -38,6 +38,7 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode } = {}) {
       selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
       focus: state.status === 'ready' ? state.focus : undefined,
       persistenceLocked: state.status === 'ready' && state.persistenceLocked === true,
+      vimEnabled: options.vimEnabled ?? true,
       vimMode,
       setVimMode,
       nodeVisualSelection: selection,
@@ -1054,7 +1055,9 @@ describe('useNodeInputBindings', () => {
       return unregister
     })
     const store = createEditorStoreDouble({ registerPendingEditFinisher })
-    const { unmount } = renderHook(() => useNodeInputBindings({ store, onPreviewAttachment: () => undefined }))
+    const { unmount } = renderHook(() =>
+      useNodeInputBindings({ store, vimEnabled: true, onPreviewAttachment: () => undefined }),
+    )
     expect(registerPendingEditFinisher).toHaveBeenCalledOnce()
     expect(finish).toBeTypeOf('function')
     unmount()
@@ -1342,7 +1345,10 @@ describe('Vim editing switch', () => {
     )
     const hook = renderHook(() => {
       const [vimMode, setVimMode] = useState<VimMode>('normal')
-      return { ...useNodeInputBindings({ store, onPreviewAttachment: vi.fn(), vimMode, setVimMode }), vimMode }
+      return {
+        ...useNodeInputBindings({ store, onPreviewAttachment: vi.fn(), vimEnabled: true, vimMode, setVimMode }),
+        vimMode,
+      }
     })
 
     act(() => hook.result.current.setVimEditing(false))

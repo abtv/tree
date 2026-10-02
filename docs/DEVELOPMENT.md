@@ -218,7 +218,6 @@ Every `e2e/*.spec.ts` file declares one category on its first line, as `// @edit
 * `vim` — the behavior under test exists only in Vim editing.
 * `independent` — the asserted behavior does not pass through a point where the modes differ. These tests run once, with Vim editing.
 * `explicit` — every launch sets its own preference because the file tests the preference itself; only `e2e/vim-toggle.spec.ts` uses it.
-* `pending` — not yet classified into one of the above; this is transitional and is accepted only while the editing-mode parity initiative (`plans/editing-mode-test-parity.md`) is open.
 
 A new spec file picks its category when it is created. Choose `both` when any step involves typing, the caret, selection, pointer input in an editor, an application editing command, the preview, or the status bar.
 
