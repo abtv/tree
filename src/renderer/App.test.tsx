@@ -1256,6 +1256,29 @@ describe('App', () => {
     expect(unpin.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Unpin window from top')
   })
 
+  // @requirement PRODUCT.md §2.2
+  it('keeps editor focus, the caret, and the Vim mode when the pin toggle is clicked', async () => {
+    const store = await createSeededStore(
+      { roots: [{ id: 'root', text: 'abc', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const setAlwaysOnTop = vi.spyOn(window.treeApi, 'setAlwaysOnTop')
+    renderReact(<App initialVimEnabled store={store} />)
+    const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    root.focus()
+    root.setSelectionRange(1, 2)
+
+    const toggle = screen.getByRole('button', { name: 'Pin window on top' })
+    // Preventing the default mouse-down keeps the browser from moving focus to the button.
+    expect(fireEvent.mouseDown(toggle)).toBe(false)
+    fireEvent.click(toggle)
+
+    expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
+    expect(document.activeElement).toBe(root)
+    expect([root.selectionStart, root.selectionEnd]).toEqual([1, 2])
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+  })
+
   describe('Vim editing toggle', () => {
     async function seededRoot(text: string): Promise<EditorStore> {
       return createSeededStore(

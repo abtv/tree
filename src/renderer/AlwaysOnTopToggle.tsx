@@ -11,6 +11,7 @@ export function AlwaysOnTopToggle({
     <StatusToggle
       active={alwaysOnTop}
       className="always-on-top-toggle"
+      keepEditorFocus
       label={alwaysOnTop ? 'Unpin window from top' : 'Pin window on top'}
       onToggle={onToggle}
     >

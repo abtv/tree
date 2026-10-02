@@ -1,4 +1,4 @@
-import { closeApp, expect, launchTree, test } from './fixtures'
+import { closeApp, expect, launchTree, node, test } from './fixtures'
 
 test.describe('always-on-top window', () => {
   // @requirement PRODUCT.md §2.2
@@ -40,5 +40,24 @@ test.describe('always-on-top window', () => {
     await expect
       .poll(() => second.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isAlwaysOnTop()))
       .toBe(true)
+  })
+
+  // @requirement PRODUCT.md §2.2
+  test('keeps the editor focused and the Vim mode when the pin is clicked', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = node(window, 1)
+    await editor.focus()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    await window.getByRole('button', { name: 'Pin window on top' }).click()
+    await expect(window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
+    await expect(editor).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+    await window.getByRole('button', { name: 'Unpin window from top' }).click()
+    await expect(window.getByRole('button', { name: 'Pin window on top' })).toBeVisible()
+    await expect(editor).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await closeApp(app)
   })
 })
