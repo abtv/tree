@@ -1,7 +1,17 @@
-// @editing-modes: pending
-import { expect, firePaste, launchTree, node, seedDocument, setCursor, test, writeClipboardText } from './fixtures'
+// @editing-modes: both
+import {
+  describeForEachEditingMode,
+  expect,
+  firePaste,
+  launchTree,
+  node,
+  seedDocument,
+  setCursor,
+  test,
+  writeClipboardText,
+} from './fixtures'
 
-test.describe('external hyperlinks', () => {
+describeForEachEditingMode('external hyperlinks', ({ screenshotName }) => {
   test('edits linked characters with immediate styling and destination updates', async ({ userDataDir }, testInfo) => {
     const url = 'https://example.com'
     seedDocument(userDataDir, {
@@ -28,11 +38,11 @@ test.describe('external hyperlinks', () => {
     await editor.press('a')
     await expect(editor.getByRole('link', { name: `${url}/a` })).toHaveAttribute('href', `${url}/a`)
     await editor.screenshot({ path: testInfo.outputPath('editable-link-light.png') })
-    await expect(editor).toHaveScreenshot('editable-link-insert-light.png')
+    await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-light.png'))
     await window.emulateMedia({ colorScheme: 'dark' })
     await expect(editor.getByRole('link')).toHaveCSS('color', 'rgb(115, 183, 255)')
     await editor.screenshot({ path: testInfo.outputPath('editable-link-dark.png') })
-    await expect(editor).toHaveScreenshot('editable-link-insert-dark.png')
+    await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-dark.png'))
   })
 
   test('restores a corrected link beside plain text without linking its neighbors', async ({ userDataDir }) => {
@@ -54,6 +64,33 @@ test.describe('external hyperlinks', () => {
     await expect(editor).toHaveText(text)
   })
 
+  test('edits on plain click and opens on Cmd+click through the main process', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await app.evaluate(({ shell }) => {
+      const control = globalThis as typeof globalThis & { __openedUrls?: string[] }
+      control.__openedUrls = []
+      shell.openExternal = async (url: string): Promise<void> => {
+        control.__openedUrls!.push(url)
+      }
+    })
+
+    await writeClipboardText(app, 'https://example.com')
+    await firePaste(node(window, 1))
+    const initialUrl = window.url()
+
+    await window.getByRole('link', { name: 'https://example.com' }).click()
+    await expect(node(window, 1)).toBeFocused()
+    expect(await app.evaluate(() => (globalThis as { __openedUrls?: string[] }).__openedUrls ?? [])).toEqual([])
+    await window.getByRole('link', { name: 'https://example.com' }).click({ modifiers: ['Meta'] })
+
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as { __openedUrls?: string[] }).__openedUrls ?? []))
+      .toEqual(['https://example.com/'])
+    expect(window.url()).toBe(initialUrl)
+  })
+})
+
+test.describe('external hyperlinks (mode-independent)', () => {
   test('drops a link when pasted text makes its covered text invalid', async ({ userDataDir }, testInfo) => {
     const url = 'https://example.com'
     seedDocument(userDataDir, {
@@ -96,32 +133,9 @@ test.describe('external hyperlinks', () => {
     await expect(link).toHaveCSS('text-decoration-line', 'underline')
     await editor.screenshot({ path: testInfo.outputPath('paste-inside-link-valid-light.png') })
   })
+})
 
-  test('edits on plain click and opens on Cmd+click through the main process', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
-    await app.evaluate(({ shell }) => {
-      const control = globalThis as typeof globalThis & { __openedUrls?: string[] }
-      control.__openedUrls = []
-      shell.openExternal = async (url: string): Promise<void> => {
-        control.__openedUrls!.push(url)
-      }
-    })
-
-    await writeClipboardText(app, 'https://example.com')
-    await firePaste(node(window, 1))
-    const initialUrl = window.url()
-
-    await window.getByRole('link', { name: 'https://example.com' }).click()
-    await expect(node(window, 1)).toBeFocused()
-    expect(await app.evaluate(() => (globalThis as { __openedUrls?: string[] }).__openedUrls ?? [])).toEqual([])
-    await window.getByRole('link', { name: 'https://example.com' }).click({ modifiers: ['Meta'] })
-
-    await expect
-      .poll(() => app.evaluate(() => (globalThis as { __openedUrls?: string[] }).__openedUrls ?? []))
-      .toEqual(['https://example.com/'])
-    expect(window.url()).toBe(initialUrl)
-  })
-
+test.describe('external hyperlinks (Vim editing only)', () => {
   test('opens the hyperlink under the Normal-mode caret with Enter', async ({ userDataDir }) => {
     const url = 'https://example.com/page'
     const text = `A${url}B`
@@ -132,7 +146,7 @@ test.describe('external hyperlinks', () => {
     })
     // Normal mode is the editor's real startup state; most other E2E tests opt into an
     // Insert-mode session instead, so this test asks for the default explicitly.
-    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     await app.evaluate(({ shell }) => {
       const control = globalThis as typeof globalThis & { __openedUrls?: string[] }
       control.__openedUrls = []

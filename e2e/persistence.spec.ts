@@ -1,9 +1,10 @@
-// @editing-modes: pending
+// @editing-modes: both
 import {
   allowRendererError,
   attachmentFiles,
   closeApp,
   configureHiddenParallelTests,
+  describeForEachEditingMode,
   documentGenerations,
   documentPath,
   exactMessage,
@@ -200,32 +201,6 @@ test.describe('persistence', () => {
 
     await typeInto(node(window, 1), text)
     await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, { timeout: 15_000 }).toBe(text)
-  })
-
-  // @requirement PRODUCT.md §16
-  // @requirement PRODUCT.md §16.1
-  // @requirement PRODUCT.md §18
-  test('restores the document, current parent, and selected node after restart', async ({ userDataDir }) => {
-    const first = await launchTree(userDataDir)
-
-    await typeInto(node(first.window, 1), 'Projects')
-    await first.window.keyboard.press('Meta+.')
-    await first.window.keyboard.press('Enter')
-    await typeInto(node(first.window, 1), 'Work')
-
-    await closeApp(first.app)
-    const persisted = readPersisted(userDataDir)
-    expect(persisted.document.roots[0]?.text).toBe('Projects')
-    const parentId = persisted.document.roots[0]!.id
-    const childId = persisted.document.roots[0]!.children[0]!.id
-    expect(persisted.document.roots[0]!.children[0]!.text).toBe('Work')
-    expect(persisted.location).toEqual({ currentParentId: parentId, selectedNodeId: childId })
-
-    const second = await launchTree(userDataDir)
-
-    await expect(parent(second.window)).toHaveValue('Projects')
-    await expect(node(second.window, 1)).toHaveValue('Work')
-    await expect(node(second.window, 1)).toBeFocused()
   })
 
   for (const { name, seed, distance } of [
@@ -447,5 +422,35 @@ test.describe('persistence', () => {
     await expect(window.locator('.save-error[role="status"]')).toHaveCount(0)
     await expect(window.locator('.persistence-locked')).toHaveCount(0)
     expect(readFileSync(documentPath(userDataDir))).toEqual(before)
+  })
+})
+
+describeForEachEditingMode('persistence of the selection', () => {
+  configureHiddenParallelTests()
+
+  // @requirement PRODUCT.md §16
+  // @requirement PRODUCT.md §16.1
+  // @requirement PRODUCT.md §18
+  test('restores the document, current parent, and selected node after restart', async ({ userDataDir }) => {
+    const first = await launchTree(userDataDir)
+
+    await typeInto(node(first.window, 1), 'Projects')
+    await first.window.keyboard.press('Meta+.')
+    await first.window.keyboard.press('Enter')
+    await typeInto(node(first.window, 1), 'Work')
+
+    await closeApp(first.app)
+    const persisted = readPersisted(userDataDir)
+    expect(persisted.document.roots[0]?.text).toBe('Projects')
+    const parentId = persisted.document.roots[0]!.id
+    const childId = persisted.document.roots[0]!.children[0]!.id
+    expect(persisted.document.roots[0]!.children[0]!.text).toBe('Work')
+    expect(persisted.location).toEqual({ currentParentId: parentId, selectedNodeId: childId })
+
+    const second = await launchTree(userDataDir)
+
+    await expect(parent(second.window)).toHaveValue('Projects')
+    await expect(node(second.window, 1)).toHaveValue('Work')
+    await expect(node(second.window, 1)).toBeFocused()
   })
 })

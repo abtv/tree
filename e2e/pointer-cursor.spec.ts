@@ -1,6 +1,6 @@
-// @editing-modes: pending
+// @editing-modes: both
 import type { Page } from '@playwright/test'
-import { expect, launchTree, seedDocument, test } from './fixtures'
+import { describeForEachEditingMode, expect, launchTree, seedDocument, test } from './fixtures'
 
 // Lists every rendered text run outside a node editor whose pointer would be the text-editing
 // I-beam: `auto` resolves to the I-beam over text, and `text` requests it explicitly.
@@ -22,7 +22,7 @@ function textCursorOffenders(page: Page): Promise<string[]> {
   })
 }
 
-test.describe('pointer cursor', () => {
+describeForEachEditingMode('pointer cursor', ({ mode }) => {
   // @requirement PRODUCT.md §20
   test('shows the default arrow rather than the text-editing cursor over text the user cannot edit', async ({
     userDataDir,
@@ -40,11 +40,12 @@ test.describe('pointer cursor', () => {
       location: { currentParentId: 'parent', selectedNodeId: 'child' },
     })
     const { window: page } = await launchTree(userDataDir)
-    // The breadcrumb has an ancestor link and the non-clickable current segment, and the status bar
-    // shows the Vim mode indicator, so every kind of non-editable text in the editor view is present.
+    // The breadcrumb has an ancestor link and the non-clickable current segment, and in Vim editing
+    // the status bar shows the mode indicator, so every kind of non-editable text in the editor view
+    // is present. Standard editing has no indicator.
     await expect(page.locator('.location-current')).toHaveText('Parent')
     await expect(page.locator('.location-link')).toHaveText('Ancestor')
-    await expect(page.getByLabel('Vim mode')).toBeVisible()
+    await expect(page.getByLabel('Vim mode')).toHaveCount(mode === 'vim' ? 1 : 0)
 
     expect(await textCursorOffenders(page)).toEqual([])
   })

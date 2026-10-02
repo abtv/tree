@@ -1,7 +1,17 @@
-// @editing-modes: pending
-import { expect, firePaste, launchTree, node, parent, test, typeInto, writeClipboardText } from './fixtures'
+// @editing-modes: both
+import {
+  describeForEachEditingMode,
+  expect,
+  firePaste,
+  launchTree,
+  node,
+  parent,
+  test,
+  typeInto,
+  writeClipboardText,
+} from './fixtures'
 
-test.describe('navigation', () => {
+describeForEachEditingMode('navigation', () => {
   // @requirement PRODUCT.md §4.1
   // @requirement PRODUCT.md §4.2
   test('arrow keys move selection between siblings', async ({ userDataDir }) => {
@@ -26,18 +36,6 @@ test.describe('navigation', () => {
     await window.keyboard.press('ArrowUp')
 
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
-  })
-
-  test('gd enters the selected node like Cmd+.', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-
-    await typeInto(node(window, 1), 'Parent')
-    await window.keyboard.press('Escape')
-    await window.keyboard.press('g')
-    await window.keyboard.press('d')
-
-    await expect(parent(window)).toBeVisible()
-    await expect(parent(window)).toBeFocused()
   })
 
   test('moves the last root caret to the end on ArrowDown', async ({ userDataDir }) => {
@@ -275,6 +273,20 @@ test.describe('navigation', () => {
     await leafIndicator.click()
     await expect(parent(window)).toHaveValue('Child')
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
+    await expect(parent(window)).toBeFocused()
+  })
+})
+
+test.describe('navigation (Vim editing only)', () => {
+  test('gd enters the selected node like Cmd+.', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir, { vimPreference: true })
+
+    await typeInto(node(window, 1), 'Parent')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+
+    await expect(parent(window)).toBeVisible()
     await expect(parent(window)).toBeFocused()
   })
 })

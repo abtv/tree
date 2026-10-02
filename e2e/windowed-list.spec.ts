@@ -1,8 +1,16 @@
-// @editing-modes: pending
+// @editing-modes: both
 import type { Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, launchTree, seedDocument, setMainWindowBounds, startRowDrag, test } from './fixtures'
+import {
+  describeForEachEditingMode,
+  expect,
+  launchTree,
+  seedDocument,
+  setMainWindowBounds,
+  startRowDrag,
+  test,
+} from './fixtures'
 
 function row(window: Page, index: number): ReturnType<Page['getByRole']> {
   return window.getByRole('textbox', { name: `Node ${index}`, exact: true })
@@ -84,7 +92,7 @@ async function rowTilingProblems(window: Page): Promise<string[]> {
   })
 }
 
-test.describe('windowed node list', () => {
+describeForEachEditingMode('windowed node list', () => {
   test('keyboard navigation reaches and types into an off-screen row', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))
     const { window } = await launchTree(userDataDir)
@@ -122,7 +130,9 @@ test.describe('windowed node list', () => {
     await expect(row(window, 41)).toBeFocused()
     await expect(row(window, 41)).toHaveValue(/y/)
   })
+})
 
+test.describe('windowed node list (mode-independent)', () => {
   // @requirement PRODUCT.md §20.1
   test('dragging near the window edge auto-scrolls to an off-screen position', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))

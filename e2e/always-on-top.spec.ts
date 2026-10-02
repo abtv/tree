@@ -1,7 +1,7 @@
-// @editing-modes: pending
-import { closeApp, expect, launchTree, node, test } from './fixtures'
+// @editing-modes: both
+import { closeApp, describeForEachEditingMode, expect, launchTree, node, test } from './fixtures'
 
-test.describe('always-on-top window', () => {
+describeForEachEditingMode('always-on-top window', ({ mode }) => {
   // @requirement PRODUCT.md §2.2
   test('toggles the native window flag and restores it after restart', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
@@ -21,12 +21,17 @@ test.describe('always-on-top window', () => {
     await expect(tooltip).toBeHidden()
     const toggleBox = await toggle.boundingBox()
     const statusBox = await first.window.locator('.status-bar').boundingBox()
-    const indicatorBox = await first.window.getByLabel('Vim mode').boundingBox()
     expect(toggleBox!.y).toBeGreaterThanOrEqual(statusBox!.y)
     expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(statusBox!.y + statusBox!.height)
-    // The Vim mode indicator is at the left end; the pin ends the status bar at the right.
-    expect(indicatorBox!.x - statusBox!.x).toBeLessThanOrEqual(13)
-    expect(indicatorBox!.x + indicatorBox!.width).toBeLessThanOrEqual(toggleBox!.x)
+    if (mode === 'vim') {
+      // The Vim mode indicator is at the left end; the pin ends the status bar at the right.
+      const indicatorBox = await first.window.getByLabel('Vim mode').boundingBox()
+      expect(indicatorBox!.x - statusBox!.x).toBeLessThanOrEqual(13)
+      expect(indicatorBox!.x + indicatorBox!.width).toBeLessThanOrEqual(toggleBox!.x)
+    } else {
+      // Standard editing shows no mode indicator.
+      await expect(first.window.getByLabel('Vim mode')).toHaveCount(0)
+    }
     expect(statusBox!.x + statusBox!.width - (toggleBox!.x + toggleBox!.width)).toBeLessThanOrEqual(13)
     await toggle.click()
     await expect(first.window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
@@ -44,21 +49,21 @@ test.describe('always-on-top window', () => {
   })
 
   // @requirement PRODUCT.md §2.2
-  test('keeps the editor focused and the Vim mode when the pin is clicked', async ({ userDataDir }) => {
+  test('keeps the editor focused when the pin is clicked', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const editor = node(window, 1)
     await editor.focus()
-    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     await window.getByRole('button', { name: 'Pin window on top' }).click()
     await expect(window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
     await expect(editor).toBeFocused()
-    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     await window.getByRole('button', { name: 'Unpin window from top' }).click()
     await expect(window.getByRole('button', { name: 'Pin window on top' })).toBeVisible()
     await expect(editor).toBeFocused()
-    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await closeApp(app)
   })
 })

@@ -1,5 +1,5 @@
-// @editing-modes: pending
-import { expect, launchTree, seedDocument, test } from './fixtures'
+// @editing-modes: both
+import { describeForEachEditingMode, expect, launchTree, seedDocument, test } from './fixtures'
 
 test.describe('sticky location toolbar', () => {
   // @requirement PRODUCT.md §2.2
@@ -42,9 +42,11 @@ test.describe('sticky location toolbar', () => {
     const windowWidth = await page.evaluate(() => document.documentElement.clientWidth)
     expect(barRight).toBe(windowWidth)
   })
+})
 
+describeForEachEditingMode('sticky status bar', ({ mode }) => {
   // @requirement PRODUCT.md §20.2
-  test('keeps the status bar with the mode indicator below the scrolling content', async ({ userDataDir }) => {
+  test('keeps the status bar below the scrolling content', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: Array.from({ length: 200 }, (_, index) => ({ id: `r${index}`, text: `Root ${index}`, children: [] })),
@@ -58,15 +60,19 @@ test.describe('sticky location toolbar', () => {
 
     const status = await page.locator('.status-bar').boundingBox()
     const viewport = await page.locator('.scroll-viewport').boundingBox()
-    const indicator = await page.getByLabel('Vim mode').boundingBox()
     const innerHeight = await page.evaluate(() => window.innerHeight)
     expect(status).not.toBeNull()
     expect(status!.y + status!.height).toBe(innerHeight)
     // The content area ends exactly where the status bar begins, so its scrollbar never reaches it.
     expect(viewport!.y + viewport!.height).toBe(status!.y)
-    expect(indicator!.y).toBeGreaterThanOrEqual(status!.y)
-    expect(indicator!.y + indicator!.height).toBeLessThanOrEqual(status!.y + status!.height)
-    // The indicator is not editable text, so the pointer over it must not become the text-editing I-beam.
-    await expect(page.getByLabel('Vim mode')).toHaveCSS('cursor', 'default')
+    if (mode === 'vim') {
+      const indicator = await page.getByLabel('Vim mode').boundingBox()
+      expect(indicator!.y).toBeGreaterThanOrEqual(status!.y)
+      expect(indicator!.y + indicator!.height).toBeLessThanOrEqual(status!.y + status!.height)
+      // The indicator is not editable text, so the pointer over it must not become the text-editing I-beam.
+      await expect(page.getByLabel('Vim mode')).toHaveCSS('cursor', 'default')
+    } else {
+      await expect(page.getByLabel('Vim mode')).toHaveCount(0)
+    }
   })
 })
