@@ -189,6 +189,46 @@ test.describe('Vim editing prototype', () => {
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toBeFocused()
   })
 
+  // @requirement PRODUCT.md §20.2
+  for (const nested of [false, true]) {
+    test(`scrolls to the first row with gg after wheel scrolling away (${nested ? 'nested' : 'top level'})`, async ({
+      userDataDir,
+    }) => {
+      const children = Array.from({ length: 90 }, (_, index) => ({
+        id: `c${index}`,
+        text: `Child ${index}`,
+        children: [],
+      }))
+      seedDocument(userDataDir, {
+        document: { roots: nested ? [{ id: 'p', text: 'Parent', children }] : children },
+        location: { currentParentId: nested ? 'p' : null, selectedNodeId: 'c60' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await expect(window.getByRole('textbox', { name: 'Node 61', exact: true })).toBeFocused()
+      await window.mouse.move(400, 300)
+      await window.mouse.wheel(0, 3000)
+      // Wait for the wheel's smooth scrolling to settle, so it cannot move the content after gg.
+      let previous = -1
+      await expect
+        .poll(async () => {
+          const top = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
+          const settled = top === previous && top > 1000
+          previous = top
+          return settled
+        })
+        .toBe(true)
+
+      await window.keyboard.press('g')
+      await window.keyboard.press('g')
+
+      const target = nested
+        ? window.getByRole('textbox', { name: 'Current parent' })
+        : window.getByRole('textbox', { name: 'Node 1', exact: true })
+      await expect(target).toBeFocused()
+      await expect(target).toBeInViewport({ ratio: 1 })
+    })
+  }
+
   test('selects an inner text object in character Visual mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one (two)', children: [] }] },

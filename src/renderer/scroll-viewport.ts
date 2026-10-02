@@ -22,6 +22,19 @@ export function scrollViewportBy(deltaY: number): void {
   else element.scrollBy(0, deltaY)
 }
 
+/**
+ * Scrolls the content area so the element is fully visible, centering it when it is not. Focusing
+ * an element scrolls it into view natively, but not reliably when the focus change happens while
+ * the list is re-rendering, so focus movement calls this afterwards. It does nothing for an
+ * element that is already fully visible.
+ */
+export function revealInViewport(element: Element): void {
+  const { top, bottom } = viewportBounds()
+  const rect = element.getBoundingClientRect()
+  if (rect.top >= top && rect.bottom <= bottom) return
+  scrollViewportBy(rect.top - (top + (bottom - top - rect.height) / 2))
+}
+
 /** The element whose size changes when the scrolled content grows or shrinks. */
 export function viewportContent(): Element {
   return scroller()?.firstElementChild ?? document.documentElement

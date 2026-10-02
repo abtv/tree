@@ -21,7 +21,7 @@ import {
 } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
-import { viewportBounds } from './scroll-viewport'
+import { revealInViewport, viewportBounds } from './scroll-viewport'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
   beginStructuralChildOpen,
@@ -517,6 +517,7 @@ export function useNodeInputBindings({
       const input = inputs.current.get(focus.nodeId)
       if (input === undefined) return
       input.focus()
+      revealInViewport(input)
       if (latestVimMode.current === 'normal') {
         // Vertical navigation may resolve the destination to its image while the store carries
         // the originating text column. Project the resolved caret, including on the deferred pass.

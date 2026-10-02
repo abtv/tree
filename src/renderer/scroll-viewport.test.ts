@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   onViewportScroll,
+  revealInViewport,
   scrollViewportBy,
   SCROLL_VIEWPORT_CLASS,
   viewportBounds,
@@ -46,6 +47,34 @@ describe('scroll viewport', () => {
     scrollViewportBy(-9)
     expect(elementScroll).toHaveBeenCalledWith(0, -9)
     expect(windowScroll).toHaveBeenCalledOnce()
+  })
+
+  it('reveals an element outside the content area by centering it, and leaves a visible one alone', () => {
+    const element = mountScroller({ top: 30, bottom: 630 })
+    const scrollBy = vi.fn()
+    element.scrollBy = scrollBy
+    const row = document.createElement('div')
+    const rowRect = (top: number) =>
+      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ top, bottom: top + 20, height: 20 } as DOMRect)
+
+    rowRect(100)
+    revealInViewport(row)
+    expect(scrollBy).not.toHaveBeenCalled()
+
+    // Above the content area: 30 + (600 - 20) / 2 = 320 is the centered top, so scroll up by 1480.
+    rowRect(-1_160)
+    revealInViewport(row)
+    expect(scrollBy).toHaveBeenLastCalledWith(0, -1_480)
+
+    // Partly hidden under the toolbar counts as not visible.
+    rowRect(20)
+    revealInViewport(row)
+    expect(scrollBy).toHaveBeenLastCalledWith(0, -300)
+
+    // Below the content area.
+    rowRect(900)
+    revealInViewport(row)
+    expect(scrollBy).toHaveBeenLastCalledWith(0, 580)
   })
 
   it('observes the scrolled content rather than the fixed-size container', () => {
