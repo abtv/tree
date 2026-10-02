@@ -1,3 +1,4 @@
+// @editing-modes: explicit
 import {
   closeApp,
   expect,

@@ -1,3 +1,4 @@
+// @editing-modes: independent
 import { expect, launchTree, node, test, typeInto } from './fixtures'
 
 test.describe('Cmd+0', () => {

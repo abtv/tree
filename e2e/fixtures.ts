@@ -79,8 +79,20 @@ const retainedSaveErrors: string[] = []
 const closedApps = new WeakSet<ElectronApplication>()
 const allowedRendererErrors: RegExp[] = []
 
-export const test = base.extend<{ userDataDir: string }>({
-  userDataDir: async ({}, use) => {
+export type EditingMode = 'vim' | 'standard'
+
+export const EDITING_MODES: readonly EditingMode[] = ['vim', 'standard']
+
+// The editing mode of the test that is running. A worker runs one test at a time, so a module-level
+// value is safe; the `userDataDir` fixture sets it before the test body and clears it afterwards.
+let activeEditingMode: EditingMode = 'vim'
+
+export const test = base.extend<{ userDataDir: string; editingMode: EditingMode }>({
+  // Specs written for Vim editing keep the default. `describeForEachEditingMode` overrides it per
+  // describe block, and `launchTree` reads it when the test gives no explicit `vimPreference`.
+  editingMode: ['vim', { option: true }],
+  userDataDir: async ({ editingMode }, use) => {
+    activeEditingMode = editingMode
     const directory = mkdtempSync(join(tmpdir(), userDataMarker))
     await use(directory)
     // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
@@ -103,6 +115,7 @@ export const test = base.extend<{ userDataDir: string }>({
         throw new Error(`Renderer reported save errors:\n${unexpectedErrors.join('\n')}`)
       }
     } finally {
+      activeEditingMode = 'vim'
       releaseSystemClipboardLock()
       rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
@@ -110,6 +123,30 @@ export const test = base.extend<{ userDataDir: string }>({
 })
 
 export { expect }
+
+export interface EditingModeContext {
+  mode: EditingMode
+  /** Adds the mode suffix to a screenshot name so each mode keeps its own baseline. */
+  screenshotName: (name: `${string}.png`) => `${string}.png`
+}
+
+/**
+ * Runs `body` once per editing mode, each time in its own describe block whose title names the mode.
+ * Tests declared inside launch with that mode unless they pass an explicit `vimPreference`. Tests whose
+ * behavior exists only in Vim editing belong in a separate describe block that launches with Vim
+ * explicitly (`e2e/AGENTS.md`).
+ */
+export function describeForEachEditingMode(title: string, body: (context: EditingModeContext) => void): void {
+  for (const mode of EDITING_MODES) {
+    test.describe(`${title} [${mode} editing]`, () => {
+      test.use({ editingMode: mode })
+      body({
+        mode,
+        screenshotName: (name) => `${name.slice(0, -'.png'.length)}-${mode}.png`,
+      })
+    })
+  }
+}
 
 export function allowRendererError(pattern: RegExp): void {
   allowedRendererErrors.push(pattern)
@@ -298,15 +335,16 @@ export async function launchTree(
     shortcut?: ShortcutMode
     initialMode?: 'normal' | 'insert'
     /**
-     * The Vim editing preference written before launch. Most specs were written for Vim editing, so
-     * it defaults to enabled; `'saved'` leaves whatever an earlier launch (or nothing) persisted.
+     * The Vim editing preference written before launch. It defaults to the test's `editingMode`
+     * (Vim editing unless `describeForEachEditingMode` selected standard editing); `'saved'` leaves
+     * whatever an earlier launch (or nothing) persisted.
      */
     vimPreference?: boolean | 'saved'
   } = {},
 ): Promise<Launched> {
   await closeTrackedApps()
   await cleanupStaleElectronProcesses(userDataMarker)
-  const vimPreference = options.vimPreference ?? true
+  const vimPreference = options.vimPreference ?? activeEditingMode === 'vim'
   if (vimPreference !== 'saved') writeVimPreference(userDataDir, vimPreference)
   const windowMode = options.windows ?? ambientWindowMode()
   const shortcutMode = options.shortcut ?? ambientShortcutMode()

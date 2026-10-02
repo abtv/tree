@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { expect, firePaste, launchTree, node, parent, test, typeInto, writeClipboardText } from './fixtures'
 
 test.describe('navigation', () => {

@@ -1,3 +1,4 @@
+// @editing-modes: independent
 import {
   closeMainWindow,
   expect,

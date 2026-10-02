@@ -206,6 +206,22 @@ Vim command sequences that need a shifted continuation key must be tested in phy
 
 The same event-sequence fidelity applies wherever handler behavior depends on platform-generated surrounding events, such as lock or dead keys, native composition, or key repeat. A helper or double that collapses a physical keypress into one synthetic event can stay green while real typing is broken, so model the event sequence the platform actually delivers whenever the handler observes more than the logical key. Native IME composition cannot be driven through Playwright, so composition handling is verified with unit-level contract sequences; do not claim real-IME end-to-end coverage.
 
+### Editing-mode end-to-end coverage
+
+Standard editing is the first-run default and Vim editing is a permanent mode (`docs/PRODUCT.md` §20.2), so a test whose behavior can differ between them must run in both. Standard editing is Vim Insert without the Vim key handler, so the modes differ only at a few points: the startup mode and restored caret, `Escape` and undo grouping, pointer handling in an editor, rendering of the caret and selection, the status-bar layout, the image preview, and the application commands that Vim pre-resolves (`Cmd+A/C/X/V`, `Cmd+.`, `Cmd+,`, `Cmd+Backspace`, `Cmd+Z`, `Cmd+E`, and the context-menu Cut and Paste).
+
+`launchTree` writes the Vim preference from the Playwright option fixture `editingMode` (`'vim'` by default) unless the test passes `vimPreference` itself. `describeForEachEditingMode(title, body)` in `e2e/fixtures.ts` runs a describe body once per mode, names each block `<title> [vim editing]` or `<title> [standard editing]`, and hands the body a `screenshotName` function that gives each mode its own baseline (`name-vim.png`, `name-standard.png`). Tests whose behavior exists only in Vim sit in a separate `Vim editing only` describe block of the same file, outside the helper.
+
+Every `e2e/*.spec.ts` file declares one category on its first line, as `// @editing-modes: <category>`, and `npm run check:e2e-modes` enforces it:
+
+* `both` — the file's tests run through `describeForEachEditingMode`; the check fails a `both` file that never calls it, and any other file that does.
+* `vim` — the behavior under test exists only in Vim editing.
+* `independent` — the asserted behavior does not pass through a point where the modes differ. These tests run once, with Vim editing.
+* `explicit` — every launch sets its own preference because the file tests the preference itself; only `e2e/vim-toggle.spec.ts` uses it.
+* `pending` — not yet classified into one of the above; this is transitional and is accepted only while the editing-mode parity initiative (`plans/editing-mode-test-parity.md`) is open.
+
+A new spec file picks its category when it is created. Choose `both` when any step involves typing, the caret, selection, pointer input in an editor, an application editing command, the preview, or the status bar.
+
 ---
 
 ## 9. Full Validation
@@ -225,10 +241,11 @@ It should run:
 3. formatting check (`prettier --check`);
 4. documentation governance (`npm run check:docs`);
 5. requirement traceability (`npm run check:requirements`);
-6. OpenCode permission checks (`npm run check:opencode`);
-7. tests with coverage enforcement;
-8. production build;
-9. dependency audit (`npm audit`).
+6. end-to-end editing-mode categories (`npm run check:e2e-modes`);
+7. OpenCode permission checks (`npm run check:opencode`);
+8. tests with coverage enforcement;
+9. production build;
+10. dependency audit (`npm audit`).
 
 The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents (including active initiative plans) resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 

@@ -1,3 +1,4 @@
+// @editing-modes: vim
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {

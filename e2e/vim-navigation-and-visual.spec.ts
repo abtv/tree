@@ -1,3 +1,4 @@
+// @editing-modes: vim
 import type { Page } from '@playwright/test'
 import {
   allowRendererError,

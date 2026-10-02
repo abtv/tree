@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import type { Page } from '@playwright/test'
 import { expect, launchTree, seedDocument, test } from './fixtures'
 

@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import {
   closeApp,
   dragRow,

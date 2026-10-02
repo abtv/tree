@@ -1,3 +1,4 @@
+// @editing-modes: independent
 import type { ElectronApplication } from '@playwright/test'
 import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

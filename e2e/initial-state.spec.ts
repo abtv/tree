@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { documentPath, expect, launchTree, node, test, tryReadPersisted } from './fixtures'
 
 test.describe('initial state', () => {

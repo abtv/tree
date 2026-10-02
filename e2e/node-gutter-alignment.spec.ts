@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import type { Page } from '@playwright/test'
 import { expect, firePaste, launchTree, node, seedDocument, test, writeClipboardImageSized } from './fixtures'
 

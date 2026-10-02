@@ -29,6 +29,7 @@
     "fix:history": "node scripts/fix-history.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:requirements": "node scripts/check-requirement-coverage.mjs",
+    "check:e2e-modes": "node scripts/check-e2e-editing-modes.mjs",
     "check:opencode": "node scripts/check-opencode-permissions.mjs",
     "changelog": "node scripts/changelog.mjs --write",
     "doctor": "node scripts/doctor.mjs",
@@ -40,7 +41,7 @@
     "test:mutation": "stryker run",
     "test:e2e": "npm run build && playwright test",
     "test:perf": "npm run build && playwright test -c perf.config.ts",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:requirements && npm run check:opencode && npm run test:coverage && npm run build && npm run audit",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:requirements && npm run check:e2e-modes && npm run check:opencode && npm run test:coverage && npm run build && npm run audit",
     "check:full": "npm run check && playwright test && playwright test -c perf.config.ts"
   },
   "dependencies": {

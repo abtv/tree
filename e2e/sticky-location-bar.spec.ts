@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { expect, launchTree, seedDocument, test } from './fixtures'
 
 test.describe('sticky location toolbar', () => {

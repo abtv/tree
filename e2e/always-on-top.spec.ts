@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { closeApp, expect, launchTree, node, test } from './fixtures'
 
 test.describe('always-on-top window', () => {

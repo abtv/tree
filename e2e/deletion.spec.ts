@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { expect, launchTree, node, parent, test, typeInto } from './fixtures'
 
 test.describe('deleting nodes', () => {

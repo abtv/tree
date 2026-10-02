@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { existsSync } from 'node:fs'
 import {
   attachmentPath,

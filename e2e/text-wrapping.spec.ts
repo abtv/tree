@@ -1,3 +1,4 @@
+// @editing-modes: independent
 import { expect, launchTree, node, parent, test } from './fixtures'
 
 function metrics(locator: ReturnType<typeof node>) {

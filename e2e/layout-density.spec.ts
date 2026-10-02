@@ -1,3 +1,4 @@
+// @editing-modes: independent
 import type { Page } from '@playwright/test'
 import { expect, launchTree, node, nodeTexts, seedDocument, setMainWindowBounds, startRowDrag, test } from './fixtures'
 

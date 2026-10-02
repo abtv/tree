@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { expect, firePaste, launchTree, node, seedDocument, setCursor, test, writeClipboardText } from './fixtures'
 
 test.describe('external hyperlinks', () => {

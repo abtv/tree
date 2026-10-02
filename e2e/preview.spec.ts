@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import { expect, firePaste, launchTree, node, test, typeInto, writeClipboardImageSized } from './fixtures'
 
 test.describe('image presentation and preview', () => {

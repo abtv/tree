@@ -1,3 +1,4 @@
+// @editing-modes: pending
 import type { ElectronApplication } from '@playwright/test'
 import {
   allowRendererError,

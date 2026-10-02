@@ -116,6 +116,8 @@
           "npm run check:docs *": "allow",
           "npm run check:requirements": "allow",
           "npm run check:requirements *": "allow",
+          "npm run check:e2e-modes": "allow",
+          "npm run check:e2e-modes *": "allow",
           "npm run check:opencode": "allow",
           "npm run check:opencode *": "allow",
           "npm run validation:snapshot": "allow",
