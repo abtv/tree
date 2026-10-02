@@ -183,6 +183,18 @@ describe('ImagePreview', () => {
     trigger.remove()
   })
 
+  it('closes on a mouse click on the backdrop or on the image', async () => {
+    const onClose = vi.fn()
+    render(<ImagePreview attachmentId="image" onClose={onClose} />)
+    const image = await screen.findByAltText('Attached image preview')
+
+    fireEvent.click(image)
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(image.closest('.image-preview-overlay')!)
+    expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
   it('ignores an already-handled Escape key', async () => {
     const onClose = vi.fn()
     render(<ImagePreview attachmentId="image" onClose={onClose} />)

@@ -56,6 +56,24 @@ test.describe('image presentation and preview', () => {
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeHidden()
   })
 
+  test('closes the preview on a mouse click in the window', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await writeClipboardImageSized(app, 400, 200)
+    await firePaste(node(window, 1))
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+    const dialog = window.getByRole('dialog', { name: 'Image preview' })
+    await expect(dialog).toBeVisible()
+
+    await window.mouse.click(5, 300)
+    await expect(dialog).toBeHidden()
+
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('img').click()
+    await expect(dialog).toBeHidden()
+  })
+
   test('keeps keyboard focus inside the preview', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 

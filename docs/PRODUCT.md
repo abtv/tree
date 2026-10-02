@@ -863,7 +863,7 @@ Clicking an attached image opens an image preview.
 
 The image preview is a modal overlay within the application window. It displays the image fitted within the available window area while preserving its aspect ratio, and it does not enlarge the image beyond its natural size.
 
-Only one preview is open at a time. The preview has a visible close button and also closes on `Esc`. Closing the preview returns focus to the element that was focused before the preview opened.
+Only one preview is open at a time. The preview has a visible close button and also closes on `Esc` and on a mouse click anywhere in the window, including on the image itself. Closing the preview returns focus to the element that was focused before the preview opened.
 
 If an attached image cannot be displayed — because its stored bytes are missing, because reading them fails, or because the image data cannot be decoded by the browser — the application shows `Image could not be loaded.` in place of that image. This applies both to the inline image and to the preview. The message does not delete the attachment, does not report a document-save failure, and does not prevent the rest of the document from being edited or the preview from being closed.
 

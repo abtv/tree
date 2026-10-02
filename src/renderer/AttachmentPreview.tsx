@@ -159,7 +159,7 @@ export function ImagePreview({
   }, [])
 
   return (
-    <div className="image-preview-overlay">
+    <div className="image-preview-overlay" onClick={onClose}>
       <div ref={dialog} aria-label="Image preview" aria-modal="true" className="image-preview" role="dialog">
         <button
           ref={closeButton}
