@@ -81,7 +81,9 @@ export function AttachmentImage({
       onClick={() => onOpen(attachmentId)}
       onPointerDown={(event) => {
         event.stopPropagation()
-        event.currentTarget.focus()
+        // Keyboard commands are bound to the node input, so focus stays there while the preview is open.
+        const input = event.currentTarget.parentElement?.querySelector<HTMLElement>(':scope > .node-input')
+        ;(input ?? event.currentTarget).focus()
         onOpen(attachmentId)
       }}
       type="button"

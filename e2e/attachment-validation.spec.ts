@@ -244,7 +244,7 @@ test.describe('attachment validation and image failures', () => {
     await expect(first.window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     await first.window.keyboard.press('Escape')
     await expect(first.window.getByRole('dialog', { name: 'Image preview' })).toBeHidden()
-    await expect(openButton).toBeFocused()
+    await expect(node(first.window, 1)).toBeFocused()
 
     const attachmentId = readPersisted(userDataDir).document.roots[0]?.attachment?.id
     expect(attachmentId).toEqual(expect.any(String))

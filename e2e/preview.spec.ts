@@ -1,4 +1,4 @@
-import { expect, firePaste, launchTree, node, test, writeClipboardImageSized } from './fixtures'
+import { expect, firePaste, launchTree, node, test, typeInto, writeClipboardImageSized } from './fixtures'
 
 test.describe('image presentation and preview', () => {
   // @requirement PRODUCT.md §17.1
@@ -72,6 +72,28 @@ test.describe('image presentation and preview', () => {
     await expect(dialog).toBeVisible()
     await dialog.getByRole('img').click()
     await expect(dialog).toBeHidden()
+  })
+
+  test('returns Normal-mode keys to the editor after a mouse click closes the preview', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const first = node(window, 1)
+    await typeInto(first, 'test')
+    await first.press('Escape')
+    await first.press('o')
+    const second = node(window, 2)
+    await writeClipboardImageSized(app, 400, 200)
+    await firePaste(second)
+    await window.keyboard.press('Escape')
+    await expect(second).toBeFocused()
+
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+    const dialog = window.getByRole('dialog', { name: 'Image preview' })
+    await expect(dialog).toBeVisible()
+    await window.mouse.click(5, 300)
+    await expect(dialog).toBeHidden()
+
+    await window.keyboard.press('k')
+    await expect(first).toBeFocused()
   })
 
   test('keeps keyboard focus inside the preview', async ({ userDataDir }) => {
