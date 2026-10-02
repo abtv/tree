@@ -73,6 +73,10 @@ textarea {
 }
 
 .location-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--color-background);
   display: flex;
   align-items: center;
   height: 30px;

@@ -2,6 +2,14 @@
 import { expect, it } from 'vitest'
 import styles from './styles.css?raw'
 
+// @requirement PRODUCT.md §2.2
+it('pins the location toolbar to the top with an opaque background', () => {
+  const rule = /\.location-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(rule).toMatch(/position:\s*sticky/)
+  expect(rule).toMatch(/top:\s*0/)
+  expect(rule).toMatch(/background:\s*var\(--color-background\)/)
+})
+
 // @requirement PRODUCT.md §20.4
 it('keeps application styles free of animations and transitions that delay interaction feedback', () => {
   const sheet = document.createElement('style')
