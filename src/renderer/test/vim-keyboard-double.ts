@@ -105,6 +105,7 @@ export function createVimKeyboardDouble(
       shift: vi.fn(),
     },
     shiftCurrentNode: vi.fn(),
+    verticalOperator: vi.fn(),
     beginStructuralOpen: vi.fn((position: 'before' | 'after') => {
       beginStructuralOpen(commandState, nodeId, position)
     }),

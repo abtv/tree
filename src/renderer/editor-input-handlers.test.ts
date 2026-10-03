@@ -233,7 +233,7 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(2)
     handle(keyEvent(input, 'j'))
     handle(keyEvent(input, 'd'))
-    expect(move).toHaveBeenCalledWith('down')
+    expect(move).toHaveBeenCalledWith('down', 1)
     expect(command).toHaveBeenCalledWith('d')
   })
 
@@ -308,9 +308,42 @@ describe('editor keyboard handler', () => {
     press('>')
     press('g')
     press('>')
-    expect(move.mock.calls).toEqual([['down']])
+    // `j` and `k` carry the count; `>` after `3j` sees no leftover count.
+    expect(move.mock.calls).toEqual([['down', 3]])
     expect(shift.mock.calls).toEqual([['in', 1]])
     expect(vim.commandState.pending).toBeUndefined()
+
+    move.mockClear()
+    press('k')
+    press('g')
+    press('j')
+    expect(move.mock.calls).toEqual([
+      ['up', 1],
+      ['down', 1],
+    ])
+  })
+
+  it('routes d, y, and c with j or k to the vertical operator with the multiplied count', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'normal')
+    const press = (...keys: string[]): void => {
+      for (const key of keys) handle(keyEvent(input, key))
+    }
+    press('d', 'j', 'y', 'k', 'c', 'j')
+    press('2', 'd', '3', 'j')
+    press('d', '2', 'k')
+    expect(vim.verticalOperator).toHaveBeenNthCalledWith(1, 'node', 'd', 'down', 1)
+    expect(vim.verticalOperator).toHaveBeenNthCalledWith(2, 'node', 'y', 'up', 1)
+    expect(vim.verticalOperator).toHaveBeenNthCalledWith(3, 'node', 'c', 'down', 1)
+    expect(vim.verticalOperator).toHaveBeenNthCalledWith(4, 'node', 'd', 'down', 6)
+    expect(vim.verticalOperator).toHaveBeenNthCalledWith(5, 'node', 'd', 'up', 2)
+    expect(vim.commandState.pending).toBeUndefined()
+    // `ys` is a surround prefix, not a vertical operator, and a plain `j` keeps navigating.
+    vi.mocked(vim.verticalOperator).mockClear()
+    press('y', 's', 'j')
+    expect(vim.verticalOperator).not.toHaveBeenCalled()
   })
 
   it('moves the current subtree for character Visual > and < and keeps the selection and mode', () => {

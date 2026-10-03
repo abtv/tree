@@ -278,7 +278,7 @@ export function useNodeInputBindings({
   }, [store, applyCaretState])
 
   const moveNodeVisual = useCallback(
-    (direction: 'up' | 'down' | 'first' | 'last'): void => {
+    (direction: 'up' | 'down' | 'first' | 'last', count = 1): void => {
       const state = store.getSnapshot()
       if (state.status !== 'ready' || nodeVisualSelection === undefined) return
       // Whole-node Visual extension stays within the focused node's actual sibling array, whatever
@@ -293,7 +293,7 @@ export function useNodeInputBindings({
           ? 0
           : direction === 'last'
             ? nodes.length - 1
-            : Math.max(0, Math.min(nodes.length - 1, index + (direction === 'down' ? 1 : -1)))
+            : Math.max(0, Math.min(nodes.length - 1, index + (direction === 'down' ? count : -count)))
       const target = nodes[targetIndex]
       if (target === undefined) return
       setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.id })
@@ -357,6 +357,36 @@ export function useNodeInputBindings({
       vimSession,
       vimCommandState,
     ],
+  )
+
+  const verticalOperator = useCallback(
+    (nodeId: string, operator: 'd' | 'y' | 'c', direction: 'down' | 'up', count: number): void => {
+      const state = store.getSnapshot()
+      if (state.status !== 'ready' || state.location.currentParentId === nodeId) return
+      // The range is the node's own actual siblings, whatever depth it is displayed at, so expanded
+      // descendant rows never count as members.
+      const located = locateNode(state.document, nodeId)
+      if (located === undefined) return
+      const edge = Math.max(
+        0,
+        Math.min(located.siblings.length - 1, located.index + (direction === 'down' ? count : -count)),
+      )
+      const first = located.siblings[Math.min(located.index, edge)]
+      const last = located.siblings[Math.max(located.index, edge)]
+      if (first === undefined || last === undefined) return
+      const span = Math.abs(located.index - edge) + 1
+      const result = store.applyNodeVisual(operator, first.id, last.id)
+      if (result === undefined) return
+      const nextRegister = visualCommandRegister(operator, result)
+      if (nextRegister !== undefined) vimSession.current.register = nextRegister
+      if (operator === 'c') {
+        beginStructuralVisual(vimCommandState.current, nodeId, 'c', span)
+        changeVimMode('insert')
+      } else if (operator === 'd') {
+        recordRepeatChange(vimCommandState.current, { kind: 'structural-visual', command: 'd', span })
+      }
+    },
+    [store, changeVimMode, vimSession, vimCommandState],
   )
 
   // Whole-node Visual keeps its endpoint IDs, direction, and mode across `>` and `<`: the moved rows
@@ -877,6 +907,7 @@ export function useNodeInputBindings({
                 shift: shiftNodeVisual,
               },
               shiftCurrentNode,
+              verticalOperator,
               beginStructuralOpen: (position) => {
                 beginStructuralOpen(vimCommandState.current, node.id, position)
               },
@@ -944,6 +975,7 @@ export function useNodeInputBindings({
       commandNodeVisual,
       shiftNodeVisual,
       shiftCurrentNode,
+      verticalOperator,
       finishVimReplace,
       finishVimInsert,
       moveVimViewport,

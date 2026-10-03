@@ -1424,6 +1424,85 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha1', 'Bravo'])
   })
 
+  test('deletes, yanks, and changes sibling subtrees with dj, d2j, dk, yj, and cj, each as one undo', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [{ id: 'bravo1', text: 'Bravo1', children: [] }] },
+          { id: 'charlie', text: 'Charlie', children: [] },
+          { id: 'delta', text: 'Delta', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    const before = await outline(window)
+
+    // `dj` takes Alpha and Bravo with its child; the descendant row is not a separate member.
+    await window.keyboard.press('d')
+    await window.keyboard.press('j')
+    await expect.poll(() => outline(window)).toEqual(['Charlie', 'Delta'])
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(before)
+
+    // `d2j` covers the current node and the following two siblings; one undo restores all three.
+    await node(window, 1).focus()
+    await window.keyboard.press('d')
+    await window.keyboard.press('2')
+    await window.keyboard.press('j')
+    await expect.poll(() => outline(window)).toEqual(['Delta'])
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(before)
+
+    // `dk` from Charlie removes Bravo and Charlie, and the register keeps them in ascending order.
+    await window.keyboard.press('G')
+    await window.keyboard.press('k')
+    await window.keyboard.press('d')
+    await window.keyboard.press('k')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Delta'])
+    await window.keyboard.press('p')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Delta', 'Bravo', 'Charlie'])
+    await window.keyboard.press('u')
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(before)
+
+    // `yj` changes nothing in the document; `cj` replaces the pair with one empty node in Insert mode.
+    await node(window, 1).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('j')
+    await expect.poll(() => outline(window)).toEqual(before)
+    await window.keyboard.press('c')
+    await window.keyboard.press('j')
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await window.keyboard.type('New')
+    await window.keyboard.press('Escape')
+    await expect.poll(() => outline(window)).toEqual(['New', 'Charlie', 'Delta'])
+  })
+
+  test('extends whole-node Visual by a count with j and k', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: ['Alpha', 'Bravo', 'Charlie', 'Delta'].map((text) => ({ id: text, text, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'Bravo' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 2).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('2')
+    await window.keyboard.press('j')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(3)
+    await window.keyboard.press('9')
+    await window.keyboard.press('k')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await window.keyboard.press('d')
+    await expect.poll(() => outline(window)).toEqual(['Charlie', 'Delta'])
+  })
+
   test('moves the current node with a character Visual > and < and keeps its character selection', async ({
     userDataDir,
   }) => {

@@ -118,7 +118,10 @@ export function handleVimKey(
       if (shiftCount > 0) vim.nodeVisual.shift(event.key === '>' ? 'in' : 'out', shiftCount)
       return handled()
     } else if (event.key === 'j' || event.key === 'k') {
-      vim.nodeVisual.move(event.key === 'j' ? 'down' : 'up')
+      vim.nodeVisual.move(
+        event.key === 'j' ? 'down' : 'up',
+        commandState.pending?.prefix === undefined ? parseCount(commandState.pending?.count ?? '') : 1,
+      )
     } else if (event.key === 'G') vim.nodeVisual.move('last')
     else if (event.key === 'g' && commandState.pending?.prefix !== 'g') {
       commandState.pending = { count: '', motionCount: '', prefix: 'g' }
@@ -131,7 +134,7 @@ export function handleVimKey(
         vim.nodeVisual.command(event.key, parseCount(commandState.pending?.count ?? ''))
       else vim.nodeVisual.command(event.key as NodeVisualCommand)
     }
-    // A count only belongs to `>`, `<`, `p`, and `P` here; any other key discards it.
+    // A count only belongs to `>`, `<`, `p`, `P`, `j`, and `k` here; any other key discards it.
     if (commandState.pending !== undefined && commandState.pending.count !== '')
       commandState.pending = { ...commandState.pending, count: '' }
     return handled()
@@ -377,6 +380,10 @@ export function handleVimKey(
       return handled()
     }
     clearPending(commandState)
+    if ((event.key === 'j' || event.key === 'k') && pending.operator !== 's') {
+      vim.verticalOperator(node.id, pending.operator, event.key === 'j' ? 'down' : 'up', totalCount)
+      return handled()
+    }
     if (isTextMotion(event.key)) {
       if (node.attachment !== undefined && cursor === node.text.length) return handled()
       applyOperatorMotion(pending.operator, event.key, totalCount)

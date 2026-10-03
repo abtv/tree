@@ -174,6 +174,44 @@ test.describe('Vim interactions at scale', () => {
     expect(deletePaintMs).toBeLessThan(250)
   })
 
+  test('counted d100j responds in a 10000-sibling level', async ({ userDataDir }) => {
+    const seed = wideSeed(10_000)
+    seed.location = { currentParentId: 'root', selectedNodeId: 'c100' }
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 101', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { verticalPaints: number[] }).verticalPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'd' && event.key !== 'j') return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    for (const key of ['1', '0', '0', 'd', 'j']) await window.keyboard.press(key)
+    await window.waitForFunction(() => (window as unknown as { verticalPaints: number[] }).verticalPaints.length === 2)
+    const deletePaintMs = await window.evaluate(
+      () => (window as unknown as { verticalPaints: number[] }).verticalPaints[1]!,
+    )
+    // The current node and the hundred siblings after it are gone: c100 through c200.
+    await expect(window.locator('.node-row[data-node-id="c100"]')).toHaveCount(0)
+    await expect(window.locator('.node-row[data-node-id="c200"]')).toHaveCount(0)
+    await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(/201/u)
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-vertical-operator-wide-10000',
+      metrics: { deletePaintMs: round(deletePaintMs) },
+    })
+    expect(deletePaintMs).toBeLessThan(250)
+  })
+
   for (const siblingCount of [1_000, 10_000]) {
     test(`whole-node Visual > and < respond in a ${siblingCount}-sibling level`, async ({ userDataDir }) => {
       const middle = Math.floor(siblingCount / 2)

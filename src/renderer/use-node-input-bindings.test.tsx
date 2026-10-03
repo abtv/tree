@@ -420,6 +420,106 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.vimMode).toBe('visual-node')
   })
 
+  it('deletes the node and the sibling subtrees reached by dj, d2j, and dk as one undo each', async () => {
+    const f = await fixture({
+      document: {
+        roots: [node('a', 'a'), node('b', 'b', [node('b1', 'b1')]), node('c', 'c'), node('d', 'd'), node('e', 'e')],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    f.press('d')
+    f.press('j')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['c', 'd', 'e'])
+    expect(f.snapshot().location.selectedNodeId).toBe('c')
+    act(() => f.store.undo())
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(f.node('b').children.map((child) => child.id)).toEqual(['b1'])
+    act(() => f.store.selectNode('b', 0))
+    f.press('d')
+    f.press('2')
+    f.press('j')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'e'])
+    act(() => f.store.undo())
+    act(() => f.store.selectNode('c', 0))
+    f.press('d')
+    f.press('k')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'd', 'e'])
+    // The removed forest is the register, in ascending order, with the folded descendants.
+    act(() => f.store.selectNode('e', 0))
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['a', 'd', 'e', 'b', 'c'])
+    expect(f.snapshot().document.roots[3]!.children.map((child) => child.text)).toEqual(['b1'])
+  })
+
+  it('clamps vertical operators at the first and last sibling and ignores the current-parent heading', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'a', [node('a1', 'a1'), node('a2', 'a2')]), node('b', 'b')] },
+      location: { currentParentId: 'a', selectedNodeId: 'a2' },
+    })
+    f.press('d')
+    f.press('9')
+    f.press('k')
+    expect(f.node('a').children).toEqual([])
+    act(() => f.store.undo())
+    act(() => f.store.selectNode('a', 0))
+    const before = f.snapshot().document
+    f.press('d')
+    f.press('j')
+    f.press('y')
+    f.press('j')
+    f.press('c')
+    f.press('j')
+    expect(f.snapshot().document).toBe(before)
+    expect(f.result.current.vimMode).toBe('normal')
+    // At the last sibling, `dj` covers only that node.
+    act(() => f.store.selectNode('a2', 0))
+    f.press('d')
+    f.press('j')
+    expect(f.node('a').children.map((child) => child.id)).toEqual(['a1'])
+  })
+
+  it('yanks with yj without changing the document and replaces the range with one empty node on cj', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'a'), node('b', 'b'), node('c', 'c')] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const before = f.snapshot().document
+    f.press('y')
+    f.press('j')
+    expect(f.snapshot().document).toBe(before)
+    act(() => f.store.selectNode('c', 0))
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['a', 'b', 'c', 'a', 'b'])
+    act(() => f.store.undo())
+    act(() => f.store.selectNode('b', 0))
+    f.press('c')
+    f.press('k')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['', 'c'])
+    expect(f.result.current.vimMode).toBe('insert')
+    expect(f.snapshot().location.selectedNodeId).toBe(f.snapshot().document.roots[0]!.id)
+  })
+
+  it('extends whole-node Visual by a count with j and k and keeps the direction', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'a'), node('b', 'b'), node('c', 'c'), node('d', 'd'), node('e', 'e')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    f.press('V')
+    f.press('2')
+    f.press('j')
+    expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'd' })
+    f.press('9')
+    f.press('k')
+    expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'a' })
+    f.press('3')
+    f.press('j')
+    expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'd' })
+    f.press('9')
+    f.press('j')
+    expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'e' })
+    expect(f.result.current.vimMode).toBe('visual-node')
+  })
+
   it('moves the current subtree for character Visual > and keeps the character selection', async () => {
     const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'one two')] } })
     act(() => f.store.selectNode('b', 0))

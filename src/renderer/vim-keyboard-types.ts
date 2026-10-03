@@ -126,7 +126,7 @@ export interface VimKeyboardState {
   scheduleCaret: (input: HTMLElement, cursor: number) => void
   nodeVisual: {
     enter: (nodeId: string) => boolean
-    move: (direction: 'up' | 'down' | 'first' | 'last') => void
+    move: (direction: 'up' | 'down' | 'first' | 'last', count?: number) => void
     swap: () => void
     exit: () => void
     command: (command: NodeVisualCommand, count?: number) => void
@@ -143,6 +143,11 @@ export interface VimKeyboardState {
     count: number,
     selection: { start: number; end: number },
   ) => void
+  /**
+   * `dj`, `dk`, `yj`, `yk`, `cj`, and `ck` (`docs/PRODUCT.md` §20.2.1 T4): the node and the `count`
+   * sibling subtrees beyond it in `direction`, clamped at the first and last sibling.
+   */
+  verticalOperator: (nodeId: string, operator: 'd' | 'y' | 'c', direction: 'down' | 'up', count: number) => void
   beginStructuralOpen: (position: 'before' | 'after') => void
   beginStructuralChildOpen: () => void
   repeatStructural: (change: VimStructuralChange) => void
