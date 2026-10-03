@@ -11,7 +11,7 @@ Confirmed product decisions:
 * Visual `>` and `<` change node nesting, rather than adding or removing text whitespace.
 * `dd` and `yy` include every descendant, regardless of whether the node is expanded.
 
-The detailed specification shown in the conversation contained additional proposed behavior. Approval of that complete draft is pending. The candidate scope below preserves those proposals for review; it does not authorize their implementation or override current [Product Requirements](../docs/PRODUCT.md). Task VIM-00 settles the proposed behavior before runtime work begins. Do not infer approval from creation of this plan.
+The detailed specification shown in the conversation was approved by the Product Owner on 2026-10-03 and is recorded as planned requirements in PRODUCT §20.2.1 (see Approved requirements below). Runtime work proceeds task by task; a request to continue authorizes the next Ready task only.
 
 Authoritative references: [PRODUCT §2.3](../docs/PRODUCT.md#23-maximum-depth), [§2.4](../docs/PRODUCT.md#24-inline-expansion), [§10](../docs/PRODUCT.md#10-undo-and-redo), [§20.2](../docs/PRODUCT.md#202-vim-inspired-editing), [§20.7](../docs/PRODUCT.md#207-consistency-across-input-paths), and [§22](../docs/PRODUCT.md#22-non-functional-requirements); [Architecture](../docs/ARCHITECTURE.md); [Development §8](../docs/DEVELOPMENT.md#8-tests), [§9](../docs/DEVELOPMENT.md#9-full-validation), and [§11](../docs/DEVELOPMENT.md#11-multi-session-initiatives); [AGENTS §5](../AGENTS.md#5-product-changes), [§8](../AGENTS.md#8-plans-and-architecture-decisions), and [§13](../AGENTS.md#13-completion-criteria).
 
@@ -43,89 +43,40 @@ Current implementation, checked by the primary agent:
 * `vim-edit-session.ts` owns the register and Insert/Replace session. `vim-command-state.ts` owns pending commands, last change/find, character Visual endpoints and structural Insert capture. `App.tsx` holds whole-node Visual endpoints; `use-node-input-bindings.ts` projects their behavior and caret state. Keep each new state fact under one pure owner, following the existing single-owner architecture.
 * `vim-keyboard-types.ts` currently stamps plain Insert captures with their origin node. The replay guard at `vim-keyboard-handler.ts` prevents applying them elsewhere. Removing that guard alone is unsafe: [Vim Conformance](../docs/VIM_CONFORMANCE.md#insert-and-replace-completion-policy) records the cross-node capture defects it prevents.
 
-## Candidate specification awaiting approval
+## Approved requirements
 
-These are the proposed clauses from the conversation, expanded only to identify implementation boundaries. VIM-00 must move approved requirements into PRODUCT and link their exact sections from the tasks. Delete this candidate section after promotion, so the plan does not become a second product specification.
+On 2026-10-03 the Product Owner approved the complete draft S1–S8 and the proposed resolutions of D1–D5. The behavior is recorded as planned requirements T1–T8 in [PRODUCT §20.2.1](../docs/PRODUCT.md#2021-planned-tree-specific-vim-editing). That subsection is the only specification; this plan does not duplicate it. Each task moves its clauses into the current-behavior text of PRODUCT §20.2 when it lands.
 
-### S1. Subtree units and atomic counts
+| Clause | Subject | Resolved decision |
+| --- | --- | --- |
+| T1 | Subtree units and counts | D2 |
+| T2 | Visual nesting | D1 |
+| T3 | Visual register exchange, `gp`/`gP` | D2 |
+| T4 | Vertical operators | D2 |
+| T5 | Text commands | Approved draft |
+| T6 | Joins | D3 |
+| T7 | `gv` | D4 |
+| T8 | Repeat | D5 |
 
-`yy`/`dd` operate on the selected subtree. Counts cover the current and following actual siblings, clamped to the available range. One counted deletion is one undoable command. Normal text or structured puts repeat the incoming contents by the count in one undoable command; every inserted node receives a fresh ID. A failed batch changes neither document nor register/history/focus.
-
-### S2. Visual nesting
-
-In whole-node Visual mode, `>` moves the selected sibling forest to the end of the preceding unselected sibling's children; `<` moves it out of its parent, immediately after that parent. Order and all descendants are retained. Unselected children remain under the original parent. In character Visual mode, the same keys move the entire current subtree.
-
-Both commands retain mode, endpoint identities/direction and character offsets. They keep the moved selection visible by opening required folds and changing location only when promotion leaves the displayed location. A count requests successive one-level moves as one atomic command; if the full request is impossible it makes no change. Root promotion, indentation without a preceding sibling and the contextual current-parent heading are no-ops. Validate every descendant against PRODUCT's depth limit before mutation. The register is unchanged.
-
-### S3. Visual register exchange and puts
-
-Visual `p` replaces the selection using a captured incoming register, then makes the removed selection the next register. `P` uses the same replacement but retains the incoming register. Counts repeat the incoming value before replacement. Character Visual accepts text; node Visual accepts forests. Empty/incompatible registers are no-ops that retain mode and selection. Successful puts return to Normal. Existing depth/ancestry restrictions apply to the whole batch.
-
-Normal text puts leave the caret on the final inserted character. Structured puts select the first inserted node at text beginning. `gp`/`gP` use the corresponding put but place the caret immediately after inserted text; a structured put selects the next sibling after the inserted forest, or its last inserted node when no next sibling exists. Existing image-caret rules continue to apply.
-
-### S4. Vertical operators and Visual counts
-
-`dj/dk/yj/yk/cj/ck` cover the current subtree and sibling subtrees reached by the motion. `dj` covers the current and next sibling; `d2j` covers the current and following sibling pair. Operator and motion counts multiply and clamp at actual sibling boundaries. They never follow expanded descendant rows as separate range members.
-
-Yank copies an ordered forest; delete copies and removes it; change copies it and replaces the entire range with a fresh empty node at its first position, then enters Insert at text beginning. Removed children and attachments remain in the register and history, following existing whole-node Visual `c`. Whole-node Visual `j/k` accept counts and retain endpoint direction. The current-parent heading is excluded.
-
-### S5. Text commands
-
-`Y` is `y$`. Visual `~` toggles the text selection's case and leaves Normal at its start. `gu`, `gU`, and `g~` apply lower/upper/toggle case through existing in-node motions and text objects; `guu`, `gUU`, and `g~~` apply to the whole current node text. These preserve children, attachments and existing hyperlink editing rules. Counts follow the underlying motion. No new Org-specific text objects are included.
-
-### S6. Joins
-
-Normal `J/gJ` join the current and next actual sibling; a count specifies the number of siblings, with at least a pair, clamped to the available range. A single available node makes no change. Node Visual joins the selected range. `J` trims trailing/leading whitespace at each join and inserts a space if both resulting texts are non-empty; `gJ` concatenates without whitespace changes. Character Visual join behavior is reserved for VIM-00.
-
-Retain the first node ID, concatenate child lists in sibling order with descendant IDs intact, and remap hyperlink ranges. Retain an attachment if only one participating node has one; multiple attached nodes reject the entire join, even if they refer to the same attachment. The contextual current-parent heading is excluded. Join is atomic, preserves the register, returns to Normal and puts the caret at the first join boundary. The rejection message and exact boundary after whitespace trimming require approval in VIM-00.
-
-### S7. Restore Visual selection
-
-Normal `gv` restores the most recent character or whole-node Visual range with its direction. After a Visual put it selects incoming content; after a shift it selects the moved range. Restoration uses node identity. Missing nodes, invalid character offsets or a forest that is no longer a valid sibling range cause no change; unrelated content is never substituted.
-
-Saved-selection invalidation after intervening edits, fold/location handling, and whether a changed sibling interval may include newly inserted nodes require a decision in VIM-00. Selection memory stays local to the renderer session and bounded to the latest range.
-
-### S8. Repeat
-
-A completed single-node Insert/change/substitute operation can repeat in another node using the original operation at the current caret. Shifts, joins, case operations and puts become repeatable. Repeated node Visual mutations use the original sibling span and do nothing when the whole span is unavailable. Repeat a put from the captured original incoming value, even when Visual `p` has exchanged the register. Each structural dot iteration remains separately undoable, following current PRODUCT.
-
-Do not record an unfinished session. A session crossing split, creation or navigation must not be replayed as an incidental text diff from another node. Exact capture/replay policy for such sessions requires a decision in VIM-00; the first deliverable may restrict new cross-node replay to sessions completed within one node if the Product Owner chooses that scope explicitly.
-
-## Requirement gaps and decisions reserved for the Product Owner
-
-No minor product gap has been resolved autonomously in this recording task. Approval of S1-S8 and the following material questions is required before dependent runtime tasks are Ready:
-
-* **D1 — nesting and scope:** approve S2's destination/order, atomic counts, selection visibility and location rules. The two confirmed decisions alone do not settle those main flows. Normal `>>/<<` are outside this draft.
-* **D2 — register and structural change:** approve Visual `p/P` exchange, atomic counted commands, sibling interpretation of vertical operators, and S4's complete-subtree replacement by `c`.
-* **D3 — joins:** approve child/attachment handling, Character Visual behavior, rejection text and caret boundary. These are data-affecting choices.
-* **D4 — `gv`:** decide whether intervening text/structure changes invalidate a saved range or adjust it; whether restoring hidden ranges opens folds/navigates; whether endpoint-only restoration may include newly inserted siblings.
-* **D5 — repeat:** distinguish completing an edit in one node and later replaying elsewhere from an Insert session that itself crosses nodes. Decide the latter's scope and capture boundaries before removing origin guards. Specify if unsupported session capture preserves the previous repeatable change. Per-command failure is atomic; decide whether counted dot stops at its first failed iteration or continues.
-
-If the complete conversation draft is approved, that approval settles the proposed clauses it actually describes. It does not settle D3-D5 details not determined by that text. Ask about remaining material choices together before implementation under AGENTS §14.
+No minor gap was resolved by the agent. New material gaps found while implementing a task are raised under AGENTS §14 before the code that depends on them.
 
 ## Ordered tasks
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| VIM-00 | Finalize authorized requirements and outstanding decisions | Product Owner answers | Ready for specification work; runtime blocked |
-| VIM-01 | Visual nesting with selection retention | VIM-00 / D1 | Planned |
-| VIM-02 | Atomic counted subtree deletion and Normal puts | VIM-00 / D2 | Planned |
-| VIM-03 | Visual `p/P` exchange and counts | VIM-02 | Planned |
-| VIM-04 | Vertical operators and counted node Visual motion | VIM-03 | Planned |
-| VIM-05 | End-of-text yank and case operators | VIM-00 | Planned |
-| VIM-06 | `gp/gP` caret destinations | VIM-02 | Planned |
-| VIM-07 | Sibling joins with data preservation | VIM-04 / D3 | Planned |
-| VIM-08 | Bounded Visual-selection memory and `gv` | VIM-01, VIM-03, VIM-07 / D4 | Planned |
-| VIM-09 | Safe cross-node replay of completed text sessions | VIM-00 / D5 | Planned |
-| VIM-10 | Repeat descriptors for new mutations and integration | VIM-01 through VIM-09 | Planned |
+| VIM-00 | Finalize authorized requirements and outstanding decisions | Product Owner answers | Done (documentation only) |
+| VIM-01 | Visual nesting with selection retention (T2) | VIM-00 | Ready |
+| VIM-02 | Atomic counted subtree deletion and Normal puts (T1) | VIM-00 | Ready |
+| VIM-03 | Visual `p/P` exchange and counts (T3) | VIM-02 | Planned |
+| VIM-04 | Vertical operators and counted node Visual motion (T4) | VIM-03 | Planned |
+| VIM-05 | End-of-text yank and case operators (T5) | VIM-00 | Ready |
+| VIM-06 | `gp/gP` caret destinations (T3) | VIM-02 | Planned |
+| VIM-07 | Sibling joins with data preservation (T6) | VIM-04 | Planned |
+| VIM-08 | Bounded Visual-selection memory and `gv` (T7) | VIM-01, VIM-03, VIM-07 | Planned |
+| VIM-09 | Safe cross-node replay of completed text sessions (T8) | VIM-00 | Ready |
+| VIM-10 | Repeat descriptors for new mutations and integration (T8) | VIM-01 through VIM-09 | Planned |
 
-### VIM-00 — Finalize the specification
-
-**Files:** `docs/PRODUCT.md`, this plan, `plans/README.md`. Update current requirements only for approved scope, clearly distinguishing planned behavior from implemented behavior until each task lands. Resolve D1-D5 and link each task to its precise requirements. Do not make code changes or turn proposal approval into permission for extra commands.
-
-**Acceptance:** every main flow has a determined result, each unresolved choice has an explicit owner, and the next implementation task is executable without the planning conversation. Replace the candidate section with requirement links. Mark VIM-01 Ready only when its behavior and authorization are settled.
-
-**Validation:** Minimal Risk; `npm run format:check:changed`, `npm run check:docs`; also `npm run check:opencode` if agent policy changes. Primary documentation review. No runtime validation claim.
+The task descriptions below name their reserved decision as D1–D5. All are now resolved in the clause listed in the table above; a task keeps only the obligation to raise new material gaps.
 
 ### VIM-01 — Visual nesting
 
@@ -221,10 +172,10 @@ For each implementation task:
 
 ## Exact next task and resume prompt
 
-**Next: VIM-00.** The complete draft and D1-D5 have not yet been approved. The two confirmed choices must be preserved; implementation does not begin by treating the rest of the candidate specification as accepted.
+**Next: VIM-01** (Visual nesting, PRODUCT §20.2.1 T2). VIM-02, VIM-05 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another.
 
 Resume prompt:
 
-> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from approved requirements and user examples, without inspecting or transferring other editors' source or tests. Take VIM-00: finalize the proposed requirements with the Product Owner, record decisions in PRODUCT and the plan, and make VIM-01 Ready when its main flow is determined. Do not implement unapproved candidate behavior.
+> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-01.
 
-After VIM-00, an ordinary “continue” selects the next Ready task through `plans/README.md`. No task has been implemented or runtime-validated yet.
+No task has been implemented or runtime-validated yet. VIM-00 changed documentation only.
