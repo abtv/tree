@@ -2600,6 +2600,87 @@ describe('editor keyboard handler', () => {
     })
   })
 
+  describe('Normal gv', () => {
+    it('asks the hook to restore the remembered Visual selection and keeps the saved change', async () => {
+      const { press, vim } = await textFixture({ id: 'node', text: 'abc', children: [] })
+      const saved = { kind: 'delete', motion: 'w', count: 1 } as const
+      vim.commandState.lastChange = saved
+      press('g', 'v')
+      expect(vim.restoreVisual).toHaveBeenCalledTimes(1)
+      expect(vim.commandState.pending).toBeUndefined()
+      expect(vim.commandState.lastChange).toBe(saved)
+    })
+
+    it('is neither a continuation of an operator nor a Visual-mode command', async () => {
+      const { press, vim } = await textFixture({ id: 'node', text: 'abc', children: [] })
+      press('d', 'g', 'v')
+      expect(vim.restoreVisual).not.toHaveBeenCalled()
+      const visual = await textFixture({ id: 'node', text: 'abc', children: [] }, 'visual')
+      visual.press('g', 'v')
+      expect(visual.vim.restoreVisual).not.toHaveBeenCalled()
+    })
+
+    it('remembers a character Visual selection written by v, a motion, a text object, and o', async () => {
+      const { input, press, vim } = await textFixture({ id: 'node', text: 'one two', children: [] })
+      input.setSelectionRange(1, 1)
+      press('v')
+      expect(vim.commandState.lastVisual).toEqual({
+        kind: 'text',
+        nodeId: 'node',
+        anchor: 1,
+        focus: 1,
+        hadText: true,
+      })
+      press('l')
+      expect(vim.commandState.lastVisual).toEqual({
+        kind: 'text',
+        nodeId: 'node',
+        anchor: 1,
+        focus: 2,
+        hadText: true,
+      })
+      press('o')
+      expect(vim.commandState.lastVisual).toEqual({
+        kind: 'text',
+        nodeId: 'node',
+        anchor: 2,
+        focus: 1,
+        hadText: true,
+      })
+      press('i', 'w')
+      expect(vim.commandState.lastVisual).toEqual({
+        kind: 'text',
+        nodeId: 'node',
+        anchor: 0,
+        focus: 2,
+        hadText: true,
+      })
+      press('Escape')
+      expect(vim.commandState.visualAnchor).toBeUndefined()
+      expect(vim.commandState.lastVisual).toEqual({
+        kind: 'text',
+        nodeId: 'node',
+        anchor: 0,
+        focus: 2,
+        hadText: true,
+      })
+    })
+
+    it('remembers the incoming text after a Visual put', async () => {
+      const { input, press, vim } = await textFixture({ id: 'node', text: 'red blue', children: [] }, 'visual')
+      vim.register.current = { kind: 'text', value: 'green' }
+      input.setSelectionRange(4, 8)
+      press('p')
+      expect(vim.commandState.lastVisual).toEqual({
+        kind: 'text',
+        nodeId: 'node',
+        anchor: 4,
+        focus: 8,
+        hadText: true,
+      })
+    })
+  })
+
   it('handles p and P without editing when the local register is empty', async () => {
     const { store, input, press, snapshot, vim, caretRequests } = await textFixture({
       id: 'node',

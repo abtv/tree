@@ -6,8 +6,19 @@ export type VimStructuralInsertSession =
   | { kind: 'visual'; originNodeId: string; command: 'c' | 's'; span: number }
 
 /**
+ * The latest Visual selection, remembered for `gv` (`docs/PRODUCT.md` §20.2.1 T7). A character-wise
+ * selection is the node and its two character offsets; a whole-node selection is its two endpoint
+ * IDs plus the IDs of the sibling range between them in ascending order, so a node inserted,
+ * deleted, or replaced inside the range is detected when the memory is resolved.
+ */
+export type VimVisualMemory =
+  | { kind: 'text'; nodeId: string; anchor: number; focus: number; hadText: boolean }
+  | { kind: 'nodes'; anchorId: string; focusId: string; ids: readonly string[] }
+
+/**
  * The single owner of the renderer-local Vim command state: the pending command being assembled,
- * the last repeatable change and character find, the character-wise Visual endpoints, and the one
+ * the last repeatable change and character find, the character-wise Visual endpoints, the latest
+ * Visual selection for `gv`, and the one
  * structural Insert session. `use-node-input-bindings.ts` holds one instance in a ref and exposes
  * it through the keyboard state, so `vim-keyboard-handler.ts` and `editor-input-handlers.ts` read
  * and write the same object and clear pending and Visual state only through the transitions below.
@@ -20,6 +31,8 @@ export interface VimCommandState {
   lastFind?: VimFindCommand | undefined
   visualAnchor?: number | undefined
   visualFocus?: number | undefined
+  /** Survives every clear below: only a later Visual selection replaces it. */
+  lastVisual?: VimVisualMemory | undefined
   structuralInsert?: VimStructuralInsertSession | undefined
 }
 
@@ -35,6 +48,46 @@ export function clearPending(state: VimCommandState): void {
 /** Record the most recent repeatable change by reference; the last write wins. */
 export function recordRepeatChange(state: VimCommandState, change: VimRepeatChange): void {
   state.lastChange = change
+}
+
+/** Write the character-wise Visual endpoints and the `gv` memory together, so they cannot disagree. */
+export function setVisualRange(
+  state: VimCommandState,
+  nodeId: string,
+  anchor: number,
+  focus: number,
+  hadText: boolean,
+): void {
+  state.visualAnchor = anchor
+  state.visualFocus = focus
+  state.lastVisual = { kind: 'text', nodeId, anchor, focus, hadText }
+}
+
+/** Remember a whole-node Visual selection; `ids` is the sibling range in ascending order. */
+export function rememberNodeVisual(
+  state: VimCommandState,
+  anchorId: string,
+  focusId: string,
+  ids: readonly string[],
+): void {
+  state.lastVisual = { kind: 'nodes', anchorId, focusId, ids }
+}
+
+/** Exchange the ends of a remembered whole-node range, as `o` does; the sibling IDs are unchanged. */
+export function swapNodeVisual(state: VimCommandState): void {
+  const memory = state.lastVisual
+  if (memory?.kind === 'nodes') state.lastVisual = { ...memory, anchorId: memory.focusId, focusId: memory.anchorId }
+}
+
+/** Remember a character-wise selection without making it the live Visual range (after a put). */
+export function rememberTextVisual(
+  state: VimCommandState,
+  nodeId: string,
+  anchor: number,
+  focus: number,
+  hadText: boolean,
+): void {
+  state.lastVisual = { kind: 'text', nodeId, anchor, focus, hadText }
 }
 
 /** The character-wise Visual endpoints only exist as a pair, so clear both halves together. */

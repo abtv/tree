@@ -24,7 +24,14 @@ import type {
   VimTextChange,
 } from './vim-keyboard-types'
 import { applySurroundEdits, surroundDelimiterKey, surroundLineRange } from './vim-surround'
-import { clearCommandAssembly, clearPending, clearVisualRange, recordRepeatChange } from './vim-command-state'
+import {
+  clearCommandAssembly,
+  clearPending,
+  clearVisualRange,
+  recordRepeatChange,
+  rememberTextVisual,
+  setVisualRange,
+} from './vim-command-state'
 import { editCaretTransition, horizontalCaretTransition } from './vim-caret-transition'
 import { navigateVertically } from './vim-vertical-navigation'
 
@@ -163,7 +170,7 @@ export function handleVimKey(
     const clamped = Math.max(0, Math.min(target, maximum))
     if (visual) {
       const anchor = commandState.visualAnchor ?? cursor
-      commandState.visualFocus = clamped
+      setVisualRange(commandState, node.id, anchor, clamped, node.text.length > 0)
       setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
     } else {
       syncImageCaretAtCursor(vim, node, input, clamped)
@@ -329,6 +336,8 @@ export function handleVimKey(
       putRegister(event.key, true)
     } else if (!visual && pending.operator === undefined && event.key === 'J') {
       joinNodes(false)
+    } else if (!visual && pending.operator === undefined && event.key === 'v') {
+      vim.restoreVisual()
     } else if (event.key === 'e') {
       if (pending.operator !== undefined && !visual) {
         applyOperatorMotion(pending.operator, 'ge', totalCount)
@@ -368,8 +377,7 @@ export function handleVimKey(
       } else if (visual) {
         const range = textMotion(node.text, motionCursor, motion, count)
         if (range !== undefined) {
-          commandState.visualAnchor = range.start
-          commandState.visualFocus = Math.max(range.start, range.end - 1)
+          setVisualRange(commandState, node.id, range.start, Math.max(range.start, range.end - 1), true)
           setSelectionRange(input, range.start, range.end)
         }
       }
@@ -557,8 +565,7 @@ export function handleVimKey(
       }
     }
   } else if (!visual && event.key === 'v') {
-    commandState.visualAnchor = cursor
-    commandState.visualFocus = cursor
+    setVisualRange(commandState, node.id, cursor, cursor, node.text.length > 0)
     vim.setMode('visual')
     setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
   } else if (!visual && event.key === 'V') {
@@ -580,8 +587,7 @@ export function handleVimKey(
   } else if (visual && event.key === 'o') {
     const anchor = commandState.visualAnchor ?? selection.start
     const focus = commandState.visualFocus ?? selection.end - 1
-    commandState.visualAnchor = focus
-    commandState.visualFocus = anchor
+    setVisualRange(commandState, node.id, focus, anchor, node.text.length > 0)
     setSelectionRange(input, Math.min(anchor, focus), Math.max(anchor, focus) + 1)
   } else if (visual && (event.key === 'd' || event.key === 'y' || event.key === 'x')) {
     if (selection.start !== selection.end) {
@@ -639,6 +645,8 @@ export function handleVimKey(
       if (store.replaceTextRange(node.id, selection.start, selection.end, incoming)) {
         // `p` exchanges: the removed selection becomes the register. `P` keeps the incoming one.
         if (event.key === 'p') vim.register.current = { kind: 'text', value: removed }
+        // `gv` after a Visual put selects the incoming text (T7).
+        rememberTextVisual(commandState, node.id, selection.start, selection.start + incoming.length - 1, true)
         vim.imageTextCursor.current = undefined
         recordRepeatChange(commandState, {
           kind: 'overwrite',

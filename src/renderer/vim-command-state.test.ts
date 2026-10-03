@@ -9,7 +9,11 @@ import {
   clearVisualRange,
   createVimCommandState,
   recordRepeatChange,
+  rememberNodeVisual,
+  rememberTextVisual,
+  setVisualRange,
   structuralRepeatChange,
+  swapNodeVisual,
   takeStructuralInsert,
   type VimCommandState,
 } from './vim-command-state'
@@ -38,6 +42,47 @@ describe('createVimCommandState', () => {
     expect(state.visualAnchor).toBeUndefined()
     expect(state.visualFocus).toBeUndefined()
     expect(state.structuralInsert).toBeUndefined()
+  })
+})
+
+describe('Visual memory for gv', () => {
+  it('writes the live endpoints and the memory together and survives every clear', () => {
+    const state = createVimCommandState()
+    setVisualRange(state, 'a', 2, 0, true)
+    expect([state.visualAnchor, state.visualFocus]).toEqual([2, 0])
+    expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 2, focus: 0, hadText: true })
+    clearVisualRange(state)
+    clearCommandAssembly(state)
+    expect(state.visualAnchor).toBeUndefined()
+    expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 2, focus: 0, hadText: true })
+  })
+
+  it('keeps only the latest selection, whatever its kind', () => {
+    const state = createVimCommandState()
+    setVisualRange(state, 'a', 0, 1, true)
+    rememberNodeVisual(state, 'b', 'c', ['b', 'c'])
+    expect(state.lastVisual).toEqual({ kind: 'nodes', anchorId: 'b', focusId: 'c', ids: ['b', 'c'] })
+    rememberTextVisual(state, 'a', 3, 5, true)
+    expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 3, focus: 5, hadText: true })
+  })
+
+  it('exchanges the ends of a remembered whole-node range and leaves any other memory alone', () => {
+    const state = createVimCommandState()
+    swapNodeVisual(state)
+    expect(state.lastVisual).toBeUndefined()
+    rememberNodeVisual(state, 'b', 'c', ['b', 'c'])
+    swapNodeVisual(state)
+    expect(state.lastVisual).toEqual({ kind: 'nodes', anchorId: 'c', focusId: 'b', ids: ['b', 'c'] })
+    setVisualRange(state, 'a', 0, 2, true)
+    swapNodeVisual(state)
+    expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 0, focus: 2, hadText: true })
+  })
+
+  it('remembers a text selection without making it the live Visual range', () => {
+    const state = createVimCommandState()
+    rememberTextVisual(state, 'a', 1, 2, true)
+    expect(state.visualAnchor).toBeUndefined()
+    expect(state.visualFocus).toBeUndefined()
   })
 })
 

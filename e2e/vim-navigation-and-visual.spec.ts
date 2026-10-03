@@ -1527,6 +1527,128 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(window.getByRole('alert')).toHaveCount(0)
   })
 
+  test('restores the latest whole-node Visual selection with gv and ignores one that was invalidated', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: ['Alpha', 'Bravo', 'Charlie', 'Delta'].map((text, index) => ({ id: `n${index}`, text, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n1' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const mode = window.getByLabel('Vim mode')
+    await node(window, 2).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await window.keyboard.press('Escape')
+    await expect(mode).toHaveText('NORMAL')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+
+    await node(window, 4).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(mode).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await expect(node(window, 3)).toBeFocused()
+
+    // The direction is part of the memory: after `o` the focus end is the upper node.
+    await window.keyboard.press('o')
+    await window.keyboard.press('Escape')
+    await node(window, 4).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await expect(node(window, 2)).toBeFocused()
+
+    // Deleting a remembered node invalidates the memory: `gv` changes nothing.
+    await window.keyboard.press('Escape')
+    await node(window, 2).focus()
+    await window.keyboard.press('d')
+    await window.keyboard.press('d')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Charlie', 'Delta'])
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(mode).toHaveText('NORMAL')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+  })
+
+  test('restores a character-wise Visual selection with gv in another node, keeping its direction', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'foo bar', children: [] },
+          { id: 'b', text: 'xyz', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const mode = window.getByLabel('Vim mode')
+    await node(window, 1).focus()
+    await setCursor(node(window, 1), 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('o')
+    await window.keyboard.press('Escape')
+    await expect(mode).toHaveText('NORMAL')
+
+    await node(window, 2).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(mode).toHaveText('VISUAL')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 3)
+    // The anchor stayed at the right end, so moving the focus right shortens the selection.
+    await window.keyboard.press('l')
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 3)
+    await window.keyboard.press('d')
+    await expect(node(window, 1)).toHaveValue('f bar')
+  })
+
+  test('selects the incoming nodes after a Visual put and the moved range after a shift', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: ['Alpha', 'Bravo', 'Charlie', 'Delta'].map((text, index) => ({ id: `n${index}`, text, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const mode = window.getByLabel('Vim mode')
+    await node(window, 1).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await node(window, 2).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await window.keyboard.press('p')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Alpha', 'Delta'])
+    await node(window, 3).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(mode).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
+    await expect(node(window, 2)).toBeFocused()
+
+    await window.keyboard.press('Escape')
+    await node(window, 2).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await pressShifted(window, '>')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha', '  Delta'])
+    await window.keyboard.press('Escape')
+    await node(window, 1).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(mode).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+  })
+
   test('deletes, yanks, and changes sibling subtrees with dj, d2j, dk, yj, and cj, each as one undo', async ({
     userDataDir,
   }) => {

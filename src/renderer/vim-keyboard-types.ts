@@ -156,6 +156,11 @@ export interface VimKeyboardState {
     join: (spaced: boolean) => void
   }
   /**
+   * Normal `gv` (`docs/PRODUCT.md` §20.2.1 T7): re-enter the remembered Visual selection when it is
+   * still valid and displayed; otherwise do nothing.
+   */
+  restoreVisual: () => void
+  /**
    * Character Visual `>` or `<`: moves the current node and keeps the character selection
    * `[start, end)` selected once the moved row has rendered.
    */

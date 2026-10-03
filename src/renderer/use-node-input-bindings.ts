@@ -32,11 +32,15 @@ import {
   clearPending,
   createVimCommandState,
   recordRepeatChange,
+  setVisualRange,
   structuralRepeatChange,
+  swapNodeVisual,
   takeStructuralInsert,
   type VimCommandState,
 } from './vim-command-state'
+import { isNodeExpanded } from '../application/expansion-state'
 import type { NodeInputBindings } from './NodeInput'
+import { rememberIncomingNodes, rememberNodeRange, resolveVisualMemory } from './vim-visual-memory'
 import type { VimMode } from './vim-editing'
 import {
   editCaretTransition,
@@ -119,7 +123,10 @@ export function useNodeInputBindings({
       }
     | undefined
   >(undefined)
-  const pendingVisualSelection = useRef<{ nodeId: string; start: number; end: number } | undefined>(undefined)
+  const pendingVisualSelection = useRef<
+    | { nodeId: string; start: number; end: number; endpoints?: { anchor: number; focus: number; hadText: boolean } }
+    | undefined
+  >(undefined)
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
   const syncedImageFocusToken = useRef<number | undefined>(focus?.token)
@@ -277,6 +284,31 @@ export function useNodeInputBindings({
     applyCaretState(target.id, next)
   }, [store, applyCaretState])
 
+  const restoreVisual = useCallback((): void => {
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') return
+    const restore = resolveVisualMemory(vimCommandState.current.lastVisual, state.document, state.location, (id) =>
+      isNodeExpanded(state.expansion, id),
+    )
+    if (restore === undefined) return
+    if (restore.kind === 'nodes') {
+      setNodeVisualSelection({ anchorId: restore.anchorId, focusId: restore.focusId })
+      store.selectNode(restore.focusId, 0)
+      changeVimMode('visual-node')
+      syncImageCaretToFocus()
+      return
+    }
+    const start = Math.min(restore.anchor, restore.focus)
+    store.selectNode(restore.nodeId, start)
+    pendingVisualSelection.current = {
+      nodeId: restore.nodeId,
+      start,
+      end: Math.max(restore.anchor, restore.focus) + 1,
+      endpoints: { anchor: restore.anchor, focus: restore.focus, hadText: restore.hadText },
+    }
+    changeVimMode('visual')
+  }, [store, setNodeVisualSelection, changeVimMode, syncImageCaretToFocus])
+
   const moveNodeVisual = useCallback(
     (direction: 'up' | 'down' | 'first' | 'last', count = 1): void => {
       const state = store.getSnapshot()
@@ -297,6 +329,7 @@ export function useNodeInputBindings({
       const target = nodes[targetIndex]
       if (target === undefined) return
       setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.id })
+      rememberNodeRange(vimCommandState.current, state.document, nodeVisualSelection.anchorId, target.id)
       store.selectNode(target.id, 0)
       syncImageCaretToFocus()
     },
@@ -328,6 +361,17 @@ export function useNodeInputBindings({
       if (result === undefined) return
       const nextRegister = visualCommandRegister(command, result)
       if (nextRegister !== undefined) vimSession.current.register = nextRegister
+      if ((command === 'p' || command === 'P') && source !== undefined) {
+        // `gv` after a Visual put selects the incoming nodes: the copies start at the selected node.
+        const next = store.getSnapshot()
+        if (next.status === 'ready')
+          rememberIncomingNodes(
+            vimCommandState.current,
+            next.document,
+            next.location.selectedNodeId,
+            source.nodes.length * repeat,
+          )
+      }
       if (command === 'c' || command === 's') {
         beginStructuralVisual(vimCommandState.current, nodeVisualSelection.focusId, command, span)
         changeVimMode('insert')
@@ -648,6 +692,16 @@ export function useNodeInputBindings({
     pendingVisualSelection.current = undefined
     // The deferred pass of the focus effect re-applies the caret unless the revision moved on.
     caretRevision.current += 1
+    // Moving focus to the restored node blurred the previous one, which cleared the live Visual
+    // endpoints; write them again now that the focus change is done.
+    if (pending.endpoints !== undefined)
+      setVisualRange(
+        vimCommandState.current,
+        pending.nodeId,
+        pending.endpoints.anchor,
+        pending.endpoints.focus,
+        pending.endpoints.hadText,
+      )
     const input = inputs.current.get(pending.nodeId)
     if (input !== undefined) setSelectionRange(input, pending.start, pending.end)
   })
@@ -915,15 +969,18 @@ export function useNodeInputBindings({
                   const state = store.getSnapshot()
                   if (state.status !== 'ready' || state.location.currentParentId === nodeId) return false
                   setNodeVisualSelection({ anchorId: nodeId, focusId: nodeId })
+                  rememberNodeRange(vimCommandState.current, state.document, nodeId, nodeId)
                   return true
                 },
                 move: moveNodeVisual,
                 swap: () => {
-                  if (nodeVisualSelection !== undefined)
+                  if (nodeVisualSelection !== undefined) {
                     setNodeVisualSelection({
                       anchorId: nodeVisualSelection.focusId,
                       focusId: nodeVisualSelection.anchorId,
                     })
+                    swapNodeVisual(vimCommandState.current)
+                  }
                 },
                 exit: () => setNodeVisualSelection(undefined),
                 command: commandNodeVisual,
@@ -931,6 +988,7 @@ export function useNodeInputBindings({
                 join: joinNodeVisual,
               },
               shiftCurrentNode,
+              restoreVisual,
               verticalOperator,
               beginStructuralOpen: (position) => {
                 beginStructuralOpen(vimCommandState.current, node.id, position)
@@ -1000,6 +1058,7 @@ export function useNodeInputBindings({
       shiftNodeVisual,
       joinNodeVisual,
       shiftCurrentNode,
+      restoreVisual,
       verticalOperator,
       finishVimReplace,
       finishVimInsert,
