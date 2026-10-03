@@ -239,6 +239,8 @@ The displayed sibling list is rendered by `src/renderer/NodeList.tsx`, which com
 
 The renderer stylesheet `src/renderer/styles.css` owns every color value as a CSS custom property declared once under `:root` and overridden for the dark appearance in the single `@media (prefers-color-scheme: dark)` `:root` block; rules reference the properties through `var()`, and no color literal appears outside a custom-property declaration. One `--highlight-background`/`--highlight-foreground` pair per appearance is shared by the whole-node Visual selection, character `::selection`, deliberate Normal-mode text selections, selected hyperlinks, and the Vim mode badge, so those surfaces cannot drift apart. A Normal-mode selection wider than the one-character block caret is a deliberate selection; `use-node-input-bindings.ts` marks the input with `node-input-text-selected` on `selectionchange` so it takes the highlight pair while the block caret keeps the ink pair. Values that do not adapt to the dark appearance are declared once without an override. The dark palette is adapted from the Zenburn Emacs port (`zenburn-emacs`, see `docs/PRODUCT.md` §20.5); `NodeRow.tsx` exposes the row depth as `data-depth`, and the dark block colors node text through zero-specificity `:where(.node-row[data-depth='N'])` rules so the selection highlight still overrides them. The light palette is original (see `docs/PRODUCT.md` §20.5). Its dot grid is a `radial-gradient` on `.scroll-viewport` painted with `--color-grid-dot`, which the dark block sets to `transparent`; `windowBackgroundColor` in `src/main/window.ts` must equal the light `--color-background`. The committed Playwright screenshot baselines remain the pixel oracle for these styles.
 
+The appearance choice is owned by the main process alone and has no IPC channel: the View > Appearance menu (`application-menu.ts`) saves it with `createAppearancePreferenceStore` (`window-state.ts`, file `appearance.json` beside the document data; a missing or unknown value reads as `system`) and sets `nativeTheme.themeSource`, which drives both the renderer's `prefers-color-scheme` block and the `nativeTheme` `updated` event that `followWindowAppearance` listens to. At startup the saved value is applied before the window is created, and `system` leaves `themeSource` untouched.
+
 The native window surface is the exception to renderer color ownership: `src/main/window.ts` mirrors the two document background colors for Electron's `backgroundColor` at construction, follows `nativeTheme` updates with `setBackgroundColor`, and removes the listener on `closed`. The real-Electron appearance tests compare the native surface with the renderer in both appearances to prevent these values drifting.
 
 ---
@@ -497,6 +499,7 @@ Electron is responsible for desktop functionality such as:
 * persisting and restoring the main window's size and position;
 * persisting the main window's always-on-top preference and applying it through `BrowserWindow.setAlwaysOnTop`;
 * persisting the Vim editing preference that the renderer reads at startup and writes when it is toggled;
+* persisting the appearance choice (`system`, `light`, or `dark`) and applying it through `nativeTheme.themeSource`;
 * application activation;
 * global or main-process keyboard shortcuts where required;
 * integration with macOS;

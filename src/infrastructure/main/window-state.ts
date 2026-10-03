@@ -106,6 +106,39 @@ export function createWindowBoundsStore(path: string): WindowBoundsStore {
   }
 }
 
+/** The appearance the user chose; `system` follows the operating system and is the default. */
+export type AppearancePreference = 'system' | 'light' | 'dark'
+
+export interface AppearancePreferenceStore {
+  load(): AppearancePreference
+  save(value: AppearancePreference): void
+}
+
+export function isAppearancePreference(value: unknown): value is AppearancePreference {
+  return value === 'system' || value === 'light' || value === 'dark'
+}
+
+export function createAppearancePreferenceStore(path: string): AppearancePreferenceStore {
+  return {
+    load: () => {
+      try {
+        const value: unknown = JSON.parse(readFileSync(path, 'utf8'))
+        return isAppearancePreference(value) ? value : 'system'
+      } catch {
+        return 'system'
+      }
+    },
+    save: (value) => {
+      try {
+        mkdirSync(dirname(path), { recursive: true })
+        writeFileSync(path, JSON.stringify(value))
+      } catch {
+        // Preference persistence is opportunistic and must not interrupt window lifecycle events.
+      }
+    },
+  }
+}
+
 export function createBooleanPreferenceStore(path: string): BooleanPreferenceStore {
   return {
     load: () => {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
   createDebouncedWindowBoundsSaver,
+  createAppearancePreferenceStore,
   createBooleanPreferenceStore,
   createWindowBoundsStore,
   isValidWindowBounds,
@@ -71,6 +72,31 @@ describe('createBooleanPreferenceStore', () => {
     writeFileSync(path, JSON.stringify('yes'))
 
     expect(store.load()).toBe(false)
+  })
+})
+
+describe('createAppearancePreferenceStore', () => {
+  it('reads as system until a choice is saved, then restores each choice', () => {
+    const path = createPath().replace('window-bounds.json', 'appearance.json')
+    const store = createAppearancePreferenceStore(path)
+
+    expect(store.load()).toBe('system')
+    for (const value of ['dark', 'light', 'system'] as const) {
+      store.save(value)
+      expect(createAppearancePreferenceStore(path).load()).toBe(value)
+      expect(JSON.parse(readFileSync(path, 'utf8'))).toBe(value)
+    }
+  })
+
+  it('reads malformed or unknown values as system', () => {
+    const path = createPath().replace('window-bounds.json', 'appearance.json')
+    const store = createAppearancePreferenceStore(path)
+    mkdirSync(dirname(path), { recursive: true })
+
+    for (const content of ['"sepia"', 'true', 'not json']) {
+      writeFileSync(path, content)
+      expect(store.load()).toBe('system')
+    }
   })
 })
 

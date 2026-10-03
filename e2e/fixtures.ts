@@ -183,6 +183,32 @@ export async function applicationMenuItemChecked(
   )
 }
 
+export async function clickApplicationSubmenuItem(
+  app: ElectronApplication,
+  path: { menu: string; submenu: string; label: string },
+): Promise<void> {
+  await app.evaluate(({ Menu }, target) => {
+    const submenu = Menu.getApplicationMenu()?.items.find((entry) => entry.label === target.menu)?.submenu
+    const nested = submenu?.items.find((entry) => entry.label === target.submenu)?.submenu
+    const item = nested?.items.find((entry) => entry.label === target.label)
+    if (item?.click === undefined) {
+      throw new Error(`The ${target.menu} > ${target.submenu} > ${target.label} menu item is unavailable.`)
+    }
+    item.click(item, undefined, {} as Electron.KeyboardEvent)
+  }, path)
+}
+
+export async function checkedApplicationSubmenuItems(
+  app: ElectronApplication,
+  path: { menu: string; submenu: string },
+): Promise<string[]> {
+  return app.evaluate(({ Menu }, target) => {
+    const submenu = Menu.getApplicationMenu()?.items.find((entry) => entry.label === target.menu)?.submenu
+    const nested = submenu?.items.find((entry) => entry.label === target.submenu)?.submenu
+    return (nested?.items ?? []).filter((entry) => entry.checked).map((entry) => entry.label)
+  }, path)
+}
+
 export async function clickApplicationMenuQuit(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ Menu }) => {
     const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items[0]

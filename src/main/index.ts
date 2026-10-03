@@ -17,8 +17,11 @@ import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
 import {
   createDebouncedWindowBoundsSaver,
+  createAppearancePreferenceStore,
   createBooleanPreferenceStore,
   createWindowBoundsStore,
+  type AppearancePreference,
+  type AppearancePreferenceStore,
   type BooleanPreferenceStore,
   type WindowBounds,
 } from '../infrastructure/main/window-state'
@@ -46,6 +49,7 @@ let mainWindow: BrowserWindow | null = null
 let appQuitting = false
 let alwaysOnTopStore: BooleanPreferenceStore | null = null
 let vimEnabledStore: BooleanPreferenceStore | null = null
+let appearanceStore: AppearancePreferenceStore | null = null
 let requestQuitFromMenu: () => void = () => undefined
 const packagedRendererPath = join(__dirname, '../renderer/index.html')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
@@ -73,13 +77,23 @@ function isVimEnabled(): boolean {
   return vimEnabledStore?.load() ?? false
 }
 
+function currentAppearance(): AppearancePreference {
+  return appearanceStore?.load() ?? 'system'
+}
+
 function rebuildApplicationMenu(): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       applicationMenuTemplate(
-        { vimEnabled: isVimEnabled(), alwaysOnTop: isAlwaysOnTop() },
+        { vimEnabled: isVimEnabled(), alwaysOnTop: isAlwaysOnTop(), appearance: currentAppearance() },
         {
           requestQuit: requestQuitFromMenu,
+          setAppearance: (value) => {
+            appearanceStore?.save(value)
+            // The renderer's prefers-color-scheme and the native window background follow themeSource.
+            nativeTheme.themeSource = value
+            rebuildApplicationMenu()
+          },
           setVimEnabled: (value) => {
             vimEnabledStore?.save(value)
             mainWindow?.webContents.send(ipcEvents.vimEnabledChanged, value)
@@ -166,6 +180,10 @@ bootstrapApplication({
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
+    appearanceStore = createAppearancePreferenceStore(join(app.getPath('userData'), 'data', 'appearance.json'))
+    // Leave the default untouched for Automatic so the system appearance applies as Electron starts it.
+    const savedAppearance = appearanceStore.load()
+    if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
       ipcMain,
       rendererUrl: resolvedRenderer.url,

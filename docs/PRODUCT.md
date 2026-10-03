@@ -504,13 +504,14 @@ Closing the main window quits the application on macOS, including when the appli
 
 ### 9.3 Application Menu
 
-The menu bar has three menus, laid out as macOS applications do (§1.3):
+The menu bar has four menus, laid out as macOS applications do (§1.3):
 
 * **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
 * **Edit** holds a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
+* **View** holds an **Appearance** submenu with three mutually exclusive items: **Automatic**, **Light**, and **Dark**. The item for the current choice is checked (§20.5).
 * **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
 
-Each check item is another control for the status-bar toggle of the same name and always agrees with it. Choosing the item has exactly the effect of clicking the toggle: Vim editing switches in Normal mode or back to standard editing with the caret kept, the window is pinned or unpinned, the editor keeps its focus, and the choice is saved and restored at the next start. Using the status-bar toggle updates the check mark. The menu bar and the status bar never disagree, including at startup.
+The Appearance items have no status-bar counterpart. Each check item is another control for the status-bar toggle of the same name and always agrees with it. Choosing the item has exactly the effect of clicking the toggle: Vim editing switches in Normal mode or back to standard editing with the caret kept, the window is pinned or unpinned, the editor keeps its focus, and the choice is saved and restored at the next start. Using the status-bar toggle updates the check mark. The menu bar and the status bar never disagree, including at startup.
 
 ---
 
@@ -1030,7 +1031,7 @@ This does not govern motion the application does not itself decide to add: nativ
 
 ### 20.5 Appearance
 
-The application follows the operating system's light or dark appearance and has no setting of its own for it. Switching the system appearance restyles the open window immediately.
+The application has an appearance choice with three values, set in the **View > Appearance** menu (§9.3): **Automatic**, **Light**, and **Dark**. Automatic follows the operating system's light or dark appearance, and switching the system appearance restyles the open window immediately. Light and Dark keep that appearance whatever the system uses. Choosing an item restyles the open window immediately, including the native window surface, and the choice is saved and restored at the next start. When no choice has been saved, as at the first start, the appearance is Automatic.
 
 The application must not show unintended flashes of a contrasting background during startup, renderer loading or reloading, closing, or system appearance changes. In dark appearance, even a brief white or light-background flash is a visual defect. This applies to the whole application window, including the native surface before the renderer paints and while it is torn down. The native window background matches the document surface from window creation through closing, including after a system appearance change.
 
