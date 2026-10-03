@@ -78,9 +78,13 @@ textarea {
 
 /* The toolbar is a fixed row above the scrolling content area, so the scrollbar starts below it. */
 .tree-app {
+  --location-bar-height: 30px;
+  --status-bar-height: 27px;
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  timeline-scope: --content-scroll;
 }
 
 .scroll-viewport {
@@ -88,6 +92,62 @@ textarea {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  scroll-timeline: --content-scroll y;
+}
+
+/* Scroll-edge fades (docs/PRODUCT.md §20.6). Content fades into the background at an edge of the
+   scrolling area while more content lies beyond it, so a row cut by a bar dissolves instead of
+   ending in a hard line. The fade strength is driven by the scroll position, not by time; without
+   overflow the scroll timeline is inactive and neither fade shows. The right inset keeps both
+   overlay and classic macOS scrollbars uncovered. */
+.tree-app::before,
+.tree-app::after {
+  position: absolute;
+  right: 16px;
+  left: 0;
+  z-index: 1;
+  height: 20px;
+  pointer-events: none;
+  content: '';
+  opacity: 0;
+}
+
+.tree-app::before {
+  top: var(--location-bar-height);
+  background: linear-gradient(var(--color-background), transparent);
+  animation-name: scroll-edge-fade-in;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: --content-scroll;
+  animation-range: 0 16px;
+}
+
+.tree-app::after {
+  bottom: var(--status-bar-height);
+  background: linear-gradient(transparent, var(--color-background));
+  animation-name: scroll-edge-fade-out;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: --content-scroll;
+  animation-range: calc(100% - 16px) 100%;
+}
+
+@keyframes scroll-edge-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scroll-edge-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .location-bar {
@@ -95,7 +155,7 @@ textarea {
   background: var(--color-background);
   display: flex;
   align-items: center;
-  height: 30px;
+  height: var(--location-bar-height);
   padding: 0 18px;
   border-bottom: 1px solid var(--color-location-border);
   color: var(--color-secondary);
@@ -530,7 +590,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
-  height: 27px;
+  height: var(--status-bar-height);
   padding: 0 12px;
   border-top: 1px solid var(--color-location-border);
   background: var(--color-background);

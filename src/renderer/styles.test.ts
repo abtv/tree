@@ -75,29 +75,40 @@ it('declares color values only as custom properties', () => {
 })
 
 // @requirement PRODUCT.md §20.4
-it('keeps application styles free of animations and transitions that delay interaction feedback', () => {
-  const sheet = document.createElement('style')
-  sheet.textContent = styles
-  document.head.append(sheet)
-  try {
-    const inspect = (rules: CSSRuleList) => {
-      for (const rule of Array.from(rules)) {
-        expect(rule.cssText).not.toMatch(/@(?:-webkit-)?keyframes\b/i)
-        if ('style' in rule) {
-          const style = (rule as CSSStyleRule).style
-          for (const property of Array.from(style)) {
-            // caret-animation controls blinking; it does not animate application transitions.
-            if (/^(?:-webkit-)?(?:animation|transition)(?:-|$)/.test(property)) {
-              expect(style.getPropertyValue(property), `${rule.cssText}: ${property}`).toMatch(/^(?:none|0s|0ms)$/)
-            }
-          }
-        }
-        if ('cssRules' in rule) inspect((rule as CSSGroupingRule).cssRules)
+// @requirement PRODUCT.md §20.6
+it('keeps application styles free of time-based animations and transitions that delay interaction feedback', () => {
+  // The raw source is parsed because the jsdom CSSOM drops scroll-driven animation properties.
+  const source = styles.replace(/\/\*[\s\S]*?\*\//g, '')
+  const scrollTimelines = new Set(Array.from(source.matchAll(/scroll-timeline:\s*(--[\w-]+)/g), (match) => match[1]))
+  const scrollDrivenAnimations = new Set<string>()
+  // Innermost blocks are style rules and keyframe steps; grouping rules contain only those.
+  for (const [, selector = '', body = ''] of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const declarations = new Map(
+      body
+        .split(';')
+        .map((declaration) => {
+          const colon = declaration.indexOf(':')
+          return [declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim()] as const
+        })
+        .filter(([property]) => property !== ''),
+    )
+    const where = selector.trim()
+    for (const [property, value] of declarations) {
+      // caret-animation controls blinking; it does not animate application transitions.
+      if (/^(?:-webkit-)?transition(?:-|$)/.test(property)) {
+        expect(value, `${where}: ${property}`).toMatch(/^(?:none|0s|0ms)$/)
       }
+      // The shorthand resets the timeline to time, so only longhands may declare an animation.
+      if (/^(?:-webkit-)?animation$/.test(property)) expect(value, `${where}: ${property}`).toBe('none')
     }
-    expect(sheet.sheet).not.toBeNull()
-    inspect(sheet.sheet!.cssRules)
-  } finally {
-    sheet.remove()
+    const name = declarations.get('animation-name')
+    if (name === undefined || name === 'none') continue
+    // An animation is allowed only when the scroll position drives it, so it has no duration.
+    expect(scrollTimelines, `${where}: animation-timeline`).toContain(declarations.get('animation-timeline'))
+    scrollDrivenAnimations.add(name)
   }
+  for (const [, name] of source.matchAll(/@(?:-webkit-)?keyframes\s+([\w-]+)/g)) {
+    expect(scrollDrivenAnimations, `@keyframes ${name}`).toContain(name)
+  }
+  expect(scrollDrivenAnimations).toEqual(new Set(['scroll-edge-fade-in', 'scroll-edge-fade-out']))
 })

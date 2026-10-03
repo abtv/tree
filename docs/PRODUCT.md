@@ -1008,7 +1008,7 @@ The application does not animate its own interface. Navigation, entering and lea
 
 This deepens the Responsiveness commitment in §1.1: even a smooth, well-performing animation still spends a fixed delay before the user can act on its result, and that delay cannot be removed by animation quality alone.
 
-This does not govern motion the application does not itself decide to add: native macOS window chrome, and scrolling driven directly by continuous user input, such as the page's own scroll position or the drag auto-scroll in §11 and §20.1, whose motion is the direct feedback of an ongoing input rather than a transition inserted after an action completes.
+This does not govern motion the application does not itself decide to add: native macOS window chrome, and scrolling driven directly by continuous user input, such as the page's own scroll position or the drag auto-scroll in §11 and §20.1, whose motion is the direct feedback of an ongoing input rather than a transition inserted after an action completes. It likewise does not govern appearance that follows the scroll position directly and has no duration of its own, such as the scroll-edge fades in §20.6.
 
 ### 20.5 Appearance
 
@@ -1019,6 +1019,14 @@ The application must not show unintended flashes of a contrasting background dur
 The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors. In the dark appearance the text of a node is colored by its depth below the current parent: the current parent's children use the first of eight colors, their expanded children the second, and so on in order. Rows nested deeper than the eighth level use the ordinary text color. The light appearance does not color text by depth. The depth color gives way to the selection highlight, so a selected row keeps the highlight's text color.
 
 In the dark appearance, Vim mode indicators share a dark gray background and use muted text colors from the document palette: green for Normal, cyan for Insert, sandy yellow for Visual and whole-node Visual, and red for Replace. The Visual indicators retain the shared selection highlight pair.
+
+### 20.6 Scroll Edges
+
+Content scrolls at pixel granularity, so a row can be cut where the content area meets the location toolbar (§2.2) or the status bar (§20.2). A cut row fades into the document background toward that edge instead of ending in a hard line through its text.
+
+The top fade shows while content is scrolled beneath the toolbar, and the bottom fade shows while more content lies below the status bar. At the start of the document there is no top fade, at its end there is no bottom fade, and content that fits the window shows neither. Each fade is shorter than one text row, leaves the scrollbar uncovered, and does not intercept the pointer: clicking, selecting, and dragging behave inside it exactly as elsewhere. The fade strength follows the scroll position directly, reaching full strength within the first few pixels scrolled away from an edge.
+
+The edges stay flat. A shadow cast by the bars onto the content was tried and rejected: it made the bars look raised above the content, a depth the otherwise flat interface has nowhere else, and it still showed the cut text.
 
 ---
 
