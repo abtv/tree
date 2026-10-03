@@ -10,6 +10,7 @@ import {
   takeInsertSession,
   takeReplaceSession,
 } from './vim-edit-session'
+import { calculateTextChange, insertPosition } from './vim-text-commands'
 import type { VimTextChange } from './vim-keyboard-types'
 
 // A single UTF-16 code unit, so `key.length === 1` holds for every generated character key.
@@ -93,19 +94,54 @@ it('captures an Insert session as a diff that reconstructs its final text on the
           return
         }
         if (captured === undefined) throw new Error('expected a captured text change')
+        // The payload carries no origin node, so the same diff can replay at another caret in another
+        // node (PRODUCT §20.2.1 T8).
+        expect(captured).not.toHaveProperty('nodeId')
         const capture = captured as {
-          nodeId?: string
           insertedText?: string
           insertOffset?: number
           deleteCount?: number
         }
-        expect(capture.nodeId).toBe('origin')
         const { insertedText = '', insertOffset = 0, deleteCount = 0 } = capture
         expect(
           baseline.slice(0, position + insertOffset) +
             insertedText +
             baseline.slice(position + insertOffset + deleteCount),
         ).toBe(finalText)
+      },
+    ),
+  )
+})
+
+it('replays a captured Insert diff as a splice at the destination caret, on any node', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ maxLength: 12 }),
+      fc.integer({ min: 0, max: 12 }),
+      fc.string({ maxLength: 6 }),
+      fc.string({ maxLength: 12 }),
+      fc.integer({ min: 0, max: 12 }),
+      (source, offsetSeed, typed, destination, cursorSeed) => {
+        if (typed === '') return
+        const offset = Math.min(offsetSeed, source.length)
+        const finalText = source.slice(0, offset) + typed + source.slice(offset)
+        const captured = insertRepeatChange(
+          { nodeId: 'origin', baseline: source, position: offset, change: { kind: 'insert', entry: 'i' } },
+          finalText,
+        )
+        if (captured === undefined || captured.kind !== 'insert') throw new Error('expected a captured insert')
+        // Replaying is a pure splice of the captured fields onto the destination text: the origin
+        // node's baseline is never consulted, so the same diff applies at any node (T8).
+        const cursor = Math.min(cursorSeed, destination.length)
+        const start = insertPosition(destination, cursor, captured.entry)
+        const position = Math.max(0, Math.min(start + (captured.insertOffset ?? 0), destination.length))
+        const expected =
+          destination.slice(0, position) +
+          (captured.insertedText ?? '') +
+          destination.slice(Math.min(destination.length, position + (captured.deleteCount ?? 0)))
+        const replay = calculateTextChange(destination, cursor, captured, true, [])
+        if (replay === undefined || replay.kind !== 'edit') throw new Error('expected a replay edit')
+        expect(replay.nextText).toBe(expected)
       },
     ),
   )

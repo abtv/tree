@@ -559,22 +559,31 @@ export function useNodeInputBindings({
   // before the commit, so repeated invocations are no-ops; the returned flag tells the flush to run
   // another pass when this call committed an edit.
   const finishPendingEdits = useCallback((): boolean => {
+    // A shutdown flush interrupts a pending plain Insert session: consume it without recording, so a
+    // later Escape cannot capture the session the flush already ended (PRODUCT §20.2.1 T8). The
+    // structural session needs its input's text to capture, so it stays pending for a later finish.
+    takeInsertSession(vimSession.current)
     const committed = finishVimReplace()
     if (latestVimMode.current === 'replace') changeVimMode('normal')
     return committed
-  }, [finishVimReplace, changeVimMode])
+  }, [finishVimReplace, changeVimMode, vimSession])
 
   useEffect(() => store.registerPendingEditFinisher(finishPendingEdits), [store, finishPendingEdits])
 
   const finishVimInsert = useCallback(
-    // Always captures: a diff-based session can span a node change (e.g. Enter while still in
-    // Insert mode) with no reliable way to detect that at finish time across every trigger
-    // (keyboard, blur, and mouse-driven navigation that never fires a distinguishing blur target).
-    // Safety instead lives at dot-repeat replay time, which checks the stamped `nodeId`.
-    (input: HTMLElement): void => {
+    /**
+     * Finish the pending Insert session. The structural session always captures; the plain session
+     * is recorded for `.` only when Escape completed it on its own node. Every other finish (blur,
+     * pointer, navigation, shortcut, toggle, flush) consumes it and keeps the previous repeatable
+     * change (PRODUCT §20.2.1 T8). The registered-input check is the fail-closed backstop against a
+     * session that crossed to another node without a blur consuming it first.
+     */
+    (input: HTMLElement, completed = false): void => {
       finishStructuralInsert(input)
       const session = takeInsertSession(vimSession.current)
       if (session === undefined) return
+      if (!completed) return
+      if (inputs.current.get(session.nodeId) !== input) return
       const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
       const change = insertRepeatChange(session, finalText)
       if (change !== undefined) recordRepeatChange(vimCommandState.current, change)
@@ -1016,7 +1025,12 @@ export function useNodeInputBindings({
         setSelectAllNodeId(undefined)
         inputs.current.get(node.id)?.classList.remove('select-all')
         store.endTextSession()
-        finishVimInsert(event.currentTarget)
+        // A structural session's typed text lives in the node `o`/`O`/Visual `c`/`s` created, not in
+        // the node under the pointer. This mousedown runs before the focused input's blur, so let
+        // that blur finish the structural session rather than capturing the clicked node's text; a
+        // plain session is still consumed here, so a pointer focus interruption records nothing
+        // (PRODUCT §20.2.1 T8).
+        if (vimCommandState.current.structuralInsert === undefined) finishVimInsert(event.currentTarget)
         // A right-click opens the context menu, which will run Cut or Paste against the visible
         // selection, so this commit must not rewrite the DOM; a left click keeps the existing
         // reset-to-typed-end behavior.

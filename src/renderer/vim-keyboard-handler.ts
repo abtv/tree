@@ -711,11 +711,9 @@ export function handleVimKey(
         }
         return handled()
       }
-      // An Insert-session-derived change (insert/change/substitute) records the node it was
-      // captured on; a session that spanned a node change with no Escape to finish it in place
-      // (e.g. Enter while still in Insert mode) must not replay onto whatever node is current now.
-      const originNodeId = (last as { nodeId?: string }).nodeId
-      if (originNodeId !== undefined && originNodeId !== node.id) return handled()
+      // A completed Insert-session change (insert/change/substitute) replays at the current caret in
+      // whatever node is current, including another one (PRODUCT §20.2.1 T8). Whether the session was
+      // recorded at all is decided when it finishes, so no origin-node guard belongs here.
       let text = node.text
       let position = cursor
       for (let index = 0; index < count; index += 1) {

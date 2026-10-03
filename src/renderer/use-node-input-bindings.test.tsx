@@ -868,7 +868,24 @@ describe('useNodeInputBindings', () => {
     expect(f.node().id).not.toBe(childId)
   })
 
-  it.each(['blur', 'pointer'])('captures a plain Insert session when %s leaves the node selected', async (finish) => {
+  it('captures a structural session from its own node when a pointer click lands on another node', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'bee')] } })
+    f.input('a')
+    f.press('o')
+    const openedId = f.node().id
+    f.type('Opened', openedId)
+    // The pointer mousedown on another node must not capture that node's text for the structural session.
+    act(() => f.bindings('b').onMouseDown({ currentTarget: f.input('b'), button: 0 } as never))
+    act(() => f.bindings(openedId).onBlur())
+    f.press('Escape', {}, 'b')
+    act(() => f.store.selectNode('a', 0))
+    f.press('.')
+    const texts = f.snapshot().document.roots.map((item) => item.text)
+    expect(texts.filter((text) => text === 'Opened').length).toBe(2)
+    expect(texts.filter((text) => text === 'bee').length).toBe(1)
+  })
+
+  it.each(['blur', 'pointer'])('does not record a plain Insert session finished by %s', async (finish) => {
     const f = await fixture({ document: { roots: [node('a', 'a')] } })
     f.press('i')
     f.type('aX')
@@ -877,24 +894,102 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.vimMode).toBe('insert')
     f.press('Escape')
     f.press('.')
-    expect(f.node('a').text).toBe('aXX')
+    // The interrupted session is discarded, so `.` does not insert a second X.
+    expect(f.node('a').text).toBe('aX')
   })
 
-  it.each([false, true])(
-    'captures Insert across a node change; replay on the original node: %s',
-    async (returnToOriginal) => {
-      const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'b')] } })
-      f.press('i')
-      f.type('aX')
-      act(() => f.bindings('a').onBlur())
-      act(() => f.store.selectNode('b', 0))
-      f.press('Escape')
-      if (returnToOriginal) act(() => f.store.selectNode('a', 1))
-      f.press('.')
-      expect(f.node('a').text).toBe(returnToOriginal ? 'aXX' : 'aX')
-      expect(f.node('b').text).toBe('b')
-    },
-  )
+  it('replays a completed Insert session at another node caret', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'b')] } })
+    f.input().setSelectionRange(0, 0)
+    f.press('i')
+    f.type('Xa')
+    f.press('Escape')
+    expect(f.node('a').text).toBe('Xa')
+    f.input('b').setSelectionRange(0, 0)
+    act(() => f.store.selectNode('b', 0))
+    f.press('.')
+    expect(f.node('a').text).toBe('Xa')
+    expect(f.node('b').text).toBe('Xb')
+  })
+
+  it('replays a completed change in another node', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'one two'), node('b', 'three four')] } })
+    f.input().setSelectionRange(0, 0)
+    f.press('c')
+    f.press('w')
+    f.type('X two')
+    f.press('Escape')
+    expect(f.node('a').text).toBe('X two')
+    f.input('b').setSelectionRange(0, 0)
+    act(() => f.store.selectNode('b', 0))
+    f.press('.')
+    expect(f.node('b').text).toBe('X four')
+  })
+
+  it('replays a completed substitute in another node', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'abc'), node('b', 'xyz')] } })
+    f.input().setSelectionRange(0, 0)
+    f.press('s')
+    f.type('Qbc')
+    f.press('Escape')
+    expect(f.node('a').text).toBe('Qbc')
+    f.input('b').setSelectionRange(0, 0)
+    act(() => f.store.selectNode('b', 0))
+    f.press('.')
+    expect(f.node('b').text).toBe('Qyz')
+  })
+
+  it('replays a completed deletion-only Insert session in another node', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'abcd'), node('b', 'xyz')] } })
+    f.input().setSelectionRange(1, 1)
+    f.press('i')
+    f.type('acd')
+    f.press('Escape')
+    expect(f.node('a').text).toBe('acd')
+    f.input('b').setSelectionRange(0, 0)
+    act(() => f.store.selectNode('b', 0))
+    f.press('.')
+    expect(f.node('b').text).toBe('yz')
+  })
+
+  it('keeps the previous repeatable change when a blur interrupts an Insert session', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'abcd')] } })
+    f.input().setSelectionRange(0, 0)
+    f.press('x')
+    expect(f.node('a').text).toBe('bcd')
+    f.press('i')
+    f.type('Zbcd')
+    act(() => f.bindings().onBlur())
+    f.press('Escape')
+    f.press('.')
+    // The prior `x` repeats; the interrupted insert is not recorded.
+    expect(f.node('a').text).toBe('Zbc')
+  })
+
+  it('does not capture an Escape delivered to a node other than the session origin', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'b')] } })
+    f.input('a').setSelectionRange(0, 0)
+    f.press('i', {}, 'a')
+    f.type('Xa', 'a')
+    // The session's own input never blurs here, so the origin-node check is the only guard.
+    f.input('b').setSelectionRange(0, 0)
+    f.press('Escape', {}, 'b')
+    f.press('.', {}, 'b')
+    expect(f.node('a').text).toBe('Xa')
+    expect(f.node('b').text).toBe('b')
+  })
+
+  it('does not record a plain Insert session ended by a shutdown flush', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'a')] } })
+    f.press('i')
+    f.type('aX')
+    await act(async () => {
+      await f.store.flushPersistence()
+    })
+    f.press('Escape')
+    f.press('.')
+    expect(f.node('a').text).toBe('aX')
+  })
 
   it('edits content using existing links and defaults to no links for plain text', async () => {
     const text = 'https://example.test'

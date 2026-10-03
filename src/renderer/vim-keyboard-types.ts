@@ -13,8 +13,6 @@ export type VimTextChange =
       insertedText?: string
       insertOffset?: number
       deleteCount?: number
-      /** Set only when enriched via a finished Insert session (`change`); see `nodeId` below. */
-      nodeId?: string
     }
   | { kind: 'replace'; count: number; character: string }
   | {
@@ -23,7 +21,6 @@ export type VimTextChange =
       insertedText?: string
       insertOffset?: number
       deleteCount?: number
-      nodeId?: string
     }
   | {
       kind: 'insert'
@@ -31,13 +28,6 @@ export type VimTextChange =
       insertedText?: string
       insertOffset?: number
       deleteCount?: number
-      /**
-       * The node an Insert session's diff was captured against. A session can span a node change
-       * (e.g. `Enter` while still in Insert mode) with no intervening Escape to finish it in place,
-       * so `.` must only replay this diff when the node it was captured on is still the current one
-       * — reapplying it elsewhere would misattribute text typed into one node to another.
-       */
-      nodeId?: string
     }
   | {
       kind: 'paste'
@@ -118,7 +108,12 @@ export interface VimKeyboardState {
   /** The command-state owner; handlers read and write its fields and clear through its transitions. */
   commandState: VimCommandState
   beginInsert: (nodeId: string, baseline: string, position: number, change: VimTextChange) => void
-  finishInsert: (input: HTMLElement) => void
+  /**
+   * Finish the pending Insert session. Only Escape completes it (`completed = true`) and records its
+   * diff for `.`; every other caller passes no flag, consumes the plain session, and keeps the
+   * previous repeatable change (PRODUCT §20.2.1 T8). Structural sessions always capture.
+   */
+  finishInsert: (input: HTMLElement, completed?: boolean) => void
   beginReplace: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
   handleReplaceKey: (input: HTMLElement, key: string) => boolean
   /**

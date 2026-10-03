@@ -404,6 +404,95 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 1)
   })
 
+  test('repeats a completed Insert session in another node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'a', children: [] },
+          { id: 'b', text: 'b', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+    await setCursor(first, 0)
+    await first.press('i')
+    await typeInto(first, 'X')
+    await window.keyboard.press('Escape')
+    await expect(first).toHaveValue('Xa')
+
+    const second = node(window, 2)
+    await second.focus()
+    await setCursor(second, 0)
+    await window.keyboard.press('.')
+    await expect(second).toHaveValue('Xb')
+    await expect(first).toHaveValue('Xa')
+  })
+
+  test('repeats a completed change and substitute in another node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'one two', children: [] },
+          { id: 'b', text: 'three four', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+    await setCursor(first, 0)
+    await window.keyboard.press('c')
+    await window.keyboard.press('w')
+    await typeInto(first, 'X')
+    await window.keyboard.press('Escape')
+    await expect(first).toHaveValue('X two')
+
+    const second = node(window, 2)
+    await second.focus()
+    await setCursor(second, 0)
+    await window.keyboard.press('.')
+    await expect(second).toHaveValue('X four')
+
+    await setCursor(second, 0)
+    await second.press('s')
+    await typeInto(second, 'Q')
+    await window.keyboard.press('Escape')
+    await expect(second).toHaveValue('Q four')
+    await first.focus()
+    await setCursor(first, 0)
+    await window.keyboard.press('.')
+    await expect(first).toHaveValue('Q two')
+  })
+
+  test('does not repeat an Insert session interrupted by pointer focus', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'a', children: [] },
+          { id: 'b', text: 'b', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+    await setCursor(first, 0)
+    await first.press('i')
+    await typeInto(first, 'X')
+    const second = node(window, 2)
+    await second.click()
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('.')
+    // The pointer focus interrupted the session, so `.` records nothing and both nodes are unchanged.
+    await expect(second).toHaveValue('b')
+    await expect(first).toHaveValue('Xa')
+  })
+
   test('changes whole-node text, deletes backward, and repeats counted text puts', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -785,7 +874,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('bd')
   })
 
-  test('does not record a cross-node Insert session as a repeatable text edit', async ({ userDataDir }) => {
+  test('does not record an Insert session interrupted by Enter as repeatable', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     await node(window, 1).press('i')
     await typeInto(node(window, 1), 'one')

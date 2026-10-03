@@ -453,6 +453,29 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 2)).toHaveValue('New')
     await expect(node(window, 3)).toHaveValue('New')
   })
+  test('captures structural text typed in its own node when a pointer click lands elsewhere', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'bee', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('o')
+    await typeInto(node(window, 2), 'Opened')
+    await node(window, 3).click()
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('.')
+    await expect(node(window, 2)).toHaveValue('Opened')
+    await expect(node(window, 3)).toHaveValue('bee')
+    await expect(node(window, 4)).toHaveValue('Opened')
+  })
   test('starts in Normal mode', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

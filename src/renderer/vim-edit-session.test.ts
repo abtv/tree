@@ -171,14 +171,13 @@ describe('applyReplaceKey', () => {
 describe('insertRepeatChange', () => {
   const session = { nodeId: 'a', baseline: 'abc', position: 1, change: { kind: 'insert', entry: 'i' } as const }
 
-  it('captures a changed Insert session with the origin node and diff', () => {
+  it('captures a changed Insert session as a node-agnostic diff', () => {
     expect(insertRepeatChange(session, 'aXbc')).toEqual({
       kind: 'insert',
       entry: 'i',
       insertedText: 'X',
       insertOffset: 0,
       deleteCount: 0,
-      nodeId: 'a',
     })
   })
 
@@ -199,7 +198,6 @@ describe('insertRepeatChange', () => {
       insertedText: '',
       insertOffset: 2,
       deleteCount: 0,
-      nodeId: 'a',
     })
     expect(
       insertRepeatChange(
@@ -212,7 +210,6 @@ describe('insertRepeatChange', () => {
       insertedText: '',
       insertOffset: 2,
       deleteCount: 0,
-      nodeId: 'a',
     })
   })
 

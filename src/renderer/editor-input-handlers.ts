@@ -92,11 +92,11 @@ export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefi
 /**
  * Finishes a pending Insert or Replace session before a command that moves focus off the current
  * node (`Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo). A pending Insert session's text is already
- * live in the store, so this only captures its dot-repeat bookkeeping (`.` later checks whether the
- * captured node still matches before replaying it); a pending Replace session commits its buffered
- * text and returns to Normal mode, matching the documented undo/redo rule. Character Visual mode's
- * stale command assembly clears while the mode stays active, and whole-node Visual mode ends
- * because its range belongs to the displayed level being left.
+ * live in the store, so consuming it without `completed` records nothing and keeps the previous
+ * repeatable change, per PRODUCT §20.2.1 T8; a pending Replace session commits its buffered text and
+ * returns to Normal mode, matching the documented undo/redo rule. Character Visual mode's stale
+ * command assembly clears while the mode stays active, and whole-node Visual mode ends because its
+ * range belongs to the displayed level being left.
  */
 function finishVimSessionBeforeNavigation(vim: VimKeyboardState | undefined, input: HTMLElement): void {
   vim?.finishInsert(input)
@@ -249,7 +249,9 @@ export function createEditorKeyDownHandler({
     if (vim !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) {
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
-        vim.finishInsert(event.currentTarget)
+        // Escape is the one completion that records the plain session's diff for `.`; every other
+        // finish path below consumes it without recording (PRODUCT §20.2.1 T8).
+        vim.finishInsert(event.currentTarget, true)
         clearCommandAssembly(vim.commandState)
         vim.setMode('normal')
         const input = event.currentTarget

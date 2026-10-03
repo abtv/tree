@@ -130,15 +130,16 @@ export function applyReplaceKey(
 }
 
 /**
- * The repeat-change payload a finishing Insert session captures, or undefined when a plain
- * `i`/`a`/`I`/`A` session is unchanged or the session's kind is not text-capturing. The origin
- * node is always stamped so dot-repeat replay can skip a session that crossed to another node.
+ * The repeat-change payload a completed Insert session captures, or undefined when a plain
+ * `i`/`a`/`I`/`A` session is unchanged or the session's kind is not text-capturing. The payload is
+ * node-agnostic so `.` can replay the same typed diff at the current caret in another node; whether
+ * a session is recorded at all is decided at the finish site (PRODUCT §20.2.1 T8).
  */
 export function insertRepeatChange(session: VimInsertSession, finalText: string): VimTextChange | undefined {
-  const { nodeId, baseline, position, change } = session
+  const { baseline, position, change } = session
   if (change.kind === 'insert' && finalText === baseline) return undefined
   if (change.kind !== 'insert' && change.kind !== 'change' && change.kind !== 'substitute') return undefined
-  return { ...change, ...diffTypedText(baseline, finalText, position), nodeId }
+  return { ...change, ...diffTypedText(baseline, finalText, position) }
 }
 
 /** The register payload a Visual or structural command reads as its put source. */
