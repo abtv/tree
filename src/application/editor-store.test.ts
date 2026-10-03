@@ -1242,6 +1242,46 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'a' }, { id: 'b' }] } })
   })
 
+  it('replaces a range with counted forest copies in one undo step and returns the removed range', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [{ id: 'b-child', text: 'child', children: [] }] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('c1', 'c2', 'c3'))
+    await store.initialize()
+    const forest = { nodes: [{ id: 'x', text: 'X', children: [] }], sourceIds: ['x'] }
+    const removed = store.applyNodeVisual('p', 'b', 'b', forest, '', 3)
+    expect(removed?.sourceIds).toEqual(['b'])
+    expect(removed?.nodes[0]?.children.map((node) => node.id)).toEqual(['b-child'])
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'a' }, { id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'c' }] },
+      location: { selectedNodeId: 'c1' },
+    })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'a' }, { id: 'b', children: [{ id: 'b-child' }] }, { id: 'c' }] },
+    })
+  })
+
+  // @requirement PRODUCT.md §16.2
+  it('blocks a Visual put and a Visual text replacement while locked and reports the rejection', async () => {
+    const { store } = await lockEditor(new FakeClock(), [
+      { id: 'root', text: 'root text', children: [] },
+      { id: 'b', text: 'B', children: [] },
+    ])
+    const before = store.getSnapshot()
+    const forest = { nodes: [{ id: 'x', text: 'X', children: [] }], sourceIds: ['x'] }
+    expect(store.applyNodeVisual('p', 'b', 'b', forest, '', 2)).toBeUndefined()
+    expect(store.replaceTextRange('b', 0, 1, 'ZZ')).toBe(false)
+    expect(store.getSnapshot()).toBe(before)
+  })
+
   it('replaces selected node ranges with an empty node or a captured forest and undoes each command', async () => {
     const services = loadedState(
       {

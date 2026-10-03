@@ -953,6 +953,52 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A'])
   })
 
+  it('exchanges the register on whole-node Visual p, keeps it on P, and applies the count to both', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('2')
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
+    expect(f.result.current.vimMode).toBe('normal')
+    // The replaced `B` is now the register, so a Normal put inserts it after the first copy.
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'B', 'A', 'C'])
+    // Both the put and the exchange were single undoable commands.
+    act(() => f.store.undo())
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
+    act(() => f.store.undo())
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'C'])
+  })
+
+  it('keeps the incoming register on whole-node Visual P so it can replace repeatedly', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('P')
+    act(() => f.store.selectNode('c', 0))
+    f.press('V')
+    f.press('P')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A'])
+  })
+
+  it('repeats a counted whole-node Visual put with the same count', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('2')
+    f.press('P')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'A', 'C'])
+  })
+
   it('captures structural and Replace sessions from a contenteditable input', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A')] } })
     f.press('o')

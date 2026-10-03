@@ -247,11 +247,13 @@ describe('register transitions', () => {
     expect(registerSource({ kind: 'text', value: 'x' })).toBeUndefined()
   })
 
-  it('writes a nodes register for whole-node Visual y/d/x/c/s results only', () => {
-    for (const command of ['y', 'd', 'x', 'c', 's'] as const) {
+  it('writes a nodes register for whole-node Visual y/d/x/c/s/p results only', () => {
+    // `p` exchanges: the removed selection becomes the register.
+    for (const command of ['y', 'd', 'x', 'c', 's', 'p'] as const) {
       expect(visualCommandRegister(command, forest)).toEqual({ kind: 'nodes', value: forest })
     }
-    for (const command of ['u', 'U', 'p', 'P'] as const) {
+    // `P` keeps the incoming register; case changes never touch it.
+    for (const command of ['u', 'U', 'P'] as const) {
       expect(visualCommandRegister(command, forest)).toBeUndefined()
     }
   })

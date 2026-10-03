@@ -60,6 +60,8 @@ export type VimStructuralChange =
       span: number
       source?: NodeForest
       text?: string
+      /** Copies of `source` a counted Visual put inserted; absent means one. */
+      repeat?: number
     }
 
 export type VimRepeatChange = VimTextChange | VimSurroundChange | VimStructuralChange
@@ -127,7 +129,7 @@ export interface VimKeyboardState {
     move: (direction: 'up' | 'down' | 'first' | 'last') => void
     swap: () => void
     exit: () => void
-    command: (command: NodeVisualCommand) => void
+    command: (command: NodeVisualCommand, count?: number) => void
     /** `>` (`in`) or `<` (`out`) over the selected sibling range, `count` levels. */
     shift: (direction: 'in' | 'out', count: number) => void
   }

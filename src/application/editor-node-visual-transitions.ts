@@ -136,6 +136,7 @@ export function nodeVisualTransition(
   insertedText: string,
   canMutate: boolean,
   createId: () => NodeId,
+  repeat = 1,
 ): NodeVisualTransition {
   // A whole-node Visual range only ever spans one real sibling array (`moveNodeVisual` only moves
   // within it), so the anchor's actual siblings resolve both endpoints, whatever depth they are
@@ -172,7 +173,10 @@ export function nodeVisualTransition(
   let replacements: readonly TreeNode[] = []
   if (command === 'c' || command === 's') replacements = [{ id: createId(), text: insertedText, children: [] }]
   else if (command === 'p' || command === 'P')
-    replacements = source!.nodes.map((node) => cloneNodeWithNewIds(node, createId))
+    // `repeat` whole copies of the incoming forest, each with fresh IDs, replace the range at once.
+    replacements = Array.from({ length: repeat }, () =>
+      source!.nodes.map((node) => cloneNodeWithNewIds(node, createId)),
+    ).flat()
   else if (command === 'u' || command === 'U') {
     const changeCase = (value: string): string => (command === 'u' ? value.toLowerCase() : value.toUpperCase())
     let changed = false

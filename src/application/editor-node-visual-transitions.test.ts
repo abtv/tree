@@ -365,6 +365,74 @@ describe('whole-node Visual transitions', () => {
       }
     })
 
+    it('replaces the range with every counted copy of the forest and returns the removed range', () => {
+      const two = {
+        nodes: [
+          { id: 's1', text: 'S1', children: [{ id: 's1c', text: 'C', children: [] }] },
+          { id: 's2', text: 'S2', children: [] },
+        ],
+        sourceIds: ['s1', 's2'],
+      }
+      for (const command of ['p', 'P'] as const) {
+        const result = nodeVisualTransition(siblings(), location, command, 'c', 'b', two, '', true, counter(), 2)
+        if (result.kind !== 'changed') throw new Error(`Expected a change, received ${result.kind}.`)
+        // Fresh IDs for every copy and descendant, in whole-forest order, with the range gone.
+        expect(result.transition.document.roots.map((node) => `${node.id}:${node.text}`)).toEqual([
+          'a:A',
+          'new-1:S1',
+          'new-3:S2',
+          'new-4:S1',
+          'new-6:S2',
+          'd:D',
+        ])
+        expect(result.transition.document.roots[1]?.children[0]?.id).toBe('new-2')
+        expect(result.transition.location.selectedNodeId).toBe('new-1')
+        expect(result.register.sourceIds).toEqual(['b', 'c'])
+        expect(result.register.nodes.map((node) => node.text)).toEqual(['B', 'C'])
+      }
+    })
+
+    it('rejects a counted put into a source descendant or past the depth limit without consuming IDs', () => {
+      let nextId = 0
+      const createId = (): string => `new-${++nextId}`
+      const document: Document = {
+        roots: [{ id: 'a', text: 'A', children: [{ id: 'child', text: 'C', children: [] }] }],
+      }
+      expect(
+        nodeVisualTransition(
+          document,
+          { currentParentId: 'a', selectedNodeId: 'child' },
+          'p',
+          'child',
+          'child',
+          { nodes: document.roots, sourceIds: ['a'] },
+          '',
+          true,
+          createId,
+          3,
+        ),
+      ).toEqual({ kind: 'rejected', message: 'Cannot paste a node into one of its descendants.' })
+      let deep: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+      for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1)
+        deep = { id: `n${index}`, text: '', children: [deep] }
+      const deepestId = `n${MAX_DOCUMENT_DEPTH - 1}`
+      expect(
+        nodeVisualTransition(
+          { roots: [deep] },
+          { currentParentId: deepestId, selectedNodeId: deepestId },
+          'P',
+          deepestId,
+          deepestId,
+          { nodes: [{ id: 's', text: '', children: [{ id: 's1', text: '', children: [] }] }], sourceIds: ['s'] },
+          '',
+          true,
+          createId,
+          3,
+        ),
+      ).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+      expect(nextId).toBe(0)
+    })
+
     it('changes case of a subtree, keeping IDs, attachments and children, and omits empty links', () => {
       const document: Document = {
         roots: [

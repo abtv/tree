@@ -372,9 +372,10 @@ export class EditorStore {
     this.textSession.endIfStandalone()
   }
 
-  public replaceTextRange(nodeId: NodeId, start: number, end: number, text: string): void {
+  /** Returns false when the persistence lock rejected the edit, so callers can leave the register alone. */
+  public replaceTextRange(nodeId: NodeId, start: number, end: number, text: string): boolean {
     const state = this.runtime.ready()
-    if (this.isPersistenceLocked()) return
+    if (this.isPersistenceLocked()) return false
     const node = requireNode(state.document, nodeId).node
     // With no stored links, reconciliation rejects malformed fallback entries as well
     // as an empty array; only normalized ranges can survive into the document.
@@ -384,6 +385,7 @@ export class EditorStore {
     this.endTextSession()
     this.textSession.markNextEditStandalone()
     this.editContent(nodeId, replacement.text, replacement.links, replacement.createsNewLink)
+    return true
   }
 
   /** Apply disjoint edits to one node's text as a single undoable change. */
@@ -737,6 +739,7 @@ export class EditorStore {
     focusId: NodeId,
     source?: NodeForest,
     insertedText = '',
+    repeat = 1,
   ): NodeForest | undefined {
     const state = this.runtime.ready()
     const result = nodeVisualTransition(
@@ -749,6 +752,7 @@ export class EditorStore {
       insertedText,
       !this.isPersistenceLocked(),
       this.createId,
+      repeat,
     )
     if (result.kind === 'none') return undefined
     if (result.kind === 'rejected') {

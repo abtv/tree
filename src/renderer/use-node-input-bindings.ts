@@ -304,7 +304,7 @@ export function useNodeInputBindings({
   )
 
   const commandNodeVisual = useCallback(
-    (command: NodeVisualCommand): void => {
+    (command: NodeVisualCommand, count = 1): void => {
       if (nodeVisualSelection === undefined) return
       const state = store.getSnapshot()
       if (state.status !== 'ready') return
@@ -316,7 +316,15 @@ export function useNodeInputBindings({
       if (focus < 0) return
       const span = Math.abs(anchorLocated.index - focus) + 1
       const source = registerSource(vimSession.current.register)
-      const result = store.applyNodeVisual(command, nodeVisualSelection.anchorId, nodeVisualSelection.focusId, source)
+      const repeat = command === 'p' || command === 'P' ? count : 1
+      const result = store.applyNodeVisual(
+        command,
+        nodeVisualSelection.anchorId,
+        nodeVisualSelection.focusId,
+        source,
+        '',
+        repeat,
+      )
       if (result === undefined) return
       const nextRegister = visualCommandRegister(command, result)
       if (nextRegister !== undefined) vimSession.current.register = nextRegister
@@ -330,6 +338,7 @@ export function useNodeInputBindings({
             command,
             span,
             ...(source === undefined ? {} : { source }),
+            ...(repeat > 1 ? { repeat } : {}),
           })
         changeVimMode('normal')
         syncImageCaretToFocus()
@@ -390,7 +399,14 @@ export function useNodeInputBindings({
         if (located === undefined) return
         const end = located.siblings[located.index + change.span - 1]
         if (end === undefined) return
-        const result = store.applyNodeVisual(change.command, located.node.id, end.id, change.source, change.text)
+        const result = store.applyNodeVisual(
+          change.command,
+          located.node.id,
+          end.id,
+          change.source,
+          change.text,
+          change.repeat,
+        )
         if (result !== undefined) {
           const nextRegister = visualCommandRegister(change.command, result)
           if (nextRegister !== undefined) vimSession.current.register = nextRegister

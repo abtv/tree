@@ -390,6 +390,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
     replaceTextRange: vi.fn((_nodeId: string, start: number, end: number, inserted: string) => {
       node = { ...node, text: node.text.slice(0, start) + inserted + node.text.slice(end) }
       input.value = node.text
+      return true
     }),
   })
   const double = createVimKeyboardDouble(node.id, { register: { kind: 'text', value: pastedText } })

@@ -148,9 +148,12 @@ export function registerSource(register: VimRegister): NodeForest | undefined {
   return undefined
 }
 
-/** The register update for a whole-node Visual command that produced a result. */
+/**
+ * The register update for a whole-node Visual command that produced a result. `p` exchanges: the
+ * removed selection becomes the register; `P` keeps the incoming register (`docs/PRODUCT.md` §20.2.1).
+ */
 export function visualCommandRegister(command: NodeVisualCommand, result: NodeForest): VimRegister | undefined {
-  return 'ydxcs'.includes(command) ? { kind: 'nodes', value: result } : undefined
+  return 'ydxcsp'.includes(command) ? { kind: 'nodes', value: result } : undefined
 }
 
 /** A structural delete records the removed subtree as a single-node register entry. */

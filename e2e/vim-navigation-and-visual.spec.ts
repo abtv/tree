@@ -984,6 +984,123 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(editor).toHaveValue('ababc')
   })
 
+  test('Visual p exchanges the register with the replaced text and P keeps the incoming text', async ({
+    userDataDir,
+  }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.press('i')
+    await typeInto(editor, 'red blue')
+    await setCursor(editor, 0)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('y')
+
+    await window.keyboard.press('w')
+    await window.keyboard.press('v')
+    await window.keyboard.press('e')
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('red red')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    // The register now holds the replaced `blue`.
+    await window.keyboard.press('$')
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('red redblue')
+
+    // `P` replaces with the register but keeps it, so the same text can be put again.
+    await window.keyboard.press('0')
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await pressShifted(window, 'P')
+    await expect(editor).toHaveValue('blue redblue')
+    await window.keyboard.press('$')
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('blue redblueblue')
+
+    // One edit per put: three undos return through the document states in reverse.
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('blue redblue')
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('red redblue')
+  })
+
+  test('applies a count to a Visual put and leaves the selection when the register is empty', async ({
+    userDataDir,
+  }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.press('i')
+    await typeInto(editor, 'x yz')
+    await setCursor(editor, 0)
+    await window.keyboard.press('Escape')
+    // An empty register changes nothing and keeps the Visual selection.
+    await window.keyboard.press('v')
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('x yz')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    await window.keyboard.press('Escape')
+
+    await window.keyboard.press('$')
+    await window.keyboard.press('v')
+    await window.keyboard.press('y')
+    await window.keyboard.press('0')
+    await window.keyboard.press('v')
+    await window.keyboard.press('3')
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('zzz yz')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    // The caret is on the final inserted character, and the register holds the replaced `x`.
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('zzzx yz')
+  })
+
+  test('whole-node Visual p exchanges the node register, P keeps it, and both accept a count', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [] },
+          { id: 'charlie', text: 'Charlie', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+
+    await node(window, 2).focus()
+    await window.keyboard.press('V')
+    await window.keyboard.press('2')
+    await window.keyboard.press('p')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Alpha', 'Alpha', 'Charlie'])
+    // The register now holds `Bravo`: a Normal put inserts it after the first copy.
+    await window.keyboard.press('p')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
+
+    // `P` replaces but keeps the register, so the same `Bravo` replaces another node afterwards.
+    await node(window, 1).focus()
+    await window.keyboard.press('V')
+    await pressShifted(window, 'P')
+    await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
+    await node(window, 5).focus()
+    await window.keyboard.press('V')
+    await pressShifted(window, 'P')
+    await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Bravo'])
+
+    // Each command was one undo step.
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
+  })
+
   test('yanks and puts a node subtree with yy, p, and P', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

@@ -2401,7 +2401,8 @@ describe('editor keyboard handler', () => {
 
   it.each([
     { key: 'c', text: 'Ad', mode: 'insert', register: 'bC' },
-    { key: 'p', text: 'AZZd', mode: 'normal', register: 'ZZ' },
+    // `p` exchanges the register with the replaced selection; `P` keeps the incoming value.
+    { key: 'p', text: 'AZZd', mode: 'normal', register: 'bC' },
     { key: 'P', text: 'AZZd', mode: 'normal', register: 'ZZ' },
     { key: 'U', text: 'ABCd', mode: 'normal', register: 'ZZ' },
   ])('applies character Visual $key to the selected text', async ({ key, text, mode, register }) => {
@@ -2416,6 +2417,61 @@ describe('editor keyboard handler', () => {
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
     fixture.store.undo()
     expect(fixture.node().text).toBe('AbCd')
+  })
+
+  it.each([
+    { key: 'p', register: 'bC' },
+    { key: 'P', register: 'ZZ' },
+  ])('repeats the incoming text for a counted character Visual $key as one edit', async ({ key, register }) => {
+    const fixture = await textFixture({ id: 'node', text: 'AbCd', children: [] }, 'visual')
+    fixture.vim.register.current = { kind: 'text', value: 'ZZ' }
+    fixture.vim.commandState.visualAnchor = 1
+    fixture.vim.commandState.visualFocus = 2
+    fixture.input.setSelectionRange(1, 3)
+    fixture.press('3', key)
+    expect(fixture.node().text).toBe('AZZZZZZd')
+    expect(fixture.vim.mode).toBe('normal')
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
+    fixture.store.undo()
+    expect(fixture.node().text).toBe('AbCd')
+  })
+
+  it('keeps register, mode, and selection when a character Visual put is rejected', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'AbCd', children: [] }, 'visual')
+    fixture.vim.register.current = { kind: 'text', value: 'ZZ' }
+    fixture.vim.commandState.visualAnchor = 1
+    fixture.vim.commandState.visualFocus = 2
+    fixture.input.setSelectionRange(1, 3)
+    vi.spyOn(fixture.store, 'replaceTextRange').mockReturnValue(false)
+    fixture.press('p')
+    expect(fixture.node().text).toBe('AbCd')
+    expect(fixture.vim.mode).toBe('visual')
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'ZZ' })
+    expect(fixture.input.selectionStart).toBe(1)
+    expect(fixture.input.selectionEnd).toBe(3)
+  })
+
+  it('leaves the register and the Visual selection alone for an empty or node register', async () => {
+    for (const register of [{ kind: 'empty' }, { kind: 'text', value: '' }] as const) {
+      const fixture = await textFixture({ id: 'node', text: 'AbCd', children: [] }, 'visual')
+      fixture.vim.register.current = register
+      fixture.input.setSelectionRange(1, 3)
+      fixture.press('p')
+      expect(fixture.node().text).toBe('AbCd')
+      expect(fixture.vim.mode).toBe('visual')
+      expect(fixture.vim.register.current).toEqual(register)
+    }
+  })
+
+  it('routes a count to whole-node Visual p and P only', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    const command = vi.fn()
+    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit: vi.fn(), command, shift: vi.fn() }
+    for (const key of ['3', 'p', '2', 'P', '4', 'd', 'p']) handle(keyEvent(input, key))
+    expect(command.mock.calls).toEqual([['p', 3], ['P', 2], ['d'], ['p', 1]])
   })
 
   it('leaves the caret at the start of a character-wise Visual case range', async () => {

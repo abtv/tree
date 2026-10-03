@@ -67,8 +67,8 @@ No minor gap was resolved by the agent. New material gaps found while implementi
 | VIM-00 | Finalize authorized requirements and outstanding decisions | Product Owner answers | Done (documentation only) |
 | VIM-01 | Visual nesting with selection retention (T2) | VIM-00 | Done |
 | VIM-02 | Atomic counted subtree deletion and Normal puts (T1) | VIM-00 | Done |
-| VIM-03 | Visual `p/P` exchange and counts (T3) | VIM-02 | Ready |
-| VIM-04 | Vertical operators and counted node Visual motion (T4) | VIM-03 | Planned |
+| VIM-03 | Visual `p/P` exchange and counts (T3) | VIM-02 | Done |
+| VIM-04 | Vertical operators and counted node Visual motion (T4) | VIM-03 | Ready |
 | VIM-05 | End-of-text yank and case operators (T5) | VIM-00 | Ready |
 | VIM-06 | `gp/gP` caret destinations (T3) | VIM-02 | Ready |
 | VIM-07 | Sibling joins with data preservation (T6) | VIM-04 | Planned |
@@ -172,10 +172,10 @@ For each implementation task:
 
 ## Exact next task and resume prompt
 
-**Next: VIM-03** (Visual paste exchange, PRODUCT §20.2.1 T3). VIM-05, VIM-06 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another. VIM-01 landed: T2 is current behavior in PRODUCT §20.2; `EditorStore.shiftNodeVisual` and domain `shiftSiblingRange` exist. VIM-02 landed: T1 is current behavior in PRODUCT §20.2; `EditorStore.deleteSiblingRange` and the `repeat` argument of `pasteNodeForest` make counted `dd` and puts one history entry, and `dd` publishes the register only after it succeeded. `docs/VIM_CONFORMANCE.md` has the rows.
+**Next: VIM-04** (vertical operators and counted node Visual motion, PRODUCT §20.2.1 T4). VIM-05, VIM-06 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another. VIM-01 landed: T2 is current behavior in PRODUCT §20.2; `EditorStore.shiftNodeVisual` and domain `shiftSiblingRange` exist. VIM-02 landed: T1 is current behavior in PRODUCT §20.2; `EditorStore.deleteSiblingRange` and the `repeat` argument of `pasteNodeForest` make counted `dd` and puts one history entry, and `dd` publishes the register only after it succeeded. VIM-03 landed: the Visual half of T3 is current behavior in PRODUCT §20.2; `applyNodeVisual` takes a `repeat` argument, `replaceTextRange` returns whether it applied, `visualCommandRegister` stores the removed range for `p`, and a counted whole-node Visual put records `repeat` in its `.` descriptor. Only `gp`/`gP` (VIM-06) remain of T3. `docs/VIM_CONFORMANCE.md` has the rows.
 
 Resume prompt:
 
-> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-03.
+> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-04.
 
-VIM-00 (documentation), VIM-01 (Visual nesting) and VIM-02 (atomic counted subtree commands) are done.
+VIM-00 (documentation), VIM-01 (Visual nesting), VIM-02 (atomic counted subtree commands) and VIM-03 (Visual paste exchange) are done.

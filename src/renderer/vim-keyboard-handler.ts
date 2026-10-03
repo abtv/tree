@@ -126,9 +126,12 @@ export function handleVimKey(
       clearPending(commandState)
       vim.nodeVisual.move('first')
     } else if (event.key === 'o') vim.nodeVisual.swap()
-    else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1)
-      vim.nodeVisual.command(event.key as NodeVisualCommand)
-    // A count only belongs to `>` and `<` here; any other key discards it.
+    else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1) {
+      if ((event.key === 'p' || event.key === 'P') && commandState.pending?.prefix === undefined)
+        vim.nodeVisual.command(event.key, parseCount(commandState.pending?.count ?? ''))
+      else vim.nodeVisual.command(event.key as NodeVisualCommand)
+    }
+    // A count only belongs to `>`, `<`, `p`, and `P` here; any other key discards it.
     if (commandState.pending !== undefined && commandState.pending.count !== '')
       commandState.pending = { ...commandState.pending, count: '' }
     return handled()
@@ -534,20 +537,27 @@ export function handleVimKey(
   } else if (visual && (event.key === 'p' || event.key === 'P')) {
     const register = vim.register.current
     if (register.kind === 'text' && register.value !== '' && selection.start !== selection.end) {
-      store.replaceTextRange(node.id, selection.start, selection.end, register.value)
-      vim.imageTextCursor.current = undefined
-      recordRepeatChange(commandState, {
-        kind: 'overwrite',
-        text: register.value,
-        replaced: selection.end - selection.start,
-      })
-      leaveVisual(
-        vim,
-        node,
-        input,
-        selection.start + Math.max(0, register.value.length - 1),
-        node.text.length - (selection.end - selection.start) + register.value.length,
-      )
+      // A count repeats the incoming value once, before the replacement (`docs/PRODUCT.md` §20.2.1).
+      const incoming = register.value.repeat(count)
+      const removed = node.text.slice(selection.start, selection.end)
+      // A rejected edit (persistence lock) leaves the register, the mode, and the selection alone.
+      if (store.replaceTextRange(node.id, selection.start, selection.end, incoming)) {
+        // `p` exchanges: the removed selection becomes the register. `P` keeps the incoming one.
+        if (event.key === 'p') vim.register.current = { kind: 'text', value: removed }
+        vim.imageTextCursor.current = undefined
+        recordRepeatChange(commandState, {
+          kind: 'overwrite',
+          text: incoming,
+          replaced: selection.end - selection.start,
+        })
+        leaveVisual(
+          vim,
+          node,
+          input,
+          selection.start + Math.max(0, incoming.length - 1),
+          node.text.length - (selection.end - selection.start) + incoming.length,
+        )
+      }
     }
   } else if (visual && (event.key === '>' || event.key === '<')) {
     // Moves the whole current subtree; the character selection stays selected afterwards.
