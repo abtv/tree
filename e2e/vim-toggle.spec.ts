@@ -169,6 +169,20 @@ test.describe('Vim editing toggle', () => {
     }
   })
 
+  // @requirement PRODUCT.md §20.5
+  test('draws the active toggle from the palette of each appearance', async ({ userDataDir }) => {
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { vimPreference: true })
+    const toggle = window.getByRole('button', { name: 'Disable Vim editing' })
+    await window.mouse.move(5, 5)
+
+    await expect(toggle).toHaveCSS('background-color', 'rgb(227, 220, 203)')
+    await expect(toggle).toHaveCSS('color', 'rgb(59, 56, 51)')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(toggle).toHaveCSS('background-color', 'rgb(95, 95, 95)')
+    await expect(toggle).toHaveCSS('color', 'rgb(220, 220, 204)')
+  })
+
   test('renders the status bar toggle in both states and appearances', async ({ userDataDir }) => {
     seedDocument(userDataDir, seed)
     const { window } = await launchTree(userDataDir, { vimPreference: false })

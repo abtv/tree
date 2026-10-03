@@ -1058,6 +1058,8 @@ The light appearance is an original palette, not adapted from a published color 
 
 In the dark appearance, Vim mode indicators share a dark gray background and use muted text colors from the document palette: green for Normal, cyan for Insert, sandy yellow for Visual and whole-node Visual, and red for Replace. The Visual indicators retain the shared selection highlight pair.
 
+The active state of the status-bar toggles (`VIM` and the pin) takes its colors from the palette of the current appearance: the same warm surface tone as a hovered disclosure triangle behind the ordinary text color, so it reads as part of the light cream palette and of the dark Zenburn palette alike. The toggles' hover text and focus outline use the hover-text and secondary colors of that palette.
+
 ### 20.6 Scroll Edges
 
 Content scrolls at pixel granularity, so a row can be cut where the content area meets the location toolbar (§2.2) or the status bar (§20.2). A cut row fades into the document background toward that edge instead of ending in a hard line through its text.

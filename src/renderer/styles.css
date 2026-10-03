@@ -10,9 +10,6 @@
   --color-location-separator: #c9c2b4;
   --color-location-border: #ebe5d9;
   --color-hover-text: #5c574e;
-  --color-toggle-hover-text: #596267;
-  --color-toggle-focus-outline: #778187;
-  --color-toggle-active-background: #dce1e3;
   --color-ink: #373f43;
   --color-link: #3a6ea5;
   --color-caret: #3b3833;
@@ -237,7 +234,7 @@ textarea {
 
 .always-on-top-toggle:hover,
 .vim-toggle:hover {
-  color: var(--color-toggle-hover-text);
+  color: var(--color-hover-text);
 }
 
 .location-root:focus-visible,
@@ -248,7 +245,7 @@ textarea {
 
 .always-on-top-toggle:focus-visible,
 .vim-toggle:focus-visible {
-  outline: 1px solid var(--color-toggle-focus-outline);
+  outline: 1px solid var(--color-secondary);
   outline-offset: 3px;
 }
 
@@ -320,8 +317,8 @@ textarea {
 
 .always-on-top-toggle-active,
 .vim-toggle-active {
-  background: var(--color-toggle-active-background);
-  color: var(--color-ink);
+  background: var(--color-disclosure-hover-background);
+  color: var(--color-text);
 }
 
 .editor-shell {
