@@ -137,6 +137,43 @@ test.describe('Vim interactions at scale', () => {
     })
   }
 
+  test('counted 100dd responds in a 10000-sibling level', async ({ userDataDir }) => {
+    const seed = wideSeed(10_000)
+    seed.location = { currentParentId: 'root', selectedNodeId: 'c100' }
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 101', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { countedPaints: number[] }).countedPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'd') return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    for (const key of ['1', '0', '0', 'd', 'd']) await window.keyboard.press(key)
+    await window.waitForFunction(() => (window as unknown as { countedPaints: number[] }).countedPaints.length === 2)
+    const deletePaintMs = await window.evaluate(
+      () => (window as unknown as { countedPaints: number[] }).countedPaints[1]!,
+    )
+    await expect(window.locator('.node-row[data-node-id="c100"]')).toHaveCount(0)
+    await expect(window.locator('.node-row[data-node-id="c199"]')).toHaveCount(0)
+    await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(/200/u)
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-counted-dd-wide-10000',
+      metrics: { deletePaintMs: round(deletePaintMs) },
+    })
+    expect(deletePaintMs).toBeLessThan(250)
+  })
+
   for (const siblingCount of [1_000, 10_000]) {
     test(`whole-node Visual > and < respond in a ${siblingCount}-sibling level`, async ({ userDataDir }) => {
       const middle = Math.floor(siblingCount / 2)

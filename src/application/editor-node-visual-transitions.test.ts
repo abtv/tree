@@ -64,6 +64,55 @@ describe('whole-node Visual transitions', () => {
     expect(nextId).toBe(0)
   })
 
+  it('rejects a counted over-depth forest put before consuming any ID', () => {
+    let node: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1)
+      node = { id: `n${index}`, text: '', children: [node] }
+    const deepestId = `n${MAX_DOCUMENT_DEPTH - 1}`
+    let nextId = 0
+    expect(
+      pasteNodeForestTransition(
+        { roots: [node] },
+        { currentParentId: deepestId, selectedNodeId: deepestId },
+        deepestId,
+        'after',
+        { nodes: [{ id: 's', text: '', children: [{ id: 's1', text: '', children: [] }] }], sourceIds: ['s'] },
+        () => `new-${++nextId}`,
+        3,
+      ),
+    ).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(nextId).toBe(0)
+  })
+
+  it('inserts every counted copy with a distinct fresh ID in forest order', () => {
+    const document: Document = { roots: [{ id: 'a', text: 'A', children: [] }] }
+    let nextId = 0
+    const transition = pasteNodeForestTransition(
+      document,
+      location,
+      'a',
+      'before',
+      {
+        nodes: [
+          { id: 'x', text: 'X', children: [] },
+          { id: 'y', text: 'Y', children: [] },
+        ],
+        sourceIds: [],
+      },
+      () => `new-${++nextId}`,
+      2,
+    )
+    if (!('document' in transition)) throw new Error('Expected an accepted transition.')
+    expect(transition.document.roots.map((node) => `${node.id}:${node.text}`)).toEqual([
+      'new-1:X',
+      'new-2:Y',
+      'new-3:X',
+      'new-4:Y',
+      'a:A',
+    ])
+    expect(transition.location.selectedNodeId).toBe('new-1')
+  })
+
   it('creates fresh forest IDs and preserves attachments', () => {
     const document: Document = { roots: [{ id: 'a', text: 'A', children: [] }] }
     const transition = pasteNodeForestTransition(

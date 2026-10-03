@@ -375,9 +375,9 @@ export function useNodeInputBindings({
       const state = store.getSnapshot()
       if (state.status !== 'ready') return
       if (change.kind === 'structural-delete') {
-        const selected = locateNode(state.document, state.location.selectedNodeId)?.node
-        if (selected !== undefined) vimSession.current.register = nodeRegister(selected)
-        store.deleteSelected()
+        // The register changes only when the deletion happened (a heading or locked store changes nothing).
+        const removed = store.deleteSiblingRange(1)
+        if (removed?.[0] !== undefined) vimSession.current.register = nodeRegister(removed[0])
       } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
       else if (change.kind === 'structural-child-open') store.createChildWithText(change.text)
       else if (change.kind === 'structural-put')

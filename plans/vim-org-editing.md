@@ -66,11 +66,11 @@ No minor gap was resolved by the agent. New material gaps found while implementi
 | --- | --- | --- | --- |
 | VIM-00 | Finalize authorized requirements and outstanding decisions | Product Owner answers | Done (documentation only) |
 | VIM-01 | Visual nesting with selection retention (T2) | VIM-00 | Done |
-| VIM-02 | Atomic counted subtree deletion and Normal puts (T1) | VIM-00 | Ready |
-| VIM-03 | Visual `p/P` exchange and counts (T3) | VIM-02 | Planned |
+| VIM-02 | Atomic counted subtree deletion and Normal puts (T1) | VIM-00 | Done |
+| VIM-03 | Visual `p/P` exchange and counts (T3) | VIM-02 | Ready |
 | VIM-04 | Vertical operators and counted node Visual motion (T4) | VIM-03 | Planned |
 | VIM-05 | End-of-text yank and case operators (T5) | VIM-00 | Ready |
-| VIM-06 | `gp/gP` caret destinations (T3) | VIM-02 | Planned |
+| VIM-06 | `gp/gP` caret destinations (T3) | VIM-02 | Ready |
 | VIM-07 | Sibling joins with data preservation (T6) | VIM-04 | Planned |
 | VIM-08 | Bounded Visual-selection memory and `gv` (T7) | VIM-01, VIM-03, VIM-07 | Planned |
 | VIM-09 | Safe cross-node replay of completed text sessions (T8) | VIM-00 | Ready |
@@ -172,10 +172,10 @@ For each implementation task:
 
 ## Exact next task and resume prompt
 
-**Next: VIM-02** (atomic counted subtree commands, PRODUCT §20.2.1 T1). VIM-05 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another. VIM-01 landed: T2 is current behavior in PRODUCT §20.2; `EditorStore.shiftNodeVisual` and domain `shiftSiblingRange` exist, and `docs/VIM_CONFORMANCE.md` has the row.
+**Next: VIM-03** (Visual paste exchange, PRODUCT §20.2.1 T3). VIM-05, VIM-06 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another. VIM-01 landed: T2 is current behavior in PRODUCT §20.2; `EditorStore.shiftNodeVisual` and domain `shiftSiblingRange` exist. VIM-02 landed: T1 is current behavior in PRODUCT §20.2; `EditorStore.deleteSiblingRange` and the `repeat` argument of `pasteNodeForest` make counted `dd` and puts one history entry, and `dd` publishes the register only after it succeeded. `docs/VIM_CONFORMANCE.md` has the rows.
 
 Resume prompt:
 
-> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-02.
+> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-03.
 
-VIM-00 (documentation) and VIM-01 (Visual nesting) are done.
+VIM-00 (documentation), VIM-01 (Visual nesting) and VIM-02 (atomic counted subtree commands) are done.

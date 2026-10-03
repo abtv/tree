@@ -308,18 +308,14 @@ export function handleVimKey(
     if (pending.operator !== 's' && event.key === pending.operator && pending.motionCount === '') {
       clearPending(commandState)
       if (pending.operator === 'd') {
-        const count = parseCount(pending.count)
-        if (count === 1) {
-          vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
-          if (store.deleteSelected()) recordRepeatChange(commandState, { kind: 'structural-delete' })
-        } else {
-          const source = selectedSiblingForest(store, node.id, count)
-          if (source !== undefined) {
-            vim.register.current = { kind: 'nodes', value: source }
-            let deleted = 0
-            while (deleted < source.nodes.length && store.deleteSelected()) deleted += 1
-            if (deleted > 0) recordRepeatChange(commandState, { kind: 'structural-delete' })
-          }
+        // One undoable command for the whole range; the register changes only after it succeeded.
+        const removed = store.deleteSiblingRange(parseCount(pending.count))
+        if (removed !== undefined) {
+          vim.register.current =
+            removed.length === 1
+              ? { kind: 'node', value: cloneNode(removed[0]!), sourceIds: [removed[0]!.id] }
+              : { kind: 'nodes', value: { nodes: removed.map(cloneNode), sourceIds: removed.map((entry) => entry.id) } }
+          recordRepeatChange(commandState, { kind: 'structural-delete' })
         }
       } else if (pending.operator === 'y') {
         const count = parseCount(pending.count)
@@ -579,11 +575,16 @@ export function handleVimKey(
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
     const register = vim.register.current
     if (register.kind === 'node') {
-      let pasted = false
-      for (let index = 0; index < count; index += 1)
-        pasted =
-          store.pasteSubtree(node.id, event.key === 'p' ? 'after' : 'before', register.value, register.sourceIds) ||
-          pasted
+      const position = event.key === 'p' ? 'after' : 'before'
+      const pasted =
+        count === 1
+          ? store.pasteSubtree(node.id, position, register.value, register.sourceIds)
+          : store.pasteNodeForest(
+              node.id,
+              position,
+              { nodes: [register.value], sourceIds: register.sourceIds ?? [] },
+              count,
+            )
       if (pasted)
         recordRepeatChange(commandState, {
           kind: 'structural-put',
@@ -592,10 +593,7 @@ export function handleVimKey(
           sourceIds: register.sourceIds ?? [],
         })
     } else if (register.kind === 'nodes') {
-      let pasted = false
-      for (let index = 0; index < count; index += 1)
-        pasted = store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value) || pasted
-      if (pasted)
+      if (store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value, count))
         recordRepeatChange(commandState, {
           kind: 'structural-forest-put',
           position: event.key === 'p' ? 'after' : 'before',

@@ -190,6 +190,12 @@ describe('EditorStore', () => {
       ['sibling with text', (store: EditorStore) => store.createSiblingWithText('after', 'Inserted')],
       ['child with text', (store: EditorStore) => store.createChildWithText('Inserted')],
       ['delete', (store: EditorStore) => store.deleteSelected(), false],
+      ['counted delete', (store: EditorStore) => store.deleteSiblingRange(2)],
+      [
+        'counted forest put',
+        (store: EditorStore) => store.pasteNodeForest('root', 'after', { nodes: [source], sourceIds: [] }, 3),
+        false,
+      ],
       ['subtree put', (store: EditorStore) => store.pasteSubtree('root', 'after', source), false],
       ['empty deletion', (store: EditorStore) => store.deleteEmptySelected()],
       ['reorder', (store: EditorStore) => store.moveNodeTo('root', 2)],
@@ -1174,6 +1180,66 @@ describe('EditorStore', () => {
     expect(upper.document.roots[0]?.text).toBe('AB')
     expect(upper.document.roots[0]?.children[0]?.text).toBe('CD')
     expect(upper.document.roots[1]?.text).toBe('EF')
+  })
+
+  it('deletes a counted sibling range with descendants in one undo step and clamps at the last sibling', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [{ id: 'b-child', text: 'child', children: [] }] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const removed = store.deleteSiblingRange(5)
+    expect(removed?.map((node) => node.id)).toEqual(['b', 'c'])
+    expect(removed?.[0]?.children.map((node) => node.id)).toEqual(['b-child'])
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'a' }] },
+      location: { selectedNodeId: 'a' },
+    })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'a' }, { id: 'b', children: [{ id: 'b-child' }] }, { id: 'c' }] },
+    })
+  })
+
+  it('leaves the document and history alone when counted deletion selects the current-parent heading', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] }] },
+      { currentParentId: 'a', selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const before = store.getSnapshot()
+    expect(store.deleteSiblingRange(2)).toBeUndefined()
+    expect(store.getSnapshot()).toBe(before)
+  })
+
+  it('puts counted copies of a forest with fresh IDs in one undo step', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'a' },
+    )
+    const store = new EditorStore(services, ids('c1', 'c2', 'c3'))
+    await store.initialize()
+    const forest = { nodes: [{ id: 'x', text: 'X', children: [] }], sourceIds: ['x'] }
+    expect(store.pasteNodeForest('a', 'after', forest, 3)).toBe(true)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'a' }, { id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'b' }] },
+      location: { selectedNodeId: 'c1' },
+    })
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'a' }, { id: 'b' }] } })
   })
 
   it('replaces selected node ranges with an empty node or a captured forest and undoes each command', async () => {

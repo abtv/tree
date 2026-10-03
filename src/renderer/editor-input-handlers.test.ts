@@ -1005,16 +1005,14 @@ describe('editor keyboard handler', () => {
       'Second',
     ])
     expect(new Set(children.map(({ id }) => id)).size).toBe(8)
-    for (let remaining = 6; remaining >= 2; remaining -= 2) {
-      store.undo()
-      expect(snapshot().document.roots[0]!.children).toHaveLength(remaining)
-    }
+    // A counted put is one undoable command (PRODUCT §20.2.1 T1).
+    store.undo()
     expect(snapshot().document).toEqual(treeDocument)
     const deletion = await textFixture(node, 'normal', options)
     deletion.press('3', 'd', 'd')
     expect(deletion.snapshot().document.roots).toEqual([{ id: 'root', text: 'Root', children: [] }])
     expect(deletion.vim.register.current.kind).toBe('nodes')
-    deletion.store.undo()
+    // A counted deletion is one undoable command.
     deletion.store.undo()
     expect(deletion.snapshot().document).toEqual(treeDocument)
   })

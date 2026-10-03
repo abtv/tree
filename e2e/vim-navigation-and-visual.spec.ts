@@ -160,6 +160,11 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await expect(window.locator('.node-row')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('Fourth')
+
+    // One counted deletion is one undoable command (PRODUCT §20.2.1 T1).
+    await window.keyboard.press('u')
+    await expect(window.locator('.node-row')).toHaveCount(4)
+    await expect(node(window, 3)).toHaveValue('Third')
   })
 
   test('does nothing when O is pressed on the current-parent heading', async ({ userDataDir }) => {

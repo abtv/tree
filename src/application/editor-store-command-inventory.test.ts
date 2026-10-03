@@ -29,6 +29,7 @@ const exclusions: Record<string, string> = {
   createChild: 'Explicit structural opening is covered by Vim properties; this generator uses split.',
   createSiblingWithText: 'Structural repeat with supplied text is covered by Vim tests; not generated here.',
   createChildWithText: 'Structural repeat with supplied text is covered by Vim tests; not generated here.',
+  deleteSiblingRange: 'Counted subtree deletion needs generated sibling spans; covered by dedicated store tests.',
   pasteSubtree: 'Node-register paste needs generated subtree/register state; clipboard paste is generated instead.',
   pasteNodeForest: 'Forest-register paste needs generated forest/register state.',
   applyNodeVisual: 'Whole-node Visual commands need generated selection spans and register state.',

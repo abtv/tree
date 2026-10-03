@@ -9,6 +9,7 @@ import {
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deleteSelectedTransition,
+  deleteSiblingRangeTransition,
   enterTransition,
   leaveTransition,
   moveHorizontalTransition,
@@ -665,6 +666,40 @@ describe('editor command transitions', () => {
       const alpha = moved?.document.roots.find((node) => node.id === 'alpha')
       expect(alpha?.children.map((node) => node.id)).toEqual(['alpha2', 'alpha1'])
       expect(moved?.document.roots.map((node) => node.id)).toEqual(['alpha', 'beta'])
+    })
+  })
+
+  describe('deleteSiblingRangeTransition', () => {
+    const leaf = (id: string, children: TreeNode[] = []): TreeNode => ({ id, text: id, children })
+    const document: Document = {
+      roots: [leaf('p', [leaf('a'), leaf('b', [leaf('b1')]), leaf('c'), leaf('d')]), leaf('q', [leaf('q1')])],
+    }
+    const at = (selectedNodeId: string, currentParentId: string | null = 'p') => ({ currentParentId, selectedNodeId })
+    const ids = (nodes: readonly TreeNode[]): string[] => nodes.map((node) => node.id)
+
+    it('removes the range with its descendants, clamps the count and selects the next sibling', () => {
+      const result = deleteSiblingRangeTransition(document, at('b'), 2, () => 'unused')
+      expect(ids(result!.removed)).toEqual(['b', 'c'])
+      expect(result!.removed[0]!.children.map((node) => node.id)).toEqual(['b1'])
+      expect(ids(result!.transition.document.roots[0]!.children)).toEqual(['a', 'd'])
+      expect(result!.transition.location.selectedNodeId).toBe('d')
+      expect(ids(deleteSiblingRangeTransition(document, at('c'), 9, () => 'unused')!.removed)).toEqual(['c', 'd'])
+    })
+
+    it('selects the previous sibling, then the parent, when no sibling follows the range', () => {
+      const tail = deleteSiblingRangeTransition(document, at('c'), 2, () => 'unused')
+      expect(tail!.transition.location.selectedNodeId).toBe('b')
+      const only = deleteSiblingRangeTransition(document, at('q1', 'q'), 3, () => 'unused')
+      expect(only!.transition.location.selectedNodeId).toBe('q')
+      expect(only!.transition.document.roots[1]!.children).toEqual([])
+    })
+
+    it('creates a fresh root when every root is removed and ignores the current-parent heading', () => {
+      const result = deleteSiblingRangeTransition(document, at('p', null), 5, () => 'fresh')
+      expect(ids(result!.removed)).toEqual(['p', 'q'])
+      expect(result!.transition.document.roots.map((node) => node.id)).toEqual(['fresh'])
+      expect(result!.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'fresh' })
+      expect(deleteSiblingRangeTransition(document, at('p', 'p'), 2, () => 'unused')).toBeUndefined()
     })
   })
 })

@@ -30,6 +30,7 @@ import {
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deleteSelectedTransition,
+  deleteSiblingRangeTransition,
   enterTransition,
   leaveTransition,
   moveHorizontalTransition,
@@ -645,6 +646,27 @@ export class EditorStore {
     return true
   }
 
+  /**
+   * Counted `dd`: removes the selected node and up to `count - 1` following siblings as one undoable
+   * command. Returns the removed subtrees, or `undefined` when nothing changed (locked, or the
+   * current-parent heading is selected), so the caller publishes the register only on success.
+   */
+  public deleteSiblingRange(count: number): readonly TreeNode[] | undefined {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return undefined
+    const result = deleteSiblingRangeTransition(state.document, state.location, count, this.createId)
+    if (result === undefined) return undefined
+    const { transition, removed } = result
+    this.endTextSession()
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
+    this.queueAttachmentCleanup()
+    return removed
+  }
+
   public pasteSubtree(
     nodeId: NodeId,
     position: SiblingInsertionPosition,
@@ -679,7 +701,7 @@ export class EditorStore {
     return true
   }
 
-  public pasteNodeForest(nodeId: NodeId, position: SiblingInsertionPosition, source: NodeForest): boolean {
+  public pasteNodeForest(nodeId: NodeId, position: SiblingInsertionPosition, source: NodeForest, repeat = 1): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked() || source.nodes.length === 0) return false
     if (nodeId === state.location.currentParentId) return false
@@ -694,6 +716,7 @@ export class EditorStore {
       position,
       source,
       this.createId,
+      repeat,
     )
     if (transition.kind === 'rejected') {
       this.reportError(new Error(transition.message))

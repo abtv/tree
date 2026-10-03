@@ -41,11 +41,15 @@ export function pasteNodeForestTransition(
   position: 'before' | 'after',
   source: NodeForest,
   createId: () => NodeId,
+  repeat = 1,
 ): StructuralTransition | RejectedTransition {
   if (wouldExceedMaximumDepth(document, nodeId, source.nodes)) {
     return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
   }
-  const copies = source.nodes.map((node) => cloneNodeWithNewIds(node, createId))
+  // `repeat` whole copies, each with fresh IDs, inserted by one document change (T1).
+  const copies = Array.from({ length: repeat }, () =>
+    source.nodes.map((node) => cloneNodeWithNewIds(node, createId)),
+  ).flat()
   const target = requireNode(document, nodeId).node
   const replacements = position === 'before' ? copies : [target, ...copies]
   const nextDocument = replaceSiblingRange(document, nodeId, position === 'before' ? 0 : 1, replacements)

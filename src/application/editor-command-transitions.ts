@@ -9,6 +9,7 @@ import {
   locateNode,
   moveSibling,
   nodePath,
+  replaceSiblingRange,
   requireNode,
   splitNode,
   wouldExceedMaximumDepth,
@@ -312,6 +313,42 @@ export function deleteSelectedTransition(
   }
 
   return { document: nextDocument, location: nextLocation, focus: { nodeId: nextLocation.selectedNodeId, cursor: 0 } }
+}
+
+/**
+ * Counted `dd` (`docs/PRODUCT.md` §20.2.1 T1): deletes the selected node and the following real
+ * siblings, up to `count` and clamped at the last one, as one document change. Returns the removed
+ * subtrees so the caller can publish them to the register only after the change succeeded. The
+ * selection moves to the sibling after the range, else the one before it, else the parent.
+ */
+export function deleteSiblingRangeTransition(
+  document: Document,
+  location: Location,
+  count: number,
+  createId: () => string,
+): { transition: StructuralTransition; removed: readonly TreeNode[] } | undefined {
+  const selected = requireNode(document, location.selectedNodeId)
+  if (location.currentParentId === selected.node.id) return undefined
+  const removed = selected.siblings.slice(selected.index, selected.index + Math.max(1, count))
+  const following = selected.siblings[selected.index + removed.length]
+  const preceding = selected.siblings[selected.index - 1]
+  let nextDocument = replaceSiblingRange(document, selected.node.id, removed.length, [])
+  let nextLocation: Location
+  const destination = following ?? preceding
+  if (destination !== undefined) nextLocation = { ...location, selectedNodeId: destination.id }
+  else if (selected.parent !== null) nextLocation = { ...location, selectedNodeId: selected.parent.id }
+  else {
+    nextDocument = ensureRoot(nextDocument, createId())
+    nextLocation = { currentParentId: null, selectedNodeId: nextDocument.roots[0]!.id }
+  }
+  return {
+    transition: {
+      document: nextDocument,
+      location: nextLocation,
+      focus: { nodeId: nextLocation.selectedNodeId, cursor: 0 },
+    },
+    removed,
+  }
 }
 
 export function deleteEmptySelectedTransition(

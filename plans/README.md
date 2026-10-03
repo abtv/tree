@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim Editing Improvements](vim-org-editing.md) | Requirements approved (PRODUCT §20.2.1); VIM-01 done | VIM-02 — Atomic counted subtree commands |
+| [Vim Editing Improvements](vim-org-editing.md) | Requirements approved (PRODUCT §20.2.1); VIM-01, VIM-02 done | VIM-03 — Visual paste exchange |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
