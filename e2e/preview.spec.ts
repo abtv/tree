@@ -98,6 +98,33 @@ describeForEachEditingMode('image preview', () => {
 
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
   })
+
+  // @requirement PRODUCT.md §17.1
+  test('shows the same focus ring on the close button however the preview was opened', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await writeClipboardImageSized(app, 400, 200)
+    await firePaste(node(window, 1))
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+    const close = window.getByRole('button', { name: 'Close image preview' })
+    const ring = (): Promise<string> =>
+      close.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return `${style.outlineStyle} ${style.outlineWidth} ${style.outlineColor}`
+      })
+
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+    await expect(close).toBeFocused()
+    const afterMouse = await ring()
+    await window.keyboard.press('Escape')
+
+    await node(window, 1).focus()
+    await window.keyboard.press('Meta+Enter')
+    await expect(close).toBeFocused()
+    const afterKeyboard = await ring()
+
+    expect(afterMouse).toMatch(/^solid 2px /)
+    expect(afterKeyboard).toBe(afterMouse)
+  })
 })
 
 test.describe('image preview (mode-independent)', () => {

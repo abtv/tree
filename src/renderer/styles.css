@@ -18,8 +18,11 @@
   --color-caret: #3b3833;
   --color-white: #fff;
   --color-scrim: rgba(18, 20, 22, 0.72);
-  --color-overlay-button-background: rgba(255, 255, 255, 0.9);
-  --color-overlay-button-focus-outline: #d9e9f7;
+  --color-overlay-button-background: rgba(251, 248, 241, 0.16);
+  --color-overlay-button-hover-background: rgba(251, 248, 241, 0.3);
+  --color-overlay-button-foreground: #fbf8f1;
+  --color-overlay-button-border: rgba(251, 248, 241, 0.22);
+  --color-overlay-button-focus-outline: #fbf8f1;
   --color-attachment-error-on-overlay: #f3d6d3;
   --color-attachment-error: #9c3b34;
   --color-save-error: #b42318;
@@ -780,20 +783,26 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--color-overlay-button-border);
   border-radius: 50%;
   background: var(--color-overlay-button-background);
-  color: var(--color-ink);
+  color: var(--color-overlay-button-foreground);
+  backdrop-filter: blur(12px);
   cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
+}
+
+.image-preview-close svg {
+  display: block;
+  width: 12px;
+  height: 12px;
 }
 
 .image-preview-close:hover {
-  background: var(--color-white);
+  background: var(--color-overlay-button-hover-background);
 }
 
-.image-preview-close:focus-visible {
+/* Focus lands here when the preview opens; :focus-visible would hide the ring after a mouse open. */
+.image-preview-close:focus {
   outline: 2px solid var(--color-overlay-button-focus-outline);
   outline-offset: 2px;
 }
@@ -859,6 +868,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
     --color-disclosure-background: #4f4f4f;
     --color-disclosure-hover-background: #5f5f5f;
     --color-drag-highlight: #4f4f4f;
+    --color-overlay-button-background: rgba(220, 220, 204, 0.12);
+    --color-overlay-button-hover-background: rgba(220, 220, 204, 0.24);
+    --color-overlay-button-foreground: #dcdccc;
+    --color-overlay-button-border: rgba(220, 220, 204, 0.18);
+    --color-overlay-button-focus-outline: rgba(220, 220, 204, 0.45);
     --highlight-background: #2b2b2b;
     --highlight-foreground: #f0dfaf;
     --color-mode-indicator-background: var(--highlight-background);

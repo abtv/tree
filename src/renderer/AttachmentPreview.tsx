@@ -200,7 +200,16 @@ export function ImagePreview({
           onClick={onClose}
           type="button"
         >
-          ×
+          <svg
+            aria-hidden="true"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.6"
+            viewBox="0 0 12 12"
+          >
+            <path d="M2 2l8 8M10 2l-8 8" />
+          </svg>
         </button>
         {state.status === 'ready' ? (
           <img className="image-preview-image" src={state.url} alt="Attached image preview" onError={onImageError} />
