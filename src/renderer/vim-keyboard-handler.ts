@@ -410,6 +410,11 @@ export function handleVimKey(
         // `guu`, `gUU`, and `g~~` act on the whole text of the node; a count does not extend them.
         applyOperatorMotion(pending.operator, 'all', 1)
       } else if (pending.operator === 'd') {
+        const imageCaret = vim.getCaretState(
+          node.id,
+          cursor,
+          input.classList.contains('node-input-image-caret'),
+        ).imageActive
         // One undoable command for the whole range; the register changes only after it succeeded.
         const removed = store.deleteSiblingRange(parseCount(pending.count))
         if (removed !== undefined) {
@@ -418,6 +423,9 @@ export function handleVimKey(
               ? { kind: 'node', value: cloneNode(removed[0]!), sourceIds: [removed[0]!.id] }
               : { kind: 'nodes', value: { nodes: removed.map(cloneNode), sourceIds: removed.map((entry) => entry.id) } }
           recordRepeatChange(commandState, { kind: 'structural-delete', span: removed.length })
+          void store
+            .copyVimContent(vimNormalClipboardContent(removed, imageCaret))
+            .catch((error: unknown) => store.reportError(error))
         }
       } else if (pending.operator === 'y') {
         const count = parseCount(pending.count)

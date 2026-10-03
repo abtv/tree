@@ -1078,6 +1078,64 @@ describe('editor keyboard handler', () => {
     expect(deletion.snapshot().document).toEqual(treeDocument)
   })
 
+  it('copies dd text without descendants, retaining the deleted subtree and one-step undo', async () => {
+    const node: TreeNode = {
+      id: 'node',
+      text: 'https://example.com',
+      links: [{ start: 0, end: 19, url: 'https://example.com' }],
+      children: [{ id: 'child', text: 'child', children: [] }],
+    }
+    const f = await textFixture(node)
+    f.press('d', 'd')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: node.text })
+    expect(f.vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
+    expect(f.snapshot().document.roots.some((root) => root.id === node.id)).toBe(false)
+    f.store.undo()
+    expect(f.snapshot().document.roots).toEqual([node])
+  })
+
+  it('captures the image caret before dd changes focus', async () => {
+    const f = await textFixture({
+      id: 'node',
+      text: 'ab',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    f.press('l', 'l', 'd', 'd')
+    expect(f.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
+    expect(f.vim.register.current.kind).toBe('node')
+  })
+
+  it('keeps the clipboard on empty and multi-node dd but exports a clamped single deletion', async () => {
+    const first: TreeNode = { id: 'first', text: 'first', children: [] }
+    const last: TreeNode = { id: 'last', text: 'last', children: [] }
+    const multiple = await textFixture(first, 'normal', { document: { roots: [first, last] } })
+    multiple.press('2', 'd', 'd')
+    expect(multiple.clipboard.content).toBeUndefined()
+    const clamped = await textFixture(last)
+    clamped.press('2', 'd', 'd')
+    expect(clamped.clipboard.content).toEqual({ kind: 'text', text: 'last' })
+    const empty = await textFixture({ id: 'empty', text: '', children: [] })
+    empty.press('d', 'd')
+    expect(empty.clipboard.content).toBeUndefined()
+  })
+
+  it('does not undo dd or lose its register when external copying fails', async () => {
+    const f = await textFixture({ id: 'node', text: 'text', children: [] }, 'normal', {
+      services: {
+        writeClipboardContent: async () => {
+          throw new Error('native copy failed')
+        },
+      },
+    })
+    f.press('d', 'd')
+    await vi.waitFor(() => expect(f.snapshot().operationError).toBe('native copy failed'))
+    expect(f.snapshot().document.roots.some((root) => root.id === 'node')).toBe(false)
+    expect(f.vim.register.current.kind).toBe('node')
+    f.press('p')
+    expect(f.snapshot().document.roots.some((root) => root.text === 'text')).toBe(true)
+  })
+
   it('copies only node text externally with yy while preserving the subtree register', async () => {
     const node: TreeNode = {
       id: 'node',

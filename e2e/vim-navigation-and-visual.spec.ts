@@ -1511,6 +1511,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('Escape')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
+    await lockSystemClipboard()
     await window.keyboard.press('d')
     await window.keyboard.press('d')
     await expect(window.locator('.node-row')).toHaveCount(2)
@@ -1770,6 +1771,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // Deleting a remembered node invalidates the memory: `gv` changes nothing.
     await window.keyboard.press('Escape')
     await node(window, 2).focus()
+    await lockSystemClipboard()
     await window.keyboard.press('d')
     await window.keyboard.press('d')
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Charlie', 'Delta'])

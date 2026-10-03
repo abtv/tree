@@ -537,6 +537,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await window.getByRole('button', { name: 'Expand node 2' }).click()
 
     await node(window, 3).click()
+    await lockSystemClipboard()
     await window.keyboard.press('d')
     await window.keyboard.press('d')
     // The only child is gone; its own parent is selected and nothing was entered.

@@ -481,7 +481,7 @@ The clipboard service should support:
 
 Clipboard-specific platform details must remain outside the domain.
 
-Vim external yanks use a separate `writeClipboardContent` service and IPC channel carrying plain text or an attachment ID. Application projections choose the content under PRODUCT §20.2; the main process validates the payload, reads image bytes through the file-service queue, and validates the PNG before writing it. Native writes are serialized with rich clipboard copies so a pending image read cannot overwrite a later copy. External yanks add no document mutation, persistence writes, or history entries; text projections read only the selected text or sibling roots, and image copying uses the existing attachment byte and decoded-image limits.
+Vim external yanks and Normal `dd` use a separate `writeClipboardContent` service and IPC channel carrying plain text or an attachment ID. Application projections choose the content under PRODUCT §20.2; the main process validates the payload, reads image bytes through the file-service queue, and validates the PNG before writing it. Native writes are serialized with rich clipboard copies so a pending image read cannot overwrite a later copy. The external copy adds no document mutation, persistence writes, or history entries beyond the command's existing behavior; text projections read only the selected text or sibling roots, and image copying uses the existing attachment byte and decoded-image limits. `dd` captures the caret before deletion changes focus and exports only after successful deletion; the existing undo history retains the removed attachment during image copying.
 
 ### Editing commands
 

@@ -66,6 +66,80 @@ async function content(app: ElectronApplication) {
 }
 
 // @requirement PRODUCT.md §20.2
+test('copies dd text and images by the pre-deletion caret while preserving undo and local puts', async ({
+  userDataDir,
+}) => {
+  seed(userDataDir)
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await writeClipboardTextAndHtml(app, 'old', '<b>old</b>')
+  await node(window, 1).focus()
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
+  await expect.poll(() => nodeTexts(window)).toEqual(['', '', 'Last'])
+  await window.keyboard.press('u')
+  await expect.poll(() => nodeTexts(window)).toEqual(['see https://example.com', '', '', 'Last'])
+  await node(window, 1).focus()
+  await window.keyboard.press('j')
+  await expect(node(window, 1)).toHaveClass(/node-input-image-caret/)
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({ text: '', html: false, image: { size: { width: 1, height: 1 } } })
+  await window.keyboard.press('p')
+  await expect.poll(() => nodeTexts(window)).toEqual(['', 'see https://example.com', '', 'Last'])
+  await node(window, 2).focus()
+  await window.keyboard.press('g')
+  await window.keyboard.press('d')
+  await expect(node(window, 1)).toHaveValue('Excluded child')
+})
+
+test('preserves the clipboard for empty and counted multiple-node dd and exports a clamped single node', async ({
+  userDataDir,
+}) => {
+  seed(userDataDir)
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await writeClipboardTextAndHtml(app, 'keep', '<b>keep</b>')
+  await node(window, 2).focus()
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await node(window, 1).focus()
+  await window.keyboard.press('2')
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await window.evaluate(() => (globalThis.window as unknown as { treeApi: TreeApi }).treeApi.getVimEnabled())
+  expect(await content(app)).toMatchObject({ text: 'keep', html: true, image: null })
+  await expect.poll(() => nodeTexts(window)).toEqual(['Last'])
+  await window.keyboard.press('2')
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await expect.poll(() => content(app)).toMatchObject({ text: 'Last', html: false, image: null })
+})
+
+test('keeps dd deletion and local put available when the native clipboard rejects the copy', async ({
+  userDataDir,
+}) => {
+  seed(userDataDir)
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await writeClipboardText(app, 'keep')
+  await app.evaluate(() => {
+    globalThis.__treeIpc.wrap('tree:write-clipboard-content', async () => {
+      throw new Error('Synthetic dd clipboard failure')
+    })
+  })
+  allowRendererError(/Operation failed:.*Synthetic dd clipboard failure/)
+  await node(window, 1).focus()
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await expect(window.locator('.save-error')).toContainText('Synthetic dd clipboard failure')
+  expect((await content(app)).text).toBe('keep')
+  await expect.poll(() => nodeTexts(window)).toEqual(['', '', 'Last'])
+  await window.keyboard.press('p')
+  await expect.poll(() => nodeTexts(window)).toEqual(['', 'see https://example.com', '', 'Last'])
+})
+
+// @requirement PRODUCT.md §20.2
 test('copies yy text and character Visual y as plain text while retaining local subtree puts', async ({
   userDataDir,
 }) => {
