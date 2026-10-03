@@ -46,7 +46,10 @@ function assertTransition(store: EditorStore, before: ReadyState, action: Comman
   for (const id of after.expansion.expandedIds) expect(knownIds.has(id)).toBe(true)
 
   // Expansion is independent of document history. Deleted nodes retain their choices for undo.
-  if (action.kind !== 'toggleExpansion' && action.kind !== 'foldAll') {
+  if (action.kind === 'shift') {
+    // A shift opens the fold that receives the moved range and never closes one.
+    for (const id of before.expansion.expandedIds) expect(after.expansion.expandedIds.has(id)).toBe(true)
+  } else if (action.kind !== 'toggleExpansion' && action.kind !== 'foldAll') {
     expect(after.expansion.expandedIds).toEqual(before.expansion.expandedIds)
   }
 
@@ -55,6 +58,18 @@ function assertTransition(store: EditorStore, before: ReadyState, action: Comman
     case 'leave':
     case 'navigate':
       return
+    case 'shift': {
+      // `<` may take the range out of the displayed location; the location then moves up to an
+      // ancestor of the previous one, never sideways or down.
+      const previous = before.location.currentParentId
+      const next = after.location.currentParentId
+      if (next === previous) break
+      expect(
+        next === null ||
+          (previous !== null && locateNode(after.document, previous)!.ancestors.some((a) => a.id === next)),
+      ).toBe(true)
+      return
+    }
     case 'undo':
     case 'redo':
       // §10 allows navigation only when displaying the resulting change site requires it.

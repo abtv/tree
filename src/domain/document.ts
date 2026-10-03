@@ -56,10 +56,12 @@ export {
   pasteText,
   removeTextRange,
   replaceSiblingRange,
+  shiftSiblingRange,
   splitNode,
   subtreeHeight,
   wouldExceedMaximumDepth,
 } from './document-operations'
+export type { SiblingRangeShift } from './document-operations'
 
 export { assertDocument, parsePersistedState, serializeState, validatePersistedState } from './document-serialization'
 export type { ViewState } from './document-serialization'

@@ -44,6 +44,7 @@ import { EditorHistory } from './editor-history'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import {
   isPasteIntoSourceDescendant,
+  nodeVisualShiftTransition,
   nodeVisualTransition,
   pasteNodeForestTransition,
   type NodeForest,
@@ -60,6 +61,7 @@ import {
   collapseForest,
   COLLAPSED_EXPANSION_STATE,
   expandForest,
+  expandNode,
   expansionFromIds,
   isNodeExpanded,
   toggleNodeExpansion,
@@ -741,6 +743,39 @@ export class EditorStore {
     return result.register
   }
 
+  /**
+   * Whole-node or character Visual `>` / `<` (`docs/PRODUCT.md` §20.2.1): moves the sibling range
+   * between `anchorId` and `focusId` `count` levels as one undoable command. Returns whether it
+   * changed the document; an impossible request changes nothing and a depth failure is reported.
+   */
+  public shiftNodeVisual(direction: 'in' | 'out', anchorId: NodeId, focusId: NodeId, count = 1): boolean {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return false
+    const result = nodeVisualShiftTransition(
+      state.document,
+      state.location,
+      direction,
+      anchorId,
+      focusId,
+      count,
+      state.focus.nodeId === state.location.selectedNodeId ? state.focus.cursor : 0,
+    )
+    if (result.kind === 'none') return false
+    if (result.kind === 'rejected') {
+      this.reportError(new Error(result.message))
+      return false
+    }
+    this.endTextSession()
+    const expansion = result.expandIds.reduce(expandNode, state.expansion)
+    this.applyStructural(
+      result.transition.document,
+      result.transition.location,
+      this.runtime.newFocus(result.transition.focus.nodeId, result.transition.focus.cursor),
+      expansion,
+    )
+    return true
+  }
+
   public deleteEmptySelected(): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
@@ -893,11 +928,16 @@ export class EditorStore {
     )
   }
 
-  private applyStructural(document: Document, location: Location, focus: FocusIntent): void {
+  private applyStructural(
+    document: Document,
+    location: Location,
+    focus: FocusIntent,
+    expansion: ExpansionState = this.runtime.ready().expansion,
+  ): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-    this.runtime.replaceReady({ ...state, document, location, focus }, true)
+    this.runtime.replaceReady({ ...state, document, location, focus, expansion }, true)
     this.markPersistedChange()
   }
 

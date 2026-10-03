@@ -371,6 +371,89 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().focus.nodeId).toBe('b')
   })
 
+  it('shifts a whole-node Visual range with > and < while keeping mode, endpoints, direction, and register', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'a'), node('b', 'b', [node('b1', 'b1')]), node('c', 'c'), node('d', 'd')] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('c', 0))
+    f.press('V')
+    f.press('k')
+    expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
+    f.press('>')
+    expect(f.snapshot().document.roots.map((item) => [item.id, item.children.map((child) => child.id)])).toEqual([
+      ['a', ['b', 'c']],
+      ['d', []],
+    ])
+    expect(f.result.current.vimMode).toBe('visual-node')
+    expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
+    f.press('<')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
+    expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
+    act(() => f.store.undo())
+    act(() => f.store.undo())
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
+    // The register still holds the earlier `yy` of `a`: neither shift replaced it.
+    f.press('Escape')
+    act(() => f.store.selectNode('d', 0))
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['a', 'b', 'c', 'd', 'a'])
+  })
+
+  it('applies a count to whole-node Visual > and changes nothing when the full count is impossible', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'a', [node('a1', 'a1')]), node('b', 'b')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    f.press('V')
+    const before = f.snapshot().document
+    f.press('3')
+    f.press('>')
+    expect(f.snapshot().document).toBe(before)
+    f.press('2')
+    f.press('>')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a'])
+    expect(f.node('a1').children.map((child) => child.id)).toEqual(['b'])
+    expect(f.result.current.vimMode).toBe('visual-node')
+  })
+
+  it('moves the current subtree for character Visual > and keeps the character selection', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'one two')] } })
+    act(() => f.store.selectNode('b', 0))
+    const input = f.input('b')
+    input.setSelectionRange(0, 0)
+    f.press('v')
+    f.press('l')
+    f.press('l')
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(3)
+    f.press('>')
+    expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
+    expect(f.result.current.vimMode).toBe('visual')
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 3])
+    f.press('<')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b'])
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 3])
+  })
+
+  it('leaves character Visual untouched when the current node cannot move', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'one two')] } })
+    const input = f.input('a')
+    input.setSelectionRange(0, 0)
+    f.press('v')
+    f.press('l')
+    const before = f.snapshot()
+    f.press('>')
+    f.press('<')
+    expect(f.snapshot()).toBe(before)
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
+  })
+
   it.each(['o', 'O'] as const)('repeats sibling opening with %s and captured text', async (key) => {
     const f = await fixture({ document: { roots: [node('a', 'A')] } })
     f.press(key)

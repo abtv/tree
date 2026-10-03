@@ -108,6 +108,15 @@ export function handleVimKey(
       clearCommandAssembly(commandState)
       vim.setMode('normal')
       vim.syncImageCaretToFocus()
+    } else if (/^[1-9]$/u.test(event.key) || (event.key === '0' && (commandState.pending?.count ?? '') !== '')) {
+      commandState.pending = { count: (commandState.pending?.count ?? '') + event.key, motionCount: '' }
+      return handled()
+    } else if (event.key === '>' || event.key === '<') {
+      // `g>` is not a command: the pending prefix cancels it instead of being ignored.
+      const shiftCount = commandState.pending?.prefix === undefined ? parseCount(commandState.pending?.count ?? '') : 0
+      clearPending(commandState)
+      if (shiftCount > 0) vim.nodeVisual.shift(event.key === '>' ? 'in' : 'out', shiftCount)
+      return handled()
     } else if (event.key === 'j' || event.key === 'k') {
       vim.nodeVisual.move(event.key === 'j' ? 'down' : 'up')
     } else if (event.key === 'G') vim.nodeVisual.move('last')
@@ -119,6 +128,9 @@ export function handleVimKey(
     } else if (event.key === 'o') vim.nodeVisual.swap()
     else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1)
       vim.nodeVisual.command(event.key as NodeVisualCommand)
+    // A count only belongs to `>` and `<` here; any other key discards it.
+    if (commandState.pending !== undefined && commandState.pending.count !== '')
+      commandState.pending = { ...commandState.pending, count: '' }
     return handled()
   }
   const input = event.currentTarget
@@ -541,6 +553,9 @@ export function handleVimKey(
         node.text.length - (selection.end - selection.start) + register.value.length,
       )
     }
+  } else if (visual && (event.key === '>' || event.key === '<')) {
+    // Moves the whole current subtree; the character selection stays selected afterwards.
+    vim.shiftCurrentNode(node.id, event.key === '>' ? 'in' : 'out', count, selection)
   } else if (!visual && event.key === 'x') {
     applyTextChange(store, node, input, cursor, vim, { kind: 'delete', motion: 'x', count })
   } else if (!visual && event.key === 'X') {

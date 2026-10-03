@@ -137,6 +137,50 @@ test.describe('Vim interactions at scale', () => {
     })
   }
 
+  for (const siblingCount of [1_000, 10_000]) {
+    test(`whole-node Visual > and < respond in a ${siblingCount}-sibling level`, async ({ userDataDir }) => {
+      const middle = Math.floor(siblingCount / 2)
+      const seed = wideSeed(siblingCount)
+      seed.location = { currentParentId: 'root', selectedNodeId: `c${middle}` }
+      seedDocument(userDataDir, seed)
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const input = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
+      await input.focus()
+      await expect(input).toBeFocused()
+      await window.evaluate(() => {
+        const samples: number[] = []
+        ;(window as unknown as { shiftPaints: number[] }).shiftPaints = samples
+        document.addEventListener(
+          'keydown',
+          (event) => {
+            if (event.key !== '>' && event.key !== '<') return
+            requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+          },
+          { capture: true },
+        )
+      })
+
+      await window.keyboard.press('V')
+      await window.keyboard.press('>')
+      await window.waitForFunction(() => (window as unknown as { shiftPaints: number[] }).shiftPaints.length === 1)
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+      await window.keyboard.press('<')
+      await window.waitForFunction(() => (window as unknown as { shiftPaints: number[] }).shiftPaints.length === 2)
+      const [indentPaintMs, outdentPaintMs] = await window.evaluate(
+        () => (window as unknown as { shiftPaints: number[] }).shiftPaints,
+      )
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+      await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
+      recordPerfResult({
+        kind: 'state',
+        scenario: `vim-node-visual-shift-wide-${siblingCount}`,
+        metrics: { indentPaintMs: round(indentPaintMs!), outdentPaintMs: round(outdentPaintMs!) },
+      })
+      expect(indentPaintMs).toBeLessThan(250)
+      expect(outdentPaintMs).toBeLessThan(250)
+    })
+  }
+
   test('wide sibling movement responds after a completed drag', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(1_000))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

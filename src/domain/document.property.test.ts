@@ -30,6 +30,7 @@ import {
   replaceLinkedTextRanges,
   replaceSiblingRange,
   serializeState,
+  shiftSiblingRange,
   splitNode,
   validatePersistedState,
   MAX_DOCUMENT_DEPTH,
@@ -446,6 +447,52 @@ describe('document invariants', () => {
         )
         expect(moved.node.children).toEqual(located.node.children)
         expect(allIds(result).slice().sort()).toEqual(allIds(document).slice().sort())
+      }),
+    )
+  })
+
+  it('shiftSiblingRange keeps every node, retains the range, and changes its depth by exactly one level', () => {
+    fc.assert(
+      fc.property(
+        forest,
+        fc.nat(),
+        fc.integer({ min: 1, max: 3 }),
+        fc.constantFrom('in' as const, 'out' as const),
+        (rawForest, seed, count, direction) => {
+          const document = materialize(rawForest)
+          const first = pick(document, seed)
+          const before = locateNode(document, first.id)!
+          const result = shiftSiblingRange(document, first.id, count, direction)
+          if (result.kind !== 'moved') {
+            expect(result.kind).toBe('impossible')
+            return
+          }
+          const range = before.siblings.slice(before.index, before.index + count)
+          expect(allIds(result.document).slice().sort()).toEqual(allIds(document).slice().sort())
+          expect(attachmentSummary(result.document)).toEqual(attachmentSummary(document))
+          const after = locateNode(result.document, first.id)!
+          expect(after.ancestors.length).toBe(before.ancestors.length + (direction === 'in' ? 1 : -1))
+          const placed = after.siblings.slice(after.index, after.index + count)
+          expect(placed.map((node) => node.id)).toEqual(range.map((node) => node.id))
+          // Moved subtrees are reused, not copied.
+          placed.forEach((node, index) => expect(node).toBe(range[index]))
+          assertDocument(result.document)
+        },
+      ),
+    )
+  })
+
+  it('shiftSiblingRange out undoes in, and in keeps the pre-order of the whole document', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: 1, max: 3 }), (rawForest, seed, count) => {
+        const document = materialize(rawForest)
+        const first = pick(document, seed)
+        const shifted = shiftSiblingRange(document, first.id, count, 'in')
+        if (shifted.kind !== 'moved') return
+        expect(allIds(shifted.document)).toEqual(allIds(document))
+        const restored = shiftSiblingRange(shifted.document, first.id, count, 'out')
+        expect(restored.kind).toBe('moved')
+        if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
     )
   })

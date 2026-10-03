@@ -128,7 +128,19 @@ export interface VimKeyboardState {
     swap: () => void
     exit: () => void
     command: (command: NodeVisualCommand) => void
+    /** `>` (`in`) or `<` (`out`) over the selected sibling range, `count` levels. */
+    shift: (direction: 'in' | 'out', count: number) => void
   }
+  /**
+   * Character Visual `>` or `<`: moves the current node and keeps the character selection
+   * `[start, end)` selected once the moved row has rendered.
+   */
+  shiftCurrentNode: (
+    nodeId: string,
+    direction: 'in' | 'out',
+    count: number,
+    selection: { start: number; end: number },
+  ) => void
   beginStructuralOpen: (position: 'before' | 'after') => void
   beginStructuralChildOpen: () => void
   repeatStructural: (change: VimStructuralChange) => void

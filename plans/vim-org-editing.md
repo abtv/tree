@@ -65,7 +65,7 @@ No minor gap was resolved by the agent. New material gaps found while implementi
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | VIM-00 | Finalize authorized requirements and outstanding decisions | Product Owner answers | Done (documentation only) |
-| VIM-01 | Visual nesting with selection retention (T2) | VIM-00 | Ready |
+| VIM-01 | Visual nesting with selection retention (T2) | VIM-00 | Done |
 | VIM-02 | Atomic counted subtree deletion and Normal puts (T1) | VIM-00 | Ready |
 | VIM-03 | Visual `p/P` exchange and counts (T3) | VIM-02 | Planned |
 | VIM-04 | Vertical operators and counted node Visual motion (T4) | VIM-03 | Planned |
@@ -172,10 +172,10 @@ For each implementation task:
 
 ## Exact next task and resume prompt
 
-**Next: VIM-01** (Visual nesting, PRODUCT §20.2.1 T2). VIM-02, VIM-05 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another.
+**Next: VIM-02** (atomic counted subtree commands, PRODUCT §20.2.1 T1). VIM-05 and VIM-09 are also Ready; take them in numeric order unless the Product Owner names another. VIM-01 landed: T2 is current behavior in PRODUCT §20.2; `EditorStore.shiftNodeVisual` and domain `shiftSiblingRange` exist, and `docs/VIM_CONFORMANCE.md` has the row.
 
 Resume prompt:
 
-> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-01.
+> Continue the Vim Editing Improvements initiative. Read plans/vim-org-editing.md and repository state. Follow its independent implementation boundary: define Tree behavior from the approved requirements in PRODUCT §20.2.1 and user examples, without inspecting or transferring other editors' source or tests. Take VIM-02.
 
-No task has been implemented or runtime-validated yet. VIM-00 changed documentation only.
+VIM-00 (documentation) and VIM-01 (Visual nesting) are done.

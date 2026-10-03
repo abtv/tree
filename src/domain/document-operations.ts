@@ -445,6 +445,48 @@ export function moveSibling(document: Document, nodeId: NodeId, destinationIndex
   return next
 }
 
+export type SiblingRangeShift = { kind: 'moved'; document: Document } | { kind: 'impossible' } | { kind: 'too-deep' }
+
+/**
+ * Moves `count` consecutive siblings starting at `firstId` one level. `in` appends them to the
+ * children of the sibling before the range; `out` places them directly after their parent. Order,
+ * IDs, and descendants are kept, and attachments are only moved, so the attachment summary carries
+ * over. `impossible` means the range has no preceding sibling (`in`), no parent (`out`), or does not
+ * fit in the sibling array; `too-deep` means a moved subtree would fall below `MAX_DOCUMENT_DEPTH`.
+ */
+export function shiftSiblingRange(
+  document: Document,
+  firstId: NodeId,
+  count: number,
+  direction: 'in' | 'out',
+): SiblingRangeShift {
+  const located = requireNode(document, firstId)
+  if (count < 1 || located.index + count > located.siblings.length) return { kind: 'impossible' }
+  const range = located.siblings.slice(located.index, located.index + count)
+  if (direction === 'in') {
+    const target = located.siblings[located.index - 1]
+    if (target === undefined) return { kind: 'impossible' }
+    // The range lands one level deeper than where it stands now.
+    const depth = located.ancestors.length + 2
+    if (range.some((node) => depth + subtreeHeight(node) - 1 > MAX_DOCUMENT_DEPTH)) return { kind: 'too-deep' }
+    const siblings = located.siblings.slice(0, located.index - 1)
+    siblings.push({ ...target, children: [...target.children, ...range] })
+    siblings.push(...located.siblings.slice(located.index + count))
+    const next = copyToRoot(document, located, siblings)
+    inheritAttachmentIds(document, next)
+    return { kind: 'moved', document: next }
+  }
+  const parent = located.parent
+  if (parent === null) return { kind: 'impossible' }
+  const parentLocated = requireNode(document, parent.id)
+  const remaining = [...parent.children.slice(0, located.index), ...parent.children.slice(located.index + count)]
+  const siblings = parentLocated.siblings.slice()
+  siblings.splice(parentLocated.index, 1, { ...parent, children: remaining }, ...range)
+  const next = copyToRoot(document, parentLocated, siblings)
+  inheritAttachmentIds(document, next)
+  return { kind: 'moved', document: next }
+}
+
 export function pasteText(
   document: Document,
   nodeId: NodeId,

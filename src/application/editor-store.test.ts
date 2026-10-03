@@ -228,6 +228,142 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toBe(before)
   })
 
+  // @requirement PRODUCT.md §16.2
+  it('blocks a Visual shift while locked', async () => {
+    const { store } = await lockEditor(new FakeClock(), [
+      { id: 'root', text: '', children: [] },
+      { id: 'b', text: 'B', children: [] },
+    ])
+    const before = store.getSnapshot()
+    expect(store.shiftNodeVisual('in', 'b', 'b')).toBe(false)
+    expect(store.getSnapshot()).toBe(before)
+  })
+
+  // @requirement PRODUCT.md §20.2
+  describe('Visual shift (> and <)', () => {
+    const roots: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      { id: 'b', text: 'B', children: [{ id: 'b1', text: 'B1', children: [] }] },
+      { id: 'c', text: 'C', children: [] },
+      { id: 'd', text: 'D', children: [] },
+    ]
+    const ready = (store: EditorStore): ReadySnapshot => {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+      return snapshot
+    }
+    const rootShape = (store: EditorStore): unknown =>
+      ready(store).document.roots.map((root) => [root.id, root.children.map((child) => child.id)])
+
+    async function load(selectedNodeId: string, currentParentId: string | null = null): Promise<EditorStore> {
+      const store = new EditorStore(
+        loadedState({ roots }, { currentParentId, selectedNodeId }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      return store
+    }
+
+    it('indents a range into the preceding sibling in one undo step, expands it, and keeps the selection', async () => {
+      const store = await load('c')
+      expect(store.shiftNodeVisual('in', 'b', 'c')).toBe(true)
+      expect(rootShape(store)).toEqual([
+        ['a', ['b', 'c']],
+        ['d', []],
+      ])
+      const snapshot = ready(store)
+      expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'c' })
+      expect(snapshot.expansion.expandedIds.has('a')).toBe(true)
+      expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'b', 'c', 'd'])
+      store.undo()
+      expect(rootShape(store)).toEqual([
+        ['a', []],
+        ['b', ['b1']],
+        ['c', []],
+        ['d', []],
+      ])
+    })
+
+    it('outdents a range to directly after its parent and changes the location only when it leaves it', async () => {
+      const store = await load('c')
+      store.shiftNodeVisual('in', 'b', 'c')
+      // Same range, now one level down inside `a`, displayed from the root location.
+      expect(store.shiftNodeVisual('out', 'c', 'b')).toBe(true)
+      expect(rootShape(store)).toEqual([
+        ['a', []],
+        ['b', ['b1']],
+        ['c', []],
+        ['d', []],
+      ])
+      expect(ready(store).location.currentParentId).toBeNull()
+    })
+
+    it('moves the displayed location up when the range leaves the current parent', async () => {
+      const store = await load('b1', 'b')
+      store.selectNode('b1', 0)
+      expect(store.shiftNodeVisual('out', 'b1', 'b1')).toBe(true)
+      expect(rootShape(store)).toEqual([
+        ['a', []],
+        ['b', []],
+        ['b1', []],
+        ['c', []],
+        ['d', []],
+      ])
+      expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'b1' })
+    })
+
+    it('applies a count as successive levels in one undo step, or not at all', async () => {
+      const store = await load('d')
+      const before = ready(store)
+      // `d` can enter `c`, but `c` then has no earlier child to receive it a second time.
+      expect(store.shiftNodeVisual('in', 'd', 'd', 2)).toBe(false)
+      expect(ready(store).document).toBe(before.document)
+
+      // `c` enters `b`, then `b1`: two levels, both destinations expanded, one history entry.
+      expect(store.shiftNodeVisual('in', 'c', 'c', 2)).toBe(true)
+      const snapshot = ready(store)
+      expect(snapshot.document.roots[1]!.children[0]!.children.map((child) => child.id)).toEqual(['c'])
+      expect([...snapshot.expansion.expandedIds].sort()).toEqual(['b', 'b1'])
+      store.undo()
+      expect(ready(store).document).toBe(before.document)
+    })
+
+    it('does nothing for the first sibling, a root moving out, and the current-parent heading', async () => {
+      const store = await load('a')
+      const before = ready(store)
+      expect(store.shiftNodeVisual('in', 'a', 'a')).toBe(false)
+      expect(store.shiftNodeVisual('out', 'b', 'c')).toBe(false)
+      expect(ready(store)).toBe(before)
+      const parentStore = await load('b', 'b')
+      const parentBefore = ready(parentStore)
+      expect(parentStore.shiftNodeVisual('out', 'b', 'b')).toBe(false)
+      expect(parentStore.shiftNodeVisual('in', 'b', 'b')).toBe(false)
+      expect(ready(parentStore)).toBe(parentBefore)
+    })
+
+    it('reports the depth error and changes nothing when a moved descendant would pass the limit', async () => {
+      let chain: TreeNode = { id: 'leaf', text: '', children: [] }
+      for (let level = MAX_DOCUMENT_DEPTH - 2; level >= 1; level -= 1) {
+        chain = { id: `n${level}`, text: '', children: [chain] }
+      }
+      const store = new EditorStore(
+        loadedState(
+          { roots: [{ id: 'first', text: '', children: [{ id: 'sibling', text: '', children: [] }] }, chain] },
+          { currentParentId: null, selectedNodeId: 'n1' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = ready(store)
+      // `n1` is MAX_DOCUMENT_DEPTH - 1 levels tall: one indent fits, a second would pass the limit.
+      expect(store.shiftNodeVisual('in', 'n1', 'n1', 2)).toBe(false)
+      expect(ready(store).document).toBe(before.document)
+      expect(ready(store).operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+    })
+  })
+
   // @requirement PRODUCT.md §16.1
   // @requirement PRODUCT.md §20.2
   describe('text-bearing structural creation', () => {

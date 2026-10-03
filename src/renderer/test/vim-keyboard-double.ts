@@ -96,7 +96,15 @@ export function createVimKeyboardDouble(
     scheduleCaret: vi.fn(),
     // Whole-node Visual entry is refused by default, matching a displayed node whose level cannot
     // enter Visual; tests that exercise the mode replace `vim.nodeVisual` with their own object.
-    nodeVisual: { enter: vi.fn(() => false), move: vi.fn(), swap: vi.fn(), exit: vi.fn(), command: vi.fn() },
+    nodeVisual: {
+      enter: vi.fn(() => false),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit: vi.fn(),
+      command: vi.fn(),
+      shift: vi.fn(),
+    },
+    shiftCurrentNode: vi.fn(),
     beginStructuralOpen: vi.fn((position: 'before' | 'after') => {
       beginStructuralOpen(commandState, nodeId, position)
     }),

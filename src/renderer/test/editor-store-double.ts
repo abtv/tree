@@ -109,6 +109,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     pasteSubtree: vi.fn(() => false),
     pasteNodeForest: vi.fn(() => false),
     applyNodeVisual: vi.fn(() => undefined),
+    shiftNodeVisual: vi.fn(() => false),
     deleteEmptySelected: vi.fn(),
     moveSelectedTo: vi.fn(),
     moveNodeTo: vi.fn(),

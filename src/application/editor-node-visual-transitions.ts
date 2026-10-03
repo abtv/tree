@@ -9,6 +9,7 @@ import {
   normalizeLinks,
   replaceSiblingRange,
   requireNode,
+  shiftSiblingRange,
   wouldExceedMaximumDepth,
   type Document,
   type Location,
@@ -53,6 +54,65 @@ export function pasteNodeForestTransition(
     document: nextDocument,
     location: { ...location, selectedNodeId: selectedId },
     focus: { nodeId: selectedId, cursor: 0 },
+  }
+}
+
+export type NodeVisualShiftTransition =
+  | { kind: 'none' }
+  | { kind: 'rejected'; message: string }
+  | { kind: 'shifted'; transition: StructuralTransition; expandIds: readonly NodeId[] }
+
+/**
+ * `>` and `<` over the sibling range between `anchorId` and `focusId` (a single node for character
+ * Visual mode): `count` successive one-level moves that either all happen or leave the document
+ * alone (`docs/PRODUCT.md` §20.2.1). The selected node and caret offset stay as they are; only the
+ * displayed location changes, and only when `out` takes the range above it.
+ */
+export function nodeVisualShiftTransition(
+  document: Document,
+  location: Location,
+  direction: 'in' | 'out',
+  anchorId: NodeId,
+  focusId: NodeId,
+  count: number,
+  cursor: number,
+): NodeVisualShiftTransition {
+  if (anchorId === location.currentParentId || focusId === location.currentParentId) return { kind: 'none' }
+  const anchorLocated = locateNode(document, anchorId)
+  if (anchorLocated === undefined) return { kind: 'none' }
+  const focusIndex = anchorLocated.siblings.findIndex((node) => node.id === focusId)
+  if (focusIndex < 0) return { kind: 'none' }
+  const start = Math.min(anchorLocated.index, focusIndex)
+  const span = Math.abs(anchorLocated.index - focusIndex) + 1
+  const firstId = anchorLocated.siblings[start]!.id
+  let next = document
+  const expandIds: NodeId[] = []
+  for (let level = 0; level < count; level += 1) {
+    if (direction === 'in') {
+      const current = requireNode(next, firstId)
+      const destination = current.siblings[current.index - 1]
+      if (destination === undefined) return { kind: 'none' }
+      expandIds.push(destination.id)
+    }
+    const result = shiftSiblingRange(next, firstId, span, direction)
+    if (result.kind === 'impossible') return { kind: 'none' }
+    if (result.kind === 'too-deep') return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+    next = result.document
+  }
+  const selected = requireNode(next, location.selectedNodeId)
+  // `<` can take the range out of the displayed location; the location then becomes the range's new
+  // parent so the selection stays a descendant of the current parent.
+  const stillDisplayed =
+    location.currentParentId === null || selected.ancestors.some((ancestor) => ancestor.id === location.currentParentId)
+  const currentParentId = stillDisplayed ? location.currentParentId : (requireNode(next, firstId).parent?.id ?? null)
+  return {
+    kind: 'shifted',
+    transition: {
+      document: next,
+      location: { ...location, currentParentId },
+      focus: { nodeId: location.selectedNodeId, cursor },
+    },
+    expandIds,
   }
 }
 

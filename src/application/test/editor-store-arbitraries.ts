@@ -51,6 +51,7 @@ export const command = fc.record({
     'selectDescendant',
     'toggleExpansion',
     'foldAll',
+    'shift',
   ),
   a: fc.nat({ max: 1_000 }),
   b: fc.nat({ max: 1_000 }),
@@ -77,6 +78,7 @@ export type CommandAction = {
     | 'selectDescendant'
     | 'toggleExpansion'
     | 'foldAll'
+    | 'shift'
   a: number
   b: number
   text: string
@@ -250,6 +252,20 @@ export async function applyCommand(
     case 'foldAll':
       store.applyFold(action.a % 2 === 0 ? 'close-all' : 'open-all')
       break
+    case 'shift': {
+      // A whole-node Visual range always ends at the selected node; its other end is any sibling.
+      const siblings = locateNode(state.document, state.location.selectedNodeId)?.siblings ?? []
+      if (siblings.length > 0) {
+        const anchor = siblings[action.b % siblings.length]!
+        store.shiftNodeVisual(
+          action.a % 2 === 0 ? 'in' : 'out',
+          anchor.id,
+          state.location.selectedNodeId,
+          1 + (action.text.length % 3),
+        )
+      }
+      break
+    }
   }
 
   return true

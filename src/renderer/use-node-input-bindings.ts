@@ -11,6 +11,7 @@ import {
   readEditableContent,
   setCaret,
   setNormalCaret,
+  setSelectionRange,
   updateSelectedLinks,
 } from './editor-dom'
 import {
@@ -118,6 +119,7 @@ export function useNodeInputBindings({
       }
     | undefined
   >(undefined)
+  const pendingVisualSelection = useRef<{ nodeId: string; start: number; end: number } | undefined>(undefined)
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
   const syncedImageFocusToken = useRef<number | undefined>(focus?.token)
@@ -348,6 +350,26 @@ export function useNodeInputBindings({
     ],
   )
 
+  // Whole-node Visual keeps its endpoint IDs, direction, and mode across `>` and `<`: the moved rows
+  // keep their IDs, so only the store changes and the selection state is left alone.
+  const shiftNodeVisual = useCallback(
+    (direction: 'in' | 'out', count: number): void => {
+      if (nodeVisualSelection === undefined) return
+      store.shiftNodeVisual(direction, nodeVisualSelection.anchorId, nodeVisualSelection.focusId, count)
+    },
+    [store, nodeVisualSelection],
+  )
+
+  const shiftCurrentNode = useCallback(
+    (nodeId: string, direction: 'in' | 'out', count: number, selection: { start: number; end: number }): void => {
+      if (!store.shiftNodeVisual(direction, nodeId, nodeId, count)) return
+      // The store's focus intent collapses the caret when the moved row renders; the layout effect
+      // below restores the selection once it has.
+      pendingVisualSelection.current = { nodeId, ...selection }
+    },
+    [store],
+  )
+
   const repeatStructural = useCallback(
     (change: VimStructuralChange): void => {
       const state = store.getSnapshot()
@@ -549,6 +571,17 @@ export function useNodeInputBindings({
       if (latestFocus.current?.token === focus.token && caretRevision.current === revision) applyFocus()
     })
   }, [focus])
+
+  // Declared after the focus effect so it runs after the focus intent collapsed the caret.
+  useLayoutEffect(() => {
+    const pending = pendingVisualSelection.current
+    if (pending === undefined) return
+    pendingVisualSelection.current = undefined
+    // The deferred pass of the focus effect re-applies the caret unless the revision moved on.
+    caretRevision.current += 1
+    const input = inputs.current.get(pending.nodeId)
+    if (input !== undefined) setSelectionRange(input, pending.start, pending.end)
+  })
 
   useLayoutEffect(() => {
     const pending = pendingCaret.current
@@ -825,7 +858,9 @@ export function useNodeInputBindings({
                 },
                 exit: () => setNodeVisualSelection(undefined),
                 command: commandNodeVisual,
+                shift: shiftNodeVisual,
               },
+              shiftCurrentNode,
               beginStructuralOpen: (position) => {
                 beginStructuralOpen(vimCommandState.current, node.id, position)
               },
@@ -891,6 +926,8 @@ export function useNodeInputBindings({
       composing,
       applyCaretState,
       commandNodeVisual,
+      shiftNodeVisual,
+      shiftCurrentNode,
       finishVimReplace,
       finishVimInsert,
       moveVimViewport,

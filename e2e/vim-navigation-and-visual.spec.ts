@@ -19,6 +19,18 @@ import {
 
 const launchTree = (userDataDir: string) => launchTreeBase(userDataDir, { initialMode: 'normal' })
 
+/** The visible rows' text, indented by two spaces per level below the shallowest visible row. */
+const outline = (window: Page): Promise<string[]> =>
+  window.locator('.node-row').evaluateAll((rows) => {
+    const depths = rows.map((row) => Number((row as HTMLElement).dataset.depth))
+    const base = Math.min(...depths)
+    return rows.map((row, index) => {
+      const input = row.querySelector('[aria-label^="Node "]')
+      const text = input instanceof HTMLTextAreaElement ? input.value : (input?.textContent ?? '')
+      return `${'  '.repeat(depths[index]! - base)}${text}`
+    })
+  })
+
 const selectionColors = (field: ReturnType<typeof node>) =>
   field.evaluate((element) => {
     const style = element.ownerDocument.defaultView?.getComputedStyle(element, '::selection')
@@ -1201,6 +1213,160 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('Meta+z')
     await window.keyboard.press('$')
     await expect(alpha).toHaveValue('one two three')
+  })
+
+  test('nests and un-nests a whole-node Visual range with > and <, keeping the range and undoing each step', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [{ id: 'bravo1', text: 'Bravo1', children: [] }] },
+          { id: 'charlie', text: 'Charlie', children: [] },
+          { id: 'delta', text: 'Delta', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'bravo' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const flat = ['Alpha', 'Bravo', 'Charlie', 'Delta']
+    const nested = ['Alpha', '  Bravo', '  Charlie', 'Delta']
+    const bravo = node(window, 2)
+    await bravo.focus()
+    await setCursor(bravo, 0)
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
+    await pressShifted(window, '>')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    // Alpha opened to show the moved range; Bravo stays collapsed, so its child is still hidden.
+    await expect.poll(() => outline(window)).toEqual(nested)
+
+    // The range kept its direction: `<` moves the same two nodes back out after Alpha.
+    await pressShifted(window, '<')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+    await expect.poll(() => outline(window)).toEqual(flat)
+
+    // Neither a first sibling nor a root can move: nothing changes and no error is shown.
+    await window.keyboard.press('Escape')
+    await node(window, 1).focus()
+    await window.keyboard.press('V')
+    await pressShifted(window, '>')
+    await pressShifted(window, '<')
+    await expect(window.getByRole('alert')).toHaveCount(0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    expect(await outline(window)).toEqual(flat)
+    await window.keyboard.press('Escape')
+
+    // Each shift is one undo step, and undo is not blocked by the failed attempts above.
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(nested)
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(flat)
+  })
+
+  test('applies a count to whole-node Visual > and refuses an impossible count without a change', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [{ id: 'alpha1', text: 'Alpha1', children: [] }] },
+          { id: 'bravo', text: 'Bravo', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'bravo' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const bravo = node(window, 2)
+    await bravo.focus()
+    await setCursor(bravo, 0)
+    await window.keyboard.press('V')
+    // Three levels are impossible (Alpha1 has no child to receive Bravo a third time).
+    await window.keyboard.press('3')
+    await pressShifted(window, '>')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.getByRole('alert')).toHaveCount(0)
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
+    expect(await outline(window)).toEqual(['Alpha', 'Bravo'])
+    await window.keyboard.press('2')
+    await pressShifted(window, '>')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha1', '    Bravo'])
+    // Both levels are one undo step.
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha1', 'Bravo'])
+  })
+
+  test('moves the current node with a character Visual > and < and keeps its character selection', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'alpha', text: 'Alpha', children: [] },
+          { id: 'bravo', text: 'Bravo', children: [] },
+          { id: 'charlie', text: 'Charlie', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'charlie' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const charlie = node(window, 3)
+    await charlie.focus()
+    await setCursor(charlie, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await expect(charlie).toHaveJSProperty('selectionEnd', 3)
+
+    await pressShifted(window, '>')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Bravo', '  Charlie'])
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 3)).toHaveJSProperty('selectionEnd', 3)
+
+    await pressShifted(window, '<')
+    await expect.poll(() => outline(window)).toEqual(['Alpha', 'Bravo', 'Charlie'])
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 3)).toHaveJSProperty('selectionEnd', 3)
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+  })
+
+  test('shows the displayed location one level up when whole-node Visual < leaves it', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'bravo',
+            text: 'Bravo',
+            children: [
+              { id: 'one', text: 'One', children: [] },
+              { id: 'two', text: 'Two', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'bravo', selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const one = node(window, 1)
+    await one.focus()
+    await setCursor(one, 0)
+    await window.keyboard.press('V')
+    await window.keyboard.press('j')
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Bravo')
+
+    await pressShifted(window, '<')
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveCount(0)
+    await expect.poll(() => nodeTexts(window)).toEqual(['Bravo', 'One', 'Two'])
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
   })
 
   test('exits whole-node Visual on a focus-changing shortcut', async ({ userDataDir }) => {
