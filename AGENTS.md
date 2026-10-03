@@ -43,6 +43,20 @@ An objection must name its anchor — a file, section, commit, or a concrete fai
 
 Leave the discussion only when the Product Owner asks for the change in words that authorize it. A conclusion the two of you reached together is not by itself that request. When a message could be either, treat it as discussion and say what you would do: acting unasked is the expensive mistake, asking is the cheap one.
 
+### Interpreting work requests
+
+The Product Owner-facing vocabulary and examples are in `README.md` under Working with the Coding Agent. Infer the kind of work and whether it needs a task or initiative from the request; the Product Owner does not need to supply a formal work type. State the interpretation before substantial work, and ask only when ambiguity affects authorization, product behavior, or a material choice.
+
+A concrete defect report is a request to investigate and correct the defect within recorded requirements. Follow the defect-first workflow, required validation, and commit policy when the defect is confirmed. A concrete usability problem with a clear result, such as an existing icon being hard to see, likewise authorizes a focused correction consistent with recorded intent; §5 still governs material choices. A tentative concern or an aesthetic preference without a clear result starts with discussion. A request to investigate authorizes evidence gathering, not implementation of newly proposed behavior. A comparison, specification draft, or proposed file text shown in the conversation changes no repository files.
+
+Explicit requests to edit files while withholding a commit authorize edits and preserve that review condition across sessions. Do not treat a request for a draft in the conversation as authorization to edit its file. A request to record an agreed discussion or create a plan authorizes the corresponding documentation work, not the planned runtime implementation.
+
+### Prototyping
+
+When explicitly requested, make a reversible prototype for Product Owner feedback within the stated scope. Honor instructions to postpone tests, full validation, or commits during this stage. State what is provisional and what has actually been checked; do not represent a prototype as a completed or validated implementation. Preserve user changes and data, and raise material product, persistence, compatibility, or architecture choices before crossing those boundaries. A prototype request authorizes trying the requested behavior, not choosing additional product behavior under §5.
+
+Iterate from feedback, keeping any review and no-commit conditions in force. When the Product Owner requests finalization, update the requirements for the authorized behavior, resolve material gaps, and complete the applicable tests, validation, review, documentation, and commit workflow in §§5 and 9-13. Liking a prototype or accepting a direction is not by itself a request to finalize. The `Exploratory` marker in `docs/PRODUCT.md` §1.2 remains a separate mechanism for implemented behavior and never waives validation.
+
 ### Agent and Model Routing
 
 Stay within the coding tool the Product Owner started for the session. Do not switch to or delegate work to a different coding tool. The primary agent may use that tool's configured planner, reviewer, product verifier, and product researcher subagents when the task calls for their roles under §§5, 8, and 13. Codex uses OpenAI models, Claude uses Anthropic models, and OpenCode uses DeepSeek models.
