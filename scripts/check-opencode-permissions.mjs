@@ -361,8 +361,8 @@ for (const command of documentedWorkflows) {
 // AGENTS.md §4 requires repository edits to go through the agent's own file-editing tool. Both
 // OpenCode and Claude Code enforce that by denying interpreters and in-place stream editing, and
 // the two configurations previously drifted: OpenCode denied them while Claude Code did not. This
-// asserts parity for that category only; OpenCode's other denials are its own approval boundary,
-// because a Claude Code session keeps the Product Owner in the loop for them.
+// asserts parity for that category only; each tool's other denials belong to its own approval
+// boundary (Claude Code's also rely on its Bash sandbox, see docs/DEVELOPMENT.md §10).
 const claudeSettings = JSON.parse(await readFile(new URL('../.claude/settings.json', import.meta.url), 'utf8'))
 const claudeDeny = claudeSettings.permissions?.deny ?? []
 
