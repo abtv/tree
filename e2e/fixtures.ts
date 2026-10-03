@@ -156,6 +156,33 @@ export function exactMessage(message: string): RegExp {
   return new RegExp(`^${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
 }
 
+// Electron toggles a checkbox item's `checked` inside `click`, exactly as a real menu click does.
+export async function clickApplicationMenuItem(app: ElectronApplication, menu: string, label: string): Promise<void> {
+  await app.evaluate(
+    ({ Menu }, target) => {
+      const submenu = Menu.getApplicationMenu()?.items.find((entry) => entry.label === target.menu)?.submenu
+      const item = submenu?.items.find((entry) => entry.label === target.label)
+      if (item?.click === undefined) throw new Error(`The ${target.menu} > ${target.label} menu item is unavailable.`)
+      item.click(item, undefined, {} as Electron.KeyboardEvent)
+    },
+    { menu, label },
+  )
+}
+
+export async function applicationMenuItemChecked(
+  app: ElectronApplication,
+  menu: string,
+  label: string,
+): Promise<boolean | undefined> {
+  return app.evaluate(
+    ({ Menu }, target) => {
+      const submenu = Menu.getApplicationMenu()?.items.find((entry) => entry.label === target.menu)?.submenu
+      return submenu?.items.find((entry) => entry.label === target.label)?.checked
+    },
+    { menu, label },
+  )
+}
+
 export async function clickApplicationMenuQuit(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ Menu }) => {
     const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items[0]

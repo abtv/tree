@@ -22,6 +22,8 @@ import {
   type BooleanPreferenceStore,
   type WindowBounds,
 } from '../infrastructure/main/window-state'
+import { ipcEvents } from '../shared/ipc'
+import { applicationMenuTemplate } from './application-menu'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
@@ -38,9 +40,13 @@ import {
   windowBackgroundColor,
 } from './window'
 
+app.setName('Tree')
+
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
 let alwaysOnTopStore: BooleanPreferenceStore | null = null
+let vimEnabledStore: BooleanPreferenceStore | null = null
+let requestQuitFromMenu: () => void = () => undefined
 const packagedRendererPath = join(__dirname, '../renderer/index.html')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 
@@ -57,6 +63,36 @@ const nativeClipboard: NativeClipboard = {
     return ''
   },
   writeRichText: (text, html) => clipboard.write([new ClipboardItem({ 'text/plain': text, 'text/html': html })]),
+}
+
+function isAlwaysOnTop(): boolean {
+  return mainWindow?.isAlwaysOnTop() ?? alwaysOnTopStore?.load() ?? false
+}
+
+function isVimEnabled(): boolean {
+  return vimEnabledStore?.load() ?? false
+}
+
+function rebuildApplicationMenu(): void {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      applicationMenuTemplate(
+        { vimEnabled: isVimEnabled(), alwaysOnTop: isAlwaysOnTop() },
+        {
+          requestQuit: requestQuitFromMenu,
+          setVimEnabled: (value) => {
+            vimEnabledStore?.save(value)
+            mainWindow?.webContents.send(ipcEvents.vimEnabledChanged, value)
+          },
+          setAlwaysOnTop: (value) => {
+            mainWindow?.setAlwaysOnTop(value)
+            alwaysOnTopStore?.save(value)
+            mainWindow?.webContents.send(ipcEvents.alwaysOnTopChanged, value)
+          },
+        },
+      ),
+    ),
+  )
 }
 
 function createMainWindow(): void {
@@ -129,7 +165,7 @@ bootstrapApplication({
     })
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
-    const vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
+    vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
     registerIpcHandlers({
       ipcMain,
       rendererUrl: resolvedRenderer.url,
@@ -153,26 +189,25 @@ bootstrapApplication({
           request,
         )
       },
-      getAlwaysOnTop: () => mainWindow?.isAlwaysOnTop() ?? alwaysOnTopStore?.load() ?? false,
+      getAlwaysOnTop: isAlwaysOnTop,
       setAlwaysOnTop: (value) => {
         mainWindow?.setAlwaysOnTop(value)
         alwaysOnTopStore?.save(value)
+        rebuildApplicationMenu()
       },
-      getVimEnabled: () => vimEnabledStore.load(),
-      setVimEnabled: (value) => vimEnabledStore.save(value),
+      getVimEnabled: isVimEnabled,
+      setVimEnabled: (value) => {
+        vimEnabledStore?.save(value)
+        rebuildApplicationMenu()
+      },
     })
   },
   registerShortcut: (surface) => globalShortcut.register('CommandOrControl+0', surface),
   surfaceWindow: () => surfaceWindow(mainWindow),
-  setApplicationMenu: (requestQuit) =>
-    Menu.setApplicationMenu(
-      Menu.buildFromTemplate([
-        {
-          label: 'Tree',
-          submenu: [{ label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: requestQuit }],
-        },
-      ]),
-    ),
+  setApplicationMenu: (requestQuit) => {
+    requestQuitFromMenu = requestQuit
+    rebuildApplicationMenu()
+  },
   unregisterShortcut: () => globalShortcut.unregister('CommandOrControl+0'),
   onStartupError: (error) => {
     reportMainProcessError('Could not start the application', error)

@@ -1,5 +1,7 @@
 // @editing-modes: explicit
 import {
+  applicationMenuItemChecked,
+  clickApplicationMenuItem,
   closeApp,
   expect,
   launchTree,
@@ -50,6 +52,40 @@ test.describe('Vim editing toggle', () => {
     const tooltipBox = (await tooltip.boundingBox())!
     expect(tooltipBox.x).toBeGreaterThanOrEqual(0)
     expect(tooltipBox.y + tooltipBox.height).toBeLessThanOrEqual(toggleBox.y)
+  })
+
+  // @requirement PRODUCT.md §9.3
+  test('switches Vim editing from the Edit menu and keeps the menu and status bar in step', async ({ userDataDir }) => {
+    seedDocument(userDataDir, seed)
+    const first = await launchTree(userDataDir, { vimPreference: 'saved' })
+    const editor = node(first.window, 1)
+    await setCursor(editor, 1)
+    expect(await applicationMenuItemChecked(first.app, 'Edit', 'Vim Editing')).toBe(false)
+
+    await clickApplicationMenuItem(first.app, 'Edit', 'Vim Editing')
+
+    await expect(first.window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(first.window.getByRole('button', { name: 'Disable Vim editing' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(editor).toBeFocused()
+    await first.window.keyboard.press('x')
+    await expect(editor).toHaveValue('ac')
+    await expect.poll(() => readVimPreference(userDataDir)).toBe(true)
+
+    await first.window.getByRole('button', { name: 'Disable Vim editing' }).click()
+    await expect(first.window.getByLabel('Vim mode')).toHaveCount(0)
+    await expect.poll(() => applicationMenuItemChecked(first.app, 'Edit', 'Vim Editing')).toBe(false)
+    await first.window.getByRole('button', { name: 'Enable Vim editing' }).click()
+    await expect.poll(() => applicationMenuItemChecked(first.app, 'Edit', 'Vim Editing')).toBe(true)
+    await closeApp(first.app)
+
+    const second = await launchTree(userDataDir, { vimPreference: 'saved', initialMode: 'normal' })
+    expect(await applicationMenuItemChecked(second.app, 'Edit', 'Vim Editing')).toBe(true)
+    await clickApplicationMenuItem(second.app, 'Edit', 'Vim Editing')
+    await expect(second.window.getByLabel('Vim mode')).toHaveCount(0)
+    await expect.poll(() => readVimPreference(userDataDir)).toBe(false)
   })
 
   // @requirement PRODUCT.md §20.2

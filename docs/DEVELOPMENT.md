@@ -78,6 +78,8 @@ To run an existing production build locally:
 npm run start
 ```
 
+Both commands first run `scripts/rename-dev-app.mjs` (the `predev` and `prestart` hooks). On macOS it rewrites the bundle name in `node_modules/electron/dist/Electron.app/Contents/Info.plist` to "Tree", so the menu bar shows the application name instead of "Electron". This changes a dependency file in place and is repeated after every `npm install`. The Dock tooltip and icon still say "Electron" in development, because macOS takes them from the bundle itself; a packaged build sets its own name.
+
 ---
 
 ## 5. Production Build

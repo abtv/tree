@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ipcChannels, type TreeApi } from '../shared/ipc'
+import { ipcChannels, ipcEvents, type TreeApi } from '../shared/ipc'
 
 const mocks = vi.hoisted(() => ({
   exposeInMainWorld: vi.fn(),
@@ -97,6 +97,32 @@ describe('preload bridge', () => {
     expect(failed).toHaveBeenCalledWith('quit failed')
     expect(mocks.removeListener).toHaveBeenCalledWith('tree:quit-requested', requestedHandler)
     expect(mocks.removeListener).toHaveBeenCalledWith('tree:quit-failed', failedHandler)
+  })
+
+  it('delivers menu-driven preference changes and removes the listeners', async () => {
+    const { treeApi } = (await import('../preload/index')) as { treeApi: TreeApi }
+    const alwaysOnTop = vi.fn()
+    const vimEnabled = vi.fn()
+    mocks.on.mockClear()
+    mocks.removeListener.mockClear()
+
+    const removeAlwaysOnTop = treeApi.onAlwaysOnTopChanged?.(alwaysOnTop)
+    const removeVimEnabled = treeApi.onVimEnabledChanged?.(vimEnabled)
+    expect(mocks.on.mock.calls.map((call) => call[0])).toEqual([
+      ipcEvents.alwaysOnTopChanged,
+      ipcEvents.vimEnabledChanged,
+    ])
+    const alwaysOnTopHandler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: boolean) => void
+    const vimEnabledHandler = mocks.on.mock.calls[1]?.[1] as (event: unknown, value: boolean) => void
+    alwaysOnTopHandler({}, true)
+    vimEnabledHandler({}, false)
+    removeAlwaysOnTop?.()
+    removeVimEnabled?.()
+
+    expect(alwaysOnTop).toHaveBeenCalledExactlyOnceWith(true)
+    expect(vimEnabled).toHaveBeenCalledExactlyOnceWith(false)
+    expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.alwaysOnTopChanged, alwaysOnTopHandler)
+    expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.vimEnabledChanged, vimEnabledHandler)
   })
 
   it('preserves rejected IPC promises', async () => {

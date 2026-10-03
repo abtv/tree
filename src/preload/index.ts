@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { ipcChannels, type TreeApi } from '../shared/ipc'
+import { ipcChannels, ipcEvents, type TreeApi } from '../shared/ipc'
 
 export const treeApi: TreeApi = {
   quit: (requestId) => ipcRenderer.invoke(ipcChannels.quit, requestId),
@@ -26,6 +26,16 @@ export const treeApi: TreeApi = {
   setAlwaysOnTop: (alwaysOnTop) => ipcRenderer.invoke(ipcChannels.setAlwaysOnTop, alwaysOnTop),
   getVimEnabled: () => ipcRenderer.invoke(ipcChannels.getVimEnabled),
   setVimEnabled: (vimEnabled) => ipcRenderer.invoke(ipcChannels.setVimEnabled, vimEnabled),
+  onAlwaysOnTopChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: boolean): void => listener(value)
+    ipcRenderer.on(ipcEvents.alwaysOnTopChanged, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.alwaysOnTopChanged, handler)
+  },
+  onVimEnabledChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: boolean): void => listener(value)
+    ipcRenderer.on(ipcEvents.vimEnabledChanged, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.vimEnabledChanged, handler)
+  },
 }
 
 contextBridge.exposeInMainWorld('treeApi', treeApi)

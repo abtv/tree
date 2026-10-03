@@ -91,6 +91,18 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     // The editing mode already changed for this session; a failed write only loses the saved choice.
     void window.treeApi.setVimEnabled(nextValue).catch((error: unknown) => store.reportError(error))
   }, [vimEnabled, setVimEditing, store])
+  // The application menu owns its own check marks and persists the value; the renderer only follows it.
+  useEffect(() => {
+    const stopAlwaysOnTop = window.treeApi.onAlwaysOnTopChanged?.(setAlwaysOnTop)
+    const stopVimEnabled = window.treeApi.onVimEnabledChanged?.((nextValue) => {
+      setVimEditing(nextValue)
+      setVimEnabled(nextValue)
+    })
+    return () => {
+      stopAlwaysOnTop?.()
+      stopVimEnabled?.()
+    }
+  }, [setVimEditing])
   // Called after the input bindings so the restore aligns the selected row after their initial focus.
   useScrollRestoration(store, state.status === 'ready')
   const enterNode = useCallback(

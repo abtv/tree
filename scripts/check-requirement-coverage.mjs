@@ -9,6 +9,10 @@ export const EXEMPTIONS = new Map([
   ['1', 'Product overview; executable rules are specified in the detailed sections.'],
   ['1.1', 'Product priorities and conflict governance; their behavior is owned by the referenced requirements.'],
   ['1.2', 'Product Owner governance for exploratory sections, rather than application behavior.'],
+  [
+    '1.3',
+    'Standing convention applied while checking every change; its behavior is owned by the requirements it governs.',
+  ],
 ])
 
 // AGENTS.md §9: native shell/shortcuts, persistence, attachments, clipboard, and drag-and-drop.
@@ -20,6 +24,7 @@ export const BOUNDARY_SECTIONS = new Set([
   '9',
   '9.1',
   '9.2',
+  '9.3',
   '11',
   '12',
   '13',

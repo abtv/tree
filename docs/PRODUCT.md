@@ -43,6 +43,14 @@ Only the Product Owner sets or removes the marker. No section is exploratory unl
 
 The requirements in a marked section stay normative: they are implemented, tested, and validated exactly like every other section. What the marker changes is how an agent may resolve what the section does not yet say, which `AGENTS.md` §5 defines.
 
+### 1.3 Platform Conventions
+
+The application is a native-feeling macOS application and follows Apple's Human Interface Guidelines (<https://developer.apple.com/design/human-interface-guidelines/>) wherever this document does not specify a different behavior. This covers the menu bar and its standard menus, standard keyboard shortcuts, window behavior, text editing, system appearance, and the wording and placement of controls. For example, a command that acts on the window belongs in the Window menu and a command that changes text editing belongs in the Edit menu, not in a menu invented for the application.
+
+A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
+
+Every change to user-visible behavior is checked against the guidelines before it is considered complete. A conflict that is not already recorded as a deliberate difference is reported to the Product Owner instead of being settled silently, under `AGENTS.md` §14.
+
 ---
 
 ## 2. Tree Model
@@ -493,6 +501,16 @@ Behavior:
 ### 9.2 Window Close
 
 Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry. In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2.
+
+### 9.3 Application Menu
+
+The menu bar has three menus, laid out as macOS applications do (§1.3):
+
+* **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
+* **Edit** holds a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
+* **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
+
+Each check item is another control for the status-bar toggle of the same name and always agrees with it. Choosing the item has exactly the effect of clicking the toggle: Vim editing switches in Normal mode or back to standard editing with the caret kept, the window is pinned or unpinned, the editor keeps its focus, and the choice is saved and restored at the next start. Using the status-bar toggle updates the check mark. The menu bar and the status bar never disagree, including at startup.
 
 ---
 

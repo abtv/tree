@@ -1,5 +1,14 @@
 // @editing-modes: both
-import { closeApp, describeForEachEditingMode, expect, launchTree, node, test } from './fixtures'
+import {
+  applicationMenuItemChecked,
+  clickApplicationMenuItem,
+  closeApp,
+  describeForEachEditingMode,
+  expect,
+  launchTree,
+  node,
+  test,
+} from './fixtures'
 
 describeForEachEditingMode('always-on-top window', ({ mode }) => {
   // @requirement PRODUCT.md §2.2
@@ -65,5 +74,39 @@ describeForEachEditingMode('always-on-top window', ({ mode }) => {
     await expect(editor).toBeFocused()
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await closeApp(app)
+  })
+
+  // @requirement PRODUCT.md §9.3
+  test('switches Always on Top from the Window menu and keeps the menu and status bar in step', async ({
+    userDataDir,
+  }) => {
+    const first = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = node(first.window, 1)
+    await editor.focus()
+    const alwaysOnTop = (): Promise<boolean | undefined> =>
+      first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isAlwaysOnTop())
+    expect(await applicationMenuItemChecked(first.app, 'Window', 'Always on Top')).toBe(false)
+
+    await clickApplicationMenuItem(first.app, 'Window', 'Always on Top')
+
+    await expect(first.window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
+    await expect.poll(alwaysOnTop).toBe(true)
+    await expect(editor).toBeFocused()
+
+    await first.window.getByRole('button', { name: 'Unpin window from top' }).click()
+    await expect.poll(() => applicationMenuItemChecked(first.app, 'Window', 'Always on Top')).toBe(false)
+    await first.window.getByRole('button', { name: 'Pin window on top' }).click()
+    await expect.poll(() => applicationMenuItemChecked(first.app, 'Window', 'Always on Top')).toBe(true)
+    await closeApp(first.app)
+
+    const second = await launchTree(userDataDir)
+    await expect(second.window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
+    expect(await applicationMenuItemChecked(second.app, 'Window', 'Always on Top')).toBe(true)
+    await clickApplicationMenuItem(second.app, 'Window', 'Always on Top')
+    await expect(second.window.getByRole('button', { name: 'Pin window on top' })).toBeVisible()
+    await expect
+      .poll(() => second.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isAlwaysOnTop()))
+      .toBe(false)
+    await closeApp(second.app)
   })
 })

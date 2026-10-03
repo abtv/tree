@@ -18,6 +18,12 @@ export const ipcChannels = {
   setVimEnabled: 'tree:set-vim-enabled',
 } as const
 
+/** Main-to-renderer notifications that the application menu changed a preference. */
+export const ipcEvents = {
+  alwaysOnTopChanged: 'tree:always-on-top-changed',
+  vimEnabledChanged: 'tree:vim-enabled-changed',
+} as const
+
 export type ClipboardPayload =
   { kind: 'text'; text: string; links?: readonly LinkRange[] } | { kind: 'image'; png: Uint8Array }
 
@@ -55,4 +61,7 @@ export interface TreeApi {
   setAlwaysOnTop(alwaysOnTop: boolean): Promise<void>
   getVimEnabled(): Promise<boolean>
   setVimEnabled(vimEnabled: boolean): Promise<void>
+  /** Fires when the application menu changes the setting, so the renderer can follow it. */
+  onAlwaysOnTopChanged?: (listener: (alwaysOnTop: boolean) => void) => () => void
+  onVimEnabledChanged?: (listener: (vimEnabled: boolean) => void) => () => void
 }

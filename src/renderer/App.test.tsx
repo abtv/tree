@@ -1279,6 +1279,84 @@ describe('App', () => {
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
   })
 
+  describe('application menu changes', () => {
+    function captureMenuListeners(): {
+      alwaysOnTop: (value: boolean) => void
+      vimEnabled: (value: boolean) => void
+      removed: () => number
+    } {
+      let alwaysOnTop: (value: boolean) => void = () => undefined
+      let vimEnabled: (value: boolean) => void = () => undefined
+      let removals = 0
+      window.treeApi.onAlwaysOnTopChanged = (listener) => {
+        alwaysOnTop = listener
+        return () => void removals++
+      }
+      window.treeApi.onVimEnabledChanged = (listener) => {
+        vimEnabled = listener
+        return () => void removals++
+      }
+      return {
+        alwaysOnTop: (value) => act(() => alwaysOnTop(value)),
+        vimEnabled: (value) => act(() => vimEnabled(value)),
+        removed: () => removals,
+      }
+    }
+
+    // @requirement PRODUCT.md §9.3
+    it('follows the menu for Always on Top without writing the preference again', async () => {
+      const store = await createSeededStore(
+        { roots: [{ id: 'root', text: 'abc', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const menu = captureMenuListeners()
+      const setAlwaysOnTop = vi.spyOn(window.treeApi, 'setAlwaysOnTop')
+      renderReact(<App initialVimEnabled store={store} />)
+
+      menu.alwaysOnTop(true)
+      expect(screen.getByRole('button', { name: 'Unpin window from top' })).toHaveAttribute('aria-pressed', 'true')
+      menu.alwaysOnTop(false)
+      expect(screen.getByRole('button', { name: 'Pin window on top' })).toHaveAttribute('aria-pressed', 'false')
+      expect(setAlwaysOnTop).not.toHaveBeenCalled()
+    })
+
+    // @requirement PRODUCT.md §9.3
+    it('follows the menu for Vim editing like the status-bar toggle, without writing the preference again', async () => {
+      const store = await createSeededStore(
+        { roots: [{ id: 'root', text: 'abc', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const menu = captureMenuListeners()
+      const setVimEnabled = vi.spyOn(window.treeApi, 'setVimEnabled')
+      renderReact(<App initialVimEnabled={false} store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      root.focus()
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
+
+      menu.vimEnabled(true)
+      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+      expect(screen.getByRole('button', { name: 'Disable Vim editing' })).toHaveAttribute('aria-pressed', 'true')
+      menu.vimEnabled(false)
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
+      expect(screen.getByRole('button', { name: 'Enable Vim editing' })).toHaveAttribute('aria-pressed', 'false')
+      expect(setVimEnabled).not.toHaveBeenCalled()
+    })
+
+    // @requirement PRODUCT.md §9.3
+    it('stops listening to the menu when unmounted', async () => {
+      const store = await createSeededStore(
+        { roots: [{ id: 'root', text: 'abc', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      const menu = captureMenuListeners()
+      const view = renderReact(<App initialVimEnabled store={store} />)
+
+      view.unmount()
+
+      expect(menu.removed()).toBe(2)
+    })
+  })
+
   describe('Vim editing toggle', () => {
     async function seededRoot(text: string): Promise<EditorStore> {
       return createSeededStore(

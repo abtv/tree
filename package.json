@@ -13,7 +13,9 @@
   "scripts": {
     "postinstall": "install-electron",
     "prepare": "git config core.hooksPath .githooks",
+    "predev": "node scripts/rename-dev-app.mjs",
     "dev": "electron-vite dev",
+    "prestart": "node scripts/rename-dev-app.mjs",
     "start": "electron-vite preview",
     "build": "electron-vite build",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",

@@ -411,6 +411,7 @@ A task is complete only when:
 * the highest applicable validation tier in `docs/DEVELOPMENT.md` §9 passes;
 * no required end-to-end test is skipped because of the environment;
 * no unrelated behavior was changed;
+* a change to user-visible behavior was checked against Apple's Human Interface Guidelines as `docs/PRODUCT.md` §1.3 requires, and any unrecorded conflict was raised under §14;
 * the repository remains in a coherent state.
 
 When a working plan is required, satisfy it and extract durable knowledge before deleting it.
