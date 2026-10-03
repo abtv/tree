@@ -41,7 +41,13 @@ export type VimTextChange =
     }
   | { kind: 'paste'; after: boolean; text: string }
   | { kind: 'overwrite'; text: string; replaced: number }
-  | { kind: 'case'; mode: 'toggle' | 'lower' | 'upper'; count: number }
+  | {
+      kind: 'case'
+      mode: 'toggle' | 'lower' | 'upper'
+      count: number
+      /** Set for `gu`, `gU`, and `g~`: the in-node motion or text object that selects the range. */
+      motion?: string
+    }
 
 export type VimSurroundChange =
   | { kind: 'surround-add'; motion: string; count: number; delimiter: string }
@@ -79,7 +85,8 @@ export type VimSurroundStage =
 
 export interface VimPendingCommand {
   count: string
-  operator?: 'd' | 'y' | 'c' | 's'
+  /** `u`, `U`, and `~` are the case operators `gu`, `gU`, and `g~`; `s` is the `ys` surround. */
+  operator?: 'd' | 'y' | 'c' | 's' | 'u' | 'U' | '~'
   motionCount: string
   awaiting?: 'f' | 'F' | 't' | 'T' | 'r'
   prefix?: 'g' | 'i' | 'a' | 'z'

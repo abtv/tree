@@ -19,6 +19,7 @@ import {
   surroundWrapEdits,
   type VimSurroundEdits,
 } from './vim-surround'
+import type { LinkedTextEdit, LinkRange } from '../domain/document'
 import type { VimFindCommand } from './vim-keyboard-types'
 import type { VimSurroundChange, VimTextChange } from './vim-keyboard-types'
 import { vimPastePosition } from './vim-editing'
@@ -153,6 +154,37 @@ export function transformCase(text: string, mode: 'toggle' | 'lower' | 'upper'):
   ).join('')
 }
 
+/**
+ * The edits that change the case of `[start, end)` outside every hyperlink. A link's text is its URL,
+ * so recasing it would change the address and drop the link; the case commands leave link text as it
+ * is (`docs/PRODUCT.md` §20.2) and rewrite only the segments between links. Segments whose case does
+ * not change produce no edit.
+ */
+export function caseEdits(
+  text: string,
+  links: readonly LinkRange[],
+  start: number,
+  end: number,
+  mode: 'toggle' | 'lower' | 'upper',
+): LinkedTextEdit[] {
+  const edits: LinkedTextEdit[] = []
+  const addSegment = (from: number, to: number): void => {
+    if (to <= from) return
+    const original = text.slice(from, to)
+    const inserted = transformCase(original, mode)
+    if (inserted !== original) edits.push({ start: from, end: to, inserted })
+  }
+  let from = start
+  for (const link of [...links].sort((a, b) => a.start - b.start)) {
+    if (link.end <= from) continue
+    if (link.start >= end) break
+    addSegment(from, link.start)
+    from = Math.max(from, link.end)
+  }
+  addSegment(from, end)
+  return edits
+}
+
 // Mutation triage: the two prefix bounds are redundant with each other, and a forced-true or
 // inclusive bound still stops when `before[start]` and `after[start]` differ or one is undefined.
 export function textDifference(before: string, after: string): { start: number; end: number; inserted: string } {
@@ -178,6 +210,8 @@ export type CalculatedTextChange =
       nextText: string
       nextCursor: number
       registerText?: string
+      /** Set for a case change: the disjoint edits that rewrite the range around its hyperlinks. */
+      edits?: LinkedTextEdit[]
     }
 
 export function calculateTextChange(
@@ -185,7 +219,9 @@ export function calculateTextChange(
   cursor: number,
   change: VimTextChange,
   replay = false,
+  links: readonly LinkRange[] = [],
 ): CalculatedTextChange | undefined {
+  let caseEditList: LinkedTextEdit[] | undefined
   let start = cursor
   let end = cursor
   // Mutation triage: every branch that reads `inserted` assigns it first, so the initializer is dead.
@@ -226,10 +262,19 @@ export function calculateTextChange(
     nextCursor = cursor + Math.max(0, inserted.length - 1)
     // Mutation triage: `case` is the last arm of an exhaustive union, so only `case` reaches it.
   } else if (change.kind === 'case') {
-    end = Math.min(text.length, cursor + change.count)
+    if (change.motion === undefined) end = Math.min(text.length, cursor + change.count)
+    else {
+      const range = textMotion(text, cursor, change.motion, change.count)
+      if (range === undefined) return undefined
+      start = range.start
+      end = range.end
+    }
     if (start === end) return undefined
-    inserted = transformCase(text.slice(start, end), change.mode)
-    nextCursor = start + inserted.length
+    caseEditList = caseEdits(text, links, start, end, change.mode)
+    const recased = applySurroundEdits(text, caseEditList)
+    inserted = recased.slice(start, recased.length - (text.length - end))
+    // `~` advances past the changed text; an operator leaves the caret at the start of its range.
+    nextCursor = change.motion === undefined ? start + inserted.length : start
   }
   const registerText =
     start !== end && (change.kind === 'delete' || change.kind === 'change' || change.kind === 'substitute')
@@ -259,6 +304,7 @@ export function calculateTextChange(
     nextCursor,
     // Mutation triage: spreading `{ registerText: undefined }` is the same for every value reader.
     ...(registerText === undefined ? {} : { registerText }),
+    ...(caseEditList === undefined ? {} : { edits: caseEditList }),
   }
 }
 

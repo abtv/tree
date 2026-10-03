@@ -4,6 +4,7 @@ import { cloneNode, displayedNodes, linkAtPosition, locateNode, requireNode, typ
 import { getCaret, getSelectionRange, setCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
+  caseEdits,
   calculateTextChange,
   insertPosition,
   isTextMotion,
@@ -12,17 +13,17 @@ import {
   parseCount,
   repeatedFindMotion,
   textMotion,
-  transformCase,
 } from './vim-text-commands'
 import type {
   VimFindCommand,
   VimFoldCommand,
   VimKeyboardState,
+  VimPendingCommand,
   VimStructuralChange,
   VimSurroundChange,
   VimTextChange,
 } from './vim-keyboard-types'
-import { surroundDelimiterKey, surroundLineRange } from './vim-surround'
+import { applySurroundEdits, surroundDelimiterKey, surroundLineRange } from './vim-surround'
 import { clearCommandAssembly, clearPending, clearVisualRange, recordRepeatChange } from './vim-command-state'
 import { editCaretTransition, horizontalCaretTransition } from './vim-caret-transition'
 import { navigateVertically } from './vim-vertical-navigation'
@@ -37,6 +38,9 @@ const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
   M: 'close-all',
   R: 'open-all',
 }
+
+/** The case operators after the `g` prefix: `gu`, `gU`, and `g~` (`docs/PRODUCT.md` §20.2.1 T5). */
+const CASE_OPERATOR_MODES = { u: 'lower', U: 'upper', '~': 'toggle' } as const
 
 /**
  * Keydowns that never form a command key by themselves: modifier and lock keys, dead or compose
@@ -166,8 +170,21 @@ export function handleVimKey(
   }
   const operatorChangeKind = (operator: 'd' | 'y' | 'c'): 'delete' | 'yank' | 'change' =>
     operator === 'd' ? 'delete' : operator === 'c' ? 'change' : 'yank'
-  /** Finish a `d`, `y`, `c`, or `ys` operator once its motion is known. */
-  const applyOperatorMotion = (operator: 'd' | 'y' | 'c' | 's', motion: string, motionTotal: number): void => {
+  /** Finish a `d`, `y`, `c`, `ys`, `gu`, `gU`, or `g~` operator once its motion is known. */
+  const applyOperatorMotion = (
+    operator: NonNullable<VimPendingCommand['operator']>,
+    motion: string,
+    motionTotal: number,
+  ): void => {
+    if (operator === 'u' || operator === 'U' || operator === '~') {
+      applyTextChange(store, node, input, cursor, vim, {
+        kind: 'case',
+        mode: CASE_OPERATOR_MODES[operator],
+        motion,
+        count: motionTotal,
+      })
+      return
+    }
     if (operator !== 's') {
       applyTextChange(store, node, input, cursor, vim, {
         kind: operatorChangeKind(operator),
@@ -269,9 +286,16 @@ export function handleVimKey(
         const range = textMotion(node.text, motionCursor, 'ge', count)
         if (range !== undefined) move(range.target)
       }
+    } else if (
+      !visual &&
+      pending.operator === undefined &&
+      (event.key === 'u' || event.key === 'U' || event.key === '~')
+    ) {
+      // `gu`, `gU`, and `g~` wait for a motion; a count typed before the `g` stays with the operator.
+      commandState.pending = { count: pending.count, motionCount: '', operator: event.key }
     } else if (!visual && pending.operator === undefined && pending.count === '' && event.key === 'g')
       vim.moveBoundary('parent', cursor)
-    else if (!visual && pending.count === '' && event.key === 'd') {
+    else if (!visual && pending.operator === undefined && pending.count === '' && event.key === 'd') {
       store.enter()
       vim.syncImageCaretToFocus()
     }
@@ -313,7 +337,10 @@ export function handleVimKey(
   if (pending.operator !== undefined) {
     if (pending.operator !== 's' && event.key === pending.operator && pending.motionCount === '') {
       clearPending(commandState)
-      if (pending.operator === 'd') {
+      if (pending.operator === 'u' || pending.operator === 'U' || pending.operator === '~') {
+        // `guu`, `gUU`, and `g~~` act on the whole text of the node; a count does not extend them.
+        applyOperatorMotion(pending.operator, 'all', 1)
+      } else if (pending.operator === 'd') {
         // One undoable command for the whole range; the register changes only after it succeeded.
         const removed = store.deleteSiblingRange(parseCount(pending.count))
         if (removed !== undefined) {
@@ -333,7 +360,8 @@ export function handleVimKey(
       } else applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
       return handled()
     }
-    if (event.key === 's' && pending.operator !== 's') {
+    // `s` after a case operator is not a surround; it falls through and cancels the command.
+    if (event.key === 's' && (pending.operator === 'd' || pending.operator === 'y' || pending.operator === 'c')) {
       if (pending.operator === 'y') {
         pending.operator = 's'
         commandState.pending = pending
@@ -380,7 +408,10 @@ export function handleVimKey(
       return handled()
     }
     clearPending(commandState)
-    if ((event.key === 'j' || event.key === 'k') && pending.operator !== 's') {
+    if (
+      (event.key === 'j' || event.key === 'k') &&
+      (pending.operator === 'd' || pending.operator === 'y' || pending.operator === 'c')
+    ) {
       vim.verticalOperator(node.id, pending.operator, event.key === 'j' ? 'down' : 'up', totalCount)
       return handled()
     }
@@ -539,8 +570,15 @@ export function handleVimKey(
         motionCount: '',
         surround: { stage: 'delimiter', start: selection.start, end: selection.end, fromVisual: true },
       }
-  } else if (visual && (event.key === 'u' || event.key === 'U')) {
-    applyVisualCase(store, node, input, vim, selection, event.key === 'u' ? 'lower' : 'upper')
+  } else if (visual && (event.key === 'u' || event.key === 'U' || event.key === '~')) {
+    applyVisualCase(
+      store,
+      node,
+      input,
+      vim,
+      selection,
+      event.key === '~' ? 'toggle' : event.key === 'u' ? 'lower' : 'upper',
+    )
   } else if (visual && (event.key === 'p' || event.key === 'P')) {
     const register = vim.register.current
     if (register.kind === 'text' && register.value !== '' && selection.start !== selection.end) {
@@ -581,6 +619,10 @@ export function handleVimKey(
       motion: '$',
       count: 1,
     })
+  } else if (!visual && event.key === 'Y') {
+    // `Y` is `y$`: it has the same no-op on an image caret and never replaces the repeatable change.
+    if (node.attachment === undefined || cursor !== node.text.length)
+      applyTextChange(store, node, input, cursor, vim, { kind: 'yank', motion: '$', count: 1 })
   } else if (!visual && event.key === 'S') {
     if (pending.count !== '') {
       clearPending(commandState)
@@ -758,13 +800,17 @@ function applyTextChange(
   change: VimTextChange,
   replay = false,
 ): { text: string; cursor: number } | undefined {
-  const result = calculateTextChange(node.text, cursor, change, replay)
+  const result = calculateTextChange(node.text, cursor, change, replay, node.links ?? [])
   if (result === undefined) return undefined
   if (result.registerText !== undefined) vim.register.current = { kind: 'text', value: result.registerText }
   if (result.kind === 'yank') return undefined
   if (replay && result.nextText === node.text) return undefined
-  if (result.nextText !== node.text) store.replaceTextRange(node.id, result.start, result.end, result.inserted)
-  if (result.nextText !== node.text) vim.imageTextCursor.current = undefined
+  if (result.nextText !== node.text) {
+    // A case change rewrites around hyperlinks as one edit list; every other change is one range.
+    if (result.edits === undefined) store.replaceTextRange(node.id, result.start, result.end, result.inserted)
+    else store.replaceTextRanges(node.id, result.edits)
+    vim.imageTextCursor.current = undefined
+  }
   if (!replay && (change.kind === 'change' || change.kind === 'substitute')) {
     vim.beginInsert(node.id, result.nextText, result.start, change)
     vim.setMode('insert')
@@ -801,20 +847,17 @@ function applyVisualCase(
   input: HTMLElement,
   vim: VimKeyboardState,
   selection: { start: number; end: number },
-  mode: 'lower' | 'upper',
+  mode: 'toggle' | 'lower' | 'upper',
 ): void {
   if (selection.start === selection.end) return
-  const replacement = transformCase(node.text.slice(selection.start, selection.end), mode)
-  store.replaceTextRange(node.id, selection.start, selection.end, replacement)
+  const edits = caseEdits(node.text, node.links ?? [], selection.start, selection.end, mode)
+  const recasedLength = applySurroundEdits(node.text, edits).length
+  store.replaceTextRanges(node.id, edits)
   vim.imageTextCursor.current = undefined
-  recordRepeatChange(vim.commandState, { kind: 'case', mode, count: selection.end - selection.start })
+  // A case change that alters nothing keeps the saved change for `.`, like the operator forms.
+  if (edits.length > 0)
+    recordRepeatChange(vim.commandState, { kind: 'case', mode, count: selection.end - selection.start })
   // Vim leaves the cursor at the start of the operated range for a Visual-mode operator,
   // independent of the selection direction and of any length change from the case transform.
-  leaveVisual(
-    vim,
-    node,
-    input,
-    selection.start,
-    node.text.length - (selection.end - selection.start) + replacement.length,
-  )
+  leaveVisual(vim, node, input, selection.start, recasedLength)
 }

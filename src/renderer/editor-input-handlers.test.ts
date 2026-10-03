@@ -1217,6 +1217,8 @@ describe('editor keyboard handler', () => {
 
     for (const pending of unfinished) {
       for (const key of ['u', 'r'] as const) {
+        // `gu` is the lowercase operator, so `u` after the `g` prefix continues that command.
+        if (key === 'u' && pending.prefix === 'g') continue
         const store = createStore()
         const input = document.createElement('textarea')
         input.value = 'text'
@@ -2540,6 +2542,189 @@ describe('editor keyboard handler', () => {
     expect(image.node().attachment?.id).toBe('image')
     expect(image.caretRequests).toEqual([0])
     expectImageCaret(image.caretNodeId, image.caret, 'node', false)
+  })
+
+  it('toggles the case of a character Visual selection with ~ and returns to its start', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'aBcDe', children: [] }, 'visual')
+    fixture.input.setSelectionRange(1, 4)
+    fixture.vim.commandState.visualAnchor = 3
+    fixture.vim.commandState.visualFocus = 1
+    fixture.vim.register.current = { kind: 'text', value: 'keep' }
+    fixture.press('~')
+    expect(fixture.node().text).toBe('abCde')
+    expect(fixture.vim.mode).toBe('normal')
+    expect(fixture.caretRequests).toEqual([1])
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
+    fixture.store.undo()
+    expect(fixture.node().text).toBe('aBcDe')
+  })
+
+  it.each([
+    { keys: ['g', 'u', 'w'], cursor: 0, text: 'foo BAR baz', expected: 'foo BAR baz', caret: 0 },
+    { keys: ['g', 'U', 'w'], cursor: 0, text: 'foo bar baz', expected: 'FOO bar baz', caret: 0 },
+    { keys: ['g', 'U', '2', 'w'], cursor: 0, text: 'foo bar baz', expected: 'FOO BAR baz', caret: 0 },
+    { keys: ['2', 'g', 'U', 'w'], cursor: 0, text: 'foo bar baz', expected: 'FOO BAR baz', caret: 0 },
+    { keys: ['2', 'g', 'U', '2', 'w'], cursor: 0, text: 'a b c d e', expected: 'A B C D e', caret: 0 },
+    { keys: ['g', 'u', 'w'], cursor: 4, text: 'FOO BAR BAZ', expected: 'FOO bar BAZ', caret: 4 },
+    { keys: ['g', '~', '$'], cursor: 4, text: 'foo bAr', expected: 'foo BaR', caret: 4 },
+    { keys: ['g', 'U', 'b'], cursor: 4, text: 'foo bar', expected: 'FOO bar', caret: 0 },
+    { keys: ['g', 'U', 'i', 'w'], cursor: 5, text: 'foo bar baz', expected: 'foo BAR baz', caret: 4 },
+    { keys: ['g', 'u', 'a', '"'], cursor: 2, text: 'x "AB" y', expected: 'x "ab" y', caret: 2 },
+    { keys: ['g', 'U', 'f', 'r'], cursor: 0, text: 'foo bar', expected: 'FOO BAR', caret: 0 },
+    { keys: ['g', 'U', 'g', 'e'], cursor: 4, text: 'foo bar', expected: 'foO bar', caret: 2 },
+    { keys: ['g', 'U', 'U'], cursor: 3, text: 'foo bar', expected: 'FOO BAR', caret: 0 },
+    { keys: ['g', 'u', 'u'], cursor: 3, text: 'Foo BAR', expected: 'foo bar', caret: 0 },
+    { keys: ['g', '~', '~'], cursor: 3, text: 'Foo bAR', expected: 'fOO Bar', caret: 0 },
+    { keys: ['3', 'g', 'U', 'U'], cursor: 0, text: 'foo bar', expected: 'FOO BAR', caret: 0 },
+    // `ß` uppercases to two characters: the range grows, the node keeps its other text.
+    { keys: ['g', 'U', 'w'], cursor: 0, text: 'straße x', expected: 'STRASSE x', caret: 0 },
+  ])('applies $keys to $text as one undoable case change', async ({ keys, cursor, text, expected, caret }) => {
+    const fixture = await textFixture({ id: 'node', text, children: [] })
+    fixture.input.setSelectionRange(cursor, cursor)
+    fixture.vim.register.current = { kind: 'text', value: 'keep' }
+    fixture.press(...keys)
+    expect(fixture.node().text).toBe(expected)
+    expect(fixture.vim.mode).toBe('normal')
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
+    expect(fixture.vim.commandState.pending).toBeUndefined()
+    if (expected !== text) expect(fixture.caretRequests.at(-1)).toBe(caret)
+    fixture.store.undo()
+    expect(fixture.node().text).toBe(text)
+  })
+
+  it('leaves the document and the repeatable change alone for a case operator that matches nothing', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'ABC', children: [] })
+    fixture.input.setSelectionRange(0, 0)
+    fixture.press('x')
+    const last = fixture.vim.commandState.lastChange
+    fixture.input.setSelectionRange(0, 0)
+    for (const keys of [
+      ['g', 'U', 'w'],
+      ['g', 'U', 'f', 'z'],
+      ['g', 'U', 'i', '('],
+      ['g', 'U', 'j'],
+      ['g', 'U', 's'],
+      ['g', 'U', 'x'],
+    ])
+      fixture.press(...keys)
+    expect(fixture.node().text).toBe('BC')
+    expect(fixture.vim.commandState.lastChange).toBe(last)
+    expect(fixture.vim.commandState.pending).toBeUndefined()
+    const empty = await textFixture({ id: 'node', text: '', children: [] })
+    empty.press('g', 'U', 'U')
+    expect(empty.node().text).toBe('')
+  })
+
+  it('cancels a case operator instead of reading the next g as a prefix command', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'ab cd', children: [] })
+    fixture.input.setSelectionRange(3, 3)
+    fixture.press('g', 'U', 'g', 'g')
+    expect(fixture.node().text).toBe('ab cd')
+    expect(fixture.vim.commandState.pending).toBeUndefined()
+    for (const operator of ['U', 'u', '~']) {
+      vi.spyOn(fixture.store, 'enter')
+      fixture.press('g', operator, 'g', 'd')
+      expect(fixture.store.enter).not.toHaveBeenCalled()
+      expect(fixture.node().text).toBe('ab cd')
+      expect(fixture.vim.commandState.pending).toBeUndefined()
+    }
+  })
+
+  it('keeps the repeatable change when a Visual case command changes nothing', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'abCD', children: [] })
+    fixture.input.setSelectionRange(0, 0)
+    fixture.press('x')
+    const last = fixture.vim.commandState.lastChange
+    fixture.vim.setMode('visual')
+    fixture.vim.commandState.visualAnchor = 1
+    fixture.vim.commandState.visualFocus = 2
+    fixture.input.setSelectionRange(1, 3)
+    fixture.press('U')
+    expect(fixture.node().text).toBe('bCD')
+    expect(fixture.vim.mode).toBe('normal')
+    expect(fixture.vim.commandState.lastChange).toBe(last)
+  })
+
+  it('records a case operator for repeat and replays it at the caret', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'ab cd ef', children: [] })
+    fixture.input.setSelectionRange(0, 0)
+    fixture.press('g', 'U', 'w')
+    expect(fixture.node().text).toBe('AB cd ef')
+    fixture.input.setSelectionRange(3, 3)
+    fixture.press('.')
+    expect(fixture.node().text).toBe('AB CD ef')
+  })
+
+  it('preserves hyperlinks, children, and the attachment through a case operator', async () => {
+    const original: TreeNode = {
+      id: 'node',
+      text: 'ß see https://Example.test/Path now',
+      links: [{ start: 6, end: 31, url: 'https://Example.test/Path' }],
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [{ id: 'child', text: 'child', children: [] }],
+    }
+    const upper = {
+      ...original,
+      text: 'SS SEE https://Example.test/Path NOW',
+      links: [{ start: 7, end: 32, url: 'https://Example.test/Path' }],
+    }
+    const fixture = await textFixture(original)
+    fixture.input.setSelectionRange(0, 0)
+    // A link's text is its URL, so the case command rewrites around it and shifts the link when
+    // an earlier character grows (`ß` to `SS`).
+    fixture.press('g', 'U', 'U')
+    expect(fixture.node()).toEqual(upper)
+    fixture.store.undo()
+    expect(fixture.node()).toEqual(original)
+    fixture.input.setSelectionRange(0, 0)
+    fixture.press('g', '~', '~')
+    expect(fixture.node()).toEqual({ ...upper, text: 'SS SEE https://Example.test/Path NOW' })
+  })
+
+  it('does not run a case operator from the image caret', async () => {
+    const original: TreeNode = {
+      id: 'node',
+      text: 'ab',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    }
+    const fixture = await textFixture(original)
+    fixture.input.setSelectionRange(2, 2)
+    fixture.press('g', 'U', 'w')
+    expect(fixture.node().text).toBe('ab')
+  })
+
+  it('yanks to the end of the text with Y without replacing the repeatable change', async () => {
+    const fixture = await textFixture({ id: 'node', text: 'foo bar', children: [] })
+    fixture.input.setSelectionRange(0, 0)
+    fixture.press('x')
+    const last = fixture.vim.commandState.lastChange
+    fixture.input.setSelectionRange(3, 3)
+    fixture.press('Y')
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'bar' })
+    expect(fixture.node().text).toBe('oo bar')
+    expect(fixture.vim.commandState.lastChange).toBe(last)
+    expect(fixture.vim.mode).toBe('normal')
+    fixture.input.setSelectionRange(4, 4)
+    fixture.press('2', 'Y')
+    expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'ar' })
+  })
+
+  it('does nothing for Y on an image caret or an empty node', async () => {
+    const image = await textFixture({
+      id: 'node',
+      text: 'ab',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    image.vim.register.current = { kind: 'text', value: 'keep' }
+    image.input.setSelectionRange(2, 2)
+    image.press('Y')
+    expect(image.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
+    const empty = await textFixture({ id: 'node', text: '', children: [] })
+    empty.vim.register.current = { kind: 'text', value: 'keep' }
+    empty.press('Y')
+    expect(empty.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
   })
 
   it('does not dispatch commands while native text composition is active', () => {

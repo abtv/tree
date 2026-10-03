@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   calculateSurround,
   calculateTextChange,
+  caseEdits,
   insertPosition,
   isTextMotion,
   isTextObjectKey,
@@ -329,10 +330,49 @@ describe('Vim text changes beyond deletion', () => {
       inserted: 'AbC',
       nextText: 'AbC',
       nextCursor: 3,
+      edits: [{ start: 0, end: 3, inserted: 'AbC' }],
     })
     expect(calculateTextChange('aBc', 0, { kind: 'case', mode: 'upper', count: 2 })).toMatchObject({ inserted: 'AB' })
     expect(calculateTextChange('aBc', 0, { kind: 'case', mode: 'lower', count: 2 })).toMatchObject({ inserted: 'ab' })
     expect(calculateTextChange('abc', 3, { kind: 'case', mode: 'toggle', count: 1 })).toBeUndefined()
+  })
+
+  it('changes case over a motion range and leaves the caret at its start', () => {
+    expect(calculateTextChange('foo bar baz', 4, { kind: 'case', mode: 'upper', motion: 'w', count: 1 })).toMatchObject(
+      {
+        start: 4,
+        end: 8,
+        inserted: 'BAR ',
+        nextText: 'foo BAR baz',
+        nextCursor: 4,
+      },
+    )
+    expect(calculateTextChange('foo bar', 4, { kind: 'case', mode: 'upper', motion: 'b', count: 1 })).toMatchObject({
+      nextText: 'FOO bar',
+      nextCursor: 0,
+    })
+    expect(calculateTextChange('foo bar', 0, { kind: 'case', mode: 'toggle', motion: 'all', count: 1 })).toMatchObject({
+      nextText: 'FOO BAR',
+      nextCursor: 0,
+    })
+    expect(calculateTextChange('foo', 0, { kind: 'case', mode: 'upper', motion: 'fz', count: 1 })).toBeUndefined()
+    expect(calculateTextChange('', 0, { kind: 'case', mode: 'upper', motion: 'all', count: 1 })).toBeUndefined()
+  })
+
+  it('rewrites case around hyperlinks and across a length change', () => {
+    const url = 'https://Example.test'
+    const links = [{ start: 2, end: 2 + url.length, url }]
+    const text = `ß ${url} ß`
+    expect(caseEdits(text, links, 0, text.length, 'upper')).toEqual([
+      { start: 0, end: 2, inserted: 'SS ' },
+      { start: 2 + url.length, end: text.length, inserted: ' SS' },
+    ])
+    expect(caseEdits(text, links, 3, 10, 'upper')).toEqual([])
+    expect(caseEdits('abc', [], 1, 3, 'upper')).toEqual([{ start: 1, end: 3, inserted: 'BC' }])
+    expect(caseEdits('ABC', [], 0, 3, 'upper')).toEqual([])
+    expect(
+      calculateTextChange(text, 0, { kind: 'case', mode: 'upper', motion: 'all', count: 1 }, false, links),
+    ).toMatchObject({ nextText: `SS ${url} SS`, nextCursor: 0 })
   })
 
   it('replays change and substitute edits through their recorded offset', () => {

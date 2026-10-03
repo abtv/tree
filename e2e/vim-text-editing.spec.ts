@@ -950,4 +950,113 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('"see" it now')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
+
+  // @requirement PRODUCT.md §20.2
+  test('changes case with gu, gU, g~, and Visual ~ around a hyperlink', async ({ userDataDir }) => {
+    const url = 'https://example.test/Page'
+    const text = `alpha ${url} beta gamma`
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text,
+            links: [{ start: 6, end: 6 + url.length, url }],
+            children: [{ id: 'child', text: 'child', children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    const mode = window.getByLabel('Vim mode')
+
+    // Every check also proves the node still has its one link, with its original address.
+    const expectText = async (expected: string): Promise<void> => {
+      await expect(editor).toHaveText(expected)
+      await expect(editor.getByRole('link')).toHaveCount(1)
+      await expect(editor.getByRole('link')).toHaveAttribute('href', url)
+      await expect(editor.getByRole('link')).toHaveText(url)
+    }
+    await expectText(text)
+
+    // The whole-node forms rewrite everything around the link and leave its URL text alone.
+    await setCursor(editor, 3)
+    await window.keyboard.press('g')
+    await pressShifted(window, 'U')
+    await pressShifted(window, 'U')
+    await expectText(`ALPHA ${url} BETA GAMMA`)
+    await expect(mode).toHaveText('NORMAL')
+    await window.keyboard.press('g')
+    await window.keyboard.press('u')
+    await window.keyboard.press('u')
+    await expectText(text)
+    await window.keyboard.press('g')
+    await pressShifted(window, '~')
+    await pressShifted(window, '~')
+    await expectText(`ALPHA ${url} BETA GAMMA`)
+
+    // A motion or a text object covers its own range; each command is one undoable change.
+    await window.keyboard.press('u')
+    await window.keyboard.press('u')
+    await window.keyboard.press('u')
+    await expectText(text)
+    await setCursor(editor, 0)
+    await window.keyboard.press('g')
+    await pressShifted(window, 'U')
+    await window.keyboard.press('w')
+    await expectText(`ALPHA ${url} beta gamma`)
+    await setCursor(editor, 2)
+    await window.keyboard.press('g')
+    await window.keyboard.press('u')
+    await window.keyboard.press('i')
+    await window.keyboard.press('w')
+    await expectText(text)
+
+    // Visual `~` toggles the selection and returns to Normal mode.
+    await setCursor(editor, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('e')
+    await pressShifted(window, '~')
+    await expectText(`ALPHA ${url} beta gamma`)
+    await expect(mode).toHaveText('NORMAL')
+
+    // One undo restores the previous text.
+    await window.keyboard.press('u')
+    await expectText(text)
+  })
+
+  // @requirement PRODUCT.md §20.2
+  test('yanks to the end of the node with Y without disturbing the repeatable change', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'one two three', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    // `Y` copies from the caret through the end of the text and leaves the text alone.
+    await setCursor(editor, 4)
+    await pressShifted(window, 'Y')
+    await expect(editor).toHaveValue('one two three')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await setCursor(editor, 0)
+    await pressShifted(window, 'P')
+    await expect(editor).toHaveValue('two threeone two three')
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('one two three')
+
+    // The yank did not replace the saved `x`, so dot still deletes one character.
+    await setCursor(editor, 0)
+    await window.keyboard.press('x')
+    await expect(editor).toHaveValue('ne two three')
+    await setCursor(editor, 3)
+    await pressShifted(window, 'Y')
+    await setCursor(editor, 0)
+    await window.keyboard.press('.')
+    await expect(editor).toHaveValue('e two three')
+  })
 })
