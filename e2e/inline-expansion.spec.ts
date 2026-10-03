@@ -527,6 +527,30 @@ test.describe('inline node expansion (Vim editing only)', () => {
     ])
   })
 
+  test('opens an empty first child with o on a collapsed node that has children, keeping the location', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+    const locationBefore = await window.getByLabel('Current location').innerText()
+    await node(window, 1).focus()
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
+    await window.keyboard.press('o')
+    await window.keyboard.type('New')
+    await window.keyboard.press('Escape')
+
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Alpha child one', 'Alpha child two', 'Bravo'])
+    await expect(node(window, 2)).toBeFocused()
+    expect(await window.getByLabel('Current location').innerText()).toBe(locationBefore)
+
+    // A leaf still gets a sibling below.
+    await node(window, 5).focus()
+    await window.keyboard.press('o')
+    await window.keyboard.press('Escape')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Alpha child one', 'Alpha child two', 'Bravo', ''])
+  })
+
   test('keeps the location when deleting with dd and undoing with u a visible descendant', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })

@@ -5,6 +5,7 @@ import { buildVisibleRows } from './visible-rows'
 import {
   ancestorNavigationTransition,
   createFirstChildTransition,
+  openBelowTransition,
   createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
@@ -436,6 +437,22 @@ describe('editor command transitions', () => {
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['new-child', 'first', 'second'])
     expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'new-child' })
     expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
+  })
+
+  it('opens a first child in place for a selected node with children and a sibling below for a leaf', () => {
+    const child = openBelowTransition(document, { currentParentId: null, selectedNodeId: 'root' }, () => 'new-child')
+
+    if (!('document' in child)) throw new Error('Expected an accepted transition.')
+    expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['new-child', 'first', 'second'])
+    expect(child.location).toEqual({ currentParentId: null, selectedNodeId: 'new-child' })
+    expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
+    expect(child.expandId).toBe('root')
+
+    const sibling = openBelowTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, () => 'below')
+    if (!('document' in sibling)) throw new Error('Expected an accepted transition.')
+    expect(sibling.document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'below', 'second'])
+    expect(sibling.location).toEqual({ currentParentId: 'root', selectedNodeId: 'below' })
+    expect(sibling.expandId).toBeUndefined()
   })
 
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {

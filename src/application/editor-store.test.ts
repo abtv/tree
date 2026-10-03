@@ -1769,6 +1769,46 @@ describe('EditorStore', () => {
     })
   })
 
+  it('opens a first child in place, expanding a collapsed node, when the selected node has children', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          {
+            id: 'root',
+            text: 'Root',
+            children: [
+              { id: 'p', text: 'P', children: [{ id: 'c', text: 'C', children: [] }] },
+              { id: 'leaf', text: 'Leaf', children: [] },
+            ],
+          },
+        ],
+      },
+      { currentParentId: 'root', selectedNodeId: 'p' },
+    )
+    const store = new EditorStore(services, ids('first', 'repeat'))
+    const ready = (target: EditorStore) => target.getSnapshot() as ReadySnapshot
+    await store.initialize()
+    expect(ready(store).expansion.expandedIds.has('p')).toBe(false)
+
+    expect(store.createSibling('after')).toBe(true)
+    expect(ready(store)).toMatchObject({
+      document: {
+        roots: [{ children: [{ id: 'p', children: [{ id: 'first', text: '' }, { id: 'c' }] }, { id: 'leaf' }] }],
+      },
+      location: { currentParentId: 'root', selectedNodeId: 'first' },
+      focus: { nodeId: 'first', cursor: 0 },
+    })
+    expect(ready(store).expansion.expandedIds.has('p')).toBe(true)
+
+    store.undo()
+    expect(ready(store).document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['c'])
+
+    store.selectNode('p', 0)
+    store.createSiblingWithText('after', 'Typed')
+    expect(ready(store).document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['repeat', 'c'])
+    expect(ready(store).document.roots[0]!.children[0]!.children[0]!.text).toBe('Typed')
+  })
+
   it('returns to the current parent after deleting its only child', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
     await store.initialize()

@@ -39,8 +39,10 @@ import {
   moveNodeTransition,
   moveSelectionTransition,
   moveSelectionBoundaryTransition,
+  openBelowTransition,
   pasteSubtreeTransition,
   type SiblingInsertionPosition,
+  type StructuralTransition,
 } from './editor-command-transitions'
 import { clipboardIntroducesLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
@@ -594,14 +596,28 @@ export class EditorStore {
   public createSibling(position: 'before' | 'after'): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
-    const transition = createSiblingTransition(state.document, state.location, position, this.createId)
+    const transition = this.openTransition(state, position)
     this.endTextSession()
     this.applyStructural(
       transition.document,
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.expansionAfterOpen(state.expansion, transition),
     )
     return true
+  }
+
+  private openTransition(
+    state: { document: Document; location: Location },
+    position: 'before' | 'after',
+  ): StructuralTransition & { expandId?: NodeId } {
+    return position === 'after'
+      ? openBelowTransition(state.document, state.location, this.createId)
+      : createSiblingTransition(state.document, state.location, position, this.createId)
+  }
+
+  private expansionAfterOpen(expansion: ExpansionState, transition: { expandId?: NodeId }): ExpansionState {
+    return transition.expandId === undefined ? expansion : expandNode(expansion, transition.expandId)
   }
 
   public createChild(): boolean {
@@ -624,13 +640,18 @@ export class EditorStore {
   public createSiblingWithText(position: 'before' | 'after', text: string): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
-    const transition = createSiblingTransition(state.document, state.location, position, this.createId)
+    const transition = this.openTransition(state, position)
     // Editing the freshly created empty node to empty text is an identity operation;
     // malformed default link entries are discarded by domain normalization.
     const document =
       text === '' ? transition.document : editNodeContent(transition.document, transition.focus.nodeId, text, [])
     this.endTextSession()
-    this.applyStructural(document, transition.location, this.runtime.newFocus(transition.focus.nodeId, text.length))
+    this.applyStructural(
+      document,
+      transition.location,
+      this.runtime.newFocus(transition.focus.nodeId, text.length),
+      this.expansionAfterOpen(state.expansion, transition),
+    )
     // For empty text, noteChange(0, false) only repeats applyStructural's pending idle save.
     if (text !== '') this.noteChange(countInsertedWords('', text), false)
   }
