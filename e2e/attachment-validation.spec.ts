@@ -238,7 +238,7 @@ test.describe('image-only text caret (Vim editing only)', () => {
 
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     await expect(editor).toHaveCSS('height', '20px')
-    await expect(editor).toHaveCSS('caret-color', 'rgb(55, 63, 67)')
+    await expect(editor).toHaveCSS('caret-color', 'rgb(59, 56, 51)')
     await expect(row).toHaveScreenshot('image-only-insert-empty.png', { caret: 'initial' })
     await typeInto(editor, 'typed after row click')
     await expect(editor).toHaveValue('typed after row click')
@@ -297,7 +297,7 @@ test.describe('image-only blank row click in standard editing', () => {
 
     await expect(editor).toBeFocused()
     await expect(editor).toHaveCSS('height', '20px')
-    await expect(editor).toHaveCSS('caret-color', 'rgb(55, 63, 67)')
+    await expect(editor).toHaveCSS('caret-color', 'rgb(59, 56, 51)')
     await expect(row).toHaveScreenshot('image-only-standard-blank-row.png', { caret: 'initial' })
     await window.keyboard.type('typed after row click')
     await expect(editor).toHaveValue('typed after row click')

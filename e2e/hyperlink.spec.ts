@@ -32,7 +32,7 @@ describeForEachEditingMode('external hyperlinks', ({ screenshotName }) => {
     const link = editor.getByRole('link', { name: url })
     await expect(link).toHaveAttribute('href', url)
     await expect(link).toHaveCSS('text-decoration-line', 'underline')
-    await expect(link).toHaveCSS('color', 'rgb(23, 105, 170)')
+    await expect(link).toHaveCSS('color', 'rgb(58, 110, 165)')
     await setCursor(editor, url.length)
     await editor.press('/')
     await editor.press('a')

@@ -2,7 +2,7 @@ import type { App, BrowserWindow, NativeTheme, Session, WebContents, WebPreferen
 
 // Match the document surface in styles.css before the renderer exists and after it is torn down.
 export function windowBackgroundColor(dark: boolean): string {
-  return dark ? '#3f3f3f' : '#ffffff'
+  return dark ? '#3f3f3f' : '#fbf8f1'
 }
 
 export function followWindowAppearance(

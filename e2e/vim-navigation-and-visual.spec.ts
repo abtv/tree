@@ -511,7 +511,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       ),
     ).toBeGreaterThan(1)
     await expect(first).toHaveClass(/node-input-text-selected/)
-    expect(await selectionColors(first)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
     await expect(first).toHaveScreenshot('vim-normal-text-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
@@ -524,7 +524,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await second.focus()
     await expect(second).not.toHaveClass(/node-input-text-selected/)
     expect(await selectionColors(second)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
-    expect(await selectionColors(first)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
 
     // Collapsing back to the block caret removes the deliberate-selection highlight.
     await first.click({ position: { x: 20, y: 10 } })
@@ -534,7 +534,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // Select-all is also a deliberate selection, not the one-character block caret.
     await window.keyboard.press('Meta+a')
     await expect(first).toHaveClass(/node-input-text-selected/)
-    expect(await selectionColors(first)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
   })
 
   test('crosses a hyperlink one character at a time', async ({ userDataDir }) => {
@@ -725,8 +725,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.toString())).toBe('http')
     expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.isCollapsed)).toBe(false)
     await expect(link).not.toHaveClass(/link-selected/)
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
-    expect(await selectionColors(link)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
     await expect(editor).toHaveScreenshot('vim-visual-link-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
@@ -766,8 +766,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     )
     expect(await editor.evaluate((field) => field.ownerDocument.defaultView?.getSelection()?.isCollapsed)).toBe(false)
     await expect(link).not.toHaveClass(/link-selected/)
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
-    expect(await selectionColors(link)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
+    expect(await selectionColors(link)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
     await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })

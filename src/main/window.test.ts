@@ -17,7 +17,7 @@ import {
 describe('window appearance', () => {
   it('uses the document surface for both appearances', () => {
     expect(windowBackgroundColor(true)).toBe('#3f3f3f')
-    expect(windowBackgroundColor(false)).toBe('#ffffff')
+    expect(windowBackgroundColor(false)).toBe('#fbf8f1')
   })
 
   it('updates the native background and removes its listener when the window closes', () => {
@@ -31,7 +31,7 @@ describe('window appearance', () => {
     expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#3f3f3f')
     theme.shouldUseDarkColors = false
     update()
-    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#ffffff')
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#fbf8f1')
     expect(window.once).toHaveBeenCalledWith('closed', closed)
     closed()
     expect(theme.removeListener).toHaveBeenCalledWith('updated', update)

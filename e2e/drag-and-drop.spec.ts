@@ -455,7 +455,7 @@ test.describe('text selection highlight in standard editing', () => {
         (element) => (element as HTMLTextAreaElement).selectionEnd - (element as HTMLTextAreaElement).selectionStart,
       ),
     ).toBeGreaterThan(1)
-    expect(await selectionColors(editor)).toEqual({ background: 'rgb(255, 240, 179)', color: 'rgb(55, 63, 67)' })
+    expect(await selectionColors(editor)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
     await expect(editor).toHaveScreenshot('standard-text-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
