@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { useState, useSyncExternalStore } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore } from '../application/editor-store'
-import type { TreeNode } from '../domain/document'
+import { MAX_DOCUMENT_DEPTH_ERROR, type TreeNode } from '../domain/document'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { createRealStoreHarness, type RealStoreOptions } from './test/real-store-harness'
 import { useNodeInputBindings } from './use-node-input-bindings'
@@ -599,6 +599,314 @@ describe('useNodeInputBindings', () => {
     const before = f.snapshot().document
     f.press('.')
     expect(f.snapshot().document).toBe(before)
+  })
+
+  it('replays a reverse Visual shift with its original span and stops at the first impossible level', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C'), node('d', 'D')] } })
+    act(() => f.store.selectNode('c', 0))
+    f.press('V')
+    f.press('k')
+    f.press('>')
+    expect(f.node('a').children.map((item) => item.id)).toEqual(['b', 'c'])
+    f.press('Escape')
+    f.press('u')
+    act(() => f.store.selectNode('b', 0))
+    const shift = vi.spyOn(f.store, 'shiftNodeVisual')
+    f.press('3')
+    f.press('.')
+    expect(f.node('a').children.map((item) => item.id)).toEqual(['b', 'c'])
+    expect(shift).toHaveBeenCalledTimes(2)
+    expect(f.result.current.vimMode).toBe('normal')
+    f.press('u')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it.each([true, false])('replays a clamped join span, spacing %s, and stops before a partial join', async (spaced) => {
+    const f = await fixture({
+      document: { roots: [node('a', ' A '), node('b', ' B '), node('c', ' C '), node('d', ' D ')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    f.press('9')
+    if (!spaced) f.press('g')
+    f.press('J')
+    f.press('u')
+    act(() => f.store.selectNode('a', 0))
+    f.press('3')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(
+      spaced ? [' A B C ', ' D '] : [' A  B  C ', ' D '],
+    )
+    f.press('u')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it.each(['p', 'P', 'gp', 'gP'])('replays the original counted subtree %s in one history entry', async (key) => {
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('2')
+    for (const part of key) f.press(part)
+    expect(f.snapshot().document.roots).toHaveLength(4)
+    // Change the register without replacing the saved put.
+    act(() => f.store.selectNode('b', 0))
+    f.press('y')
+    f.press('y')
+    f.press('.')
+    expect(f.snapshot().document.roots).toHaveLength(6)
+    expect(f.snapshot().document.roots.filter((item) => item.text === 'A')).toHaveLength(5)
+    expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(6)
+    f.press('u')
+    expect(f.snapshot().document.roots).toHaveLength(4)
+  })
+
+  it('replays counted dd with the original clamped span and exchanges the complete removed forest', async () => {
+    const f = await fixture({ document: { roots: ['a', 'b', 'c', 'd', 'e'].map((id) => node(id, id)) } })
+    f.press('2')
+    f.press('d')
+    f.press('d')
+    f.press('3')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['e'])
+    f.press('u')
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['c', 'd', 'e'])
+    f.press('p')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['c', 'c', 'd', 'd', 'e'])
+  })
+
+  it('keeps a case descriptor through yank, motion, unchanged case, and a rejected join', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'one two'), node('b', 'THREE four')] } })
+    f.press('0')
+    f.press('g')
+    f.press('U')
+    f.press('w')
+    act(() => f.store.selectNode('b', 0))
+    f.press('0')
+    f.press('g')
+    f.press('U')
+    f.press('w')
+    f.press('Y')
+    f.press('J')
+    f.press('w')
+    f.press('.')
+    expect(f.node('b').text).toBe('THREE FOUR')
+  })
+
+  it.each(['p', 'P'])(
+    'replays character Visual %s with captured incoming text after a register exchange',
+    async (key) => {
+      const f = await fixture({ document: { roots: [node('a', 'red'), node('b', 'blue'), node('c', 'grey')] } })
+      f.press('0')
+      f.press('Y')
+      act(() => f.store.selectNode('b', 0))
+      f.press('0')
+      f.press('v')
+      f.press('$')
+      f.press('2')
+      f.press(key)
+      expect(f.node('b').text).toBe('redred')
+      act(() => f.store.selectNode('c', 0))
+      f.press('0')
+      f.press('Y')
+      f.press('.')
+      expect(f.node('c').text).toBe('redred')
+      expect(f.result.current.vimMode).toBe('normal')
+      f.press('u')
+      expect(f.node('c').text).toBe('grey')
+    },
+  )
+
+  it('replays a character Visual shift with its original level count and keeps the caret on an image', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A', [node('x', 'X')]), image('ab')] } })
+    act(() => f.store.selectNode('node', 1))
+    f.press('v')
+    f.press('2')
+    f.press('>')
+    expect(f.node('x').children[0]?.id).toBe('node')
+    f.press('Escape')
+    f.press('u')
+    act(() => f.store.selectNode('node', 0))
+    f.press('$')
+    f.press('l')
+    f.press('.')
+    expect(f.node('x').children[0]?.id).toBe('node')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    expect(getCaret(f.input())).toBe(2)
+  })
+
+  it('replays a reverse Visual join span after undo and rejects multiple attachments atomically', async () => {
+    const attachment = { id: 'image', mimeType: 'image/png' as const }
+    const f = await fixture({
+      document: {
+        roots: [
+          node('a', 'a'),
+          node('b', 'b'),
+          node('c', 'c'),
+          { ...node('d', 'd'), attachment },
+          { ...node('e', 'e'), attachment },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'c' },
+    })
+    f.press('V')
+    f.press('k')
+    f.press('g')
+    f.press('J')
+    f.press('u')
+    act(() => f.store.selectNode('d', 0))
+    const before = f.snapshot()
+    const join = vi.spyOn(f.store, 'joinNodes')
+    f.press('3')
+    f.press('.')
+    expect(join).toHaveBeenCalledTimes(1)
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().focus).toBe(before.focus)
+    expect(f.snapshot().operationError).toBe('Cannot join nodes that both have attachments')
+    act(() => f.store.selectNode('a', 0))
+    f.press('.')
+    expect(f.node('a').text).toBe('ab')
+  })
+
+  it('keeps captured incoming node content for Visual p replay after the register exchange', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'A', [node('a1', 'child')]), node('b', 'B'), node('c', 'C')] },
+    })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('2')
+    f.press('p')
+    act(() => f.store.selectNode('c', 0))
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'A', 'A'])
+    expect(f.snapshot().document.roots.every((item) => item.children[0]?.text === 'child')).toBe(true)
+    f.press('u')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
+  })
+
+  it('stops a repeated put on ancestry rejection without changing focus, register, or history', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A', [node('child', 'child')]), node('b', 'B')] } })
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('b', 0))
+    f.press('p')
+    f.press('u')
+    act(() => {
+      f.store.selectNode('a', 0)
+      f.store.enter()
+    })
+    const before = f.snapshot()
+    const paste = vi.spyOn(f.store, 'pasteNodeForest')
+    f.press('3')
+    f.press('.')
+    expect(paste).toHaveBeenCalledTimes(1)
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().focus).toBe(before.focus)
+    expect(f.snapshot().operationError).toBe('Cannot paste a node into one of its descendants.')
+    // Returning to the root makes the same descriptor valid; the failed attempt did not replace it.
+    act(() => f.store.leave())
+    act(() => f.store.selectNode('b', 0))
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'A'])
+  })
+
+  it('stops shift replay at the depth limit with no partial iteration or new focus', async () => {
+    let branch = node('deep-parent', 'deep', [node('x', 'X'), node('y', 'Y')])
+    for (let level = 18; level > 0; level -= 1) branch = node(`level${level}`, 'level', [branch])
+    const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), branch] } })
+    act(() => f.store.selectNode('b', 0))
+    f.press('V')
+    f.press('>')
+    f.press('Escape')
+    f.press('u')
+    act(() => {
+      f.store.selectNode('deep-parent', 0)
+      f.store.enter()
+      f.store.selectNode('y', 0)
+    })
+    const before = f.snapshot()
+    const shift = vi.spyOn(f.store, 'shiftNodeVisual')
+    f.press('3')
+    f.press('.')
+    expect(shift).toHaveBeenCalledTimes(1)
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().focus).toBe(before.focus)
+    expect(f.snapshot().operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+  })
+
+  it('replays an outward shift from the displayed location and ignores the parent heading', async () => {
+    const f = await fixture({
+      document: { roots: [node('parent', 'Parent', [node('a', 'A'), node('b', 'B')]), node('tail', 'Tail')] },
+      location: { currentParentId: 'parent', selectedNodeId: 'a' },
+    })
+    f.press('V')
+    f.press('j')
+    f.press('<')
+    f.press('Escape')
+    f.press('u')
+    act(() => f.store.selectNode('parent', 0))
+    const before = f.snapshot()
+    f.press('.')
+    expect(f.snapshot()).toBe(before)
+    act(() => f.store.selectNode('a', 0))
+    f.press('.')
+    expect(f.snapshot().location.currentParentId).toBeNull()
+    expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['parent', 'a', 'b', 'tail'])
+    expect(f.snapshot().location.selectedNodeId).toBe('a')
+    f.press('u')
+    expect(f.node('parent').children.map((item) => item.id)).toEqual(['a', 'b'])
+  })
+
+  it('replays the count and post-put destination of a captured multi-node forest', async () => {
+    const f = await fixture({ document: { roots: ['a', 'b', 'c'].map((id) => node(id, id)) } })
+    f.press('2')
+    f.press('y')
+    f.press('y')
+    act(() => f.store.selectNode('c', 0))
+    f.press('2')
+    f.press('g')
+    f.press('P')
+    expect(f.snapshot().location.selectedNodeId).toBe('c')
+    f.press('y')
+    f.press('y')
+    f.press('2')
+    f.press('.')
+    expect(f.snapshot().location.selectedNodeId).toBe('c')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual([
+      'a',
+      'b',
+      ...Array.from({ length: 6 }, () => ['a', 'b']).flat(),
+      'c',
+    ])
+    f.press('u')
+    expect(f.snapshot().document.roots).toHaveLength(11)
+    f.press('u')
+    expect(f.snapshot().document.roots).toHaveLength(7)
+  })
+
+  it('stops repeated child opening at the depth limit and keeps its captured text', async () => {
+    let root = node('heading', 'heading')
+    for (let level = 18; level > 0; level -= 1) root = node(`parent${level}`, 'parent', [root])
+    const f = await fixture({
+      document: { roots: [root] },
+      location: { currentParentId: 'heading', selectedNodeId: 'heading' },
+    })
+    f.press('o')
+    f.type('captured')
+    f.press('Escape')
+    const before = f.snapshot()
+    const open = vi.spyOn(f.store, 'createChildWithText')
+    f.press('3')
+    f.press('.')
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().focus).toBe(before.focus)
+    expect(f.snapshot().operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+    f.press('u')
+    act(() => f.store.selectNode('heading', 0))
+    f.press('.')
+    expect(f.node().text).toBe('captured')
   })
 
   it('joins a whole-node Visual range with J or gJ and returns to Normal mode', async () => {

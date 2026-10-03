@@ -306,6 +306,7 @@ export function handleVimKey(
           source: cloneNode(register.value),
           sourceIds,
           ...(past ? { past } : {}),
+          ...(count > 1 ? { repeat: count } : {}),
         })
     } else if (register.kind === 'nodes') {
       if (store.pasteNodeForest(node.id, position, register.value, count, past))
@@ -314,6 +315,7 @@ export function handleVimKey(
           position,
           source: register.value,
           ...(past ? { past } : {}),
+          ...(count > 1 ? { repeat: count } : {}),
         })
     } else if (register.kind === 'text' && register.value !== '') {
       applyTextChange(store, node, input, cursor, vim, {
@@ -327,7 +329,15 @@ export function handleVimKey(
 
   /** Normal `J` and `gJ`: join this node with the following siblings; a count joins that many. */
   const joinNodes = (spaced: boolean): void => {
-    if (store.joinNodes({ count }, spaced)) vim.syncImageCaretToFocus()
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') return
+    const located = locateNode(state.document, node.id)
+    if (located === undefined) return
+    const span = Math.min(Math.max(2, count), located.siblings.length - located.index)
+    if (store.joinNodes({ count }, spaced)) {
+      recordRepeatChange(commandState, { kind: 'structural-join', span, spaced })
+      vim.syncImageCaretToFocus()
+    }
   }
 
   if (pending.prefix === 'g') {
@@ -406,7 +416,7 @@ export function handleVimKey(
             removed.length === 1
               ? { kind: 'node', value: cloneNode(removed[0]!), sourceIds: [removed[0]!.id] }
               : { kind: 'nodes', value: { nodes: removed.map(cloneNode), sourceIds: removed.map((entry) => entry.id) } }
-          recordRepeatChange(commandState, { kind: 'structural-delete' })
+          recordRepeatChange(commandState, { kind: 'structural-delete', span: removed.length })
         }
       } else if (pending.operator === 'y') {
         const count = parseCount(pending.count)
@@ -697,7 +707,9 @@ export function handleVimKey(
     const last = commandState.lastChange
     if (last !== undefined) {
       if (last.kind.startsWith('structural-')) {
-        for (let index = 0; index < count; index += 1) vim.repeatStructural(last as VimStructuralChange)
+        for (let index = 0; index < count; index += 1) {
+          if (!vim.repeatStructural(last as VimStructuralChange, cursor)) break
+        }
         return handled()
       }
       if (last.kind.startsWith('surround-')) {

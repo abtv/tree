@@ -32,6 +32,53 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: image caret', () => {
+  test('replays gp onto an image and a Visual shift without losing the image caret', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'b', text: 'B', children: [] },
+          { id: 'picture', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('0')
+    await pressShifted(window, 'Y')
+    const picture = node(window, 3)
+    await picture.focus()
+    await window.keyboard.press('$')
+    await window.keyboard.press('g')
+    await window.keyboard.press('p')
+    await expect(picture).toHaveValue('abA')
+    await expect(picture).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('u')
+    await window.keyboard.press('$')
+    await window.keyboard.press('.')
+    await expect(picture).toHaveValue('abA')
+    await expect(picture).toHaveClass(/node-input-image-caret/)
+    await window.keyboard.press('k')
+    await expect(picture).not.toHaveClass(/node-input-image-caret/)
+    await setCursor(picture, 0)
+    await window.keyboard.press('v')
+    await pressShifted(window, '>')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('u')
+    await picture.focus()
+    await window.keyboard.press('$')
+    await window.keyboard.press('l')
+    await window.keyboard.press('.')
+    await expect(window.locator('.node-row[data-node-id="picture"]')).toHaveAttribute('data-depth', '1')
+    await expect(picture).toBeFocused()
+    await expect(picture).toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-image-shift-light.png')
+    await window.keyboard.press('k')
+    await expect(picture).not.toHaveClass(/node-input-image-caret/)
+  })
+
   test('opens an image immediately after moving up from another image', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

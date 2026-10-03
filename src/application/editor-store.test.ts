@@ -291,6 +291,17 @@ describe('EditorStore', () => {
       ])
     })
 
+    it('uses the live renderer cursor for shift replay and publishes no focus on rejection', async () => {
+      const store = await load('b')
+      store.selectNode('b', 0)
+      expect(store.shiftNodeVisual('in', 'b', 'b', 1, 1)).toBe(true)
+      expect(ready(store).focus).toMatchObject({ nodeId: 'b', cursor: 1 })
+      store.undo()
+      const before = ready(store)
+      expect(store.shiftNodeVisual('out', 'b', 'b', 1, 1)).toBe(false)
+      expect(ready(store)).toBe(before)
+    })
+
     it('outdents a range to directly after its parent and changes the location only when it leaves it', async () => {
       const store = await load('c')
       store.shiftNodeVisual('in', 'b', 'c')

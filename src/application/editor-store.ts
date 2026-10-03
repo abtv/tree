@@ -784,7 +784,13 @@ export class EditorStore {
    * between `anchorId` and `focusId` `count` levels as one undoable command. Returns whether it
    * changed the document; an impossible request changes nothing and a depth failure is reported.
    */
-  public shiftNodeVisual(direction: 'in' | 'out', anchorId: NodeId, focusId: NodeId, count = 1): boolean {
+  public shiftNodeVisual(
+    direction: 'in' | 'out',
+    anchorId: NodeId,
+    focusId: NodeId,
+    count = 1,
+    cursor?: number,
+  ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const result = nodeVisualShiftTransition(
@@ -794,7 +800,7 @@ export class EditorStore {
       anchorId,
       focusId,
       count,
-      state.focus.nodeId === state.location.selectedNodeId ? state.focus.cursor : 0,
+      cursor ?? (state.focus.nodeId === state.location.selectedNodeId ? state.focus.cursor : 0),
     )
     if (result.kind === 'none') return false
     if (result.kind === 'rejected') {

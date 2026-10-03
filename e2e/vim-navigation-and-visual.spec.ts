@@ -48,6 +48,174 @@ async function dragSelect(window: Page, field: ReturnType<typeof node>, fromX: n
 }
 
 test.describe('Vim editing: navigation and Visual modes', () => {
+  test('replays counted dd with complete subtrees and one undo per successful iteration', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: ['A', 'B', 'C', 'D', 'E'].map((text) => ({
+          id: text,
+          text,
+          children: [{ id: `${text}1`, text: `${text} child`, children: [] }],
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'A' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    for (const key of ['2', 'd', 'd']) await window.keyboard.press(key)
+    await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
+    await window.keyboard.press('3')
+    await window.keyboard.press('.')
+    await expect.poll(() => nodeTexts(window)).toEqual(['E'])
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('u')
+    await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
+    await window.keyboard.press('p')
+    await expect.poll(() => nodeTexts(window)).toEqual(['C', 'C', 'D', 'D', 'E'])
+    await window.keyboard.press('z')
+    await pressShifted(window, 'R')
+    await expect
+      .poll(() => outline(window))
+      .toEqual(['C', '  C child', 'C', '  C child', 'D', '  D child', 'D', '  D child', 'E', '  E child'])
+  })
+
+  test('replays shifts and joins with exact sibling spans and stops counted dot on failure', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: { roots: ['A', 'B', 'C', 'D'].map((text) => ({ id: text, text, children: [] })) },
+      location: { currentParentId: null, selectedNodeId: 'C' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 3).focus()
+    await pressShifted(window, 'V')
+    await window.keyboard.press('k')
+    await pressShifted(window, '>')
+    await expect.poll(() => outline(window)).toEqual(['A', '  B', '  C', 'D'])
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('u')
+    await node(window, 2).focus()
+    await window.getByRole('button', { name: 'Disable Vim editing' }).click()
+    await window.getByRole('button', { name: 'Enable Vim editing' }).click()
+    await node(window, 2).focus()
+    await window.keyboard.press('3')
+    await window.keyboard.press('.')
+    await expect.poll(() => outline(window)).toEqual(['A', '  B', '  C', 'D'])
+    await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-shift-light.png')
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(['A', 'B', 'C', 'D'])
+    // The original join clamps to three siblings. Dot requires all three, rather than a partial join.
+    await node(window, 2).focus()
+    await window.keyboard.press('9')
+    await pressShifted(window, 'J')
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await window.keyboard.press('3')
+    await window.keyboard.press('.')
+    await expect.poll(() => outline(window)).toEqual(['A B C', 'D'])
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-join-light.png')
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(['A', 'B', 'C', 'D'])
+    await window.keyboard.press('Control+r')
+    await expect.poll(() => outline(window)).toEqual(['A B C', 'D'])
+  })
+
+  test('replays counted gp and gP with captured incoming subtrees and their destination', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: ['A', 'B', 'C'].map((text) => ({ id: text, text, children: [] })) },
+      location: { currentParentId: null, selectedNodeId: 'A' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await node(window, 2).focus()
+    await window.keyboard.press('2')
+    await window.keyboard.press('g')
+    await window.keyboard.press('p')
+    await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C'])
+    await expect(node(window, 5)).toBeFocused()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('.')
+    await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C', 'A', 'A'])
+    await expect(node(window, 7)).toBeFocused()
+    await window.keyboard.press('u')
+    await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C'])
+    // gP retains the original target as its destination, even across several dot iterations.
+    await node(window, 5).focus()
+    await window.keyboard.press('2')
+    await window.keyboard.press('g')
+    await pressShifted(window, 'P')
+    await expect(node(window, 7)).toBeFocused()
+    await window.keyboard.press('2')
+    await window.keyboard.press('.')
+    await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C', 'C', 'C', 'C', 'C', 'C', 'C'])
+    await expect(node(window, 11)).toBeFocused()
+    await window.keyboard.press('u')
+    await expect(window.locator('.node-row')).toHaveCount(9)
+  })
+
+  test('replays Visual puts and case after register exchanges, then repeats vertical changes', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: ['red', 'blue', 'grey', 'one two', 'THREE four', 'last', 'end'].map((text, index) => ({
+          id: `n${index}`,
+          text,
+          children: [],
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.press('0')
+    await pressShifted(window, 'Y')
+    await node(window, 2).focus()
+    await window.keyboard.press('0')
+    await window.keyboard.press('v')
+    await pressShifted(window, '$')
+    await window.keyboard.press('2')
+    await window.keyboard.press('p')
+    await expect(node(window, 2)).toHaveValue('redred')
+    await node(window, 3).focus()
+    await window.keyboard.press('0')
+    await pressShifted(window, 'Y')
+    await window.keyboard.press('.')
+    await expect(node(window, 3)).toHaveValue('redred')
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 5)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-visual-put-light.png')
+    await node(window, 4).focus()
+    await window.keyboard.press('0')
+    await window.keyboard.press('g')
+    await pressShifted(window, 'U')
+    await window.keyboard.press('w')
+    await node(window, 5).focus()
+    await window.keyboard.press('0')
+    await window.keyboard.press('g')
+    await pressShifted(window, 'U')
+    await window.keyboard.press('w')
+    await pressShifted(window, 'Y')
+    await window.keyboard.press('w')
+    await window.keyboard.press('.')
+    await expect(node(window, 5)).toHaveValue('THREE FOUR')
+    await node(window, 4).focus()
+    await window.keyboard.press('c')
+    await window.keyboard.press('j')
+    await typeInto(node(window, 4), 'changed')
+    await window.keyboard.press('Escape')
+    await node(window, 5).focus()
+    await window.keyboard.press('.')
+    await expect.poll(() => nodeTexts(window)).toEqual(['red', 'redred', 'redred', 'changed', 'changed'])
+    await window.keyboard.press('u')
+    await expect.poll(() => nodeTexts(window)).toEqual(['red', 'redred', 'redred', 'changed', 'last', 'end'])
+  })
+
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

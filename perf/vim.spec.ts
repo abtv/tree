@@ -226,7 +226,7 @@ test.describe('Vim interactions at scale', () => {
       document.addEventListener(
         'keydown',
         (event) => {
-          if (event.key !== 'J') return
+          if (event.key !== 'J' && event.key !== '.') return
           requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
         },
         { capture: true },
@@ -248,6 +248,19 @@ test.describe('Vim interactions at scale', () => {
       metrics: { joinPaintMs: round(joinPaintMs) },
     })
     expect(joinPaintMs).toBeLessThan(250)
+    await window.keyboard.press('u')
+    await expect(input).toHaveValue('Child 100')
+    await window.keyboard.press('.')
+    await window.waitForFunction(() => (window as unknown as { joinPaints: number[] }).joinPaints.length === 2)
+    const repeatPaintMs = await window.evaluate(() => (window as unknown as { joinPaints: number[] }).joinPaints[1]!)
+    await expect(input).toHaveValue(/^Child 100 Child 101 .* Child 199$/u)
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-repeat-join-wide-10000',
+      metrics: { originalPaintMs: round(joinPaintMs), repeatPaintMs: round(repeatPaintMs) },
+    })
+    // Replay uses the same atomic range transition, so it shares the measured original-command budget.
+    expect(repeatPaintMs).toBeLessThan(250)
   })
 
   test('whole-node Visual J over a whole 10000-sibling level responds', async ({ userDataDir }) => {

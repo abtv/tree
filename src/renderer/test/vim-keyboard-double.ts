@@ -114,7 +114,7 @@ export function createVimKeyboardDouble(
     beginStructuralChildOpen: vi.fn(() => {
       beginStructuralChildOpen(commandState, nodeId)
     }),
-    repeatStructural: vi.fn(),
+    repeatStructural: vi.fn(() => true),
     fold: vi.fn(),
   }
 

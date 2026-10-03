@@ -438,7 +438,15 @@ export function useNodeInputBindings({
   const shiftNodeVisual = useCallback(
     (direction: 'in' | 'out', count: number): void => {
       if (nodeVisualSelection === undefined) return
-      store.shiftNodeVisual(direction, nodeVisualSelection.anchorId, nodeVisualSelection.focusId, count)
+      const { anchorId, focusId } = nodeVisualSelection
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      const anchor = locateNode(state.document, anchorId)
+      const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
+      if (anchor === undefined || focus < 0) return
+      const span = Math.abs(anchor.index - focus) + 1
+      if (store.shiftNodeVisual(direction, anchorId, focusId, count))
+        recordRepeatChange(vimCommandState.current, { kind: 'structural-shift', direction, span, count })
     },
     [store, nodeVisualSelection],
   )
@@ -449,7 +457,14 @@ export function useNodeInputBindings({
     (spaced: boolean): void => {
       if (nodeVisualSelection === undefined) return
       const { anchorId, focusId } = nodeVisualSelection
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      const anchor = locateNode(state.document, anchorId)
+      const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
+      if (anchor === undefined || focus < 0) return
+      const span = Math.abs(anchor.index - focus) + 1
       if (!store.joinNodes({ anchorId, focusId }, spaced)) return
+      recordRepeatChange(vimCommandState.current, { kind: 'structural-join', span, spaced })
       changeVimMode('normal')
       syncImageCaretToFocus()
       clearCommandAssembly(vimCommandState.current)
@@ -461,6 +476,7 @@ export function useNodeInputBindings({
   const shiftCurrentNode = useCallback(
     (nodeId: string, direction: 'in' | 'out', count: number, selection: { start: number; end: number }): void => {
       if (!store.shiftNodeVisual(direction, nodeId, nodeId, count)) return
+      recordRepeatChange(vimCommandState.current, { kind: 'structural-shift', direction, span: 1, count })
       // The store's focus intent collapses the caret when the moved row renders; the layout effect
       // below restores the selection once it has.
       pendingVisualSelection.current = { nodeId, ...selection }
@@ -469,33 +485,52 @@ export function useNodeInputBindings({
   )
 
   const repeatStructural = useCallback(
-    (change: VimStructuralChange): void => {
+    (change: VimStructuralChange, cursor: number): boolean => {
       const state = store.getSnapshot()
-      if (state.status !== 'ready') return
+      if (state.status !== 'ready' || state.persistenceLocked === true) return false
       if (change.kind === 'structural-delete') {
         // The register changes only when the deletion happened (a heading or locked store changes nothing).
-        const removed = store.deleteSiblingRange(1)
-        if (removed?.[0] !== undefined) vimSession.current.register = nodeRegister(removed[0])
-      } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
-      else if (change.kind === 'structural-child-open') store.createChildWithText(change.text)
-      else if (change.kind === 'structural-put' && change.past === true)
-        store.pasteNodeForest(
+        const span = change.span
+        const located = locateNode(state.document, state.location.selectedNodeId)
+        if (located === undefined || located.siblings.length - located.index < span) return false
+        const removed = store.deleteSiblingRange(span)
+        if (removed !== undefined)
+          vimSession.current.register =
+            removed.length === 1
+              ? nodeRegister(removed[0]!)
+              : { kind: 'nodes', value: { nodes: removed, sourceIds: removed.map((node) => node.id) } }
+        return removed !== undefined
+      } else if (change.kind === 'structural-open' || change.kind === 'structural-child-open') {
+        if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
+        else store.createChildWithText(change.text)
+        const next = store.getSnapshot()
+        return next.status === 'ready' && next.document !== state.document
+      } else if (change.kind === 'structural-put')
+        return store.pasteNodeForest(
           state.location.selectedNodeId,
           change.position,
           { nodes: [change.source], sourceIds: change.sourceIds },
-          1,
-          true,
+          change.repeat ?? 1,
+          change.past === true,
         )
-      else if (change.kind === 'structural-put')
-        store.pasteSubtree(state.location.selectedNodeId, change.position, change.source, change.sourceIds)
       else if (change.kind === 'structural-forest-put')
-        store.pasteNodeForest(state.location.selectedNodeId, change.position, change.source, 1, change.past === true)
+        return store.pasteNodeForest(
+          state.location.selectedNodeId,
+          change.position,
+          change.source,
+          change.repeat ?? 1,
+          change.past === true,
+        )
       else {
         // A repeated whole-node Visual mutation applies to the current node's own actual siblings.
         const located = locateNode(state.document, state.location.selectedNodeId)
-        if (located === undefined) return
+        if (located === undefined || state.location.selectedNodeId === state.location.currentParentId) return false
         const end = located.siblings[located.index + change.span - 1]
-        if (end === undefined) return
+        if (end === undefined) return false
+        if (change.kind === 'structural-shift')
+          return store.shiftNodeVisual(change.direction, located.node.id, end.id, change.count, cursor)
+        if (change.kind === 'structural-join')
+          return store.joinNodes({ anchorId: located.node.id, focusId: end.id }, change.spaced)
         const result = store.applyNodeVisual(
           change.command,
           located.node.id,
@@ -508,6 +543,7 @@ export function useNodeInputBindings({
           const nextRegister = visualCommandRegister(change.command, result)
           if (nextRegister !== undefined) vimSession.current.register = nextRegister
         }
+        return result !== undefined
       }
     },
     [store, vimSession],

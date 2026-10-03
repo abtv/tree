@@ -2027,7 +2027,7 @@ describe('editor keyboard handler', () => {
       value: { id: 'node', text: 'text' },
       sourceIds: ['node'],
     })
-    expect(commandState.lastChange).toEqual({ kind: 'structural-delete' })
+    expect(commandState.lastChange).toEqual({ kind: 'structural-delete', span: 1 })
     expect(commandState.pending).toBeUndefined()
     expect(input.selectionStart).toBe(0)
     expect(repeat.preventDefault).toHaveBeenCalledOnce()
@@ -2586,17 +2586,19 @@ describe('editor keyboard handler', () => {
       expect(heading.snapshot().document).toBe(headingBefore)
     })
 
-    it('is not a continuation of an operator and does not replace the saved change', async () => {
+    it('is not a continuation of an operator and records only a successful join', async () => {
       const { press, snapshot, vim } = await fixture('a')
       const saved = { kind: 'delete', motion: 'w', count: 1 } as const
       vim.commandState.lastChange = saved
       press('d', 'J')
       expect(snapshot().document.roots).toHaveLength(3)
       expect(vim.commandState.pending).toBeUndefined()
+      expect(vim.commandState.lastChange).toBe(saved)
       press('J')
+      expect(vim.commandState.lastChange).toEqual({ kind: 'structural-join', span: 2, spaced: true })
       press('g', 'J')
       expect(snapshot().document.roots.length).toBeLessThan(3)
-      expect(vim.commandState.lastChange).toBe(saved)
+      expect(vim.commandState.lastChange).toEqual({ kind: 'structural-join', span: 2, spaced: false })
     })
   })
 

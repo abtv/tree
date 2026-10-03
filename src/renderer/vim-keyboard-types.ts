@@ -51,7 +51,7 @@ export type VimSurroundChange =
   | { kind: 'surround-change'; target: string; delimiter: string; count: number }
 
 export type VimStructuralChange =
-  | { kind: 'structural-delete' }
+  | { kind: 'structural-delete'; span: number }
   | {
       kind: 'structural-put'
       position: 'before' | 'after'
@@ -59,8 +59,11 @@ export type VimStructuralChange =
       sourceIds: readonly string[]
       /** Set for `gp` and `gP`: the node after the inserted copy is selected. */
       past?: boolean
+      repeat?: number
     }
-  | { kind: 'structural-forest-put'; position: 'before' | 'after'; source: NodeForest; past?: boolean }
+  | { kind: 'structural-forest-put'; position: 'before' | 'after'; source: NodeForest; past?: boolean; repeat?: number }
+  | { kind: 'structural-shift'; direction: 'in' | 'out'; span: number; count: number }
+  | { kind: 'structural-join'; span: number; spaced: boolean }
   | { kind: 'structural-open'; position: 'before' | 'after'; text: string }
   | { kind: 'structural-child-open'; text: string }
   | {
@@ -172,7 +175,8 @@ export interface VimKeyboardState {
   verticalOperator: (nodeId: string, operator: 'd' | 'y' | 'c', direction: 'down' | 'up', count: number) => void
   beginStructuralOpen: (position: 'before' | 'after') => void
   beginStructuralChildOpen: () => void
-  repeatStructural: (change: VimStructuralChange) => void
+  /** Returns false at the first failed iteration, so counted dot cannot skip a failure. */
+  repeatStructural: (change: VimStructuralChange, cursor: number) => boolean
   fold: (command: VimFoldCommand, nodeId: string) => void
 }
 
