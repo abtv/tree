@@ -113,6 +113,44 @@ describe('whole-node Visual transitions', () => {
     expect(transition.location.selectedNodeId).toBe('new-1')
   })
 
+  it('selects the node after the inserted forest, or the last copy when none follows', () => {
+    const document: Document = {
+      roots: [
+        { id: 'a', text: 'A', children: [] },
+        { id: 'b', text: 'B', children: [] },
+      ],
+    }
+    const forest = {
+      nodes: [
+        { id: 'x', text: 'X', children: [] },
+        { id: 'y', text: 'Y', children: [] },
+      ],
+      sourceIds: [],
+    }
+    const run = (nodeId: string, position: 'before' | 'after', repeat: number) => {
+      let nextId = 0
+      const transition = pasteNodeForestTransition(
+        document,
+        location,
+        nodeId,
+        position,
+        forest,
+        () => `new-${++nextId}`,
+        repeat,
+        true,
+      )
+      if (!('document' in transition)) throw new Error('Expected an accepted transition.')
+      return transition
+    }
+    // After `a`, `b` follows the forest; after `b`, nothing does, so the last copy is selected.
+    expect(run('a', 'after', 1).location.selectedNodeId).toBe('b')
+    expect(run('b', 'after', 2).location.selectedNodeId).toBe('new-4')
+    expect(run('b', 'after', 2).focus).toEqual({ nodeId: 'new-4', cursor: 0 })
+    // Before `b`, the target itself follows the forest.
+    expect(run('b', 'before', 3).location.selectedNodeId).toBe('b')
+    expect(run('a', 'before', 1).document.roots.map((node) => node.id)).toEqual(['new-1', 'new-2', 'a', 'b'])
+  })
+
   it('creates fresh forest IDs and preserves attachments', () => {
     const document: Document = { roots: [{ id: 'a', text: 'A', children: [] }] }
     const transition = pasteNodeForestTransition(

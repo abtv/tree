@@ -1029,6 +1029,76 @@ test.describe('Vim editing: text editing', () => {
   })
 
   // @requirement PRODUCT.md §20.2
+  test('puts with gp and gP and leaves the caret on the character after the inserted text', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'one two', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+
+    await setCursor(editor, 4)
+    await pressShifted(window, 'Y')
+    await setCursor(editor, 0)
+    await window.keyboard.press('g')
+    await window.keyboard.press('p')
+    await expect(editor).toHaveValue('otwone two')
+    // The caret is on `n`, the character after the put text, so `x` removes it.
+    await window.keyboard.press('x')
+    await expect(editor).toHaveValue('otwoe two')
+    await window.keyboard.press('u')
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('one two')
+
+    // `P` is typed with Shift after the `g` prefix; the caret lands on the character that followed.
+    // The earlier `x` replaced the register, so yank `two` again.
+    await setCursor(editor, 4)
+    await pressShifted(window, 'Y')
+    await setCursor(editor, 0)
+    await window.keyboard.press('g')
+    await pressShifted(window, 'P')
+    await expect(editor).toHaveValue('twoone two')
+    await window.keyboard.press('x')
+    await expect(editor).toHaveValue('twone two')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  // @requirement PRODUCT.md §20.2
+  test('selects the node after a gp subtree put, or the last copy when none follows', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] },
+          { id: 'b', text: 'B', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await window.keyboard.press('g')
+    await window.keyboard.press('p')
+    // Folds are closed, so the rows are A, the copy of A, and B. B follows the copy and is selected.
+    await expect(node(window, 3)).toHaveValue('B')
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('u')
+    await expect(node(window, 2)).toHaveValue('B')
+
+    // After the last sibling nothing follows, so the last inserted copy is selected.
+    await node(window, 2).focus()
+    await window.keyboard.press('2')
+    await window.keyboard.press('g')
+    await window.keyboard.press('p')
+    await expect(node(window, 4)).toHaveValue('A')
+    await expect(node(window, 4)).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §20.2
   test('yanks to the end of the node with Y without disturbing the repeatable change', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one two three', children: [] }] },

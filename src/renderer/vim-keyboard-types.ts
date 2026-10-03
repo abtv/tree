@@ -39,7 +39,13 @@ export type VimTextChange =
        */
       nodeId?: string
     }
-  | { kind: 'paste'; after: boolean; text: string }
+  | {
+      kind: 'paste'
+      after: boolean
+      text: string
+      /** Set for `gp` and `gP`: the caret goes to the character after the inserted text. */
+      past?: boolean
+    }
   | { kind: 'overwrite'; text: string; replaced: number }
   | {
       kind: 'case'
@@ -56,8 +62,15 @@ export type VimSurroundChange =
 
 export type VimStructuralChange =
   | { kind: 'structural-delete' }
-  | { kind: 'structural-put'; position: 'before' | 'after'; source: TreeNode; sourceIds: readonly string[] }
-  | { kind: 'structural-forest-put'; position: 'before' | 'after'; source: NodeForest }
+  | {
+      kind: 'structural-put'
+      position: 'before' | 'after'
+      source: TreeNode
+      sourceIds: readonly string[]
+      /** Set for `gp` and `gP`: the node after the inserted copy is selected. */
+      past?: boolean
+    }
+  | { kind: 'structural-forest-put'; position: 'before' | 'after'; source: NodeForest; past?: boolean }
   | { kind: 'structural-open'; position: 'before' | 'after'; text: string }
   | { kind: 'structural-child-open'; text: string }
   | {

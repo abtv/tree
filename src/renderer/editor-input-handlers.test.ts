@@ -2316,6 +2316,144 @@ describe('editor keyboard handler', () => {
     expect(node().text).toBe('abcd')
   })
 
+  it('puts with gp and gP and leaves the caret after the inserted text', async () => {
+    const { node, input, press, store, vim, caretRequests } = await textFixture({
+      id: 'node',
+      text: 'abcd',
+      children: [],
+    })
+    input.setSelectionRange(1, 1)
+    vim.register.current = { kind: 'text', value: 'XY' }
+
+    press('g', 'p')
+    expect(node().text).toBe('abXYcd')
+    expect(caretRequests).toEqual([4])
+    input.setSelectionRange(3, 3)
+    press('g', 'P')
+    expect(node().text).toBe('abXXYYcd')
+    expect(caretRequests).toEqual([4, 5])
+    // A count repeats the text; the caret still follows all of it.
+    input.setSelectionRange(0, 0)
+    press('g', 'P')
+    press('2', 'g', 'p')
+    expect(node().text).toBe('XYaXYXYbXXYYcd')
+    // The insertion point was after `a` (index 3), and four characters went in.
+    expect(caretRequests.at(-1)).toBe(7)
+    expect(vim.mode).toBe('normal')
+    store.undo()
+    expect(node().text).toBe('XYabXXYYcd')
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'XY' })
+  })
+
+  it('repeats gp with the same caret destination on dot', async () => {
+    const { node, input, press, vim, caretRequests } = await textFixture({ id: 'node', text: 'abcd', children: [] })
+    input.setSelectionRange(0, 0)
+    vim.register.current = { kind: 'text', value: 'X' }
+    press('g', 'p')
+    expect(node().text).toBe('aXbcd')
+    input.setSelectionRange(3, 3)
+    press('.')
+    expect(node().text).toBe('aXbcXd')
+    expect(caretRequests.at(-1)).toBe(5)
+  })
+
+  it('clamps the gp caret to the last character at the end of the text', async () => {
+    const { node, input, press, vim, caretRequests } = await textFixture({ id: 'node', text: 'abc', children: [] })
+    input.setSelectionRange(2, 2)
+    vim.register.current = { kind: 'text', value: 'XY' }
+    press('g', 'p')
+    expect(node().text).toBe('abcXY')
+    expect(caretRequests).toEqual([4])
+  })
+
+  it('moves the gp caret onto an attached image when the put ends the text', async () => {
+    const { node, input, press, vim, caretNodeId, caret } = await textFixture({
+      id: 'node',
+      text: 'abc',
+      attachment: { id: 'png', mimeType: 'image/png' },
+      children: [],
+    })
+    input.setSelectionRange(2, 2)
+    vim.register.current = { kind: 'text', value: 'XY' }
+    press('g', 'p')
+    expect(node().text).toBe('abcXY')
+    expectImageCaret(caretNodeId, caret, 'node', true)
+  })
+
+  it('makes gp and gP select the node after the put forest, or the last copy', async () => {
+    const treeDocument = {
+      roots: [
+        {
+          id: 'root',
+          text: 'Root',
+          children: [
+            { id: 'first', text: 'First', children: [] },
+            { id: 'second', text: 'Second', children: [] },
+          ],
+        },
+      ],
+    }
+    const options: RealStoreOptions = {
+      document: treeDocument,
+      location: { currentParentId: 'root', selectedNodeId: 'first' },
+    }
+    const { store, snapshot, press, vim } = await textFixture(treeDocument.roots[0]!.children[0]!, 'normal', options)
+    vim.register.current = { kind: 'node', value: { id: 'src', text: 'Put', children: [] }, sourceIds: ['src'] }
+    press('g', 'p')
+    // `second` follows the inserted copy.
+    expect(snapshot().document.roots[0]!.children.map(({ text }) => text)).toEqual(['First', 'Put', 'Second'])
+    expect(snapshot().location.selectedNodeId).toBe('second')
+    store.undo()
+    expect(snapshot().document).toEqual(treeDocument)
+    // `gP` puts before `first`, which then follows the copy.
+    store.selectNode('first', 0)
+    press('g', 'P')
+    expect(snapshot().document.roots[0]!.children.map(({ text }) => text)).toEqual(['Put', 'First', 'Second'])
+    expect(snapshot().location.selectedNodeId).toBe('first')
+    store.undo()
+    // A counted forest put after the last sibling selects the last inserted copy.
+    vim.register.current = {
+      kind: 'nodes',
+      value: {
+        nodes: [
+          { id: 'x', text: 'X', children: [] },
+          { id: 'y', text: 'Y', children: [] },
+        ],
+        sourceIds: ['x', 'y'],
+      },
+    }
+    store.selectNode('second', 0)
+    press('2', 'g', 'p')
+    const children = snapshot().document.roots[0]!.children
+    expect(children.map(({ text }) => text)).toEqual(['First', 'Second', 'X', 'Y', 'X', 'Y'])
+    expect(snapshot().location.selectedNodeId).toBe(children[5]!.id)
+    store.undo()
+    expect(snapshot().document).toEqual(treeDocument)
+  })
+
+  it('leaves the caret and the document alone for gp with an empty register', async () => {
+    const { input, press, snapshot, caretRequests } = await textFixture({ id: 'node', text: 'abc', children: [] })
+    input.setSelectionRange(1, 1)
+    const original = snapshot()
+    press('g', 'p')
+    expect(snapshot().document).toEqual(original.document)
+    expect(caretRequests).toEqual([])
+  })
+
+  it('does nothing for gp on the editable current-parent heading', async () => {
+    const treeDocument = {
+      roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }],
+    }
+    const { press, snapshot, vim } = await textFixture(treeDocument.roots[0]!, 'normal', {
+      document: treeDocument,
+      location: { currentParentId: 'root', selectedNodeId: 'root' },
+    })
+    vim.register.current = { kind: 'node', value: { id: 'src', text: 'Put', children: [] }, sourceIds: ['src'] }
+    press('g', 'p')
+    expect(snapshot().document).toEqual(treeDocument)
+    expect(snapshot().location.selectedNodeId).toBe('root')
+  })
+
   it('handles p and P without editing when the local register is empty', async () => {
     const { store, input, press, snapshot, vim, caretRequests } = await textFixture({
       id: 'node',

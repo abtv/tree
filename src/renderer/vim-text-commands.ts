@@ -255,7 +255,8 @@ export function calculateTextChange(
     start = vimPastePosition(text.length, cursor, change.after)
     end = start
     inserted = change.text
-    nextCursor = start + inserted.length - 1
+    // `gp` and `gP` leave the caret on the character after the text; the Normal caret clamps it.
+    nextCursor = start + inserted.length - (change.past === true ? 0 : 1)
   } else if (change.kind === 'overwrite') {
     end = Math.min(text.length, cursor + change.replaced)
     inserted = change.text

@@ -703,7 +703,13 @@ export class EditorStore {
     return true
   }
 
-  public pasteNodeForest(nodeId: NodeId, position: SiblingInsertionPosition, source: NodeForest, repeat = 1): boolean {
+  public pasteNodeForest(
+    nodeId: NodeId,
+    position: SiblingInsertionPosition,
+    source: NodeForest,
+    repeat = 1,
+    selectAfter = false,
+  ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked() || source.nodes.length === 0) return false
     if (nodeId === state.location.currentParentId) return false
@@ -719,6 +725,7 @@ export class EditorStore {
       source,
       this.createId,
       repeat,
+      selectAfter,
     )
     if (transition.kind === 'rejected') {
       this.reportError(new Error(transition.message))

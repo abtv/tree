@@ -277,9 +277,47 @@ export function handleVimKey(
     return handled()
   }
 
+  /** `p`/`P`, or `gp`/`gP` when `past`: put the register and leave the caret after the inserted content. */
+  const putRegister = (key: 'p' | 'P', past: boolean): void => {
+    const register = vim.register.current
+    const position = key === 'p' ? 'after' : 'before'
+    if (register.kind === 'node') {
+      const sourceIds = register.sourceIds ?? []
+      const pasted =
+        count === 1 && !past
+          ? store.pasteSubtree(node.id, position, register.value, register.sourceIds)
+          : store.pasteNodeForest(node.id, position, { nodes: [register.value], sourceIds }, count, past)
+      if (pasted)
+        recordRepeatChange(commandState, {
+          kind: 'structural-put',
+          position,
+          source: cloneNode(register.value),
+          sourceIds,
+          ...(past ? { past } : {}),
+        })
+    } else if (register.kind === 'nodes') {
+      if (store.pasteNodeForest(node.id, position, register.value, count, past))
+        recordRepeatChange(commandState, {
+          kind: 'structural-forest-put',
+          position,
+          source: register.value,
+          ...(past ? { past } : {}),
+        })
+    } else if (register.kind === 'text' && register.value !== '') {
+      applyTextChange(store, node, input, cursor, vim, {
+        kind: 'paste',
+        after: key === 'p',
+        text: register.value.repeat(count),
+        ...(past ? { past } : {}),
+      })
+    }
+  }
+
   if (pending.prefix === 'g') {
     clearPending(commandState)
-    if (event.key === 'e') {
+    if (!visual && pending.operator === undefined && (event.key === 'p' || event.key === 'P')) {
+      putRegister(event.key, true)
+    } else if (event.key === 'e') {
       if (pending.operator !== undefined && !visual) {
         applyOperatorMotion(pending.operator, 'ge', totalCount)
       } else {
@@ -632,39 +670,7 @@ export function handleVimKey(
   } else if (!visual && event.key === '~') {
     applyTextChange(store, node, input, cursor, vim, { kind: 'case', mode: 'toggle', count })
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
-    const register = vim.register.current
-    if (register.kind === 'node') {
-      const position = event.key === 'p' ? 'after' : 'before'
-      const pasted =
-        count === 1
-          ? store.pasteSubtree(node.id, position, register.value, register.sourceIds)
-          : store.pasteNodeForest(
-              node.id,
-              position,
-              { nodes: [register.value], sourceIds: register.sourceIds ?? [] },
-              count,
-            )
-      if (pasted)
-        recordRepeatChange(commandState, {
-          kind: 'structural-put',
-          position: event.key === 'p' ? 'after' : 'before',
-          source: cloneNode(register.value),
-          sourceIds: register.sourceIds ?? [],
-        })
-    } else if (register.kind === 'nodes') {
-      if (store.pasteNodeForest(node.id, event.key === 'p' ? 'after' : 'before', register.value, count))
-        recordRepeatChange(commandState, {
-          kind: 'structural-forest-put',
-          position: event.key === 'p' ? 'after' : 'before',
-          source: register.value,
-        })
-    } else if (register.kind === 'text' && register.value !== '') {
-      applyTextChange(store, node, input, cursor, vim, {
-        kind: 'paste',
-        after: event.key === 'p',
-        text: register.value.repeat(count),
-      })
-    }
+    putRegister(event.key, false)
   } else if (!visual && event.key === '.') {
     const last = commandState.lastChange
     if (last !== undefined) {

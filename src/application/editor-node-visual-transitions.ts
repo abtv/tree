@@ -42,6 +42,7 @@ export function pasteNodeForestTransition(
   source: NodeForest,
   createId: () => NodeId,
   repeat = 1,
+  selectAfter = false,
 ): StructuralTransition | RejectedTransition {
   if (wouldExceedMaximumDepth(document, nodeId, source.nodes)) {
     return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
@@ -50,10 +51,13 @@ export function pasteNodeForestTransition(
   const copies = Array.from({ length: repeat }, () =>
     source.nodes.map((node) => cloneNodeWithNewIds(node, createId)),
   ).flat()
-  const target = requireNode(document, nodeId).node
+  const located = requireNode(document, nodeId)
+  const target = located.node
   const replacements = position === 'before' ? copies : [target, ...copies]
   const nextDocument = replaceSiblingRange(document, nodeId, position === 'before' ? 0 : 1, replacements)
-  const selectedId = copies[0]!.id
+  // `gp`/`gP` select the node that follows the inserted forest, or the last copy when none follows.
+  const following = position === 'before' ? target : located.siblings[located.index + 1]
+  const selectedId = selectAfter ? (following ?? copies[copies.length - 1]!).id : copies[0]!.id
   return {
     document: nextDocument,
     location: { ...location, selectedNodeId: selectedId },

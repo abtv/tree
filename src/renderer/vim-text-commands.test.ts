@@ -303,6 +303,22 @@ describe('Vim text changes beyond deletion', () => {
     })
   })
 
+  it('puts with the caret after the inserted text for gp and gP', () => {
+    expect(calculateTextChange('abc', 1, { kind: 'paste', after: true, text: 'XY', past: true })).toMatchObject({
+      nextText: 'abXYc',
+      nextCursor: 4,
+    })
+    expect(calculateTextChange('abc', 1, { kind: 'paste', after: false, text: 'XY', past: true })).toMatchObject({
+      nextText: 'aXYbc',
+      nextCursor: 3,
+    })
+    // At the end of the text the raw cursor equals the text length; the Normal caret clamps it.
+    expect(calculateTextChange('abc', 2, { kind: 'paste', after: true, text: 'XY', past: true })).toMatchObject({
+      nextText: 'abcXY',
+      nextCursor: 5,
+    })
+  })
+
   it('overwrites without extending past the text', () => {
     expect(calculateTextChange('abc', 0, { kind: 'overwrite', text: 'XY', replaced: 1 })).toEqual({
       kind: 'edit',

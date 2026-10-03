@@ -419,10 +419,18 @@ export function useNodeInputBindings({
         if (removed?.[0] !== undefined) vimSession.current.register = nodeRegister(removed[0])
       } else if (change.kind === 'structural-open') store.createSiblingWithText(change.position, change.text)
       else if (change.kind === 'structural-child-open') store.createChildWithText(change.text)
+      else if (change.kind === 'structural-put' && change.past === true)
+        store.pasteNodeForest(
+          state.location.selectedNodeId,
+          change.position,
+          { nodes: [change.source], sourceIds: change.sourceIds },
+          1,
+          true,
+        )
       else if (change.kind === 'structural-put')
         store.pasteSubtree(state.location.selectedNodeId, change.position, change.source, change.sourceIds)
       else if (change.kind === 'structural-forest-put')
-        store.pasteNodeForest(state.location.selectedNodeId, change.position, change.source)
+        store.pasteNodeForest(state.location.selectedNodeId, change.position, change.source, 1, change.past === true)
       else {
         // A repeated whole-node Visual mutation applies to the current node's own actual siblings.
         const located = locateNode(state.document, state.location.selectedNodeId)
