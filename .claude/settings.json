@@ -9,6 +9,11 @@
             "type": "command",
             "command": "jq -c 'if ((.tool_input.command // \"\") | test(\"^[[:space:]]*cd[[:space:]].*(&&|;)\")) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"deny\", permissionDecisionReason: \"Do not start a command with cd ... && or cd ... ;. Run one simple command with absolute paths instead (AGENTS.md section 4). Prefer the Read and Grep tools for reading and searching.\"}} else empty end'",
             "statusMessage": "Checking for cd chains"
+          },
+          {
+            "type": "command",
+            "command": "jq -c 'if ((.tool_input.command // \"\") | test(\"^[[:space:]]*(for|while|until)[[:space:]]\")) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"deny\", permissionDecisionReason: \"Do not run shell loops (for, while, until): the shell parser cannot analyze them and the Product Owner is prompted every time (AGENTS.md section 4). Use the tool own repeat option, for example playwright --repeat-each=N, or separate tool calls.\"}} else empty end'",
+            "statusMessage": "Checking for shell loops"
           }
         ]
       }
