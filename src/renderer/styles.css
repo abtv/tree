@@ -2,19 +2,20 @@
   /* Every color is defined once here or in the single dark override. The selection highlight is
      one background/foreground pair per appearance, shared by the Visual row, Visual text
      selection, selected hyperlinks, and the Vim mode badge. */
-  --color-text: #373f43;
-  --color-background: #fff;
-  --color-shell-text: #737b80;
-  --color-secondary: #778187;
-  --color-location-separator: #b1b8bc;
-  --color-location-border: #e9edef;
-  --color-hover-text: #596267;
+  --color-grid-dot: #e6dfd0;
+  --color-text: #3b3833;
+  --color-background: #fbf8f1;
+  --color-shell-text: #857f74;
+  --color-secondary: #8c867b;
+  --color-location-separator: #c9c2b4;
+  --color-location-border: #ebe5d9;
+  --color-hover-text: #5c574e;
   --color-toggle-hover-text: #596267;
   --color-toggle-focus-outline: #778187;
   --color-toggle-active-background: #dce1e3;
   --color-ink: #373f43;
-  --color-link: #1769aa;
-  --color-caret: #373f43;
+  --color-link: #3a6ea5;
+  --color-caret: #3b3833;
   --color-white: #fff;
   --color-scrim: rgba(18, 20, 22, 0.72);
   --color-overlay-button-background: rgba(255, 255, 255, 0.9);
@@ -29,12 +30,12 @@
   --color-mode-normal-foreground: var(--color-white);
   --color-mode-replace-background: #a04b45;
   --color-mode-replace-foreground: var(--color-white);
-  --color-gutter-mark: #596267;
-  --color-disclosure-hover-background: #cfd6d9;
-  --color-drag-highlight: #eef0f1;
-  --color-disclosure-background: #dce1e3;
-  --highlight-background: #fff0b3;
-  --highlight-foreground: #373f43;
+  --color-gutter-mark: #b3ab9b;
+  --color-disclosure-hover-background: #e3dccb;
+  --color-drag-highlight: #f1ebdd;
+  --color-disclosure-background: #efe9da;
+  --highlight-background: #f1e4bd;
+  --highlight-foreground: #3b3833;
   color: var(--color-text);
   background: var(--color-background);
   font-family: 'JetBrains Mono';
@@ -93,6 +94,9 @@ textarea {
   overflow-x: hidden;
   overflow-y: auto;
   scroll-timeline: --content-scroll y;
+  background-image: radial-gradient(circle, var(--color-grid-dot) 1px, transparent 1.3px);
+  background-size: 20px 20px;
+  background-attachment: local;
 }
 
 /* Scroll-edge fades (docs/PRODUCT.md §20.6). Content fades into the background at an edge of the
@@ -841,6 +845,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
      (https://github.com/bbatsov/zenburn-emacs). Node text takes one accent color per depth
      below the current parent, in the manner of Org-mode headline levels (docs/PRODUCT.md §20.5). */
   :root {
+    --color-grid-dot: transparent;
     --color-text: #dcdccc;
     --color-background: #3f3f3f;
     --color-shell-text: #9f9f8f;
