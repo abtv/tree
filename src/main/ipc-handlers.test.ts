@@ -28,6 +28,9 @@ function createHarness() {
   const nativeClipboard = {
     read: vi.fn(async () => []),
     readText: vi.fn(async () => ''),
+    writePlainText: vi.fn<(text: string) => Promise<void>>(async () => undefined),
+    writeImage: vi.fn<(png: Uint8Array) => Promise<void>>(async () => undefined),
+    writeRichText: vi.fn<(text: string, html: string) => Promise<void>>(async () => undefined),
   }
   const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true), force: vi.fn() }
   const onQuitConfirmed = vi.fn()
@@ -67,6 +70,87 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('writes plain text and validated attachment bytes through the content channel', async () => {
+    const { handlers, fileServices, nativeClipboard, decodePng } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    expect(ipcChannels.writeClipboardContent).toBe('tree:write-clipboard-content')
+    const write = handlers.get(ipcChannels.writeClipboardContent)!
+    await expect(write(event, { kind: 'text', text: 'https://example.com' })).resolves.toBeUndefined()
+    expect(nativeClipboard.writePlainText).toHaveBeenCalledWith('https://example.com')
+    vi.mocked(fileServices.readAttachment).mockResolvedValue(onePixelPng)
+    await expect(write(event, { kind: 'image', attachmentId: 'image-1' })).resolves.toBeUndefined()
+    expect(fileServices.readAttachment).toHaveBeenCalledWith('image-1')
+    expect(decodePng).toHaveBeenCalledWith(onePixelPng)
+    expect(nativeClipboard.writeImage).toHaveBeenCalledWith(onePixelPng)
+  })
+
+  it('rejects invalid content before native copying or attachment access', async () => {
+    const { handlers, fileServices, nativeClipboard } = createHarness()
+    const write = handlers.get(ipcChannels.writeClipboardContent)!
+    const event = { senderFrame: { url: rendererUrl } }
+    for (const payload of [
+      null,
+      { kind: 'text', text: 12 },
+      { kind: 'other' },
+      { kind: 'image', attachmentId: '../escape' },
+    ])
+      expect(() => write(event, payload)).toThrow()
+    expect(fileServices.readAttachment).not.toHaveBeenCalled()
+    expect(nativeClipboard.writePlainText).not.toHaveBeenCalled()
+    expect(nativeClipboard.writeImage).not.toHaveBeenCalled()
+  })
+
+  it('propagates attachment and native failures and allows a later copy to succeed', async () => {
+    const { handlers, fileServices, nativeClipboard } = createHarness()
+    const write = handlers.get(ipcChannels.writeClipboardContent)!
+    const event = { senderFrame: { url: rendererUrl } }
+    await expect(write(event, { kind: 'image', attachmentId: 'missing' })).rejects.toThrow('attachment is missing')
+    vi.mocked(fileServices.readAttachment).mockRejectedValueOnce(new Error('attachment read failed'))
+    await expect(write(event, { kind: 'image', attachmentId: 'bad' })).rejects.toThrow('attachment read failed')
+    vi.mocked(fileServices.readAttachment).mockResolvedValueOnce(new Uint8Array([1, 2]))
+    await expect(write(event, { kind: 'image', attachmentId: 'corrupt' })).rejects.toThrow('PNG')
+    expect(nativeClipboard.writeImage).not.toHaveBeenCalled()
+    nativeClipboard.writePlainText.mockRejectedValueOnce(new Error('native write failed'))
+    await expect(write(event, { kind: 'text', text: 'first' })).rejects.toThrow('native write failed')
+    await expect(write(event, { kind: 'text', text: 'retry' })).resolves.toBeUndefined()
+  })
+
+  it('reports unavailable native writers before changing the clipboard or reading an image', async () => {
+    const { handlers, fileServices, nativeClipboard } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const write = handlers.get(ipcChannels.writeClipboardContent)!
+    Reflect.deleteProperty(nativeClipboard, 'writePlainText')
+    Reflect.deleteProperty(nativeClipboard, 'writeImage')
+    await expect(write(event, { kind: 'text', text: 'text' })).rejects.toThrow('text copying is unavailable')
+    await expect(write(event, { kind: 'image', attachmentId: 'image' })).rejects.toThrow('image copying is unavailable')
+    expect(fileServices.readAttachment).not.toHaveBeenCalled()
+  })
+
+  it('serializes delayed image copying before a later plain or rich copy', async () => {
+    const { handlers, fileServices, nativeClipboard } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    let release!: (png: Uint8Array) => void
+    vi.mocked(fileServices.readAttachment).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    const image = handlers.get(ipcChannels.writeClipboardContent)!(event, { kind: 'image', attachmentId: 'image' })
+    const text = handlers.get(ipcChannels.writeClipboardContent)!(event, { kind: 'text', text: 'later' })
+    const rich = handlers.get(ipcChannels.writeClipboard)!(event, { text: 'rich', html: '<b>rich</b>' })
+    await Promise.resolve()
+    expect(nativeClipboard.writePlainText).not.toHaveBeenCalled()
+    release(onePixelPng)
+    await Promise.all([image, text, rich])
+    expect(nativeClipboard.writeImage.mock.invocationCallOrder[0]).toBeLessThan(
+      nativeClipboard.writePlainText.mock.invocationCallOrder[0]!,
+    )
+    expect(nativeClipboard.writePlainText.mock.invocationCallOrder[0]).toBeLessThan(
+      nativeClipboard.writeRichText.mock.invocationCallOrder[0]!,
+    )
+    expect(nativeClipboard.writeRichText).toHaveBeenCalledWith('rich', '<b>rich</b>')
+  })
+
   it.each([
     ['an attachment path separator', { id: '../escape', mimeType: 'image/png' }, ''],
     ['a non-HTTP(S) link destination', undefined, 'javascript:alert(1)'],

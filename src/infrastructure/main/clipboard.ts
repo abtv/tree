@@ -9,6 +9,8 @@ export interface NativeClipboard {
   readText(): Promise<string>
   readHTML?(): string | Promise<string>
   writeRichText?(text: string, html: string): Promise<void>
+  writePlainText?(text: string): Promise<void>
+  writeImage?(png: Uint8Array): Promise<void>
   writeText?(text: string): void
   writeHTML?(html: string): void
 }

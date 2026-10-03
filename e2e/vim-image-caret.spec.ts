@@ -8,6 +8,7 @@ import {
   closeApp,
   exactMessage,
   expect,
+  lockSystemClipboard,
   launchTree as launchTreeBase,
   node,
   pressShifted,
@@ -686,6 +687,7 @@ test.describe('Vim editing: image caret', () => {
     await editor.focus()
     await setCursor(editor, 0)
     await editor.press('v')
+    await lockSystemClipboard()
     await editor.press('y')
     await editor.press('2')
     await editor.press('l')

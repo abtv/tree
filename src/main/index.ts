@@ -67,6 +67,9 @@ const nativeClipboard: NativeClipboard = {
     return ''
   },
   writeRichText: (text, html) => clipboard.write([new ClipboardItem({ 'text/plain': text, 'text/html': html })]),
+  writePlainText: (text) => clipboard.write([new ClipboardItem({ 'text/plain': text })]),
+  writeImage: (png) =>
+    clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })]),
 }
 
 function isAlwaysOnTop(): boolean {

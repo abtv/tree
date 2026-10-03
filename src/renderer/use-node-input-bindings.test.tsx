@@ -1078,6 +1078,7 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().location.selectedNodeId).toBe('b')
     f.press('y')
     expect(f.result.current.vimMode).toBe('normal')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'A\nB' })
     f.press('p')
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'A', 'B'])
     expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(4)
@@ -1098,6 +1099,50 @@ describe('useNodeInputBindings', () => {
     act(() => f.store.enter())
     f.press('V')
     expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it('copies reverse whole-node Visual ranges with empty entries and excludes descendants', async () => {
+    const a = node('a', 'A', [node('child', 'Excluded')])
+    const b = node('b', '')
+    const c = { ...node('c', ''), attachment: { id: 'image', mimeType: 'image/png' as const } }
+    const d = node('d', 'D')
+    const f = await fixture({
+      document: { roots: [a, b, c, d] },
+      location: { currentParentId: null, selectedNodeId: 'd' },
+    })
+    f.press('V')
+    f.press('3')
+    f.press('k')
+    f.press('y')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'A\n\n\nD' })
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it('uses text priority for one Visual node and otherwise copies its image or preserves the clipboard', async () => {
+    const f = await fixture({ document: { roots: [image('Text')] } })
+    f.press('j')
+    f.press('V')
+    f.press('y')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'Text' })
+    const imageOnly = await fixture({ document: { roots: [image('')] } })
+    imageOnly.press('V')
+    imageOnly.press('y')
+    expect(imageOnly.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
+    const empty = await fixture({ document: { roots: [node('empty', '')] } })
+    empty.press('V')
+    empty.press('y')
+    expect(empty.clipboard.content).toBeUndefined()
+  })
+
+  it('does not export vertical-operator yanks or text deletes to the system clipboard', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'ABC'), node('b', 'B')] } })
+    f.press('y')
+    f.press('j')
+    expect(f.clipboard.content).toBeUndefined()
+    f.press('v')
+    f.press('l')
+    f.press('d')
+    expect(f.clipboard.content).toBeUndefined()
   })
 
   it('resyncs the image caret after a whole-node Visual command keeps the same node selected', async () => {

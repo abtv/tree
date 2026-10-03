@@ -1,7 +1,7 @@
 import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from '../../application/editor-store'
 import { allIds, createServices, freshIds } from '../../application/test/editor-store-arbitraries'
 import { requireNode, serializeState, type Document, type Location } from '../../domain/document'
-import type { ClipboardWritePayload } from '../../shared/ipc'
+import type { ClipboardContent, ClipboardWritePayload } from '../../shared/ipc'
 import { extractClipboardLinks } from '../../infrastructure/main/clipboard'
 
 export interface RealStoreOptions {
@@ -16,9 +16,14 @@ export interface RealStoreOptions {
 export async function createRealStoreHarness(options: RealStoreOptions = {}) {
   const document = options.document ?? { roots: [{ id: 'node', text: 'hello', children: [] }] }
   const location = options.location ?? { currentParentId: null, selectedNodeId: document.roots[0]!.id }
-  const clipboard: { current: ClipboardValue; written: ClipboardWritePayload | undefined } = {
+  const clipboard: {
+    current: ClipboardValue
+    written: ClipboardWritePayload | undefined
+    content: ClipboardContent | undefined
+  } = {
     current: { kind: 'text', text: '' },
     written: undefined,
+    content: undefined,
   }
   const attachments = new Map<string, Uint8Array>()
   const usedIds = new Set(allIds(document))
@@ -40,6 +45,10 @@ export async function createRealStoreHarness(options: RealStoreOptions = {}) {
           text: payload.text,
           links: extractClipboardLinks(payload.html, payload.text),
         }
+      },
+      writeClipboardContent: async (payload) => {
+        clipboard.content = payload
+        if (payload.kind === 'text') clipboard.current = payload
       },
       writeAttachment: async (id, bytes) => {
         attachments.set(id, bytes.slice())

@@ -4677,6 +4677,27 @@ describe('EditorStore', () => {
       return state.status === 'ready' ? state.document.roots[0]!.text : undefined
     }
 
+    it('skips empty or unavailable Vim copies and tracks a pending write before paste', async () => {
+      const services = textState('copy me')
+      const store = new EditorStore(services, ids('unused'))
+      await store.initialize()
+      await expect(store.copyVimContent(undefined)).resolves.toBe(false)
+      await expect(store.copyVimContent({ kind: 'text', text: 'copy me' })).resolves.toBe(false)
+      const pending = gate()
+      services.writeClipboardContent = vi.fn(() => pending.promise)
+      services.readClipboard = vi.fn(async () => ({ kind: 'text' as const, text: 'copied' }))
+      const before = store.getSnapshot()
+      const copying = store.copyVimContent({ kind: 'text', text: 'copy me' })
+      expect(store.getSnapshot()).toBe(before)
+      const pasting = store.paste('root', 0)
+      await Promise.resolve()
+      expect(services.readClipboard).not.toHaveBeenCalled()
+      pending.open()
+      await expect(copying).resolves.toBe(true)
+      await pasting
+      expect(rootText(store)).toBe('copiedcopy me')
+    })
+
     it('writes nothing for an empty copy or cut selection even when a clipboard writer exists', async () => {
       const services = textState('copy me')
       const writes: unknown[] = []

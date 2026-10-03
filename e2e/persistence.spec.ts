@@ -10,6 +10,7 @@ import {
   exactMessage,
   expect,
   firePaste,
+  lockSystemClipboard,
   launchTree,
   node,
   parent,
@@ -410,6 +411,7 @@ test.describe('persistence', () => {
     // Yank the level-19 sibling subtree, enter the target's parent, and put the register after the
     // level-20 node: the copied child would land at level 21, so the paste must reject in full.
     await node(window, 2).focus()
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await window.getByRole('button', { name: 'Enter node 1' }).click()

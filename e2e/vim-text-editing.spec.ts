@@ -291,6 +291,7 @@ test.describe('Vim editing: text editing', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('v')
     await window.keyboard.press('l')
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('$')
     await window.keyboard.press('p')
@@ -517,6 +518,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(node(window, 1)).toHaveValue('nw')
     await setCursor(node(window, 1), 0)
     await window.keyboard.press('v')
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('3')
     await window.keyboard.press('p')
@@ -947,6 +949,7 @@ test.describe('Vim editing: text editing', () => {
     await editor.focus()
 
     await setCursor(editor, 4)
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('s')
     await window.keyboard.press('i')
@@ -969,6 +972,7 @@ test.describe('Vim editing: text editing', () => {
 
     // The opening bracket pads the inside; its closing counterpart does not.
     await setCursor(editor, 4)
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('s')
     await window.keyboard.press('i')
@@ -994,6 +998,7 @@ test.describe('Vim editing: text editing', () => {
     await editor.focus()
 
     await setCursor(editor, 3)
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('s')
     await window.keyboard.press('s')
@@ -1004,6 +1009,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('alpha beta')
 
     await setCursor(editor, 0)
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('s')
     await window.keyboard.press('i')
@@ -1168,6 +1174,7 @@ test.describe('Vim editing: text editing', () => {
     const first = node(window, 1)
     await first.focus()
 
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await window.keyboard.press('g')

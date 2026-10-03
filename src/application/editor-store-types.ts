@@ -1,5 +1,5 @@
 import type { AttachmentId, Document, Location, NodeId, PersistedEditorState } from '../domain/document'
-import type { ClipboardPayload, ClipboardWritePayload } from '../shared/ipc'
+import type { ClipboardContent, ClipboardPayload, ClipboardWritePayload } from '../shared/ipc'
 import type { ExpansionState } from './expansion-state'
 
 export type ClipboardValue = ClipboardPayload
@@ -9,6 +9,7 @@ export interface EditorServices {
   save(state: PersistedEditorState): Promise<void>
   readClipboard(): Promise<ClipboardValue>
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
+  writeClipboardContent?: (payload: ClipboardContent) => Promise<void>
   writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
   cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
 }

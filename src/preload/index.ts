@@ -18,6 +18,7 @@ export const treeApi: TreeApi = {
   save: (state) => ipcRenderer.invoke(ipcChannels.save, state),
   readClipboard: () => ipcRenderer.invoke(ipcChannels.readClipboard),
   writeClipboard: (payload) => ipcRenderer.invoke(ipcChannels.writeClipboard, payload),
+  writeClipboardContent: (payload) => ipcRenderer.invoke(ipcChannels.writeClipboardContent, payload),
   writeAttachment: (id, png) => ipcRenderer.invoke(ipcChannels.writeAttachment, id, png),
   readAttachment: (id) => ipcRenderer.invoke(ipcChannels.readAttachment, id),
   cleanupAttachments: (referencedIds) => ipcRenderer.invoke(ipcChannels.cleanupAttachments, referencedIds),

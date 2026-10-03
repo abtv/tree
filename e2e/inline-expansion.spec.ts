@@ -4,6 +4,7 @@ import {
   describeForEachEditingMode,
   dragRow,
   expect,
+  lockSystemClipboard,
   launchTree,
   node,
   nodeTexts,
@@ -636,6 +637,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     // of both subtrees after Charlie — not two flattened visible rows.
     await node(window, 1).click()
     await window.keyboard.press('2')
+    await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await node(window, 6).click()

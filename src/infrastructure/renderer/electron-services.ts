@@ -9,6 +9,7 @@ export function createElectronEditorServices(): EditorServices {
     save: (state) => window.treeApi.save(state),
     readClipboard: () => window.treeApi.readClipboard(),
     writeClipboard: (payload) => window.treeApi.writeClipboard?.(payload) ?? Promise.resolve(),
+    writeClipboardContent: (payload) => window.treeApi.writeClipboardContent?.(payload) ?? Promise.resolve(),
     writeAttachment: (id, png) => window.treeApi.writeAttachment(id, png),
     cleanupAttachments: (referencedIds) => window.treeApi.cleanupAttachments(referencedIds),
   }

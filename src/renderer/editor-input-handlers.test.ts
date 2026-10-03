@@ -1078,6 +1078,72 @@ describe('editor keyboard handler', () => {
     expect(deletion.snapshot().document).toEqual(treeDocument)
   })
 
+  it('copies only node text externally with yy while preserving the subtree register', async () => {
+    const node: TreeNode = {
+      id: 'node',
+      text: 'https://example.com',
+      links: [{ start: 0, end: 19, url: 'https://example.com' }],
+      children: [{ id: 'child', text: 'child', children: [] }],
+    }
+    const f = await textFixture(node)
+    const before = f.snapshot()
+    f.input.setSelectionRange(4, 4)
+    f.press('y', 'y')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: node.text })
+    expect(f.snapshot()).toBe(before)
+    expect(f.input.selectionStart).toBe(4)
+    expect(f.vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
+  })
+
+  it('copies a Visual character selection externally without expanding it to the node', async () => {
+    const f = await textFixture({ id: 'node', text: 'one two', children: [] }, 'visual')
+    f.input.setSelectionRange(0, 3)
+    f.press('y')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'one' })
+    expect(f.vim.register.current).toEqual({ kind: 'text', value: 'one' })
+    expect(f.snapshot().document.roots[0]!.text).toBe('one two')
+  })
+
+  it('copies only the attached image with yy on the image caret', async () => {
+    const f = await textFixture({
+      id: 'node',
+      text: 'ab',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    })
+    f.press('l', 'l')
+    const before = f.caret()
+    f.press('y', 'y')
+    expect(f.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
+    expect(f.caret()).toEqual(before)
+  })
+
+  it('keeps the external clipboard for counted multi-node yy and copies a clamped single node', async () => {
+    const first: TreeNode = { id: 'first', text: 'first', children: [] }
+    const last: TreeNode = { id: 'last', text: 'last', children: [] }
+    const f = await textFixture(first, 'normal', { document: { roots: [first, last] } })
+    f.press('2', 'y', 'y')
+    expect(f.clipboard.content).toBeUndefined()
+    f.store.selectNode('last', 0)
+    f.press('2', 'y', 'y')
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'last' })
+  })
+
+  it('keeps local yy available and reports an external copy failure', async () => {
+    const f = await textFixture({ id: 'node', text: 'text', children: [] }, 'normal', {
+      services: {
+        writeClipboardContent: async () => {
+          throw new Error('native copy failed')
+        },
+      },
+    })
+    f.press('y', 'y')
+    await vi.waitFor(() => expect(f.snapshot().operationError).toBe('native copy failed'))
+    expect(f.vim.register.current.kind).toBe('node')
+    f.press('p')
+    expect(f.snapshot().document.roots).toHaveLength(2)
+  })
+
   it('copies a node subtree with yy and pastes it as a sibling with p or P', async () => {
     const node: TreeNode = {
       id: 'node',

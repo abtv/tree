@@ -361,6 +361,7 @@ export function useNodeInputBindings({
       if (result === undefined) return
       const nextRegister = visualCommandRegister(command, result)
       if (nextRegister !== undefined) vimSession.current.register = nextRegister
+      if (command === 'y') void store.copyVimForest(result.nodes).catch((error: unknown) => store.reportError(error))
       if ((command === 'p' || command === 'P') && source !== undefined) {
         // `gv` after a Visual put selects the incoming nodes: the copies start at the selected node.
         const next = store.getSnapshot()

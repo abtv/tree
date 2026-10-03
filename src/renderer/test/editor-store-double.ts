@@ -91,6 +91,8 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     replaceTextRanges: vi.fn(),
     deleteLink: vi.fn(() => false),
     copy: vi.fn(async () => false),
+    copyVimContent: vi.fn(async () => false),
+    copyVimForest: vi.fn(async () => false),
     cut: vi.fn(async () => false),
     endTextSession: vi.fn(),
     markNextTextEditStandalone: vi.fn(),

@@ -56,6 +56,8 @@ describe('preload bridge', () => {
     await treeApi.save(state)
     await treeApi.readClipboard()
     await treeApi.writeClipboard?.(payload)
+    await treeApi.writeClipboardContent?.({ kind: 'text', text: 'plain' })
+    await treeApi.writeClipboardContent?.({ kind: 'image', attachmentId: 'attachment-1' })
     await treeApi.writeAttachment('attachment-1', bytes)
     await treeApi.readAttachment('attachment-1')
     await treeApi.cleanupAttachments(['attachment-1'])
@@ -69,6 +71,8 @@ describe('preload bridge', () => {
       [ipcChannels.save, state],
       [ipcChannels.readClipboard],
       [ipcChannels.writeClipboard, payload],
+      [ipcChannels.writeClipboardContent, { kind: 'text', text: 'plain' }],
+      [ipcChannels.writeClipboardContent, { kind: 'image', attachmentId: 'attachment-1' }],
       [ipcChannels.writeAttachment, 'attachment-1', bytes],
       [ipcChannels.readAttachment, 'attachment-1'],
       [ipcChannels.cleanupAttachments, ['attachment-1']],
@@ -130,5 +134,9 @@ describe('preload bridge', () => {
     mocks.invoke.mockRejectedValueOnce(new Error('save failed'))
 
     await expect(treeApi.load()).rejects.toThrow('save failed')
+    mocks.invoke.mockRejectedValueOnce(new Error('clipboard failed'))
+    await expect(treeApi.writeClipboardContent?.({ kind: 'image', attachmentId: 'picture' })).rejects.toThrow(
+      'clipboard failed',
+    )
   })
 })

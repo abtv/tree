@@ -4,6 +4,7 @@ import {
   validateAttachmentId,
   validateAttachmentIds,
   validateClipboardWritePayload,
+  validateClipboardContent,
   validateEditorContextMenuRequest,
   validatePersistedEditorState,
   isTrustedRendererUrl,
@@ -57,6 +58,14 @@ export function registerIpcHandlers({
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
 
+  // Keep asynchronous image reads and native writes in command order, including rich Copy.
+  let pendingClipboardWrite = Promise.resolve()
+  const queueClipboardWrite = (write: () => Promise<void>): Promise<void> => {
+    const operation = pendingClipboardWrite.then(write)
+    pendingClipboardWrite = operation.catch(() => undefined)
+    return operation
+  }
+
   ipcMain.handle(ipcChannels.quit, (event, requestId?: unknown) => {
     requireTrustedRenderer(event)
     if (typeof requestId === 'string' && quitHandshake.confirm(requestId)) {
@@ -85,7 +94,23 @@ export function registerIpcHandlers({
   })
   ipcMain.handle(ipcChannels.writeClipboard, (event, payload) => {
     requireTrustedRenderer(event)
-    return writeClipboard(nativeClipboard, validateClipboardWritePayload(payload))
+    const content = validateClipboardWritePayload(payload)
+    return queueClipboardWrite(() => writeClipboard(nativeClipboard, content))
+  })
+  ipcMain.handle(ipcChannels.writeClipboardContent, (event, payload) => {
+    requireTrustedRenderer(event)
+    const content = validateClipboardContent(payload)
+    return queueClipboardWrite(async () => {
+      if (content.kind === 'text') {
+        if (nativeClipboard.writePlainText === undefined) throw new Error('Clipboard text copying is unavailable.')
+        await nativeClipboard.writePlainText(content.text)
+      } else {
+        if (nativeClipboard.writeImage === undefined) throw new Error('Clipboard image copying is unavailable.')
+        const png = await fileServices.readAttachment(content.attachmentId)
+        if (png === null) throw new Error('The image could not be copied because its attachment is missing.')
+        await nativeClipboard.writeImage(validateAttachmentBytes(png, decodePng))
+      }
+    })
   })
   ipcMain.handle(ipcChannels.writeAttachment, (event, id, png) => {
     requireTrustedRenderer(event)

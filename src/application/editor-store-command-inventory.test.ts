@@ -21,6 +21,9 @@ const exclusions: Record<string, string> = {
   replaceTextRanges: 'Multi-range link-preserving edits need range-aware generated inputs.',
   deleteLink: 'Link deletion needs link-aware generated documents.',
   copy: 'Clipboard output needs writable clipboard services; this harness only supplies input.',
+  copyVimContent:
+    'Vim clipboard output is covered by focused application, renderer, and IPC tests; this harness only supplies input.',
+  copyVimForest: 'Vim forest export has focused projection and renderer coverage and does not mutate the document.',
   cut: 'Clipboard output needs writable clipboard services; this harness only supplies input.',
   endTextSession: 'History properties call this between commands to separate history entries.',
   markNextTextEditStandalone: 'Text-session grouping is covered by dedicated session tests.',

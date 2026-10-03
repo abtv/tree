@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
+import { vimNormalClipboardContent, vimSelectionClipboardContent } from '../application/vim-clipboard-content'
 import { cloneNode, displayedNodes, linkAtPosition, locateNode, requireNode, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setSelectionRange } from './editor-dom'
 import {
@@ -420,11 +421,26 @@ export function handleVimKey(
         }
       } else if (pending.operator === 'y') {
         const count = parseCount(pending.count)
-        if (count === 1) vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
-        else {
+        let forest: readonly TreeNode[] | undefined
+        if (count === 1) {
+          vim.register.current = { kind: 'node', value: cloneNode(node), sourceIds: [node.id] }
+          forest = [node]
+        } else {
           const source = selectedSiblingForest(store, node.id, count)
-          if (source !== undefined) vim.register.current = { kind: 'nodes', value: source }
+          if (source !== undefined) {
+            vim.register.current = { kind: 'nodes', value: source }
+            forest = source.nodes
+          }
         }
+        if (forest !== undefined)
+          void store
+            .copyVimContent(
+              vimNormalClipboardContent(
+                forest,
+                vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')).imageActive,
+              ),
+            )
+            .catch((error: unknown) => store.reportError(error))
       } else applyTextChange(store, node, input, cursor, vim, { kind: 'change', motion: 'all', count: 1 })
       return handled()
     }
@@ -603,6 +619,10 @@ export function handleVimKey(
     if (selection.start !== selection.end) {
       vim.register.current = { kind: 'text', value: node.text.slice(selection.start, selection.end) }
     }
+    if (event.key === 'y')
+      void store
+        .copyVimContent(vimSelectionClipboardContent(node.text, selection.start, selection.end))
+        .catch((error: unknown) => store.reportError(error))
     if (event.key !== 'y' && selection.start !== selection.end) {
       store.replaceTextRange(node.id, selection.start, selection.end, '')
       vim.imageTextCursor.current = undefined

@@ -22,6 +22,8 @@ import {
   type TreeNode,
 } from '../domain/document'
 import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
+import type { ClipboardContent } from '../shared/ipc'
+import { vimForestClipboardContent } from './vim-clipboard-content'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 import {
   ancestorNavigationTransition,
@@ -434,6 +436,22 @@ export class EditorStore {
     } finally {
       if (this.pendingClipboardOperation === operation) this.pendingClipboardOperation = undefined
     }
+  }
+
+  public async copyVimContent(content: ClipboardContent | undefined): Promise<boolean> {
+    if (content === undefined || this.services.writeClipboardContent === undefined) return false
+    const operation = this.services.writeClipboardContent(content)
+    this.pendingClipboardOperation = operation
+    try {
+      await operation
+      return true
+    } finally {
+      if (this.pendingClipboardOperation === operation) this.pendingClipboardOperation = undefined
+    }
+  }
+
+  public copyVimForest(nodes: readonly TreeNode[]): Promise<boolean> {
+    return this.copyVimContent(vimForestClipboardContent(nodes))
   }
 
   public async cut(nodeId: NodeId, start: number, end: number): Promise<boolean> {

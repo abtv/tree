@@ -8,6 +8,7 @@ export const ipcChannels = {
   save: 'tree:save',
   readClipboard: 'tree:read-clipboard',
   writeClipboard: 'tree:write-clipboard',
+  writeClipboardContent: 'tree:write-clipboard-content',
   writeAttachment: 'tree:write-attachment',
   readAttachment: 'tree:read-attachment',
   cleanupAttachments: 'tree:cleanup-attachments',
@@ -32,6 +33,8 @@ export interface ClipboardWritePayload {
   html: string
 }
 
+export type ClipboardContent = { kind: 'text'; text: string } | { kind: 'image'; attachmentId: string }
+
 export interface EditorContextMenuRequest {
   x: number
   y: number
@@ -53,6 +56,7 @@ export interface TreeApi {
   save(state: PersistedEditorState): Promise<void>
   readClipboard(): Promise<ClipboardPayload>
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
+  writeClipboardContent?: (payload: ClipboardContent) => Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
   readAttachment(id: string): Promise<Uint8Array | null>
   cleanupAttachments(referencedIds: string[]): Promise<void>

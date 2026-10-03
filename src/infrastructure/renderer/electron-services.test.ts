@@ -14,6 +14,7 @@ describe('renderer Electron services', () => {
     save: vi.fn(async () => undefined),
     readClipboard: vi.fn(async (): Promise<ClipboardPayload> => ({ kind: 'text', text: '' })),
     writeClipboard: vi.fn(async () => undefined),
+    writeClipboardContent: vi.fn(async () => undefined),
     writeAttachment: vi.fn(async () => undefined),
     readAttachment: vi.fn(async () => new Uint8Array([1, 2, 3])),
     cleanupAttachments: vi.fn(async () => undefined),
@@ -43,6 +44,8 @@ describe('renderer Electron services', () => {
     await services.save(state)
     await expect(services.readClipboard()).resolves.toEqual({ kind: 'text', text: '' })
     await services.writeClipboard?.(payload)
+    await services.writeClipboardContent?.({ kind: 'text', text: 'plain' })
+    await services.writeClipboardContent?.({ kind: 'image', attachmentId: 'attachment-1' })
     await services.writeAttachment('attachment-1', bytes)
     await services.cleanupAttachments(['attachment-1'])
     await expect(readAttachment('attachment-1')).resolves.toEqual(bytes)
@@ -51,6 +54,8 @@ describe('renderer Electron services', () => {
     expect(api.save).toHaveBeenCalledWith(state)
     expect(api.readClipboard).toHaveBeenCalledWith()
     expect(api.writeClipboard).toHaveBeenCalledWith(payload)
+    expect(api.writeClipboardContent).toHaveBeenCalledWith({ kind: 'text', text: 'plain' })
+    expect(api.writeClipboardContent).toHaveBeenCalledWith({ kind: 'image', attachmentId: 'attachment-1' })
     expect(api.writeAttachment).toHaveBeenCalledWith('attachment-1', bytes)
     expect(api.cleanupAttachments).toHaveBeenCalledWith(['attachment-1'])
     expect(api.readAttachment).toHaveBeenCalledWith('attachment-1')
@@ -64,10 +69,16 @@ describe('renderer Electron services', () => {
     api.readAttachment = vi.fn(async () => {
       throw failure
     })
+    api.writeClipboardContent = vi.fn(async () => {
+      throw failure
+    })
     window.treeApi = api
 
     await expect(createElectronEditorServices().load()).rejects.toBe(failure)
     await expect(readAttachment('attachment-1')).rejects.toBe(failure)
+    await expect(createElectronEditorServices().writeClipboardContent?.({ kind: 'text', text: 'plain' })).rejects.toBe(
+      failure,
+    )
   })
 
   it('provides a no-op optional clipboard writer when the bridge omits it', async () => {

@@ -104,6 +104,7 @@ describeForEachEditingMode('editable node context menu', () => {
 test.describe('editable node context menu (mode-independent)', () => {
   test('bounds long selections in the native Look Up menu label', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+    await lockSystemClipboard()
     const selection = 'long selection '.repeat(25)
     const editor = node(window, 1)
     await typeInto(editor, selection)
