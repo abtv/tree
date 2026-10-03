@@ -99,7 +99,7 @@ describeForEachEditingMode('image preview', () => {
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
   })
 
-  // @requirement PRODUCT.md §17.1
+  // @requirement PRODUCT.md §20.7
   test('shows the same focus ring on the close button however the preview was opened', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await writeClipboardImageSized(app, 400, 200)

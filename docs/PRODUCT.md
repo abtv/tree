@@ -882,7 +882,7 @@ Clicking an attached image opens an image preview.
 
 The image preview is a modal overlay within the application window. It displays the image fitted within the available window area while preserving its aspect ratio, and it does not enlarge the image beyond its natural size.
 
-Only one preview is open at a time. The preview has a visible close button and also closes on `Esc` and on a mouse click anywhere in the window, including on the image itself. When the preview opens, focus moves to the close button, which shows the same focus ring whether the preview was opened with the mouse or the keyboard. Closing the preview returns focus to the element that was focused before the preview opened.
+Only one preview is open at a time. The preview has a visible close button and also closes on `Esc` and on a mouse click anywhere in the window, including on the image itself. When the preview opens, focus moves to the close button (§20.7 applies to how it was opened). Closing the preview returns focus to the element that was focused before the preview opened.
 
 If an attached image cannot be displayed — because its stored bytes are missing, because reading them fails, or because the image data cannot be decoded by the browser — the application shows `Image could not be loaded.` in place of that image. This applies both to the inline image and to the preview. The message does not delete the attachment, does not report a document-save failure, and does not prevent the rest of the document from being edited or the preview from being closed.
 
@@ -1048,6 +1048,12 @@ Content scrolls at pixel granularity, so a row can be cut where the content area
 The top fade shows while content is scrolled beneath the toolbar, and the bottom fade shows while more content lies below the status bar. At the start of the document there is no top fade, at its end there is no bottom fade, and content that fits the window shows neither. Each fade is shorter than one text row, leaves the scrollbar uncovered, and does not intercept the pointer: clicking, selecting, and dragging behave inside it exactly as elsewhere. The fade strength follows the scroll position directly, reaching full strength within the first few pixels scrolled away from an edge.
 
 The edges stay flat. A shadow cast by the bars onto the content was tried and rejected: it made the bars look raised above the content, a depth the otherwise flat interface has nowhere else, and it still showed the cut text.
+
+### 20.7 Consistency Across Input Paths
+
+What the application shows and does depends on its state, never on the input path that produced the state. When one command or state can be reached in several ways — mouse, keyboard shortcut, Vim key, menu item, or a restored session — the result is identical in every way: the same appearance, including focus indicators, the same focus target, the same caret and selection, and the same side effects. Opening an image preview with a click, with `Enter`, or with `Cmd+Enter` is one example.
+
+A difference between paths is allowed only where this document records it and its reason. An appearance that the platform or browser derives from the most recent input device, rather than from the application's state, is a difference of this kind and is not recorded anywhere: an element that receives focus programmatically shows its focus indicator whether the user last used the mouse or the keyboard.
 
 ---
 
