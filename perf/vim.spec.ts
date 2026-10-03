@@ -212,6 +212,88 @@ test.describe('Vim interactions at scale', () => {
     expect(deletePaintMs).toBeLessThan(250)
   })
 
+  test('counted 100J responds in a 10000-sibling level', async ({ userDataDir }) => {
+    const seed = wideSeed(10_000)
+    seed.location = { currentParentId: 'root', selectedNodeId: 'c100' }
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 101', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+    await window.evaluate(() => {
+      const samples: number[] = []
+      ;(window as unknown as { joinPaints: number[] }).joinPaints = samples
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'J') return
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+        },
+        { capture: true },
+      )
+    })
+
+    for (const key of ['1', '0', '0', 'J']) await window.keyboard.press(key)
+    await window.waitForFunction(() => (window as unknown as { joinPaints: number[] }).joinPaints.length === 1)
+    const joinPaintMs = await window.evaluate(() => (window as unknown as { joinPaints: number[] }).joinPaints[0]!)
+    // The node and the ninety-nine siblings after it are one node: c100 absorbed c101 through c199.
+    await expect(window.locator('.node-row[data-node-id="c101"]')).toHaveCount(0)
+    await expect(window.locator('.node-row[data-node-id="c199"]')).toHaveCount(0)
+    await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(
+      /^Child 100 Child 101 .* Child 199$/u,
+    )
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-counted-join-wide-10000',
+      metrics: { joinPaintMs: round(joinPaintMs) },
+    })
+    expect(joinPaintMs).toBeLessThan(250)
+  })
+
+  test('whole-node Visual J over a whole 10000-sibling level responds', async ({ userDataDir }) => {
+    const seed = wideSeed(10_000)
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await input.focus()
+    await expect(input).toBeFocused()
+    await window.keyboard.press('V')
+    await window.keyboard.press('G')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+    await window.evaluate(() => {
+      const probe = window as unknown as { joinAllPaintMs?: number }
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'J') return
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              probe.joinAllPaintMs = performance.now() - event.timeStamp
+            }),
+          )
+        },
+        { capture: true },
+      )
+    })
+
+    await window.keyboard.press('J')
+    await window.waitForFunction(() => (window as unknown as { joinAllPaintMs?: number }).joinAllPaintMs !== undefined)
+    const joinPaintMs = await window.evaluate(() => (window as unknown as { joinAllPaintMs: number }).joinAllPaintMs)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.node-row[data-node-id="c9999"]')).toHaveCount(0)
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue(
+      /^Child 0 Child 1 .* Child 9999$/u,
+    )
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-visual-join-all-wide-10000',
+      metrics: { joinPaintMs: round(joinPaintMs) },
+    })
+    // Three same-machine runs measured 811-819 ms, of which the join itself is about 4 ms; the rest is
+    // laying out one node of about 108,000 characters, so the budget is that baseline plus headroom.
+    expect(joinPaintMs).toBeLessThan(1_500)
+  })
+
   for (const siblingCount of [1_000, 10_000]) {
     test(`whole-node Visual > and < respond in a ${siblingCount}-sibling level`, async ({ userDataDir }) => {
       const middle = Math.floor(siblingCount / 2)

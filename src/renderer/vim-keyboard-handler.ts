@@ -133,7 +133,12 @@ export function handleVimKey(
       clearPending(commandState)
       vim.nodeVisual.move('first')
     } else if (event.key === 'o') vim.nodeVisual.swap()
-    else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1) {
+    else if (event.key === 'J') {
+      // `J` trims and inserts one space; `gJ` joins the texts unchanged. A count is discarded below.
+      const spaced = commandState.pending?.prefix !== 'g'
+      clearPending(commandState)
+      vim.nodeVisual.join(spaced)
+    } else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1) {
       if ((event.key === 'p' || event.key === 'P') && commandState.pending?.prefix === undefined)
         vim.nodeVisual.command(event.key, parseCount(commandState.pending?.count ?? ''))
       else vim.nodeVisual.command(event.key as NodeVisualCommand)
@@ -313,10 +318,17 @@ export function handleVimKey(
     }
   }
 
+  /** Normal `J` and `gJ`: join this node with the following siblings; a count joins that many. */
+  const joinNodes = (spaced: boolean): void => {
+    if (store.joinNodes({ count }, spaced)) vim.syncImageCaretToFocus()
+  }
+
   if (pending.prefix === 'g') {
     clearPending(commandState)
     if (!visual && pending.operator === undefined && (event.key === 'p' || event.key === 'P')) {
       putRegister(event.key, true)
+    } else if (!visual && pending.operator === undefined && event.key === 'J') {
+      joinNodes(false)
     } else if (event.key === 'e') {
       if (pending.operator !== undefined && !visual) {
         applyOperatorMotion(pending.operator, 'ge', totalCount)
@@ -671,6 +683,8 @@ export function handleVimKey(
     applyTextChange(store, node, input, cursor, vim, { kind: 'case', mode: 'toggle', count })
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
     putRegister(event.key, false)
+  } else if (!visual && event.key === 'J') {
+    joinNodes(true)
   } else if (!visual && event.key === '.') {
     const last = commandState.lastChange
     if (last !== undefined) {

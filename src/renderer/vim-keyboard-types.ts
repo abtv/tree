@@ -152,6 +152,8 @@ export interface VimKeyboardState {
     command: (command: NodeVisualCommand, count?: number) => void
     /** `>` (`in`) or `<` (`out`) over the selected sibling range, `count` levels. */
     shift: (direction: 'in' | 'out', count: number) => void
+    /** `J` (`spaced`) or `gJ` over the selected sibling range; leaves whole-node Visual mode on success. */
+    join: (spaced: boolean) => void
   }
   /**
    * Character Visual `>` or `<`: moves the current node and keeps the character selection

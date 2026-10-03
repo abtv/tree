@@ -103,6 +103,7 @@ export function createVimKeyboardDouble(
       exit: vi.fn(),
       command: vi.fn(),
       shift: vi.fn(),
+      join: vi.fn(),
     },
     shiftCurrentNode: vi.fn(),
     verticalOperator: vi.fn(),

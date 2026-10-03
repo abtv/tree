@@ -19,6 +19,7 @@ import {
   insertSubtreeSibling,
   isHttpUrl,
   isValidLocation,
+  joinSiblingRange,
   linksAfterTextEdit,
   locateNode,
   moveSibling,
@@ -494,6 +495,42 @@ describe('document invariants', () => {
         expect(restored.kind).toBe('moved')
         if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
+    )
+  })
+
+  it('joinSiblingRange merges only the later nodes, keeps every other node and attachment, and shares children', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.integer({ min: 1, max: 4 }), fc.boolean(), (rawForest, seed, count, spaced) => {
+        const document = materialize(rawForest)
+        const first = pick(document, seed)
+        const before = locateNode(document, first.id)!
+        const result = joinSiblingRange(document, first.id, count, spaced)
+        const range = before.siblings.slice(before.index, before.index + count)
+        if (count < 2 || before.index + count > before.siblings.length) {
+          expect(result.kind).toBe('impossible')
+          return
+        }
+        const attached = range.filter((node) => node.attachment !== undefined)
+        if (attached.length > 1) {
+          expect(result.kind).toBe('attachments')
+          return
+        }
+        if (result.kind !== 'joined') throw new Error(`expected a join, got ${result.kind}`)
+        const mergedIds = new Set(range.slice(1).map((node) => node.id))
+        expect(allIds(result.document)).toEqual(allIds(document).filter((id) => !mergedIds.has(id)))
+        expect(attachmentSummary(result.document)).toEqual(attachmentSummary(document))
+        const after = locateNode(result.document, first.id)!
+        expect(after.node.attachment).toBe(attached[0]?.attachment)
+        const children = range.flatMap((node) => node.children)
+        expect(after.node.children).toHaveLength(children.length)
+        after.node.children.forEach((child, index) => expect(child).toBe(children[index]))
+        expect(after.siblings.length).toBe(before.siblings.length - (count - 1))
+        if (!spaced) expect(after.node.text).toBe(range.map((node) => node.text).join(''))
+        expect(result.cursor).toBeGreaterThanOrEqual(0)
+        expect(result.cursor).toBeLessThanOrEqual(after.node.text.length)
+        assertDocument(result.document)
+      }),
+      { numRuns: propertyRuns(100) },
     )
   })
 

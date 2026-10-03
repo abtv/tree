@@ -370,6 +370,131 @@ describe('EditorStore', () => {
     })
   })
 
+  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §16.2
+  describe('sibling joins (J and gJ)', () => {
+    const image = { id: 'image', mimeType: 'image/png' as const }
+    const roots: TreeNode[] = [
+      { id: 'a', text: 'alpha  ', children: [{ id: 'a1', text: 'one', children: [] }] },
+      { id: 'b', text: '  beta', children: [{ id: 'b1', text: 'two', children: [] }] },
+      { id: 'c', text: 'gamma', children: [] },
+      { id: 'd', text: 'delta', attachment: image, children: [] },
+    ]
+    const ready = (store: EditorStore): ReadySnapshot => {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+      return snapshot
+    }
+
+    async function load(selectedNodeId: string, currentParentId: string | null = null): Promise<EditorStore> {
+      const store = new EditorStore(
+        loadedState({ roots }, { currentParentId, selectedNodeId }),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      return store
+    }
+
+    it('joins the selected node with the next one, selects the first, and puts the caret on the join point', async () => {
+      const store = await load('a')
+      expect(store.joinNodes({ count: 1 }, true)).toBe(true)
+      const snapshot = ready(store)
+      expect(
+        snapshot.document.roots.map((root) => [root.id, root.text, root.children.map((child) => child.id)]),
+      ).toEqual([
+        ['a', 'alpha beta', ['a1', 'b1']],
+        ['c', 'gamma', []],
+        ['d', 'delta', []],
+      ])
+      expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'a' })
+      expect(snapshot.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
+    })
+
+    it('keeps the texts unchanged for gJ', async () => {
+      const store = await load('a')
+      expect(store.joinNodes({ count: 1 }, false)).toBe(true)
+      expect(ready(store).document.roots[0]!.text).toBe('alpha    beta')
+      expect(ready(store).focus).toMatchObject({ cursor: 7 })
+    })
+
+    it('joins a counted range in one undo step, clamped at the last sibling', async () => {
+      const store = await load('a')
+      const before = ready(store).document
+      expect(store.joinNodes({ count: 3 }, true)).toBe(true)
+      expect(ready(store).document.roots.map((root) => root.text)).toEqual(['alpha beta gamma', 'delta'])
+      store.undo()
+      expect(ready(store).document).toBe(before)
+
+      // `9J` from `c` reaches only `d`; the single attachment moves to the retained node.
+      const clamped = await load('c')
+      expect(clamped.joinNodes({ count: 9 }, true)).toBe(true)
+      expect(ready(clamped).document.roots.map((root) => [root.id, root.text, root.attachment])).toEqual([
+        ['a', 'alpha  ', undefined],
+        ['b', '  beta', undefined],
+        ['c', 'gamma delta', image],
+      ])
+    })
+
+    it('does nothing for the last sibling and the current-parent heading', async () => {
+      const last = await load('d')
+      const lastBefore = ready(last)
+      expect(last.joinNodes({ count: 1 }, true)).toBe(false)
+      expect(ready(last)).toBe(lastBefore)
+      const heading = await load('a', 'a')
+      const headingBefore = ready(heading)
+      expect(heading.joinNodes({ count: 1 }, true)).toBe(false)
+      expect(heading.joinNodes({ anchorId: 'a', focusId: 'a' }, true)).toBe(false)
+      expect(ready(heading)).toBe(headingBefore)
+    })
+
+    it('joins a whole-node Visual range in either direction', async () => {
+      const store = await load('c')
+      expect(store.joinNodes({ anchorId: 'c', focusId: 'a' }, true)).toBe(true)
+      expect(ready(store).document.roots.map((root) => root.text)).toEqual(['alpha beta gamma', 'delta'])
+      const single = await load('b')
+      const before = ready(single)
+      expect(single.joinNodes({ anchorId: 'b', focusId: 'b' }, true)).toBe(false)
+      expect(ready(single)).toBe(before)
+    })
+
+    it('rejects a range with two attached nodes with the approved message and changes nothing', async () => {
+      const store = new EditorStore(
+        loadedState(
+          {
+            roots: [
+              { id: 'a', text: 'A', attachment: image, children: [] },
+              { id: 'b', text: 'B', attachment: image, children: [] },
+            ],
+          },
+          { currentParentId: null, selectedNodeId: 'a' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = ready(store).document
+      expect(store.joinNodes({ count: 1 }, true)).toBe(false)
+      expect(ready(store).document).toBe(before)
+      expect(ready(store).operationError).toBe('Cannot join nodes that both have attachments')
+    })
+
+    it('is blocked while persistence is locked', async () => {
+      const clock = new FakeClock()
+      const { store } = await lockEditor(clock, [
+        { id: 'root', text: 'one', children: [] },
+        { id: 'next', text: 'two', children: [] },
+      ])
+      // The two-node document needs one more failed retry before the editor locks.
+      clock.runAll()
+      await tick()
+      const before = store.getSnapshot()
+      expect(before).toMatchObject({ status: 'ready', persistenceLocked: true })
+      expect(store.joinNodes({ count: 1 }, true)).toBe(false)
+      expect(store.getSnapshot()).toBe(before)
+    })
+  })
+
   // @requirement PRODUCT.md §16.1
   // @requirement PRODUCT.md §20.2
   describe('text-bearing structural creation', () => {

@@ -52,6 +52,7 @@ export const command = fc.record({
     'toggleExpansion',
     'foldAll',
     'shift',
+    'join',
   ),
   a: fc.nat({ max: 1_000 }),
   b: fc.nat({ max: 1_000 }),
@@ -79,6 +80,7 @@ export type CommandAction = {
     | 'toggleExpansion'
     | 'foldAll'
     | 'shift'
+    | 'join'
   a: number
   b: number
   text: string
@@ -264,6 +266,17 @@ export async function applyCommand(
           1 + (action.text.length % 3),
         )
       }
+      break
+    }
+    case 'join': {
+      // Either Normal `J` over a count of following siblings, or a Visual range ending at the selection.
+      const siblings = locateNode(state.document, state.location.selectedNodeId)?.siblings ?? []
+      if (action.a % 2 === 0) store.joinNodes({ count: 1 + (action.b % 4) }, action.text.length % 2 === 0)
+      else if (siblings.length > 0)
+        store.joinNodes(
+          { anchorId: siblings[action.b % siblings.length]!.id, focusId: state.location.selectedNodeId },
+          action.text.length % 2 === 0,
+        )
       break
     }
   }

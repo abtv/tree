@@ -14,7 +14,7 @@ export type {
   TreeNode,
 } from './document-types'
 
-export { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
+export { JOIN_ATTACHMENTS_ERROR, MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 
 export {
   isHttpUrl,
@@ -49,6 +49,7 @@ export {
   insertSiblingBefore,
   insertSubtreeSibling,
   isValidLocation,
+  joinSiblingRange,
   moveSibling,
   nodePath,
   normalizeVisibleLocation,
@@ -61,7 +62,7 @@ export {
   subtreeHeight,
   wouldExceedMaximumDepth,
 } from './document-operations'
-export type { SiblingRangeShift } from './document-operations'
+export type { SiblingRangeJoin, SiblingRangeShift } from './document-operations'
 
 export { assertDocument, parsePersistedState, serializeState, validatePersistedState } from './document-serialization'
 export type { ViewState } from './document-serialization'

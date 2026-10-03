@@ -1,5 +1,7 @@
 export const MAX_DOCUMENT_DEPTH_ERROR = 'Nodes cannot be nested deeper than 20 levels.'
 
+export const JOIN_ATTACHMENTS_ERROR = 'Cannot join nodes that both have attachments'
+
 export const CUT_CONFLICT_ERROR = 'The cut could not finish because the text changed.'
 
 export const IMAGE_LOAD_ERROR = 'Image could not be loaded.'

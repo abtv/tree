@@ -399,6 +399,21 @@ export function useNodeInputBindings({
     [store, nodeVisualSelection],
   )
 
+  // `J` and `gJ` end whole-node Visual mode only when the join happened; a rejected or impossible
+  // join leaves the mode and the selected range alone.
+  const joinNodeVisual = useCallback(
+    (spaced: boolean): void => {
+      if (nodeVisualSelection === undefined) return
+      const { anchorId, focusId } = nodeVisualSelection
+      if (!store.joinNodes({ anchorId, focusId }, spaced)) return
+      changeVimMode('normal')
+      syncImageCaretToFocus()
+      clearCommandAssembly(vimCommandState.current)
+      setNodeVisualSelection(undefined)
+    },
+    [store, nodeVisualSelection, setNodeVisualSelection, changeVimMode, syncImageCaretToFocus, vimCommandState],
+  )
+
   const shiftCurrentNode = useCallback(
     (nodeId: string, direction: 'in' | 'out', count: number, selection: { start: number; end: number }): void => {
       if (!store.shiftNodeVisual(direction, nodeId, nodeId, count)) return
@@ -913,6 +928,7 @@ export function useNodeInputBindings({
                 exit: () => setNodeVisualSelection(undefined),
                 command: commandNodeVisual,
                 shift: shiftNodeVisual,
+                join: joinNodeVisual,
               },
               shiftCurrentNode,
               verticalOperator,
@@ -982,6 +998,7 @@ export function useNodeInputBindings({
       applyCaretState,
       commandNodeVisual,
       shiftNodeVisual,
+      joinNodeVisual,
       shiftCurrentNode,
       verticalOperator,
       finishVimReplace,

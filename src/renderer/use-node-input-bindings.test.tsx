@@ -601,6 +601,47 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().document).toBe(before)
   })
 
+  it('joins a whole-node Visual range with J or gJ and returns to Normal mode', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'alpha '), node('b', ' beta'), node('c', 'gamma')] } })
+    f.press('V')
+    f.press('j')
+    f.press('J')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha beta', 'gamma'])
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.snapshot().location.selectedNodeId).toBe('a')
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'a', cursor: 5 })
+    f.press('u')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha ', ' beta', 'gamma'])
+    // After the undo, the same range joins without touching its whitespace for gJ.
+    f.press('V')
+    f.press('j')
+    f.press('g')
+    f.press('J')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha  beta', 'gamma'])
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it('keeps whole-node Visual active when a one-node range cannot join or two attachments conflict', async () => {
+    const image = { id: 'image', mimeType: 'image/png' as const }
+    const f = await fixture({
+      document: {
+        roots: [
+          { ...node('a', 'A'), attachment: image },
+          { ...node('b', 'B'), attachment: image },
+        ],
+      },
+    })
+    const before = f.snapshot().document
+    f.press('V')
+    f.press('J')
+    expect(f.result.current.vimMode).toBe('visual-node')
+    f.press('j')
+    f.press('J')
+    expect(f.result.current.vimMode).toBe('visual-node')
+    expect(f.snapshot().document).toBe(before)
+    expect(f.snapshot().operationError).toBe('Cannot join nodes that both have attachments')
+  })
+
   it('keeps whole-node Visual active when an empty register cannot replace the range', async () => {
     const f = await fixture()
     const before = f.snapshot().document

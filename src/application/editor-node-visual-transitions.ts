@@ -3,6 +3,8 @@ import {
   cloneNodeWithNewIds,
   displayedNodes,
   ensureRoot,
+  JOIN_ATTACHMENTS_ERROR,
+  joinSiblingRange,
   locateNode,
   MAX_DOCUMENT_DEPTH_ERROR,
   nodePath,
@@ -122,6 +124,71 @@ export function nodeVisualShiftTransition(
     },
     expandIds,
   }
+}
+
+export type NodeJoinTransition =
+  { kind: 'none' } | { kind: 'rejected'; message: string } | { kind: 'joined'; transition: StructuralTransition }
+
+function joinTransition(
+  document: Document,
+  location: Location,
+  firstId: NodeId,
+  span: number,
+  spaced: boolean,
+): NodeJoinTransition {
+  const result = joinSiblingRange(document, firstId, span, spaced)
+  if (result.kind === 'impossible') return { kind: 'none' }
+  if (result.kind === 'attachments') return { kind: 'rejected', message: JOIN_ATTACHMENTS_ERROR }
+  return {
+    kind: 'joined',
+    transition: {
+      document: result.document,
+      location: { ...location, selectedNodeId: firstId },
+      focus: { nodeId: firstId, cursor: result.cursor },
+    },
+  }
+}
+
+/**
+ * Normal `J` and `gJ`: joins the selected node with the `count - 1` siblings after it, at least one,
+ * clamped at the last sibling. A node with no following sibling and the current-parent heading
+ * change nothing (`docs/PRODUCT.md` §20.2.1 T6).
+ */
+export function forwardJoinTransition(
+  document: Document,
+  location: Location,
+  nodeId: NodeId,
+  count: number,
+  spaced: boolean,
+): NodeJoinTransition {
+  if (nodeId === location.currentParentId) return { kind: 'none' }
+  const located = locateNode(document, nodeId)
+  if (located === undefined) return { kind: 'none' }
+  const span = Math.min(Math.max(2, count), located.siblings.length - located.index)
+  return joinTransition(document, location, nodeId, span, spaced)
+}
+
+/** Whole-node Visual `J` and `gJ`: joins the sibling range between `anchorId` and `focusId`. */
+export function nodeVisualJoinTransition(
+  document: Document,
+  location: Location,
+  anchorId: NodeId,
+  focusId: NodeId,
+  spaced: boolean,
+): NodeJoinTransition {
+  if (anchorId === location.currentParentId || focusId === location.currentParentId) return { kind: 'none' }
+  const anchorLocated = locateNode(document, anchorId)
+  if (anchorLocated === undefined) return { kind: 'none' }
+  const focusIndex = anchorLocated.siblings.findIndex((node) => node.id === focusId)
+  if (focusIndex < 0) return { kind: 'none' }
+  const start = Math.min(anchorLocated.index, focusIndex)
+  return joinTransition(
+    document,
+    location,
+    anchorLocated.siblings[start]!.id,
+    Math.abs(anchorLocated.index - focusIndex) + 1,
+    spaced,
+  )
 }
 
 export type NodeVisualTransition =

@@ -18,6 +18,7 @@ import {
 } from './test/editor-store-arbitraries'
 import {
   assertDocument,
+  attachmentSummary,
   cloneNode,
   isValidLocation,
   locateNode,
@@ -69,6 +70,14 @@ function assertTransition(store: EditorStore, before: ReadyState, action: Comman
           (previous !== null && locateNode(after.document, previous)!.ancestors.some((a) => a.id === next)),
       ).toBe(true)
       return
+    }
+    case 'join': {
+      // A join only merges siblings into the first one: it creates no node, and every attachment
+      // reference survives (only one participating node may carry one, and it moves to the first).
+      const beforeIds = new Set(allIds(before.document))
+      for (const id of allIds(after.document)) expect(beforeIds.has(id)).toBe(true)
+      expect([...attachmentSummary(after.document)]).toEqual([...attachmentSummary(before.document)])
+      break
     }
     case 'undo':
     case 'redo':

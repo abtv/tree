@@ -44,7 +44,9 @@ import { clipboardIntroducesLink, nodeContent, sameNodeContent } from './editor-
 import { EditorHistory } from './editor-history'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import {
+  forwardJoinTransition,
   isPasteIntoSourceDescendant,
+  nodeVisualJoinTransition,
   nodeVisualShiftTransition,
   nodeVisualTransition,
   pasteNodeForestTransition,
@@ -806,6 +808,33 @@ export class EditorStore {
       result.transition.location,
       this.runtime.newFocus(result.transition.focus.nodeId, result.transition.focus.cursor),
       expansion,
+    )
+    return true
+  }
+
+  /**
+   * Normal `J` / `gJ` (`docs/PRODUCT.md` §20.2.1 T6) joins the selected node with the following
+   * siblings, and whole-node Visual `J` / `gJ` joins the range between `range.anchorId` and
+   * `range.focusId`. Either is one undoable command; returns whether it changed the document. A
+   * range with two attached nodes is reported and changes nothing.
+   */
+  public joinNodes(target: { count: number } | { anchorId: NodeId; focusId: NodeId }, spaced: boolean): boolean {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return false
+    const result =
+      'count' in target
+        ? forwardJoinTransition(state.document, state.location, state.location.selectedNodeId, target.count, spaced)
+        : nodeVisualJoinTransition(state.document, state.location, target.anchorId, target.focusId, spaced)
+    if (result.kind === 'none') return false
+    if (result.kind === 'rejected') {
+      this.reportError(new Error(result.message))
+      return false
+    }
+    this.endTextSession()
+    this.applyStructural(
+      result.transition.document,
+      result.transition.location,
+      this.runtime.newFocus(result.transition.focus.nodeId, result.transition.focus.cursor),
     )
     return true
   }

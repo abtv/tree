@@ -225,7 +225,7 @@ describe('editor keyboard handler', () => {
     const enter = vi.fn(() => true)
     const move = vi.fn()
     const command = vi.fn()
-    vim.nodeVisual = { enter, move, command, swap: vi.fn(), exit: vi.fn(), shift: vi.fn() }
+    vim.nodeVisual = { enter, move, command, swap: vi.fn(), exit: vi.fn(), shift: vi.fn(), join: vi.fn() }
     handle(keyEvent(input, 'V'))
     expect(enter).toHaveBeenCalledWith('node')
     expect(vim.mode).toBe('visual-node')
@@ -246,7 +246,7 @@ describe('editor keyboard handler', () => {
     const swap = vi.fn()
     const exit = vi.fn()
     const command = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move, swap, exit, command, shift: vi.fn() }
+    vim.nodeVisual = { enter: vi.fn(() => true), move, swap, exit, command, shift: vi.fn(), join: vi.fn() }
     handle(keyEvent(input, 'G'))
     handle(keyEvent(input, 'g'))
     handle(keyEvent(input, 'g'))
@@ -273,7 +273,15 @@ describe('editor keyboard handler', () => {
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
     const shift = vi.fn()
     const move = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move, swap: vi.fn(), exit: vi.fn(), command: vi.fn(), shift }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move,
+      swap: vi.fn(),
+      exit: vi.fn(),
+      command: vi.fn(),
+      shift,
+      join: vi.fn(),
+    }
     const press = (key: string): ReturnType<typeof keyEvent> => {
       const event = keyEvent(input, key)
       handle(event)
@@ -344,6 +352,26 @@ describe('editor keyboard handler', () => {
     vi.mocked(vim.verticalOperator).mockClear()
     press('y', 's', 'j')
     expect(vim.verticalOperator).not.toHaveBeenCalled()
+  })
+
+  it('routes whole-node Visual J and gJ, and discards a count or other prefix for them', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'node'
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    const press = (...keys: string[]): void => {
+      for (const key of keys) handle(keyEvent(input, key))
+    }
+    press('J', 'g', 'J', '3', 'J')
+    expect(vi.mocked(vim.nodeVisual.join).mock.calls).toEqual([[true], [false], [true]])
+    expect(vim.commandState.pending).toBeUndefined()
+    // Character Visual mode has no join: `J` neither joins nor edits there.
+    const character = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual')
+    character.handle(keyEvent(input, 'J'))
+    character.handle(keyEvent(input, 'g'))
+    character.handle(keyEvent(input, 'J'))
+    expect(character.vim.nodeVisual.join).not.toHaveBeenCalled()
+    expect(store.joinNodes).not.toHaveBeenCalled()
   })
 
   it('moves the current subtree for character Visual > and < and keeps the selection and mode', () => {
@@ -1406,7 +1434,15 @@ describe('editor keyboard handler', () => {
     input.value = 'node'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
     const exit = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn(), shift: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit,
+      command: vi.fn(),
+      shift: vi.fn(),
+      join: vi.fn(),
+    }
 
     handle(keyEvent(input, 'g'))
     expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
@@ -1423,7 +1459,15 @@ describe('editor keyboard handler', () => {
     input.value = 'node'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
     const exit = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn(), shift: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit,
+      command: vi.fn(),
+      shift: vi.fn(),
+      join: vi.fn(),
+    }
 
     handle(keyEvent(input, 'g'))
     handle(keyEvent(input, 'V'))
@@ -1686,7 +1730,15 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
     const exit = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn(), shift: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit,
+      command: vi.fn(),
+      shift: vi.fn(),
+      join: vi.fn(),
+    }
     const event = keyEvent(input, 'z')
 
     handle(event)
@@ -1998,7 +2050,15 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
     const exit = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn(), shift: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit,
+      command: vi.fn(),
+      shift: vi.fn(),
+      join: vi.fn(),
+    }
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'g' }
     vim.commandState.visualAnchor = 0
     vim.commandState.visualFocus = 1
@@ -2137,7 +2197,15 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual-node')
     const exit = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit, command: vi.fn(), shift: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit,
+      command: vi.fn(),
+      shift: vi.fn(),
+      join: vi.fn(),
+    }
     const pending = { count: '', motionCount: '', prefix: 'g' as const }
     vim.commandState.pending = pending
 
@@ -2454,6 +2522,84 @@ describe('editor keyboard handler', () => {
     expect(snapshot().location.selectedNodeId).toBe('root')
   })
 
+  describe('Normal J and gJ', () => {
+    const siblings = {
+      roots: [
+        { id: 'a', text: 'alpha  ', children: [] },
+        { id: 'b', text: '  beta', children: [] },
+        { id: 'c', text: 'gamma', children: [] },
+      ],
+    }
+    const fixture = (
+      selected: string,
+      location: { currentParentId: string | null; selectedNodeId: string } = {
+        currentParentId: null,
+        selectedNodeId: selected,
+      },
+    ) =>
+      textFixture(
+        siblings.roots.find((entry) => entry.id === selected)!,
+        'normal',
+        { document: siblings, location },
+      )
+
+    it('joins with the next sibling, trimming and inserting one space for J', async () => {
+      const { press, snapshot, vim } = await fixture('a')
+      vim.register.current = { kind: 'text', value: 'kept' }
+      press('J')
+      expect(snapshot().document.roots.map((root) => root.text)).toEqual(['alpha beta', 'gamma'])
+      expect(snapshot().location.selectedNodeId).toBe('a')
+      expect(vim.register.current).toEqual({ kind: 'text', value: 'kept' })
+      expect(vim.mode).toBe('normal')
+      expect(vim.syncImageCaretToFocus).toHaveBeenCalled()
+    })
+
+    it('keeps the texts unchanged for gJ and applies a count to either form', async () => {
+      const gj = await fixture('a')
+      gj.press('g', 'J')
+      expect(gj.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
+      const counted = await fixture('a')
+      counted.press('3', 'J')
+      expect(counted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha beta gamma'])
+      const gCounted = await fixture('a')
+      gCounted.press('3', 'g', 'J')
+      expect(gCounted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    betagamma'])
+      // `1J` still joins two nodes, and a count past the end clamps at the last sibling.
+      const one = await fixture('a')
+      one.press('1', 'J')
+      expect(one.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha beta', 'gamma'])
+      const clamped = await fixture('b')
+      clamped.press('9', 'J')
+      expect(clamped.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha  ', '  beta gamma'])
+    })
+
+    it('does nothing on the last sibling or the current-parent heading, and discards the pending count', async () => {
+      const last = await fixture('c')
+      const before = last.snapshot().document
+      last.press('J')
+      last.press('g', 'J')
+      expect(last.snapshot().document).toBe(before)
+      expect(last.vim.commandState.pending).toBeUndefined()
+      const heading = await fixture('a', { currentParentId: 'a', selectedNodeId: 'a' })
+      const headingBefore = heading.snapshot().document
+      heading.press('J')
+      expect(heading.snapshot().document).toBe(headingBefore)
+    })
+
+    it('is not a continuation of an operator and does not replace the saved change', async () => {
+      const { press, snapshot, vim } = await fixture('a')
+      const saved = { kind: 'delete', motion: 'w', count: 1 } as const
+      vim.commandState.lastChange = saved
+      press('d', 'J')
+      expect(snapshot().document.roots).toHaveLength(3)
+      expect(vim.commandState.pending).toBeUndefined()
+      press('J')
+      press('g', 'J')
+      expect(snapshot().document.roots.length).toBeLessThan(3)
+      expect(vim.commandState.lastChange).toBe(saved)
+    })
+  })
+
   it('handles p and P without editing when the local register is empty', async () => {
     const { store, input, press, snapshot, vim, caretRequests } = await textFixture({
       id: 'node',
@@ -2642,7 +2788,15 @@ describe('editor keyboard handler', () => {
     input.value = 'node'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
     const command = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move: vi.fn(), swap: vi.fn(), exit: vi.fn(), command, shift: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move: vi.fn(),
+      swap: vi.fn(),
+      exit: vi.fn(),
+      command,
+      shift: vi.fn(),
+      join: vi.fn(),
+    }
     for (const key of ['3', 'p', '2', 'P', '4', 'd', 'p']) handle(keyEvent(input, key))
     expect(command.mock.calls).toEqual([['p', 3], ['P', 2], ['d'], ['p', 1]])
   })

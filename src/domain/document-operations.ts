@@ -487,6 +487,78 @@ export function shiftSiblingRange(
   return { kind: 'moved', document: next }
 }
 
+export type SiblingRangeJoin =
+  { kind: 'joined'; document: Document; cursor: number } | { kind: 'impossible' } | { kind: 'attachments' }
+
+/**
+ * Joins `count` consecutive siblings starting at `firstId` into the first one (`docs/PRODUCT.md`
+ * §20.2.1 T6). The first node keeps its ID, attachment, and links; the texts are concatenated, with
+ * hyperlink ranges moving with their text, and the children of every joined node follow in sibling
+ * order with their IDs and subtrees intact. With `spaced`, each join first removes the earlier text's
+ * trailing and the later text's leading whitespace and then inserts one space when both remain
+ * non-empty. `cursor` is the offset of the first join point after trimming. `impossible` means fewer
+ * than two nodes are available; `attachments` means two or more of the joined nodes carry one.
+ * Children keep their depth, so a join cannot exceed `MAX_DOCUMENT_DEPTH`, and the attachment
+ * multiset is unchanged because the only removed attachment is carried by the retained node.
+ */
+export function joinSiblingRange(
+  document: Document,
+  firstId: NodeId,
+  count: number,
+  spaced: boolean,
+): SiblingRangeJoin {
+  const located = requireNode(document, firstId)
+  if (count < 2 || located.index + count > located.siblings.length) return { kind: 'impossible' }
+  const range = located.siblings.slice(located.index, located.index + count)
+  const attached = range.filter((node) => node.attachment !== undefined)
+  if (attached.length > 1) return { kind: 'attachments' }
+  const first = range[0]!
+  // The pieces are joined once at the end and each step only touches the tail, so the cost stays
+  // linear in the total text length however many nodes are joined.
+  const parts: string[] = [first.text]
+  let length = first.text.length
+  let links: LinkRange[] = [...(first.links ?? [])]
+  let cursor = 0
+  const children: TreeNode[] = []
+  for (const [index, node] of range.entries()) {
+    for (const child of node.children) children.push(child)
+    if (index === 0) continue
+    let right = node.text
+    let leading = 0
+    if (spaced) {
+      const before = length
+      while (parts.length > 0) {
+        const last = parts.pop()!
+        length -= last.length
+        const trimmed = last.replace(/\s+$/u, '')
+        if (trimmed !== '') {
+          parts.push(trimmed)
+          length += trimmed.length
+          break
+        }
+      }
+      if (length < before) links = links.filter((link) => link.end <= length)
+      const trimmedRight = right.replace(/^\s+/u, '')
+      leading = right.length - trimmedRight.length
+      right = trimmedRight
+    }
+    const separator = spaced && length > 0 && right !== '' ? ' ' : ''
+    if (index === 1) cursor = length
+    const shift = length + separator.length - leading
+    for (const link of node.links ?? [])
+      if (link.start >= leading) links.push({ ...link, start: link.start + shift, end: link.end + shift })
+    parts.push(separator, right)
+    length += separator.length + right.length
+  }
+  const text = parts.join('')
+  const merged = contentReplacement({ ...first, children }, text, normalizeLinks(links, text), attached[0]?.attachment)
+  const siblings = located.siblings.slice()
+  siblings.splice(located.index, count, merged)
+  const next = copyToRoot(document, located, siblings)
+  inheritAttachmentIds(document, next)
+  return { kind: 'joined', document: next, cursor }
+}
+
 export function pasteText(
   document: Document,
   nodeId: NodeId,

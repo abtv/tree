@@ -2,11 +2,16 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  allowRendererError,
+  attachmentFiles,
   attachmentPath,
+  closeApp,
+  exactMessage,
   expect,
   launchTree as launchTreeBase,
   node,
   pressShifted,
+  readPersisted,
   seedDocument,
   setCursor,
   startRowDrag,
@@ -1003,5 +1008,51 @@ test.describe('Vim editing: image caret', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(editor).toHaveValue('AB')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
+  })
+
+  test('joins nodes with one image onto the retained node and rejects two images without a change', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'plain', text: 'Plain', children: [] },
+          { id: 'first', text: 'First', attachment: { id: 'first-image', mimeType: 'image/png' }, children: [] },
+          { id: 'second', text: 'Second', attachment: { id: 'second-image', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'plain' },
+    })
+    seedAttachmentImage(userDataDir, 'first-image')
+    seedAttachmentImage(userDataDir, 'second-image')
+    const { app, window } = await launchTree(userDataDir)
+    const imageButtons = window.getByRole('button', { name: 'Open image preview' })
+    await expect(imageButtons).toHaveCount(2)
+
+    // The image of the later node moves to the retained node, and nothing is cleaned up.
+    await node(window, 1).focus()
+    await pressShifted(window, 'J')
+    await expect(node(window, 1)).toHaveValue('Plain First')
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 5)
+    await expect(
+      window.locator('.node-row[data-node-id="plain"]').getByRole('button', { name: 'Open image preview' }),
+    ).toHaveCount(1)
+    await expect(imageButtons).toHaveCount(2)
+
+    // Two attached nodes cannot join: the whole join is rejected with the approved message.
+    allowRendererError(exactMessage('Operation failed: Cannot join nodes that both have attachments'))
+    await pressShifted(window, 'J')
+    await expect(window.getByText('Operation failed: Cannot join nodes that both have attachments')).toBeVisible()
+    await expect(node(window, 1)).toHaveValue('Plain First')
+    await expect(node(window, 2)).toHaveValue('Second')
+    await expect(imageButtons).toHaveCount(2)
+
+    // A structural change saves on quit: the saved document holds the carried image, and both files remain.
+    await closeApp(app)
+    expect(readPersisted(userDataDir).document.roots.map((root) => [root.id, root.attachment?.id])).toEqual([
+      ['plain', 'first-image'],
+      ['second', 'second-image'],
+    ])
+    expect(attachmentFiles(userDataDir)).toHaveLength(2)
   })
 })
