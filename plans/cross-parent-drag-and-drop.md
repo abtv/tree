@@ -38,6 +38,7 @@ Reserved for the Product Owner: any behavior not listed here, including keyboard
 | S7 | Breadcrumb targets are each ancestor segment and the root glyph below root level. The current-parent segment and the root glyph at root level are not targets. A drop appends as last child (document root: last root). A breadcrumb hit wins over rows. The hit region is the segment's width by the toolbar's full height. | §2.2 "clicking the current-parent segment does nothing" | T7 |
 | S8 | The gap marker keeps its class names; its left edge sits at the chosen level's column through a CSS variable. The marker needs more contrast than the current drag-highlight color, so use a palette variable with a dark override. A drop on a node is an inset outline in a palette color. The breadcrumb target uses the existing hover-surface variable. `not-allowed` applies on `body` and the list. No animation and no layout shift. | §20.4; ARCHITECTURE §8; §2.1 "no additional blank gap" | T5, T6, T7 |
 | S9 | Whole-node Visual mode ends (Normal mode, range cleared) when a drop changes the node's parent, as `enterNode` and `navigateToAncestor` do in `App.tsx`. The Vim register and `.` repeat are untouched. | §20.2 pointer paragraph | T5 |
+| S10 | The outer band of a row is a quarter of its height, at most a capped number of pixels; the level changes by one for each full horizontal step from the press point, truncated toward zero, so a sloppy vertical drag keeps the level; the step equals the per-level row indent. The values are exported constants in `node-drag.ts` and can be tuned without a behavior change elsewhere. | M2 "fixed horizontal distance", "a straight vertical drag keeps today's reorder"; M3 "capped size"; S8 single indent source | T4 |
 
 The Product Owner should see the screenshots for S8.
 
@@ -73,7 +74,7 @@ The Product Owner should see the screenshots for S8.
 | T1 | Domain `moveSubtree` | T0 | Low | Done |
 | T2 | Drop-target model and real parent ids | T1 | Low | Done |
 | T3 | Store command `moveNodeToParent` | T1, T2 | Moderate, independent review | Ready |
-| T4 | Pointer geometry in `node-drag.ts` | T0 | Low | Ready |
+| T4 | Pointer geometry in `node-drag.ts` | T0 | Low | Done |
 | T5 | Between-row drops with a level | T3, T4 | High (`npm run check:full`), reviewer and product verifier, `WORKING_PLAN.md` | Planned |
 | T6 | Drop onto a node | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Planned |
 | T7 | Drop onto a breadcrumb entry | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Planned |
@@ -108,8 +109,8 @@ The Product Owner should see the screenshots for S8.
 ### T4. Pointer geometry in `src/renderer/node-drag.ts`
 
 * Files: `node-drag.ts`, `node-drag.test.ts`, `node-drag.property.test.ts`.
-* Add `dropZoneAtPoint(regions, y)` returning `{gap}` or `{row}` for the bands (M3) and `dropLevelAtPoint(...)` for the relative rule (M2), ties going shallower. Constants are exported.
-* Acceptance: bands partition every row, the gap index is monotonic in y, clamp and tie cases hold, zero-height rows are ignored. The old midpoint tests become band tests; keep the reducer and `resolveNodeDrag` tests.
+* Add `dropZoneAtPoint(regions, y)` returning `{gap}` or `{row}` for the bands (M3) and `dropLevelAtPoint(sourceLevel, pressX, pointerX, levels)` for the relative rule (M2). Constants are exported. Landed with S10: the level rule truncates toward zero, so it has no ties to break.
+* Acceptance: bands partition every row, the zone position is monotonic in y, clamp cases hold, zero-height rows are ignored. `insertionIndexAtPoint`, `effectiveDestination`, `shouldCommitMove` and `dropMarkerFor` stay with their tests until T5, because `use-node-list-drag.ts` still uses them; T5 replaces them with the band tests and deletes them. Keep the reducer and `resolveNodeDrag` tests.
 * Commit: `feat(renderer): resolve drop bands and levels from pointer geometry`.
 
 ### T5. Between-row drops with a level
@@ -164,6 +165,6 @@ The Product Owner should see the screenshots for S8.
 
 ## Next task
 
-T3 (store command `moveNodeToParent`) is the next task. T4 is independent and also ready.
+T3 (store command `moveNodeToParent`) is the next task; T5 depends on it.
 
 Resume prompt: "Continue the cross-parent drag-and-drop initiative (plans/cross-parent-drag-and-drop.md): take the next Ready task."

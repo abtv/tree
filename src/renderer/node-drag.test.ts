@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DROP_BAND_MAX_PX,
+  DROP_LEVEL_STEP_PX,
   IDLE_NODE_DRAG,
+  dropLevelAtPoint,
   dropMarkerFor,
+  dropZoneAtPoint,
   exceedsHoldTolerance,
   insertionIndexAtPoint,
   nodeDragReducer,
@@ -181,6 +185,106 @@ describe('insertionIndexAtPoint', () => {
         10000,
       ),
     ).toBe(37)
+  })
+})
+
+describe('dropZoneAtPoint', () => {
+  it('returns undefined without rendered rows or with rows that have no height', () => {
+    expect(dropZoneAtPoint([], 10)).toBeUndefined()
+    expect(dropZoneAtPoint([{ index: 0, top: 10, bottom: 10 }], 10)).toBeUndefined()
+  })
+
+  it('splits a row into an upper gap band, a middle drop on the node, and a lower gap band', () => {
+    // A 20px row has 5px bands.
+    const regions = [{ index: 3, top: 100, bottom: 120 }]
+    expect(dropZoneAtPoint(regions, 100)).toEqual({ gap: 3 })
+    expect(dropZoneAtPoint(regions, 104.9)).toEqual({ gap: 3 })
+    expect(dropZoneAtPoint(regions, 105)).toEqual({ row: 3 })
+    expect(dropZoneAtPoint(regions, 114.9)).toEqual({ row: 3 })
+    expect(dropZoneAtPoint(regions, 115)).toEqual({ gap: 4 })
+    expect(dropZoneAtPoint(regions, 119.9)).toEqual({ gap: 4 })
+  })
+
+  it('caps the band of a tall row so its middle stays a drop on the node', () => {
+    const regions = [{ index: 0, top: 0, bottom: 100 }]
+    expect(DROP_BAND_MAX_PX).toBe(8)
+    expect(dropZoneAtPoint(regions, 7.9)).toEqual({ gap: 0 })
+    expect(dropZoneAtPoint(regions, 8)).toEqual({ row: 0 })
+    expect(dropZoneAtPoint(regions, 91.9)).toEqual({ row: 0 })
+    expect(dropZoneAtPoint(regions, 92)).toEqual({ gap: 1 })
+  })
+
+  it('resolves the boundary between two touching rows to the gap between them', () => {
+    const regions = [
+      { index: 0, top: 0, bottom: 27 },
+      { index: 1, top: 27, bottom: 54 },
+    ]
+    expect(dropZoneAtPoint(regions, 26.9)).toEqual({ gap: 1 })
+    expect(dropZoneAtPoint(regions, 27)).toEqual({ gap: 1 })
+  })
+
+  it('maps above the first and below the last row to the list edges', () => {
+    const regions = [
+      { index: 0, top: 0, bottom: 27 },
+      { index: 1, top: 27, bottom: 54 },
+    ]
+    expect(dropZoneAtPoint(regions, -10)).toEqual({ gap: 0 })
+    expect(dropZoneAtPoint(regions, 100)).toEqual({ gap: 2 })
+  })
+
+  it('maps a point exactly on the bottom edge of a row to the gap after it', () => {
+    expect(dropZoneAtPoint([{ index: 4, top: 0, bottom: 27 }], 27)).toEqual({ gap: 5 })
+    const regions = [
+      { index: 0, top: 0, bottom: 27 },
+      { index: 36, top: 972, bottom: 999 },
+    ]
+    expect(dropZoneAtPoint(regions, 27)).toEqual({ gap: 1 })
+    expect(dropZoneAtPoint(regions, 999)).toEqual({ gap: 37 })
+  })
+
+  it('maps a stretch of unmounted rows to the gap after the nearest rendered row above it', () => {
+    const regions = [
+      { index: 550, top: 14850, bottom: 14877 },
+      { index: 0, top: 0, bottom: 27 },
+      { index: 36, top: 972, bottom: 999 },
+    ]
+    expect(dropZoneAtPoint(regions, 500)).toEqual({ gap: 1 })
+    expect(dropZoneAtPoint(regions, 10000)).toEqual({ gap: 37 })
+    expect(dropZoneAtPoint(regions, 20000)).toEqual({ gap: 551 })
+  })
+
+  it('ignores a row without height instead of using it as a neighbor', () => {
+    const regions = [
+      { index: 0, top: 0, bottom: 27 },
+      { index: 1, top: 40, bottom: 40 },
+      { index: 2, top: 54, bottom: 81 },
+    ]
+    expect(dropZoneAtPoint(regions, 40)).toEqual({ gap: 1 })
+    expect(dropZoneAtPoint(regions, -5)).toEqual({ gap: 0 })
+  })
+})
+
+describe('dropLevelAtPoint', () => {
+  const open = { min: 0, max: 9 }
+
+  it('keeps the dragged node level while the pointer stays within one step of the press point', () => {
+    expect(dropLevelAtPoint(2, 300, 300, open)).toBe(2)
+    expect(dropLevelAtPoint(2, 300, 300 + DROP_LEVEL_STEP_PX - 1, open)).toBe(2)
+    expect(dropLevelAtPoint(2, 300, 300 - DROP_LEVEL_STEP_PX + 1, open)).toBe(2)
+  })
+
+  it('changes by one level for each full step travelled, deeper to the right and shallower to the left', () => {
+    expect(dropLevelAtPoint(2, 300, 300 + DROP_LEVEL_STEP_PX, open)).toBe(3)
+    expect(dropLevelAtPoint(2, 300, 300 + 3 * DROP_LEVEL_STEP_PX + 5, open)).toBe(5)
+    expect(dropLevelAtPoint(2, 300, 300 - DROP_LEVEL_STEP_PX, open)).toBe(1)
+    expect(dropLevelAtPoint(2, 300, 300 - 2 * DROP_LEVEL_STEP_PX - 5, open)).toBe(0)
+  })
+
+  it('clamps to the levels the gap offers', () => {
+    expect(dropLevelAtPoint(2, 300, 300 + 10 * DROP_LEVEL_STEP_PX, { min: 1, max: 4 })).toBe(4)
+    expect(dropLevelAtPoint(2, 300, 300 - 10 * DROP_LEVEL_STEP_PX, { min: 1, max: 4 })).toBe(1)
+    expect(dropLevelAtPoint(2, 300, 300, { min: 3, max: 3 })).toBe(3)
+    expect(dropLevelAtPoint(5, 300, 300, { min: 0, max: 2 })).toBe(2)
   })
 })
 
