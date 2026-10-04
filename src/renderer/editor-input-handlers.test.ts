@@ -2032,7 +2032,7 @@ describe('editor keyboard handler', () => {
       expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
 
       // `compositionstart` then clears the unfinished command — the same production `clearPending`
-      // call `use-node-input-bindings.ts` makes — and the composed keydown is ignored because the
+      // call `node-input-text-handlers.ts` makes — and the composed keydown is ignored because the
       // composing state is set.
       clearPending(commandState)
       composing = true

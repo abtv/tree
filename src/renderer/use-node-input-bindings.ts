@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
+import type { ClipboardEvent, FocusEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
-import { reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
+import { requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from './node-input-types'
 import {
   collapseSelectionToAnchor,
@@ -11,7 +11,6 @@ import {
   getSelectionRange,
   hasAttachmentCharacter,
   isCollapsedSelection,
-  readEditableContent,
   setCaret,
   setNormalCaret,
   setSelectionRange,
@@ -24,17 +23,11 @@ import {
   type VimTextCommandState,
 } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
-import { currentLinkDraft, normalCaretTarget } from './link-caret'
+import { normalCaretTarget } from './link-caret'
 import { revealInViewport } from './scroll-viewport'
 import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
-import {
-  clearCommandAssembly,
-  clearPending,
-  createVimCommandState,
-  setVisualRange,
-  type VimCommandState,
-} from './vim-command-state'
+import { clearCommandAssembly, createVimCommandState, setVisualRange, type VimCommandState } from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
@@ -42,8 +35,9 @@ import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
 import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
-import { beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
+import { createVimEditSessionState } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
+import { createTextEditHandlers } from './node-input-text-handlers'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -601,71 +595,20 @@ export function useNodeInputBindings({
         if (latestVimMode.current === 'replace') changeVimMode('normal')
         store.endTextSession()
       },
-      onTextChange: (event) => {
-        const text = event.currentTarget.value
-        // Replacing the textarea would cancel a native composition and orphan its compositionend,
-        // so link recognition waits for the first edit after the composition.
-        const composingNow = composing || (event.nativeEvent as Partial<InputEvent> | undefined)?.isComposing === true
-        // A textarea holds a node without links, so a link can only appear here when typing completes a URL.
-        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text)
-        if (composingNow || edit.links.length === 0) {
-          store.editText(node.id, text)
-          return
-        }
-        // The node now has a link, so its textarea is replaced by the rich editor; restore focus and
-        // the caret on the new element once it is mounted.
-        schedulePendingCaret({
-          nodeId: node.id,
-          cursor: event.currentTarget.selectionStart,
-          refocus: true,
-        })
-        store.editContent(node.id, text, edit.links, edit.createsNewLink)
-      },
-      onContentInput: (event: FormEvent<HTMLElement>) => {
-        const cursor = getCaret(event.currentTarget)
-        const content = readEditableContent(event.currentTarget)
-        schedulePendingCaret({
-          nodeId: node.id,
-          input: event.currentTarget,
-          cursor,
-        })
-        const draft =
-          pendingLinkDraft.current?.nodeId === node.id
-            ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
-            : undefined
-        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], content.text, draft)
-        pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }
-        store.editContent(node.id, content.text, edit.links, edit.createsNewLink)
-      },
-      onContentChange: (event: FormEvent<HTMLElement>) => {
-        const text = event.currentTarget.textContent ?? ''
-        const draft =
-          pendingLinkDraft.current?.nodeId === node.id
-            ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
-            : undefined
-        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text, draft)
-        pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }
-        store.editContent(node.id, text, edit.links, edit.createsNewLink)
-      },
-      onCompositionEnd: (event) => {
-        setComposing(false)
-        if (latestVimMode.current === 'replace') {
-          const baseline =
-            event.currentTarget instanceof HTMLTextAreaElement
-              ? event.currentTarget.value
-              : readEditableContent(event.currentTarget).text
-          beginReplaceSession(vimSession.current, {
-            nodeId: node.id,
-            baseline,
-            position: getCaret(event.currentTarget),
-          })
-        }
-      },
-      onCompositionStart: () => {
-        clearPending(vimCommandState.current)
-        finishVimReplace(undefined, false, true)
-        setComposing(true)
-      },
+      ...createTextEditHandlers(
+        {
+          store,
+          composing,
+          pendingLinkDraft,
+          schedulePendingCaret,
+          getMode: () => latestVimMode.current,
+          session: vimSession.current,
+          commandState: vimCommandState.current,
+          finishVimReplace,
+          setComposing,
+        },
+        node,
+      ),
       onContextMenu: (event: MouseEvent<HTMLElement>) => {
         if (persistenceLocked) return
         event.preventDefault()

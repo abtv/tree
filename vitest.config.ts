@@ -56,10 +56,16 @@ export default defineConfig({
           lines: 99,
         },
         'src/renderer/use-node-input-bindings.ts': {
-          statements: 98.1,
-          branches: 91.4,
-          functions: 94.9,
-          lines: 98.5,
+          statements: 98,
+          branches: 91.9,
+          functions: 94.7,
+          lines: 98.4,
+        },
+        'src/renderer/node-input-text-handlers.ts': {
+          statements: 99.9,
+          branches: 99.9,
+          functions: 99.9,
+          lines: 99.9,
         },
         'src/renderer/vim-keyboard-state.ts': {
           statements: 99.9,
