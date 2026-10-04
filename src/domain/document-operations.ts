@@ -445,6 +445,54 @@ export function moveSibling(document: Document, nodeId: NodeId, destinationIndex
   return next
 }
 
+export type SubtreeMove = { kind: 'moved'; document: Document } | { kind: 'impossible' } | { kind: 'too-deep' }
+
+/**
+ * Moves a node with its subtree under `parentId` (`null` for the document root), so that it ends at
+ * `index` among that parent's children as counted after the node is removed from its old place, like
+ * `moveSibling`; an out-of-range index is clamped. IDs, order, and descendants are kept, and
+ * attachments are only moved, so the attachment summary carries over. `impossible` means an unknown
+ * node or parent, or a parent that is the node itself or one of its descendants; `too-deep` means the
+ * moved subtree would fall below `MAX_DOCUMENT_DEPTH`. Only the two affected root-to-array paths are
+ * copied, so every other subtree stays shared by reference.
+ */
+export function moveSubtree(document: Document, nodeId: NodeId, parentId: NodeId | null, index: number): SubtreeMove {
+  const source = locateNode(document, nodeId)
+  if (source === undefined) return { kind: 'impossible' }
+  const destination = parentId === null ? null : locateNode(document, parentId)
+  if (destination === undefined) return { kind: 'impossible' }
+  if (
+    destination !== null &&
+    (destination.node.id === nodeId || destination.ancestors.some((ancestor) => ancestor.id === nodeId))
+  ) {
+    return { kind: 'impossible' }
+  }
+  const landingDepth = destination === null ? 1 : destination.ancestors.length + 2
+  if (landingDepth + subtreeHeight(source.node) - 1 > MAX_DOCUMENT_DEPTH) return { kind: 'too-deep' }
+
+  const sourceParentId = source.parent?.id ?? null
+  // Every node on the way to the source parent or the destination parent has to be copied.
+  const pathIds = new Set<NodeId>(source.ancestors.map((ancestor) => ancestor.id))
+  if (destination !== null) {
+    for (const ancestor of destination.ancestors) pathIds.add(ancestor.id)
+    pathIds.add(destination.node.id)
+  }
+
+  const rewrite = (ownerId: NodeId | null, children: readonly TreeNode[]): readonly TreeNode[] => {
+    const next = children.slice()
+    for (const [position, child] of children.entries()) {
+      if (pathIds.has(child.id)) next[position] = { ...child, children: rewrite(child.id, child.children) }
+    }
+    if (ownerId === sourceParentId) next.splice(source.index, 1)
+    if (ownerId === parentId) next.splice(clamp(index, 0, next.length), 0, source.node)
+    return next
+  }
+
+  const next: Document = { roots: rewrite(null, document.roots) as TreeNode[] }
+  inheritAttachmentIds(document, next)
+  return { kind: 'moved', document: next }
+}
+
 export type SiblingRangeShift = { kind: 'moved'; document: Document } | { kind: 'impossible' } | { kind: 'too-deep' }
 
 /**

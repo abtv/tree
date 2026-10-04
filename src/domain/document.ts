@@ -51,6 +51,7 @@ export {
   isValidLocation,
   joinSiblingRange,
   moveSibling,
+  moveSubtree,
   nodePath,
   normalizeVisibleLocation,
   pasteMultilineText,
@@ -62,7 +63,7 @@ export {
   subtreeHeight,
   wouldExceedMaximumDepth,
 } from './document-operations'
-export type { SiblingRangeJoin, SiblingRangeShift } from './document-operations'
+export type { SiblingRangeJoin, SiblingRangeShift, SubtreeMove } from './document-operations'
 
 export { assertDocument, parsePersistedState, serializeState, validatePersistedState } from './document-serialization'
 export type { ViewState } from './document-serialization'

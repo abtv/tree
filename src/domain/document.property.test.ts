@@ -23,6 +23,7 @@ import {
   linksAfterTextEdit,
   locateNode,
   moveSibling,
+  moveSubtree,
   nodePath,
   parsePersistedState,
   pasteMultilineText,
@@ -495,6 +496,43 @@ describe('document invariants', () => {
         expect(restored.kind).toBe('moved')
         if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
+    )
+  })
+
+  it('moveSubtree moves the same subtree object, keeps every node and attachment, and the inverse restores the document', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.nat(), fc.integer({ min: -1, max: 6 }), (rawForest, seed, parentSeed, index) => {
+        const document = materialize(rawForest)
+        const node = pick(document, seed)
+        const before = locateNode(document, node.id)!
+        const nodes = allNodes(document)
+        const slot = parentSeed % (nodes.length + 1)
+        const parentId = slot === nodes.length ? null : nodes[slot]!.id
+        const result = moveSubtree(document, node.id, parentId, index)
+        if (result.kind === 'impossible') {
+          expect(parentId !== null && subtreeIds(node).includes(parentId)).toBe(true)
+          return
+        }
+        if (result.kind === 'too-deep') {
+          const landing = parentId === null ? 1 : locateNode(document, parentId)!.ancestors.length + 2
+          expect(landing + heightOf(node) - 1).toBeGreaterThan(MAX_DOCUMENT_DEPTH)
+          return
+        }
+        expect(allIds(result.document).slice().sort()).toEqual(allIds(document).slice().sort())
+        expect(attachmentSummary(result.document)).toEqual(attachmentSummary(document))
+        const after = locateNode(result.document, node.id)!
+        expect(after.node).toBe(node)
+        expect(after.parent?.id ?? null).toBe(parentId)
+        const siblingCount = (parentId === null ? document.roots : locateNode(document, parentId)!.node.children).length
+        const expectedLength =
+          siblingCount - (before.parent?.id === parentId || (before.parent === null && parentId === null) ? 1 : 0)
+        expect(after.index).toBe(Math.max(0, Math.min(index, expectedLength)))
+        assertDocument(result.document)
+        const restored = moveSubtree(result.document, node.id, before.parent?.id ?? null, before.index)
+        expect(restored.kind).toBe('moved')
+        if (restored.kind === 'moved') expect(restored.document).toEqual(document)
+      }),
+      { numRuns: propertyRuns(100) },
     )
   })
 

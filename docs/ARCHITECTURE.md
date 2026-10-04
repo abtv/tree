@@ -169,6 +169,8 @@ redo
 
 Sibling creation, splitting, pasting, editing, and reordering do not increase node depth and remain available at the maximum depth defined in `docs/PRODUCT.md` §2.3. A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
 
+`moveSubtree` moves a node with its subtree under any parent, or to the document root, at a given index counted after the node is removed from its old place. It reports `impossible` for an unknown ID or a destination inside the moved subtree, and `too-deep` when the subtree would exceed the maximum-depth limit. It copies only the two affected root-to-array paths and carries the attachment summary over, so a move shares every other subtree with the previous document.
+
 The exact API and naming may evolve.
 
 The important principle is that product behavior should be represented by explicit operations rather than being scattered across UI event handlers.

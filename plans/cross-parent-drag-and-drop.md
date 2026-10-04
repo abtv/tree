@@ -70,8 +70,8 @@ The Product Owner should see the screenshots for S8.
 | ID | Outcome | Depends on | Validation tier (`DEVELOPMENT.md` §9) | Status |
 | --- | --- | --- | --- | --- |
 | T0 | This plan and its index entry | — | Minimal | Done |
-| T1 | Domain `moveSubtree` | T0 | Low | Ready |
-| T2 | Drop-target model and real parent ids | T1 | Low | Planned |
+| T1 | Domain `moveSubtree` | T0 | Low | Done |
+| T2 | Drop-target model and real parent ids | T1 | Low | Ready |
 | T3 | Store command `moveNodeToParent` | T1, T2 | Moderate, independent review | Planned |
 | T4 | Pointer geometry in `node-drag.ts` | T0 | Low | Ready |
 | T5 | Between-row drops with a level | T3, T4 | High (`npm run check:full`), reviewer and product verifier, `WORKING_PLAN.md` | Planned |
@@ -164,6 +164,6 @@ The Product Owner should see the screenshots for S8.
 
 ## Next task
 
-T1 (domain `moveSubtree`) is the next task. T4 is independent and also ready.
+T2 (drop-target model and real parent ids) is the next task. T4 is independent and also ready.
 
 Resume prompt: "Continue the cross-parent drag-and-drop initiative (plans/cross-parent-drag-and-drop.md): take the next Ready task."
