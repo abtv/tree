@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ClipboardEvent, FocusEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from './node-input-types'
@@ -8,35 +7,29 @@ import {
   hasMultiCharacterSelection,
   nodeTextLength,
   getCaret,
-  getSelectionRange,
   hasAttachmentCharacter,
-  isCollapsedSelection,
   setCaret,
   setNormalCaret,
   setSelectionRange,
   updateSelectedLinks,
 } from './editor-dom'
-import {
-  createEditorKeyDownHandler,
-  executeEditorContextMenuCommand,
-  finishVimSessionBeforeTextEdit,
-  type VimTextCommandState,
-} from './editor-input-handlers'
+import { createEditorKeyDownHandler, type VimTextCommandState } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { normalCaretTarget } from './link-caret'
 import { revealInViewport } from './scroll-viewport'
 import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
-import { clearCommandAssembly, createVimCommandState, setVisualRange, type VimCommandState } from './vim-command-state'
+import { createVimCommandState, setVisualRange, type VimCommandState } from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
-import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
+import { focusCaretTransition, type VimCaretState } from './vim-caret-transition'
 import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
 import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
 import { createVimEditSessionState } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
+import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
 
 interface UseNodeInputBindingsOptions {
@@ -579,22 +572,6 @@ export function useNodeInputBindings({
           normalCaretResizeObserver.current?.observe(input)
         }
       },
-      onBlur: () => {
-        const input = inputs.current.get(node.id)
-        setSelectAllNodeId(undefined)
-        // A blur moves focus to a non-input control (a breadcrumb or enter-control click) or to
-        // another node, so the command assembly that belongs to this node must clear with it.
-        clearCommandAssembly(vimCommandState.current)
-        // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and
-        // immediately moving focus onto it, which blurs *this* node as an incidental side effect
-        // before the user has typed anything into the new one. Only finish a structural session
-        // from blur once it is a different node's own blur — the one it actually began on.
-        const structuralBeganHere = vimCommandState.current.structuralInsert?.originNodeId === node.id
-        if (input !== undefined && !structuralBeganHere) finishVimInsert(input)
-        finishVimReplace()
-        if (latestVimMode.current === 'replace') changeVimMode('normal')
-        store.endTextSession()
-      },
       ...createTextEditHandlers(
         {
           store,
@@ -609,47 +586,25 @@ export function useNodeInputBindings({
         },
         node,
       ),
-      onContextMenu: (event: MouseEvent<HTMLElement>) => {
-        if (persistenceLocked) return
-        event.preventDefault()
-        const input = event.currentTarget
-        const selection = getSelectionRange(input)
-        const request = {
-          x: event.clientX,
-          y: event.clientY,
-          selectionText:
-            input instanceof HTMLTextAreaElement
-              ? input.value.slice(selection.start, selection.end)
-              : (getSelection()?.toString() ?? ''),
-          canCut: selection.start !== selection.end,
-          canCopy: selection.start !== selection.end,
-          canPaste: true,
-          canSelectAll:
-            input.textContent?.length !== 0 || (input instanceof HTMLTextAreaElement && input.value.length !== 0),
-        }
-        if (window.treeApi.showEditorContextMenu === undefined) return
-        void window.treeApi
-          .showEditorContextMenu(request)
-          .then((command) => executeEditorContextMenuCommand(command, store, node, input, vimTextCommandState))
-          .catch((error: unknown) => store.reportError(error))
-      },
-      onClick: (event: MouseEvent<HTMLElement>) => {
-        const target = event.target
-        const link = target instanceof Element ? target.closest('a[href]') : null
-        if (link === null || !event.currentTarget.contains(link)) return
-        event.preventDefault()
-        if (event.metaKey) window.open(link.getAttribute('href') ?? '', '_blank')
-      },
-      onCut: () => store.markNextTextEditStandalone(),
-      onFocus: (event: FocusEvent<HTMLElement>) => {
-        if (selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
-        else if (
-          latestVimMode.current === 'normal' &&
-          node.attachment !== undefined &&
-          getCaret(event.currentTarget) === node.text.length
-        )
-          setNormalCaret(event.currentTarget, node.text.length)
-      },
+      ...createPointerHandlers(
+        {
+          store,
+          selectedNodeId,
+          persistenceLocked,
+          vimMode,
+          commandState: vimCommandState.current,
+          vimTextCommandState,
+          getMode: () => latestVimMode.current,
+          getInput: (id) => inputs.current.get(id),
+          readAuthority: () => caretAuthority.current,
+          applyCaretState,
+          changeVimMode,
+          finishVimInsert,
+          finishVimReplace,
+          setSelectAllNodeId,
+        },
+        node,
+      ),
       onKeyDown: createEditorKeyDownHandler({
         store,
         node,
@@ -689,61 +644,6 @@ export function useNodeInputBindings({
               node,
             ),
       }),
-      onMouseDown: (event: MouseEvent<HTMLElement>) => {
-        applyCaretState(
-          node.id,
-          pointerCaretTransition(
-            caretAuthority.current.caret,
-            getCaret(event.currentTarget),
-            node.text.length,
-            node.attachment !== undefined,
-          ),
-          false,
-          'preserve-selection',
-        )
-        if (event.button === 2) event.preventDefault()
-        setSelectAllNodeId(undefined)
-        inputs.current.get(node.id)?.classList.remove('select-all')
-        store.endTextSession()
-        // A structural session's typed text lives in the node `o`/`O`/Visual `c`/`s` created, not in
-        // the node under the pointer. This mousedown runs before the focused input's blur, so let
-        // that blur finish the structural session rather than capturing the clicked node's text; a
-        // plain session is still consumed here, so a pointer focus interruption records nothing
-        // (PRODUCT §20.2.1 T8).
-        if (vimCommandState.current.structuralInsert === undefined) finishVimInsert(event.currentTarget)
-        // A right-click opens the context menu, which will run Cut or Paste against the visible
-        // selection, so this commit must not rewrite the DOM; a left click keeps the existing
-        // reset-to-typed-end behavior.
-        finishVimReplace(event.currentTarget, false, event.button === 2)
-        clearCommandAssembly(vimCommandState.current)
-      },
-      onMouseUp: (event: MouseEvent<HTMLElement>) => {
-        if (latestVimMode.current !== 'normal') return
-        applyCaretState(
-          node.id,
-          pointerCaretTransition(
-            caretAuthority.current.caret,
-            getCaret(event.currentTarget),
-            node.text.length,
-            node.attachment !== undefined,
-          ),
-          false,
-          'preserve-selection',
-        )
-      },
-      onPaste: (event: ClipboardEvent<HTMLElement>) => {
-        setSelectAllNodeId(undefined)
-        event.preventDefault()
-        finishVimSessionBeforeTextEdit(vimTextCommandState, event.currentTarget)
-        void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
-      },
-      onSelect: (event: SyntheticEvent<HTMLElement>) => {
-        if (vimMode === 'normal') return
-        const target = event.currentTarget
-        if (target instanceof HTMLTextAreaElement) {
-          if (target.selectionStart !== target.selectionEnd) store.endTextSession()
-        } else if (!isCollapsedSelection()) store.endTextSession()
-      },
     }),
     [
       composing,

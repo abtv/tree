@@ -56,10 +56,16 @@ export default defineConfig({
           lines: 99,
         },
         'src/renderer/use-node-input-bindings.ts': {
-          statements: 98,
-          branches: 91.9,
-          functions: 94.7,
-          lines: 98.4,
+          statements: 97.6,
+          branches: 91.2,
+          functions: 94,
+          lines: 98.1,
+        },
+        'src/renderer/node-input-pointer-handlers.ts': {
+          statements: 99.9,
+          branches: 97.9,
+          functions: 99.9,
+          lines: 99.9,
         },
         'src/renderer/node-input-text-handlers.ts': {
           statements: 99.9,
