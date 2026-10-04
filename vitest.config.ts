@@ -57,9 +57,15 @@ export default defineConfig({
         },
         'src/renderer/use-node-input-bindings.ts': {
           statements: 97.8,
-          branches: 91.6,
+          branches: 91,
           functions: 94.4,
           lines: 98.5,
+        },
+        'src/renderer/caret-projection-rules.ts': {
+          statements: 99.9,
+          branches: 99.9,
+          functions: 99.9,
+          lines: 99.9,
         },
         'src/renderer/vim-node-visual-commands.ts': {
           statements: 99.2,

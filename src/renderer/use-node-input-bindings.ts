@@ -53,6 +53,7 @@ import {
 } from './vim-caret-transition'
 import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
+import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
 import {
   applyReplaceKey,
   beginInsertSession,
@@ -167,10 +168,7 @@ export function useNodeInputBindings({
       if (mode !== latestVimMode.current) {
         const revision = ++caretRevision.current
         const pending = pendingCaret.current
-        // A change command schedules its native insertion point before switching mode. Keep
-        // that compatible projection while invalidating focus work from the preceding mode.
-        pendingCaret.current =
-          pending !== undefined && pending.normal === (mode === 'normal') ? { ...pending, revision } : undefined
+        pendingCaret.current = pendingCaretAfterModeChange(pending, mode, revision)
         latestVimMode.current = mode
       }
       setVimMode(mode)
@@ -551,11 +549,7 @@ export function useNodeInputBindings({
         const authority = caretAuthority.current
         const cursor = authority.nodeId === focus.nodeId ? authority.caret.cursor : focus.cursor
         const target = normalCaretTarget(nodeTextLength(input), cursor, hasAttachmentCharacter(input))
-        const matches =
-          input instanceof HTMLTextAreaElement &&
-          (target.kind === 'block'
-            ? input.selectionStart === target.start && input.selectionEnd === target.end
-            : input.selectionStart === target.position && input.selectionEnd === target.position)
+        const matches = normalCaretIsDrawn(input, target)
         if (!matches) setNormalCaret(input, cursor)
       } else if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
       else setCaret(input, focus.cursor)
@@ -592,17 +586,9 @@ export function useNodeInputBindings({
     if (pending === undefined) return
     pendingCaret.current = undefined
     const state = store.getSnapshot()
-    const input = inputs.current.get(pending.nodeId)
-    if (
-      state.status !== 'ready' ||
-      state.location.selectedNodeId !== pending.nodeId ||
-      state.focus?.token !== pending.focusToken ||
-      pending.revision !== caretRevision.current ||
-      input === undefined ||
-      !input.isConnected ||
-      (pending.input !== undefined && pending.input !== input)
-    )
-      return
+    const registeredInput = inputs.current.get(pending.nodeId)
+    const input = currentPendingCaretInput(pending, state, caretRevision.current, registeredInput)
+    if (input === undefined) return
     if (pending.refocus === true && input.ownerDocument.activeElement !== input) input.focus()
     if (pending.normal) setNormalCaret(input, pending.cursor)
     else if (vimMode !== 'normal') setCaret(input, pending.cursor)
