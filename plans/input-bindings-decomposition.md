@@ -8,14 +8,14 @@ Split `src/renderer/use-node-input-bindings.ts` ("the hook", 1,251 lines at comm
 
 Done when every remaining task is `Done`, the hook's public surface is unchanged, no existing test changed, each new module has direct tests and a per-file coverage floor, and `docs/ARCHITECTURE.md` describes the module map.
 
-Expectation (inference): T3 to T10 cut the hook to roughly 650 lines and move stable command and handler code out. The recurring defects sit mostly in caret and session projection: about 25 of 79 `fix` subjects in the local reflog name caret or image-caret synchronization, caret publication, session completion, or Visual and pending-command clearing. T6, T7, and T11 isolate that logic; the other tasks mainly make diffs smaller. If relieving that hot spot matters more than file size, ask the Product Owner to promote T11 (R3).
+Expectation (inference): T3 to T10 cut the hook to roughly 650 lines and move stable command and handler code out. The recurring defects sit mostly in caret and session projection: about 25 of 79 `fix` subjects in the local reflog name caret or image-caret synchronization, caret publication, session completion, or Visual and pending-command clearing. T6 and T7 isolate that logic; the other tasks mainly make diffs smaller. T11, which would have moved the caret-projection state and effects, was declined (R3, D8).
 
 ## Boundaries
 
 - No product behavior change; `docs/PRODUCT.md` is not edited. A defect found while moving code is neither preserved nor fixed inside a move commit: reproduce it and fix it as its own `fix` commit (ADR 0014 Consequences, AGENTS.md §9). Ask under AGENTS.md §14 when `PRODUCT.md` does not determine the correct behavior.
 - No architecture change beyond ADR 0014. Renderer-internal only; domain, application, main, and preload are untouched and no logic crosses a layer ([Development Guide §14](../docs/DEVELOPMENT.md#14-code-organization)). Through T10 the hook still creates every owner instance and holds every ref and effect. New modules keep no module-level mutable state and never import the hook.
 - Public surface fixed: `useNodeInputBindings`, its options, and `NodeInputBindingsResult` (`bindings`, `dragFreeze`, `setVimEditing`). `App.tsx`, `NodeList.tsx`, and `NodeInput.tsx` are not edited.
-- Existing tests are not removed, renamed, moved, weakened, or edited, except the comment-only edits named in T8, T9, and T11. `docs/VIM_CONFORMANCE.md` cites hook tests by path and title on 22 lines and `npm run check:docs` verifies each. New tests go in new files.
+- Existing tests are not removed, renamed, moved, weakened, or edited, except the comment-only edits named in T8 and T9. `docs/VIM_CONFORMANCE.md` cites hook tests by path and title on 22 lines and `npm run check:docs` verifies each. New tests go in new files.
 - Coverage floors are never lowered except under R2.
 - Performance assessment (PRODUCT.md §22.1): no disk writes or syncs, no new retained state, unchanged interactive call graph. The only cost that can move is `bindings(node)`, which `App.tsx` calls for each re-rendered row. T1 guards its identity; T10 and T13 compare the `perf/` suite with a same-machine baseline.
 - The eleven mutation-scoped renderer modules listed in `stryker.config.mjs` are not edited. If a task must, run `npm run test:mutation -- --mutate <file>` (Development Guide §12).
@@ -27,13 +27,13 @@ Objective authorized by the Product Owner's request that produced this plan (202
 
 Ask R1 and R2 once, in the T1 handoff, and record the answers in the table.
 
-The Product Owner approved both recommended options on 2026-10-04 ("yes both" in response to the T1 handoff): R1 permits extracted modules to write the DOM while owner instances stay in the hook; R2 permits rebasing the hook's floors just below its measured coverage in each extraction commit, with each new module's floors at least 95 statements, 88.5 branches, 93.5 functions, and 98 lines, and just below its measured coverage. These decisions authorize only the initiative's stated scope. R3 remains open.
+The Product Owner approved both recommended options on 2026-10-04 ("yes both" in response to the T1 handoff): R1 permits extracted modules to write the DOM while owner instances stay in the hook; R2 permits rebasing the hook's floors just below its measured coverage in each extraction commit, with each new module's floors at least 95 statements, 88.5 branches, 93.5 functions, and 98 lines, and just below its measured coverage. These decisions authorize only the initiative's stated scope. The Product Owner declined R3 on 2026-10-04 (T11 and T12 removed; see D8).
 
 | ID | Decision reserved for the Product Owner | Planner default and recommendation | Needed by | Answer |
 | --- | --- | --- | --- | --- |
 | R1 | How strictly to read ADR 0014's sentence that the hook "holds one instance of each owner and is the single place that projects that state into React, the DOM, and the store". | Default applied (D1): one instance per owner created in the hook, the caret published only through `applyCaretState`, mode changed only through `changeVimMode`, no extracted module keeps a copy of an owner's fact. Under it T3 to T10 stay inside ADR 0014, and ARCHITECTURE §9 and §21 need only a module-map update. Strict alternative: extracted bodies never write the DOM; DOM writes (`setEditableText`, `setCaret`, `setNormalCaret`, class changes) arrive as one-line ports the hook implements, and T7 to T10 add that plumbing. Recommended: the default, because the ADR's rationale is parallel copies and scattered resynchronization, not where a DOM write sits. | T7 | Approved recommended default, 2026-10-04 |
 | R2 | Rebasing the hook's per-file floor (`vitest.config.ts` L58-63: 95, 88.5, 93.5, 98 for statements, branches, functions, lines). Development Guide §12 says to restore coverage rather than lower a floor. | Moving covered code out lowers the hook's own ratio although no coverage is lost (inference; T1 measures the headroom). Proposal: each new module gets a floor just below its measured values and at least the hook's old floor per metric, and the hook's floor is rebased just below its new measurement in the same commit. If declined: add tests of the remaining hook code until the old floors hold, and stop when that is disproportionate. | T3 | Approved proposal, 2026-10-04 |
-| R3 | Approve or decline T11 and T12, which move the caret-projection state and effects and the drag freeze into hooks that only `useNodeInputBindings` calls. That moves the projection point and the owner instances ADR 0014 places in the hook. It needs a new ADR that refines ADR 0014 (ADRs are not edited: `docs/decisions/README.md`) and an ARCHITECTURE §9 and §21 update. | Recommend approving T11 and promoting it right after T6 if relieving the hot spot is the goal; T12 has the lowest value. If declined, delete T11 and T12 from the table and record that under Decisions. | T11 | open |
+| R3 | Approve or decline T11 and T12, which move the caret-projection state and effects and the drag freeze into hooks that only `useNodeInputBindings` calls. That moves the projection point and the owner instances ADR 0014 places in the hook. It needs a new ADR that refines ADR 0014 (ADRs are not edited: `docs/decisions/README.md`) and an ARCHITECTURE §9 and §21 update. | Recommend approving T11 and promoting it right after T6 if relieving the hot spot is the goal; T12 has the lowest value. If declined, delete T11 and T12 from the table and record that under Decisions. | T11 | Declined, 2026-10-04: T11 and T12 were removed. The caret-projection state and effects and the drag freeze stay in the hook. See D8. |
 
 Product Owner actions (not decisions): after T10 and after T13, check by hand in `npm run dev` with the real keyboard: IME composition, key repeat, autocorrect, and typing a link. Playwright cannot exercise them (Development Guide §8 and §9).
 
@@ -51,7 +51,7 @@ Read by the planner on 2026-10-04 at commit `c95c30c`. Line anchors in this plan
 8. Writer inventory (grep). `caretAuthority` is written only in `applyCaretState`. `pendingCaret` is produced in `changeVimMode`, `applyCaretState`, `onTextChange`, `onContentInput`, and `vim.scheduleCaret`, and cleared by its layout effect. `caretRevision` is incremented at six sites (`changeVimMode`, `applyCaretState`, the pending-Visual-selection effect, `onTextChange`, `onContentInput`, `vim.scheduleCaret`). `syncedImageFocusToken` is written by `applyCaretState` (when `fromFocus`) and `syncImageCaretToFocus`; `latestVimMode` by `changeVimMode` and one layout effect; `latestFocus` by one layout effect; `pendingVisualSelection` by `restoreVisual`, `shiftCurrentNode`, and its consumer effect; `pendingLinkDraft` by `onContentInput` and `onContentChange`.
 9. Churn, from subjects only: `.git/logs/HEAD` lists 79 `fix` commits from 2026-09-26 to 2026-10-04. About 25 concern code that lives in the hook: caret and image-caret synchronization (14), caret publication and projection (2), Insert and Replace session completion and flush (4), Visual and pending-command clearing (2), and single fixes for the drag caret, focus reveal, viewport motion, and the selection mark.
 
-Inference (not verified): per-file fix attribution; the hook sizes after T10 (about 650 lines) and after T12 (about 400 lines); that the hook's floors fail once covered code moves out; that the passive effects touch disjoint resources, so their order may change in T11; that React re-runs a ref callback whose identity changed; how the React compiler lint rules treat each pattern; that one extra deps literal per handler group per `bindings(node)` call is negligible.
+Inference (not verified): per-file fix attribution; the hook size after T10 (about 650 lines planned; 707 measured); that the hook's floors fail once covered code moves out; that React re-runs a ref callback whose identity changed; how the React compiler lint rules treat each pattern; that one extra deps literal per handler group per `bindings(node)` call is negligible.
 
 Not done at plan time: coverage measurement and any test, lint, build, or E2E run. The planner had no shell; the primary agent confirmed the commit, the file sizes, and the 22-commit `fix:history` result.
 
@@ -69,12 +69,10 @@ Not done at plan time: coverage measurement and any test, lint, build, or E2E ru
 | `vim-keyboard-state.ts` | the `VimKeyboardState` adapter | L978-1091 | T8 |
 | `node-input-text-handlers.ts` | text edit, link draft, composition handlers | L860-930 | T9 |
 | `node-input-pointer-handlers.ts` | blur, focus, pointer, select, paste, menu, link click, cut | L844-859, L931-971, L1093-1148 | T10 |
-| `use-caret-projection.ts` | caret refs, publication, image sync, projection effects | L112-135, L159-179, L237-287, L703-827 | T11 (R3) |
-| `use-drag-caret-freeze.ts` | drag caret freeze | L162-163, L181-235, L1227-1230 | T12 (R3) |
 
 Remaining in the hook after T10: option destructuring, owner and ref creation, the `useCallback` shells, the effects, `registerHandle`, `vimTextCommandState`, `inputRef`, `selectedAll`, `disabled`, the `bindings` composition, and the return value.
 
-## Common rules (T2 to T12)
+## Common rules (T2 to T10)
 
 **C1. Extraction method.**
 1. Move text; do not rewrite. Each moved callback body becomes an exported plain function of the new module, with its comments. Its first line destructures a `deps` argument under the names the old body used. Permitted substitutions only: `vimSession.current` becomes `session`, `vimCommandState.current` becomes `commandState` (the owner objects are passed), `latestVimMode.current` becomes a `getMode()` port, `inputs.current.get(id)` becomes a `getInput(id)` port, `caretAuthority.current` becomes a `readAuthority()` port. Any other edit may change behavior: stop and describe it.
@@ -94,7 +92,7 @@ Remaining in the hook after T10: option destructuring, owner and ref creation, t
 7. Tests replace the global `queueMicrotask` and timers: call globals at call time, never at import.
 8. Keep comments with the code they explain; many cite PRODUCT sections.
 
-**C3. Tests.** Existing tests stay untouched; `git diff --stat` over `*.test.*` shows only added files (comment-only edits named in T8, T9, T11 excepted). Each new module gets a direct test file beside it. Store-driven code uses `createRealStoreHarness`; `createEditorStoreDouble` only for failure injection (Development Guide §12). Cover every early-return guard and branch of the moved code. Property tests are optional (wiring and projection, AGENTS.md §9); the existing property suites must stay green.
+**C3. Tests.** Existing tests stay untouched; `git diff --stat` over `*.test.*` shows only added files (comment-only edits named in T8 and T9 excepted). Each new module gets a direct test file beside it. Store-driven code uses `createRealStoreHarness`; `createEditorStoreDouble` only for failure injection (Development Guide §12). Cover every early-return guard and branch of the moved code. Property tests are optional (wiring and projection, AGENTS.md §9); the existing property suites must stay green.
 
 **C4. Floors.** After each extraction run `npm run test:coverage`, read the new module's four metrics, and add `'src/renderer/<module>.ts': { statements, branches, functions, lines }` to `vitest.config.ts`, each just below the measured value (convention at `vitest.config.ts:38-39`) and at least the hook's original floor per metric. R2 is approved: rebase the hook's floors just below its new measured coverage in the same extraction commit. Never lower any other existing floor.
 
@@ -104,7 +102,7 @@ Remaining in the hook after T10: option destructuring, owner and ref creation, t
 3. Real Electron: `npm run test:e2e -- e2e/vim-image-caret.spec.ts e2e/vim-text-editing.spec.ts e2e/vim-navigation-and-visual.spec.ts e2e/vim-clipboard.spec.ts e2e/vim-toggle.spec.ts` plus the task's extras. It needs macOS with a display; a run that cannot launch Electron is blocked, not passed.
 4. Record each result with the exact command and `npm run validation:snapshot` output (Development Guide §9). Reuse results while their inputs are unchanged.
 
-**C6. Review.** An independent reviewer pass (AGENTS.md §13, shared interaction state) is required for T5 to T12. Give it this plan, `git status`, the full diff, and the validation record. It compares each removed block with the added block against C1 and checks C2. For T2 to T4 the primary agent's diff review with the same comparison is enough unless the diff is not a textual move. No separate product verifier: no user-visible behavior changes; the E2E set and the Product Owner's manual check cover it.
+**C6. Review.** An independent reviewer pass (AGENTS.md §13, shared interaction state) is required for T5 to T10. Give it this plan, `git status`, the full diff, and the validation record. It compares each removed block with the added block against C1 and checks C2. For T2 to T4 the primary agent's diff review with the same comparison is enough unless the diff is not a textual move. No separate product verifier: no user-visible behavior changes; the E2E set and the Product Owner's manual check cover it.
 
 **C7. Commit and handoff.** One commit per task (T2 has two), message `type(scope): summary` with no attribution line (AGENTS.md §12). The task's status, the next task, Baseline numbers, and R answers go into the same commit. At most four tasks per session; stop earlier on a surprise. A temporary `WORKING_PLAN.md` follows AGENTS.md §8; this plan normally suffices. The handoff lists what was completed, decisions made with their principle, validation passed, failed, or blocked, the next task, and the resume prompt; `npm run fix:history` output only when a defect was fixed.
 
@@ -126,9 +124,7 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 | T8 | `vim-keyboard-state.ts` | T2b, T5, T7, R1 | Direct tests; every key-press oracle green; floor added | Moderate | Done |
 | T9 | `node-input-text-handlers.ts` | T2b, T7 | Direct tests; link and composition oracles green; floor added | Moderate | Done |
 | T10 | `node-input-pointer-handlers.ts` and perf comparison | T2, T7, R1 | Direct tests; pointer, menu, and paste oracles green; perf within tolerance | Moderate | Done |
-| T11 | `use-caret-projection.ts` with contract tests and a refining ADR | T6 to T10, R3 | One contract test per projection rule; full E2E and perf green | Moderate with full E2E | Blocked (R3) |
-| T12 | `use-drag-caret-freeze.ts` | T11, R3 | Freeze oracles and drag E2E green; `dragFreeze` identity stable | Moderate | Blocked (R3) |
-| T13 | Docs, final floors, aggregate validation, plan removal | T1 to T10, and T11, T12 if approved | `npm run check:full`, perf comparison, ARCHITECTURE updated, plan removed | Aggregate | Planned |
+| T13 | Docs, final floors, aggregate validation, plan removal | T1 to T10 | `npm run check:full`, perf comparison, ARCHITECTURE updated, plan removed | Aggregate | Ready |
 
 ### T1. Baseline and characterization (Low, Done)
 
@@ -218,22 +214,6 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 - Product Owner action afterwards: the manual native-keyboard check.
 - Commit: `refactor(renderer): extract pointer and clipboard handlers from the input bindings hook`.
 
-### T11. Caret-projection hook (Blocked until R3; reviewer)
-
-- Files: new `src/renderer/use-caret-projection.ts`, `use-caret-projection.test.tsx`; the hook; `vitest.config.ts`; a new ADR (next free number) that refines ADR 0014 without editing it, plus its row in `docs/decisions/README.md`; comment-only edit in `src/renderer/vim-interaction.property.test.ts` ("mirroring `use-node-input-bindings.ts`"); this plan.
-- Seam: refs `inputs`, `normalCaretResizeObserver`, `caretRevision`, `pendingCaret`, `pendingVisualSelection`, `latestFocus`, `syncedImageFocusToken`, `latestVimMode` (L112-135) and `caretAuthority` (L159-161); `changeVimMode`, `applyCaretState`, `syncImageCaretToFocus` (L165-179, L237-287); `schedulePendingCaret` and `schedulePendingVisualSelection` (T2b); the seven layout effects (L703-794) and the selection-change and resize-observer effects (L797-827). The body of `inputRef` becomes `registerInput(nodeId, input)` while the closure itself stays per call.
-- Module: `useCaretProjection(options)` returning the ports used since T7 (`getInput`, `registerInput`, `readAuthority`, `getMode`, `changeVimMode`, `applyCaretState`, `syncImageCaretToFocus`, `schedulePendingCaret`, `schedulePendingVisualSelection`). Called once from `useNodeInputBindings`, at the position of the first moved effect. Layout-effect order stays as C2.3 says. The two passive effects now run before the freeze and finisher effects; the reviewer confirms they are independent (inference). The identity of `applyCaretState`, `changeVimMode`, and `syncImageCaretToFocus` must change under the same conditions as today (T1 guard).
-- Tests, one per rule in ARCHITECTURE §9 (L297) and the Evidence 8 inventory: a newer intent supersedes earlier pending work; a pending caret is consumed only under the T6 conditions and `refocus` focuses first; a mode change keeps only a compatible pending projection; the focus effect projects now and once more in the microtask only if token and revision are unchanged, and uses the authority cursor on the same node; a new focus token replaces local image state and an old token is a no-op; the pending Visual selection is restored after the focus projection, bumps the revision, and rewrites the live endpoints; selection change marks `node-input-text-selected` for a multi-character selection on the active input; the resize observer skips a multi-character selection. Optionally commit the contract tests first against the unchanged hook, then the move.
-- Validation: Moderate plus the full E2E suite (`npm run test:e2e`) and the perf comparison; Product Owner manual check.
-- Commit: `refactor(renderer): move caret projection into its own hook`.
-
-### T12. Drag-freeze hook (Blocked until R3; depends on T11; reviewer)
-
-- Files: new `src/renderer/use-drag-caret-freeze.ts`, `use-drag-caret-freeze.test.tsx`; the hook; `vitest.config.ts`; this plan. `drag-caret-freeze.ts` (mutation-scoped) is not edited.
-- Seam: refs `frozenCaret`, `frozenPointerListener` (L162-163), `clearFrozenPointerListener`, `releaseFrozenCaret`, `beginFrozenCaret` (L181-227), the unmount effect (L229-235), the `dragFreeze` memo (L1227-1230). Module: `useDragCaretFreeze({ getInput, readCaret })` returning the same `{ begin, end }` object, stable for the mount (T1 guard).
-- Tests: the hook's "drag caret freeze" describe stays; add direct tests of the same transitions. Extra E2E: `e2e/drag-and-drop.spec.ts`, `e2e/drag-and-drop-hierarchy.spec.ts`, `e2e/vim-image-caret.spec.ts` (cancelled drag).
-- Commit: `refactor(renderer): move the drag caret freeze into its own hook`.
-
 ### T13. Close-out (aggregate validation)
 
 - Files: `docs/ARCHITECTURE.md` (L244, 256, 299, 694, 696, 698, 704: name each new module and keep "one instance of each owner" accurate for what was done), `src/renderer/AGENTS.md` (L9), `vitest.config.ts` (final floors and comments), this plan and its README row (removed in the closing commit once the Product Owner confirms no further tasks remain: `npm run retire:file -- plans/input-bindings-decomposition.md`).
@@ -248,7 +228,8 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 | D2 | Shells keep their dependency arrays; modules take explicit `deps` | Same callback identities; PRODUCT.md §22.2, no added render work |
 | D3 | Flat files in `src/renderer/`, named by responsibility | Existing layout (`vim-*.ts`, `use-*.ts`); ARCHITECTURE §21 calls structure a guideline |
 | D4 | Existing tests stay in place; new tests in new files | Development Guide §12 (L445); `docs/VIM_CONFORMANCE.md` citations |
-| D5 | Leaf modules first, projection core last and gated | Risk grows with shared state; R3 |
+| D5 | Leaf modules first; the projection core stays in the hook | Risk grows with shared state; R3 declined (D8) |
+| D8 | T11 and T12 declined by the Product Owner on 2026-10-04 and removed from the plan | Explicit Product Owner decision. Basis shown to the Product Owner: by diff, 6 to 10 of the 17 `fix` commits that touched the hook since 2026-09-26 changed code T11 would have moved, but no caret-position `fix` landed after `b9f0972` (2026-10-01) other than a one-line scroll fix (`f01923c`, 2026-10-02). Revisit if caret defects recur |
 | D6 | `inputRef`, `selectedAll`, `disabled` stay in the hook | C2.2 |
 | D7 | Rebase hook floors after extraction; new module floors meet the hook's original floors. R2 approved by the Product Owner on 2026-10-04 | Explicit Product Owner decision; per-module coverage guards retained |
 
@@ -287,6 +268,6 @@ T10 is complete: nine pointer, focus, clipboard, and menu handlers moved to `nod
 
 Perf at T10 (inconclusive for two vim scenarios, no T10 cause found): the T1 baseline artifact was deleted by a later Playwright run, which clears `test-results/`. Do not keep baselines there; copy them elsewhere. A fresh baseline was recorded at `42aa080` (before T10) for `perf/typing.spec.ts` and `perf/vim.spec.ts`, 25 scenarios, and kept outside the repository. All typing scenarios pass against it after T10. In the vim suite, single-frame paint metrics fail the 1.5x comparison in changing scenarios (`indentPaintMs` 7.9 ms baseline against 20 to 26 ms; others vary run to run), and the unmodified `42aa080` fails the same comparison against the same baseline, so the failures are baseline noise, not caused by T10. T13 must record a steadier baseline (several runs, median) before it compares.
 
-T11 and T12 remain blocked on R3. The next task that can start is T13 only if the Product Owner declines T11 and T12; otherwise the Product Owner must answer R3 first. The Product Owner's native-keyboard check (IME composition, key repeat, autocorrect, typing a link in `npm run dev`) is due now, after T10.
+R3 was declined on 2026-10-04: T11 and T12 are removed (D8). T13 (Ready) is the only task left and requires a new Product Owner continuation request. Before it, the Product Owner's native-keyboard check (IME composition, key repeat, autocorrect, typing a link in `npm run dev`) is due after T10, and T13 must first record a steadier perf baseline (several runs, median) outside `test-results/`.
 
 Resume prompt: "Continue the input-bindings decomposition initiative. Read AGENTS.md, docs/DEVELOPMENT.md section 11, plans/README.md, plans/input-bindings-decomposition.md, and git status. State the task you are taking (the plan's next task), do it under the plan's Common rules, commit it together with the plan's status update, and stop after at most four committed tasks or at the first stop condition (C8)."
