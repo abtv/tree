@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Input bindings decomposition](input-bindings-decomposition.md) | Active. T1 through T4 complete; R1 and R2 approved. Each task starts when the Product Owner asks to continue. | T5: extract whole-node Visual and sibling-range commands into `vim-node-visual-commands.ts` |
+| [Input bindings decomposition](input-bindings-decomposition.md) | Active. T1 through T4 complete; T5 in progress under its two-commit rule; R1 and R2 approved. | T5: complete the remaining whole-node Visual and sibling-range command extraction |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

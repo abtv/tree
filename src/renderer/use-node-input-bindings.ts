@@ -43,9 +43,8 @@ import {
   takeStructuralInsert,
   type VimCommandState,
 } from './vim-command-state'
-import { isNodeExpanded } from '../application/expansion-state'
 import type { NodeInputBindings } from './NodeInput'
-import { rememberIncomingNodes, rememberNodeRange, resolveVisualMemory } from './vim-visual-memory'
+import { rememberIncomingNodes, rememberNodeRange } from './vim-visual-memory'
 import type { VimMode } from './vim-editing'
 import {
   editCaretTransition,
@@ -54,6 +53,7 @@ import {
   type VimCaretState,
 } from './vim-caret-transition'
 import { repeatStructural as replayStructural } from './vim-structural-repeat'
+import * as nodeVisualCommands from './vim-node-visual-commands'
 import {
   applyReplaceKey,
   beginInsertSession,
@@ -290,53 +290,29 @@ export function useNodeInputBindings({
   }, [store, applyCaretState])
 
   const restoreVisual = useCallback((): void => {
-    const state = store.getSnapshot()
-    if (state.status !== 'ready') return
-    const restore = resolveVisualMemory(vimCommandState.current.lastVisual, state.document, state.location, (id) =>
-      isNodeExpanded(state.expansion, id),
-    )
-    if (restore === undefined) return
-    if (restore.kind === 'nodes') {
-      setNodeVisualSelection({ anchorId: restore.anchorId, focusId: restore.focusId })
-      store.selectNode(restore.focusId, 0)
-      changeVimMode('visual-node')
-      syncImageCaretToFocus()
-      return
-    }
-    const start = Math.min(restore.anchor, restore.focus)
-    store.selectNode(restore.nodeId, start)
-    schedulePendingVisualSelection({
-      nodeId: restore.nodeId,
-      start,
-      end: Math.max(restore.anchor, restore.focus) + 1,
-      endpoints: { anchor: restore.anchor, focus: restore.focus, hadText: restore.hadText },
+    nodeVisualCommands.restoreVisual({
+      store,
+      commandState: vimCommandState.current,
+      setNodeVisualSelection,
+      changeVimMode,
+      syncImageCaretToFocus,
+      schedulePendingVisualSelection,
     })
-    changeVimMode('visual')
   }, [store, setNodeVisualSelection, changeVimMode, syncImageCaretToFocus])
 
   const moveNodeVisual = useCallback(
     (direction: 'up' | 'down' | 'first' | 'last', count = 1): void => {
-      const state = store.getSnapshot()
-      if (state.status !== 'ready' || nodeVisualSelection === undefined) return
-      // Whole-node Visual extension stays within the focused node's actual sibling array, whatever
-      // depth it is displayed at through inline expansion.
-      const located = locateNode(state.document, nodeVisualSelection.focusId)
-      if (located === undefined) return
-      const nodes = located.siblings
-      const index = located.index
-      if (nodes.length === 0) return
-      const targetIndex =
-        direction === 'first'
-          ? 0
-          : direction === 'last'
-            ? nodes.length - 1
-            : Math.max(0, Math.min(nodes.length - 1, index + (direction === 'down' ? count : -count)))
-      const target = nodes[targetIndex]
-      if (target === undefined) return
-      setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.id })
-      rememberNodeRange(vimCommandState.current, state.document, nodeVisualSelection.anchorId, target.id)
-      store.selectNode(target.id, 0)
-      syncImageCaretToFocus()
+      nodeVisualCommands.moveNodeVisual(
+        {
+          store,
+          commandState: vimCommandState.current,
+          nodeVisualSelection,
+          setNodeVisualSelection,
+          syncImageCaretToFocus,
+        },
+        direction,
+        count,
+      )
     },
     [store, nodeVisualSelection, setNodeVisualSelection, syncImageCaretToFocus],
   )

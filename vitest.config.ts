@@ -56,10 +56,16 @@ export default defineConfig({
           lines: 99,
         },
         'src/renderer/use-node-input-bindings.ts': {
-          statements: 94.8,
-          branches: 88.3,
+          statements: 95.4,
+          branches: 88.9,
           functions: 93.6,
           lines: 98.8,
+        },
+        'src/renderer/vim-node-visual-commands.ts': {
+          statements: 97.2,
+          branches: 95.6,
+          functions: 99.9,
+          lines: 99.9,
         },
         'src/renderer/vim-structural-repeat.ts': {
           statements: 99.9,
