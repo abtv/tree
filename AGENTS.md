@@ -61,6 +61,8 @@ Iterate from feedback, keeping any review and no-commit conditions in force. Whe
 
 Stay within the coding tool the Product Owner started for the session. Do not switch to or delegate work to a different coding tool. The primary agent may use that tool's configured planner, reviewer, product verifier, and product researcher subagents when the task calls for their roles under §§5, 8, and 13. Codex uses OpenAI models, Claude uses Anthropic models, and OpenCode uses DeepSeek models.
 
+Standing authorization across sessions: use the configured planner, reviewer, product verifier, and product researcher subagents whenever their information gathering, analysis, review, or verification is needed within the authorized task. This is an explicit instruction to delegate such work without asking the Product Owner for separate permission to launch a subagent. Keep each delegated task within the role's security posture in `docs/AGENT_ROLES.md`; this launch authorization does not grant additional tools or actions. If a higher-priority session instruction prevents a required launch, report that instruction and the blocked role rather than treating the independent pass as completed.
+
 ---
 
 ## 2. Source of Truth
