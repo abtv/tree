@@ -177,7 +177,6 @@ export function NodeList({
   } = useNodeListDrag({
     rows: visibleRows,
     locked,
-    windowed,
     listRef,
     observedElementsRef,
     onDrop,

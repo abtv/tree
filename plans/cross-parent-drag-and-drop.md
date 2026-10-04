@@ -78,7 +78,7 @@ The Product Owner should see the screenshots for S8.
 | T5 | Between-row drops with a level | T3, T4 | High (`npm run check:full`), reviewer and product verifier, `WORKING_PLAN.md` | Done |
 | T6 | Drop onto a node | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Done |
 | T7 | Drop onto a breadcrumb entry | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Done |
-| T8 | Auto-scroll in every overflowing list (M4) | T5 | Moderate | Planned |
+| T8 | Auto-scroll in every overflowing list (M4) | T5 | Moderate | Done |
 | T9 | Cross-task verification, final documentation sweep, plan removal | T6, T7, T8 | High (`npm run check:full`), product verifier | Planned |
 
 ### T1. Domain `moveSubtree`
@@ -165,7 +165,9 @@ The Product Owner should see the screenshots for S8.
 
 ## Next task
 
-T8 (auto-scroll in every overflowing list) is the next task. T1 to T7 are done. T8 is Moderate Risk.
+T9 (cross-task verification, final documentation sweep, plan removal) is the next task. T1 to T8 are done. T9 is High Risk: it needs `npm run check:full` and a product-verifier pass.
+
+T8 removed the windowing gate on auto-scroll and added a drop-target recomputation on each viewport scroll during a drag, because an unwindowed list has no viewport state that triggers it. The T9 verifier should drag in a list below the windowing threshold that overflows the window, and over the toolbar.
 
 T5's missed independent review found that an unfocused drag source could unmount during windowed scrolling. The follow-up keeps the source mounted independently of the focused row and covers its cancellation cleanup.
 

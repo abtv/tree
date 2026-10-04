@@ -1308,6 +1308,38 @@ describe('NodeList windowing', () => {
     expect(onMove).toHaveBeenCalledWith('n0', { parentId: null, index: 430 })
   })
 
+  it('auto-scrolls an unwindowed list and follows the rows moving under a stationary pointer', () => {
+    vi.useFakeTimers()
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const cancelAnimationFrame = vi.fn()
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
+    const scrollBy = vi.fn()
+    vi.stubGlobal('scrollBy', scrollBy)
+    mockRowRects()
+    const { container, onMove } = renderRows({ list: buildNodes(10) })
+    const rows = rowElements(container)
+
+    activate(rows[5]!, 13)
+    pointerMoveAt(rows[5]!, 2)
+    expect(frames).toHaveLength(1)
+    frames[0]!(0)
+    expect(scrollBy).toHaveBeenCalledWith(0, -EDGE_SCROLL_STEP)
+    expect(rows[0]).toHaveClass('node-row-drop-before')
+
+    mockRowRects(-2 * ROW_HEIGHT_ESTIMATE)
+    fireEvent.scroll(window)
+    expect(rows[0]).not.toHaveClass('node-row-drop-before')
+    expect(rows[2]).toHaveClass('node-row-drop-before')
+
+    pointerUpAt(rows[5]!, 2)
+    expect(onMove).toHaveBeenCalledWith('n5', { parentId: null, index: 2 })
+    expect(cancelAnimationFrame).toHaveBeenCalled()
+  })
+
   it('never arms or keeps a pending hold when windowing unmounts the pressed row', () => {
     vi.useFakeTimers()
     mockRowRects()

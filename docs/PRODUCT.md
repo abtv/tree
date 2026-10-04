@@ -946,7 +946,7 @@ When the current location contains more than 500 visible rows, including inline 
 
 The focused row stays mounted even when it is off-screen, so keyboard navigation, focus restoration, typing, and the caret never lose their input.
 
-A drag that reaches the top or bottom edge of the window scrolls the page automatically, so a sibling can be moved to a position outside the mounted rows.
+A node drag that reaches the top or bottom edge of the content area scrolls the list automatically, so the node can be moved to a position outside the visible rows. This holds in every list that overflows the window, whether or not its rows are windowed; a list that fits the window does not scroll. Hovering the location toolbar does not scroll the list (§2.2).
 
 The page continues to scroll as a single document. The location bar and the current-parent heading scroll with the content.
 

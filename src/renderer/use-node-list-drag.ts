@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, 
 import type { TreeNode } from '../domain/document'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { autoScrollStep } from './list-window'
-import { scrollViewportBy, viewportBounds } from './scroll-viewport'
+import { onViewportScroll, scrollViewportBy, viewportBounds } from './scroll-viewport'
 import {
   dragBlock,
   dropTargetAtGap,
@@ -29,7 +29,6 @@ import { breadcrumbAtPoint } from './node-list-layout'
 interface UseNodeListDragOptions {
   rows: readonly VisibleRow[]
   locked: boolean
-  windowed: boolean
   listRef: RefObject<HTMLElement | null>
   observedElementsRef: RefObject<Map<string, HTMLElement>>
   onDrop: (nodeId: string, target: DropTarget) => void
@@ -62,7 +61,6 @@ type ResolvedDrop =
 export function useNodeListDrag({
   rows,
   locked,
-  windowed,
   listRef,
   observedElementsRef,
   onDrop,
@@ -243,12 +241,10 @@ export function useNodeListDrag({
       pointerYRef.current = event.clientY
       const nextDrop = computeDrop(event.clientX, event.clientY)
       setDrop((previous) => (sameDrop(previous, nextDrop) ? previous : nextDrop))
-      if (windowed) {
-        const { top, bottom } = viewportBounds()
-        setAutoScrollDirection(nextDrop?.kind === 'breadcrumb' ? 0 : autoScrollStep(event.clientY - top, bottom - top))
-      }
+      const { top, bottom } = viewportBounds()
+      setAutoScrollDirection(nextDrop?.kind === 'breadcrumb' ? 0 : autoScrollStep(event.clientY - top, bottom - top))
     },
-    [resolved, cancelDrag, observedElementsRef, computeDrop, windowed],
+    [resolved, cancelDrag, observedElementsRef, computeDrop],
   )
 
   const onListPointerUp = useCallback(
@@ -340,6 +336,13 @@ export function useNodeListDrag({
     const nextDrop = computeDrop(pointerX, pointerY)
     setDrop((previous) => (sameDrop(previous, nextDrop) ? previous : nextDrop))
   }, [computeDrop, freeze])
+
+  // Auto-scroll moves rows under a stationary pointer; an unwindowed list has no viewport state that
+  // would otherwise trigger the recomputation.
+  useEffect(() => {
+    if (freeze === undefined) return undefined
+    return onViewportScroll(recomputeDropIndex)
+  }, [freeze, recomputeDropIndex])
 
   return {
     freeze,
