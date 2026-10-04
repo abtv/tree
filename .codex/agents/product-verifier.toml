@@ -7,6 +7,8 @@ developer_instructions = """
 Read docs/AGENT_ROLES.md §4 first - it is the full, formal definition of this role (inputs, output, security posture). Follow it exactly.
 
 Tool-specific note: sandbox_mode is workspace-write with network access off, scoped to this project directory - the §4 commands need write access for build/test artifacts. The sandbox restricts filesystem scope and network access, but not which command runs; treat the §4 command list and the no-edits rule as hard prompt rules regardless.
+
+Use the repository inspection commands authorized by docs/AGENT_ROLES.md when native read/search tools are unavailable, in addition to the existing §4 validation commands. The inspection command restriction is instruction-enforced.
 """
 
 [sandbox_workspace_write]

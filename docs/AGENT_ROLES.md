@@ -9,6 +9,8 @@ This document is the single formal definition of every agent role used to develo
 
 **Changing role behavior:** edit this document once; every tool's adapter file already defers to it.
 
+**Repository inspection for all four subagent roles:** use native file-read and search tools when available. When a tool provides file inspection only through shell execution, the role may use `cat`, `head`, `tail`, read-only `sed` (no in-place editing, write, or execute commands), `rg`, `grep`, and `git status`, `git diff`, `git show`, or `git log` to inspect the authorized task's repository files and history. Use direct commands with read-only arguments; do not use output redirection, command substitution, shell chains, scripts, or options that write files, execute other commands, or launch external helpers. These inspection commands do not authorize tests, builds, file changes, network access, or additional shell commands. A tool adapter may omit shell access when native read/search tools cover inspection; the primary role then supplies Git evidence. In Codex, the command restriction is instruction-enforced; sandbox scope is a separate control and does not enforce this command list.
+
 ---
 
 ## 1. Primary / development role
@@ -19,9 +21,9 @@ Owns the Product Owner's authorized outcome, which may include several focused, 
 
 Inspects the repository in a fresh context and proposes a focused implementation plan when the outcome needs independent planning under `AGENTS.md` §8.
 
-**Security posture:** read-only. No file edits. No shell execution. Web research allowed.
+**Security posture:** read-only. No file edits. Only the repository inspection shell commands above are allowed when native read/search tools are unavailable. Web research allowed.
 
-**Inputs:** `AGENTS.md`, relevant current-state documentation, applicable nested instructions, existing implementation and tests, and — since this role cannot run shell commands — the current Git status and any pre-existing diff supplied by the primary role.
+**Inputs:** `AGENTS.md`, relevant current-state documentation, applicable nested instructions, existing implementation and tests, and the current Git status and any pre-existing diff supplied by the primary role. The role may inspect Git evidence independently when its tool adapter supports the inspection commands above.
 
 **Output:** a plan covering the requested outcome and affected requirements; current behavior and relevant implementation boundaries; proposed changes by file or module; testing and product-verification strategy; the applicable validation tier, commands, and expected invalidation boundaries (`docs/DEVELOPMENT.md` §9); documentation or ADR consequences; performance implications when state or persistence may be affected; the requirement-gap classification required by `AGENTS.md` §5, naming the minor gaps it resolved with the recorded principle each one followed and the material gaps that must reach the Product Owner; and material risks, ambiguities, and decisions requiring Product Owner approval. Resolves ordinary engineering details itself; escalates only choices that materially affect behavior, data, persistence, architecture, compatibility, or expensive-to-reverse direction.
 
@@ -29,7 +31,7 @@ Inspects the repository in a fresh context and proposes a focused implementation
 
 Independently reviews a completed implementation and reports only meaningful findings when required by `AGENTS.md` §13, after validation and before commit.
 
-**Security posture:** read-only. No file edits. No shell execution. No web access.
+**Security posture:** read-only. No file edits. Only the repository inspection shell commands above are allowed when native read/search tools are unavailable. No web access.
 
 **Inputs:** the working plan when one exists, current Git status, full Git diff, and validation record supplied by the primary role, plus every relevant untracked file named by the status. If the required change-set evidence is omitted, reports the omission instead of reviewing an unknown change set.
 
@@ -39,7 +41,7 @@ Independently reviews a completed implementation and reports only meaningful fin
 
 Checks changed behavior as a careful user and reports meaningful product issues when a separate pass is required by `AGENTS.md` §13, after implementation and validation and before commit.
 
-**Security posture:** read-only file access. Shell execution limited strictly to the test/build/lint commands defined in `docs/DEVELOPMENT.md` §9 (currently `npm test`, `npm run test:e2e`, `npm run test:perf`, `npm run build`, and their documented environment-prefixed forms) — no other shell command. No file edits. No web access.
+**Security posture:** read-only file access. Shell execution limited strictly to the repository inspection commands above when native read/search tools are unavailable, and the test/build/lint commands defined in `docs/DEVELOPMENT.md` §9 (currently `npm test`, `npm run test:e2e`, `npm run test:perf`, `npm run build`, and their documented environment-prefixed forms). No other shell command. No file edits. No web access.
 
 **Inputs:** the working plan when one exists, current Git status, full Git diff, validation record, every relevant untracked file named by the status, and affected product requirements.
 
@@ -49,11 +51,11 @@ Checks changed behavior as a careful user and reports meaningful product issues 
 
 Investigates one bounded product hypothesis and proposes evidence and experiments without making product decisions. Used only for an open product question (`AGENTS.md` §5).
 
-**Security posture:** read-only. No file edits. No shell execution. Web research allowed.
+**Security posture:** read-only. No file edits. Only the repository inspection shell commands above are allowed when native read/search tools are unavailable. Web research allowed.
 
 **Inputs:** relevant sections of `docs/PRODUCT.md` and the `Kind: product` entries of `docs/OPEN_QUESTIONS.md`, the implementation, and usage evidence supplied by the primary role.
 
-A `Kind: technical` entry is out of scope for this role. Such a question is settled by running something — a measurement, a performance guard, a throwaway prototype — and this role has no shell, so its answer would rest on reading the code alone while sounding as confident as a measured one. Route a technical question to an ordinary development session, which has the shell; no read-only role is a substitute.
+A `Kind: technical` entry is out of scope for this role. Such a question requires a measurement, a performance guard, or a throwaway prototype, and this role cannot execute those experiments. Route a technical question to an ordinary development session; repository inspection alone does not supply measured evidence.
 
 **Output:** counter-hypotheses, simpler explanations, and conflicts with established product principles; the cheapest experiment capable of disproving or materially changing the hypothesis, with success/disconfirmation criteria stated in advance; claims labeled as repository fact, Product Owner statement, usage evidence, external evidence, or agent inference. Never sets a hypothesis to `Accepted`, `Rejected`, or `Deferred`, and never treats a discovery decision as authorization to implement.
 
@@ -73,6 +75,7 @@ Changing a model/effort choice is a one-line edit in the owning tool's native co
 
 ## 7. Known limitations
 
+* **Codex role defaults do not establish the live sandbox policy.** A role's TOML may declare `sandbox_mode = "read-only"` while the spawned session's runtime permissions declare `workspace-write`, as observed in the planner inspection probe on 2026-10-04. Parent runtime overrides can take precedence over role defaults ([OpenAI subagent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents)). Treat successful file reading as evidence of inspection access only; it does not verify enforcement of the no-edits rule. Check the actual session permissions before claiming a role has a mechanically enforced read-only sandbox.
 * **Only OpenCode enforces the Product Verifier's command restriction mechanically.** `opencode.json`'s per-command `bash` allow/deny rules restrict which command runs. Codex's `sandbox_mode = "workspace-write"` and Claude Code's `tools: Bash` grant scope *where* a command can write (and, for Codex, whether it can reach the network), but neither restricts *which* command runs — `rm -rf` would be exactly as permitted as `npm test`. On both tools, the §4 command list and the no-edits rule are prompt-enforced only, not sandbox-enforced. Claude's permission patterns can avoid prompts for named commands, but they do not turn the Bash tool into an OS sandbox or a complete command allowlist.
   * **This is not just unbuilt — it's currently unbuildable.** A `PreToolUse` hook in `.claude/settings.json` looks like the fix, but Claude Code hooks do not fire for tool calls made by a subagent ([anthropics/claude-code#34692](https://github.com/anthropics/claude-code/issues/34692), closed as "not planned") — only main-thread tool calls trigger them, regardless of the documented `agent_id`/`agent_type` hook-input fields. A hook scoped to `product-verifier` would silently never run. Codex has the same category of gap: its native subagent shell execution does not appear to route through any documented per-command policy hook either. Re-check both platforms' changelogs before attempting this again.
 * **Claude Code's primary/development role is pinned via `.claude/settings.json`'s `model` field (added alongside this document)**, matching OpenCode's and Codex's top-level `model`. You can still override it for a session with `/model` — the pin only sets what a fresh session starts with.
