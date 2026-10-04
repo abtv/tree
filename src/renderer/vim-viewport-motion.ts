@@ -66,7 +66,7 @@ export function contextViewport(viewport: Viewport, edges: { atStart: boolean; a
 }
 
 export function moveViewportSelection(
-  deps: { store: EditorStore; syncImageCaretToFocus: () => void },
+  deps: { store: EditorStore; syncImageCaretToFocus: () => void; beforeSelect?: (preserveViewport: boolean) => void },
   nodeId: string,
   motion: VimViewportMotion,
   cursor: number,
@@ -88,6 +88,7 @@ export function moveViewportSelection(
       const { text, attachment } = requireNode(state.document, targetId).node
       column = attachment === undefined ? firstNonWhitespace(text) : text.length
     }
+    deps.beforeSelect?.(lineMotion)
     store.selectNode(targetId, column)
     syncImageCaretToFocus()
   }

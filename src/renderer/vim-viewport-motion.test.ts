@@ -204,8 +204,12 @@ describe('viewport selection dispatch', () => {
     const syncImageCaretToFocus = vi.fn(() => {
       expect(store.selectNode).toHaveBeenCalledExactlyOnceWith(target, column)
     })
-    moveViewportSelection({ store, syncImageCaretToFocus }, 'b', motion, 9)
+    const beforeSelect = vi.fn(() => {
+      expect(store.selectNode).not.toHaveBeenCalled()
+    })
+    moveViewportSelection({ store, syncImageCaretToFocus, beforeSelect }, 'b', motion, 9)
     expect(syncImageCaretToFocus).toHaveBeenCalledOnce()
+    expect(beforeSelect).toHaveBeenCalledExactlyOnceWith(['top', 'middle', 'bottom'].includes(motion))
   })
 
   it.each<[VimViewportMotion, number]>([

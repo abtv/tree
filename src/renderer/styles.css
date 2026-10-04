@@ -3,6 +3,7 @@
      one background/foreground pair per appearance, shared by the Visual row, Visual text
      selection, selected hyperlinks, and the Vim mode badge. */
   --color-grid-dot: #e6dfd0;
+  --node-row-min-height: 25px;
   --color-text: #3b3833;
   --color-background: #fbf8f1;
   --color-shell-text: #857f74;
@@ -114,7 +115,7 @@ textarea {
   right: 16px;
   left: 0;
   z-index: 1;
-  height: 20px;
+  height: min(20px, calc((100vh - var(--location-bar-height) - var(--status-bar-height)) / 4));
   pointer-events: none;
   content: '';
   opacity: 0;
@@ -370,7 +371,7 @@ body:not(.node-drag-active) .location-link:hover {
 .node-row {
   position: relative;
   display: flow-root;
-  min-height: 25px;
+  min-height: var(--node-row-min-height);
   margin-left: calc(28px + var(--row-depth, 0) * var(--row-indent));
   padding-left: 21px;
 }

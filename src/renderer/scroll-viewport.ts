@@ -1,14 +1,33 @@
+import { ROW_HEIGHT_ESTIMATE } from './list-window'
+
 /** Class of the element that scrolls the tree content below the location toolbar. */
 export const SCROLL_VIEWPORT_CLASS = 'scroll-viewport'
 
 /** The scrolling content area, or undefined when the page has none (before the editor renders). */
-function scroller(): HTMLElement | undefined {
+export function viewportScroller(): HTMLElement | undefined {
   return document.querySelector<HTMLElement>(`.${SCROLL_VIEWPORT_CLASS}`) ?? undefined
+}
+
+let contextUnit: number | undefined
+
+/** Refresh the CSS context after a viewport resize; navigation otherwise reuses the measured unit. */
+export function refreshViewportContext(): void {
+  contextUnit = undefined
+}
+
+function singleLineHeight(): number {
+  if (contextUnit === undefined) {
+    const value = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--node-row-min-height'),
+    )
+    contextUnit = Number.isFinite(value) && value > 0 ? value : ROW_HEIGHT_ESTIMATE
+  }
+  return contextUnit
 }
 
 /** The visible content area in window coordinates: below the toolbar, above the window bottom. */
 export function viewportBounds(): { top: number; bottom: number } {
-  const element = scroller()
+  const element = viewportScroller()
   if (element === undefined) return { top: 0, bottom: globalThis.innerHeight }
   const { top, bottom } = element.getBoundingClientRect()
   // An element that is not laid out has no visible area to measure against.
@@ -17,7 +36,7 @@ export function viewportBounds(): { top: number; bottom: number } {
 }
 
 export function scrollViewportBy(deltaY: number): void {
-  const element = scroller()
+  const element = viewportScroller()
   if (element === undefined || typeof element.scrollBy !== 'function') globalThis.scrollBy(0, deltaY)
   else element.scrollBy(0, deltaY)
 }
@@ -41,6 +60,15 @@ export function revealInViewport(element: Element, keepContext = false): void {
   // With keepContext the element must also stay clear of both edges, not only be fully visible.
   const inset = keepContext ? margin : 0
   if (rect.top >= top + inset && rect.bottom <= bottom - inset) return
+  const oversized = rect.height > height - 2 * margin
+  if (oversized) {
+    // Preserve leading document padding when an oversized first row already shows its start.
+    // Elsewhere its start takes priority over centering or reaching the document end.
+    const atStart = (viewportScroller()?.scrollTop ?? 0) === 0
+    if (atStart && rect.top >= top + inset && rect.top < bottom - inset) return
+    scrollRevealBy(rect.top - (top + margin), margin, false)
+    return
+  }
   if (rect.bottom < top - height / 2 || rect.top > bottom + height / 2) {
     scrollRevealBy(rect.top - (top + (height - rect.height) / 2), margin)
     return
@@ -55,8 +83,8 @@ export function revealInViewport(element: Element, keepContext = false): void {
  * than two margins goes all the way there, so every way of reaching the document edge — walking,
  * `gg`, `G` — ends at the same offset instead of leaving a sliver of the margin unscrolled.
  */
-function scrollRevealBy(deltaY: number, margin: number): void {
-  const element = scroller()
+function scrollRevealBy(deltaY: number, margin: number, snapEnd = true): void {
+  const element = viewportScroller()
   if (element === undefined || typeof element.scrollBy !== 'function') return scrollViewportBy(deltaY)
   const max = element.scrollHeight - element.clientHeight
   const target = element.scrollTop + deltaY
@@ -64,21 +92,18 @@ function scrollRevealBy(deltaY: number, margin: number): void {
   // two margins. The snap only follows the direction of travel: scrolling down never returns to
   // the start.
   if (deltaY < 0 && target < margin * 2) scrollViewportBy(-element.scrollTop)
-  else if (deltaY > 0 && target > max - margin * 2) scrollViewportBy(max - element.scrollTop)
+  else if (snapEnd && deltaY > 0 && target > max - margin * 2) scrollViewportBy(max - element.scrollTop)
   else scrollViewportBy(deltaY)
 }
 
-/** Height of a one-line row, the `min-height` of `.node-row` in styles.css. */
-const CONTEXT_UNIT = 25
-
 /** The context kept beyond an element: one one-line row, capped at a quarter of the content area. */
-export function contextMargin(elementHeight: number, contentHeight: number): number {
-  return Math.max(0, Math.min(CONTEXT_UNIT, contentHeight / 4, (contentHeight - elementHeight) / 2))
+export function contextMargin(_elementHeight: number, contentHeight: number): number {
+  return Math.max(0, Math.min(singleLineHeight(), contentHeight / 4))
 }
 
 /** Whether the content area is scrolled to its very start or very end. */
 export function viewportScrollEdges(): { atStart: boolean; atEnd: boolean } {
-  const element = scroller()
+  const element = viewportScroller()
   if (element === undefined) return { atStart: true, atEnd: true }
   return {
     atStart: element.scrollTop <= 0,
@@ -88,13 +113,27 @@ export function viewportScrollEdges(): { atStart: boolean; atEnd: boolean } {
 
 /** The element whose size changes when the scrolled content grows or shrinks. */
 export function viewportContent(): Element {
-  return scroller()?.firstElementChild ?? document.documentElement
+  return viewportScroller()?.firstElementChild ?? document.documentElement
+}
+
+const layoutListeners = new Set<() => void>()
+
+/** Windowed spacers can move a row without changing its own height. Project after that layout commits. */
+export function notifyViewportLayout(): void {
+  for (const listener of layoutListeners) listener()
+}
+
+export function onViewportLayout(listener: () => void): () => void {
+  layoutListeners.add(listener)
+  return () => {
+    layoutListeners.delete(listener)
+  }
 }
 
 /** Subscribes to scrolling of the content area only; returns the unsubscribe function. */
 export function onViewportScroll(listener: () => void): () => void {
   const onElementScroll = (event: Event): void => {
-    if (event.target === scroller()) listener()
+    if (event.target === viewportScroller()) listener()
   }
   // Element scroll events do not bubble, so a capturing listener on the document sees the content
   // area; the window listener covers the page-level fallback when there is no content area.

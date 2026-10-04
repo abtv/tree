@@ -16,7 +16,7 @@ import {
 } from './node-list-layout'
 import { DROP_LEVEL_STEP_PX, dropMarkerFor } from './node-drag'
 import type { DropTarget } from '../application/drop-targets'
-import { onViewportScroll, viewportBounds } from './scroll-viewport'
+import { notifyViewportLayout, onViewportScroll, viewportBounds } from './scroll-viewport'
 import { useNodeListDrag } from './use-node-list-drag'
 
 interface NodeListProps {
@@ -147,6 +147,7 @@ export function NodeList({
 
   useLayoutEffect(() => {
     if (windowed) updateViewport()
+    notifyViewportLayout()
   }, [layoutState.key, measureRevision, structuralVersion, updateViewport, windowed])
 
   useEffect(() => {

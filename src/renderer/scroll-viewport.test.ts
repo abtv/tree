@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   contextMargin,
+  refreshViewportContext,
   onViewportScroll,
   revealInViewport,
   viewportScrollEdges,
@@ -23,6 +24,8 @@ function mountScroller(rect: { top: number; bottom: number }): HTMLElement {
 
 afterEach(() => {
   document.body.replaceChildren()
+  document.documentElement.style.removeProperty('--node-row-min-height')
+  refreshViewportContext()
   vi.restoreAllMocks()
 })
 
@@ -148,7 +151,34 @@ describe('scroll viewport', () => {
       document.body.replaceChildren()
       const taller = mountRow({ height: 700 })
       taller.place(100)
-      expect(taller.scrollBy).toHaveBeenLastCalledWith(0, 70)
+      expect(taller.scrollBy).toHaveBeenLastCalledWith(0, 45)
+    })
+
+    it('keeps the readable start of a near-fit or distant oversized row below the context', () => {
+      const near = mountRow({ height: 570 })
+      near.place(100, true)
+      expect(near.scrollBy).toHaveBeenLastCalledWith(0, 45)
+      near.place(55, true)
+      expect(near.scrollBy).toHaveBeenLastCalledWith(0, 0)
+      near.place(1500, true)
+      expect(near.scrollBy).toHaveBeenLastCalledWith(0, 1445)
+    })
+
+    it('reaches the document start for an oversized first row and preserves its padding on retry', () => {
+      const first = mountRow({ height: 700, scrollTop: 5000 })
+      first.place(30 + 48 - 5000, true)
+      expect(first.scrollBy).toHaveBeenLastCalledWith(0, -5000)
+      document.body.replaceChildren()
+      const retry = mountRow({ height: 700, scrollTop: 0 })
+      retry.place(78, true)
+      expect(retry.scrollBy).not.toHaveBeenCalled()
+    })
+
+    it('does not snap an oversized final row past its visible start', () => {
+      const last = mountRow({ height: 570, scrollTop: 9000, scrollHeight: 10000 })
+      last.place(480, true)
+      // The desired target9435 is close to max9400, but start priority forbids the end snap.
+      expect(last.scrollBy).toHaveBeenLastCalledWith(0, 425)
     })
 
     it('goes all the way to the document edge when the move ends within two rows of it', () => {
@@ -188,7 +218,17 @@ describe('scroll viewport', () => {
     expect(contextMargin(20, 600)).toBe(25)
     expect(contextMargin(80, 600)).toBe(25)
     expect(contextMargin(20, 60)).toBe(15)
-    expect(contextMargin(700, 600)).toBe(0)
+    expect(contextMargin(700, 600)).toBe(25)
+  })
+
+  it('reads the single-line height from CSS and refreshes it after a layout change', () => {
+    document.documentElement.style.setProperty('--node-row-min-height', '30px')
+    refreshViewportContext()
+    expect(contextMargin(20, 600)).toBe(30)
+    document.documentElement.style.setProperty('--node-row-min-height', '35px')
+    expect(contextMargin(20, 600)).toBe(30)
+    refreshViewportContext()
+    expect(contextMargin(20, 600)).toBe(35)
   })
 
   it('reports whether the content area is scrolled to its start or end', () => {

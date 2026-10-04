@@ -17,6 +17,7 @@ import { createEditorKeyDownHandler, type VimTextCommandState } from './editor-i
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { normalCaretTarget } from './link-caret'
 import { revealInViewport } from './scroll-viewport'
+import { createViewportReveal } from './viewport-reveal'
 import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import { createVimCommandState, setVisualRange, type VimCommandState } from './vim-command-state'
@@ -80,6 +81,9 @@ export function useNodeInputBindings({
   onFoldCommand = () => undefined,
 }: UseNodeInputBindingsOptions): NodeInputBindingsResult {
   const inputs = useRef(new Map<string, HTMLElement>())
+  const viewportReveal = useMemo(() => createViewportReveal(), [])
+  const preserveViewport = useRef(false)
+  const initialFocusApplied = useRef(false)
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const caretRevision = useRef(0)
   const pendingCaret = useRef<PendingCaret | undefined>(undefined)
@@ -438,7 +442,19 @@ export function useNodeInputBindings({
 
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number, count = 1): void => {
-      moveViewportSelection({ store, syncImageCaretToFocus }, nodeId, motion, cursor, count)
+      moveViewportSelection(
+        {
+          store,
+          syncImageCaretToFocus,
+          beforeSelect: (preserve) => {
+            preserveViewport.current = preserve
+          },
+        },
+        nodeId,
+        motion,
+        cursor,
+        count,
+      )
     },
     [store, syncImageCaretToFocus],
   )
@@ -469,6 +485,7 @@ export function useNodeInputBindings({
   // Keyboard motion keeps context beyond the selected row; a pointer press on a visible row must not
   // move the content under the pointer (docs/PRODUCT.md §20.8).
   const pointerDriven = useRef(false)
+  useEffect(() => viewportReveal.mount(), [viewportReveal])
   useEffect(() => {
     const onPointer = (): void => {
       pointerDriven.current = true
@@ -487,13 +504,32 @@ export function useNodeInputBindings({
   useLayoutEffect(() => {
     if (focus === undefined) return
     const revision = caretRevision.current
-    const applyFocus = (): void => {
+    // Capture the policy once per focus token; later input must not reinterpret its deferred pass.
+    const keepContext = !pointerDriven.current
+    const preserve = preserveViewport.current
+    preserveViewport.current = false
+    pointerDriven.current = false
+    const restoring = !initialFocusApplied.current && store.getRestoredSelectedRowTop() !== undefined
+    initialFocusApplied.current = true
+    const isCurrent = (): boolean => {
+      const state = store.getSnapshot()
+      return state.status === 'ready' && state.focus?.token === focus.token
+    }
+    viewportReveal.cancel()
+    const applyFocus = (firstPass = false): void => {
       const input = inputs.current.get(focus.nodeId)
       if (input === undefined) return
       // The native focus scroll centers an element that is not fully visible, so it is suppressed
       // and the reveal below decides how far to scroll (docs/PRODUCT.md §20.8).
       input.focus({ preventScroll: true })
-      revealInViewport(input.closest('.node-row') ?? input, !pointerDriven.current)
+      if (!preserve) {
+        const row = input.closest('.node-row') ?? input
+        if (restoring) {
+          // Session restoration owns startup alignment and its asynchronous geometry until input.
+          if (firstPass) revealInViewport(row, keepContext)
+        } else if (firstPass) viewportReveal.begin(row, keepContext, isCurrent)
+        else viewportReveal.correct()
+      }
       if (latestVimMode.current === 'normal') {
         // Vertical navigation may resolve the destination to its image while the store carries
         // the originating text column. Project the resolved caret, including on the deferred pass.
@@ -505,11 +541,11 @@ export function useNodeInputBindings({
       } else if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)
       else setCaret(input, focus.cursor)
     }
-    applyFocus()
+    applyFocus(true)
     queueMicrotask(() => {
       if (latestFocus.current?.token === focus.token && caretRevision.current === revision) applyFocus()
     })
-  }, [focus])
+  }, [focus, store, viewportReveal])
 
   // Declared after the focus effect so it runs after the focus intent collapsed the caret.
   useLayoutEffect(() => {
