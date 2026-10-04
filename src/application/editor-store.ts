@@ -137,8 +137,10 @@ export class EditorStore {
       cached.expansion === state.expansion
     )
       return cached.rows
-    const rows = buildVisibleRows(displayedNodes(state.document, state.location.currentParentId), (id) =>
-      isNodeExpanded(state.expansion, id),
+    const rows = buildVisibleRows(
+      displayedNodes(state.document, state.location.currentParentId),
+      (id) => isNodeExpanded(state.expansion, id),
+      state.location.currentParentId,
     )
     this.visibleRowsCache = {
       document: state.document,

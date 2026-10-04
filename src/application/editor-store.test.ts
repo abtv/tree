@@ -765,6 +765,31 @@ describe('EditorStore', () => {
     })
   })
 
+  it('gives the top-level rows the displayed parent as their parent id', async () => {
+    const document = {
+      roots: [
+        {
+          id: 'a',
+          text: 'A',
+          children: [{ id: 'a1', text: 'A1', children: [{ id: 'a1x', text: 'X', children: [] }] }],
+        },
+      ],
+    }
+    const store = new EditorStore(
+      loadedState(document, { currentParentId: 'a', selectedNodeId: 'a1' }),
+      ids('unused'),
+      new FakeClock(),
+    )
+    await store.initialize()
+    store.toggleExpansion('a1')
+    expect(store.getVisibleRows().map((row) => [row.node.id, row.depth, row.parentId])).toEqual([
+      ['a1', 0, 'a'],
+      ['a1x', 1, 'a1'],
+    ])
+    store.navigateToAncestor(null)
+    expect(store.getVisibleRows()[0]).toMatchObject({ node: { id: 'a' }, parentId: null })
+  })
+
   describe('remembered expansion', () => {
     // root ─ child ─ grandchild ─ leaf, plus a second root 'other' with one child.
     const nestedDocument = {
