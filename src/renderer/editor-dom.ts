@@ -1,6 +1,24 @@
 import type { LinkRange, TreeNode } from '../domain/document'
 import { normalCaretTarget } from './link-caret'
 
+export function nodeTextLength(input: HTMLElement): number {
+  return input instanceof HTMLTextAreaElement ? input.value.length : (input.textContent?.length ?? 0)
+}
+
+/**
+ * The Normal caret is a collapsed position or a one-character block; anything wider is a deliberate
+ * selection (Cmd+A or a pointer drag) that caret normalization must not overwrite.
+ */
+export function hasMultiCharacterSelection(input: HTMLElement): boolean {
+  const selection = getSelectionRange(input)
+  return selection.end - selection.start > 1
+}
+
+export function setEditableText(input: HTMLElement, text: string): void {
+  if (input instanceof HTMLTextAreaElement) input.value = text
+  else input.textContent = text
+}
+
 export function richTextHtml(node: TreeNode): string {
   const links = node.links ?? []
   const parts: string[] = []

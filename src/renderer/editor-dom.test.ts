@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
   collapseSelectionToAnchor,
+  hasMultiCharacterSelection,
+  nodeTextLength,
+  setEditableText,
   getCaret,
   getSelectionRange,
   isCollapsedSelection,
@@ -30,6 +33,60 @@ function setDomSelection(startNode: Node, start: number, endNode = startNode, en
 }
 
 describe('editor DOM adapters', () => {
+  it('reads editable text lengths from textarea values and contenteditable text', () => {
+    const textarea = document.createElement('textarea')
+    textarea.value = 'hello'
+    textarea.textContent = 'unused'
+    expect(nodeTextLength(textarea)).toBe(5)
+
+    const editable = document.createElement('div')
+    editable.contentEditable = 'true'
+    expect(nodeTextLength(editable)).toBe(0)
+    editable.textContent = 'hello'
+    expect(nodeTextLength(editable)).toBe(5)
+  })
+
+  it.each([0, 1, 2])('recognizes textarea selection width %i', (width) => {
+    const textarea = document.createElement('textarea')
+    textarea.value = 'hello'
+    textarea.setSelectionRange(1, 1 + width)
+    expect(hasMultiCharacterSelection(textarea)).toBe(width > 1)
+  })
+
+  it.each([0, 1, 2])('recognizes contenteditable selection width %i', (width) => {
+    const editable = document.createElement('div')
+    editable.contentEditable = 'true'
+    editable.textContent = 'hello'
+    document.body.append(editable)
+    const range = document.createRange()
+    range.setStart(editable.firstChild!, 1)
+    range.setEnd(editable.firstChild!, 1 + width)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    try {
+      expect(hasMultiCharacterSelection(editable)).toBe(width > 1)
+    } finally {
+      selection.removeAllRanges()
+      editable.remove()
+    }
+  })
+
+  it('writes editable text to textarea values and contenteditable text', () => {
+    const textarea = document.createElement('textarea')
+    textarea.textContent = 'default'
+    setEditableText(textarea, 'updated')
+    expect(textarea.value).toBe('updated')
+    expect(textarea.textContent).toBe('default')
+
+    const editable = document.createElement('div')
+    editable.contentEditable = 'true'
+    editable.innerHTML = '<b>original</b>'
+    setEditableText(editable, 'updated')
+    expect(editable.textContent).toBe('updated')
+    expect(editable.children).toHaveLength(0)
+  })
+
   it('renders escaped text and editable links', () => {
     expect(
       richTextHtml(

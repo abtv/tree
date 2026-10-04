@@ -117,7 +117,7 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 | ID | Outcome | Depends on | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- | --- |
 | T1 | Baseline recorded; identity of `bindings`, `dragFreeze`, `setVimEditing` characterized | none | New identity tests pass on unchanged code; Baseline filled; R1 and R2 asked | Low | Done |
-| T2 | (a) DOM helpers in `editor-dom.ts`; (b) named pending types and one writer each for `pendingCaret` and `pendingVisualSelection` | T1 | Helper tests; writer grep; no test edited; hook and identity suites green | (a) Low, (b) Moderate | Ready (T2a next) |
+| T2 | (a) DOM helpers in `editor-dom.ts`; (b) named pending types and one writer each for `pendingCaret` and `pendingVisualSelection` | T1 | Helper tests; writer grep; existing tests preserved except added T2a helper cases explicitly authorized 2026-10-04; hook and identity suites green | (a) Low, (b) Moderate | In progress (T2a Done; T2b Ready) |
 | T3 | `vim-viewport-motion.ts` | T1, R2 | Direct tests; viewport oracles green; floor added | Moderate | Planned |
 | T4 | `vim-structural-repeat.ts` | T1 | Direct tests; replay oracles green; floor added | Moderate | Planned |
 | T5 | `vim-node-visual-commands.ts` | T2b | Direct tests; whole-node Visual and `gv` oracles green; floor added | Moderate | Planned |
@@ -283,6 +283,6 @@ The first performance attempt could not launch Electron inside the sandbox (SIGA
 
 ## Next task
 
-T2a (Ready): move shared DOM helpers to `editor-dom.ts` with direct tests, preserving the hook's behavior. T1 is complete; R1 and R2 are approved. T3 and T7 now wait only for their task dependencies. Suggested later sessions: T2 to T3; T4 to T6; T7 to T9; T10, then T13, or T11 first if R3 is approved; later T12 and T13.
+T2b (Ready): name pending input types and centralize pending caret/selection writes, preserving evaluation order and field values. T1 and T2a are complete; R1 and R2 are approved. For T2a, the Product Owner explicitly authorized adding direct helper cases to the existing `editor-dom.test.ts` while preserving its existing cases; this exception to C3/C8 applies only to T2a. T3 and T7 now wait only for their task dependencies. Suggested later sessions: T2b to T3; T4 to T6; T7 to T9; T10, then T13, or T11 first if R3 is approved; later T12 and T13.
 
 Resume prompt: "Continue the input-bindings decomposition initiative. Read AGENTS.md, docs/DEVELOPMENT.md section 11, plans/README.md, plans/input-bindings-decomposition.md, and git status. State the task you are taking (the plan's next task), do it under the plan's Common rules, commit it together with the plan's status update, and stop after at most four committed tasks or at the first stop condition (C8)."

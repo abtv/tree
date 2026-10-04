@@ -4,6 +4,9 @@ import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application
 import { locateNode, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import {
   collapseSelectionToAnchor,
+  hasMultiCharacterSelection,
+  nodeTextLength,
+  setEditableText,
   getCaret,
   getSelectionRange,
   hasAttachmentCharacter,
@@ -1230,22 +1233,4 @@ export function useNodeInputBindings({
   )
 
   return { bindings, dragFreeze, setVimEditing }
-}
-
-function nodeTextLength(input: HTMLElement): number {
-  return input instanceof HTMLTextAreaElement ? input.value.length : (input.textContent?.length ?? 0)
-}
-
-/**
- * The Normal caret is a collapsed position or a one-character block; anything wider is a deliberate
- * selection (Cmd+A or a pointer drag) that caret normalization must not overwrite.
- */
-function hasMultiCharacterSelection(input: HTMLElement): boolean {
-  const selection = getSelectionRange(input)
-  return selection.end - selection.start > 1
-}
-
-function setEditableText(input: HTMLElement, text: string): void {
-  if (input instanceof HTMLTextAreaElement) input.value = text
-  else input.textContent = text
 }
