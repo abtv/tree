@@ -139,7 +139,8 @@ describe('structural dot replay invariants', () => {
             act(() => f.store.selectNode('n1', 0))
             f.count(copies)
             if (past) f.press('g')
-            f.press('p')
+            // `P`: every generated node has children, and `p` on such a node puts into them.
+            f.press('P')
             f.press('u')
             f.press('y')
             f.press('y')

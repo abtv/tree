@@ -151,7 +151,8 @@ test('copies yy text and character Visual y as plain text while retaining local 
   await window.keyboard.press('y')
   await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
   await expect(node(window, 1)).toBeFocused()
-  await window.keyboard.press('p')
+  // `p` on this node would put the copy into its own children, which is rejected; `P` puts it before.
+  await window.keyboard.press('P')
   await expect
     .poll(() => nodeTexts(window))
     .toEqual(['see https://example.com', 'see https://example.com', '', '', 'Last'])
@@ -268,7 +269,7 @@ test('reports native copy failure, preserves the old clipboard and local yank, t
   await window.keyboard.press('y')
   await expect(window.locator('.save-error')).toContainText('Synthetic native clipboard failure')
   expect((await content(app)).text).toBe('keep')
-  await window.keyboard.press('p')
+  await window.keyboard.press('P')
   await expect
     .poll(() => nodeTexts(window))
     .toEqual(['see https://example.com', 'see https://example.com', '', '', 'Last'])

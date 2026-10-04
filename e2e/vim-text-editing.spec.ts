@@ -1166,6 +1166,7 @@ test.describe('Vim editing: text editing', () => {
         roots: [
           { id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] },
           { id: 'b', text: 'B', children: [] },
+          { id: 'c', text: 'C', children: [] },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'a' },
@@ -1177,21 +1178,23 @@ test.describe('Vim editing: text editing', () => {
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
+    // Put on the leaf B, since `p` on A would put the copy into A's own children.
+    await node(window, 2).focus()
     await window.keyboard.press('g')
     await window.keyboard.press('p')
-    // Folds are closed, so the rows are A, the copy of A, and B. B follows the copy and is selected.
-    await expect(node(window, 3)).toHaveValue('B')
-    await expect(node(window, 3)).toBeFocused()
+    // Folds are closed, so the rows are A, B, the copy of A, and C. C follows the copy and is selected.
+    await expect(node(window, 4)).toHaveValue('C')
+    await expect(node(window, 4)).toBeFocused()
     await window.keyboard.press('u')
-    await expect(node(window, 2)).toHaveValue('B')
+    await expect(node(window, 3)).toHaveValue('C')
 
     // After the last sibling nothing follows, so the last inserted copy is selected.
-    await node(window, 2).focus()
+    await node(window, 3).focus()
     await window.keyboard.press('2')
     await window.keyboard.press('g')
     await window.keyboard.press('p')
-    await expect(node(window, 4)).toHaveValue('A')
-    await expect(node(window, 4)).toBeFocused()
+    await expect(node(window, 5)).toHaveValue('A')
+    await expect(node(window, 5)).toBeFocused()
   })
 
   // @requirement PRODUCT.md §20.2

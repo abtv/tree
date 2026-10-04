@@ -1598,6 +1598,131 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'a' }, { id: 'b' }] } })
   })
 
+  // @requirement PRODUCT.md §20.2
+  describe('put on a node with children', () => {
+    const source: TreeNode = { id: 'x', text: 'X', children: [{ id: 'x-child', text: 'XC', children: [] }] }
+    const forest = { nodes: [source], sourceIds: ['x'] }
+    const ready = (store: EditorStore): ReadySnapshot => {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+      return snapshot
+    }
+    const setup = async (idValues: string[], selectedNodeId = 'a') => {
+      const store = new EditorStore(
+        loadedState(
+          {
+            roots: [
+              {
+                id: 'a',
+                text: 'A',
+                children: [
+                  { id: 'a1', text: 'A1', children: [] },
+                  { id: 'a2', text: 'A2', children: [] },
+                ],
+              },
+              { id: 'b', text: 'B', children: [] },
+            ],
+          },
+          { currentParentId: null, selectedNodeId },
+        ),
+        ids(...idValues),
+        new FakeClock(),
+      )
+      await store.initialize()
+      return store
+    }
+
+    it('puts a subtree as the first child, keeps the location, and opens the fold', async () => {
+      const store = await setup(['c1', 'c2'])
+      expect(store.pasteSubtree('a', 'after', source, ['x'])).toBe(true)
+      const state = ready(store)
+      expect(state.document.roots.map((node) => node.id)).toEqual(['a', 'b'])
+      expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual(['c1', 'a1', 'a2'])
+      expect(state.document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['c2'])
+      expect(state.location).toEqual({ currentParentId: null, selectedNodeId: 'c1' })
+      expect(state.expansion.expandedIds.has('a')).toBe(true)
+      store.undo()
+      expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
+    })
+
+    it('puts counted forest copies as the first children in one undo step', async () => {
+      const store = await setup(['c1', 'c2', 'c3', 'c4'])
+      expect(store.pasteNodeForest('a', 'after', forest, 2)).toBe(true)
+      expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['c1', 'c3', 'a1', 'a2'])
+      expect(ready(store).location.selectedNodeId).toBe('c1')
+      store.undo()
+      expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
+    })
+
+    it('selects the old first child after a put that leaves the caret after the content', async () => {
+      const store = await setup(['c1', 'c2'])
+      expect(store.pasteNodeForest('a', 'after', forest, 1, true)).toBe(true)
+      expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['c1', 'a1', 'a2'])
+      expect(ready(store).location.selectedNodeId).toBe('a1')
+      expect(ready(store).expansion.expandedIds.has('a')).toBe(true)
+    })
+
+    it('keeps the sibling-before put and the sibling put on a leaf', async () => {
+      const store = await setup(['c1', 'c2', 'c3', 'c4'])
+      expect(store.pasteSubtree('a', 'before', source, ['x'])).toBe(true)
+      expect(ready(store).document.roots.map((node) => node.id)).toEqual(['c1', 'a', 'b'])
+      expect(ready(store).document.roots[1]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
+      expect(ready(store).expansion.expandedIds.has('a')).toBe(false)
+      expect(store.pasteSubtree('b', 'after', source, ['x'])).toBe(true)
+      expect(ready(store).document.roots.map((node) => node.id)).toEqual(['c1', 'a', 'b', 'c3'])
+    })
+
+    it('does nothing for the current-parent heading', async () => {
+      const store = new EditorStore(
+        loadedState(
+          { roots: [{ id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] }] },
+          { currentParentId: 'a', selectedNodeId: 'a' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = store.getSnapshot()
+      expect(store.pasteSubtree('a', 'after', source, ['x'])).toBe(false)
+      expect(store.pasteNodeForest('a', 'after', forest)).toBe(false)
+      expect(store.getSnapshot()).toBe(before)
+    })
+
+    it.each(['subtree', 'forest'] as const)('rejects a %s put of the node into its own children', async (kind) => {
+      const store = await setup(['unused'])
+      const own = { id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] }
+      const before = ready(store)
+      const result =
+        kind === 'subtree'
+          ? store.pasteSubtree('a', 'after', own, ['a'])
+          : store.pasteNodeForest('a', 'after', { nodes: [own], sourceIds: ['a'] })
+      expect(result).toBe(false)
+      expect(ready(store).operationError).toBe('Cannot paste a node into one of its descendants.')
+      expect(ready(store).document).toBe(before.document)
+      expect(ready(store).expansion).toBe(before.expansion)
+    })
+
+    it('rejects a put whose content would pass the depth limit as a child', async () => {
+      let node: TreeNode = { id: 'leaf', text: '', children: [] }
+      node = { id: 'n', text: '', children: [node] }
+      // `n` sits at depth MAX - 1, so its children are at the limit and a two-level subtree cannot fit.
+      for (let level = MAX_DOCUMENT_DEPTH - 2; level >= 1; level -= 1) {
+        node = { id: `p${level}`, text: '', children: [node] }
+      }
+      const store = new EditorStore(
+        loadedState({ roots: [node] }, { currentParentId: null, selectedNodeId: 'n' }),
+        ids('c1', 'c2'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = ready(store)
+      expect(store.pasteSubtree('n', 'after', source, ['x'])).toBe(false)
+      expect(ready(store).operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+      expect(ready(store).document).toBe(before.document)
+      expect(ready(store).expansion).toBe(before.expansion)
+    })
+  })
+
   it('replaces a range with counted forest copies in one undo step and returns the removed range', async () => {
     const services = loadedState(
       {

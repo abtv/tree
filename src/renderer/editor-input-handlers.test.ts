@@ -1202,7 +1202,7 @@ describe('editor keyboard handler', () => {
     expect(f.snapshot().document.roots).toHaveLength(2)
   })
 
-  it('copies a node subtree with yy and pastes it as a sibling with p or P', async () => {
+  it('copies a node subtree with yy and pastes it as a sibling with p on a leaf or P', async () => {
     const node: TreeNode = {
       id: 'node',
       text: 'parent',
@@ -1215,21 +1215,92 @@ describe('editor keyboard handler', () => {
 
     expect(vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
     expect(vim.register.current).not.toBe(node)
+    press('P')
+    const beforeId = snapshot().location.selectedNodeId
+    expect(snapshot().document.roots.map(({ id }) => id)).toEqual([beforeId, 'node'])
+    // A leaf inside the copy: `p` on a leaf is the sibling-after put.
+    const copyChildId = snapshot().document.roots[0]!.children[0]!.id
+    store.selectNode(copyChildId, 0)
     press('p')
     const afterId = snapshot().location.selectedNodeId
-    expect(snapshot().document.roots.map(({ id }) => id)).toEqual(['node', afterId])
-    press('P')
-    const roots = snapshot().document.roots
-    expect(roots.map(({ id }) => id)).toEqual(['node', snapshot().location.selectedNodeId, afterId])
-    expect(roots.map(({ text, children }) => [text, children.map(({ text }) => text)])).toEqual([
-      ['parent', ['child']],
-      ['parent', ['child']],
-      ['parent', ['child']],
-    ])
-    expect(new Set(roots.flatMap((root) => [root.id, root.children[0]!.id])).size).toBe(6)
+    const children = snapshot().document.roots[0]!.children
+    expect(children.map(({ id }) => id)).toEqual([copyChildId, afterId])
+    expect(children[1]!.children.map(({ text }) => text)).toEqual(['child'])
+    const ids = snapshot().document.roots.flatMap((root) => [root.id, ...root.children.map(({ id }) => id)])
+    expect(new Set(ids).size).toBe(ids.length)
     store.undo()
     store.undo()
     expect(snapshot().document.roots).toEqual([node])
+  })
+
+  // @requirement PRODUCT.md §20.2
+  describe('p on a node with children', () => {
+    const parent = (): TreeNode => ({
+      id: 'parent',
+      text: 'parent',
+      children: [
+        { id: 'c1', text: 'one', children: [] },
+        { id: 'c2', text: 'two', children: [] },
+      ],
+    })
+
+    it('puts the register as the first child like o, keeping the location and opening the fold', async () => {
+      const { store, snapshot, press, vim } = await textFixture(parent())
+      vim.register.current = { kind: 'node', value: { id: 'src', text: 'copy', children: [] }, sourceIds: ['src'] }
+      press('p')
+      const state = snapshot()
+      expect(state.document.roots.map(({ id }) => id)).toEqual(['parent'])
+      const children = state.document.roots[0]!.children
+      expect(children.map(({ text }) => text)).toEqual(['copy', 'one', 'two'])
+      expect(state.location).toEqual({ currentParentId: null, selectedNodeId: children[0]!.id })
+      expect(state.expansion.expandedIds.has('parent')).toBe(true)
+      store.undo()
+      expect(snapshot().document.roots[0]!.children.map(({ text }) => text)).toEqual(['one', 'two'])
+    })
+
+    it('keeps P as a sibling before', async () => {
+      const { snapshot, press, vim } = await textFixture(parent())
+      vim.register.current = { kind: 'node', value: { id: 'src', text: 'copy', children: [] }, sourceIds: ['src'] }
+      press('P')
+      expect(snapshot().document.roots.map(({ text }) => text)).toEqual(['copy', 'parent'])
+      expect(snapshot().document.roots[1]!.children).toHaveLength(2)
+    })
+
+    it('puts a counted forest as first children and gp leaves the selection on the old first child', async () => {
+      const { snapshot, press, vim } = await textFixture(parent())
+      vim.register.current = {
+        kind: 'nodes',
+        value: {
+          nodes: [
+            { id: 's1', text: 'S1', children: [] },
+            { id: 's2', text: 'S2', children: [] },
+          ],
+          sourceIds: ['s1', 's2'],
+        },
+      }
+      press('2', 'g', 'p')
+      const children = snapshot().document.roots[0]!.children
+      expect(children.map(({ text }) => text)).toEqual(['S1', 'S2', 'S1', 'S2', 'one', 'two'])
+      expect(snapshot().location.selectedNodeId).toBe('c1')
+    })
+
+    it('leaves a text register to the text put', async () => {
+      const { snapshot, press, vim } = await textFixture(parent())
+      vim.register.current = { kind: 'text', value: 'abc' }
+      press('p')
+      expect(snapshot().document.roots[0]!.children).toHaveLength(2)
+      expect(snapshot().document.roots[0]!.text).toBe('parentabc')
+    })
+
+    it('reports an error and changes nothing when the node is put into itself', async () => {
+      const { snapshot, press } = await textFixture(parent())
+      const before = snapshot().document
+      press('y')
+      press('y')
+      press('p')
+      expect(snapshot().document).toBe(before)
+      expect(snapshot().operationError).toBe('Cannot paste a node into one of its descendants.')
+    })
   })
 
   it('enters the selected node after gd and resyncs the image caret', async () => {

@@ -713,16 +713,37 @@ export class EditorStore {
     return removed
   }
 
-  public pasteSubtree(
+  /**
+   * Vim `p` (`docs/PRODUCT.md` §20.2): on a node with children, "after" puts the content before its
+   * first child, like `o`, and `expandId` names the node whose fold must open to show it. `P` keeps
+   * the plain sibling-before insertion.
+   */
+  private putTarget(
+    document: Document,
     nodeId: NodeId,
     position: SiblingInsertionPosition,
+  ): { nodeId: NodeId; position: SiblingInsertionPosition; expandId: NodeId | undefined } {
+    const firstChild = position === 'after' ? requireNode(document, nodeId).node.children[0] : undefined
+    return firstChild === undefined
+      ? { nodeId, position, expandId: undefined }
+      : { nodeId: firstChild.id, position: 'before', expandId: nodeId }
+  }
+
+  private expansionAfterPut(expansion: ExpansionState, expandId: NodeId | undefined): ExpansionState {
+    return expandId === undefined ? expansion : expandNode(expansion, expandId)
+  }
+
+  public pasteSubtree(
+    requestedId: NodeId,
+    requestedPosition: SiblingInsertionPosition,
     source: TreeNode,
     sourceIds: readonly NodeId[] = [],
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     // A sibling of the current-parent heading would sit outside the displayed location.
-    if (nodeId === state.location.currentParentId) return false
+    if (requestedId === state.location.currentParentId) return false
+    const { nodeId, position, expandId } = this.putTarget(state.document, requestedId, requestedPosition)
     if (isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
@@ -743,20 +764,22 @@ export class EditorStore {
       transition.document,
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.expansionAfterPut(state.expansion, expandId),
     )
     return true
   }
 
   public pasteNodeForest(
-    nodeId: NodeId,
-    position: SiblingInsertionPosition,
+    requestedId: NodeId,
+    requestedPosition: SiblingInsertionPosition,
     source: NodeForest,
     repeat = 1,
     selectAfter = false,
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked() || source.nodes.length === 0) return false
-    if (nodeId === state.location.currentParentId) return false
+    if (requestedId === state.location.currentParentId) return false
+    const { nodeId, position, expandId } = this.putTarget(state.document, requestedId, requestedPosition)
     if (isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
@@ -780,6 +803,7 @@ export class EditorStore {
       transition.document,
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      this.expansionAfterPut(state.expansion, expandId),
     )
     return true
   }

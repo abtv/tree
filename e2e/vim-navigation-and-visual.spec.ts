@@ -69,13 +69,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toBeFocused()
     await window.keyboard.press('u')
     await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
-    await window.keyboard.press('p')
-    await expect.poll(() => nodeTexts(window)).toEqual(['C', 'C', 'D', 'D', 'E'])
+    // `p` on C would put the register into C's own children, which is rejected; `P` puts it before.
+    await pressShifted(window, 'P')
+    await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'C', 'D', 'E'])
     await window.keyboard.press('z')
     await pressShifted(window, 'R')
     await expect
       .poll(() => outline(window))
-      .toEqual(['C', '  C child', 'C', '  C child', 'D', '  D child', 'D', '  D child', 'E', '  E child'])
+      .toEqual(['C', '  C child', 'D', '  D child', 'C', '  C child', 'D', '  D child', 'E', '  E child'])
   })
 
   test('replays shifts and joins with exact sibling spans and stops counted dot on failure', async ({
@@ -159,6 +160,42 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 11)).toBeFocused()
     await window.keyboard.press('u')
     await expect(window.locator('.node-row')).toHaveCount(9)
+  })
+
+  // @requirement PRODUCT.md §20.2
+  test('puts a subtree as the first child of a node with children, like o, and repeats it', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'A',
+            text: 'A',
+            children: ['A1', 'A2'].map((text) => ({ id: text, text, children: [] })),
+          },
+          { id: 'B', text: 'B', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'B' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 2).focus()
+    await lockSystemClipboard()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await node(window, 1).focus()
+    await window.keyboard.press('p')
+    await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', 'B'])
+    await expect(node(window, 2)).toBeFocused()
+    // The repeated put follows the same rule: a leaf receives a sibling after it.
+    await node(window, 4).focus()
+    await window.keyboard.press('.')
+    await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', '  B', 'B'])
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', 'B'])
+    // P keeps the sibling-before put.
+    await node(window, 1).focus()
+    await pressShifted(window, 'P')
+    await expect.poll(() => outline(window)).toEqual(['B', 'A', '  B', '  A1', '  A2', 'B'])
   })
 
   test('replays Visual puts and case after register exchanges, then repeats vertical changes', async ({
@@ -1326,11 +1363,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
+    // `p` on Child would put it into its own children, so put after the leaf sibling instead.
+    await node(window, 2).focus()
     await window.keyboard.press('p')
-    await expect(node(window, 2)).toHaveValue('Child')
+    await expect(node(window, 3)).toHaveValue('Child')
 
     await window.keyboard.press('P')
-    await expect(node(window, 2)).toHaveValue('Child')
+    await expect(node(window, 3)).toHaveValue('Child')
     await window.keyboard.press('g')
     await window.keyboard.press('d')
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Child')
