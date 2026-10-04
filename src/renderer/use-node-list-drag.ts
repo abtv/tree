@@ -346,8 +346,8 @@ export function useNodeListDrag({
 
   return {
     freeze,
-    dropIndex: drop?.kind === 'gap' ? drop.gap : undefined,
-    dropLevel: drop?.kind === 'gap' ? drop.level : undefined,
+    dropIndex: drop?.kind === 'gap' && drop.target !== undefined ? drop.gap : undefined,
+    dropLevel: drop?.kind === 'gap' && drop.target !== undefined ? drop.level : undefined,
     dropRow: freeze !== undefined && drop?.kind === 'row' && drop.target !== undefined ? drop.row : undefined,
     invalidDrop,
     onRowPointerDown,

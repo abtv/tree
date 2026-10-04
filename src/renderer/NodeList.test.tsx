@@ -403,6 +403,7 @@ describe('NodeList inline expansion', () => {
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
     expect(document.body).toHaveClass('node-drag-invalid')
+    expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
 
     expect(onMove).not.toHaveBeenCalled()
@@ -1278,6 +1279,38 @@ describe('NodeList windowing', () => {
 
     pointerUpAt(row, globalThis.innerHeight - 1)
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops auto-scrolling while the pointer is over the toolbar', () => {
+    vi.useFakeTimers()
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const cancelAnimationFrame = vi.fn()
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
+    vi.stubGlobal('scrollBy', vi.fn())
+    mockRowRects(40)
+    render(<LocationBar path={[nodes[0]!]} currentParentId="a" onNavigate={() => undefined} />)
+    const toolbar = document.querySelector<HTMLElement>('.location-bar')!
+    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(rect(0, 30))
+    const root = screen.getByRole('button', { name: 'Top level' })
+    const { container } = renderRows({ list: buildNodes(10) })
+    const row = rowElements(container)[0]!
+
+    activate(row, 50)
+    // Inside the top edge margin of the content area, away from the toolbar: scrolling starts.
+    pointerMoveAt(row, 50)
+    expect(frames).toHaveLength(1)
+
+    pointerMoveAt(root, 15)
+    expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
+    expect(frames).toHaveLength(1)
+
+    // Leaving the toolbar for the content area resumes scrolling.
+    pointerMoveAt(row, 50)
+    expect(frames).toHaveLength(2)
   })
 
   it('recomputes the drop target after auto-scrolling changes the mounted rows', () => {

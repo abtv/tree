@@ -528,6 +528,7 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
 
     await dragToGap(window, 'a', 'a1', 'top', 0)
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
+    await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
     await window.mouse.up()
 
     expect(await nodeTexts(window)).toEqual(before)

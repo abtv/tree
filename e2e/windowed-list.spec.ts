@@ -227,6 +227,36 @@ test.describe('windowed node list (mode-independent)', () => {
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
   })
 
+  // @requirement PRODUCT.md §20.1
+  test('dragging over the location toolbar does not auto-scroll the list', async ({ userDataDir }) => {
+    seedDocument(userDataDir, wideSeed(120))
+    const { window } = await launchTree(userDataDir)
+    const scrollTop = (): Promise<number> =>
+      window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
+
+    const source = window.locator('.node-row').first()
+    const box = await source.boundingBox()
+    if (box === null) throw new Error('The source row was not rendered.')
+    const innerHeight = await window.evaluate(() => globalThis.innerHeight)
+    const x = box.x + box.width / 2
+
+    await startRowDrag(window, source, { xOffset: box.width / 2 })
+    await window.mouse.move(x, box.y + box.height, { steps: 5 })
+    await window.mouse.move(x, innerHeight - 8, { steps: 10 })
+    await expect.poll(scrollTop).toBeGreaterThan(300)
+
+    // A single jump, so no intermediate pointer event passes through the top edge margin.
+    const toolbar = await window.locator('.location-bar').boundingBox()
+    if (toolbar === null) throw new Error('The location toolbar was not rendered.')
+    await window.mouse.move(x, toolbar.y + toolbar.height / 2)
+    const resting = await scrollTop()
+    await window.waitForTimeout(300)
+    expect(await scrollTop()).toBe(resting)
+
+    await window.keyboard.press('Escape')
+    await window.mouse.up()
+  })
+
   test('dragging at the window edge does not scroll a list that fits the window', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(5))
     const { window } = await launchTree(userDataDir)
