@@ -134,6 +134,37 @@ describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
     )
     expect((await gutterAlignment(window, 1)).focusMarkerCenter).toBeNull()
   })
+
+  // @requirement PRODUCT.md §2.1
+  test('draws the selected-node bullet in the text color on top of the muted bullet', async ({ userDataDir }) => {
+    seedDocument(userDataDir, seed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    const selected = await window
+      .locator('.node-row')
+      .nth(0)
+      .evaluate((row) => {
+        const marker = row.querySelector('.node-focus-marker')
+        const control = row.querySelector('.node-enter-control')
+        if (!marker || !control) throw new Error('Expected the focus marker and enter control')
+        const markerRect = marker.getBoundingClientRect()
+        const controlRect = control.getBoundingClientRect()
+        return {
+          color: getComputedStyle(marker).backgroundColor,
+          width: markerRect.width,
+          dx: markerRect.left + markerRect.width / 2 - (controlRect.left + controlRect.width / 2),
+          dy: markerRect.top + markerRect.height / 2 - (controlRect.top + controlRect.height / 2),
+          bulletColor: getComputedStyle(control, '::before').backgroundColor,
+          textColor: getComputedStyle(row.querySelector('.node-input') as Element).color,
+        }
+      })
+
+    expect(selected.color).toBe(selected.textColor)
+    expect(selected.color).not.toBe(selected.bulletColor)
+    expect(selected.width).toBe(7)
+    expect(Math.abs(selected.dx)).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(selected.dy)).toBeLessThanOrEqual(0.5)
+  })
 })
 
 test.describe('node gutter alignment (Vim editing only)', () => {
