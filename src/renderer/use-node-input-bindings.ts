@@ -35,35 +35,19 @@ import {
   clearCommandAssembly,
   clearPending,
   createVimCommandState,
-  recordRepeatChange,
   setVisualRange,
-  structuralRepeatChange,
   swapNodeVisual,
-  takeStructuralInsert,
   type VimCommandState,
 } from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
 import { rememberNodeRange } from './vim-visual-memory'
 import type { VimMode } from './vim-editing'
-import {
-  editCaretTransition,
-  focusCaretTransition,
-  pointerCaretTransition,
-  type VimCaretState,
-} from './vim-caret-transition'
+import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
+import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
-import {
-  applyReplaceKey,
-  beginInsertSession,
-  beginReplaceSession,
-  createVimEditSessionState,
-  insertRepeatChange,
-  resolveReplaceCommit,
-  takeInsertSession,
-  takeReplaceSession,
-} from './vim-edit-session'
+import { applyReplaceKey, beginInsertSession, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -262,10 +246,7 @@ export function useNodeInputBindings({
     [store, setImageCaretNodeId],
   )
   const finishStructuralInsert = useCallback((input: HTMLElement): void => {
-    const session = takeStructuralInsert(vimCommandState.current)
-    if (session === undefined) return
-    const text = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-    recordRepeatChange(vimCommandState.current, structuralRepeatChange(session, text))
+    sessionFinish.finishStructuralInsertSession({ commandState: vimCommandState.current }, input)
   }, [])
 
   const syncImageCaretToFocus = useCallback((): void => {
@@ -411,78 +392,45 @@ export function useNodeInputBindings({
 
   const finishVimReplace = useCallback(
     (input?: HTMLElement, retreatCursor = false, preserveDomSelection = false): boolean => {
-      const session = takeReplaceSession(vimSession.current)
-      if (session === undefined) return false
-      const commit = resolveReplaceCommit(session)
-      if (commit === undefined) return false
-      const { finalText, replacedStart, replacedEnd, rawCursor } = commit
-      store.replaceTextRange(session.nodeId, replacedStart, replacedEnd, session.typed)
-      recordRepeatChange(vimCommandState.current, {
-        kind: 'overwrite',
-        text: session.typed,
-        replaced: replacedEnd - replacedStart,
-      })
-      const state = store.getSnapshot()
-      const hasAttachment =
-        state.status === 'ready' && requireNode(state.document, session.nodeId).node.attachment !== undefined
-      const prior =
-        caretAuthority.current.nodeId === session.nodeId
-          ? caretAuthority.current.caret
-          : { cursor: rawCursor, imageActive: false }
-      const committedCursor = retreatCursor ? Math.max(0, rawCursor - 1) : rawCursor
-      const next = editCaretTransition(prior, committedCursor, finalText.length, hasAttachment)
-      // A command-driven commit must not rewrite the DOM: the visible text already equals the
-      // committed text, and the user's selection is what the command is about to act on.
-      if (input !== undefined && !preserveDomSelection) {
-        setEditableText(input, finalText)
-      }
-      applyCaretState(
-        session.nodeId,
-        next,
-        false,
-        preserveDomSelection ? 'preserve-selection' : input === undefined ? 'after-edit' : 'immediate',
+      return sessionFinish.finishReplaceSession(
+        {
+          store,
+          session: vimSession.current,
+          commandState: vimCommandState.current,
+          readAuthority: () => caretAuthority.current,
+          applyCaretState,
+        },
+        input,
+        retreatCursor,
+        preserveDomSelection,
       )
-      return true
     },
     [store, applyCaretState, vimSession, vimCommandState],
   )
 
-  // The store invokes this before it captures a quit save and again after that save completes, so
-  // a pending Replace buffer is committed into the document and persisted by the quit flush rather
-  // than dying with the renderer. The commit path is the same one blur uses: no DOM rewrite (the
-  // visible text already equals the committed text), no Escape-style caret retreat, and a return to
-  // Normal mode so a failed quit leaves the editor in a consistent state. The session is consumed
-  // before the commit, so repeated invocations are no-ops; the returned flag tells the flush to run
-  // another pass when this call committed an edit.
   const finishPendingEdits = useCallback((): boolean => {
-    // A shutdown flush interrupts a pending plain Insert session: consume it without recording, so a
-    // later Escape cannot capture the session the flush already ended (PRODUCT §20.2.1 T8). The
-    // structural session needs its input's text to capture, so it stays pending for a later finish.
-    takeInsertSession(vimSession.current)
-    const committed = finishVimReplace()
-    if (latestVimMode.current === 'replace') changeVimMode('normal')
-    return committed
+    return sessionFinish.finishPendingEditSessions({
+      session: vimSession.current,
+      finishVimReplace,
+      getMode: () => latestVimMode.current,
+      changeVimMode,
+    })
   }, [finishVimReplace, changeVimMode, vimSession])
 
   useEffect(() => store.registerPendingEditFinisher(finishPendingEdits), [store, finishPendingEdits])
 
   const finishVimInsert = useCallback(
-    /**
-     * Finish the pending Insert session. The structural session always captures; the plain session
-     * is recorded for `.` only when Escape completed it on its own node. Every other finish (blur,
-     * pointer, navigation, shortcut, toggle, flush) consumes it and keeps the previous repeatable
-     * change (PRODUCT §20.2.1 T8). The registered-input check is the fail-closed backstop against a
-     * session that crossed to another node without a blur consuming it first.
-     */
     (input: HTMLElement, completed = false): void => {
-      finishStructuralInsert(input)
-      const session = takeInsertSession(vimSession.current)
-      if (session === undefined) return
-      if (!completed) return
-      if (inputs.current.get(session.nodeId) !== input) return
-      const finalText = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-      const change = insertRepeatChange(session, finalText)
-      if (change !== undefined) recordRepeatChange(vimCommandState.current, change)
+      sessionFinish.finishInsertSession(
+        {
+          finishStructuralInsert,
+          session: vimSession.current,
+          commandState: vimCommandState.current,
+          getInput: (id) => inputs.current.get(id),
+        },
+        input,
+        completed,
+      )
     },
     [finishStructuralInsert, vimSession, vimCommandState],
   )
@@ -972,45 +920,20 @@ export function useNodeInputBindings({
 
   const setVimEditing = useCallback(
     (enabled: boolean): void => {
-      const state = store.getSnapshot()
-      if (state.status !== 'ready') {
-        changeVimMode(enabled ? 'normal' : 'insert')
-        return
-      }
-      const node = requireNode(state.document, state.location.selectedNodeId).node
-      const candidate = inputs.current.get(node.id)
-      const input =
-        candidate !== undefined && candidate.ownerDocument.activeElement === candidate ? candidate : undefined
-      const hasAttachment = node.attachment !== undefined
-      if (enabled) {
-        changeVimMode('normal')
-        const cursor = input === undefined ? (state.focus?.cursor ?? 0) : getCaret(input)
-        // A deliberate multi-character selection survives the switch, as it survives other changes
-        // into Normal mode; otherwise the block caret is drawn at the caret.
-        applyCaretState(
-          node.id,
-          editCaretTransition({ cursor, imageActive: false }, cursor, node.text.length, hasAttachment),
-          false,
-          input === undefined || hasMultiCharacterSelection(input) ? 'preserve-selection' : 'immediate',
-        )
-        return
-      }
-      // Disabling resolves every Vim session the way a focus change would, except that the editor
-      // keeps focus: Insert bookkeeping finishes, a pending replacement commits as one edit without
-      // rewriting the visible text, and Visual ranges and an unfinished command clear.
-      if (input !== undefined) finishVimInsert(input)
-      finishVimReplace(input, false, true)
-      clearCommandAssembly(vimCommandState.current)
-      setNodeVisualSelection(undefined)
-      const caret = caretAuthority.current.nodeId === node.id ? caretAuthority.current.caret : undefined
-      const cursor =
-        caret?.imageActive === true
-          ? node.text.length
-          : input === undefined
-            ? (state.focus?.cursor ?? 0)
-            : getCaret(input)
-      applyCaretState(node.id, { cursor, imageActive: false }, false, 'preserve-selection')
-      changeVimMode('insert')
+      sessionFinish.switchVimEditing(
+        {
+          store,
+          getInput: (id) => inputs.current.get(id),
+          readAuthority: () => caretAuthority.current,
+          changeVimMode,
+          applyCaretState,
+          finishVimInsert,
+          finishVimReplace,
+          commandState: vimCommandState.current,
+          setNodeVisualSelection,
+        },
+        enabled,
+      )
     },
     [store, changeVimMode, applyCaretState, finishVimInsert, finishVimReplace, setNodeVisualSelection],
   )
