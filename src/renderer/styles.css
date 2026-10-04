@@ -36,6 +36,9 @@
   --color-drag-highlight: #f1ebdd;
   --color-drop-marker: #9b4d00;
   --color-disclosure-background: #efe9da;
+  --color-enter-ring-background: #ddd5c2;
+  --color-enter-ring-hover-background: #cfc6b0;
+  --color-disclosure-arrow: #9a9384;
   --highlight-background: #f1e4bd;
   --highlight-foreground: #3b3833;
   color: var(--color-text);
@@ -439,11 +442,11 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .node-enter-control-has-children {
-  background: var(--color-disclosure-background);
+  background: var(--color-enter-ring-background);
 }
 
 .node-enter-control-has-children:hover {
-  background: var(--color-disclosure-hover-background);
+  background: var(--color-enter-ring-hover-background);
 }
 
 .node-enter-control:focus-visible {
@@ -476,7 +479,7 @@ body:not(.node-drag-active) .location-link:hover {
   height: 0;
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
-  border-left: 5px solid var(--color-location-separator);
+  border-left: 5px solid var(--color-disclosure-arrow);
   content: '';
 }
 
@@ -920,6 +923,9 @@ body.node-drag-invalid * {
     --color-gutter-mark: #9f9f8f;
     --color-disclosure-background: #4f4f4f;
     --color-disclosure-hover-background: #5f5f5f;
+    --color-enter-ring-background: #4f4f4f;
+    --color-enter-ring-hover-background: #5f5f5f;
+    --color-disclosure-arrow: #656555;
     --color-drag-highlight: #4f4f4f;
     --color-drop-marker: #f0dfaf;
     --color-overlay-button-background: rgba(220, 220, 204, 0.12);

@@ -283,6 +283,39 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('inline-expansion-nested-dark.png'))
     await window.emulateMedia({ colorScheme: 'light' })
   })
+
+  test('keeps the outer ring and disclosure triangle distinguishable from the light document surface', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, nestedSeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    const contrast = await window.evaluate(() => {
+      const luminance = (color: string): number => {
+        const channels = (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+        const [r, g, b] = channels.map((value) => {
+          const s = value / 255
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0)
+      }
+      const ratio = (a: string, b: string): number => {
+        const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+        return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05)
+      }
+      const surface = getComputedStyle(document.documentElement).backgroundColor
+      const ring = document.querySelector('.node-enter-control-has-children')
+      const triangle = document.querySelector('.node-disclosure-triangle')
+      if (!ring || !triangle) throw new Error('Expected a node with children')
+      return {
+        ring: ratio(getComputedStyle(ring).backgroundColor, surface),
+        triangle: ratio(getComputedStyle(triangle, '::before').borderLeftColor, surface),
+      }
+    })
+
+    expect(contrast.ring).toBeGreaterThanOrEqual(1.25)
+    expect(contrast.triangle).toBeGreaterThanOrEqual(2.5)
+  })
 })
 
 // @requirement PRODUCT.md §2.4
