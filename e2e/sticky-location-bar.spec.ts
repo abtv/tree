@@ -35,7 +35,10 @@ test.describe('sticky location toolbar', () => {
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true)
     const box = await bar.boundingBox()
     const viewport = await page.locator('.scroll-viewport').boundingBox()
-    expect(box?.y).toBe(0)
+    // The toolbar sits directly below the window title strip (§20.5).
+    const strip = await page.locator('.title-bar').boundingBox()
+    expect(strip?.y).toBe(0)
+    expect(box?.y).toBe(strip?.height)
     expect(viewport?.y).toBe(box === null ? undefined : box.y + box.height)
     // The scrollbar occupies the right edge of the content area only, never the toolbar row.
     const barRight = await page.evaluate(() => document.querySelector('.location-bar')?.clientWidth ?? 0)

@@ -1,6 +1,14 @@
 // @editing-modes: independent
 import type { Page } from '@playwright/test'
-import { expect, launchTree, screenshotContentSize, seedDocument, setMainWindowContentSize, test } from './fixtures'
+import {
+  expect,
+  launchTree,
+  screenshotContentSize,
+  seedDocument,
+  setMainWindowContentSize,
+  test,
+  titleStripHeight,
+} from './fixtures'
 
 function seedRoots(userDataDir: string, count: number): void {
   seedDocument(userDataDir, {
@@ -129,7 +137,7 @@ test.describe('scroll edges', () => {
       // reveal (PRODUCT.md §20.8) until the scroll below relinquishes it, so settle the geometry first.
       await expect
         .poll(() => page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
-        .toEqual(screenshotContentSize)
+        .toEqual({ width: screenshotContentSize.width, height: screenshotContentSize.height + titleStripHeight })
       await page.evaluate(
         () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
       )

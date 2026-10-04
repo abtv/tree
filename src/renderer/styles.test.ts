@@ -18,6 +18,15 @@ it('keeps the location toolbar outside the scrolling content area, with an opaqu
   expect(/\.vim-mode\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '').not.toMatch(/position:\s*fixed/)
 })
 
+// @requirement PRODUCT.md §20.5
+it('draws the window title strip in the document background and lets it drag the window', () => {
+  const strip = /\.title-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(strip).toMatch(/background:\s*var\(--color-background\)/)
+  expect(strip).toMatch(/color:\s*var\(--color-secondary\)/)
+  expect(strip).toMatch(/-webkit-app-region:\s*drag/)
+  expect(strip).toMatch(/flex:\s*0 0 auto/)
+})
+
 // @requirement PRODUCT.md §20
 it('shows the text-editing cursor only over a focused node editor', () => {
   const sheet = document.createElement('style')

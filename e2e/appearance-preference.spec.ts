@@ -57,4 +57,25 @@ test.describe('appearance preference', () => {
     expect(await themeSource(third.app)).toBe('system')
     await closeApp(third.app)
   })
+
+  // @requirement PRODUCT.md §20.5
+  test('draws the window title strip in the document background in both appearances', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const strip = window.locator('.title-bar')
+    const colors = () =>
+      window.evaluate(() => ({
+        strip: getComputedStyle(document.querySelector('.title-bar')!).backgroundColor,
+        document: getComputedStyle(document.documentElement).backgroundColor,
+      }))
+    await expect(strip).toHaveText('Tree')
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getContentBounds().y)).toBe(
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getBounds().y),
+    )
+
+    for (const label of ['Light', 'Dark']) {
+      await clickApplicationSubmenuItem(app, { ...appearanceMenu, label })
+      await expect.poll(async () => (await colors()).strip).toBe((await colors()).document)
+    }
+    await closeApp(app)
+  })
 })

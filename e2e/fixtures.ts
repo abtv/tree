@@ -248,15 +248,23 @@ export async function setMainWindowBounds(
 // height differs between macOS versions. Pin the content size, small enough for a small CI display.
 export const screenshotContentSize = { width: 1000, height: 600 } as const
 
+// The window title strip (PRODUCT.md §20.5) is part of the content view because the system title bar is
+// hidden. The requested height is the area below the strip, so layout tests keep the same room for the
+// toolbar, the list, and the status bar.
+export const titleStripHeight = 28
+
 export async function setMainWindowContentSize(
   app: ElectronApplication,
   size: { width: number; height: number },
 ): Promise<void> {
-  await app.evaluate(({ BrowserWindow }, requested) => {
-    const windows = BrowserWindow.getAllWindows()
-    if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
-    windows[0]!.setContentSize(requested.width, requested.height)
-  }, size)
+  await app.evaluate(
+    ({ BrowserWindow }, requested) => {
+      const windows = BrowserWindow.getAllWindows()
+      if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
+      windows[0]!.setContentSize(requested.width, requested.height + requested.strip)
+    },
+    { ...size, strip: titleStripHeight },
+  )
 }
 
 export async function readMainWindowBounds(app: ElectronApplication): Promise<PersistedWindowBounds> {

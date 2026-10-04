@@ -243,6 +243,9 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
 
   return (
     <main className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}>
+      <div className="title-bar" aria-hidden="true">
+        Tree
+      </div>
       <LocationBar
         path={path}
         currentParentId={state.location.currentParentId}

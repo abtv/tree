@@ -84,6 +84,7 @@ textarea {
 
 /* The toolbar is a fixed row above the scrolling content area, so the scrollbar starts below it. */
 .tree-app {
+  --title-bar-height: 28px;
   --location-bar-height: 30px;
   --status-bar-height: 27px;
   position: relative;
@@ -115,14 +116,17 @@ textarea {
   right: 16px;
   left: 0;
   z-index: 1;
-  height: min(20px, calc((100vh - var(--location-bar-height) - var(--status-bar-height)) / 4));
+  height: min(
+    20px,
+    calc((100vh - var(--title-bar-height) - var(--location-bar-height) - var(--status-bar-height)) / 4)
+  );
   pointer-events: none;
   content: '';
   opacity: 0;
 }
 
 .tree-app::before {
-  top: var(--location-bar-height);
+  top: calc(var(--title-bar-height) + var(--location-bar-height));
   background: linear-gradient(var(--color-background), transparent);
   animation-name: scroll-edge-fade-in;
   animation-timing-function: linear;
@@ -157,6 +161,23 @@ textarea {
   to {
     opacity: 0;
   }
+}
+
+/* The native title bar is hidden (docs/PRODUCT.md §20.5), so the window controls sit on this strip.
+   It has the document background in every appearance and drags the window. */
+.title-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--title-bar-height);
+  background: var(--color-background);
+  color: var(--color-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+  -webkit-app-region: drag;
 }
 
 .location-bar {

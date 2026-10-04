@@ -126,6 +126,7 @@ function createMainWindow(): void {
     minWidth: 640,
     minHeight: 480,
     title: 'Tree',
+    titleBarStyle: 'hidden',
     backgroundColor: windowBackgroundColor(nativeTheme.shouldUseDarkColors),
     webPreferences: createWindowWebPreferences(join(__dirname, '../preload/index.js')),
   })
