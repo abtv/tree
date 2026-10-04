@@ -36,6 +36,7 @@ import {
   enterTransition,
   leaveTransition,
   moveHorizontalTransition,
+  moveNodeToParentTransition,
   moveNodeTransition,
   moveSelectionTransition,
   moveSelectionBoundaryTransition,
@@ -920,6 +921,36 @@ export class EditorStore {
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
+  }
+
+  /**
+   * Moves a node with its subtree under another parent, or to the document root with `parentId`
+   * `null`, at `index` among that parent's children counted without the moved node. It is one
+   * undoable, pending-save change that opens the receiving fold and selects the moved node; the
+   * displayed location follows only when the node leaves it. Returns whether it changed the
+   * document: a destination inside the moved subtree or the current place changes nothing, and a
+   * subtree that would pass the maximum depth is reported.
+   */
+  public moveNodeToParent(nodeId: NodeId, parentId: NodeId | null, index: number): boolean {
+    const state = this.runtime.ready()
+    // Keep the early guard: a locked command must avoid building a moved document, not only publishing it.
+    if (this.isPersistenceLocked()) return false
+    const cursor = state.focus.nodeId === nodeId ? state.focus.cursor : 0
+    const result = moveNodeToParentTransition(state.document, state.location, nodeId, parentId, index, cursor)
+    if (result.kind === 'none') return false
+    if (result.kind === 'rejected') {
+      this.reportError(new Error(result.message))
+      return false
+    }
+    this.endTextSession()
+    const expansion = result.expandIds.reduce(expandNode, state.expansion)
+    this.applyStructural(
+      result.transition.document,
+      result.transition.location,
+      this.runtime.newFocus(result.transition.focus.nodeId, result.transition.focus.cursor),
+      expansion,
+    )
+    return true
   }
 
   public async paste(nodeId: NodeId, cursor: number): Promise<void> {

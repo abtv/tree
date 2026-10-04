@@ -14,6 +14,7 @@ import {
   enterTransition,
   leaveTransition,
   moveHorizontalTransition,
+  moveNodeToParentTransition,
   moveNodeTransition,
   moveSelectionBoundaryTransition,
   moveSelectionTransition,
@@ -489,6 +490,122 @@ describe('editor command transitions', () => {
     expect(
       moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'second' }, 'second', 1),
     ).toBeUndefined()
+  })
+
+  describe('moveNodeToParentTransition', () => {
+    function moved(result: ReturnType<typeof moveNodeToParentTransition>) {
+      if (result.kind !== 'moved') throw new Error(`Expected a move, got ${result.kind}.`)
+      return result
+    }
+    const ids = (nodes: readonly TreeNode[]): string[] => nodes.map((node) => node.id)
+
+    it('nests a node as the last child, opens the receiving fold, selects the node, and keeps the caret', () => {
+      const result = moved(moveNodeToParentTransition(nestedDocument, rootLocation, 'beta', 'alpha', 2, 4))
+      expect(ids(result.transition.document.roots)).toEqual(['alpha'])
+      expect(ids(result.transition.document.roots[0]!.children)).toEqual(['alpha1', 'alpha2', 'beta'])
+      expect(result.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'beta' })
+      expect(result.transition.focus).toEqual({ nodeId: 'beta', cursor: 4 })
+      expect(result.expandIds).toEqual(['alpha'])
+    })
+
+    it('outdents to the displayed level without opening a fold or moving the location', () => {
+      const result = moved(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha1a', null, 1))
+      expect(ids(result.transition.document.roots)).toEqual(['alpha', 'alpha1a', 'beta'])
+      expect(result.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'alpha1a' })
+      expect(result.expandIds).toEqual([])
+    })
+
+    it('opens every fold between the displayed parent and a deep receiving parent', () => {
+      const result = moved(
+        moveNodeToParentTransition(
+          nestedDocument,
+          { currentParentId: 'alpha', selectedNodeId: 'alpha2' },
+          'alpha2',
+          'alpha1a',
+          0,
+        ),
+      )
+      expect(result.transition.location).toEqual({ currentParentId: 'alpha', selectedNodeId: 'alpha2' })
+      expect(result.expandIds).toEqual(['alpha1', 'alpha1a'])
+      const deeper = moved(
+        moveNodeToParentTransition(
+          nestedDocument,
+          { currentParentId: 'alpha1', selectedNodeId: 'alpha2' },
+          'alpha2',
+          'alpha1a',
+          0,
+        ),
+      )
+      expect(deeper.expandIds).toEqual(['alpha1a'])
+      const fromRoot = moved(moveNodeToParentTransition(nestedDocument, rootLocation, 'beta', 'alpha1a', 0))
+      expect(fromRoot.expandIds).toEqual(['alpha', 'alpha1', 'alpha1a'])
+    })
+
+    it('moves the location to the new parent when the node leaves the displayed location', () => {
+      const result = moved(
+        moveNodeToParentTransition(
+          nestedDocument,
+          { currentParentId: 'alpha1', selectedNodeId: 'alpha1a' },
+          'alpha1a',
+          'alpha',
+          0,
+        ),
+      )
+      expect(result.transition.location).toEqual({ currentParentId: 'alpha', selectedNodeId: 'alpha1a' })
+      expect(result.expandIds).toEqual([])
+      const toRoot = moved(
+        moveNodeToParentTransition(
+          nestedDocument,
+          { currentParentId: 'alpha1', selectedNodeId: 'alpha1a' },
+          'alpha1a',
+          null,
+          2,
+        ),
+      )
+      expect(toRoot.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'alpha1a' })
+    })
+
+    it('reorders within one parent like moveNodeTransition does', () => {
+      const location = { currentParentId: 'root', selectedNodeId: 'first' }
+      const result = moved(moveNodeToParentTransition(document, location, 'first', 'root', 1))
+      expect(ids(result.transition.document.roots[0]!.children)).toEqual(['second', 'first'])
+      expect(result.transition.document).toEqual(moveNodeTransition(document, location, 'first', 2)!.document)
+      expect(result.expandIds).toEqual([])
+    })
+
+    it('changes nothing for an unknown node, the displayed parent, or a destination inside the node', () => {
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'missing', null, 0)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', 'missing', 0)).toEqual({ kind: 'none' })
+      const heading = { currentParentId: 'alpha', selectedNodeId: 'alpha' }
+      expect(moveNodeToParentTransition(nestedDocument, heading, 'alpha', null, 1)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', 'alpha', 0)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', 'alpha1a', 0)).toEqual({ kind: 'none' })
+    })
+
+    it('changes nothing when the parent and the position stay the same, however the index is clamped', () => {
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha1', 'alpha', 0)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha2', 'alpha', 1)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha2', 'alpha', 99)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'beta', null, 99)).toEqual({ kind: 'none' })
+      expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', null, -3)).toEqual({ kind: 'none' })
+    })
+
+    it('rejects a subtree that would pass the maximum depth and leaves the document alone', () => {
+      let chain: TreeNode = { id: 'leaf', text: '', children: [] }
+      for (let level = MAX_DOCUMENT_DEPTH - 2; level >= 1; level -= 1) {
+        chain = { id: `n${level}`, text: '', children: [chain] }
+      }
+      const deep: Document = {
+        roots: [{ id: 'first', text: '', children: [{ id: 'second', text: '', children: [] }] }, chain],
+      }
+      const location = { currentParentId: null, selectedNodeId: 'n1' }
+      // `n1` is one level short of the limit: it fits under `first`, but not under `second`.
+      expect(moveNodeToParentTransition(deep, location, 'n1', 'first', 1).kind).toBe('moved')
+      expect(moveNodeToParentTransition(deep, location, 'n1', 'second', 0)).toEqual({
+        kind: 'rejected',
+        message: MAX_DOCUMENT_DEPTH_ERROR,
+      })
+    })
   })
 
   it('does not route horizontal text movement from a heading to its child', () => {

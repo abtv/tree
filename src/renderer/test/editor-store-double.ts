@@ -119,6 +119,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     deleteEmptySelected: vi.fn(),
     moveSelectedTo: vi.fn(),
     moveNodeTo: vi.fn(),
+    moveNodeToParent: vi.fn(() => false),
     paste: vi.fn(async () => {}),
     undo: vi.fn(),
     redo: vi.fn(),

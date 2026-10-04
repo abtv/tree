@@ -67,6 +67,24 @@ export function pasteNodeForestTransition(
   }
 }
 
+/**
+ * The displayed parent after nodes moved in `document`. It stays while `selectedId` is still a
+ * descendant of it; a move that takes the selection out of the displayed location makes the moved
+ * node's new parent the location instead, so the selection stays a descendant of the current parent.
+ * `<` and a drop onto another parent share this rule.
+ */
+export function currentParentAfterMove(
+  document: Document,
+  location: Location,
+  selectedId: NodeId,
+  movedId: NodeId,
+): NodeId | null {
+  const selected = requireNode(document, selectedId)
+  const stillDisplayed =
+    location.currentParentId === null || selected.ancestors.some((ancestor) => ancestor.id === location.currentParentId)
+  return stillDisplayed ? location.currentParentId : (requireNode(document, movedId).parent?.id ?? null)
+}
+
 export type NodeVisualShiftTransition =
   | { kind: 'none' }
   | { kind: 'rejected'; message: string }
@@ -109,12 +127,9 @@ export function nodeVisualShiftTransition(
     if (result.kind === 'too-deep') return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
     next = result.document
   }
-  const selected = requireNode(next, location.selectedNodeId)
   // `<` can take the range out of the displayed location; the location then becomes the range's new
   // parent so the selection stays a descendant of the current parent.
-  const stillDisplayed =
-    location.currentParentId === null || selected.ancestors.some((ancestor) => ancestor.id === location.currentParentId)
-  const currentParentId = stillDisplayed ? location.currentParentId : (requireNode(next, firstId).parent?.id ?? null)
+  const currentParentId = currentParentAfterMove(next, location, location.selectedNodeId, firstId)
   return {
     kind: 'shifted',
     transition: {

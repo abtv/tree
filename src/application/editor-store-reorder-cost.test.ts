@@ -3,9 +3,7 @@ import * as transitions from './editor-command-transitions'
 import { EditorStore, type Clock } from './editor-store'
 import { createServices, freshIds } from './test/editor-store-arbitraries'
 
-// @requirement PRODUCT.md §16.2
-// @requirement PRODUCT.md §22.1
-it('avoids building a reordered document while locked and permits the transition after recovery', async () => {
+async function lockedStore(): Promise<{ store: EditorStore; services: ReturnType<typeof createServices> }> {
   const services = createServices(
     {
       version: 1,
@@ -31,6 +29,13 @@ it('avoids building a reordered document while locked and permits the transition
     await expect(store.flushPersistence()).rejects.toThrow('disk full')
   }
   expect(store.getSnapshot()).toMatchObject({ persistenceLocked: true })
+  return { store, services }
+}
+
+// @requirement PRODUCT.md §16.2
+// @requirement PRODUCT.md §22.1
+it('avoids building a reordered document while locked and permits the transition after recovery', async () => {
+  const { store, services } = await lockedStore()
   const before = store.getSnapshot()
   // This call count guards allocation work, while the snapshots guard its result.
   const build = vi.spyOn(transitions, 'moveNodeTransition')
@@ -47,6 +52,31 @@ it('avoids building a reordered document while locked and permits the transition
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'b' }, { id: 'a', text: 'Changed' }] },
       location: { selectedNodeId: 'a' },
+    })
+  } finally {
+    build.mockRestore()
+  }
+})
+
+// @requirement PRODUCT.md §16.2
+// @requirement PRODUCT.md §22.1
+it('avoids building a moved document while locked and permits the move to another parent after recovery', async () => {
+  const { store, services } = await lockedStore()
+  const before = store.getSnapshot()
+  const build = vi.spyOn(transitions, 'moveNodeToParentTransition')
+  try {
+    expect(store.moveNodeToParent('a', 'b', 0)).toBe(false)
+    expect(build).not.toHaveBeenCalled()
+    expect(store.getSnapshot()).toBe(before)
+    services.save = async (state) => {
+      services.saves.push(state)
+    }
+    await store.flushPersistence()
+    expect(store.moveNodeToParent('a', 'b', 0)).toBe(true)
+    expect(build).toHaveBeenCalledTimes(1)
+    expect(store.getSnapshot()).toMatchObject({
+      document: { roots: [{ id: 'b', children: [{ id: 'a', text: 'Changed' }] }] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
     })
   } finally {
     build.mockRestore()

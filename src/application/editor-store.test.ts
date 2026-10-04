@@ -3,6 +3,7 @@ import { EditorStore, type ClipboardValue, type Clock, type EditorServices } fro
 import type { ReadySnapshot } from './editor-runtime-state'
 import {
   displayedNodes,
+  isValidLocation,
   MAX_DOCUMENT_DEPTH,
   MAX_DOCUMENT_DEPTH_ERROR,
   reconcileLinkTextEdit,
@@ -378,6 +379,198 @@ describe('EditorStore', () => {
       expect(store.shiftNodeVisual('in', 'n1', 'n1', 2)).toBe(false)
       expect(ready(store).document).toBe(before.document)
       expect(ready(store).operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+    })
+  })
+
+  // @requirement PRODUCT.md §16.1
+  // @requirement PRODUCT.md §16.2
+  describe('move to another parent', () => {
+    const image = { id: 'image', mimeType: 'image/png' as const }
+    const roots: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      { id: 'b', text: 'B', children: [{ id: 'b1', text: 'B1', children: [] }] },
+      { id: 'c', text: 'C', attachment: image, children: [] },
+      { id: 'd', text: 'D', children: [] },
+    ]
+    const ready = (store: EditorStore): ReadySnapshot => {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+      return snapshot
+    }
+    const rootShape = (store: EditorStore): unknown =>
+      ready(store).document.roots.map((root) => [root.id, root.children.map((child) => child.id)])
+
+    async function load(
+      selectedNodeId: string,
+      currentParentId: string | null = null,
+    ): Promise<{ store: EditorStore; services: EditorServices & { saves: unknown[] }; clock: FakeClock }> {
+      const services = loadedState({ roots }, { currentParentId, selectedNodeId })
+      const clock = new FakeClock()
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      return { store, services, clock }
+    }
+
+    // The observable state a one-level move leaves behind; the caret intent is compared by node and offset.
+    function outcome(store: EditorStore): unknown {
+      const snapshot = ready(store)
+      return {
+        document: snapshot.document,
+        location: snapshot.location,
+        expandedIds: [...snapshot.expansion.expandedIds].sort(),
+        focus: { nodeId: snapshot.focus.nodeId, cursor: snapshot.focus.cursor },
+      }
+    }
+
+    it.each([
+      ['in', 'c', 'b', 1, null],
+      ['in', 'b', 'a', 0, null],
+      ['out', 'b1', null, 2, null],
+      ['out', 'b1', null, 2, 'b'],
+    ] as const)(
+      'is the same command as Visual shift %s for %s (parent %s, index %s, location %s)',
+      async (direction, nodeId, parentId, index, currentParentId) => {
+        const shifted = await load(nodeId, currentParentId)
+        shifted.store.selectNode(nodeId, 1)
+        expect(shifted.store.shiftNodeVisual(direction, nodeId, nodeId)).toBe(true)
+        const dropped = await load(nodeId, currentParentId)
+        dropped.store.selectNode(nodeId, 1)
+        expect(dropped.store.moveNodeToParent(nodeId, parentId, index)).toBe(true)
+        expect(outcome(dropped.store)).toEqual(outcome(shifted.store))
+        // One history entry each: a single undo restores the starting document.
+        shifted.store.undo()
+        dropped.store.undo()
+        expect(ready(dropped.store).document).toEqual({ roots })
+        expect(ready(dropped.store).document).toEqual(ready(shifted.store).document)
+      },
+    )
+
+    it('opens the receiving fold and every fold on the way, selects the moved node, and undoes in one step', async () => {
+      const { store } = await load('d')
+      expect(store.moveNodeToParent('d', 'b1', 0)).toBe(true)
+      expect(rootShape(store)).toEqual([
+        ['a', []],
+        ['b', ['b1']],
+        ['c', []],
+      ])
+      const snapshot = ready(store)
+      expect(snapshot.document.roots[1]!.children[0]!.children.map((child) => child.id)).toEqual(['d'])
+      expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'd' })
+      expect([...snapshot.expansion.expandedIds].sort()).toEqual(['b', 'b1'])
+      expect(store.getVisibleRows().map((row) => [row.node.id, row.depth])).toEqual([
+        ['a', 0],
+        ['b', 0],
+        ['b1', 1],
+        ['d', 2],
+        ['c', 0],
+      ])
+      store.undo()
+      expect(ready(store).document).toEqual({ roots })
+      store.redo()
+      expect(rootShape(store)).toEqual([
+        ['a', []],
+        ['b', ['b1']],
+        ['c', []],
+      ])
+      expect(ready(store).location.selectedNodeId).toBe('d')
+    })
+
+    it('keeps the caret of a focused node and starts an unfocused node at the start', async () => {
+      const { store } = await load('a')
+      store.selectNode('a', 1)
+      expect(store.moveNodeToParent('a', 'd', 0)).toBe(true)
+      expect(ready(store).focus).toMatchObject({ nodeId: 'a', cursor: 1 })
+      store.selectNode('b', 1)
+      expect(store.moveNodeToParent('c', 'b', 0)).toBe(true)
+      expect(ready(store).focus).toMatchObject({ nodeId: 'c', cursor: 0 })
+      expect(ready(store).location.selectedNodeId).toBe('c')
+    })
+
+    it('moves the displayed location up to the new parent only when the node leaves it', async () => {
+      const inside = await load('b1', 'b')
+      expect(inside.store.moveNodeToParent('b1', 'b', 0)).toBe(false)
+      expect(inside.store.moveNodeToParent('b1', 'a', 0)).toBe(true)
+      expect(ready(inside.store).location).toEqual({ currentParentId: 'a', selectedNodeId: 'b1' })
+      inside.store.undo()
+      expect(ready(inside.store).document).toEqual({ roots })
+      const restored = ready(inside.store)
+      expect(isValidLocation(restored.document, restored.location)).toBe(true)
+      inside.store.redo()
+      expect(ready(inside.store).location).toEqual({ currentParentId: 'a', selectedNodeId: 'b1' })
+    })
+
+    it('opens no fold and adds no pending mark for a no-op, and reports nothing', async () => {
+      const { store, services, clock } = await load('b')
+      const before = ready(store)
+      // The same place, a clamped index past the end, a destination inside the node, and unknown ids.
+      expect(store.moveNodeToParent('b', null, 1)).toBe(false)
+      expect(store.moveNodeToParent('d', null, 99)).toBe(false)
+      expect(store.moveNodeToParent('b', 'b', 0)).toBe(false)
+      expect(store.moveNodeToParent('b', 'b1', 0)).toBe(false)
+      expect(store.moveNodeToParent('missing', null, 0)).toBe(false)
+      expect(store.moveNodeToParent('b', 'missing', 0)).toBe(false)
+      expect(ready(store)).toBe(before)
+      clock.runAll()
+      await tick()
+      expect(services.saves).toEqual([])
+      store.undo()
+      expect(ready(store).document).toBe(before.document)
+    })
+
+    it('reports the depth error and changes nothing when the subtree would pass the limit', async () => {
+      let chain: TreeNode = { id: 'leaf', text: '', children: [] }
+      for (let level = MAX_DOCUMENT_DEPTH - 2; level >= 1; level -= 1) {
+        chain = { id: `n${level}`, text: '', children: [chain] }
+      }
+      const store = new EditorStore(
+        loadedState(
+          { roots: [{ id: 'first', text: '', children: [{ id: 'second', text: '', children: [] }] }, chain] },
+          { currentParentId: null, selectedNodeId: 'n1' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = ready(store)
+      expect(store.moveNodeToParent('n1', 'second', 0)).toBe(false)
+      expect(ready(store).document).toBe(before.document)
+      expect(ready(store).location).toBe(before.location)
+      expect(ready(store).operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+    })
+
+    it('marks one pending change without an immediate save and queues no attachment cleanup', async () => {
+      const { store, services, clock } = await load('c')
+      const cleanup = vi.fn(async () => undefined)
+      services.cleanupAttachments = cleanup
+      expect(store.moveNodeToParent('c', 'b', 1)).toBe(true)
+      await tick()
+      expect(services.saves).toEqual([])
+      clock.runAll()
+      await tick()
+      expect(services.saves).toHaveLength(1)
+      expect(services.saves[0]).toMatchObject({
+        document: {
+          roots: [{ id: 'a' }, { id: 'b', children: [{ id: 'b1' }, { id: 'c', attachment: image }] }, { id: 'd' }],
+        },
+      })
+      expect(cleanup).not.toHaveBeenCalled()
+    })
+
+    it('blocks a move while persistence is locked and works after recovery', async () => {
+      const clock = new FakeClock()
+      const { store, services } = await lockEditor(clock, [
+        { id: 'root', text: '', children: [] },
+        { id: 'b', text: 'B', children: [] },
+      ])
+      const before = ready(store)
+      expect(store.moveNodeToParent('b', 'root', 0)).toBe(false)
+      expect(store.getSnapshot()).toBe(before)
+      services.save = async (state) => {
+        services.saves.push(state)
+      }
+      await store.flushPersistence()
+      expect(store.moveNodeToParent('b', 'root', 0)).toBe(true)
+      expect(rootShape(store)).toEqual([['root', ['b']]])
     })
   })
 

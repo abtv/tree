@@ -7,7 +7,7 @@ import {
   insertSiblingBefore,
   insertSubtreeSibling,
   locateNode,
-  moveSibling,
+  moveSubtree,
   nodePath,
   replaceSiblingRange,
   requireNode,
@@ -19,6 +19,7 @@ import {
   type TreeNode,
 } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
+import { currentParentAfterMove } from './editor-node-visual-transitions'
 import type { VisibleRow } from './visible-rows'
 
 export interface FocusTarget {
@@ -158,6 +159,55 @@ export function createSiblingOrFirstChildTransition(
   }
 }
 
+export type NodeMoveTransition =
+  | { kind: 'none' }
+  | RejectedTransition
+  | { kind: 'moved'; transition: StructuralTransition; expandIds: readonly NodeId[] }
+
+/**
+ * Moves `nodeId` with its subtree under `parentId` (`null` for the document root) at `index`, counted
+ * among the new parent's children after the node is removed from its old place, so the same parent
+ * and the same position is a no-op. The node ends up selected with the caret at `cursor`. The
+ * displayed location follows only when the node leaves it (`currentParentAfterMove`). `expandIds` are
+ * the folds the node's new ancestors need to be open below the location, which includes the receiving
+ * parent. A destination inside the moved subtree changes nothing; a subtree that would pass the
+ * maximum depth is rejected with the product's operation error.
+ */
+export function moveNodeToParentTransition(
+  document: Document,
+  location: Location,
+  nodeId: NodeId,
+  parentId: NodeId | null,
+  index: number,
+  cursor = 0,
+): NodeMoveTransition {
+  const located = locateNode(document, nodeId)
+  // The current-parent heading is not a row and never moves.
+  if (located === undefined || nodeId === location.currentParentId) return { kind: 'none' }
+  const sameParent = (located.parent?.id ?? null) === parentId
+  // Clamped like `moveSibling`, so an index past either end is only a real move when it lands somewhere new.
+  if (sameParent && Math.max(0, Math.min(index, located.siblings.length - 1)) === located.index) {
+    return { kind: 'none' }
+  }
+  const result = moveSubtree(document, nodeId, parentId, index)
+  if (result.kind === 'impossible') return { kind: 'none' }
+  if (result.kind === 'too-deep') return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+  const moved = requireNode(result.document, nodeId)
+  const currentParentId = currentParentAfterMove(result.document, location, nodeId, nodeId)
+  // The ancestors strictly below the displayed parent, the receiving parent last, have to be open.
+  // At the document root no ancestor matches, which gives the index of the first one.
+  const firstBelow = moved.ancestors.findIndex((node) => node.id === currentParentId) + 1
+  return {
+    kind: 'moved',
+    transition: {
+      document: result.document,
+      location: { currentParentId, selectedNodeId: nodeId },
+      focus: { nodeId, cursor },
+    },
+    expandIds: moved.ancestors.slice(firstBelow).map((node) => node.id),
+  }
+}
+
 export function moveNodeTransition(
   document: Document,
   location: Location,
@@ -171,15 +221,15 @@ export function moveNodeTransition(
   if (located === undefined) return undefined
   const sourceIndex = located.index
   const rawDestination = insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
-  // Clamped to the same bounds `moveSibling` applies, so an insertion index past either end of the
-  // sibling list is only treated as a real move when it actually lands somewhere new.
-  const destination = Math.max(0, Math.min(rawDestination, located.siblings.length - 1))
-  if (destination === sourceIndex) return undefined
-  return {
-    document: moveSibling(document, nodeId, destination),
-    location: { ...location, selectedNodeId: nodeId },
-    focus: { nodeId, cursor },
-  }
+  const result = moveNodeToParentTransition(
+    document,
+    location,
+    nodeId,
+    located.parent?.id ?? null,
+    rawDestination,
+    cursor,
+  )
+  return result.kind === 'moved' ? result.transition : undefined
 }
 
 export function moveSelectionTransition(

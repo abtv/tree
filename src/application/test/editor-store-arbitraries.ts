@@ -53,6 +53,7 @@ export const command = fc.record({
     'foldAll',
     'shift',
     'join',
+    'moveToParent',
   ),
   a: fc.nat({ max: 1_000 }),
   b: fc.nat({ max: 1_000 }),
@@ -81,6 +82,7 @@ export type CommandAction = {
     | 'foldAll'
     | 'shift'
     | 'join'
+    | 'moveToParent'
   a: number
   b: number
   text: string
@@ -191,6 +193,20 @@ export async function applyCommand(
         const target = rows[action.a % rows.length]!.node
         const siblings = locateNode(state.document, target.id)!.siblings
         store.moveNodeTo(target.id, action.b % (siblings.length + 2))
+      }
+      break
+    }
+    case 'moveToParent': {
+      // Any visible row moves under any other visible row, the displayed parent, or the document root;
+      // the store itself decides what is impossible, a no-op, or too deep.
+      const rows = store.getVisibleRows()
+      if (rows.length > 0) {
+        const parents = [null, state.location.currentParentId, ...rows.map((row) => row.node.id)]
+        store.moveNodeToParent(
+          rows[action.a % rows.length]!.node.id,
+          parents[action.b % parents.length]!,
+          action.text.length % 4,
+        )
       }
       break
     }
