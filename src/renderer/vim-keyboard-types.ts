@@ -136,7 +136,7 @@ export interface VimKeyboardState {
     timing?: 'immediate' | 'after-edit' | 'preserve-selection',
   ) => void
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
-  moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number) => void
+  moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number, count?: number) => void
   syncImageCaretToFocus: () => void
   setMode: (mode: VimMode) => void
   openAttachment: (attachmentId: string) => void

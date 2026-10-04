@@ -1406,11 +1406,30 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'd', { ctrlKey: true }))
     handle(keyEvent(input, 'u', { ctrlKey: true }))
 
-    expect(vim.moveViewport).toHaveBeenNthCalledWith(1, 'node', 'top', 4)
-    expect(vim.moveViewport).toHaveBeenNthCalledWith(2, 'node', 'middle', 4)
-    expect(vim.moveViewport).toHaveBeenNthCalledWith(3, 'node', 'bottom', 4)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(1, 'node', 'top', 4, 1)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(2, 'node', 'middle', 4, 1)
+    expect(vim.moveViewport).toHaveBeenNthCalledWith(3, 'node', 'bottom', 4, 1)
     expect(vim.moveViewport).toHaveBeenNthCalledWith(4, 'node', 'half-down', 4)
     expect(vim.moveViewport).toHaveBeenNthCalledWith(5, 'node', 'half-up', 4)
+  })
+
+  it('passes a pending count to H, M, and L instead of discarding it', () => {
+    for (const [key, motion] of [
+      ['H', 'top'],
+      ['M', 'middle'],
+      ['L', 'bottom'],
+    ] as const) {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = 'text'
+      const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+      vim.commandState.pending = { count: '3', motionCount: '' }
+
+      handle(keyEvent(input, key))
+
+      expect(vim.moveViewport, key).toHaveBeenCalledWith('node', motion, 4, 3)
+      expect(vim.commandState.pending, key).toBeUndefined()
+    }
   })
 
   it('undoes with u and redoes with Ctrl+r in Normal mode', async () => {

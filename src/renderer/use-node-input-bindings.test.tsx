@@ -333,12 +333,12 @@ describe('useNodeInputBindings', () => {
   )
 
   it.each([
-    ['H', false, 'a'],
-    ['M', false, 'b'],
-    ['L', false, 'c'],
-    ['d', true, 'c'],
-    ['u', true, 'a'],
-  ] as const)('moves the viewport caret with %s, Ctrl: %s', async (key, ctrlKey, expected) => {
+    ['H', false, 'a', 0],
+    ['M', false, 'b', 0],
+    ['L', false, 'c', 0],
+    ['d', true, 'c', 2],
+    ['u', true, 'a', 2],
+  ] as const)('moves the viewport caret with %s, Ctrl: %s', async (key, ctrlKey, expected, column) => {
     const f = await fixture({
       document: { roots: [node('a', 'Alpha'), node('b', 'Beta'), node('c', 'Gamma'), node('off', 'Offscreen')] },
       location: { currentParentId: null, selectedNodeId: 'b' },
@@ -355,8 +355,78 @@ describe('useNodeInputBindings', () => {
     f.input('b').setSelectionRange(2, 2)
     f.press(key, { ctrlKey })
     expect(f.snapshot().location.selectedNodeId).toBe(expected)
-    expect(f.snapshot().focus).toMatchObject({ nodeId: expected, cursor: 2 })
+    expect(f.snapshot().focus).toMatchObject({ nodeId: expected, cursor: column })
     expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it.each([
+    ['H', 1, 'a'],
+    ['H', 2, 'b'],
+    ['H', 99, 'd'],
+    ['L', 1, 'd'],
+    ['L', 2, 'c'],
+    ['L', 99, 'a'],
+    ['M', 3, 'b'],
+  ] as const)('%s with count %d selects %s among four fully visible rows', async (key, count, expected) => {
+    const f = await fixture({
+      document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C'), node('d', 'D')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    for (const [id, top] of [
+      ['a', 10],
+      ['b', 50],
+      ['c', 90],
+      ['d', 130],
+    ] as const) {
+      vi.spyOn(f.input(id).parentElement!, 'getBoundingClientRect').mockReturnValue({
+        top,
+        bottom: top + 30,
+      } as DOMRect)
+    }
+    for (const digit of String(count)) f.press(digit)
+    f.press(key)
+    expect(f.snapshot().location.selectedNodeId).toBe(expected)
+  })
+
+  it('lands H on the image of a destination that has one', async () => {
+    const withImage = { ...image('  text'), id: 'a' }
+    const f = await fixture({
+      document: { roots: [withImage, node('b', 'B')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    for (const [id, top] of [
+      ['a', 10],
+      ['b', 50],
+    ] as const) {
+      vi.spyOn(f.input(id).parentElement!, 'getBoundingClientRect').mockReturnValue({
+        top,
+        bottom: top + 30,
+      } as DOMRect)
+    }
+    f.press('H')
+    expect(f.snapshot().location.selectedNodeId).toBe('a')
+    expect(f.result.current.imageCaretNodeId).toBe('a')
+  })
+
+  it('lands H, M, and L on the first non-blank character of the destination', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', '  indented'), node('b', '   '), node('c', 'plain')] },
+      location: { currentParentId: null, selectedNodeId: 'c' },
+    })
+    for (const [id, top] of [
+      ['a', 10],
+      ['b', 50],
+      ['c', 90],
+    ] as const) {
+      vi.spyOn(f.input(id).parentElement!, 'getBoundingClientRect').mockReturnValue({
+        top,
+        bottom: top + 30,
+      } as DOMRect)
+    }
+    f.press('H')
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'a', cursor: 2 })
+    f.press('M')
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'b', cursor: 0 })
   })
 
   it.each(['d', 'u'])('uses the visible edge when Ctrl+%s starts outside the viewport', async (key) => {

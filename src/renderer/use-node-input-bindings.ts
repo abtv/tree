@@ -41,7 +41,7 @@ import {
 import { isNodeExpanded } from '../application/expansion-state'
 import type { NodeInputBindings } from './NodeInput'
 import { rememberIncomingNodes, rememberNodeRange, resolveVisualMemory } from './vim-visual-memory'
-import type { VimMode } from './vim-editing'
+import { firstNonWhitespace, type VimMode } from './vim-editing'
 import {
   editCaretTransition,
   focusCaretTransition,
@@ -649,7 +649,7 @@ export function useNodeInputBindings({
   )
 
   const moveVimViewport = useCallback(
-    (nodeId: string, motion: VimViewportMotion, cursor: number): void => {
+    (nodeId: string, motion: VimViewportMotion, cursor: number, count = 1): void => {
       const viewport = viewportBounds()
       const intersectingRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
         const bounds = row.getBoundingClientRect()
@@ -670,11 +670,11 @@ export function useNodeInputBindings({
       const baseIndex = currentIndex < 0 ? (motion === 'half-up' ? visibleRows.length - 1 : 0) : currentIndex
       const targetIndex =
         motion === 'top'
-          ? 0
+          ? Math.min(visibleRows.length - 1, count - 1)
           : motion === 'middle'
             ? Math.floor((visibleRows.length - 1) / 2)
             : motion === 'bottom'
-              ? visibleRows.length - 1
+              ? Math.max(0, visibleRows.length - count)
               : Math.max(
                   0,
                   Math.min(
@@ -684,7 +684,16 @@ export function useNodeInputBindings({
                 )
       const targetId = visibleRows[targetIndex]?.dataset.nodeId
       if (targetId !== undefined) {
-        store.selectNode(targetId, cursor)
+        // H, M, and L are line motions: they land on the first non-blank character, or on the image of a
+        // node that has one (the position after its text), where the half-page motions keep the caret column.
+        const state = store.getSnapshot()
+        const lineMotion = motion === 'top' || motion === 'middle' || motion === 'bottom'
+        let column = cursor
+        if (lineMotion && state.status === 'ready') {
+          const { text, attachment } = requireNode(state.document, targetId).node
+          column = attachment === undefined ? firstNonWhitespace(text) : text.length
+        }
+        store.selectNode(targetId, column)
         syncImageCaretToFocus()
       }
     },

@@ -792,11 +792,8 @@ export function handleVimKey(
     store.undo()
     vim.syncImageCaretToFocus()
   } else if (!visual && (event.key === 'H' || event.key === 'M' || event.key === 'L')) {
-    if (pending.count !== '') {
-      clearPending(commandState)
-      return handled()
-    }
-    vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor)
+    // `3H` and `3L` count rows from the top and bottom of the viewport; `M` takes no count, as in Vim.
+    vim.moveViewport(node.id, event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', cursor, count)
   } else if (!visual && event.key === 'Enter') {
     if (pending.count !== '') {
       clearPending(commandState)
