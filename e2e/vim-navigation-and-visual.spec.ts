@@ -1219,8 +1219,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         }
       })
 
+    // Row 1 is clipped and row 2 lies within the 25 px edge context (PRODUCT.md §20.8), so H skips both.
     await window.keyboard.press('H')
-    await expect(row(2)).toBeFocused()
+    await expect(row(3)).toBeFocused()
     expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
     await window.keyboard.press('L')
     expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
@@ -1290,6 +1291,136 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       }
     }
     throw new Error('Walking back up never scrolled the content.')
+  })
+
+  /** A parent with expanded children that have expanded grandchildren; some of the text wraps over lines. */
+  function longNestedSeed(): Parameters<typeof seedDocument>[1] {
+    const wrapped = 'The quick brown fox jumps over the lazy dog. '.repeat(7).trim()
+    const children = Array.from({ length: 40 }, (_, index) => ({
+      id: `c${index}`,
+      text: index % 3 === 0 ? `C${index} ${wrapped}` : `Child ${index}`,
+      children: [0, 1].map((child) => ({
+        id: `g${index}_${child}`,
+        text: (index + child) % 4 === 0 ? `G${index}.${child} ${wrapped}` : `Grand ${index}.${child}`,
+        children: [],
+      })),
+    }))
+    return {
+      document: { roots: [{ id: 'p', text: 'Parent', children }] },
+      location: { currentParentId: 'p', selectedNodeId: 'c0' },
+      view: { expandedIds: children.map((child) => child.id) },
+    } as Parameters<typeof seedDocument>[1]
+  }
+
+  const selectedRowGeometry = (window: Page): Promise<{ top: number; gap: number; scrollTop: number; max: number }> =>
+    window.evaluate(() => {
+      const viewport = document.querySelector('.scroll-viewport')!
+      const view = viewport.getBoundingClientRect()
+      const active = document.activeElement as HTMLElement
+      const row = (active.closest('.node-row') ?? active.parentElement!).getBoundingClientRect()
+      return {
+        top: Math.round(row.top - view.top),
+        gap: Math.round(view.bottom - row.bottom),
+        scrollTop: Math.round(viewport.scrollTop),
+        max: Math.round(viewport.scrollHeight - viewport.clientHeight),
+      }
+    })
+
+  // @requirement PRODUCT.md §20.8
+  test('keeps one row of context on every keyboard step through nested and wrapped nodes, in both directions', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, longNestedSeed())
+    const { window } = await launchTree(userDataDir)
+    await expect(window.locator('.node-input:focus')).toHaveCount(1)
+    for (const key of ['j', 'k']) {
+      for (let step = 0; step < 125; step += 1) {
+        await window.keyboard.press(key)
+        await expect
+          .poll(async () => {
+            const { top, gap, scrollTop, max } = await selectedRowGeometry(window)
+            return (top >= 25 || scrollTop === 0) && (gap >= 25 || scrollTop >= max - 1)
+          })
+          .toBe(true)
+      }
+    }
+  })
+
+  // @requirement PRODUCT.md §20.8
+  test('reaches the same scroll position at the document edges by walking, gg, and G', async ({ userDataDir }) => {
+    seedDocument(userDataDir, longNestedSeed())
+    const { window } = await launchTree(userDataDir)
+    await expect(window.locator('.node-input:focus')).toHaveCount(1)
+    const settled = async (): Promise<Awaited<ReturnType<typeof selectedRowGeometry>>> => {
+      let previous = await selectedRowGeometry(window)
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await window.waitForTimeout(30)
+        const next = await selectedRowGeometry(window)
+        if (JSON.stringify(next) === JSON.stringify(previous)) return next
+        previous = next
+      }
+      return previous
+    }
+
+    // From the top: G first, then a walk down from the top, then the same from the other direction.
+    await window.keyboard.press('G')
+    const lastByG = await settled()
+    await window.keyboard.type('gg')
+    const firstByGg = await settled()
+    for (let step = 0; step < 125; step += 1) await window.keyboard.press('j')
+    expect(await settled()).toEqual(lastByG)
+    for (let step = 0; step < 125; step += 1) await window.keyboard.press('k')
+    expect(await settled()).toEqual(firstByGg)
+    expect(firstByGg.scrollTop).toBe(0)
+    expect(lastByG.scrollTop).toBe(lastByG.max)
+  })
+
+  // @requirement PRODUCT.md §20.8
+  test('H and L choose rows clear of the edge context and do not scroll', async ({ userDataDir }) => {
+    seedDocument(userDataDir, longNestedSeed())
+    const { window } = await launchTree(userDataDir)
+    await expect(window.locator('.node-input:focus')).toHaveCount(1)
+    await window.keyboard.type('30j')
+    await expect.poll(async () => (await selectedRowGeometry(window)).scrollTop).toBeGreaterThan(0)
+    const resting = await selectedRowGeometry(window)
+
+    await window.keyboard.press('H')
+    await expect.poll(async () => (await selectedRowGeometry(window)).top).toBeLessThan(resting.top)
+    const afterH = await selectedRowGeometry(window)
+    expect(afterH.top).toBeGreaterThanOrEqual(25)
+    expect(afterH.scrollTop).toBe(resting.scrollTop)
+
+    await window.keyboard.press('L')
+    await expect.poll(async () => (await selectedRowGeometry(window)).top).toBeGreaterThan(afterH.top)
+    const afterL = await selectedRowGeometry(window)
+    expect(afterL.gap).toBeGreaterThanOrEqual(25)
+    expect(afterL.scrollTop).toBe(resting.scrollTop)
+  })
+
+  // @requirement PRODUCT.md §20.8
+  test('a click on a fully visible row near the edge does not move the content', async ({ userDataDir }) => {
+    seedDocument(userDataDir, longNestedSeed())
+    const { window } = await launchTree(userDataDir)
+    await expect(window.locator('.node-input:focus')).toHaveCount(1)
+    await window.keyboard.type('30j')
+    // Bring the focused row's neighbour to 10 px above the bottom edge: fully visible, inside the context.
+    const target = await window.evaluate(() => {
+      const viewport = document.querySelector('.scroll-viewport')!
+      const view = viewport.getBoundingClientRect()
+      const rows = [...document.querySelectorAll<HTMLElement>('.node-row')]
+      const row = rows.find((candidate) => {
+        const rect = candidate.getBoundingClientRect()
+        return rect.height <= 30 && rect.top > view.top + 100
+      })!
+      viewport.scrollTop += row.getBoundingClientRect().bottom - (view.bottom - 10)
+      return row.dataset.nodeId!
+    })
+    const scrollTop = (): Promise<number> =>
+      window.evaluate(() => Math.round(document.querySelector('.scroll-viewport')!.scrollTop))
+    const before = await scrollTop()
+    await window.locator(`.node-row[data-node-id="${target}"] .node-input`).click()
+    await window.waitForTimeout(150)
+    expect(await scrollTop()).toBe(before)
   })
 
   test('o and O open empty siblings below and above', async ({ userDataDir }) => {

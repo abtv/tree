@@ -23,26 +23,67 @@ export function scrollViewportBy(deltaY: number): void {
 }
 
 /**
- * Scrolls the content area so the element is fully visible. Focusing an element scrolls it into
- * view natively, but not reliably when the focus change happens while the list is re-rendering, so
- * focus movement calls this afterwards. It does nothing for an element that is already fully
- * visible. A nearby element moves by the smallest distance that leaves one element height of
- * context beyond it, like Vim's `scrolloff`; an element more than half a viewport outside the
- * content area is centered, since the context around a distant destination is what matters.
+ * Scrolls the content area so the element is fully visible (docs/PRODUCT.md §20.8). Focusing an
+ * element scrolls it into view natively, but centers it and not reliably when the focus change
+ * happens while the list is re-rendering, so focus movement suppresses that scroll and calls this
+ * instead. A nearby element moves by the smallest distance that leaves one row of context beyond
+ * it, like Vim's `scrolloff`; an element more than half a viewport outside the content area is
+ * centered. An element that is already fully visible stays put, unless `keepContext` also requires
+ * the context on both sides: keyboard motion asks for it, a pointer press does not.
  */
-export function revealInViewport(element: Element): void {
+export function revealInViewport(element: Element, keepContext = false): void {
   const { top, bottom } = viewportBounds()
   const rect = element.getBoundingClientRect()
-  if (rect.top >= top && rect.bottom <= bottom) return
+  // An element that is not laid out has no position to reveal.
+  if (rect.width === 0 && rect.height === 0) return
   const height = bottom - top
+  const margin = contextMargin(rect.height, height)
+  // With keepContext the element must also stay clear of both edges, not only be fully visible.
+  const inset = keepContext ? margin : 0
+  if (rect.top >= top + inset && rect.bottom <= bottom - inset) return
   if (rect.bottom < top - height / 2 || rect.top > bottom + height / 2) {
-    scrollViewportBy(rect.top - (top + (height - rect.height) / 2))
+    scrollRevealBy(rect.top - (top + (height - rect.height) / 2), margin)
     return
   }
-  const margin = Math.max(0, Math.min(rect.height, height / 4, (height - rect.height) / 2))
-  if (rect.top < top) scrollViewportBy(rect.top - (top + margin))
+  if (rect.top < top + inset) scrollRevealBy(rect.top - (top + margin), margin)
   // An element taller than the content area keeps its start in view instead of its end.
-  else scrollViewportBy(Math.min(rect.bottom - (bottom - margin), rect.top - top))
+  else scrollRevealBy(Math.min(rect.bottom - (bottom - margin), rect.top - top), margin)
+}
+
+/**
+ * Scrolls by the distance, except that a scroll position closer to the start or end of the content
+ * than two margins goes all the way there, so every way of reaching the document edge — walking,
+ * `gg`, `G` — ends at the same offset instead of leaving a sliver of the margin unscrolled.
+ */
+function scrollRevealBy(deltaY: number, margin: number): void {
+  const element = scroller()
+  if (element === undefined || typeof element.scrollBy !== 'function') return scrollViewportBy(deltaY)
+  const max = element.scrollHeight - element.clientHeight
+  const target = element.scrollTop + deltaY
+  // The document has its own padding beyond the first and last row, so the sliver is measured in
+  // two margins. The snap only follows the direction of travel: scrolling down never returns to
+  // the start.
+  if (deltaY < 0 && target < margin * 2) scrollViewportBy(-element.scrollTop)
+  else if (deltaY > 0 && target > max - margin * 2) scrollViewportBy(max - element.scrollTop)
+  else scrollViewportBy(deltaY)
+}
+
+/** Height of a one-line row, the `min-height` of `.node-row` in styles.css. */
+const CONTEXT_UNIT = 25
+
+/** The context kept beyond an element: one one-line row, capped at a quarter of the content area. */
+export function contextMargin(elementHeight: number, contentHeight: number): number {
+  return Math.max(0, Math.min(CONTEXT_UNIT, contentHeight / 4, (contentHeight - elementHeight) / 2))
+}
+
+/** Whether the content area is scrolled to its very start or very end. */
+export function viewportScrollEdges(): { atStart: boolean; atEnd: boolean } {
+  const element = scroller()
+  if (element === undefined) return { atStart: true, atEnd: true }
+  return {
+    atStart: element.scrollTop <= 0,
+    atEnd: element.scrollTop + element.clientHeight >= element.scrollHeight - 1,
+  }
 }
 
 /** The element whose size changes when the scrolled content grows or shrinks. */

@@ -1,6 +1,6 @@
 import type { EditorStore } from '../application/editor-store'
 import { requireNode } from '../domain/document'
-import { viewportBounds } from './scroll-viewport'
+import { contextMargin, viewportBounds, viewportScrollEdges } from './scroll-viewport'
 import { firstNonWhitespace } from './vim-editing'
 import type { VimViewportMotion } from './vim-keyboard-types'
 
@@ -51,6 +51,20 @@ export function viewportMotionTarget(
   return visibleRows[targetIndex]?.nodeId
 }
 
+/**
+ * The part of the content area that H, M, and L choose from: the viewport without the context that
+ * keyboard motion keeps beyond the selected row (docs/PRODUCT.md §20.8), so the destination never
+ * needs a scroll for the next motion. An edge where the content is scrolled to its very start or
+ * end keeps no context, since nothing can scroll further there.
+ */
+export function contextViewport(viewport: Viewport, edges: { atStart: boolean; atEnd: boolean }): Viewport {
+  const margin = contextMargin(0, viewport.bottom - viewport.top)
+  return {
+    top: viewport.top + (edges.atStart ? 0 : margin),
+    bottom: viewport.bottom - (edges.atEnd ? 0 : margin),
+  }
+}
+
 export function moveViewportSelection(
   deps: { store: EditorStore; syncImageCaretToFocus: () => void },
   nodeId: string,
@@ -60,12 +74,15 @@ export function moveViewportSelection(
 ): void {
   const { store, syncImageCaretToFocus } = deps
   const { rows, viewport } = readViewportRows()
-  const targetId = viewportMotionTarget(rows, viewport, nodeId, motion, count)
+  const lineMotion = motion === 'top' || motion === 'middle' || motion === 'bottom'
+  const inner = lineMotion ? contextViewport(viewport, viewportScrollEdges()) : viewport
+  // With no row wholly inside the context-free area, choose among the rows of the whole area.
+  const choiceViewport = rows.some((row) => row.top >= inner.top && row.bottom <= inner.bottom) ? inner : viewport
+  const targetId = viewportMotionTarget(rows, choiceViewport, nodeId, motion, count)
   if (targetId !== undefined) {
     // H, M, and L are line motions: they land on the first non-blank character, or on the image of a
     // node that has one (the position after its text), where the half-page motions keep the caret column.
     const state = store.getSnapshot()
-    const lineMotion = motion === 'top' || motion === 'middle' || motion === 'bottom'
     let column = cursor
     if (lineMotion && state.status === 'ready') {
       const { text, attachment } = requireNode(state.document, targetId).node

@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { viewportBounds } from './scroll-viewport'
-import { moveViewportSelection, readViewportRows, viewportMotionTarget } from './vim-viewport-motion'
+import { viewportBounds, viewportScrollEdges } from './scroll-viewport'
+import { contextViewport, moveViewportSelection, readViewportRows, viewportMotionTarget } from './vim-viewport-motion'
 import type { VimViewportMotion } from './vim-keyboard-types'
 import { createEditorStoreDouble } from './test/editor-store-double'
 
-vi.mock('./scroll-viewport', () => ({ viewportBounds: vi.fn(() => ({ top: 0, bottom: 100 })) }))
+// The content is scrolled to both ends by default, so H, M, and L keep no edge context.
+vi.mock('./scroll-viewport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./scroll-viewport')>()),
+  viewportBounds: vi.fn(() => ({ top: 0, bottom: 100 })),
+  viewportScrollEdges: vi.fn(() => ({ atStart: true, atEnd: true })),
+}))
 
 type ViewportRow = Parameters<typeof viewportMotionTarget>[0][number]
 const viewport = { top: 0, bottom: 100 }
@@ -29,6 +34,7 @@ function mountRows(records: readonly ViewportRow[]): HTMLElement[] {
 afterEach(() => {
   document.body.replaceChildren()
   vi.clearAllMocks()
+  vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: true, atEnd: true })
 })
 
 describe('viewport motion target', () => {
@@ -157,6 +163,21 @@ describe('viewport DOM reader', () => {
   })
 })
 
+describe('context viewport', () => {
+  const both = { atStart: false, atEnd: false }
+
+  it('removes one row of context from each edge the content can still scroll past', () => {
+    expect(contextViewport(viewport, both)).toEqual({ top: 25, bottom: 75 })
+    expect(contextViewport(viewport, { atStart: true, atEnd: false })).toEqual({ top: 0, bottom: 75 })
+    expect(contextViewport(viewport, { atStart: false, atEnd: true })).toEqual({ top: 25, bottom: 100 })
+    expect(contextViewport(viewport, { atStart: true, atEnd: true })).toEqual(viewport)
+  })
+
+  it('shrinks the context in a short content area', () => {
+    expect(contextViewport({ top: 10, bottom: 50 }, both)).toEqual({ top: 20, bottom: 40 })
+  })
+})
+
 describe('viewport selection dispatch', () => {
   it.each<[VimViewportMotion, string, number]>([
     ['top', 'a', 2],
@@ -210,6 +231,58 @@ describe('viewport selection dispatch', () => {
     moveViewportSelection({ store, syncImageCaretToFocus }, 'image', motion, 9)
     expect(store.selectNode).toHaveBeenCalledExactlyOnceWith('image', column)
     expect(syncImageCaretToFocus).toHaveBeenCalledOnce()
+  })
+
+  it('chooses H and L outside the edge context, except where the content is scrolled to an end', () => {
+    // The content area is 100 high, so the context is 25: only c (40-60) lies wholly inside 25-75.
+    const store = createEditorStoreDouble({
+      snapshot: {
+        status: 'ready',
+        document: { roots: ['a', 'b', 'c', 'd'].map((id) => ({ id, text: id, children: [] })) },
+        location: { currentParentId: null, selectedNodeId: 'b' },
+      },
+    })
+    mountRows(rows)
+    vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: false })
+    moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'top', 0)
+    expect(store.selectNode).toHaveBeenLastCalledWith('c', 0)
+    moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'bottom', 0)
+    expect(store.selectNode).toHaveBeenLastCalledWith('c', 0)
+    // Scrolled to the start, H may use the first row; at the end, L may use the last.
+    vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: true, atEnd: false })
+    moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'top', 0)
+    expect(store.selectNode).toHaveBeenLastCalledWith('a', 0)
+    vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: true })
+    moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'bottom', 0)
+    expect(store.selectNode).toHaveBeenLastCalledWith('d', 0)
+  })
+
+  it('falls back to the whole content area when no row lies inside the edge context', () => {
+    vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: false })
+    mountRows([{ nodeId: 'low', top: 80, bottom: 100 }])
+    const store = createEditorStoreDouble({
+      snapshot: {
+        status: 'ready',
+        document: { roots: [{ id: 'low', text: 'low', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'low' },
+      },
+    })
+    moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'low', 'top', 0)
+    expect(store.selectNode).toHaveBeenCalledExactlyOnceWith('low', 0)
+  })
+
+  it('does not apply the edge context to the half-page motions', () => {
+    vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: false })
+    mountRows(rows)
+    const store = createEditorStoreDouble({
+      snapshot: {
+        status: 'ready',
+        document: { roots: ['a', 'b', 'c', 'd'].map((id) => ({ id, text: id, children: [] })) },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      },
+    })
+    moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'a', 'half-down', 0)
+    expect(store.selectNode).toHaveBeenLastCalledWith('c', 0)
   })
 
   it('passes the count through to the target selector', () => {

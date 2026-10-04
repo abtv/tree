@@ -466,6 +466,24 @@ export function useNodeInputBindings({
     } else if (vimMode === 'insert' || vimMode === 'replace') setCaret(focusedInput, getCaret(focusedInput))
   }, [focus, vimMode])
 
+  // Keyboard motion keeps context beyond the selected row; a pointer press on a visible row must not
+  // move the content under the pointer (docs/PRODUCT.md §20.8).
+  const pointerDriven = useRef(false)
+  useEffect(() => {
+    const onPointer = (): void => {
+      pointerDriven.current = true
+    }
+    const onKey = (): void => {
+      pointerDriven.current = false
+    }
+    document.addEventListener('pointerdown', onPointer, true)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [])
+
   useLayoutEffect(() => {
     if (focus === undefined) return
     const revision = caretRevision.current
@@ -475,7 +493,7 @@ export function useNodeInputBindings({
       // The native focus scroll centers an element that is not fully visible, so it is suppressed
       // and the reveal below decides how far to scroll (docs/PRODUCT.md §20.8).
       input.focus({ preventScroll: true })
-      revealInViewport(input.closest('.node-row') ?? input)
+      revealInViewport(input.closest('.node-row') ?? input, !pointerDriven.current)
       if (latestVimMode.current === 'normal') {
         // Vertical navigation may resolve the destination to its image while the store carries
         // the originating text column. Project the resolved caret, including on the deferred pass.

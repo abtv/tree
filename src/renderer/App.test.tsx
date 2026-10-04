@@ -652,6 +652,12 @@ describe('App', () => {
         { roots: [{ id: 'root', text: 'Root', children: [] }] },
         { currentParentId: null, selectedNodeId: 'root' },
       )
+      // The row is well inside the content area, so neither a restore nor a reveal has to scroll.
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('scroll-viewport'))
+          return { top: 0, bottom: window.innerHeight, height: window.innerHeight } as DOMRect
+        return { top: 100, bottom: 120, height: 20, left: 0, right: 0, width: 0, x: 0, y: 100 } as DOMRect
+      })
       const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
 
       renderReact(<App initialVimEnabled store={store} />)
