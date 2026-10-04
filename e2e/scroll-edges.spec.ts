@@ -1,6 +1,6 @@
 // @editing-modes: independent
 import type { Page } from '@playwright/test'
-import { expect, launchTree, seedDocument, test } from './fixtures'
+import { expect, launchTree, screenshotContentSize, seedDocument, setMainWindowContentSize, test } from './fixtures'
 
 function seedRoots(userDataDir: string, count: number): void {
   seedDocument(userDataDir, {
@@ -120,7 +120,8 @@ test.describe('scroll edges', () => {
     // @requirement PRODUCT.md §20.6
     test(`renders the cut rows fading into the ${appearance} background`, async ({ userDataDir }) => {
       seedRoots(userDataDir, 200)
-      const { window: page } = await launchTree(userDataDir, { appearance })
+      const { window: page, app } = await launchTree(userDataDir, { appearance })
+      await setMainWindowContentSize(app, screenshotContentSize)
       // Playwright's browser context defaults to light media independently of nativeTheme.
       await page.emulateMedia({ colorScheme: appearance })
       await expect(page.locator('.node-row')).toHaveCount(200)

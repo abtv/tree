@@ -242,6 +242,22 @@ export async function setMainWindowBounds(
   }, bounds)
 }
 
+// A window-level screenshot depends on the window's content size. The default window is clamped to the
+// display's visible frame, which differs between a developer's screen and a CI runner, and its title bar
+// height differs between macOS versions. Pin the content size, small enough for a small CI display.
+export const screenshotContentSize = { width: 1000, height: 600 } as const
+
+export async function setMainWindowContentSize(
+  app: ElectronApplication,
+  size: { width: number; height: number },
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, requested) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
+    windows[0]!.setContentSize(requested.width, requested.height)
+  }, size)
+}
+
 export async function readMainWindowBounds(app: ElectronApplication): Promise<PersistedWindowBounds> {
   return app.evaluate(({ BrowserWindow }) => {
     const windows = BrowserWindow.getAllWindows()

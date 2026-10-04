@@ -6,8 +6,10 @@ import {
   describeForEachEditingMode,
   expect,
   launchTree,
+  screenshotContentSize,
   seedDocument,
   setMainWindowBounds,
+  setMainWindowContentSize,
   startRowDrag,
   test,
 } from './fixtures'
@@ -96,7 +98,8 @@ describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
   // @requirement PRODUCT.md §11
   test('keeps an unfocused drag source mounted while the viewport scrolls away', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))
-    const { window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, screenshotContentSize)
     const source = window.locator('.node-row[data-node-id="c2"]')
     // The free gutter starts a row drag without moving focus from c0 to the source input.
     await startRowDrag(window, source, { xOffset: 1 })
