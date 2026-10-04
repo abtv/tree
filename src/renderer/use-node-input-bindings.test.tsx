@@ -378,6 +378,46 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().location.selectedNodeId).toBe(key === 'd' ? 'b' : 'a')
   })
 
+  it.each([
+    ['H', 'b'],
+    ['M', 'c'],
+    ['L', 'd'],
+  ] as const)('%s skips rows that are only partly visible, so it never has to scroll', async (key, expected) => {
+    const f = await fixture({
+      document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C'), node('d', 'D'), node('e', 'E')] },
+      location: { currentParentId: null, selectedNodeId: 'c' },
+    })
+    const bottom = globalThis.innerHeight
+    for (const [id, top] of [
+      ['a', -10],
+      ['b', 30],
+      ['c', 70],
+      ['d', 110],
+      ['e', bottom - 10],
+    ] as const) {
+      vi.spyOn(f.input(id).parentElement!, 'getBoundingClientRect').mockReturnValue({
+        top,
+        bottom: top + 30,
+      } as DOMRect)
+    }
+    f.press(key)
+    expect(f.snapshot().location.selectedNodeId).toBe(expected)
+  })
+
+  it('selects the only partly visible row when no row is fully visible', async () => {
+    const f = await fixture({
+      document: { roots: [node('a', 'A'), node('b', 'B')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    vi.spyOn(f.input('a').parentElement!, 'getBoundingClientRect').mockReturnValue({ top: -10, bottom: 20 } as DOMRect)
+    vi.spyOn(f.input('b').parentElement!, 'getBoundingClientRect').mockReturnValue({
+      top: 2000,
+      bottom: 2030,
+    } as DOMRect)
+    f.press('L')
+    expect(f.snapshot().location.selectedNodeId).toBe('a')
+  })
+
   it('leaves selection unchanged when no rows intersect the viewport', async () => {
     const f = await fixture()
     vi.spyOn(f.input().parentElement!, 'getBoundingClientRect').mockReturnValue({ top: 2000, bottom: 2030 } as DOMRect)

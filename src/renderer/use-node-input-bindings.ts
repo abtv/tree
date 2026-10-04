@@ -651,10 +651,20 @@ export function useNodeInputBindings({
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number): void => {
       const viewport = viewportBounds()
-      const visibleRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
+      const intersectingRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
         const bounds = row.getBoundingClientRect()
         return bounds.top < viewport.bottom && bounds.bottom > viewport.top
       })
+      // H, M, and L pick among fully visible rows, as Vim does, so the destination never needs the
+      // scroll that revealing a clipped row would cause. A viewport with none falls back to the clipped ones.
+      const fullyVisibleRows =
+        motion === 'top' || motion === 'middle' || motion === 'bottom'
+          ? intersectingRows.filter((row) => {
+              const bounds = row.getBoundingClientRect()
+              return bounds.top >= viewport.top && bounds.bottom <= viewport.bottom
+            })
+          : []
+      const visibleRows = fullyVisibleRows.length > 0 ? fullyVisibleRows : intersectingRows
       if (visibleRows.length === 0) return
       const currentIndex = visibleRows.findIndex((row) => row.dataset.nodeId === nodeId)
       const baseIndex = currentIndex < 0 ? (motion === 'half-up' ? visibleRows.length - 1 : 0) : currentIndex

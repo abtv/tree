@@ -1181,6 +1181,40 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 5)).toBeFocused()
   })
 
+  test('H and L select fully visible rows without scrolling the clipped ones into view', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 100 }, (_, index) => ({ id: `n${index}`, text: `Row ${index}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const row = (index: number) => window.getByRole('textbox', { name: `Node ${index}`, exact: true })
+    await row(1).focus()
+    // Scroll by half a row, so the first row is clipped at the top.
+    await window.evaluate(() => {
+      const viewport = document.querySelector('.scroll-viewport')!
+      const first = document.querySelector('.node-row')!.getBoundingClientRect()
+      viewport.scrollTop += first.top - viewport.getBoundingClientRect().top + first.height / 2
+    })
+    const scrollTop = await window.evaluate(() => document.querySelector('.scroll-viewport')!.scrollTop)
+    const focusedRowFit = (): Promise<{ fits: boolean; scrollTop: number }> =>
+      window.evaluate(() => {
+        const viewport = document.querySelector('.scroll-viewport')!.getBoundingClientRect()
+        const row = document.activeElement!.closest('.node-row')!.getBoundingClientRect()
+        return {
+          fits: row.top >= viewport.top && row.bottom <= viewport.bottom,
+          scrollTop: document.querySelector('.scroll-viewport')!.scrollTop,
+        }
+      })
+
+    await window.keyboard.press('H')
+    await expect(row(2)).toBeFocused()
+    expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
+    await window.keyboard.press('L')
+    expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
+  })
+
   test('o and O open empty siblings below and above', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
