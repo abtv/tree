@@ -1033,6 +1033,27 @@ describe('NodeList windowing', () => {
     expect(container.querySelector('[data-node-id="n550"] .node-focus-marker')).not.toBeNull()
   })
 
+  it('keeps an unfocused drag source mounted across window changes and releases its extra pin on cancel', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows({ list: buildNodes(600), focusedNodeId: 'n550' })
+    const source = container.querySelector('[data-node-id="n0"]')!
+    activate(source, 13)
+
+    mockRows(-ROW_HEIGHT_ESTIMATE * 300)
+    fireEvent.scroll(window)
+
+    expect(container.querySelector('[data-node-id="n0"]')).toBe(source)
+    expect(source).toHaveClass('node-row-dragging', 'node-row-pinned')
+    expect(container.querySelector('[data-node-id="n550"] .node-focus-marker')).not.toBeNull()
+    expect(container.querySelectorAll('[data-node-id="n0"]')).toHaveLength(1)
+    expect(container.querySelectorAll('.node-row').length).toBeLessThan(100)
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(container.querySelector('[data-node-id="n0"]')).toBeNull()
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
   it('targets the pinned focused row without duplicating the marker', () => {
     vi.useFakeTimers()
     mockRowRects()

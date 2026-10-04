@@ -167,6 +167,8 @@ The Product Owner should see the screenshots for S8.
 
 T6 (drop onto a node) is the next task. T1 to T5 are done. T6 is Moderate Risk and uses `WORKING_PLAN.md` for task evidence.
 
+T5's missed independent review found that an unfocused drag source could unmount during windowed scrolling. The follow-up keeps the source mounted independently of the focused row and covers its cancellation cleanup.
+
 Notes carried forward from T3 for T5 to T7:
 
 * `EditorStore.moveNodeToParent(nodeId, parentId, index)` takes a post-removal index and returns whether it changed the document; the renderer maps a `DropTarget` from `drop-targets.ts` onto it directly. It selects the moved node, keeps the caret of a focused node, opens the receiving fold and the folds below the displayed parent, and moves the location only when the node leaves it.

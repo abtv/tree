@@ -188,6 +188,14 @@ export function NodeList({
         focusedIndex: focusedIndex >= 0 ? focusedIndex : undefined,
       })
     : undefined
+  const sourceIndex = freeze === undefined ? -1 : visibleRows.findIndex((row) => row.node.id === freeze.nodeId)
+  const pinnedSourceIndex =
+    listWindow !== undefined &&
+    sourceIndex >= 0 &&
+    sourceIndex !== listWindow.pinnedIndex &&
+    (sourceIndex < listWindow.start || sourceIndex >= listWindow.end)
+      ? sourceIndex
+      : undefined
   const visualAnchorIndex =
     visualNodeSelection === undefined
       ? -1
@@ -199,7 +207,9 @@ export function NodeList({
   const dropMarker = dropMarkerFor(
     freeze === undefined ? undefined : dropIndex,
     visibleRows.length,
-    listWindow === undefined ? undefined : collectWindowIndices(listWindow),
+    listWindow === undefined
+      ? undefined
+      : [...collectWindowIndices(listWindow), ...(pinnedSourceIndex === undefined ? [] : [pinnedSourceIndex])],
   )
 
   const renderRow = (
@@ -267,6 +277,12 @@ export function NodeList({
     }
     if (pinnedIndex !== undefined && pinnedRow !== undefined) {
       children.push(renderRow(pinnedRow.node, pinnedRow.depth, pinnedIndex, true, layout.offsets[pinnedIndex] ?? 0))
+    }
+    if (pinnedSourceIndex !== undefined) {
+      const sourceRow = visibleRows[pinnedSourceIndex]!
+      children.push(
+        renderRow(sourceRow.node, sourceRow.depth, pinnedSourceIndex, true, layout.offsets[pinnedSourceIndex] ?? 0),
+      )
     }
     children.push(
       <div aria-hidden="true" className="node-list-spacer" key="trailing-spacer" style={{ height: trailingHeight }} />,

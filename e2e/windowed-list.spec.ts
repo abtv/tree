@@ -92,7 +92,31 @@ async function rowTilingProblems(window: Page): Promise<string[]> {
   })
 }
 
-describeForEachEditingMode('windowed node list', () => {
+describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
+  // @requirement PRODUCT.md §11
+  test('keeps an unfocused drag source mounted while the viewport scrolls away', async ({ userDataDir }) => {
+    seedDocument(userDataDir, wideSeed(600))
+    const { window } = await launchTree(userDataDir)
+    const source = window.locator('.node-row[data-node-id="c2"]')
+    // The free gutter starts a row drag without moving focus from c0 to the source input.
+    await startRowDrag(window, source, { xOffset: 1 })
+    await expect(window.locator('.node-row[data-node-id="c0"] .node-focus-marker')).toHaveCount(1)
+    await window.evaluate(() => {
+      document.querySelector('.scroll-viewport')!.scrollTop = 7500
+    })
+    await expect(source).toHaveClass(/node-row-pinned/)
+    await expect(source).toHaveClass(/node-row-dragging/)
+    await expect(window.locator('.node-row[data-node-id="c0"] .node-focus-marker')).toHaveCount(1)
+    expect(await window.locator('.node-row').count()).toBeLessThan(100)
+    expect(await rowTilingProblems(window)).toEqual([])
+    await expect(window).toHaveScreenshot(screenshotName('windowed-unfocused-drag-scrolled.png'))
+    await window.keyboard.press('Escape')
+    await window.mouse.up()
+    await expect(window.locator('.node-row[data-node-id="c0"] .node-focus-marker')).toHaveCount(1)
+    await expect(source).toHaveCount(0)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(0)
+  })
+
   test('keyboard navigation reaches and types into an off-screen row', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))
     const { window } = await launchTree(userDataDir)

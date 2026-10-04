@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Cross-parent drag and drop](cross-parent-drag-and-drop.md) | Active, T1 to T4 done | T5: between-row drops with a level |
+| [Cross-parent drag and drop](cross-parent-drag-and-drop.md) | Active, T1 to T5 done | T6: drop onto a node |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
