@@ -1036,6 +1036,8 @@ The application uses the bundled JetBrains Mono typeface for all user-interface 
 font is distributed under the SIL Open Font License 1.1; the application source remains under the
 project's MIT license.
 
+Text is drawn character by character: the typeface's ligatures and contextual alternates are disabled, so every typed or stored character appears exactly as it is, and a sequence such as `://` never changes the visible position or shape of its characters.
+
 ### 20.4 Immediate Interaction
 
 The application does not animate its own interface. Navigation, entering and leaving a node, expanding and collapsing a node inline, creating and deleting nodes, reordering, selection, Vim mode changes, and error states all apply immediately: no transition, easing, or fade stands between the user's action and its visible result.

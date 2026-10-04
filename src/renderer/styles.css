@@ -41,6 +41,9 @@
   background: var(--color-background);
   font-family: 'JetBrains Mono';
   font-synthesis: none;
+  /* JetBrains Mono draws sequences such as "://" as contextual ligatures, which moves a typed slash
+     and makes "http://l" read as "http: /l". Text must look exactly as it is stored. */
+  font-variant-ligatures: none;
   text-rendering: optimizeLegibility;
 }
 
