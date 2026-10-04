@@ -18,8 +18,8 @@ The Product Owner authorized this objective in conversation on 2026-10-04 ("да
 
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| T1 | A real-renderer test proves that node text is drawn character by character: for a corpus of risky strings, the pixels of the node equal the pixels of a reference where every character is drawn separately. | none | The test passes on `main` and fails when `font-variant-ligatures: none` is removed from `src/renderer/styles.css` (revert and observe). | Ready |
-| T2 | A typed-input corpus test types realistic strings by key press into an empty node and into the middle of existing text, in both editing modes, and checks text, focus, caret position, and a screenshot. | none | Test passes; each corpus string asserts the exact final text and that the caret follows the last typed character. | Planned |
+| T1 | A real-renderer test proves that node text is drawn character by character: for a corpus of risky strings, the pixels of the node equal the pixels of a reference where every character is drawn separately. | none | The test passes on `main` and fails when `font-variant-ligatures: none` is removed from `src/renderer/styles.css` (revert and observe). | Done |
+| T2 | A typed-input corpus test types realistic strings by key press into an empty node and into the middle of existing text, in both editing modes, and checks text, focus, caret position, and a screenshot. | none | Test passes; each corpus string asserts the exact final text and that the caret follows the last typed character. | Ready |
 | T3 | `docs/DEVELOPMENT.md` §9 states the concrete question for reviewing any new or updated screenshot baseline, and the handoff rule "which test level should have caught this defect and why it did not". | none | `npm run check:docs` passes; text names the question and the handoff line. | Planned |
 
 ### T1 details
@@ -43,11 +43,12 @@ The Product Owner authorized this objective in conversation on 2026-10-04 ("да
 
 ## Next task
 
-T1.
+T2.
 
 ## Decisions and findings
 
 - Native macOS keyboard input (IME, autocorrect, key repeat) is not reproducible by Playwright; it stays a manual check in `npm run dev` after input changes.
+- T1 method (done): `e2e/text-fidelity.spec.ts` draws each risky string twice in the real renderer with the node's computed typography, once as is and once with `liga`, `clig`, `calt`, `dlig`, and `hlig` forced off, and requires identical element screenshots. Checked defect-first: with `font-variant-ligatures: none` removed from `src/renderer/styles.css` it fails on `://`; restored, it passes. It covers plain and linked nodes; it does not cover glyph shaping outside the forced-off features.
 - Whether the ligature defect existed since the font was bundled was not verified.
 
 ## Resume prompt
