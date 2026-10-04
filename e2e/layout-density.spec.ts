@@ -74,6 +74,15 @@ test.describe('compact layout density', () => {
     await expect(node(window, 13)).toBeInViewport({ ratio: 1 })
     expect(await window.evaluate(() => document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true)
 
+    // Text keeps 28px of clear space from the right edge of the content area.
+    const rightClearance = await window.evaluate(() => {
+      const shell = document.querySelector('.editor-shell')
+      const row = document.querySelector('.node-row')
+      if (!shell || !row) throw new Error('Expected the editor shell and a node row')
+      return shell.getBoundingClientRect().right - row.getBoundingClientRect().right
+    })
+    expect(rightClearance).toBeCloseTo(28, 0)
+
     await setMainWindowBounds(app, { width: 1200 })
     await expect.poll(() => window.evaluate(() => globalThis.innerWidth)).toBeGreaterThan(1100)
     const shellWidth = await window
