@@ -119,6 +119,37 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
 }
 
 describe('useNodeInputBindings', () => {
+  it('turns a typed URL into a link only once the typed word is a valid URL', async () => {
+    const f = await fixture({ document: { roots: [node('node', '')] } })
+    f.type('see http:/')
+    expect(f.node().links ?? []).toEqual([])
+    f.type('see http://w')
+    expect(f.node().links).toEqual([{ start: 4, end: 12, url: 'http://w' }])
+    f.type('see http://www.x.com')
+    expect(f.node().links).toEqual([{ start: 4, end: 20, url: 'http://www.x.com' }])
+    f.type('see http://www.x.com y')
+    expect(f.node().links).toEqual([{ start: 4, end: 20, url: 'http://www.x.com' }])
+  })
+
+  it('waits for the end of a native composition before linking a typed URL', async () => {
+    const f = await fixture({ document: { roots: [node('node', '')] } })
+    const element = f.input()
+    element.value = 'http://w'
+    element.setSelectionRange(8, 8)
+    act(() => f.bindings().onTextChange({ currentTarget: element, nativeEvent: { isComposing: true } } as never))
+    expect(f.node().text).toBe('http://w')
+    expect(f.node().links ?? []).toEqual([])
+    f.type('http://wx')
+    expect(f.node().links).toEqual([{ start: 0, end: 9, url: 'http://wx' }])
+  })
+
+  it('leaves ordinary typed text without links', async () => {
+    const f = await fixture({ document: { roots: [node('node', '')] } })
+    f.type('plain text')
+    f.type('ftp://example.com and mailto:a@b.c')
+    expect(f.node().links ?? []).toEqual([])
+  })
+
   it('projects a native insertion position after a change command edits the text', async () => {
     const f = await fixture({ document: { roots: [image('one two')] } })
     const input = f.input()

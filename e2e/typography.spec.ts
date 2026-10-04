@@ -22,7 +22,7 @@ describeForEachEditingMode('typography', ({ screenshotName }) => {
     await setMainWindowContentSize(app, screenshotContentSize)
     const editor = node(window, 1)
     await typeInto(editor, 'http://localhost:8080 test me')
-    await expect(editor).toHaveValue('http://localhost:8080 test me')
+    await expect(editor).toHaveText('http://localhost:8080 test me')
     // The bundled font draws "://l" as a ligature that moves the second slash and reads as ": /l".
     await expect(editor).toHaveCSS('font-variant-ligatures', 'none')
     await expect(editor).toHaveScreenshot(screenshotName('typed-url-without-ligatures.png'))

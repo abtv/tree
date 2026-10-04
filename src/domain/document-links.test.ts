@@ -28,9 +28,13 @@ describe('link normalization and edit outcomes', () => {
 
   it('keeps URL recovery after a middle replacement even when its tail repeats', () => {
     expect(reconcileLinkTextEdit(url, [link], 'https://a.tesa bt')).toEqual({
+      links: [{ start: 0, end: 14, url: 'https://a.tesa' }],
+      createsNewLink: true,
+    })
+    expect(reconcileLinkTextEdit(url, [link], 'https://a.t^sa bt')).toEqual({
       links: [],
       createsNewLink: false,
-      draft: { start: 0, end: 17, url: 'https://a.tesa bt' },
+      draft: { start: 0, end: 17, url: 'https://a.t^sa bt' },
     })
     expect(reconcileLinkTextEdit(`${url} z`, [link], 'https://a.tz')).toEqual({
       links: [{ start: 0, end: 12, url: 'https://a.tz' }],
@@ -100,9 +104,36 @@ describe('link normalization and edit outcomes', () => {
 
   it('replaces a whitespace-containing link edit without treating it as an append', () => {
     expect(reconcileLinkTextEdit(`${url} tail`, [link], 'https://a.tes words tail')).toEqual({
+      links: [{ start: 0, end: 13, url: 'https://a.tes' }],
+      createsNewLink: true,
+    })
+    expect(reconcileLinkTextEdit(`${url} tail`, [link], 'https://a.t^ words tail')).toEqual({
       links: [],
-      draft: { start: 0, end: 19, url: 'https://a.tes words' },
+      draft: { start: 0, end: 18, url: 'https://a.t^ words' },
       createsNewLink: false,
+    })
+  })
+
+  it('links each valid word left by whitespace typed inside a link', () => {
+    // Typing a URL directly before an existing word links the joined word; the space that follows
+    // splits it, and the URL half must stay a link while the remainder is plain text.
+    const joined = { start: 0, end: 14, url: 'http://x.comcd' }
+    expect(reconcileLinkTextEdit('http://x.comcd', [joined], 'http://x.com cd')).toEqual({
+      links: [{ start: 0, end: 12, url: 'http://x.com' }],
+      createsNewLink: true,
+    })
+    expect(
+      reconcileLinkTextEdit(
+        'http://x.comhttp://y.org',
+        [{ start: 0, end: 24, url: 'http://x.comhttp://y.org' }],
+        'http://x.com http://y.org',
+      ),
+    ).toEqual({
+      links: [
+        { start: 0, end: 12, url: 'http://x.com' },
+        { start: 13, end: 25, url: 'http://y.org' },
+      ],
+      createsNewLink: true,
     })
   })
 

@@ -120,6 +120,8 @@ export function useNodeInputBindings({
         normal: boolean
         revision: number
         focusToken: number | undefined
+        /** The edit replaced the node's element, so the new element must take focus before the caret. */
+        refocus?: boolean
       }
     | undefined
   >(undefined)
@@ -768,6 +770,7 @@ export function useNodeInputBindings({
       (pending.input !== undefined && pending.input !== input)
     )
       return
+    if (pending.refocus === true && input.ownerDocument.activeElement !== input) input.focus()
     if (pending.normal) setNormalCaret(input, pending.cursor)
     else if (vimMode !== 'normal') setCaret(input, pending.cursor)
   })
@@ -835,7 +838,29 @@ export function useNodeInputBindings({
         if (latestVimMode.current === 'replace') changeVimMode('normal')
         store.endTextSession()
       },
-      onTextChange: (event) => store.editText(node.id, event.currentTarget.value),
+      onTextChange: (event) => {
+        const text = event.currentTarget.value
+        // Replacing the textarea would cancel a native composition and orphan its compositionend,
+        // so link recognition waits for the first edit after the composition.
+        const composingNow = composing || (event.nativeEvent as Partial<InputEvent> | undefined)?.isComposing === true
+        // A textarea holds a node without links, so a link can only appear here when typing completes a URL.
+        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text)
+        if (composingNow || edit.links.length === 0) {
+          store.editText(node.id, text)
+          return
+        }
+        // The node now has a link, so its textarea is replaced by the rich editor; restore focus and
+        // the caret on the new element once it is mounted.
+        pendingCaret.current = {
+          nodeId: node.id,
+          cursor: event.currentTarget.selectionStart,
+          normal: false,
+          revision: ++caretRevision.current,
+          focusToken: latestFocus.current?.token,
+          refocus: true,
+        }
+        store.editContent(node.id, text, edit.links, edit.createsNewLink)
+      },
       onContentInput: (event: FormEvent<HTMLElement>) => {
         const cursor = getCaret(event.currentTarget)
         const content = readEditableContent(event.currentTarget)

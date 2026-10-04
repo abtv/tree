@@ -9,6 +9,7 @@ export interface PersistedNode {
   id: string
   text: string
   attachment?: { id: string; mimeType: string }
+  links?: { start: number; end: number; url: string }[]
   children: PersistedNode[]
 }
 

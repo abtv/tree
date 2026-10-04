@@ -91,6 +91,15 @@ export function reconcileLinkTextEdit(
     }
     if (isHttpUrl(projected.url))
       return { links: normalizeLinks([...retained, projected], nextText), createsNewLink: false }
+    // Whitespace typed inside a link splits it into words. Each word that is a valid URL stays a
+    // link, so a URL typed in front of an existing word keeps its link once the space is typed.
+    if (insertedIntroducesWhitespace) {
+      const words = [...nextText.slice(projected.start, projected.end).matchAll(/\S+/g)]
+        .map((match) => ({ start: projected.start + match.index, text: match[0] }))
+        .filter((word) => isHttpUrl(word.text))
+        .map((word) => ({ start: word.start, end: word.start + word.text.length, url: word.text }))
+      if (words.length > 0) return { links: normalizeLinks([...retained, ...words], nextText), createsNewLink: true }
+    }
     return {
       links: normalizeLinks(retained, nextText),
       createsNewLink: false,

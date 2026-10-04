@@ -1,13 +1,16 @@
 // @editing-modes: both
 import {
+  closeApp,
   describeForEachEditingMode,
   expect,
   firePaste,
   launchTree,
   node,
+  readPersisted,
   seedDocument,
   setCursor,
   test,
+  typeInto,
   writeClipboardText,
 } from './fixtures'
 
@@ -62,6 +65,93 @@ describeForEachEditingMode('external hyperlinks', ({ screenshotName }) => {
     await editor.press('t')
     await expect(editor.getByRole('link', { name: url })).toHaveAttribute('href', url)
     await expect(editor).toHaveText(text)
+  })
+
+  // @requirement PRODUCT.md §13
+  test('turns a typed URL into a link while typing and follows later edits', async ({ userDataDir }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: '', links: [], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await typeInto(editor, 'see http://www.google.com test')
+    await expect(editor).toHaveText('see http://www.google.com test')
+    const link = editor.getByRole('link')
+    await expect(link).toHaveCount(1)
+    await expect(link).toHaveText('http://www.google.com')
+    await expect(link).toHaveAttribute('href', 'http://www.google.com')
+    await expect(link).toHaveCSS('text-decoration-line', 'underline')
+    await expect(link).toHaveCSS('color', 'rgb(58, 110, 165)')
+    await expect(editor).toBeFocused()
+    await editor.screenshot({ path: testInfo.outputPath('typed-link-light.png') })
+
+    // Editing the link into an invalid URL removes the link styling at once.
+    await setCursor(editor, 'see http:'.length)
+    await editor.press('Backspace')
+    await expect(editor).toHaveText('see http//www.google.com test')
+    await expect(editor.getByRole('link')).toHaveCount(0)
+
+    // Typing the missing character back restores it.
+    await editor.press(':')
+    await expect(editor).toHaveText('see http://www.google.com test')
+    await expect(editor.getByRole('link')).toHaveText('http://www.google.com')
+    await editor.screenshot({ path: testInfo.outputPath('restored-link-light.png') })
+    // Link edits save on the idle and quit triggers (PRODUCT.md §13), so quit to flush them.
+    await closeApp(app)
+    expect(readPersisted(userDataDir).document.roots[0]?.links).toEqual([
+      { start: 4, end: 25, url: 'http://www.google.com' },
+    ])
+  })
+
+  // @requirement PRODUCT.md §13
+  test('keeps the link of a URL typed in front of an existing word once a space follows', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'ab cd', links: [], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await typeInto(editor, '')
+    await setCursor(editor, 3)
+    await editor.pressSequentially('http://x.com')
+    // Before the space the URL and the following word are one word, so the whole word is the link.
+    await expect(editor.getByRole('link')).toHaveText('http://x.comcd')
+    await editor.pressSequentially(' Z')
+    await expect(editor).toHaveText('ab http://x.com Zcd')
+    await expect(editor.getByRole('link')).toHaveCount(1)
+    await expect(editor.getByRole('link')).toHaveText('http://x.com')
+    await expect(editor).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §13
+  test('keeps typing in the next node after a URL is typed and Enter creates a sibling', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: '', links: [], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await typeInto(node(window, 1), 'http://x.com')
+    await node(window, 1).press('Enter')
+    await window.keyboard.type('next http://y.org')
+    await expect(node(window, 1)).toHaveText('http://x.com')
+    await expect(node(window, 1).getByRole('link')).toHaveCount(1)
+    await expect(node(window, 2)).toHaveText('next http://y.org')
+    await expect(node(window, 2).getByRole('link')).toHaveCount(1)
+    await expect(node(window, 2)).toBeFocused()
+  })
+
+  test('keeps every character when a URL typed at speed becomes a link', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: '', links: [], children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const text = 'http://localhost:8080/path?q=1 and https://example.com/a/b done'
+    await typeInto(editor, text)
+    await expect(editor).toHaveText(text)
+    await expect(editor.getByRole('link')).toHaveCount(2)
   })
 
   test('edits on plain click and opens on Cmd+click through the main process', async ({ userDataDir }) => {
