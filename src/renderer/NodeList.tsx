@@ -160,6 +160,7 @@ export function NodeList({
     freeze,
     dropIndex,
     dropLevel,
+    dropRow,
     invalidDrop,
     onRowPointerDown,
     onRowPointerLeave,
@@ -225,6 +226,7 @@ export function NodeList({
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
       dropLevel={dropMarker?.index === index ? dropLevel : undefined}
+      dropOn={dropRow === index}
       expanded={isExpanded(node.id)}
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}
       visualSelected={visualStart >= 0 && index >= visualStart && index <= visualEnd}

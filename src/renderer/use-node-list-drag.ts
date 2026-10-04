@@ -4,7 +4,14 @@ import type { TreeNode } from '../domain/document'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { autoScrollStep } from './list-window'
 import { scrollViewportBy, viewportBounds } from './scroll-viewport'
-import { dragBlock, dropTargetAtGap, gapLevels, isNoOpDrop, type DropTarget } from '../application/drop-targets'
+import {
+  dragBlock,
+  dropTargetAtGap,
+  dropTargetOnRow,
+  gapLevels,
+  isNoOpDrop,
+  type DropTarget,
+} from '../application/drop-targets'
 import {
   HOLD_ACTIVATION_MS,
   IDLE_NODE_DRAG,
@@ -32,6 +39,7 @@ interface NodeListDrag {
   freeze: NodeDragSource | undefined
   dropIndex: number | undefined
   dropLevel: number | undefined
+  dropRow: number | undefined
   invalidDrop: boolean
   onRowPointerDown: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
   onRowPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
@@ -42,6 +50,10 @@ interface NodeListDrag {
   onListClick: (event: ReactMouseEvent<HTMLElement>) => void
   recomputeDropIndex: () => void
 }
+
+type ResolvedDrop =
+  | { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined }
+  | { kind: 'row'; row: number; target: DropTarget | undefined }
 
 export function useNodeListDrag({
   rows,
@@ -54,9 +66,7 @@ export function useNodeListDrag({
 }: UseNodeListDragOptions): NodeListDrag {
   const [autoScrollDirection, setAutoScrollDirection] = useState(0)
   const [drag, dispatch] = useReducer(nodeDragReducer, IDLE_NODE_DRAG)
-  const [drop, setDrop] = useState<
-    { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' }
-  >()
+  const [drop, setDrop] = useState<ResolvedDrop>()
   const pointerXRef = useRef<number | undefined>(undefined)
   const pointerYRef = useRef<number | undefined>(undefined)
   const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
@@ -68,7 +78,7 @@ export function useNodeListDrag({
   // describe different gestures.
   const resolved = resolveNodeDrag(drag, { locked, sourceAvailable })
   const freeze = resolved.phase === 'dragging' ? resolved.source : undefined
-  const invalidDrop = freeze !== undefined && drop?.kind === 'gap' && drop.target === undefined
+  const invalidDrop = freeze !== undefined && drop !== undefined && drop.target === undefined
 
   const cancelDrag = useCallback((): void => {
     dispatch({ type: 'cancel' })
@@ -81,10 +91,7 @@ export function useNodeListDrag({
   }, [drag.phase, resolved.phase])
 
   const computeDrop = useCallback(
-    (
-      clientX: number,
-      clientY: number,
-    ): { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' } | undefined => {
+    (clientX: number, clientY: number): ResolvedDrop | undefined => {
       const regions: NodeDropRegion[] = []
       observedElementsRef.current.forEach((element) => {
         const index = Number(element.dataset.nodeIndex)
@@ -99,7 +106,7 @@ export function useNodeListDrag({
       if (source === undefined) return undefined
       const block = dragBlock(rows, source.nodeId)
       if (block === undefined) return undefined
-      if ('row' in zone) return { kind: 'row' }
+      if ('row' in zone) return { kind: 'row', row: zone.row, target: dropTargetOnRow(rows, block, zone.row) }
       const levels = gapLevels(rows, block, zone.gap)
       if (levels === undefined)
         return { kind: 'gap', gap: zone.gap, level: rows[block.start]!.depth, target: undefined }
@@ -188,8 +195,8 @@ export function useNodeListDrag({
       dragFreeze.end()
       suppressClickRef.current = false
       pressPointRef.current = { x: event.clientX, y: event.clientY }
-      pointerYRef.current = undefined
-      pointerXRef.current = undefined
+      pointerYRef.current = event.clientY
+      pointerXRef.current = event.clientX
       setAutoScrollDirection(0)
       dispatch({
         type: 'press',
@@ -252,7 +259,6 @@ export function useNodeListDrag({
       const resolvedDrop = computeDrop(event.clientX, event.clientY)
       const sourceBlock = dragBlock(rows, freeze.nodeId)
       if (
-        resolvedDrop?.kind === 'gap' &&
         resolvedDrop?.target !== undefined &&
         sourceBlock !== undefined &&
         !isNoOpDrop(rows, sourceBlock, resolvedDrop.target)
@@ -291,6 +297,7 @@ export function useNodeListDrag({
     freeze,
     dropIndex: drop?.kind === 'gap' ? drop.gap : undefined,
     dropLevel: drop?.kind === 'gap' ? drop.level : undefined,
+    dropRow: freeze !== undefined && drop?.kind === 'row' && drop.target !== undefined ? drop.row : undefined,
     invalidDrop,
     onRowPointerDown,
     onRowPointerLeave,
@@ -303,12 +310,12 @@ export function useNodeListDrag({
   }
 }
 
-function sameDrop(
-  left: { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' } | undefined,
-  right: { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' } | undefined,
-): boolean {
+function sameDrop(left: ResolvedDrop | undefined, right: ResolvedDrop | undefined): boolean {
   if (left?.kind !== right?.kind) return false
-  if (left === undefined || right === undefined || left.kind === 'row' || right.kind === 'row') return true
+  if (left === undefined || right === undefined) return true
+  if (left.target?.parentId !== right.target?.parentId || left.target?.index !== right.target?.index) return false
+  if (left.kind === 'row' && right.kind === 'row') return left.row === right.row
+  if (left.kind !== 'gap' || right.kind !== 'gap') return false
   return (
     left.gap === right.gap &&
     left.level === right.level &&

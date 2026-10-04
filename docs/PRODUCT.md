@@ -568,11 +568,11 @@ The undo/redo history retains at most the 200 most recent entries. A history ent
 
 ## 11. Drag and Drop
 
-Mouse drag-and-drop moves one node together with its subtree. Between-row gaps can reorder siblings or move the node to another parent. Dropping onto a node and onto a breadcrumb entry are specified separately in later initiative tasks.
+Mouse drag-and-drop moves one node together with its subtree. Between-row gaps can reorder siblings or move the node to another parent. Dropping onto the middle of a node row makes the dragged node its last child. Dropping onto a breadcrumb entry is specified separately in a later initiative task.
 
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Pointer movement within 4 pixels does not cancel the pending hold, but moving farther before the threshold cancels the pending drag so the gesture selects text instead; the pending hold also cancels if the pointer leaves the row.
 
-Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row stays in place with its gray drag highlight. Keeping the source visible preserves its outline context while the user chooses a destination. The node's text surface loses focus while the drag is active: any transient selection is cleared, no text can be selected, and pointer movement cannot move the text cursor. The outer quarter of a row's height, capped at 8 pixels, acts as the gaps before and after it; its middle is not a target in this task. A gap shows a marker at the level chosen by horizontal movement from the press point: each full row-indent step right moves one level deeper, each step left moves one level shallower, and vertical movement alone keeps the source level. The level is clamped to the levels that gap permits. The dragged node and its visible descendants cannot be drop targets; hovering their gaps shows the not-allowed cursor, and release changes nothing. Releasing on an allowed gap completes the move. Releasing without changing the position leaves the document unchanged. When the drag ends, focus and the text cursor return to the node. `Escape` cancels an active drag without moving the node, and cancellation keeps text selection disabled until the primary mouse button is released.
+Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row stays in place with its gray drag highlight. Keeping the source visible preserves its outline context while the user chooses a destination. The node's text surface loses focus while the drag is active: any transient selection is cleared, no text can be selected, and pointer movement cannot move the text cursor. The outer quarter of a row's height, capped at 8 pixels, acts as the gaps before and after it; its middle accepts the dragged node as a child. A gap shows a marker at the level chosen by horizontal movement from the press point: each full row-indent step right moves one level deeper, each step left moves one level shallower, and vertical movement alone keeps the source level. The level is clamped to the levels that gap permits. The dragged node and its visible descendants cannot be drop targets; hovering their row middles or internal gaps shows the not-allowed cursor, and release changes nothing. Releasing on an allowed gap or row completes the move. Releasing without changing the position leaves the document unchanged. When the drag ends, focus and the text cursor return to the node. `Escape` cancels an active drag without moving the node, and cancellation keeps text selection disabled until the primary mouse button is released.
 
 Gap targets are resolved against the visible rows with the dragged block removed. The chosen level cannot be shallower than the row below or deeper than one level below the row above. A gap inside the dragged block is invalid. Drops may reorder siblings, indent beneath a visible node, or outdent to a displayed ancestor or the document root.
 
@@ -582,11 +582,11 @@ While a node is being dragged, its row displays a subtle gray background. The hi
 
 The entire subtree moves together with its node.
 
-Use drop zones between nodes.
+Use the outer row bands for gaps and the middle for dropping onto a node.
 
 The drop zones before the first sibling and after the last sibling have expanded hit areas while preserving the list's normal spacing. The bottom edge target is larger than the top edge target to make use of the available space after the final sibling.
 
-The middle of a row is not a drop target in this task.
+An accepting row middle shows an inset outline in the drop-marker palette color, without animation or layout shift. Dropping onto a leaf, collapsed node, or expanded node appends as its last child and opens the receiving fold. Dropping its existing last child onto the parent is a no-op. A drop that would exceed the maximum-depth limit (§2.3) is offered; releasing reports the operation error and changes nothing. No row outline is shown for the source or its descendants.
 
 After a move:
 

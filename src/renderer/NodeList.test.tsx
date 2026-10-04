@@ -371,6 +371,86 @@ describe('NodeList inline expansion', () => {
 })
 
 describe('NodeList drag interaction', () => {
+  it.each(['leaf', 'collapsed', 'expanded'] as const)(
+    'appends onto a %s row and switches between row and gap feedback',
+    (kind) => {
+      vi.useFakeTimers()
+      mockRowRects()
+      const children = kind === 'leaf' ? [] : [{ id: 'child', text: 'Child', children: [] }]
+      const { container, onMove } = renderRows({
+        list: [
+          { id: 'parent', text: 'Parent', children },
+          { id: 'source', text: 'Source', children: [] },
+        ],
+        isExpanded: () => kind === 'expanded',
+      })
+      const rows = rowElements(container)
+      const source = rows.at(-1)!
+      activate(source, (rows.length - 1) * ROW_HEIGHT_ESTIMATE + 13)
+      expect(document.body).toHaveClass('node-drag-invalid')
+
+      pointerMoveAt(source, 13)
+      expect(rows[0]).toHaveClass('node-row-drop-on')
+      expect(document.body).not.toHaveClass('node-drag-invalid')
+      expect(container.querySelectorAll('.node-row-drop-on')).toHaveLength(1)
+      expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
+
+      pointerMoveAt(source, 2)
+      expect(rows[0]).toHaveClass('node-row-drop-before')
+      expect(container.querySelector('.node-row-drop-on')).toBeNull()
+      pointerMoveAt(source, 13)
+      pointerUpAt(source, 13)
+      expect(onMove).toHaveBeenCalledExactlyOnceWith('source', { parentId: 'parent', index: children.length })
+      expect(container.querySelector('.node-row-drop-on')).toBeNull()
+    },
+  )
+
+  it('prohibits row targets in the source block and does not commit a last-child row no-op', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container, onMove } = renderRows({
+      list: [{ id: 'a', text: 'A', children: [{ id: 'child', text: 'Child', children: [] }] }],
+      isExpanded: () => true,
+    })
+    const rows = rowElements(container)
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, ROW_HEIGHT_ESTIMATE + 13)
+    expect(document.body).toHaveClass('node-drag-invalid')
+    expect(container.querySelector('.node-row-drop-on')).toBeNull()
+    pointerUpAt(rows[0]!, ROW_HEIGHT_ESTIMATE + 13)
+    expect(onMove).not.toHaveBeenCalled()
+
+    activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 13)
+    pointerMoveAt(rows[1]!, 13)
+    expect(rows[0]).toHaveClass('node-row-drop-on')
+    pointerUpAt(rows[1]!, 13)
+    expect(onMove).not.toHaveBeenCalled()
+  })
+
+  it.each(['locked', 'hidden'] as const)('clears an accepting row when the source becomes %s', (reason) => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const view = renderRows()
+    const rows = rowElements(view.container)
+    activate(rows[0]!, 13)
+    pointerMoveAt(rows[0]!, ROW_HEIGHT_ESTIMATE + 13)
+    expect(rows[1]).toHaveClass('node-row-drop-on')
+    view.rerender(
+      <NodeList
+        dragFreeze={view.dragFreeze}
+        locked={reason === 'locked'}
+        nodes={reason === 'hidden' ? nodes.slice(1) : nodes}
+        renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
+        onEnter={() => undefined}
+        onDrop={view.onMove}
+      />,
+    )
+    expect(view.container.querySelector('.node-row-drop-on')).toBeNull()
+    expect(document.body).not.toHaveClass('node-drag-active', 'node-drag-invalid')
+    pointerUpAt(view.container.querySelector('.node-list')!, ROW_HEIGHT_ESTIMATE + 13)
+    expect(view.onMove).not.toHaveBeenCalled()
+  })
+
   it('moves a root node into an expanded branch at the pointer-selected level', () => {
     vi.useFakeTimers()
     mockRowRects()
@@ -719,49 +799,58 @@ describe('NodeList drag interaction', () => {
     pointerUpAt(rows[0]!, 13)
   })
 
-  it('cancels an active drag on Escape, pointer cancellation, lost capture, and window blur', () => {
-    vi.useFakeTimers()
-    mockRowRects()
+  it.each([
+    { targetY: 47, marker: '.node-row-drop-after' },
+    { targetY: 38, marker: '.node-row-drop-on' },
+  ])(
+    'cancels an active drag with $marker on Escape, pointer cancellation, lost capture, and window blur',
+    ({ targetY, marker }) => {
+      vi.useFakeTimers()
+      mockRowRects()
 
-    const cases: Array<{ label: string; cancel: (row: Element, container: HTMLElement) => void }> = [
-      {
-        label: 'Escape',
-        cancel: () => fireEvent.keyDown(window, { key: 'Escape' }),
-      },
-      {
-        label: 'pointercancel',
-        cancel: (row) => fireEvent.pointerCancel(row, { pointerId: 1 }),
-      },
-      {
-        label: 'lostpointercapture',
-        cancel: (_row, container) =>
-          fireEvent.lostPointerCapture(container.querySelector('.node-list')!, {
-            pointerId: 1,
-          }),
-      },
-      {
-        label: 'blur',
-        cancel: () => fireEvent.blur(window),
-      },
-    ]
+      const cases: Array<{ label: string; cancel: (row: Element, container: HTMLElement) => void }> = [
+        {
+          label: 'Escape',
+          cancel: () => fireEvent.keyDown(window, { key: 'Escape' }),
+        },
+        {
+          label: 'pointercancel',
+          cancel: (row) => fireEvent.pointerCancel(row, { pointerId: 1 }),
+        },
+        {
+          label: 'lostpointercapture',
+          cancel: (_row, container) =>
+            fireEvent.lostPointerCapture(container.querySelector('.node-list')!, {
+              pointerId: 1,
+            }),
+        },
+        {
+          label: 'blur',
+          cancel: () => fireEvent.blur(window),
+        },
+      ]
 
-    for (const { label, cancel } of cases) {
-      const { container, onMove, unmount } = renderRows()
-      const row = rowElements(container)[0]!
-      activate(row, 13)
-      pointerMoveAt(row, 47)
-      expect(container.querySelector('.node-row-drop-after'), label).not.toBeNull()
+      for (const { label, cancel } of cases) {
+        const { container, onMove, unmount } = renderRows()
+        const row = rowElements(container)[0]!
+        activate(row, 13)
+        pointerMoveAt(row, targetY)
+        expect(container.querySelector(marker), label).not.toBeNull()
 
-      cancel(row, container)
+        cancel(row, container)
 
-      expect(container.querySelector('.node-row-dragging'), label).toBeNull()
-      expect(container.querySelector('.node-row-drop-before, .node-row-drop-after'), label).toBeNull()
-      expect(document.body, label).not.toHaveClass('node-drag-active')
-      pointerUpAt(row, 47)
-      expect(onMove, label).not.toHaveBeenCalled()
-      unmount()
-    }
-  })
+        expect(container.querySelector('.node-row-dragging'), label).toBeNull()
+        expect(
+          container.querySelector('.node-row-drop-before, .node-row-drop-after, .node-row-drop-on'),
+          label,
+        ).toBeNull()
+        expect(document.body, label).not.toHaveClass('node-drag-active')
+        pointerUpAt(row, targetY)
+        expect(onMove, label).not.toHaveBeenCalled()
+        unmount()
+      }
+    },
+  )
 
   it('keeps an active drag through events that do not belong to the gesture', () => {
     vi.useFakeTimers()

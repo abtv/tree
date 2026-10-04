@@ -12,6 +12,7 @@ import {
   startRowDrag,
   test,
 } from './fixtures'
+import { MAX_DOCUMENT_DEPTH } from '../src/domain/document'
 
 function hierarchySeed(): { document: unknown; location: unknown } {
   return {
@@ -55,9 +56,176 @@ async function dragToGap(
   await window.mouse.move(pressX + horizontalSteps * 20, clientY, { steps: 5 })
 }
 
+async function dragOntoRow(window: Parameters<typeof node>[0], sourceId: string, targetId: string): Promise<void> {
+  const source = window.locator(`.node-row[data-node-id="${sourceId}"] .node-input`)
+  const box = await window.locator(`.node-row[data-node-id="${targetId}"]`).boundingBox()
+  if (box === null) throw new Error('The receiving row was not rendered.')
+  await startRowDrag(window, source)
+  await window.mouse.move(box.x + 30, box.y + box.height / 2, { steps: 5 })
+}
+
 // @requirement PRODUCT.md §2.4
 // @requirement PRODUCT.md §11
 describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
+  const states = mode === 'vim' ? ['normal', 'insert', 'replace', 'visual', 'visual-node'] : ['insert']
+  for (const state of states) {
+    test(`keeps the caret and resolves ${state} editing when dropping onto a row`, async ({ userDataDir }) => {
+      seedDocument(userDataDir, hierarchySeed())
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const source = window.locator('.node-row[data-node-id="b"] .node-input')
+      await source.focus()
+      if (mode === 'vim') {
+        if (state === 'insert') await window.keyboard.press('i')
+        if (state === 'replace') await window.keyboard.press('R')
+        if (state === 'visual') await window.keyboard.press('v')
+        if (state === 'visual-node') await window.keyboard.press('V')
+      }
+      if (state === 'replace' || state === 'insert') await window.keyboard.type('x')
+      await startRowDrag(window, source)
+      const frozenCursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+      const parent = await window.locator('.node-row[data-node-id="a"]').boundingBox()
+      if (parent === null) throw new Error('The target row was not rendered.')
+      await window.mouse.move(parent.x + 30, parent.y + parent.height / 2)
+      await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
+      await window.mouse.up()
+      await expect(source).toBeFocused()
+      await expect(window.locator('.node-row[data-node-id="b"]')).toHaveAttribute('data-depth', '1')
+      await expect(source).toHaveValue(state === 'replace' ? 'xravo' : state === 'insert' ? 'xBravo' : 'Bravo')
+      expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(frozenCursor)
+      if (mode === 'vim') {
+        const expectedMode = state === 'insert' ? 'INSERT' : state === 'visual' ? 'VISUAL' : 'NORMAL'
+        await expect(window.getByLabel('Vim mode')).toHaveText(expectedMode)
+      }
+    })
+  }
+
+  test('selects a source dragged from its unfocused gutter and starts its caret', async ({ userDataDir }) => {
+    const seed = hierarchySeed()
+    seed.location = { currentParentId: null, selectedNodeId: 'c' }
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await startRowDrag(window, window.locator('.node-row[data-node-id="b"]'), { xOffset: 1 })
+    const parent = await window.locator('.node-row[data-node-id="a"]').boundingBox()
+    if (parent === null) throw new Error('The target row was not rendered.')
+    await window.mouse.move(parent.x + 30, parent.y + parent.height / 2)
+    await window.mouse.up()
+    const source = window.locator('.node-row[data-node-id="b"] .node-input')
+    await expect(source).toBeFocused()
+    expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+    await expect(window.locator('.node-row[data-node-id="b"] .node-focus-marker')).toHaveCount(1)
+  })
+
+  for (const expanded of [false, true]) {
+    test(`appends onto ${expanded ? 'an expanded' : 'a collapsed'} node, opens its fold, and supports undo and redo`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, hierarchySeed())
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      if (expanded) await openAlpha(window)
+      await dragOntoRow(window, 'b', 'a')
+      const parent = window.locator('.node-row[data-node-id="a"]')
+      await expect(parent).toHaveClass(/node-row-drop-on/)
+      await window.mouse.up()
+      await expect
+        .poll(() => nodeTexts(window))
+        .toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo', 'Charlie'])
+      const moved = window.locator('.node-row[data-node-id="b"]')
+      await expect(moved).toHaveAttribute('data-depth', '1')
+      await expect(moved.locator('.node-input')).toBeFocused()
+      await expect(parent.locator('.node-disclosure-triangle')).toHaveAttribute('aria-expanded', 'true')
+      await window.keyboard.press('Meta+z')
+      await expect(moved).toHaveAttribute('data-depth', '0')
+      await window.keyboard.press('Meta+Shift+z')
+      await expect(moved).toHaveAttribute('data-depth', '1')
+    })
+  }
+
+  test('outlines only the receiving row in both appearances and keeps the edge band as a gap', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, hierarchySeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const target = window.locator('.node-row[data-node-id="c"]')
+    const before = await target.boundingBox()
+    if (before === null) throw new Error('The leaf row was not rendered.')
+    if (mode === 'vim') await window.keyboard.press('V')
+    await dragOntoRow(window, 'b', 'c')
+    await expect(target).toHaveClass(/node-row-drop-on/)
+    await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
+    await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
+    expect(await target.boundingBox()).toEqual(before)
+    await expect(window.locator('.node-list')).toHaveScreenshot(`hierarchy-row-target-${mode}-light.png`)
+    await window.emulateMedia({ colorScheme: 'dark' })
+    const darkBox = await target.boundingBox()
+    if (darkBox === null) throw new Error('The dark receiving row was not rendered.')
+    await window.mouse.move(darkBox.x + 30, darkBox.y + darkBox.height / 2)
+    await expect(target).toHaveClass(/node-row-drop-on/)
+    await expect(window.locator('.node-list')).toHaveScreenshot(`hierarchy-row-target-${mode}-dark.png`)
+    await expect(target).toHaveClass(/node-row-drop-on/)
+    await window.emulateMedia({ colorScheme: 'light' })
+
+    const edgeBox = await target.boundingBox()
+    if (edgeBox === null) throw new Error('The receiving row was not rendered after appearance switching.')
+    await window.mouse.move(edgeBox.x + 30, edgeBox.y + 2)
+    await expect(target).toHaveClass(/node-row-drop-before/)
+    await expect(window.locator('.node-row-drop-on')).toHaveCount(0)
+    await window.mouse.move(edgeBox.x + 30, edgeBox.y + edgeBox.height / 2)
+    await expect(target).toHaveClass(/node-row-drop-on/)
+    await window.mouse.up()
+    await expect(window.locator('.node-row[data-node-id="b"]')).toHaveAttribute('data-depth', '1')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Charlie', 'Bravo'])
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  test('prohibits the source and its descendant row middles and cancels an accepting row with Escape', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, hierarchySeed())
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await openAlpha(window)
+    const before = await nodeTexts(window)
+    await startRowDrag(window, window.locator('.node-row[data-node-id="a"] .node-input'))
+    await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
+    const child = await window.locator('.node-row[data-node-id="a1"]').boundingBox()
+    if (child === null) throw new Error('The descendant row was not rendered.')
+    await window.mouse.move(child.x + 30, child.y + child.height / 2)
+    await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
+    await expect(window.locator('.node-row-drop-on')).toHaveCount(0)
+    await window.mouse.up()
+    expect(await nodeTexts(window)).toEqual(before)
+
+    await dragOntoRow(window, 'b', 'a')
+    await expect(window.locator('.node-row[data-node-id="a"]')).toHaveClass(/node-row-drop-on/)
+    await window.keyboard.press('Escape')
+    await expect(window.locator('.node-row-drop-on')).toHaveCount(0)
+    await window.mouse.up()
+    expect(await nodeTexts(window)).toEqual(before)
+    await expect(window.locator('.node-row[data-node-id="b"] .node-input')).toBeFocused()
+  })
+
+  test('offers an over-depth row target and reports the operation error without moving', async ({ userDataDir }) => {
+    const branch = (depth: number): { id: string; text: string; children: unknown[] } => ({
+      id: `depth-${depth}`,
+      text: `Depth ${depth}`,
+      children: depth === MAX_DOCUMENT_DEPTH ? [] : [branch(depth + 1)],
+    })
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'source', text: 'Source', children: [] }, branch(1)] },
+      location: { currentParentId: null, selectedNodeId: 'source' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    for (let depth = 1; depth < MAX_DOCUMENT_DEPTH; depth += 1) {
+      await window.locator(`.node-row[data-node-id="depth-${depth}"] .node-disclosure-triangle`).click()
+    }
+    const message = `Operation failed: Nodes cannot be nested deeper than ${MAX_DOCUMENT_DEPTH} levels.`
+    allowRendererError(exactMessage(message))
+    await dragOntoRow(window, 'source', `depth-${MAX_DOCUMENT_DEPTH}`)
+    await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
+    await window.mouse.up()
+    await expect(window.getByRole('alert')).toHaveText(message)
+    await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '0')
+  })
+
   test('nests at the selected gap level, supports undo and redo, and survives restart', async ({ userDataDir }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })

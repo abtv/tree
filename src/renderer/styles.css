@@ -671,6 +671,11 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   content: '';
 }
 
+.node-row-drop-on {
+  outline: 2px solid var(--color-drop-marker);
+  outline-offset: -2px;
+}
+
 .node-row-drop-before::before {
   top: -1px;
 }

@@ -76,7 +76,7 @@ The Product Owner should see the screenshots for S8.
 | T3 | Store command `moveNodeToParent` | T1, T2 | Moderate, independent review | Done |
 | T4 | Pointer geometry in `node-drag.ts` | T0 | Low | Done |
 | T5 | Between-row drops with a level | T3, T4 | High (`npm run check:full`), reviewer and product verifier, `WORKING_PLAN.md` | Done |
-| T6 | Drop onto a node | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Planned |
+| T6 | Drop onto a node | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Done |
 | T7 | Drop onto a breadcrumb entry | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Planned |
 | T8 | Auto-scroll in every overflowing list (M4) | T5 | Moderate | Planned |
 | T9 | Cross-task verification, final documentation sweep, plan removal | T6, T7, T8 | High (`npm run check:full`), product verifier | Planned |
@@ -122,7 +122,7 @@ The Product Owner should see the screenshots for S8.
 
 ### T6. Drop onto a node
 
-* Files: `NodeList.tsx`, `NodeRow.tsx`, `use-node-list-drag.ts`, `styles.css`, their tests, the e2e spec from T5, PRODUCT §11 (replace the "no drop inside node" sentence).
+* Files: `NodeList.tsx`, `NodeRow.tsx`, `use-node-list-drag.ts`, `styles.css`, their tests, the e2e spec from T5, existing drag/windowed/image-caret e2e specs and snapshots, `perf/vim.spec.ts`, PRODUCT §11 (replace the "no drop inside node" sentence), ARCHITECTURE §8.
 * Acceptance: onto a collapsed node with children opens the fold and appends; onto a leaf and onto an expanded node append; onto itself or a descendant shows not-allowed; a depth-limit drop shows the operation error; a band geometry assertion; a screenshot of the highlight in light and dark.
 * Commit: `feat(renderer): drop a dragged node onto a node to make it a child`.
 
@@ -161,11 +161,11 @@ The Product Owner should see the screenshots for S8.
 
 * No main-process, preload, IPC, dependency, or schema change; the persisted shape is unchanged, so no contract test applies.
 * Residual risks: the drag-versus-caret defect cluster, legacy gesture positions in existing tests, and cursor observability.
-* The PRODUCT §1.3 Apple Human Interface Guidelines check for drag and drop is still open. The implementing session performs it and raises any conflict under `AGENTS.md` §14.
+* PRODUCT §1.3's Apple Human Interface Guidelines check for T6 found no new conflict: accepting row outlines and invalid-target feedback follow the official drag-and-drop guidance. Each remaining task checks its own changed behavior.
 
 ## Next task
 
-T6 (drop onto a node) is the next task. T1 to T5 are done. T6 is Moderate Risk and uses `WORKING_PLAN.md` for task evidence.
+T7 (drop onto a breadcrumb entry) is the next task. T1 to T6 are done. T7 is Moderate Risk and uses `WORKING_PLAN.md` for task evidence. Resolve the undo/location acceptance issue below before implementing its behavior.
 
 T5's missed independent review found that an unfocused drag source could unmount during windowed scrolling. The follow-up keeps the source mounted independently of the focused row and covers its cancellation cleanup.
 

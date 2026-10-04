@@ -291,6 +291,44 @@ test.describe('Vim editing: image caret', () => {
     ).toEqual(frozen)
   })
 
+  for (const text of ['', 'abcd']) {
+    test(`keeps the ${text === '' ? 'image' : 'non-final text'} caret when an attached node is dropped onto a row`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'source', text, attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+            { id: 'parent', text: 'Parent', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'source' },
+      })
+      seedAttachmentImage(userDataDir, 'image')
+      const { window } = await launchTree(userDataDir)
+      const editor = window.locator('.node-row[data-node-id="source"] .node-input')
+      await editor.focus()
+      await startRowDrag(window, editor)
+      const cursor = await editor.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+      const target = window.locator('.node-row[data-node-id="parent"]')
+      const box = await target.boundingBox()
+      if (box === null) throw new Error('The receiving parent was not rendered.')
+      await window.mouse.move(box.x + 30, box.y + box.height / 2)
+      await expect(target).toHaveClass(/node-row-drop-on/)
+      await window.mouse.up()
+      await expect(editor).toBeFocused()
+      await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '1')
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      expect(await editor.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(cursor)
+      if (text === '') await expect(editor).toHaveClass(/node-input-image-caret/)
+      else {
+        expect(cursor).toBeLessThan(text.length - 1)
+        await expect(editor).not.toHaveClass(/node-input-image-caret/)
+      }
+      await expect(window.getByAltText('Attached image')).toBeVisible()
+    })
+  }
+
   test('treats an image-only node as one character and crosses its row in both directions', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

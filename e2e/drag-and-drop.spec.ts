@@ -66,11 +66,12 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
     await expect(window.locator('body')).toHaveClass(/node-drag-active/)
-    await expect(source).toHaveCSS('cursor', 'grabbing')
+    await expect(source).toHaveCSS('cursor', 'not-allowed')
 
     const target = await rowBox(window, 1)
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
+    await expect(source).toHaveCSS('cursor', 'grabbing')
 
     await window.mouse.up()
 

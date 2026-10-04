@@ -386,87 +386,97 @@ test.describe('Vim interactions at scale', () => {
     expect(movePaintMs).toBeLessThan(250)
   })
 
-  test('cross-parent drag resolves and paints over a thousand-row visible list', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: {
-        roots: [
-          { id: 'source', text: 'Source', children: [] },
-          {
-            id: 'destination',
-            text: 'Destination',
-            children: Array.from({ length: 999 }, (_, index) => ({
-              id: `destination-${index}`,
-              text: `Destination child ${index}`,
-              children: [],
-            })),
+  for (const targetKind of ['gap', 'row'] as const) {
+    test(`cross-parent ${targetKind} drag resolves and paints over a thousand-row visible list`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'source', text: 'Source', children: [] },
+            {
+              id: 'destination',
+              text: 'Destination',
+              children: Array.from({ length: 999 }, (_, index) => ({
+                id: `destination-${index}`,
+                text: `Destination child ${index}`,
+                children: [],
+              })),
+            },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'source' },
+        view: { expandedIds: ['destination'] },
+      })
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const source = window.locator('.node-row[data-node-id="source"] .node-input')
+      const receiver = window.locator(
+        `.node-row[data-node-id="${targetKind === 'row' ? 'destination' : 'destination-0'}"]`,
+      )
+      const sourceBox = await source.boundingBox()
+      const targetBox = await receiver.boundingBox()
+      if (sourceBox === null || targetBox === null)
+        throw new Error('The cross-parent performance rows were not rendered.')
+      expect(await window.locator('.node-row').count()).toBeLessThan(100)
+
+      await startRowDrag(window, source)
+      await window.evaluate(() => {
+        const state = window as unknown as { hoverPaintMs?: number; crossParentMovePaintMs?: number }
+        document.addEventListener(
+          'pointermove',
+          () => {
+            if (!document.body.classList.contains('node-drag-active')) return
+            const start = performance.now()
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                state.hoverPaintMs = performance.now() - start
+              }),
+            )
           },
-        ],
-      },
-      location: { currentParentId: null, selectedNodeId: 'source' },
-      view: { expandedIds: ['destination'] },
-    })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    const source = window.locator('.node-row[data-node-id="source"] .node-input')
-    const firstChild = window.locator('.node-row[data-node-id="destination-0"]')
-    const sourceBox = await source.boundingBox()
-    const targetBox = await firstChild.boundingBox()
-    if (sourceBox === null || targetBox === null)
-      throw new Error('The cross-parent performance rows were not rendered.')
-    expect(await window.locator('.node-row').count()).toBeLessThan(100)
-
-    await startRowDrag(window, source)
-    await window.evaluate(() => {
-      const state = window as unknown as { hoverPaintMs?: number; crossParentMovePaintMs?: number }
-      document.addEventListener(
-        'pointermove',
-        () => {
-          if (!document.body.classList.contains('node-drag-active')) return
-          const start = performance.now()
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => {
-              state.hoverPaintMs = performance.now() - start
-            }),
-          )
-        },
-        { capture: true },
+          { capture: true },
+        )
+        document.addEventListener(
+          'pointerup',
+          () => {
+            const start = performance.now()
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                state.crossParentMovePaintMs = performance.now() - start
+              }),
+            )
+          },
+          { capture: true, once: true },
+        )
+      })
+      await window.mouse.move(
+        targetKind === 'row' ? targetBox.x + 30 : sourceBox.x + 28,
+        targetBox.y + (targetKind === 'row' ? targetBox.height / 2 : 2),
+        { steps: 5 },
       )
-      document.addEventListener(
-        'pointerup',
-        () => {
-          const start = performance.now()
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => {
-              state.crossParentMovePaintMs = performance.now() - start
-            }),
-          )
-        },
-        { capture: true, once: true },
+      await expect(receiver).toHaveClass(targetKind === 'row' ? /node-row-drop-on/ : /node-row-drop-before/)
+      await window.waitForFunction(() => (window as unknown as { hoverPaintMs?: number }).hoverPaintMs !== undefined)
+      await window.mouse.up()
+      await window.waitForFunction(
+        () => (window as unknown as { crossParentMovePaintMs?: number }).crossParentMovePaintMs !== undefined,
       )
-    })
-    await window.mouse.move(sourceBox.x + 28, targetBox.y + 2, { steps: 5 })
-    await expect(window.locator('.node-row[data-node-id="destination-0"]')).toHaveClass(/node-row-drop-before/)
-    await window.waitForFunction(() => (window as unknown as { hoverPaintMs?: number }).hoverPaintMs !== undefined)
-    await window.mouse.up()
-    await window.waitForFunction(
-      () => (window as unknown as { crossParentMovePaintMs?: number }).crossParentMovePaintMs !== undefined,
-    )
 
-    const metrics = await window.evaluate(() => {
-      const state = window as unknown as { hoverPaintMs: number; crossParentMovePaintMs: number }
-      return { hoverPaintMs: state.hoverPaintMs, crossParentMovePaintMs: state.crossParentMovePaintMs }
+      const metrics = await window.evaluate(() => {
+        const state = window as unknown as { hoverPaintMs: number; crossParentMovePaintMs: number }
+        return { hoverPaintMs: state.hoverPaintMs, crossParentMovePaintMs: state.crossParentMovePaintMs }
+      })
+      await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '1')
+      recordPerfResult({
+        kind: 'state',
+        scenario: targetKind === 'row' ? 'cross-parent-row-drag-windowed-1000' : 'cross-parent-drag-windowed-1000',
+        metrics: {
+          hoverToPaintMs: round(metrics.hoverPaintMs),
+          moveToPaintMs: round(metrics.crossParentMovePaintMs),
+        },
+      })
+      expect(metrics.hoverPaintMs).toBeLessThan(250)
+      expect(metrics.crossParentMovePaintMs).toBeLessThan(250)
     })
-    await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '1')
-    recordPerfResult({
-      kind: 'state',
-      scenario: 'cross-parent-drag-windowed-1000',
-      metrics: {
-        hoverToPaintMs: round(metrics.hoverPaintMs),
-        moveToPaintMs: round(metrics.crossParentMovePaintMs),
-      },
-    })
-    expect(metrics.hoverPaintMs).toBeLessThan(250)
-    expect(metrics.crossParentMovePaintMs).toBeLessThan(250)
-  })
+  }
 
   test('common editing remains usable with four-times renderer CPU throttling', async ({ userDataDir }) => {
     const children = Array.from({ length: 1_000 }, (_, index) => ({

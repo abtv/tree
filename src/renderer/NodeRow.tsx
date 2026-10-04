@@ -17,6 +17,7 @@ interface NodeRowProps {
   dragging: boolean
   dropBefore: boolean
   dropAfter: boolean
+  dropOn: boolean
   dropLevel?: number | undefined
   focused: boolean
   visualSelected?: boolean
@@ -39,6 +40,7 @@ export const NodeRow = memo(function NodeRow({
   dragging,
   dropBefore,
   dropAfter,
+  dropOn,
   dropLevel,
   focused,
   visualSelected = false,
@@ -52,6 +54,7 @@ export const NodeRow = memo(function NodeRow({
     dragging ? 'node-row-dragging' : '',
     dropBefore ? 'node-row-drop-before' : '',
     dropAfter ? 'node-row-drop-after' : '',
+    dropOn ? 'node-row-drop-on' : '',
     visualSelected ? 'node-row-visual-selected' : '',
   ]
     .filter(Boolean)
