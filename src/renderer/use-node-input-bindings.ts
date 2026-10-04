@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { locateNode, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
+import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from './node-input-types'
 import {
   collapseSelectionToAnchor,
   hasMultiCharacterSelection,
@@ -79,8 +80,8 @@ interface UseNodeInputBindingsOptions {
   vimMode?: VimMode
   setVimMode?: (mode: VimMode) => void
   setImageCaretNodeId?: (nodeId: string | undefined) => void
-  nodeVisualSelection?: { anchorId: string; focusId: string } | undefined
-  setNodeVisualSelection?: (selection: { anchorId: string; focusId: string } | undefined) => void
+  nodeVisualSelection?: NodeVisualSelection | undefined
+  setNodeVisualSelection?: (selection: NodeVisualSelection | undefined) => void
   /**
    * Applies a Normal-mode fold key to the inline-expansion state. `EditorStore` owns that state, so
    * the keyboard handler dispatches the command here instead of touching it directly.
@@ -115,23 +116,8 @@ export function useNodeInputBindings({
   const inputs = useRef(new Map<string, HTMLElement>())
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const caretRevision = useRef(0)
-  const pendingCaret = useRef<
-    | {
-        nodeId: string
-        input?: HTMLElement
-        cursor: number
-        normal: boolean
-        revision: number
-        focusToken: number | undefined
-        /** The edit replaced the node's element, so the new element must take focus before the caret. */
-        refocus?: boolean
-      }
-    | undefined
-  >(undefined)
-  const pendingVisualSelection = useRef<
-    | { nodeId: string; start: number; end: number; endpoints?: { anchor: number; focus: number; hadText: boolean } }
-    | undefined
-  >(undefined)
+  const pendingCaret = useRef<PendingCaret | undefined>(undefined)
+  const pendingVisualSelection = useRef<PendingVisualSelection | undefined>(undefined)
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const latestFocus = useRef<FocusIntent | undefined>(focus)
   const syncedImageFocusToken = useRef<number | undefined>(focus?.token)
@@ -164,6 +150,19 @@ export function useNodeInputBindings({
   })
   const frozenCaret = useRef<CaretFreeze | undefined>(undefined)
   const frozenPointerListener = useRef<((event: PointerEvent) => void) | undefined>(undefined)
+
+  function schedulePendingCaret(request: Omit<PendingCaret, 'normal' | 'revision' | 'focusToken'>): void {
+    pendingCaret.current = {
+      ...request,
+      normal: false,
+      revision: ++caretRevision.current,
+      focusToken: latestFocus.current?.token,
+    }
+  }
+
+  function schedulePendingVisualSelection(pending: PendingVisualSelection): void {
+    pendingVisualSelection.current = pending
+  }
 
   const changeVimMode = useCallback(
     (mode: VimMode): void => {
@@ -305,12 +304,12 @@ export function useNodeInputBindings({
     }
     const start = Math.min(restore.anchor, restore.focus)
     store.selectNode(restore.nodeId, start)
-    pendingVisualSelection.current = {
+    schedulePendingVisualSelection({
       nodeId: restore.nodeId,
       start,
       end: Math.max(restore.anchor, restore.focus) + 1,
       endpoints: { anchor: restore.anchor, focus: restore.focus, hadText: restore.hadText },
-    }
+    })
     changeVimMode('visual')
   }, [store, setNodeVisualSelection, changeVimMode, syncImageCaretToFocus])
 
@@ -485,7 +484,7 @@ export function useNodeInputBindings({
       recordRepeatChange(vimCommandState.current, { kind: 'structural-shift', direction, span: 1, count })
       // The store's focus intent collapses the caret when the moved row renders; the layout effect
       // below restores the selection once it has.
-      pendingVisualSelection.current = { nodeId, ...selection }
+      schedulePendingVisualSelection({ nodeId, ...selection })
     },
     [store],
   )
@@ -873,27 +872,21 @@ export function useNodeInputBindings({
         }
         // The node now has a link, so its textarea is replaced by the rich editor; restore focus and
         // the caret on the new element once it is mounted.
-        pendingCaret.current = {
+        schedulePendingCaret({
           nodeId: node.id,
           cursor: event.currentTarget.selectionStart,
-          normal: false,
-          revision: ++caretRevision.current,
-          focusToken: latestFocus.current?.token,
           refocus: true,
-        }
+        })
         store.editContent(node.id, text, edit.links, edit.createsNewLink)
       },
       onContentInput: (event: FormEvent<HTMLElement>) => {
         const cursor = getCaret(event.currentTarget)
         const content = readEditableContent(event.currentTarget)
-        pendingCaret.current = {
+        schedulePendingCaret({
           nodeId: node.id,
           input: event.currentTarget,
           cursor,
-          normal: false,
-          revision: ++caretRevision.current,
-          focusToken: latestFocus.current?.token,
-        }
+        })
         const draft =
           pendingLinkDraft.current?.nodeId === node.id
             ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
@@ -1048,14 +1041,11 @@ export function useNodeInputBindings({
                 )
               },
               scheduleCaret: (input, cursor) => {
-                pendingCaret.current = {
+                schedulePendingCaret({
                   nodeId: node.id,
                   input,
                   cursor,
-                  normal: false,
-                  revision: ++caretRevision.current,
-                  focusToken: latestFocus.current?.token,
-                }
+                })
               },
               nodeVisual: {
                 enter: (nodeId) => {
