@@ -7,7 +7,6 @@ import {
   collapseSelectionToAnchor,
   hasMultiCharacterSelection,
   nodeTextLength,
-  setEditableText,
   getCaret,
   getSelectionRange,
   hasAttachmentCharacter,
@@ -30,24 +29,21 @@ import { revealInViewport } from './scroll-viewport'
 import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
-  beginStructuralChildOpen,
-  beginStructuralOpen,
   clearCommandAssembly,
   clearPending,
   createVimCommandState,
   setVisualRange,
-  swapNodeVisual,
   type VimCommandState,
 } from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
-import { rememberNodeRange } from './vim-visual-memory'
 import type { VimMode } from './vim-editing'
 import { focusCaretTransition, pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
 import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
-import { applyReplaceKey, beginInsertSession, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
+import { beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
+import { createVimKeyboardState } from './vim-keyboard-state'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -719,115 +715,36 @@ export function useNodeInputBindings({
         onPreviewAttachment,
         vim: !vimEnabled
           ? undefined
-          : {
-              mode: vimMode,
-              register: registerHandle,
-              get commandState(): VimCommandState {
-                return vimCommandState.current
+          : createVimKeyboardState(
+              {
+                store,
+                vimMode,
+                registerHandle,
+                commandState: vimCommandState.current,
+                session: vimSession.current,
+                readAuthority: () => caretAuthority.current,
+                finishVimInsert,
+                finishVimReplace,
+                applyCaretState,
+                moveVimViewport,
+                syncImageCaretToFocus,
+                changeVimMode,
+                onPreviewAttachment,
+                schedulePendingCaret,
+                nodeVisualSelection,
+                setNodeVisualSelection,
+                moveNodeVisual,
+                commandNodeVisual,
+                shiftNodeVisual,
+                joinNodeVisual,
+                shiftCurrentNode,
+                restoreVisual,
+                verticalOperator,
+                repeatStructural,
+                onFoldCommand,
               },
-              beginInsert: (nodeId, baseline, position, change) => {
-                beginInsertSession(vimSession.current, { nodeId, baseline, position, change })
-              },
-              finishInsert: finishVimInsert,
-              beginReplace: (nodeId, _input, baseline, position) => {
-                beginReplaceSession(vimSession.current, { nodeId, baseline, position })
-              },
-              handleReplaceKey: (input, key) => {
-                const result = applyReplaceKey(vimSession.current.replace, key)
-                if (result === undefined) return false
-                setEditableText(input, result.workingText)
-                setCaret(input, result.cursor)
-                return true
-              },
-              finishReplace: (input, retreatCursor, preserveDomSelection) => {
-                return finishVimReplace(input, retreatCursor, preserveDomSelection)
-              },
-              imageTextCursor: {
-                get current() {
-                  return caretAuthority.current.caret.imageTextReturnCursor
-                },
-                set current(value: number | undefined) {
-                  const authority = caretAuthority.current
-                  if (authority.nodeId !== undefined)
-                    applyCaretState(
-                      authority.nodeId,
-                      { ...authority.caret, imageTextReturnCursor: value },
-                      false,
-                      'preserve-selection',
-                    )
-                },
-              },
-              getCaretState: (nodeId, cursor, imageActive) =>
-                caretAuthority.current.nodeId === nodeId
-                  ? { ...caretAuthority.current.caret, cursor }
-                  : { cursor, imageActive, imageTextReturnCursor: undefined },
-              applyCaretState,
-              moveBoundary: (boundary, cursor, count) => {
-                store.moveSelectionBoundary(boundary, cursor, count)
-                syncImageCaretToFocus()
-              },
-              moveViewport: moveVimViewport,
-              syncImageCaretToFocus,
-              setMode: changeVimMode,
-              openAttachment: onPreviewAttachment,
-              setImageCaret: (nodeId, active, fromFocus) => {
-                const snapshot = store.getSnapshot()
-                if (snapshot.status !== 'ready') return
-                const target = requireNode(snapshot.document, nodeId).node
-                applyCaretState(
-                  nodeId,
-                  {
-                    cursor: active
-                      ? target.text.length
-                      : Math.min(caretAuthority.current.caret.cursor, Math.max(0, target.text.length - 1)),
-                    imageActive: active,
-                    imageTextReturnCursor: active ? caretAuthority.current.caret.imageTextReturnCursor : undefined,
-                  },
-                  fromFocus,
-                )
-              },
-              scheduleCaret: (input, cursor) => {
-                schedulePendingCaret({
-                  nodeId: node.id,
-                  input,
-                  cursor,
-                })
-              },
-              nodeVisual: {
-                enter: (nodeId) => {
-                  const state = store.getSnapshot()
-                  if (state.status !== 'ready' || state.location.currentParentId === nodeId) return false
-                  setNodeVisualSelection({ anchorId: nodeId, focusId: nodeId })
-                  rememberNodeRange(vimCommandState.current, state.document, nodeId, nodeId)
-                  return true
-                },
-                move: moveNodeVisual,
-                swap: () => {
-                  if (nodeVisualSelection !== undefined) {
-                    setNodeVisualSelection({
-                      anchorId: nodeVisualSelection.focusId,
-                      focusId: nodeVisualSelection.anchorId,
-                    })
-                    swapNodeVisual(vimCommandState.current)
-                  }
-                },
-                exit: () => setNodeVisualSelection(undefined),
-                command: commandNodeVisual,
-                shift: shiftNodeVisual,
-                join: joinNodeVisual,
-              },
-              shiftCurrentNode,
-              restoreVisual,
-              verticalOperator,
-              beginStructuralOpen: (position) => {
-                beginStructuralOpen(vimCommandState.current, node.id, position)
-              },
-              beginStructuralChildOpen: () => {
-                beginStructuralChildOpen(vimCommandState.current, node.id)
-              },
-              repeatStructural,
-              fold: onFoldCommand,
-            },
+              node,
+            ),
       }),
       onMouseDown: (event: MouseEvent<HTMLElement>) => {
         applyCaretState(

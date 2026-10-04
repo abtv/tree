@@ -13,14 +13,14 @@ import type { VimMode } from '../vim-editing'
  * The single test double for `VimKeyboardState`.
  *
  * Every member of that interface is supplied, because the production wiring in
- * `use-node-input-bindings.ts` supplies every member unconditionally. A double that omits one makes
+ * `vim-keyboard-state.ts` supplies every member unconditionally. A double that omits one makes
  * the suite exercise a path the application never takes, which is the defect class
  * [ADR 0014](../../../docs/decisions/0014-single-owner-for-renderer-interaction-state.md) exists to
  * remove — so this helper is the one place the wiring is expressed, not a per-file literal.
  *
  * The caret authority and the command-state owner are real: `getCaretState`, `applyCaretState`,
  * `setImageCaret`, and `imageTextCursor` close over one shared `VimCaretState`, copying the formulas
- * in `use-node-input-bindings.ts`, and the command slots come from a real `vim-command-state.ts`
+ * in `vim-keyboard-state.ts`, and the command slots come from a real `vim-command-state.ts`
  * owner. They are still wrapped in `vi.fn` so call assertions keep working. The session and
  * navigation members are bare spies, because their behavior belongs to `vim-edit-session.ts` and
  * `EditorStore`, which own their own tests.
