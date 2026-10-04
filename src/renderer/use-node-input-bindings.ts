@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent, FocusEvent, FormEvent, MouseEvent, SyntheticEvent } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
-import { locateNode, reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
+import { reconcileLinkTextEdit, requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from './node-input-types'
 import {
   collapseSelectionToAnchor,
@@ -32,7 +32,6 @@ import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotio
 import {
   beginStructuralChildOpen,
   beginStructuralOpen,
-  beginStructuralVisual,
   clearCommandAssembly,
   clearPending,
   createVimCommandState,
@@ -44,7 +43,7 @@ import {
   type VimCommandState,
 } from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
-import { rememberIncomingNodes, rememberNodeRange } from './vim-visual-memory'
+import { rememberNodeRange } from './vim-visual-memory'
 import type { VimMode } from './vim-editing'
 import {
   editCaretTransition,
@@ -60,11 +59,9 @@ import {
   beginReplaceSession,
   createVimEditSessionState,
   insertRepeatChange,
-  registerSource,
   resolveReplaceCommit,
   takeInsertSession,
   takeReplaceSession,
-  visualCommandRegister,
 } from './vim-edit-session'
 
 interface UseNodeInputBindingsOptions {
@@ -319,60 +316,19 @@ export function useNodeInputBindings({
 
   const commandNodeVisual = useCallback(
     (command: NodeVisualCommand, count = 1): void => {
-      if (nodeVisualSelection === undefined) return
-      const state = store.getSnapshot()
-      if (state.status !== 'ready') return
-      // The anchor and focus of a whole-node Visual range always share a real parent (see
-      // `moveNodeVisual`), so the anchor's actual siblings resolve the span.
-      const anchorLocated = locateNode(state.document, nodeVisualSelection.anchorId)
-      if (anchorLocated === undefined) return
-      const focus = anchorLocated.siblings.findIndex((node) => node.id === nodeVisualSelection.focusId)
-      if (focus < 0) return
-      const span = Math.abs(anchorLocated.index - focus) + 1
-      const source = registerSource(vimSession.current.register)
-      const repeat = command === 'p' || command === 'P' ? count : 1
-      const result = store.applyNodeVisual(
+      nodeVisualCommands.commandNodeVisual(
+        {
+          store,
+          session: vimSession.current,
+          commandState: vimCommandState.current,
+          nodeVisualSelection,
+          setNodeVisualSelection,
+          changeVimMode,
+          syncImageCaretToFocus,
+        },
         command,
-        nodeVisualSelection.anchorId,
-        nodeVisualSelection.focusId,
-        source,
-        '',
-        repeat,
+        count,
       )
-      if (result === undefined) return
-      const nextRegister = visualCommandRegister(command, result)
-      if (nextRegister !== undefined) vimSession.current.register = nextRegister
-      if (command === 'y') void store.copyVimForest(result.nodes).catch((error: unknown) => store.reportError(error))
-      if ((command === 'p' || command === 'P') && source !== undefined) {
-        // `gv` after a Visual put selects the incoming nodes: the copies start at the selected node.
-        const next = store.getSnapshot()
-        if (next.status === 'ready')
-          rememberIncomingNodes(
-            vimCommandState.current,
-            next.document,
-            next.location.selectedNodeId,
-            source.nodes.length * repeat,
-          )
-      }
-      if (command === 'c' || command === 's') {
-        beginStructuralVisual(vimCommandState.current, nodeVisualSelection.focusId, command, span)
-        changeVimMode('insert')
-      } else {
-        if (command !== 'y')
-          recordRepeatChange(vimCommandState.current, {
-            kind: 'structural-visual',
-            command,
-            span,
-            ...(source === undefined ? {} : { source }),
-            ...(repeat > 1 ? { repeat } : {}),
-          })
-        changeVimMode('normal')
-        syncImageCaretToFocus()
-      }
-      // The command exits whole-node Visual mode, so an unfinished `g` prefix must not survive into
-      // the mode the command lands in.
-      clearCommandAssembly(vimCommandState.current)
-      setNodeVisualSelection(undefined)
     },
     [
       store,
@@ -387,81 +343,63 @@ export function useNodeInputBindings({
 
   const verticalOperator = useCallback(
     (nodeId: string, operator: 'd' | 'y' | 'c', direction: 'down' | 'up', count: number): void => {
-      const state = store.getSnapshot()
-      if (state.status !== 'ready' || state.location.currentParentId === nodeId) return
-      // The range is the node's own actual siblings, whatever depth it is displayed at, so expanded
-      // descendant rows never count as members.
-      const located = locateNode(state.document, nodeId)
-      if (located === undefined) return
-      const edge = Math.max(
-        0,
-        Math.min(located.siblings.length - 1, located.index + (direction === 'down' ? count : -count)),
+      nodeVisualCommands.verticalOperator(
+        {
+          store,
+          session: vimSession.current,
+          commandState: vimCommandState.current,
+          changeVimMode,
+        },
+        nodeId,
+        operator,
+        direction,
+        count,
       )
-      const first = located.siblings[Math.min(located.index, edge)]
-      const last = located.siblings[Math.max(located.index, edge)]
-      if (first === undefined || last === undefined) return
-      const span = Math.abs(located.index - edge) + 1
-      const result = store.applyNodeVisual(operator, first.id, last.id)
-      if (result === undefined) return
-      const nextRegister = visualCommandRegister(operator, result)
-      if (nextRegister !== undefined) vimSession.current.register = nextRegister
-      if (operator === 'c') {
-        beginStructuralVisual(vimCommandState.current, nodeId, 'c', span)
-        changeVimMode('insert')
-      } else if (operator === 'd') {
-        recordRepeatChange(vimCommandState.current, { kind: 'structural-visual', command: 'd', span })
-      }
     },
     [store, changeVimMode, vimSession, vimCommandState],
   )
 
-  // Whole-node Visual keeps its endpoint IDs, direction, and mode across `>` and `<`: the moved rows
-  // keep their IDs, so only the store changes and the selection state is left alone.
   const shiftNodeVisual = useCallback(
     (direction: 'in' | 'out', count: number): void => {
-      if (nodeVisualSelection === undefined) return
-      const { anchorId, focusId } = nodeVisualSelection
-      const state = store.getSnapshot()
-      if (state.status !== 'ready') return
-      const anchor = locateNode(state.document, anchorId)
-      const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
-      if (anchor === undefined || focus < 0) return
-      const span = Math.abs(anchor.index - focus) + 1
-      if (store.shiftNodeVisual(direction, anchorId, focusId, count))
-        recordRepeatChange(vimCommandState.current, { kind: 'structural-shift', direction, span, count })
+      nodeVisualCommands.shiftNodeVisual(
+        { store, commandState: vimCommandState.current, nodeVisualSelection },
+        direction,
+        count,
+      )
     },
     [store, nodeVisualSelection],
   )
 
-  // `J` and `gJ` end whole-node Visual mode only when the join happened; a rejected or impossible
-  // join leaves the mode and the selected range alone.
   const joinNodeVisual = useCallback(
     (spaced: boolean): void => {
-      if (nodeVisualSelection === undefined) return
-      const { anchorId, focusId } = nodeVisualSelection
-      const state = store.getSnapshot()
-      if (state.status !== 'ready') return
-      const anchor = locateNode(state.document, anchorId)
-      const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
-      if (anchor === undefined || focus < 0) return
-      const span = Math.abs(anchor.index - focus) + 1
-      if (!store.joinNodes({ anchorId, focusId }, spaced)) return
-      recordRepeatChange(vimCommandState.current, { kind: 'structural-join', span, spaced })
-      changeVimMode('normal')
-      syncImageCaretToFocus()
-      clearCommandAssembly(vimCommandState.current)
-      setNodeVisualSelection(undefined)
+      nodeVisualCommands.joinNodeVisual(
+        {
+          store,
+          commandState: vimCommandState.current,
+          nodeVisualSelection,
+          changeVimMode,
+          syncImageCaretToFocus,
+          setNodeVisualSelection,
+        },
+        spaced,
+      )
     },
     [store, nodeVisualSelection, setNodeVisualSelection, changeVimMode, syncImageCaretToFocus, vimCommandState],
   )
 
   const shiftCurrentNode = useCallback(
     (nodeId: string, direction: 'in' | 'out', count: number, selection: { start: number; end: number }): void => {
-      if (!store.shiftNodeVisual(direction, nodeId, nodeId, count)) return
-      recordRepeatChange(vimCommandState.current, { kind: 'structural-shift', direction, span: 1, count })
-      // The store's focus intent collapses the caret when the moved row renders; the layout effect
-      // below restores the selection once it has.
-      schedulePendingVisualSelection({ nodeId, ...selection })
+      nodeVisualCommands.shiftCurrentNode(
+        {
+          store,
+          commandState: vimCommandState.current,
+          schedulePendingVisualSelection,
+        },
+        nodeId,
+        direction,
+        count,
+        selection,
+      )
     },
     [store],
   )
