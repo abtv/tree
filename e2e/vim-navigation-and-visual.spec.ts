@@ -1226,6 +1226,72 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
   })
 
+  // @requirement PRODUCT.md §20.8
+  test('j and k at the window edge scroll by about one row instead of centering the row', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 100 }, (_, index) => ({ id: `n${index}`, text: `Row ${index}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const focusedRow = (): Promise<{
+      top: number
+      bottom: number
+      height: number
+      scrollTop: number
+      view: number[]
+    }> =>
+      window.evaluate(() => {
+        const viewport = document.querySelector('.scroll-viewport')!
+        const view = viewport.getBoundingClientRect()
+        const row = document.activeElement!.closest('.node-row')!.getBoundingClientRect()
+        return {
+          top: row.top - view.top,
+          bottom: view.bottom - row.bottom,
+          height: row.height,
+          scrollTop: viewport.scrollTop,
+          view: [view.top, view.bottom],
+        }
+      })
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeFocused()
+    const start = await focusedRow()
+    const rowsPerScreen = Math.floor((start.view[1]! - start.view[0]!) / start.height)
+
+    // Walking down never hides the focused row; the first scroll moves the content by about one row
+    // and leaves the row one row height above the bottom edge, instead of centering it.
+    let scrolledBy = 0
+    for (let step = 0; step < rowsPerScreen + 2 && scrolledBy === 0; step += 1) {
+      await window.keyboard.press('j')
+      const state = await focusedRow()
+      expect(state.top).toBeGreaterThanOrEqual(0)
+      expect(state.bottom).toBeGreaterThanOrEqual(0)
+      scrolledBy = state.scrollTop
+      if (scrolledBy > 0) {
+        expect(scrolledBy).toBeLessThanOrEqual(state.height * 3)
+        expect(state.bottom).toBeGreaterThanOrEqual(state.height * 0.9)
+        expect(state.bottom).toBeLessThanOrEqual(state.height * 1.1)
+      }
+    }
+    expect(scrolledBy).toBeGreaterThan(0)
+
+    // Walking back up scrolls the same way at the top edge: the row lands one row height below it.
+    await window.keyboard.type('30j')
+    await window.keyboard.press('Control+u')
+    const before = (await focusedRow()).scrollTop
+    for (let step = 0; step < rowsPerScreen * 2; step += 1) {
+      await window.keyboard.press('k')
+      const state = await focusedRow()
+      expect(state.top).toBeGreaterThanOrEqual(0)
+      if (state.scrollTop < before) {
+        expect(state.top).toBeGreaterThanOrEqual(state.height * 0.9)
+        expect(state.top).toBeLessThanOrEqual(state.height * 1.1)
+        return
+      }
+    }
+    throw new Error('Walking back up never scrolled the content.')
+  })
+
   test('o and O open empty siblings below and above', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

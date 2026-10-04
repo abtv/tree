@@ -49,32 +49,67 @@ describe('scroll viewport', () => {
     expect(windowScroll).toHaveBeenCalledOnce()
   })
 
-  it('reveals an element outside the content area by centering it, and leaves a visible one alone', () => {
-    const element = mountScroller({ top: 30, bottom: 630 })
-    const scrollBy = vi.fn()
-    element.scrollBy = scrollBy
-    const row = document.createElement('div')
-    const rowRect = (top: number) =>
-      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ top, bottom: top + 20, height: 20 } as DOMRect)
+  describe('revealInViewport', () => {
+    // The content area spans 30 to 630, so it is 600 high and half of it is 300.
+    function mountRow(height = 20): { scrollBy: ReturnType<typeof vi.fn>; place: (top: number) => void } {
+      const element = mountScroller({ top: 30, bottom: 630 })
+      const scrollBy = vi.fn()
+      element.scrollBy = scrollBy
+      const row = document.createElement('div')
+      return {
+        scrollBy,
+        place: (top: number) => {
+          vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ top, bottom: top + height, height } as DOMRect)
+          revealInViewport(row)
+        },
+      }
+    }
 
-    rowRect(100)
-    revealInViewport(row)
-    expect(scrollBy).not.toHaveBeenCalled()
+    it('leaves a fully visible element alone, even one inside the margin', () => {
+      const { scrollBy, place } = mountRow()
+      place(100)
+      place(30)
+      place(610)
+      expect(scrollBy).not.toHaveBeenCalled()
+    })
 
-    // Above the content area: 30 + (600 - 20) / 2 = 320 is the centered top, so scroll up by 1480.
-    rowRect(-1_160)
-    revealInViewport(row)
-    expect(scrollBy).toHaveBeenLastCalledWith(0, -1_480)
+    it('moves a nearby element by the smallest distance that leaves one element height of context', () => {
+      const { scrollBy, place } = mountRow()
+      // Partly hidden under the toolbar: its top must end at 30 + 20.
+      place(20)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, -30)
+      // Just below the content area: its bottom must end at 630 - 20.
+      place(630)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, 40)
+      // Partly hidden at the bottom edge.
+      place(620)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, 30)
+      // Almost half a viewport away is still nearby.
+      place(900)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, 310)
+      place(-270)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, -320)
+    })
 
-    // Partly hidden under the toolbar counts as not visible.
-    rowRect(20)
-    revealInViewport(row)
-    expect(scrollBy).toHaveBeenLastCalledWith(0, -300)
+    it('centers an element more than half the content area away', () => {
+      const { scrollBy, place } = mountRow()
+      // 30 + (600 - 20) / 2 = 320 is the centered top.
+      place(-1_160)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, -1_480)
+      place(1_000)
+      expect(scrollBy).toHaveBeenLastCalledWith(0, 680)
+    })
 
-    // Below the content area.
-    rowRect(900)
-    revealInViewport(row)
-    expect(scrollBy).toHaveBeenLastCalledWith(0, 580)
+    it('caps the margin for a tall element and keeps the start of one taller than the content area', () => {
+      const tall = mountRow(200)
+      // The margin is a quarter of the content area, 150, not the element height: 700 - (630 - 150).
+      tall.place(500)
+      expect(tall.scrollBy).toHaveBeenLastCalledWith(0, 220)
+      document.body.replaceChildren()
+      const taller = mountRow(700)
+      taller.place(100)
+      expect(taller.scrollBy).toHaveBeenLastCalledWith(0, 70)
+    })
   })
 
   it('observes the scrolled content rather than the fixed-size container', () => {

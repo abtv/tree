@@ -23,16 +23,26 @@ export function scrollViewportBy(deltaY: number): void {
 }
 
 /**
- * Scrolls the content area so the element is fully visible, centering it when it is not. Focusing
- * an element scrolls it into view natively, but not reliably when the focus change happens while
- * the list is re-rendering, so focus movement calls this afterwards. It does nothing for an
- * element that is already fully visible.
+ * Scrolls the content area so the element is fully visible. Focusing an element scrolls it into
+ * view natively, but not reliably when the focus change happens while the list is re-rendering, so
+ * focus movement calls this afterwards. It does nothing for an element that is already fully
+ * visible. A nearby element moves by the smallest distance that leaves one element height of
+ * context beyond it, like Vim's `scrolloff`; an element more than half a viewport outside the
+ * content area is centered, since the context around a distant destination is what matters.
  */
 export function revealInViewport(element: Element): void {
   const { top, bottom } = viewportBounds()
   const rect = element.getBoundingClientRect()
   if (rect.top >= top && rect.bottom <= bottom) return
-  scrollViewportBy(rect.top - (top + (bottom - top - rect.height) / 2))
+  const height = bottom - top
+  if (rect.bottom < top - height / 2 || rect.top > bottom + height / 2) {
+    scrollViewportBy(rect.top - (top + (height - rect.height) / 2))
+    return
+  }
+  const margin = Math.max(0, Math.min(rect.height, height / 4, (height - rect.height) / 2))
+  if (rect.top < top) scrollViewportBy(rect.top - (top + margin))
+  // An element taller than the content area keeps its start in view instead of its end.
+  else scrollViewportBy(Math.min(rect.bottom - (bottom - margin), rect.top - top))
 }
 
 /** The element whose size changes when the scrolled content grows or shrinks. */

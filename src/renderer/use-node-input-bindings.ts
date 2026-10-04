@@ -472,8 +472,10 @@ export function useNodeInputBindings({
     const applyFocus = (): void => {
       const input = inputs.current.get(focus.nodeId)
       if (input === undefined) return
-      input.focus()
-      revealInViewport(input)
+      // The native focus scroll centers an element that is not fully visible, so it is suppressed
+      // and the reveal below decides how far to scroll (docs/PRODUCT.md §20.8).
+      input.focus({ preventScroll: true })
+      revealInViewport(input.closest('.node-row') ?? input)
       if (latestVimMode.current === 'normal') {
         // Vertical navigation may resolve the destination to its image while the store carries
         // the originating text column. Project the resolved caret, including on the deferred pass.

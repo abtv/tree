@@ -1074,6 +1074,12 @@ What the application shows and does depends on its state, never on the input pat
 
 A difference between paths is allowed only where this document records it and its reason. An appearance that the platform or browser derives from the most recent input device, rather than from the application's state, is a difference of this kind and is not recorded anywhere: an element that receives focus programmatically shows its focus indicator whether the user last used the mouse or the keyboard.
 
+### 20.8 Keeping the Selection in View
+
+When a command moves the selection or the caret to a node that is not fully visible in the content area, the content scrolls by the smallest distance that shows it whole and leaves one node height of context beyond it, so `j`, `k`, and the arrow keys at the edge of the window move the content by about one row instead of re-centering it. The context is capped at a quarter of the content area. A node taller than the content area shows its start. A node already fully visible never causes scrolling, even next to an edge, so `H`, `M`, and `L` (§20.2) and a click on a visible node leave the content where it is.
+
+A destination more than half the height of the content area beyond its nearest edge, such as the target of `G` in a long list, is centered in the content area instead, since the surrounding nodes matter more than a small shift. The location toolbar and the status bar are not part of the content area.
+
 ---
 
 ## 21. Unexpected Renderer Errors
