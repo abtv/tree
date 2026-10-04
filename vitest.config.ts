@@ -57,9 +57,15 @@ export default defineConfig({
         },
         'src/renderer/use-node-input-bindings.ts': {
           statements: 95,
-          branches: 88.5,
-          functions: 93.5,
-          lines: 98,
+          branches: 88.8,
+          functions: 93.7,
+          lines: 98.9,
+        },
+        'src/renderer/vim-viewport-motion.ts': {
+          statements: 99.9,
+          branches: 99.9,
+          functions: 99.9,
+          lines: 99.9,
         },
         'src/renderer/use-scroll-restoration.ts': {
           statements: 98,

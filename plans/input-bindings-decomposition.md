@@ -118,8 +118,8 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 | --- | --- | --- | --- | --- | --- |
 | T1 | Baseline recorded; identity of `bindings`, `dragFreeze`, `setVimEditing` characterized | none | New identity tests pass on unchanged code; Baseline filled; R1 and R2 asked | Low | Done |
 | T2 | (a) DOM helpers in `editor-dom.ts`; (b) named pending types and one writer each for `pendingCaret` and `pendingVisualSelection` | T1 | Helper tests; writer grep; existing tests preserved except added T2a helper cases explicitly authorized 2026-10-04; hook and identity suites green | (a) Low, (b) Moderate | Done |
-| T3 | `vim-viewport-motion.ts` | T1, R2 | Direct tests; viewport oracles green; floor added | Moderate | Ready |
-| T4 | `vim-structural-repeat.ts` | T1 | Direct tests; replay oracles green; floor added | Moderate | Planned |
+| T3 | `vim-viewport-motion.ts` | T1, R2 | Direct tests; viewport oracles green; floor added | Moderate | Done |
+| T4 | `vim-structural-repeat.ts` | T1 | Direct tests; replay oracles green; floor added | Moderate | Ready |
 | T5 | `vim-node-visual-commands.ts` | T2b | Direct tests; whole-node Visual and `gv` oracles green; floor added | Moderate | Planned |
 | T6 | `caret-projection-rules.ts` | T2b | One test per currency rule; focus-pass oracles green; floor added | Moderate | Planned |
 | T7 | `vim-session-finish.ts` | T2, T6, R1 | Direct tests; Replace, Insert, flush, and switch oracles green; shutdown E2E green | Moderate (High if the finisher registration changes) | Planned |
@@ -283,6 +283,6 @@ The first performance attempt could not launch Electron inside the sandbox (SIGA
 
 ## Next task
 
-T3 (Ready): extract viewport motion into `vim-viewport-motion.ts` with direct tests and coverage floors, preserving viewport behavior and hook callback identity. T1 and T2 are complete; R1 and R2 are approved. For T2a, the Product Owner explicitly authorized adding direct helper cases to the existing `editor-dom.test.ts` while preserving its existing cases; this exception to C3/C8 applies only to T2a. T2b preserved existing tests, callback dependencies, owner refs, and consumer guards. Suggested later sessions: T3; T4 to T6; T7 to T9; T10, then T13, or T11 first if R3 is approved; later T12 and T13.
+T4 (Ready): extract structural repeat replay into `vim-structural-repeat.ts` with direct tests and coverage floors, preserving replay behavior and hook callback identity. T1 through T3 are complete; R1 and R2 are approved. For T2a, the Product Owner explicitly authorized adding direct helper cases to the existing `editor-dom.test.ts` while preserving its existing cases; this exception to C3/C8 applies only to T2a. T2b and T3 preserved existing tests, callback dependencies, and owner refs. Suggested later sessions: T4 to T6; T7 to T9; T10, then T13, or T11 first if R3 is approved; later T12 and T13.
 
 Resume prompt: "Continue the input-bindings decomposition initiative. Read AGENTS.md, docs/DEVELOPMENT.md section 11, plans/README.md, plans/input-bindings-decomposition.md, and git status. State the task you are taking (the plan's next task), do it under the plan's Common rules, commit it together with the plan's status update, and stop after at most four committed tasks or at the first stop condition (C8)."

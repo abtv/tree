@@ -26,7 +26,8 @@ import {
 } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
-import { revealInViewport, viewportBounds } from './scroll-viewport'
+import { revealInViewport } from './scroll-viewport'
+import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
   beginStructuralChildOpen,
@@ -45,7 +46,7 @@ import {
 import { isNodeExpanded } from '../application/expansion-state'
 import type { NodeInputBindings } from './NodeInput'
 import { rememberIncomingNodes, rememberNodeRange, resolveVisualMemory } from './vim-visual-memory'
-import { firstNonWhitespace, type VimMode } from './vim-editing'
+import type { VimMode } from './vim-editing'
 import {
   editCaretTransition,
   focusCaretTransition,
@@ -652,52 +653,7 @@ export function useNodeInputBindings({
 
   const moveVimViewport = useCallback(
     (nodeId: string, motion: VimViewportMotion, cursor: number, count = 1): void => {
-      const viewport = viewportBounds()
-      const intersectingRows = Array.from(document.querySelectorAll<HTMLElement>('.node-row')).filter((row) => {
-        const bounds = row.getBoundingClientRect()
-        return bounds.top < viewport.bottom && bounds.bottom > viewport.top
-      })
-      // H, M, and L pick among fully visible rows, as Vim does, so the destination never needs the
-      // scroll that revealing a clipped row would cause. A viewport with none falls back to the clipped ones.
-      const fullyVisibleRows =
-        motion === 'top' || motion === 'middle' || motion === 'bottom'
-          ? intersectingRows.filter((row) => {
-              const bounds = row.getBoundingClientRect()
-              return bounds.top >= viewport.top && bounds.bottom <= viewport.bottom
-            })
-          : []
-      const visibleRows = fullyVisibleRows.length > 0 ? fullyVisibleRows : intersectingRows
-      if (visibleRows.length === 0) return
-      const currentIndex = visibleRows.findIndex((row) => row.dataset.nodeId === nodeId)
-      const baseIndex = currentIndex < 0 ? (motion === 'half-up' ? visibleRows.length - 1 : 0) : currentIndex
-      const targetIndex =
-        motion === 'top'
-          ? Math.min(visibleRows.length - 1, count - 1)
-          : motion === 'middle'
-            ? Math.floor((visibleRows.length - 1) / 2)
-            : motion === 'bottom'
-              ? Math.max(0, visibleRows.length - count)
-              : Math.max(
-                  0,
-                  Math.min(
-                    visibleRows.length - 1,
-                    baseIndex + (motion === 'half-down' ? 1 : -1) * Math.max(1, Math.floor(visibleRows.length / 2)),
-                  ),
-                )
-      const targetId = visibleRows[targetIndex]?.dataset.nodeId
-      if (targetId !== undefined) {
-        // H, M, and L are line motions: they land on the first non-blank character, or on the image of a
-        // node that has one (the position after its text), where the half-page motions keep the caret column.
-        const state = store.getSnapshot()
-        const lineMotion = motion === 'top' || motion === 'middle' || motion === 'bottom'
-        let column = cursor
-        if (lineMotion && state.status === 'ready') {
-          const { text, attachment } = requireNode(state.document, targetId).node
-          column = attachment === undefined ? firstNonWhitespace(text) : text.length
-        }
-        store.selectNode(targetId, column)
-        syncImageCaretToFocus()
-      }
+      moveViewportSelection({ store, syncImageCaretToFocus }, nodeId, motion, cursor, count)
     },
     [store, syncImageCaretToFocus],
   )

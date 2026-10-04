@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Input bindings decomposition](input-bindings-decomposition.md) | Active. T1 and T2 complete; R1 and R2 approved. Each task starts when the Product Owner asks to continue. | T3: extract viewport motion into `vim-viewport-motion.ts` |
+| [Input bindings decomposition](input-bindings-decomposition.md) | Active. T1 through T3 complete; R1 and R2 approved. Each task starts when the Product Owner asks to continue. | T4: extract structural repeat replay into `vim-structural-repeat.ts` |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
