@@ -125,6 +125,14 @@ test.describe('scroll edges', () => {
       // Playwright's browser context defaults to light media independently of nativeTheme.
       await page.emulateMedia({ colorScheme: appearance })
       await expect(page.locator('.node-row')).toHaveCount(200)
+      // The window resize reaches the renderer asynchronously and re-applies the initial selection
+      // reveal (PRODUCT.md §20.8) until the scroll below relinquishes it, so settle the geometry first.
+      await expect
+        .poll(() => page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
+        .toEqual(screenshotContentSize)
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+      )
       // Both edges cut through a row, so the screenshots show the fade over partial text.
       await scrollContentTo(page, 512)
       await expect.poll(() => fadeOpacities(page)).toEqual({ top: 1, bottom: 1 })
