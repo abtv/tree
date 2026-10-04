@@ -67,3 +67,11 @@ worth that.
   order to suit that one command would misplace the far more common `dd`.
 - A future move from snapshot history to command/inverse-operation history would make the change
   site directly available and could retire the comparison.
+
+## Cross-parent movement clarification
+
+On 2026-10-04, the Product Owner chose selecting the moved node on undo and redo, keeping the current
+location when it is visible and navigating to its parent only when hidden. Snapshot comparison now
+matches stable IDs removed from and added to different changed sibling lists before falling back to
+the positional rule. Same-parent reordering remains approximate. History stays a pure document store
+and does not restore previous navigation.

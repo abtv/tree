@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
+  breadcrumbDropTargets,
   dragBlock,
   dropTargetAtGap,
   dropTargetOnRow,
@@ -24,6 +25,18 @@ const roots = [
   node('d'),
 ]
 const rows = buildVisibleRows(roots, (id) => id === 'a' || id === 'c')
+
+describe('breadcrumbDropTargets', () => {
+  it('offers root and ancestors as last-child destinations, excluding the current parent', () => {
+    expect([...breadcrumbDropTargets({ roots }, 'a2').entries()]).toEqual([
+      [null, target(null, roots.length)],
+      ['a', target('a', 2)],
+    ])
+    expect(breadcrumbDropTargets({ roots }, 'a').has('a')).toBe(false)
+    expect(breadcrumbDropTargets({ roots }, null).size).toBe(0)
+    expect(breadcrumbDropTargets({ roots }, 'missing').size).toBe(0)
+  })
+})
 
 function blockOf(source: readonly VisibleRow[], id: string): DragBlock {
   const block = dragBlock(source, id)

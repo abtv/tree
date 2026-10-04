@@ -1,4 +1,5 @@
 import type { VisibleRow } from './visible-rows'
+import { locateNode, type Document } from '../domain/document'
 
 /** The dragged node's own row plus every visible descendant row, as `[start, end)` in the row list. */
 export interface DragBlock {
@@ -10,6 +11,23 @@ export interface DragBlock {
 export interface DropTarget {
   readonly parentId: string | null
   readonly index: number
+}
+
+/** Breadcrumb ancestors append the source; the current parent is never a destination. */
+export function breadcrumbDropTargets(
+  document: Document,
+  currentParentId: string | null,
+): ReadonlyMap<string | null, DropTarget> {
+  if (currentParentId === null) return new Map()
+  const current = locateNode(document, currentParentId)
+  if (current === undefined) return new Map()
+  return new Map([
+    [null, { parentId: null, index: document.roots.length }],
+    ...current.ancestors.map((node): [string, DropTarget] => [
+      node.id,
+      { parentId: node.id, index: node.children.length },
+    ]),
+  ])
 }
 
 /** The inclusive range of row depths a gap offers; depth 0 is the displayed location's top level. */

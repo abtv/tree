@@ -33,6 +33,8 @@ interface NodeListProps {
   structuralVersion?: number
   visualNodeSelection?: { anchorId: string; focusId: string } | undefined
   locked?: boolean
+  breadcrumbTargets?: ReadonlyMap<string | null, DropTarget> | undefined
+  onBreadcrumbTarget?: ((parentId: string | null | undefined) => void) | undefined
 }
 
 const NEVER_EXPANDED = (): boolean => false
@@ -51,6 +53,8 @@ export function NodeList({
   structuralVersion = 0,
   visualNodeSelection,
   locked = false,
+  breadcrumbTargets,
+  onBreadcrumbTarget,
 }: NodeListProps): React.JSX.Element {
   const listRef = useRef<HTMLElement | null>(null)
   const heightsRef = useRef(new Map<string, number>())
@@ -170,7 +174,17 @@ export function NodeList({
     onLostPointerCapture,
     onListClick,
     recomputeDropIndex,
-  } = useNodeListDrag({ rows: visibleRows, locked, windowed, listRef, observedElementsRef, onDrop, dragFreeze })
+  } = useNodeListDrag({
+    rows: visibleRows,
+    locked,
+    windowed,
+    listRef,
+    observedElementsRef,
+    onDrop,
+    dragFreeze,
+    breadcrumbTargets,
+    onBreadcrumbTarget,
+  })
 
   useLayoutEffect(() => {
     recomputeDropIndex()

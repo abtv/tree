@@ -17,6 +17,23 @@ export interface LayoutState {
 export const EMPTY_HEIGHTS: ReadonlyMap<string, number> = new Map()
 export const EMPTY_LAYOUT: ListLayout = { offsets: new Float64Array(1), total: 0, count: 0 }
 
+/** Pointer capture belongs to the list, so breadcrumb targets are resolved by geometry. */
+export function breadcrumbAtPoint(
+  clientX: number,
+  clientY: number,
+): { parentId: string | null | undefined } | undefined {
+  const toolbar = document.querySelector<HTMLElement>('.location-bar')
+  if (toolbar === null) return undefined
+  const bounds = toolbar.getBoundingClientRect()
+  if (clientY < bounds.top || clientY >= bounds.bottom || clientX < bounds.left || clientX >= bounds.right)
+    return undefined
+  for (const segment of toolbar.querySelectorAll<HTMLElement>('[data-breadcrumb-id]')) {
+    const rect = segment.getBoundingClientRect()
+    if (clientX >= rect.left && clientX < rect.right) return { parentId: segment.dataset.breadcrumbId || null }
+  }
+  return { parentId: undefined }
+}
+
 export function collectWindowIndices(windowRange: ListWindow): number[] {
   const indices: number[] = []
   for (let index = windowRange.start; index < windowRange.end; index += 1) indices.push(index)

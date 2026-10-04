@@ -26,7 +26,32 @@ export interface ChangeSite {
  */
 export function locateChangeSite(before: Document, after: Document): ChangeSite | undefined {
   if (before === after) return undefined
-  return forestChangeSite(before.roots, after.roots, null)
+  return crossParentMoveSite(before, after) ?? forestChangeSite(before.roots, after.roots, null)
+}
+
+/** Match nodes leaving and entering changed sibling lists, without walking shared subtrees. */
+function crossParentMoveSite(before: Document, after: Document): ChangeSite | undefined {
+  const removed = new Map<NodeId, NodeId | null>()
+  const added: ChangeSite[] = []
+  const compare = (from: readonly TreeNode[], to: readonly TreeNode[], parentId: NodeId | null): void => {
+    if (from === to) return
+    if (from.length === to.length && from.every((node, index) => node.id === to[index]!.id)) {
+      for (let index = 0; index < from.length; index += 1) {
+        if (from[index] !== to[index]) compare(from[index]!.children, to[index]!.children, to[index]!.id)
+      }
+      return
+    }
+    const fromIds = new Map(from.map((node) => [node.id, node]))
+    const toIds = new Set(to.map((node) => node.id))
+    for (const node of from) if (!toIds.has(node.id)) removed.set(node.id, parentId)
+    for (const node of to) {
+      const previous = fromIds.get(node.id)
+      if (previous === undefined) added.push({ nodeId: node.id, parentId, cursor: 0 })
+      else if (previous !== node) compare(previous.children, node.children, node.id)
+    }
+  }
+  compare(before.roots, after.roots, null)
+  return added.find((site) => removed.has(site.nodeId) && removed.get(site.nodeId) !== site.parentId)
 }
 
 /**

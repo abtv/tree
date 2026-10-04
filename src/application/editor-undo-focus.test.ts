@@ -15,6 +15,21 @@ function tree(...roots: TreeNode[]): Document {
 const collapsed = () => false
 
 describe('locateChangeSite', () => {
+  it('never descends into an unchanged subtree during move or text comparison', () => {
+    const untouched: TreeNode = {
+      id: 'large',
+      text: 'Untouched',
+      get children(): readonly TreeNode[] {
+        throw new Error('Shared subtree was traversed')
+      },
+    }
+    const x = node('x', 'X')
+    const before = tree(untouched, node('p', 'Parent', [x]))
+    const moved = tree(untouched, node('p', 'Parent'), x)
+    expect(locateChangeSite(before, moved)).toEqual({ nodeId: 'x', parentId: null, cursor: 0 })
+    expect(locateChangeSite(moved, before)).toEqual({ nodeId: 'x', parentId: 'p', cursor: 0 })
+    expect(locateChangeSite(before, tree(untouched, node('p', 'Changed', [x])))).toMatchObject({ nodeId: 'p' })
+  })
   it('reports no site for the same document', () => {
     const document = tree(node('a', 'text'))
     expect(locateChangeSite(document, document)).toBeUndefined()
@@ -181,6 +196,37 @@ describe('locateChangeSite', () => {
 describe('changeSiteFocus', () => {
   const before = tree(node('root', 'Root', [node('a', 'one'), node('b', 'two')]))
   const after = tree(node('root', 'Root', [node('a', 'one'), node('b', 'tXo')]))
+
+  it('selects a moved node on undo and redo, navigating only when it is hidden', () => {
+    const moved = node('x', 'Moved', [node('child', 'Child')])
+    const original = tree(node('a', 'A'), node('b', 'B', [moved]))
+    const outdented = tree(original.roots[0]!, node('b', 'B'), moved)
+    const root = { currentParentId: null, selectedNodeId: 'a' }
+    expect(changeSiteFocus(outdented, original, root, collapsed)).toEqual({
+      location: { currentParentId: 'b', selectedNodeId: 'x' },
+      focus: { nodeId: 'x', cursor: 0 },
+    })
+    expect(changeSiteFocus(outdented, original, root, (id) => id === 'b')?.location).toEqual({
+      currentParentId: null,
+      selectedNodeId: 'x',
+    })
+    expect(changeSiteFocus(original, outdented, { currentParentId: 'b', selectedNodeId: 'x' }, collapsed)).toEqual({
+      location: { currentParentId: null, selectedNodeId: 'x' },
+      focus: { nodeId: 'x', cursor: 0 },
+    })
+  })
+
+  it('finds a move when its receiving branch precedes or follows its source', () => {
+    for (const reverse of [false, true]) {
+      const x = node('x', 'X')
+      const roots = [node('a', 'A', [x]), node('b', 'B')]
+      const moved = [node('a', 'A'), node('b', 'B', [x])]
+      const before = tree(...(reverse ? roots.toReversed() : roots))
+      const after = tree(...(reverse ? moved.toReversed() : moved))
+      expect(locateChangeSite(before, after)).toEqual({ nodeId: 'x', parentId: 'b', cursor: 0 })
+      expect(locateChangeSite(after, before)).toEqual({ nodeId: 'x', parentId: 'a', cursor: 0 })
+    }
+  })
 
   it('displays the change site at its own parent level', () => {
     const target = changeSiteFocus(before, after, { currentParentId: 'root', selectedNodeId: 'a' }, collapsed)

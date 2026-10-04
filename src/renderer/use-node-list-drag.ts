@@ -24,6 +24,7 @@ import {
   type NodeDropRegion,
 } from './node-drag'
 import type { VisibleRow } from '../application/visible-rows'
+import { breadcrumbAtPoint } from './node-list-layout'
 
 interface UseNodeListDragOptions {
   rows: readonly VisibleRow[]
@@ -33,6 +34,8 @@ interface UseNodeListDragOptions {
   observedElementsRef: RefObject<Map<string, HTMLElement>>
   onDrop: (nodeId: string, target: DropTarget) => void
   dragFreeze: NodeDragCaretFreeze
+  breadcrumbTargets?: ReadonlyMap<string | null, DropTarget> | undefined
+  onBreadcrumbTarget?: ((parentId: string | null | undefined) => void) | undefined
 }
 
 interface NodeListDrag {
@@ -54,6 +57,7 @@ interface NodeListDrag {
 type ResolvedDrop =
   | { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined }
   | { kind: 'row'; row: number; target: DropTarget | undefined }
+  | { kind: 'breadcrumb'; parentId: string | null | undefined; target: DropTarget | undefined }
 
 export function useNodeListDrag({
   rows,
@@ -63,6 +67,8 @@ export function useNodeListDrag({
   observedElementsRef,
   onDrop,
   dragFreeze,
+  breadcrumbTargets,
+  onBreadcrumbTarget,
 }: UseNodeListDragOptions): NodeListDrag {
   const [autoScrollDirection, setAutoScrollDirection] = useState(0)
   const [drag, dispatch] = useReducer(nodeDragReducer, IDLE_NODE_DRAG)
@@ -80,6 +86,13 @@ export function useNodeListDrag({
   const freeze = resolved.phase === 'dragging' ? resolved.source : undefined
   const invalidDrop = freeze !== undefined && drop !== undefined && drop.target === undefined
 
+  const breadcrumbTarget =
+    freeze !== undefined && drop?.kind === 'breadcrumb' && drop.target !== undefined ? drop.parentId : undefined
+  useEffect(() => {
+    onBreadcrumbTarget?.(breadcrumbTarget)
+    return () => onBreadcrumbTarget?.(undefined)
+  }, [breadcrumbTarget, onBreadcrumbTarget])
+
   const cancelDrag = useCallback((): void => {
     dispatch({ type: 'cancel' })
     setDrop(undefined)
@@ -92,6 +105,13 @@ export function useNodeListDrag({
 
   const computeDrop = useCallback(
     (clientX: number, clientY: number): ResolvedDrop | undefined => {
+      const breadcrumb = breadcrumbAtPoint(clientX, clientY)
+      if (breadcrumb !== undefined)
+        return {
+          kind: 'breadcrumb',
+          parentId: breadcrumb.parentId,
+          target: breadcrumb.parentId === undefined ? undefined : breadcrumbTargets?.get(breadcrumb.parentId),
+        }
       const regions: NodeDropRegion[] = []
       observedElementsRef.current.forEach((element) => {
         const index = Number(element.dataset.nodeIndex)
@@ -114,7 +134,7 @@ export function useNodeListDrag({
       const level = dropLevelAtPoint(rows[block.start]!.depth, origin?.x ?? clientX, clientX, levels)
       return { kind: 'gap', gap: zone.gap, level, target: dropTargetAtGap(rows, block, zone.gap, level) }
     },
-    [drag.source, observedElementsRef, rows],
+    [drag.source, observedElementsRef, rows, breadcrumbTargets],
   )
 
   useEffect(() => {
@@ -158,31 +178,6 @@ export function useNodeListDrag({
     return () => document.body.classList.remove('node-drag-invalid')
   }, [invalidDrop])
 
-  useEffect(() => {
-    if (resolved.phase === 'idle') return undefined
-    const pointerId = resolved.source?.pointerId
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      cancelDrag()
-    }
-    const onBlur = (): void => cancelDrag()
-    const onPointerUp = (event: PointerEvent): void => {
-      if (pointerId === undefined || event.pointerId !== pointerId) return
-      dispatch({ type: 'release', pointerId: event.pointerId })
-      setDrop(undefined)
-      setAutoScrollDirection(0)
-    }
-    globalThis.addEventListener('keydown', onKeyDown)
-    globalThis.addEventListener('blur', onBlur)
-    globalThis.addEventListener('pointerup', onPointerUp)
-    return () => {
-      globalThis.removeEventListener('keydown', onKeyDown)
-      globalThis.removeEventListener('blur', onBlur)
-      globalThis.removeEventListener('pointerup', onPointerUp)
-    }
-  }, [cancelDrag, resolved.phase, resolved.source])
-
   const onRowPointerDown = useCallback(
     (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (locked) return
@@ -221,55 +216,108 @@ export function useNodeListDrag({
     [cancelDrag, resolved.phase, resolved.source],
   )
 
-  const onListPointerMove = (event: ReactPointerEvent<HTMLElement>): void => {
-    if (resolved.phase === 'idle' || resolved.source === undefined) return
-    if (resolved.phase === 'pending') {
-      const origin = pressPointRef.current
-      if (origin !== undefined && exceedsHoldTolerance(origin.x, origin.y, event.clientX, event.clientY)) {
-        cancelDrag()
+  const onListPointerMove = useCallback(
+    (event: Pick<PointerEvent, 'clientX' | 'clientY'>): void => {
+      if (resolved.phase === 'idle' || resolved.source === undefined) return
+      if (resolved.phase === 'pending') {
+        const origin = pressPointRef.current
+        if (origin !== undefined && exceedsHoldTolerance(origin.x, origin.y, event.clientX, event.clientY)) {
+          cancelDrag()
+          return
+        }
+        const row = observedElementsRef.current.get(resolved.source.nodeId)
+        if (row === undefined) {
+          cancelDrag()
+          return
+        }
+        const bounds = row.getBoundingClientRect()
+        const inside =
+          event.clientY >= bounds.top &&
+          event.clientY < bounds.bottom &&
+          event.clientX >= bounds.left &&
+          event.clientX <= bounds.right
+        if (!inside) cancelDrag()
         return
       }
-      const row = observedElementsRef.current.get(resolved.source.nodeId)
-      if (row === undefined) {
-        cancelDrag()
-        return
+      pointerXRef.current = event.clientX
+      pointerYRef.current = event.clientY
+      const nextDrop = computeDrop(event.clientX, event.clientY)
+      setDrop((previous) => (sameDrop(previous, nextDrop) ? previous : nextDrop))
+      if (windowed) {
+        const { top, bottom } = viewportBounds()
+        setAutoScrollDirection(nextDrop?.kind === 'breadcrumb' ? 0 : autoScrollStep(event.clientY - top, bottom - top))
       }
-      const bounds = row.getBoundingClientRect()
-      const inside =
-        event.clientY >= bounds.top &&
-        event.clientY < bounds.bottom &&
-        event.clientX >= bounds.left &&
-        event.clientX <= bounds.right
-      if (!inside) cancelDrag()
-      return
-    }
-    pointerXRef.current = event.clientX
-    pointerYRef.current = event.clientY
-    const nextDrop = computeDrop(event.clientX, event.clientY)
-    setDrop((previous) => (sameDrop(previous, nextDrop) ? previous : nextDrop))
-    if (windowed) {
-      const { top, bottom } = viewportBounds()
-      setAutoScrollDirection(autoScrollStep(event.clientY - top, bottom - top))
-    }
-  }
+    },
+    [resolved, cancelDrag, observedElementsRef, computeDrop, windowed],
+  )
 
-  const onListPointerUp = (event: ReactPointerEvent<HTMLElement>): void => {
-    if (freeze !== undefined && freeze.pointerId === event.pointerId) {
-      suppressClickRef.current = true
-      const resolvedDrop = computeDrop(event.clientX, event.clientY)
-      const sourceBlock = dragBlock(rows, freeze.nodeId)
-      if (
-        resolvedDrop?.target !== undefined &&
-        sourceBlock !== undefined &&
-        !isNoOpDrop(rows, sourceBlock, resolvedDrop.target)
-      )
-        onDrop(freeze.nodeId, resolvedDrop.target)
+  const onListPointerUp = useCallback(
+    (event: Pick<PointerEvent, 'pointerId' | 'clientX' | 'clientY' | 'target'>): void => {
+      if (freeze !== undefined && freeze.pointerId === event.pointerId) {
+        suppressClickRef.current = event.target instanceof Node && listRef.current?.contains(event.target) === true
+        const resolvedDrop = computeDrop(event.clientX, event.clientY)
+        const sourceBlock = dragBlock(rows, freeze.nodeId)
+        if (
+          resolvedDrop?.target !== undefined &&
+          sourceBlock !== undefined &&
+          !isNoOpDrop(rows, sourceBlock, resolvedDrop.target)
+        )
+          onDrop(freeze.nodeId, resolvedDrop.target)
+      }
+      dragFreeze.end(event.pointerId)
+      dispatch({ type: 'release', pointerId: event.pointerId })
+      setDrop(undefined)
+      setAutoScrollDirection(0)
+    },
+    [freeze, computeDrop, rows, onDrop, dragFreeze, listRef],
+  )
+
+  useEffect(() => {
+    if (resolved.phase === 'idle') return undefined
+    const pointerId = resolved.source?.pointerId
+    const outsideList = (event: PointerEvent): boolean =>
+      event.target instanceof Node && !listRef.current?.contains(event.target)
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      cancelDrag()
     }
-    dragFreeze.end(event.pointerId)
-    dispatch({ type: 'release', pointerId: event.pointerId })
-    setDrop(undefined)
-    setAutoScrollDirection(0)
-  }
+    const onBlur = (): void => cancelDrag()
+    const onNativeDragStart = (event: DragEvent): void => {
+      if (resolved.phase === 'dragging' && event.target instanceof Node && listRef.current?.contains(event.target))
+        event.preventDefault()
+    }
+    // Native capture can be unavailable; outside events still use the same target and release paths.
+    const onPointerMove = (event: PointerEvent): void => {
+      if (event.pointerId === pointerId && resolved.phase === 'dragging' && outsideList(event)) onListPointerMove(event)
+    }
+    const onPointerUp = (event: PointerEvent): void => {
+      if (pointerId === undefined || event.pointerId !== pointerId) return
+      if (outsideList(event)) onListPointerUp(event)
+      else {
+        dispatch({ type: 'release', pointerId: event.pointerId })
+        setDrop(undefined)
+        setAutoScrollDirection(0)
+      }
+    }
+    globalThis.addEventListener('keydown', onKeyDown)
+    globalThis.addEventListener('blur', onBlur)
+    globalThis.addEventListener('dragstart', onNativeDragStart)
+    globalThis.addEventListener('pointermove', onPointerMove)
+    const onPointerCancel = (event: PointerEvent): void => {
+      if (event.pointerId === pointerId && outsideList(event)) cancelDrag()
+    }
+    globalThis.addEventListener('pointercancel', onPointerCancel)
+    globalThis.addEventListener('pointerup', onPointerUp)
+    return () => {
+      globalThis.removeEventListener('keydown', onKeyDown)
+      globalThis.removeEventListener('blur', onBlur)
+      globalThis.removeEventListener('dragstart', onNativeDragStart)
+      globalThis.removeEventListener('pointermove', onPointerMove)
+      globalThis.removeEventListener('pointercancel', onPointerCancel)
+      globalThis.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [cancelDrag, resolved.phase, resolved.source, listRef, onListPointerMove, onListPointerUp])
 
   const onListPointerCancel = (): void => cancelDrag()
 
@@ -315,6 +363,7 @@ function sameDrop(left: ResolvedDrop | undefined, right: ResolvedDrop | undefine
   if (left === undefined || right === undefined) return true
   if (left.target?.parentId !== right.target?.parentId || left.target?.index !== right.target?.index) return false
   if (left.kind === 'row' && right.kind === 'row') return left.row === right.row
+  if (left.kind === 'breadcrumb' && right.kind === 'breadcrumb') return left.parentId === right.parentId
   if (left.kind !== 'gap' || right.kind !== 'gap') return false
   return (
     left.gap === right.gap &&

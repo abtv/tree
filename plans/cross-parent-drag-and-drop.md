@@ -77,7 +77,7 @@ The Product Owner should see the screenshots for S8.
 | T4 | Pointer geometry in `node-drag.ts` | T0 | Low | Done |
 | T5 | Between-row drops with a level | T3, T4 | High (`npm run check:full`), reviewer and product verifier, `WORKING_PLAN.md` | Done |
 | T6 | Drop onto a node | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Done |
-| T7 | Drop onto a breadcrumb entry | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Planned |
+| T7 | Drop onto a breadcrumb entry | T5 | Moderate, reviewer and verifier, `WORKING_PLAN.md` | Done |
 | T8 | Auto-scroll in every overflowing list (M4) | T5 | Moderate | Planned |
 | T9 | Cross-task verification, final documentation sweep, plan removal | T6, T7, T8 | High (`npm run check:full`), product verifier | Planned |
 
@@ -129,7 +129,7 @@ The Product Owner should see the screenshots for S8.
 ### T7. Drop onto a breadcrumb entry
 
 * Files: `LocationBar.tsx`, `App.tsx` (highlight state lifted to App), `use-node-list-drag.ts`, `node-list-layout.ts` (hit-test helper), `styles.css`, their tests, the e2e spec, PRODUCT §2.2 and §11.
-* Acceptance: ancestor and root-glyph drops append and follow M1; the current-parent segment is not a target; undo returns the node and navigates back; Visual mode ends; highlight geometry and a screenshot.
+* Acceptance: ancestor and root-glyph drops append and follow M1; the current-parent segment is not a target; undo/redo selects the moved node, retaining the current location when it is visible and otherwise displaying its parent's level; Visual mode ends; highlight geometry and a screenshot.
 * Commit: `feat(renderer): drop a dragged node onto a breadcrumb entry`.
 
 ### T8. Auto-scroll in every overflowing list
@@ -165,13 +165,13 @@ The Product Owner should see the screenshots for S8.
 
 ## Next task
 
-T7 (drop onto a breadcrumb entry) is the next task. T1 to T6 are done. T7 is Moderate Risk and uses `WORKING_PLAN.md` for task evidence. Resolve the undo/location acceptance issue below before implementing its behavior.
+T8 (auto-scroll in every overflowing list) is the next task. T1 to T7 are done. T8 is Moderate Risk.
 
 T5's missed independent review found that an unfocused drag source could unmount during windowed scrolling. The follow-up keeps the source mounted independently of the focused row and covers its cancellation cleanup.
 
 Notes carried forward from T3 for T5 to T7:
 
 * `EditorStore.moveNodeToParent(nodeId, parentId, index)` takes a post-removal index and returns whether it changed the document; the renderer maps a `DropTarget` from `drop-targets.ts` onto it directly. It selects the moved node, keeps the caret of a focused node, opens the receiving fold and the folds below the displayed parent, and moves the location only when the node leaves it.
-* After undoing a move that left the displayed location, the location stays at the new parent and selects that parent's heading rather than returning to the old place. The T3 test only asserts that the location is valid. T7's acceptance, "undo returns the node and navigates back", needs its own handling or a Product Owner decision on what undo should show.
+* On 2026-10-04 the Product Owner resolved the undo/location issue: undo/redo of cross-parent movement selects the moved node, retaining the current location when it is visible and otherwise displaying its own parent's level. It does not restore the location preceding the move. T7 implements this through snapshot comparison, preserving ADR 0015's document-only history.
 
 Resume prompt: "Continue the cross-parent drag-and-drop initiative (plans/cross-parent-drag-and-drop.md): take the next Ready task."

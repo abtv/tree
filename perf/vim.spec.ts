@@ -475,6 +475,33 @@ test.describe('Vim interactions at scale', () => {
       })
       expect(metrics.hoverPaintMs).toBeLessThan(250)
       expect(metrics.crossParentMovePaintMs).toBeLessThan(250)
+      await window.evaluate(() => {
+        const observeUndo = (event: KeyboardEvent): void => {
+          if (event.key !== 'z') return
+          document.removeEventListener('keydown', observeUndo, true)
+          const started = performance.now()
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              ;(window as unknown as { moveUndoPaintMs: number }).moveUndoPaintMs = performance.now() - started
+            }),
+          )
+        }
+        document.addEventListener('keydown', observeUndo, true)
+      })
+      await window.keyboard.press('Meta+z')
+      await window.waitForFunction(
+        () => (window as unknown as { moveUndoPaintMs?: number }).moveUndoPaintMs !== undefined,
+      )
+      await expect(source).toBeFocused()
+      const undoPaintMs = await window.evaluate(
+        () => (window as unknown as { moveUndoPaintMs: number }).moveUndoPaintMs,
+      )
+      recordPerfResult({
+        kind: 'state',
+        scenario: `cross-parent-${targetKind}-undo-windowed-1000`,
+        metrics: { undoToPaintMs: round(undoPaintMs) },
+      })
+      expect(undoPaintMs).toBeLessThan(250)
     })
   }
 

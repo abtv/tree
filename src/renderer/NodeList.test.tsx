@@ -8,6 +8,8 @@ import './test/setup'
 import { NodeList } from './NodeList'
 import { EDGE_SCROLL_STEP, ROW_HEIGHT_ESTIMATE, WINDOWING_THRESHOLD } from './list-window'
 import { HOLD_ACTIVATION_MS } from './node-drag'
+import type { DropTarget } from '../application/drop-targets'
+import { LocationBar } from './LocationBar'
 
 afterEach(() => {
   cleanup()
@@ -74,6 +76,8 @@ function resizeEntry(target: Element, blockSize?: number): ResizeObserverEntry {
 }
 
 interface RenderOptions {
+  breadcrumbTargets?: ReadonlyMap<string | null, DropTarget>
+  onBreadcrumbTarget?: (parentId: string | null | undefined) => void
   focusedNodeId?: string | undefined
   locked?: boolean
   list?: TreeNode[]
@@ -103,6 +107,8 @@ function renderRows(
   const dragFreeze = stubDragFreeze()
   const view = render(
     <NodeList
+      breadcrumbTargets={options.breadcrumbTargets}
+      onBreadcrumbTarget={options.onBreadcrumbTarget}
       dragFreeze={dragFreeze}
       focusedNodeId={options.focusedNodeId}
       isExpanded={options.isExpanded}
@@ -151,6 +157,78 @@ function rowElements(container: HTMLElement): Element[] {
 }
 
 describe('NodeList', () => {
+  it.each(['release', 'cancel', 'invalid'])(
+    'handles outside-list %s when native pointer capture is unavailable',
+    (ending) => {
+      vi.useFakeTimers()
+      mockRowRects(40)
+      render(<LocationBar path={[nodes[0]!]} currentParentId="a" onNavigate={() => undefined} />)
+      const toolbar = document.querySelector<HTMLElement>('.location-bar')!
+      vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(rect(0, 30))
+      const root = screen.getByRole('button', { name: 'Top level' })
+      vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({ ...rect(0, 30), right: 150 } as DOMRect)
+      const onBreadcrumbTarget = vi.fn()
+      const { container, onMove } = renderRows({
+        breadcrumbTargets: new Map(ending === 'invalid' ? [] : [[null, { parentId: null, index: 2 }]]),
+        onBreadcrumbTarget,
+      })
+      activate(rowElements(container)[0]!, 50)
+      pointerMoveAt(root, 15)
+      expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(ending === 'invalid' ? undefined : null)
+      if (ending === 'cancel') fireEvent.pointerCancel(root, { pointerId: 1 })
+      else pointerUpAt(root, 15)
+      if (ending === 'release') expect(onMove).toHaveBeenCalledExactlyOnceWith('a', { parentId: null, index: 2 })
+      else expect(onMove).not.toHaveBeenCalled()
+      if (ending === 'release') {
+        const click = createEvent.click(rowElements(container)[0]!)
+        fireEvent(rowElements(container)[0]!, click)
+        expect(click.defaultPrevented).toBe(false)
+      }
+      expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(undefined)
+    },
+  )
+  it.each(['release', 'escape', 'cancel', 'lost', 'blur', 'lock', 'missing'])(
+    'clears a breadcrumb projection on %s',
+    (ending) => {
+      vi.useFakeTimers()
+      mockRowRects(40)
+      render(<LocationBar path={[nodes[0]!]} currentParentId="a" onNavigate={() => undefined} />)
+      const toolbar = document.querySelector<HTMLElement>('.location-bar')!
+      vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(rect(0, 30))
+      const root = screen.getByRole('button', { name: 'Top level' })
+      vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({ ...rect(0, 30), right: 150 } as DOMRect)
+      const onBreadcrumbTarget = vi.fn()
+      const { container, onMove, rerender, dragFreeze } = renderRows({
+        breadcrumbTargets: new Map([[null, { parentId: null, index: 2 }]]),
+        onBreadcrumbTarget,
+      })
+      const row = rowElements(container)[0]!
+      activate(row, 50)
+      pointerMoveAt(row, 1)
+      expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(null)
+      expect(container.querySelector('.node-row-drop-before, .node-row-drop-on')).toBeNull()
+      if (ending === 'release') pointerUpAt(row, 1)
+      if (ending === 'escape') fireEvent.keyDown(window, { key: 'Escape' })
+      if (ending === 'cancel') fireEvent.pointerCancel(row, { pointerId: 1 })
+      if (ending === 'lost') fireEvent.lostPointerCapture(row, { pointerId: 1 })
+      if (ending === 'blur') fireEvent.blur(window)
+      if (ending === 'lock' || ending === 'missing')
+        rerender(
+          <NodeList
+            dragFreeze={dragFreeze}
+            nodes={ending === 'missing' ? [] : nodes}
+            locked={ending === 'lock'}
+            renderInput={() => null}
+            onDrop={onMove}
+            onEnter={() => undefined}
+            onBreadcrumbTarget={onBreadcrumbTarget}
+          />,
+        )
+      expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(undefined)
+      if (ending === 'release') expect(onMove).toHaveBeenCalledWith('a', { parentId: null, index: 2 })
+      else expect(onMove).not.toHaveBeenCalled()
+    },
+  )
   it('does not render a range when a Visual endpoint is no longer displayed', () => {
     const { container } = renderRows({ visualNodeSelection: { anchorId: 'missing', focusId: 'b' } })
 
@@ -675,6 +753,18 @@ describe('NodeList drag interaction', () => {
 
     expect(container.querySelector('.node-row-dragging')).toBeNull()
     expect(document.body).not.toHaveClass('node-drag-active')
+  })
+
+  it('prevents native image or selection dragging only while the node drag is active', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const row = rowElements(container)[0]!
+    expect(fireEvent.dragStart(row)).toBe(true)
+    activate(row, 13)
+    expect(fireEvent.dragStart(row)).toBe(false)
+    pointerUpAt(row, 13)
+    expect(fireEvent.dragStart(row)).toBe(true)
   })
 
   it('hands the caret freeze to its owner when drag mode activates and releases it with the pointer', () => {

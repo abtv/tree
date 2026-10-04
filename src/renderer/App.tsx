@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../application/expansion-state'
@@ -8,6 +8,7 @@ import type { VimFoldCommand } from './vim-keyboard-types'
 import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
 import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
+import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
 import type { DropTarget } from '../application/drop-targets'
@@ -27,6 +28,13 @@ interface AppProps {
 export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
+  const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
+  const readyDocument = state.status === 'ready' ? state.document : undefined
+  const readyParentId = state.status === 'ready' ? state.location.currentParentId : null
+  const breadcrumbTargets = useMemo(
+    () => (readyDocument === undefined ? undefined : breadcrumbDropTargets(readyDocument, readyParentId)),
+    [readyDocument, readyParentId],
+  )
   const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled)
@@ -235,7 +243,12 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
 
   return (
     <main className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}>
-      <LocationBar path={path} currentParentId={state.location.currentParentId} onNavigate={navigateToAncestor} />
+      <LocationBar
+        path={path}
+        currentParentId={state.location.currentParentId}
+        onNavigate={navigateToAncestor}
+        dropParentId={breadcrumbTarget}
+      />
       <div className={SCROLL_VIEWPORT_CLASS}>
         <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
           {currentParent === undefined ? null : (
@@ -269,6 +282,8 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
             </section>
           )}
           <NodeList
+            breadcrumbTargets={breadcrumbTargets}
+            onBreadcrumbTarget={setBreadcrumbTarget}
             dragFreeze={dragFreeze}
             focusedNodeId={focus?.nodeId}
             isExpanded={isExpanded}

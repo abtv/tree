@@ -2,6 +2,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { isValidLocation, locateNode, type Document, type TreeNode } from '../domain/document'
 import { changeSiteFocus, locateChangeSite } from './editor-undo-focus'
+import { moveSubtree } from '../domain/document'
 
 /** A small tree whose node ids are unique and stable, so mutations can address a node by id. */
 const treeArbitrary = (): fc.Arbitrary<Document> => {
@@ -59,6 +60,37 @@ function mapNode(document: Document, id: string, change: (node: TreeNode) => Tre
 const anyNodeId = (document: Document): fc.Arbitrary<string> => fc.constantFrom(...allNodes(document).map((n) => n.id))
 
 describe('undo focus invariants', () => {
+  it('selects the moved node in both directions and retains a location where it is visible', () => {
+    fc.assert(
+      fc.property(treeArbitrary(), fc.nat(), fc.nat(), (document, sourceIndex, targetIndex) => {
+        const nodes = allNodes(document)
+        const source = nodes[sourceIndex % nodes.length]!
+        const parent = targetIndex % (nodes.length + 1) === nodes.length ? null : nodes[targetIndex % nodes.length]!.id
+        const result = moveSubtree(document, source.id, parent, 0)
+        if (
+          result.kind !== 'moved' ||
+          locateNode(document, source.id)!.parent?.id === parent ||
+          (locateNode(document, source.id)!.parent === null && parent === null)
+        )
+          return
+        for (const [before, after] of [
+          [document, result.document],
+          [result.document, document],
+        ] as const) {
+          const root = { currentParentId: null, selectedNodeId: after.roots[0]!.id }
+          const visible = changeSiteFocus(before, after, root, () => true)!
+          expect(visible.location).toEqual({ currentParentId: null, selectedNodeId: source.id })
+          const hidden = changeSiteFocus(before, after, root, () => false)!
+          expect(hidden.location).toEqual({
+            currentParentId: locateNode(after, source.id)!.parent?.id ?? null,
+            selectedNodeId: source.id,
+          })
+          expect(hidden.focus).toEqual({ nodeId: source.id, cursor: 0 })
+          expect(isValidLocation(after, hidden.location)).toBe(true)
+        }
+      }),
+    )
+  })
   it('reports no change site for a reference-identical document', () => {
     fc.assert(
       fc.property(treeArbitrary(), (document) => {

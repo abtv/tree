@@ -495,6 +495,8 @@ describe('EditorStore', () => {
       expect(ready(inside.store).document).toEqual({ roots })
       const restored = ready(inside.store)
       expect(isValidLocation(restored.document, restored.location)).toBe(true)
+      expect(restored.location).toEqual({ currentParentId: 'b', selectedNodeId: 'b1' })
+      expect(restored.focus).toMatchObject({ nodeId: 'b1', cursor: 0 })
       inside.store.redo()
       expect(ready(inside.store).location).toEqual({ currentParentId: 'a', selectedNodeId: 'b1' })
     })

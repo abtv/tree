@@ -176,7 +176,7 @@ textarea {
   align-items: center;
   justify-content: center;
   width: 18px;
-  height: 18px;
+  height: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -195,9 +195,27 @@ textarea {
 
 .location-segment {
   display: inline-flex;
+  align-self: stretch;
   align-items: center;
   min-width: 0;
   flex: 0 1 auto;
+}
+
+.location-root,
+.location-segment {
+  position: relative;
+}
+
+.location-drop-target::before {
+  position: absolute;
+  inset: 0;
+  background: var(--color-disclosure-hover-background);
+  pointer-events: none;
+  content: '';
+}
+
+.location-drop-target > * {
+  position: relative;
 }
 
 .location-separator {
@@ -228,8 +246,8 @@ textarea {
   white-space: nowrap;
 }
 
-.location-root:hover,
-.location-link:hover {
+body:not(.node-drag-active) .location-root:hover,
+body:not(.node-drag-active) .location-link:hover {
   color: var(--color-hover-text);
 }
 
@@ -467,6 +485,8 @@ body.node-drag-active .node-row,
 body.node-drag-active .node-row .node-input,
 body.node-drag-active .node-row .node-input a,
 body.node-drag-active .node-enter-control,
+body.node-drag-active .location-root,
+body.node-drag-active .location-link,
 body.node-drag-active .node-disclosure-triangle {
   cursor: grabbing;
 }

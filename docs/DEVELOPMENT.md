@@ -172,6 +172,8 @@ Hidden mode still requires a macOS GUI session; it does not make the suite headl
 
 Drag tests start a gesture through `startRowDrag` in `e2e/fixtures.ts`. A visible run happens on a live desktop, so that helper verifies the active drag survives a short settling window and retries the gesture a bounded number of times, since a window that loses focus releases pointer capture and the application cancels the drag by design. The hidden default removes desktop focus changes from the gesture, and the bounded retries remain for visible runs.
 
+Breadcrumb drag coverage in `e2e/drag-and-drop-hierarchy.spec.ts` checks toolbar destinations, focus/mode transitions, and both visible and hidden restored move sites after undo. Native pointer capture can also fail without a lost-capture event; renderer tests exercise outside-list move, release, invalid-target, and cancellation events through the same gesture handlers, so toolbar coverage does not assume capture succeeded.
+
 Window addressing in `e2e/fixtures.ts` is focus-independent for the same reason: closing, resizing, or reading the main window through `closeMainWindow`, `setMainWindowBounds`, and `readMainWindowBounds` addresses the application's window directly instead of relying on the application being frontmost, so the window-close flush and quit path stays testable while the application is inactive.
 
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**` and the `test-results/**` scratch directory where finished diagnostic specs are parked, and Playwright only reads `e2e/`.
