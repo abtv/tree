@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Input bindings decomposition](input-bindings-decomposition.md) | Active. Objective authorized; each task starts when the Product Owner asks to continue. R1 and R2 are asked in the T1 handoff. | T1: characterize `bindings` and `dragFreeze` identity and record the baseline |
+| [Input bindings decomposition](input-bindings-decomposition.md) | Active. T1 complete; each task starts when the Product Owner asks to continue. R1 and R2 await answers from the T1 handoff. | T2a: move shared input DOM helpers to `editor-dom.ts` |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

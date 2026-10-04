@@ -114,8 +114,8 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 
 | ID | Outcome | Depends on | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- | --- |
-| T1 | Baseline recorded; identity of `bindings`, `dragFreeze`, `setVimEditing` characterized | none | New identity tests pass on unchanged code; Baseline filled; R1 and R2 asked | Low | Ready |
-| T2 | (a) DOM helpers in `editor-dom.ts`; (b) named pending types and one writer each for `pendingCaret` and `pendingVisualSelection` | T1 | Helper tests; writer grep; no test edited; hook and identity suites green | (a) Low, (b) Moderate | Planned |
+| T1 | Baseline recorded; identity of `bindings`, `dragFreeze`, `setVimEditing` characterized | none | New identity tests pass on unchanged code; Baseline filled; R1 and R2 asked | Low | Done |
+| T2 | (a) DOM helpers in `editor-dom.ts`; (b) named pending types and one writer each for `pendingCaret` and `pendingVisualSelection` | T1 | Helper tests; writer grep; no test edited; hook and identity suites green | (a) Low, (b) Moderate | Ready (T2a next) |
 | T3 | `vim-viewport-motion.ts` | T1, R2 | Direct tests; viewport oracles green; floor added | Moderate | Planned |
 | T4 | `vim-structural-repeat.ts` | T1 | Direct tests; replay oracles green; floor added | Moderate | Planned |
 | T5 | `vim-node-visual-commands.ts` | T2b | Direct tests; whole-node Visual and `gv` oracles green; floor added | Moderate | Planned |
@@ -128,7 +128,7 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 | T12 | `use-drag-caret-freeze.ts` | T11, R3 | Freeze oracles and drag E2E green; `dragFreeze` identity stable | Moderate | Blocked (R3) |
 | T13 | Docs, final floors, aggregate validation, plan removal | T1 to T10, and T11, T12 if approved | `npm run check:full`, perf comparison, ARCHITECTURE updated, plan removed | Aggregate | Planned |
 
-### T1. Baseline and characterization (Low, Ready)
+### T1. Baseline and characterization (Low, Done)
 
 - Files: `src/renderer/use-node-input-bindings.identity.test.tsx` (new); this plan (Baseline, statuses, R answers).
 - Do:
@@ -262,16 +262,24 @@ Statuses: `Planned`, `Ready`, `In progress`, `Blocked`, `Done`. Pick the lowest-
 
 | Item | At plan time | Recorded by T1 |
 | --- | --- | --- |
-| `HEAD` and snapshot | `c95c30c`, clean worktree | |
-| Hook lines | 1,251 | |
-| Hook test lines (`.test.tsx`, `.property.test.tsx`) | 2,571, 281 | |
-| Hook coverage (statements, branches, functions, lines) and headroom | unmeasured | |
-| `npm run fix:history -- src/renderer/use-node-input-bindings.ts` | 22 `fix` commits for this file in the 14-day default window (2026-10-04) | |
-| `git log --oneline -30 -- src/renderer/use-node-input-bindings.ts` | 10 `fix` subjects among the 30 newest commits | |
-| Perf baseline artifact (local, never committed) | none | `test-results/perf-input-bindings-baseline.json` |
+| `HEAD` and snapshot | `c95c30c`, clean worktree | Runtime HEAD `7e5fcc988028eab7e5cd5c8e5b16ca5666e7da66`; initially clean. Measurement snapshot with the new identity test: `sha256:3e30387d9bb3c86f328dff9790bd0e6fff67e40286f9ed3a69fe6026594fad8e`. |
+| Hook lines | 1,251 | 1,251; unchanged |
+| Hook test lines (`.test.tsx`, `.property.test.tsx`) | 2,571, 281 | 2,571, 281; unchanged |
+| Hook coverage (statements, branches, functions, lines) and headroom | unmeasured | Statements 580/609 (95.23%), branches 438/489 (89.57%), functions 94/100 (94%), lines 503/508 (99.01%). Headroom, covered minus floor × total: 1.45 statements, 5.235 branches, 0.5 functions, 5.16 lines. |
+| `npm run fix:history -- src/renderer/use-node-input-bindings.ts` | 22 `fix` commits for this file in the 14-day default window (2026-10-04) | 23 entries on 2026-10-04, from `59da5c3` to `e3f63f7`; the command reports a possible shared design cause. This initiative already addresses the cluster. |
+| `git log --oneline -30 -- src/renderer/use-node-input-bindings.ts` | 10 `fix` subjects among the 30 newest commits | Confirmed 10; newest hook commit remains `c95c30c`. |
+| Perf baseline artifact (local, never committed) | none | `test-results/perf-input-bindings-baseline.json`, created `2026-10-04T16:11:37.719Z`, darwin/arm64, Node v24.13.1, visible Electron, one worker; all 41 scenarios passed. SHA-256 `2c369d62b5db4de5349983f5d739daf8defe42e20f7d9187c89b4dd3b0a0430a`. |
+
+### T1 findings
+
+The eight new identity tests confirm the planned dependencies on unchanged runtime code. A focus-only token/cursor update preserves all three public identities. Changing exactly one of `vimMode`, `vimEnabled`, `selectedNodeId`, `persistenceLocked`, `nodeVisualSelection`, `onPreviewAttachment`, or `onFoldCommand` changes `bindings` while preserving `dragFreeze` (including its `begin` and `end` members) and `setVimEditing`. Every optional callback is stable, as in App; omitted callback defaults are outside these assertions (C2.6).
+
+Coverage report inspected: `coverage/renderer/use-node-input-bindings.ts.html` (local generated artifact). Six uncovered functions: default callbacks at hook lines 106, 107, 109, 110; the yank failure handler at 366; the keyboard command-state getter at 1005. The HTML highlights uncovered branch alternatives at 106, 107, 109, 110, 260, 281, 448, 466, 626, 903, 905, 908, 942, 957, 960, 1196, 1219, and 1236. These include missing focus/node/DOM fallbacks, plain Insert textarea completion, pending-link-draft matching, and native selection/link fallbacks. Total uncovered branch count is 51/489; the HTML line highlights are navigation anchors, not a one-to-one enumeration of V8 branch counters. Existing floors were not changed.
+
+The first performance attempt could not launch Electron inside the sandbox (SIGABRT, kill EPERM). The approved retry outside the sandbox completed all 41 scenarios and produced the baseline above; use that artifact for T10/T13 on this machine. No runtime defect was found or fixed. R1 and R2 are asked in the T1 handoff; their answers remain open until the Product Owner replies.
 
 ## Next task
 
-T1 (Ready). Suggested sessions: S1 T1 to T3 (ask R1 and R2 at the end of T1); S2 T4 to T6; S3 T7 to T9; S4 T10, then T13, or T11 first if R3 is approved; later T12 and T13.
+T2a (Ready): move shared DOM helpers to `editor-dom.ts` with direct tests, preserving the hook's behavior. T1 is complete. R1 and R2 have been asked in its handoff; record the answers before tasks that depend on them. T3 waits for R2; T7 waits for R1. Suggested later sessions: T2 to T3; T4 to T6; T7 to T9; T10, then T13, or T11 first if R3 is approved; later T12 and T13.
 
 Resume prompt: "Continue the input-bindings decomposition initiative. Read AGENTS.md, docs/DEVELOPMENT.md section 11, plans/README.md, plans/input-bindings-decomposition.md, and git status. State the task you are taking (the plan's next task), do it under the plan's Common rules, commit it together with the plan's status update, and stop after at most four committed tasks or at the first stop condition (C8)."
