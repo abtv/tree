@@ -10,6 +10,7 @@ import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
+import type { DropTarget } from '../application/drop-targets'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
 import { useNodeInputBindings } from './use-node-input-bindings'
 import { SCROLL_VIEWPORT_CLASS } from './scroll-viewport'
@@ -128,10 +129,17 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     [store],
   )
   const moveNode = useCallback(
-    (nodeId: string, insertionIndex: number): void => {
-      store.moveNodeTo(nodeId, insertionIndex)
+    (nodeId: string, target: DropTarget): void => {
+      const before = store.getSnapshot()
+      if (before.status !== 'ready') return
+      const sourceParent = requireNode(before.document, nodeId).ancestors.at(-1)?.id ?? null
+      const moved = store.moveNodeToParent(nodeId, target.parentId, target.index)
+      if (moved && sourceParent !== target.parentId && vimMode === 'visual-node') {
+        setNodeVisualSelection(undefined)
+        setVimMode('normal')
+      }
     },
-    [store],
+    [store, vimMode, setNodeVisualSelection, setVimMode],
   )
   const onToggleExpansion = useCallback(
     (node: TreeNode): void => {
@@ -270,7 +278,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
             onActivate={activateNode}
             visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
             onEnter={enterNode}
-            onMove={moveNode}
+            onDrop={moveNode}
             onToggleExpansion={onToggleExpansion}
             renderInput={renderInput}
             structuralVersion={state.structuralVersion}

@@ -152,7 +152,10 @@ test.describe('windowed node list (mode-independent)', () => {
     await expect
       .poll(() => window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0))
       .toBeGreaterThan(500)
-    await window.mouse.move(x, innerHeight / 2, { steps: 5 })
+    const dropRow = window.locator('.node-row').nth(20)
+    const dropBox = await dropRow.boundingBox()
+    if (dropBox === null) throw new Error('The windowed drop row was not rendered after scrolling.')
+    await window.mouse.move(x, dropBox.y + 1, { steps: 5 })
     const scrollY = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
     await window.mouse.up()
 

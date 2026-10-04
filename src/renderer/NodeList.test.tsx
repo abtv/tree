@@ -113,7 +113,7 @@ function renderRows(
         ((node, label) => <textarea aria-label={label} className="node-input" readOnly value={node.text} />)
       }
       onEnter={() => undefined}
-      onMove={onMove}
+      onDrop={onMove}
       onToggleExpansion={options.onToggleExpansion}
       visualNodeSelection={options.visualNodeSelection}
     />,
@@ -138,12 +138,12 @@ function activate(target: Element, clientY: number): void {
   act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
 }
 
-function pointerMoveAt(target: Element, clientY: number): void {
-  fireEvent.pointerMove(target, { pointerId: 1, clientX: 100, clientY })
+function pointerMoveAt(target: Element, clientY: number, clientX = 100): void {
+  fireEvent.pointerMove(target, { pointerId: 1, clientX, clientY })
 }
 
-function pointerUpAt(target: Element, clientY: number): void {
-  fireEvent.pointerUp(target, { pointerId: 1, clientX: 100, clientY })
+function pointerUpAt(target: Element, clientY: number, clientX = 100): void {
+  fireEvent.pointerUp(target, { pointerId: 1, clientX, clientY })
 }
 
 function rowElements(container: HTMLElement): Element[] {
@@ -172,7 +172,7 @@ describe('NodeList', () => {
         nodes={nodes}
         renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
         onEnter={onEnter}
-        onMove={() => undefined}
+        onDrop={() => undefined}
       />,
     )
 
@@ -190,7 +190,7 @@ describe('NodeList', () => {
         nodes={[parentNode, ...nodes]}
         renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
         onEnter={onEnter}
-        onMove={() => undefined}
+        onDrop={() => undefined}
       />,
     )
 
@@ -217,7 +217,7 @@ describe('NodeList', () => {
         focusedNodeId={focusedNodeId}
         nodes={list}
         onEnter={() => undefined}
-        onMove={() => undefined}
+        onDrop={() => undefined}
         renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
       />
     )
@@ -291,7 +291,7 @@ describe('NodeList inline expansion', () => {
         nodes={[parentNode, ...nodes]}
         renderInput={(node, label) => <span>{`${label}:${node.text}`}</span>}
         onEnter={onEnter}
-        onMove={() => undefined}
+        onDrop={() => undefined}
         onToggleExpansion={onToggleExpansion}
       />,
     )
@@ -302,13 +302,11 @@ describe('NodeList inline expansion', () => {
     expect(onEnter).not.toHaveBeenCalled()
   })
 
-  it('snaps a drop position inside a dragged node’s own descendant block to the nearest real boundary', () => {
+  it('prohibits a drop into the dragged node’s own visible block', () => {
     vi.useFakeTimers()
     mockRowRects()
     // p1 has its own child p1a; p2 is p1's next real sibling. Flattened: a, p1, p1a, p2, b. The
-    // position between p1 and p1a (row index 2) is not a valid boundary for a's children — it sits
-    // inside p1's own visible block — so it must snap to the nearest real boundary (before p1) and
-    // dropping there commits nothing.
+    // The position between p1 and p1a is inside the dragged block and must be visibly prohibited.
     const parentNode: TreeNode = {
       id: 'a',
       text: 'A',
@@ -326,8 +324,7 @@ describe('NodeList inline expansion', () => {
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
-    expect(rows[1]).toHaveClass('node-row-drop-before')
-    expect(container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')).toHaveLength(1)
+    expect(document.body).toHaveClass('node-drag-invalid')
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
 
     expect(onMove).not.toHaveBeenCalled()
@@ -352,11 +349,11 @@ describe('NodeList inline expansion', () => {
     expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['a', 'p1', 'p2', 'b'])
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
-    pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 + 5)
+    pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 3)
     expect(rows[3]).toHaveClass('node-row-drop-before')
-    pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 + 5)
+    pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 3)
 
-    expect(onMove).toHaveBeenCalledWith('p1', 2)
+    expect(onMove).toHaveBeenCalledWith('p1', { parentId: 'a', index: 1 })
   })
 
   it('does not start a drag from the disclosure triangle', () => {
@@ -374,6 +371,54 @@ describe('NodeList inline expansion', () => {
 })
 
 describe('NodeList drag interaction', () => {
+  it('moves a root node into an expanded branch at the pointer-selected level', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const parent: TreeNode = {
+      id: 'a',
+      text: 'A',
+      children: [{ id: 'a1', text: 'A child', children: [] }],
+    }
+    const { container, onMove } = renderRows({
+      list: [parent, { id: 'b', text: 'B', children: [] }],
+      isExpanded: (id) => id === 'a',
+    })
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[2]!, 65)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    pointerMoveAt(rows[2]!, ROW_HEIGHT_ESTIMATE * 2 - 1, 120)
+    expect(rows[2]).toHaveClass('node-row-drop-before')
+    expect(rows[2]).toHaveStyle({ '--drop-level': '1' })
+    pointerUpAt(rows[2]!, ROW_HEIGHT_ESTIMATE * 2 - 1, 120)
+
+    expect(onMove).toHaveBeenCalledWith('b', { parentId: 'a', index: 1 })
+  })
+
+  it('outdents a child through its expanded branch at the pointer-selected level', () => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const parent: TreeNode = {
+      id: 'a',
+      text: 'A',
+      children: [{ id: 'a1', text: 'A child', children: [] }],
+    }
+    const { container, onMove } = renderRows({
+      list: [parent, { id: 'b', text: 'B', children: [] }],
+      isExpanded: (id) => id === 'a',
+    })
+    const rows = rowElements(container)
+
+    pointerDownAt(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 1, 80)
+    expect(rows[2]).toHaveClass('node-row-drop-after')
+    expect(rows[2]).toHaveStyle({ '--drop-level': '0' })
+    pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 1, 80)
+
+    expect(onMove).toHaveBeenCalledWith('a1', { parentId: null, index: 2 })
+  })
+
   it('only marks the source row once the hold threshold elapses', () => {
     vi.useFakeTimers()
     mockRowRects()
@@ -440,7 +485,7 @@ describe('NodeList drag interaction', () => {
     pointerUpAt(rows[0]!, 47)
 
     expect(onMove).toHaveBeenCalledTimes(1)
-    expect(onMove).toHaveBeenCalledWith('a', 2)
+    expect(onMove).toHaveBeenCalledWith('a', { parentId: null, index: 1 })
   })
 
   it('does not enter drag mode on a release before the threshold', () => {
@@ -599,7 +644,7 @@ describe('NodeList drag interaction', () => {
         nodes={buildNodes(2).slice(1)}
         renderInput={(node, label) => <textarea aria-label={label} className="node-input" readOnly value={node.text} />}
         onEnter={() => undefined}
-        onMove={view.onMove}
+        onDrop={view.onMove}
       />,
     )
 
@@ -623,7 +668,7 @@ describe('NodeList drag interaction', () => {
     pointerUpAt(rows[0]!, 47)
 
     expect(onMove).toHaveBeenCalledTimes(1)
-    expect(onMove).toHaveBeenCalledWith('a', 2)
+    expect(onMove).toHaveBeenCalledWith('a', { parentId: null, index: 1 })
     expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
   })
 
@@ -639,7 +684,7 @@ describe('NodeList drag interaction', () => {
 
     pointerUpAt(rows[1]!, 5)
 
-    expect(onMove).toHaveBeenCalledWith('b', 0)
+    expect(onMove).toHaveBeenCalledWith('b', { parentId: null, index: 0 })
   })
 
   it('releases without a position change and commits nothing', () => {
@@ -748,7 +793,7 @@ describe('NodeList drag interaction', () => {
     pointerUpAt(rows[0]!, 47)
 
     expect(onMove).toHaveBeenCalledTimes(1)
-    expect(onMove).toHaveBeenCalledWith('a', 2)
+    expect(onMove).toHaveBeenCalledWith('a', { parentId: null, index: 1 })
     expect(container.querySelector('.node-row-dragging')).toBeNull()
   })
 
@@ -765,7 +810,7 @@ describe('NodeList drag interaction', () => {
         nodes={nodes}
         renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
         onEnter={() => undefined}
-        onMove={first.onMove}
+        onDrop={first.onMove}
       />,
     )
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
@@ -781,7 +826,7 @@ describe('NodeList drag interaction', () => {
         nodes={buildNodes(4).slice(1)}
         renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
         onEnter={() => undefined}
-        onMove={second.onMove}
+        onDrop={second.onMove}
       />,
     )
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
@@ -966,13 +1011,13 @@ describe('NodeList windowing', () => {
     pointerMoveAt(rows[1]!, -10)
     expect(rows[0]).toHaveClass('node-row-drop-before')
     pointerUpAt(rows[1]!, -10)
-    expect(onMove).toHaveBeenLastCalledWith('n1', 0)
+    expect(onMove).toHaveBeenLastCalledWith('n1', { parentId: null, index: 0 })
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * mountedCount + 10)
     expect(rows[mountedCount - 1]).toHaveClass('node-row-drop-after')
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * mountedCount + 10)
-    expect(onMove).toHaveBeenLastCalledWith('n1', mountedCount)
+    expect(onMove).toHaveBeenLastCalledWith('n1', { parentId: null, index: mountedCount - 1 })
   })
 
   it('keeps the caret marker on the pinned row while the caret row is outside the window', () => {
@@ -997,14 +1042,14 @@ describe('NodeList windowing', () => {
     if (pinned === null) throw new Error('The pinned row was not rendered.')
 
     activate(rows[0]!, 13)
-    pointerMoveAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + 10)
+    pointerMoveAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + ROW_HEIGHT_ESTIMATE - 1)
 
     const markers = container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')
     expect(markers).toHaveLength(1)
-    expect(pinned).toHaveClass('node-row-drop-before')
+    expect(pinned).toHaveClass('node-row-drop-after')
 
-    pointerUpAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + 10)
-    expect(onMove).toHaveBeenCalledWith('n0', 550)
+    pointerUpAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + ROW_HEIGHT_ESTIMATE - 1)
+    expect(onMove).toHaveBeenCalledWith('n0', { parentId: null, index: 550 })
   })
 
   it('auto-scrolls only while dragging and stops on release', () => {
@@ -1052,7 +1097,7 @@ describe('NodeList windowing', () => {
     pointerMoveAt(row, globalThis.innerHeight - 1)
     expect(frames).toHaveLength(1)
 
-    mockRowRects(-ROW_HEIGHT_ESTIMATE * 400)
+    mockRowRects(-ROW_HEIGHT_ESTIMATE * 400 - 8)
     fireEvent.scroll(window)
 
     const list = container.querySelector('.node-list')
@@ -1060,7 +1105,7 @@ describe('NodeList windowing', () => {
     const marker = container.querySelector('.node-row-drop-before, .node-row-drop-after')
     expect(marker).not.toBeNull()
     pointerUpAt(list, globalThis.innerHeight - 1)
-    expect(onMove).toHaveBeenCalledWith('n0', 431)
+    expect(onMove).toHaveBeenCalledWith('n0', { parentId: null, index: 430 })
   })
 
   it('never arms or keeps a pending hold when windowing unmounts the pressed row', () => {

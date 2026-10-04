@@ -17,6 +17,7 @@ interface NodeRowProps {
   dragging: boolean
   dropBefore: boolean
   dropAfter: boolean
+  dropLevel?: number | undefined
   focused: boolean
   visualSelected?: boolean
   pinned?: boolean
@@ -38,6 +39,7 @@ export const NodeRow = memo(function NodeRow({
   dragging,
   dropBefore,
   dropAfter,
+  dropLevel,
   focused,
   visualSelected = false,
   pinned = false,
@@ -54,7 +56,11 @@ export const NodeRow = memo(function NodeRow({
   ]
     .filter(Boolean)
     .join(' ')
-  const style: CSSProperties = { ...(pinned ? { top: pinnedOffset } : {}), '--row-depth': depth } as CSSProperties
+  const style: CSSProperties = {
+    ...(pinned ? { top: pinnedOffset } : {}),
+    '--row-depth': depth,
+    ...(dropLevel === undefined ? {} : { '--drop-level': dropLevel }),
+  } as CSSProperties
 
   return (
     <div

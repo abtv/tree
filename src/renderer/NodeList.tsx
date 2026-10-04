@@ -14,7 +14,8 @@ import {
   pruneHeights,
   type LayoutState,
 } from './node-list-layout'
-import { dropMarkerFor } from './node-drag'
+import { DROP_LEVEL_STEP_PX, dropMarkerFor } from './node-drag'
+import type { DropTarget } from '../application/drop-targets'
 import { onViewportScroll, viewportBounds } from './scroll-viewport'
 import { useNodeListDrag } from './use-node-list-drag'
 
@@ -24,7 +25,7 @@ interface NodeListProps {
   renderInput: (node: TreeNode, label: string) => ReactNode
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
-  onMove: (nodeId: string, insertionIndex: number) => void
+  onDrop: (nodeId: string, target: DropTarget) => void
   isExpanded?: ((nodeId: string) => boolean) | undefined
   onToggleExpansion?: ((node: TreeNode) => void) | undefined
   dragFreeze: NodeDragCaretFreeze
@@ -42,7 +43,7 @@ export function NodeList({
   renderInput,
   onActivate,
   onEnter,
-  onMove,
+  onDrop,
   isExpanded = NEVER_EXPANDED,
   onToggleExpansion,
   dragFreeze,
@@ -158,6 +159,8 @@ export function NodeList({
   const {
     freeze,
     dropIndex,
+    dropLevel,
+    invalidDrop,
     onRowPointerDown,
     onRowPointerLeave,
     onListPointerMove,
@@ -166,7 +169,7 @@ export function NodeList({
     onLostPointerCapture,
     onListClick,
     recomputeDropIndex,
-  } = useNodeListDrag({ rows: visibleRows, locked, windowed, listRef, observedElementsRef, onMove, dragFreeze })
+  } = useNodeListDrag({ rows: visibleRows, locked, windowed, listRef, observedElementsRef, onDrop, dragFreeze })
 
   useLayoutEffect(() => {
     recomputeDropIndex()
@@ -211,6 +214,7 @@ export function NodeList({
       dragging={freeze?.nodeId === node.id}
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
+      dropLevel={dropMarker?.index === index ? dropLevel : undefined}
       expanded={isExpanded(node.id)}
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}
       visualSelected={visualStart >= 0 && index >= visualStart && index <= visualEnd}
@@ -232,13 +236,14 @@ export function NodeList({
   return (
     <section
       aria-label="Nodes"
-      className="node-list"
+      className={`node-list${invalidDrop ? ' node-list-drop-invalid' : ''}`}
       onClickCapture={onListClick}
       onLostPointerCapture={onLostPointerCapture}
       onPointerCancel={onListPointerCancel}
       onPointerMove={onListPointerMove}
       onPointerUp={onListPointerUp}
       ref={listRef}
+      style={{ '--row-indent': `${DROP_LEVEL_STEP_PX}px` } as React.CSSProperties}
     >
       <DropZone index={0} start />
       {listWindow === undefined

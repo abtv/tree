@@ -1586,7 +1586,7 @@ describe('App', () => {
     })
   })
 
-  it('reorders siblings through a press-and-hold drag over the editable surface', async () => {
+  it('reorders siblings through a press-and-hold drag into a between-row gap', async () => {
     const store = createStore()
     await act(async () => {
       await store.initialize()
@@ -1617,8 +1617,8 @@ describe('App', () => {
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
     expect(third).toHaveClass('node-row-dragging')
 
-    fireEvent.pointerMove(third, { pointerId: 1, clientX: 100, clientY: 10 })
-    fireEvent.pointerUp(third, { pointerId: 1, clientX: 100, clientY: 10 })
+    fireEvent.pointerMove(third, { pointerId: 1, clientX: 100, clientY: 4 })
+    fireEvent.pointerUp(third, { pointerId: 1, clientX: 100, clientY: 4 })
 
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('C')
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('A')

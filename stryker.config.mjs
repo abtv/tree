@@ -18,7 +18,6 @@ export default {
     'src/renderer/link-caret.ts',
     'src/renderer/drag-caret-freeze.ts',
     'src/renderer/node-drag.ts',
-    'src/renderer/visible-tree.ts',
     'src/renderer/list-window.ts',
     '!src/**/*.test.ts',
     '!src/application/test/**',

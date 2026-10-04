@@ -7,10 +7,8 @@ import {
   dropMarkerFor,
   dropZoneAtPoint,
   exceedsHoldTolerance,
-  insertionIndexAtPoint,
   nodeDragReducer,
   resolveNodeDrag,
-  shouldCommitMove,
   type NodeDragAction,
   type NodeDragState,
 } from './node-drag'
@@ -112,82 +110,6 @@ describe('exceedsHoldTolerance', () => {
   })
 })
 
-describe('insertionIndexAtPoint', () => {
-  it('returns undefined without rendered regions', () => {
-    expect(insertionIndexAtPoint([], 10)).toBeUndefined()
-  })
-
-  it('splits a row at its midpoint', () => {
-    const regions = [{ index: 3, top: 100, bottom: 120 }]
-    expect(insertionIndexAtPoint(regions, 100)).toBe(3)
-    expect(insertionIndexAtPoint(regions, 109)).toBe(3)
-    expect(insertionIndexAtPoint(regions, 110)).toBe(4)
-    expect(insertionIndexAtPoint(regions, 119)).toBe(4)
-  })
-
-  it('maps above the first and below the last row to the list edges', () => {
-    const regions = [
-      { index: 0, top: 0, bottom: 27 },
-      { index: 1, top: 27, bottom: 54 },
-    ]
-    expect(insertionIndexAtPoint(regions, -10)).toBe(0)
-    expect(insertionIndexAtPoint(regions, 100)).toBe(2)
-  })
-
-  it('does not depend on region order', () => {
-    const regions = [
-      { index: 2, top: 54, bottom: 81 },
-      { index: 0, top: 0, bottom: 27 },
-      { index: 1, top: 27, bottom: 54 },
-    ]
-    expect(insertionIndexAtPoint(regions, 40)).toBe(1)
-    expect(insertionIndexAtPoint(regions, -5)).toBe(0)
-    expect(insertionIndexAtPoint(regions, 90)).toBe(3)
-  })
-
-  it('maps a gap to the position after the nearest row above it', () => {
-    const regions = [
-      { index: 0, top: 0, bottom: 27 },
-      { index: 36, top: 972, bottom: 999 },
-      { index: 550, top: 14850, bottom: 14877 },
-    ]
-    expect(insertionIndexAtPoint(regions, 500)).toBe(1)
-    expect(insertionIndexAtPoint(regions, 10000)).toBe(37)
-    expect(insertionIndexAtPoint(regions, 14850)).toBe(550)
-    expect(insertionIndexAtPoint(regions, 14870)).toBe(551)
-    expect(insertionIndexAtPoint(regions, 20000)).toBe(551)
-  })
-
-  it('maps a point exactly on the bottom edge of a row above a gap to the position after that row', () => {
-    const regions = [
-      { index: 0, top: 0, bottom: 27 },
-      { index: 36, top: 972, bottom: 999 },
-      { index: 550, top: 14850, bottom: 14877 },
-    ]
-    expect(insertionIndexAtPoint(regions, 27)).toBe(1)
-    expect(insertionIndexAtPoint(regions, 999)).toBe(37)
-  })
-
-  it('maps a gap to the position after the lowest row above it in any region order', () => {
-    const regions = [
-      { index: 550, top: 14850, bottom: 14877 },
-      { index: 36, top: 972, bottom: 999 },
-      { index: 0, top: 0, bottom: 27 },
-    ]
-    expect(insertionIndexAtPoint(regions, 500)).toBe(1)
-    expect(insertionIndexAtPoint(regions, 10000)).toBe(37)
-    expect(
-      insertionIndexAtPoint(
-        [
-          { index: 36, top: 972, bottom: 999 },
-          { index: 0, top: 0, bottom: 27 },
-        ],
-        10000,
-      ),
-    ).toBe(37)
-  })
-})
-
 describe('dropZoneAtPoint', () => {
   it('returns undefined without rendered rows or with rows that have no height', () => {
     expect(dropZoneAtPoint([], 10)).toBeUndefined()
@@ -285,23 +207,6 @@ describe('dropLevelAtPoint', () => {
     expect(dropLevelAtPoint(2, 300, 300 - 10 * DROP_LEVEL_STEP_PX, { min: 1, max: 4 })).toBe(1)
     expect(dropLevelAtPoint(2, 300, 300, { min: 3, max: 3 })).toBe(3)
     expect(dropLevelAtPoint(5, 300, 300, { min: 0, max: 2 })).toBe(2)
-  })
-})
-
-describe('shouldCommitMove', () => {
-  it('treats the effective current position as a no-op', () => {
-    expect(shouldCommitMove(2, 2)).toBe(false)
-    expect(shouldCommitMove(3, 2)).toBe(false)
-    expect(shouldCommitMove(3, 3)).toBe(false)
-    expect(shouldCommitMove(4, 3)).toBe(false)
-  })
-
-  it('commits a real position change', () => {
-    expect(shouldCommitMove(0, 2)).toBe(true)
-    expect(shouldCommitMove(1, 2)).toBe(true)
-    expect(shouldCommitMove(4, 2)).toBe(true)
-    expect(shouldCommitMove(2, 3)).toBe(true)
-    expect(shouldCommitMove(2, 0)).toBe(true)
   })
 })
 

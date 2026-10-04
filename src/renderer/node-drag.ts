@@ -73,32 +73,6 @@ export function exceedsHoldTolerance(startX: number, startY: number, clientX: nu
   return deltaX * deltaX + deltaY * deltaY > HOLD_MOVE_TOLERANCE_PX * HOLD_MOVE_TOLERANCE_PX
 }
 
-export function insertionIndexAtPoint(regions: readonly NodeDropRegion[], pointerY: number): number | undefined {
-  if (regions.length === 0) return undefined
-  let topmost = regions[0]!
-  let bottommost = regions[0]!
-  let previous: NodeDropRegion | undefined
-  // Mutation triage: the remaining survivors in this function are equivalent for rows with a positive
-  // height and distinct tops, bottoms, and indices. A point on a row's bottom edge falls to the next row's
-  // top edge or to the gap rule, and both give `index + 1`; a point above every row, or on the last row's
-  // bottom edge, reaches the same index through the `previous` rule; `previous` is always defined once a
-  // point is not above the topmost row and inside no row; ties between regions cannot occur.
-  for (const region of regions) {
-    if (pointerY >= region.top && pointerY < region.bottom) {
-      const middle = region.top + (region.bottom - region.top) / 2
-      return pointerY < middle ? region.index : region.index + 1
-    }
-    if (region.top < topmost.top) topmost = region
-    if (region.bottom > bottommost.bottom) bottommost = region
-    if (region.bottom <= pointerY && (previous === undefined || region.bottom > previous.bottom)) {
-      previous = region
-    }
-  }
-  if (pointerY < topmost.top) return topmost.index
-  if (pointerY >= bottommost.bottom) return bottommost.index + 1
-  return previous === undefined ? topmost.index : previous.index + 1
-}
-
 /** A row's outer band, top and bottom, as a share of its height; the band is a drop between rows. */
 export const DROP_BAND_FRACTION = 0.25
 /** The largest height of an outer band, so a tall wrapped row keeps a drop on the node in its middle. */
@@ -158,14 +132,6 @@ export function dropLevelAtPoint(
 ): number {
   const steps = Math.trunc((pointerX - pressX) / DROP_LEVEL_STEP_PX)
   return Math.max(levels.min, Math.min(levels.max, sourceLevel + steps))
-}
-
-export function effectiveDestination(insertionIndex: number, sourceIndex: number): number {
-  return insertionIndex > sourceIndex ? insertionIndex - 1 : insertionIndex
-}
-
-export function shouldCommitMove(insertionIndex: number, sourceIndex: number): boolean {
-  return effectiveDestination(insertionIndex, sourceIndex) !== sourceIndex
 }
 
 export interface DropMarker {

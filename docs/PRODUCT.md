@@ -16,7 +16,7 @@ Each node:
 
 The user's location is one level: either the top-level root nodes or the immediate children of the current parent. Nodes at that level may be expanded to show descendants inline (see §2.4).
 
-The application is keyboard-first. Mouse interaction is primarily used for drag-and-drop reordering.
+The application is keyboard-first. Mouse interaction is primarily used for moving nodes by drag-and-drop.
 
 Text remains editable inline. The user chooses between standard text editing and Vim-inspired editing, which adds Insert, Normal, and Visual interaction modes, as defined in §20.2.
 
@@ -102,7 +102,7 @@ Nodes with children display a disclosure triangle to the left of their circular 
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
-Sibling reordering is started by pressing and holding the primary mouse button on a node row for 200 ms. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. A quick press and release still places the text cursor at the clicked position, and pressing and dragging selects text. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
+Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. A quick press and release still places the text cursor at the clicked position, and pressing and dragging selects text. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
 
 Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a sibling (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
 
@@ -147,7 +147,7 @@ If an action would create a node below level 20:
 * do not change the document, selection, focus, undo/redo history, or persisted state;
 * display `Nodes cannot be nested deeper than 20 levels.` as an operation error.
 
-Sibling creation, multiline paste, image paste, editing, and reordering remain available at level 20 because they do not increase node depth.
+Sibling creation, multiline paste, image paste, editing, and reordering remain available at level 20 because they do not increase node depth. A drag that would exceed the maximum depth shows the operation error and leaves the document unchanged.
 
 Pasting a subtree or a multi-node Vim register is rejected in full when any copied node would fall below level 20; it is never partially applied or truncated.
 
@@ -157,13 +157,13 @@ A persisted document containing a node below level 20 is invalid. Loading such a
 
 Every node remembers whether it is expanded. A node that has never been expanded is collapsed. Clicking a node's disclosure triangle shows its direct children immediately beneath it, indented to reflect their depth. An expanded child can be expanded in the same way, and collapsing an ancestor hides every visible descendant beneath it. Expanding that ancestor again restores the nested expansion choices beneath it.
 
-Visible descendants are ordinary editable nodes: the user can click their text, place the caret, edit them, use their circular indicator to enter them, and expand or collapse their children. The location path and current-parent heading continue to represent the current location, even when a visible descendant has the caret. Motion between nodes (`↑`, `↓`, `j`, `k`, `←`, `→`, `G`, and counted forms) follows the location's visible rows, including descendants shown by inline expansion. Commands that act on the tree — sibling creation, deletion, yank and put, whole-node Visual ranges, and drag reordering — use the focused node's actual sibling level instead: each of these operates on a sibling subtree as one unit, and a range or move spanning a node together with its own descendant has no meaning for them. The Vim fold commands in §20.2 operate on the selected node's own fold and on the folds within the current location. `Cmd+E` toggles the selected node's own fold, exactly as `za` does, in every Vim mode and in the same way whether or not Vim mode is enabled: it does nothing on a node without children and on the editable current-parent heading, never moves the caret, and does not end Insert mode. Like the other `Cmd` commands it discards an unfinished Normal-mode command. Expansion adds no other keyboard command.
+Visible descendants are ordinary editable nodes: the user can click their text, place the caret, edit them, use their circular indicator to enter them, and expand or collapse their children. The location path and current-parent heading continue to represent the current location, even when a visible descendant has the caret. Motion between nodes (`↑`, `↓`, `j`, `k`, `←`, `→`, `G`, and counted forms) follows the location's visible rows, including descendants shown by inline expansion. Commands that act on the tree — sibling creation, deletion, yank and put, and whole-node Visual ranges — use the focused node's actual sibling level and operate on a sibling subtree as one unit. Dragging moves a node's whole subtree between visible rows at the level selected by the pointer; it may change the node's parent. The Vim fold commands in §20.2 operate on the selected node's own fold and on the folds within the current location. `Cmd+E` toggles the selected node's own fold, exactly as `za` does, in every Vim mode and in the same way whether or not Vim mode is enabled: it does nothing on a node without children and on the editable current-parent heading, never moves the caret, and does not end Insert mode. Like the other `Cmd` commands it discards an unfinished Normal-mode command. Expansion adds no other keyboard command.
 
 Expansion is view state, not a document edit. It creates no undo entry and never saves by itself. An expansion change is a pending change like a selection change: the idle, volume, and quit triggers in §16.1 save it together with the document. Expansion choices are kept when the location changes: entering a node shows its children with their own remembered expansion, and leaving it or using the location path shows the destination with the choices made there before. Reopening the application restores every remembered choice. If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged. When the application opens with a selected node that a collapsed ancestor hides, for example a document saved before expansion was remembered, the nearest displayed ancestor is selected instead, with its caret at the beginning of its text.
 
 Deleting a node retains its remembered expansion choice, including choices for its descendants. Undoing the deletion restores those choices, so restored nodes keep their previous expansion. These retained choices remain view state and do not become part of document history.
 
-Dragging visible descendants can reorder nodes only among their actual siblings. An expanded view provides no cross-level drop target and cannot change hierarchy by dragging.
+Dragging visible descendants moves a sibling subtree as one unit. Gaps are resolved against the visible rows with that subtree removed; a drop level is no shallower than the row below and no deeper than one level below the row above. A gap can therefore indent beneath an ancestor or outdent to an ancestor or the document root. Gaps inside the dragged subtree are invalid and release there changes nothing.
 
 ---
 
@@ -534,7 +534,7 @@ Undo/redo must support:
 * Enter/split;
 * node deletion;
 * subtree deletion;
-* sibling reordering;
+* node movement by drag-and-drop;
 * Vim subtree paste;
 * text paste;
 * multiline text paste;
@@ -568,21 +568,13 @@ The undo/redo history retains at most the 200 most recent entries. A history ent
 
 ## 11. Drag and Drop
 
-Mouse drag-and-drop is supported for sibling reordering.
+Mouse drag-and-drop moves one node together with its subtree. Between-row gaps can reorder siblings or move the node to another parent. Dropping onto a node and onto a breadcrumb entry are specified separately in later initiative tasks.
 
-Sibling reordering begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Pointer movement within 4 pixels does not cancel the pending hold, but moving farther before the threshold cancels the pending drag so the gesture selects text instead; the pending hold also cancels if the pointer leaves the row.
+Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Pointer movement within 4 pixels does not cancel the pending hold, but moving farther before the threshold cancels the pending drag so the gesture selects text instead; the pending hold also cancels if the pointer leaves the row.
 
-Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row shows its gray drag highlight. The node's text surface loses focus while the drag is active: any transient selection is cleared, no text can be selected, and pointer movement cannot move the text cursor. Moving the pointer highlights the current between-row drop target and releasing completes the move. Releasing without changing the position leaves the document unchanged. When the drag ends, focus and the text cursor return to the node. `Escape` cancels an active drag without moving the node, and cancellation keeps text selection disabled until the primary mouse button is released.
+Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row stays in place with its gray drag highlight. Keeping the source visible preserves its outline context while the user chooses a destination. The node's text surface loses focus while the drag is active: any transient selection is cleared, no text can be selected, and pointer movement cannot move the text cursor. The outer quarter of a row's height, capped at 8 pixels, acts as the gaps before and after it; its middle is not a target in this task. A gap shows a marker at the level chosen by horizontal movement from the press point: each full row-indent step right moves one level deeper, each step left moves one level shallower, and vertical movement alone keeps the source level. The level is clamped to the levels that gap permits. The dragged node and its visible descendants cannot be drop targets; hovering their gaps shows the not-allowed cursor, and release changes nothing. Releasing on an allowed gap completes the move. Releasing without changing the position leaves the document unchanged. When the drag ends, focus and the text cursor return to the node. `Escape` cancels an active drag without moving the node, and cancellation keeps text selection disabled until the primary mouse button is released.
 
-Drag-and-drop is allowed only between actual siblings at the dragged node's level, including when those siblings are visible through inline expansion.
-
-A drag operation:
-
-* can reorder siblings;
-* cannot change hierarchy;
-* cannot change depth;
-* cannot make one node a child of another;
-* cannot move a node to another level.
+Gap targets are resolved against the visible rows with the dragged block removed. The chosen level cannot be shallower than the row below or deeper than one level below the row above. A gap inside the dragged block is invalid. Drops may reorder siblings, indent beneath a visible node, or outdent to a displayed ancestor or the document root.
 
 The circular indicator remains a dedicated pointer target for entering the node; it never places a text cursor or starts a row drag.
 
@@ -594,12 +586,12 @@ Use drop zones between nodes.
 
 The drop zones before the first sibling and after the last sibling have expanded hit areas while preserving the list's normal spacing. The bottom edge target is larger than the top edge target to make use of the available space after the final sibling.
 
-There must be no "drop inside node" target.
+The middle of a row is not a drop target in this task.
 
 After a move:
 
 * the moved node remains selected;
-* the change is automatically saved.
+* the change is marked pending and saved by the idle, volume, or quit triggers in §16.1.
 
 Example:
 
@@ -938,7 +930,7 @@ The user normally interacts with the application through:
 * keyboard commands;
 * text editing;
 * clipboard;
-* mouse drag-and-drop for sibling reordering.
+* mouse drag-and-drop for moving nodes in the hierarchy.
 
 The tree hierarchy can be navigated by entering and leaving nodes or inspected and edited through inline expansion. Expansion does not change the current location.
 
@@ -967,6 +959,8 @@ While Vim editing is disabled, the editor is a standard text editor: it has no m
 Disabling Vim editing completes a pending Replace-mode replacement as one undoable edit, discards an unfinished Normal-mode command, and clears a character-wise or whole-node Visual selection; a Visual selection or Normal-mode block caret collapses to its start while a text selection made in Insert mode is kept, and a Normal-mode caret on an attached image moves to the end of the node's text. Enabling Vim editing enters Normal mode with the block caret on the character at the caret, clamped to the final text character or the attached image; a deliberate multi-character selection is kept instead. The local Vim register, the last repeatable change, and the last character find belong to the running session and survive switching Vim editing off and on. The rest of this section describes the editor while Vim editing is enabled.
 
 The editor starts in Normal mode, with a block caret on the current character. When the current node is empty, Normal mode displays a non-blinking block caret at its only insertion position. Pressing `i` or `a` enters Insert mode, where text entry and all existing application commands behave normally; Insert mode uses the normal thin text caret. Pressing `R` enters Replace mode, where printable input overwrites existing characters and appends after the end of the node. Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode. If the user invokes an application undo or redo shortcut, selects all text, cuts or pastes, enters or leaves a node (including with the mouse), or deletes the selected node while Replace mode has a pending replacement, finish that replacement as one edit before running the command, then return to Normal mode; a select-all, cut, or paste commits it without disturbing the visible text or selection, so the command still acts on what the user selected. Quitting the application or closing the window while Replace mode has a pending replacement completes that replacement as one edit before the quit save, so the saved document includes it; a failed save leaves the replacement committed and the application open for a retry. The same interruptions during Insert mode leave Insert mode active, since Insert already behaves like other application commands run normally within it. Mouse clicks and pointer presses place focus or a text selection without changing the Vim mode, except that navigation through the location breadcrumb or a node's enter control, and an application command that changes focus or replaces the selection, end whole-node Visual mode for Normal mode and clear its selected range. A select-all, cut, or paste drops an unfinished Normal-mode command and both character-wise Visual endpoints before it runs; character Visual mode stays active, while a cut or paste leaves whole-node Visual mode and its selected range unchanged. A persistent indicator displays `INSERT`, `REPLACE`, `NORMAL`, `VISUAL`, or `VISUAL NODE`. The indicator sits at the left end of a status bar fixed at the bottom of the window, while the `VIM` toggle and the always-on-top pin toggle (§2.2) stay at the right end. The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20). The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
+
+Whole-node Visual mode ends and returns to Normal mode when a between-row drag changes the selected node's parent. Same-parent reordering does not end the mode. The Vim register and `.` repeat are unchanged by drag-and-drop.
 
 Normal mode supports:
 

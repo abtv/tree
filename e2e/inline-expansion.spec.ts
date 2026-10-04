@@ -2,7 +2,6 @@
 import {
   closeApp,
   describeForEachEditingMode,
-  dragRow,
   expect,
   lockSystemClipboard,
   launchTree,
@@ -12,7 +11,6 @@ import {
   pressShifted,
   readPersisted,
   seedDocument,
-  startRowDrag,
   test,
 } from './fixtures'
 
@@ -358,45 +356,6 @@ test.describe('inline node expansion (mode-independent)', () => {
     // 'Alpha' itself was never expanded, so it stays collapsed at the top level.
     await second.window.getByRole('button', { name: 'Top level' }).click()
     await expect.poll(() => nodeTexts(second.window)).toEqual(['Alpha', 'Bravo'])
-  })
-
-  test('reorders a dragged descendant only among its own real siblings', async ({ userDataDir }) => {
-    seedDocument(userDataDir, nestedSeed())
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    // Flattened rows are now: Alpha(1), Alpha child one(2), Alpha child two(3), Bravo(4).
-    await expect(node(window, 1)).toHaveValue('Alpha')
-    await expect(node(window, 2)).toHaveValue('Alpha child one')
-    await expect(node(window, 3)).toHaveValue('Alpha child two')
-    await expect(node(window, 4)).toHaveValue('Bravo')
-
-    // Dragging "Alpha child one" (row index 1) past "Bravo" (a's next real sibling, row index 3)
-    // must still land it among a's own children, never past Bravo into the root level.
-    await dragRow(window, 1, 3)
-
-    await expect(node(window, 1)).toHaveValue('Alpha')
-    await expect(node(window, 2)).toHaveValue('Alpha child two')
-    await expect(node(window, 3)).toHaveValue('Alpha child one')
-    await expect(node(window, 4)).toHaveValue('Bravo')
-  })
-
-  test('clamps a drag overshooting past the descendant’s real siblings to the last valid position', async ({
-    userDataDir,
-  }) => {
-    seedDocument(userDataDir, nestedSeed())
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    const source = window.locator('.node-row').nth(1)
-    await startRowDrag(window, source.locator('.node-input'))
-    const bravoBox = await window.locator('.node-row').nth(3).boundingBox()
-    if (bravoBox === null) throw new Error('Bravo’s row was not rendered.')
-    // Move well past Bravo's row; the drop must still snap to a's own last child boundary.
-    await window.mouse.move(bravoBox.x + 8, bravoBox.y + bravoBox.height + 40, { steps: 5 })
-    await window.mouse.up()
-
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child two', 'Alpha child one', 'Bravo'])
   })
 
   test('windows on the flattened visible row count once inline descendants push past the threshold', async ({

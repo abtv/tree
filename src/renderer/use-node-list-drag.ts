@@ -4,18 +4,19 @@ import type { TreeNode } from '../domain/document'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { autoScrollStep } from './list-window'
 import { scrollViewportBy, viewportBounds } from './scroll-viewport'
+import { dragBlock, dropTargetAtGap, gapLevels, isNoOpDrop, type DropTarget } from '../application/drop-targets'
 import {
   HOLD_ACTIVATION_MS,
   IDLE_NODE_DRAG,
   exceedsHoldTolerance,
-  insertionIndexAtPoint,
+  dropLevelAtPoint,
+  dropZoneAtPoint,
   nodeDragReducer,
   resolveNodeDrag,
-  shouldCommitMove,
   type NodeDragSource,
   type NodeDropRegion,
 } from './node-drag'
-import { nearestSiblingBoundary, siblingBoundaryIndices, type VisibleRow } from './visible-tree'
+import type { VisibleRow } from '../application/visible-rows'
 
 interface UseNodeListDragOptions {
   rows: readonly VisibleRow[]
@@ -23,13 +24,15 @@ interface UseNodeListDragOptions {
   windowed: boolean
   listRef: RefObject<HTMLElement | null>
   observedElementsRef: RefObject<Map<string, HTMLElement>>
-  onMove: (nodeId: string, insertionIndex: number) => void
+  onDrop: (nodeId: string, target: DropTarget) => void
   dragFreeze: NodeDragCaretFreeze
 }
 
 interface NodeListDrag {
   freeze: NodeDragSource | undefined
   dropIndex: number | undefined
+  dropLevel: number | undefined
+  invalidDrop: boolean
   onRowPointerDown: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
   onRowPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
   onListPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
@@ -46,12 +49,15 @@ export function useNodeListDrag({
   windowed,
   listRef,
   observedElementsRef,
-  onMove,
+  onDrop,
   dragFreeze,
 }: UseNodeListDragOptions): NodeListDrag {
   const [autoScrollDirection, setAutoScrollDirection] = useState(0)
   const [drag, dispatch] = useReducer(nodeDragReducer, IDLE_NODE_DRAG)
-  const [dropIndex, setDropIndex] = useState<number>()
+  const [drop, setDrop] = useState<
+    { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' }
+  >()
+  const pointerXRef = useRef<number | undefined>(undefined)
   const pointerYRef = useRef<number | undefined>(undefined)
   const pressPointRef = useRef<{ x: number; y: number } | undefined>(undefined)
   const suppressClickRef = useRef(false)
@@ -62,10 +68,11 @@ export function useNodeListDrag({
   // describe different gestures.
   const resolved = resolveNodeDrag(drag, { locked, sourceAvailable })
   const freeze = resolved.phase === 'dragging' ? resolved.source : undefined
+  const invalidDrop = freeze !== undefined && drop?.kind === 'gap' && drop.target === undefined
 
   const cancelDrag = useCallback((): void => {
     dispatch({ type: 'cancel' })
-    setDropIndex(undefined)
+    setDrop(undefined)
     setAutoScrollDirection(0)
   }, [])
 
@@ -73,8 +80,11 @@ export function useNodeListDrag({
     if (drag.phase !== 'idle' && resolved.phase === 'idle') dispatch({ type: 'cancel' })
   }, [drag.phase, resolved.phase])
 
-  const computeInsertionIndex = useCallback(
-    (clientY: number): number | undefined => {
+  const computeDrop = useCallback(
+    (
+      clientX: number,
+      clientY: number,
+    ): { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' } | undefined => {
       const regions: NodeDropRegion[] = []
       observedElementsRef.current.forEach((element) => {
         const index = Number(element.dataset.nodeIndex)
@@ -83,22 +93,21 @@ export function useNodeListDrag({
         if (bounds.height <= 0) return
         regions.push({ index, top: bounds.top, bottom: bounds.bottom })
       })
-      return insertionIndexAtPoint(regions, clientY)
+      const zone = dropZoneAtPoint(regions, clientY)
+      if (zone === undefined) return undefined
+      const source = drag.source
+      if (source === undefined) return undefined
+      const block = dragBlock(rows, source.nodeId)
+      if (block === undefined) return undefined
+      if ('row' in zone) return { kind: 'row' }
+      const levels = gapLevels(rows, block, zone.gap)
+      if (levels === undefined)
+        return { kind: 'gap', gap: zone.gap, level: rows[block.start]!.depth, target: undefined }
+      const origin = pressPointRef.current
+      const level = dropLevelAtPoint(rows[block.start]!.depth, origin?.x ?? clientX, clientX, levels)
+      return { kind: 'gap', gap: zone.gap, level, target: dropTargetAtGap(rows, block, zone.gap, level) }
     },
-    [observedElementsRef],
-  )
-
-  // Drag-and-drop reorders only among the dragged node's actual siblings (`docs/PRODUCT.md` §2.4): a
-  // raw flattened position from pointer geometry is snapped to the nearest boundary that does not
-  // cross into or out of another real child's visible block.
-  const snapToRealParentBoundary = useCallback(
-    (rawIndex: number, nodeId: string): number | undefined => {
-      const sourceRow = rows.find((row) => row.node.id === nodeId)
-      if (sourceRow === undefined) return rawIndex
-      const boundaries = siblingBoundaryIndices(rows, sourceRow.parentId)
-      return nearestSiblingBoundary(boundaries, rawIndex) ?? rawIndex
-    },
-    [rows],
+    [drag.source, observedElementsRef, rows],
   )
 
   useEffect(() => {
@@ -138,6 +147,11 @@ export function useNodeListDrag({
   }, [dragFreeze, freeze, listRef])
 
   useEffect(() => {
+    document.body.classList.toggle('node-drag-invalid', invalidDrop)
+    return () => document.body.classList.remove('node-drag-invalid')
+  }, [invalidDrop])
+
+  useEffect(() => {
     if (resolved.phase === 'idle') return undefined
     const pointerId = resolved.source?.pointerId
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -149,7 +163,7 @@ export function useNodeListDrag({
     const onPointerUp = (event: PointerEvent): void => {
       if (pointerId === undefined || event.pointerId !== pointerId) return
       dispatch({ type: 'release', pointerId: event.pointerId })
-      setDropIndex(undefined)
+      setDrop(undefined)
       setAutoScrollDirection(0)
     }
     globalThis.addEventListener('keydown', onKeyDown)
@@ -175,6 +189,7 @@ export function useNodeListDrag({
       suppressClickRef.current = false
       pressPointRef.current = { x: event.clientX, y: event.clientY }
       pointerYRef.current = undefined
+      pointerXRef.current = undefined
       setAutoScrollDirection(0)
       dispatch({
         type: 'press',
@@ -221,9 +236,10 @@ export function useNodeListDrag({
       if (!inside) cancelDrag()
       return
     }
+    pointerXRef.current = event.clientX
     pointerYRef.current = event.clientY
-    const raw = computeInsertionIndex(event.clientY)
-    setDropIndex(raw === undefined ? undefined : snapToRealParentBoundary(raw, resolved.source.nodeId))
+    const nextDrop = computeDrop(event.clientX, event.clientY)
+    setDrop((previous) => (sameDrop(previous, nextDrop) ? previous : nextDrop))
     if (windowed) {
       const { top, bottom } = viewportBounds()
       setAutoScrollDirection(autoScrollStep(event.clientY - top, bottom - top))
@@ -233,20 +249,19 @@ export function useNodeListDrag({
   const onListPointerUp = (event: ReactPointerEvent<HTMLElement>): void => {
     if (freeze !== undefined && freeze.pointerId === event.pointerId) {
       suppressClickRef.current = true
-      const raw = computeInsertionIndex(event.clientY)
-      const sourceRow = rows.find((row) => row.node.id === freeze.nodeId)
-      if (raw !== undefined && sourceRow !== undefined) {
-        const boundaries = siblingBoundaryIndices(rows, sourceRow.parentId)
-        const snapped = nearestSiblingBoundary(boundaries, raw)
-        const realInsertionIndex = snapped === undefined ? -1 : boundaries.indexOf(snapped)
-        if (realInsertionIndex >= 0 && shouldCommitMove(realInsertionIndex, sourceRow.siblingIndex)) {
-          onMove(freeze.nodeId, realInsertionIndex)
-        }
-      }
+      const resolvedDrop = computeDrop(event.clientX, event.clientY)
+      const sourceBlock = dragBlock(rows, freeze.nodeId)
+      if (
+        resolvedDrop?.kind === 'gap' &&
+        resolvedDrop?.target !== undefined &&
+        sourceBlock !== undefined &&
+        !isNoOpDrop(rows, sourceBlock, resolvedDrop.target)
+      )
+        onDrop(freeze.nodeId, resolvedDrop.target)
     }
     dragFreeze.end(event.pointerId)
     dispatch({ type: 'release', pointerId: event.pointerId })
-    setDropIndex(undefined)
+    setDrop(undefined)
     setAutoScrollDirection(0)
   }
 
@@ -266,14 +281,17 @@ export function useNodeListDrag({
   const recomputeDropIndex = useCallback((): void => {
     if (freeze === undefined) return
     const pointerY = pointerYRef.current
-    if (pointerY === undefined) return
-    const raw = computeInsertionIndex(pointerY)
-    setDropIndex(raw === undefined ? undefined : snapToRealParentBoundary(raw, freeze.nodeId))
-  }, [computeInsertionIndex, freeze, snapToRealParentBoundary])
+    const pointerX = pointerXRef.current
+    if (pointerY === undefined || pointerX === undefined) return
+    const nextDrop = computeDrop(pointerX, pointerY)
+    setDrop((previous) => (sameDrop(previous, nextDrop) ? previous : nextDrop))
+  }, [computeDrop, freeze])
 
   return {
     freeze,
-    dropIndex,
+    dropIndex: drop?.kind === 'gap' ? drop.gap : undefined,
+    dropLevel: drop?.kind === 'gap' ? drop.level : undefined,
+    invalidDrop,
     onRowPointerDown,
     onRowPointerLeave,
     onListPointerMove,
@@ -283,6 +301,20 @@ export function useNodeListDrag({
     onListClick,
     recomputeDropIndex,
   }
+}
+
+function sameDrop(
+  left: { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' } | undefined,
+  right: { kind: 'gap'; gap: number; level: number; target: DropTarget | undefined } | { kind: 'row' } | undefined,
+): boolean {
+  if (left?.kind !== right?.kind) return false
+  if (left === undefined || right === undefined || left.kind === 'row' || right.kind === 'row') return true
+  return (
+    left.gap === right.gap &&
+    left.level === right.level &&
+    left.target?.parentId === right.target?.parentId &&
+    left.target?.index === right.target?.index
+  )
 }
 
 function setCapture(element: HTMLElement, pointerId: number): void {
