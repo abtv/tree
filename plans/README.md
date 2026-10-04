@@ -4,6 +4,5 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Input bindings decomposition](input-bindings-decomposition.md) | Active. T1 through T10 complete; R1 and R2 approved; R3 declined (T11 and T12 removed). Each task starts when the Product Owner asks to continue. | T13: docs, final floors, aggregate validation, plan removal. Manual native-keyboard check is due first. |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
