@@ -132,6 +132,61 @@ function render(ui: Parameters<typeof renderReact>[0]): ReturnType<typeof render
   return result
 }
 
+// @requirement PRODUCT.md §2.5
+describe('App strikethrough', () => {
+  const tasks = {
+    roots: [
+      { id: 'a', text: 'Alpha', children: [{ id: 'a1', text: 'Alpha step', children: [] }] },
+      { id: 'b', text: 'Bravo', struckThrough: true, children: [] },
+    ],
+  }
+
+  it('renders a struck-through node and toggles it with Cmd+Y without moving the caret', async () => {
+    const store = await createSeededStore(tasks, { currentParentId: null, selectedNodeId: 'a' })
+    renderReact(<App initialVimEnabled store={store} />)
+    const alpha = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+    const bravo = screen.getByRole('textbox', { name: 'Node 2' })
+    expect(alpha).not.toHaveClass('node-input-struck')
+    expect(bravo).toHaveClass('node-input-struck')
+    act(() => alpha.setSelectionRange(2, 2))
+
+    fireEvent.keyDown(alpha, { key: 'y', metaKey: true })
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-struck')
+    expect(alpha.value).toBe('Alpha')
+    expect(alpha.selectionStart).toBe(2)
+    expect(document.activeElement).toBe(alpha)
+
+    fireEvent.keyDown(alpha, { key: 'y', metaKey: true })
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
+  })
+
+  it('strikes the editable current-parent heading and leaves its children normal', async () => {
+    const store = await createSeededStore(tasks, { currentParentId: 'a', selectedNodeId: 'a' })
+    renderReact(<App initialVimEnabled store={store} />)
+    const heading = screen.getByRole('textbox', { name: 'Current parent' })
+
+    fireEvent.keyDown(heading, { key: 'y', metaKey: true })
+
+    expect(screen.getByRole('textbox', { name: 'Current parent' })).toHaveClass('node-input-struck')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
+  })
+
+  it('toggles a whole-node Visual range and returns to Normal mode', async () => {
+    const store = await createSeededStore(tasks, { currentParentId: null, selectedNodeId: 'a' })
+    renderReact(<App initialVimEnabled store={store} />)
+    const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+    fireEvent.keyDown(alpha, { key: 'V' })
+    fireEvent.keyDown(alpha, { key: 'j' })
+    const bravo = screen.getByRole('textbox', { name: 'Node 2' })
+
+    fireEvent.keyDown(bravo, { key: 'y', metaKey: true })
+
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-struck')
+    expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveClass('node-input-struck')
+    expect(screen.getByText('NORMAL')).toBeInTheDocument()
+  })
+})
+
 describe('App', () => {
   it('starts in Normal mode with an empty caret position', async () => {
     const store = createStore()

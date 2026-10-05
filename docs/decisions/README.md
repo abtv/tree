@@ -21,5 +21,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0015](0015-undo-redo-caret-from-snapshot-comparison.md) | Undo/Redo Caret From Snapshot Comparison | Accepted | 2026-09-28 |
 | [0016](0016-application-owns-inline-expansion.md) | Application Owns Inline Expansion | Accepted | 2026-09-29 |
 | [0017](0017-persisted-view-state.md) | Persisted View State in the Document File | Accepted | 2026-09-29 |
+| [0018](0018-struck-through-nodes-in-schema-version-4.md) | Struck-Through Nodes in Schema Version 4 | Accepted | 2026-10-05 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

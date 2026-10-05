@@ -165,6 +165,7 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
       command: commandNodeVisual,
       shift: shiftNodeVisual,
       join: joinNodeVisual,
+      selection: () => nodeVisualSelection,
     },
     shiftCurrentNode,
     restoreVisual,

@@ -19,6 +19,7 @@ function sameNode(a: TreeNode, b: TreeNode): boolean {
   if (a === b) return true
   if (a.id !== b.id || a.text !== b.text) return false
   if ((a.attachment?.id ?? null) !== (b.attachment?.id ?? null)) return false
+  if (a.struckThrough !== b.struckThrough) return false
   const aLinks = a.links ?? []
   const bLinks = b.links ?? []
   if (aLinks.length !== bLinks.length) return false

@@ -124,6 +124,8 @@ function nodeChangeSite(from: TreeNode, to: TreeNode, parentId: NodeId | null): 
   if (from.attachment?.id !== to.attachment?.id) return { nodeId: to.id, parentId, cursor: to.text.length }
   const link = firstChangedLinkStart(from.links, to.links)
   if (link !== undefined) return { nodeId: to.id, parentId, cursor: link }
+  // Strikethrough belongs to the whole node, so its change starts at the node's beginning.
+  if (from.struckThrough !== to.struckThrough) return { nodeId: to.id, parentId, cursor: 0 }
   return forestChangeSite(from.children, to.children, to.id)
 }
 

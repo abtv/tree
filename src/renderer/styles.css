@@ -8,6 +8,7 @@
   --color-background: #fbf8f1;
   --color-shell-text: #857f74;
   --color-secondary: #8c867b;
+  --color-struck-text: var(--color-secondary);
   --color-location-separator: #c9c2b4;
   --color-location-border: #ebe5d9;
   --color-hover-text: #5c574e;
@@ -556,6 +557,18 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   white-space: pre-wrap;
   font-size: 15px;
   line-height: 20px;
+}
+
+/* A struck-through node (docs/PRODUCT.md §2.5): a line through its text, which is muted in both
+   appearances. Hyperlinks keep their own color under the same line. */
+.node-input.node-input-struck {
+  color: var(--color-struck-text);
+  text-decoration: line-through;
+}
+
+/* Inside the whole-node Visual highlight the struck text takes the highlight pair, keeping its line. */
+.node-row-visual-selected .node-input.node-input-struck {
+  color: var(--highlight-foreground);
 }
 
 .node-input-image-only {

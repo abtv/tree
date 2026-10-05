@@ -329,3 +329,49 @@ describe('document operation content and retention outcomes', () => {
     },
   )
 })
+
+// @requirement PRODUCT.md §2.5
+describe('strikethrough across node operations', () => {
+  const struck: Document = {
+    roots: [{ id: 'task', text: 'Task', struckThrough: true, children: [{ id: 'step', text: 'Step', children: [] }] }],
+  }
+
+  it('keeps it on the original node and leaves every new node normal', () => {
+    const split = splitNode(struck, 'task', 2, 'new')
+    expect(split.roots.map((node) => [node.text, node.struckThrough])).toEqual([
+      ['Ta', true],
+      ['sk', undefined],
+    ])
+    const pasted = pasteMultilineText(struck, 'task', 4, ['!', 'next'], ['line'])
+    expect(pasted.roots.map((node) => [node.text, node.struckThrough])).toEqual([
+      ['Task!', true],
+      ['next', undefined],
+    ])
+    expect(insertSiblingAfter(struck, 'task', 'after').roots[1]).not.toHaveProperty('struckThrough')
+    const child = createFirstChild(struck, 'task', 'child')
+    expect(child.roots[0]!.struckThrough).toBe(true)
+    expect(child.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
+  })
+
+  it('keeps it through text edits, link removal, and image attachment', () => {
+    expect(editNodeText(struck, 'task', 'Done').roots[0]).toMatchObject({ text: 'Done', struckThrough: true })
+    expect(removeTextRange(struck, 'task', 0, 1).roots[0]!.struckThrough).toBe(true)
+    expect(pasteText(struck, 'task', 0, url).roots[0]!.struckThrough).toBe(true)
+    expect(attachImage(struck, 'task', attachment).roots[0]!.struckThrough).toBe(true)
+  })
+
+  it('copies it with every cloned node', () => {
+    let next = 0
+    const copy = cloneNodeWithNewIds(struck.roots[0]!, () => `copy-${next++}`)
+    expect(copy).toEqual({
+      id: 'copy-0',
+      text: 'Task',
+      struckThrough: true,
+      children: [{ id: 'copy-1', text: 'Step', children: [] }],
+    })
+    expect(cloneDocument(struck)).toEqual(struck)
+    expect(
+      insertSubtreeSibling(struck, 'task', 'after', struck.roots[0]!, () => `put-${next++}`).roots[1],
+    ).toMatchObject({ struckThrough: true })
+  })
+})

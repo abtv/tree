@@ -10,6 +10,7 @@ export interface PersistedNode {
   text: string
   attachment?: { id: string; mimeType: string }
   links?: { start: number; end: number; url: string }[]
+  struckThrough?: true
   children: PersistedNode[]
 }
 

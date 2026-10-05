@@ -503,6 +503,22 @@ describe('whole-node Visual transitions', () => {
       const result = changed('u', 'a', 'a')
       expect(result.transition.document.roots[0]).toEqual({ id: 'a', text: 'a', children: [] })
       expect(result.transition.document.roots[0]).not.toHaveProperty('attachment')
+      expect(result.transition.document.roots[0]).not.toHaveProperty('struckThrough')
+    })
+
+    // @requirement PRODUCT.md §2.5
+    it('keeps the strikethrough of each node whose case changes', () => {
+      const document: Document = {
+        roots: [{ id: 'a', text: 'ab', struckThrough: true, children: [{ id: 'kid', text: 'cd', children: [] }] }],
+      }
+      const upper = nodeVisualTransition(document, location, 'U', 'a', 'a', undefined, '', true, counter())
+      if (upper.kind !== 'changed') throw new Error('Expected a change.')
+      expect(upper.transition.document.roots[0]).toEqual({
+        id: 'a',
+        text: 'AB',
+        struckThrough: true,
+        children: [{ id: 'kid', text: 'CD', children: [] }],
+      })
     })
   })
 

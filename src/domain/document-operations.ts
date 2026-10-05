@@ -58,6 +58,7 @@ function cloneNodeShallow(node: TreeNode): BuildNode {
     text: node.text,
     ...(node.links === undefined ? {} : { links: node.links.map((link) => ({ ...link })) }),
     ...(node.attachment === undefined ? {} : { attachment: { ...node.attachment } }),
+    ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
     children: [],
   }
 }
@@ -103,6 +104,7 @@ function contentReplacement(
     text,
     ...(links.length === 0 ? {} : { links }),
     ...(attachment === undefined ? {} : { attachment }),
+    ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
     children: node.children,
   }
 }
@@ -361,6 +363,7 @@ function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNo
     text: source.text,
     ...(source.links === undefined ? {} : { links: source.links.map((link) => ({ ...link })) }),
     ...(source.attachment === undefined ? {} : { attachment: { ...source.attachment } }),
+    ...(source.struckThrough === true ? { struckThrough: true as const } : {}),
     children: [],
   }
   const stack: Array<{ source: TreeNode; target: BuildNode }> = [{ source, target: root }]
@@ -372,6 +375,7 @@ function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNo
         text: child.text,
         ...(child.links === undefined ? {} : { links: child.links.map((link) => ({ ...link })) }),
         ...(child.attachment === undefined ? {} : { attachment: { ...child.attachment } }),
+        ...(child.struckThrough === true ? { struckThrough: true as const } : {}),
         children: [],
       }
       target.children.push(copy)
@@ -698,6 +702,38 @@ export function attachImage(document: Document, nodeId: NodeId, attachment: Atta
   } else if (located.node.attachment.id === attachment.id) {
     inheritAttachmentIds(document, next)
   }
+  return next
+}
+
+/**
+ * Toggles the strikethrough of the sibling range between `anchorId` and `focusId`, inclusive, in
+ * either order (`docs/PRODUCT.md` §2.5). A range whose every node is struck through returns to
+ * normal; any other range becomes struck through. Only the range's own nodes change: their text,
+ * links, attachment, and children are kept, and every child subtree stays shared by reference.
+ * Returns `undefined` when the two nodes are not siblings.
+ */
+export function toggleStrikethrough(document: Document, anchorId: NodeId, focusId: NodeId): Document | undefined {
+  const located = requireNode(document, anchorId)
+  const focus = located.siblings.findIndex((node) => node.id === focusId)
+  if (focus < 0) return undefined
+  const start = Math.min(located.index, focus)
+  const end = Math.max(located.index, focus)
+  const range = located.siblings.slice(start, end + 1)
+  const strike = !range.every((node) => node.struckThrough === true)
+  const siblings = located.siblings.slice()
+  for (const [offset, node] of range.entries()) {
+    siblings[start + offset] = {
+      id: node.id,
+      text: node.text,
+      ...(node.links === undefined ? {} : { links: node.links }),
+      ...(node.attachment === undefined ? {} : { attachment: node.attachment }),
+      ...(strike ? { struckThrough: true as const } : {}),
+      children: node.children,
+    }
+  }
+  const next = copyToRoot(document, located, siblings)
+  shareIndex(document, next)
+  inheritAttachmentIds(document, next)
   return next
 }
 

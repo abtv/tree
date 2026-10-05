@@ -12,6 +12,7 @@ import {
   replaceLinkedTextRanges,
   removeTextRange,
   requireNode,
+  toggleStrikethrough,
   type AttachmentId,
   type AttachmentReference,
   type Document,
@@ -908,6 +909,22 @@ export class EditorStore {
       result.transition.location,
       this.runtime.newFocus(result.transition.focus.nodeId, result.transition.focus.cursor),
     )
+    return true
+  }
+
+  /**
+   * `Cmd+Y` (`docs/PRODUCT.md` §2.5): toggles the strikethrough of the sibling range between
+   * `anchorId` and `focusId` — one node when they are equal, including the current-parent heading —
+   * as one undoable command. The location and the caret stay where they are, and the change is saved
+   * by the ordinary pending-change policy. Returns whether it changed the document.
+   */
+  public toggleStrikethrough(anchorId: NodeId, focusId: NodeId): boolean {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked()) return false
+    const document = toggleStrikethrough(state.document, anchorId, focusId)
+    if (document === undefined) return false
+    this.endTextSession()
+    this.applyStructural(document, state.location, state.focus)
     return true
   }
 

@@ -13,16 +13,23 @@ import type { EditorStore } from '../editor-store'
 interface RawNode {
   text: string
   hasAttachment: boolean
+  struckThrough: boolean
   children: RawNode[]
 }
 
 function rawNode(depth: number): fc.Arbitrary<RawNode> {
   if (depth === 0) {
-    return fc.record<RawNode>({ text: fc.string(), hasAttachment: fc.boolean(), children: fc.constant<RawNode[]>([]) })
+    return fc.record<RawNode>({
+      text: fc.string(),
+      hasAttachment: fc.boolean(),
+      struckThrough: fc.boolean(),
+      children: fc.constant<RawNode[]>([]),
+    })
   }
   return fc.record<RawNode>({
     text: fc.string(),
     hasAttachment: fc.boolean(),
+    struckThrough: fc.boolean(),
     children: fc.array(rawNode(depth - 1), { maxLength: 2 }),
   })
 }
@@ -54,6 +61,7 @@ export const command = fc.record({
     'shift',
     'join',
     'moveToParent',
+    'strike',
   ),
   a: fc.nat({ max: 1_000 }),
   b: fc.nat({ max: 1_000 }),
@@ -83,6 +91,7 @@ export type CommandAction = {
     | 'shift'
     | 'join'
     | 'moveToParent'
+    | 'strike'
   a: number
   b: number
   text: string
@@ -103,6 +112,7 @@ export function materialize(rawForest: RawNode[]): Document {
       id,
       text: raw.text,
       ...(raw.hasAttachment ? { attachment: { id: `a${id}`, mimeType: 'image/png' as const } } : {}),
+      ...(raw.struckThrough ? { struckThrough: true as const } : {}),
       children: raw.children.map(build),
     }
   }
@@ -293,6 +303,13 @@ export async function applyCommand(
           { anchorId: siblings[action.b % siblings.length]!.id, focusId: state.location.selectedNodeId },
           action.text.length % 2 === 0,
         )
+      break
+    }
+    case 'strike': {
+      // `Cmd+Y` on the selected node, or on a whole-node Visual range ending at the selection.
+      const siblings = locateNode(state.document, state.location.selectedNodeId)?.siblings ?? []
+      const anchor = action.a % 2 === 0 ? undefined : siblings[action.b % Math.max(1, siblings.length)]
+      store.toggleStrikethrough(anchor?.id ?? state.location.selectedNodeId, state.location.selectedNodeId)
       break
     }
   }

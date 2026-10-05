@@ -215,7 +215,7 @@ describe('document operations', () => {
 
     expect(validatePersistedState(state)).toBe(state)
     expect(validatePersistedState({ ...state, version: 1 })).toEqual({ ...state, version: 1 })
-    expect(() => validatePersistedState({ ...state, version: 4 })).toThrow('unsupported format')
+    expect(() => validatePersistedState({ ...state, version: 5 })).toThrow('unsupported format')
     expect(() => validatePersistedState({ ...state, document: { roots: [] } })).toThrow('at least one root node')
     expect(() =>
       validatePersistedState({ ...state, location: { currentParentId: 'missing', selectedNodeId: 'root' } }),
@@ -613,26 +613,26 @@ describe('document operations', () => {
     expect(result?.roots[0]!.links).toBeUndefined()
   })
 
-  it('migrates version one documents with an empty view and persists links as version three', () => {
+  it('migrates version one documents with an empty view and persists links as version four', () => {
     const parsed = parsePersistedState({
       version: 1,
       document: { roots: [{ id: 'a', text: 'https://example.com', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
-    expect(parsed.version).toBe(3)
+    expect(parsed.version).toBe(4)
     expect(parsed.view).toEqual({ expandedIds: [] })
     const document = pasteText(parsed.document, 'a', 0, 'https://example.com')
-    expect(serializeState(document, parsed.location).version).toBe(3)
+    expect(serializeState(document, parsed.location).version).toBe(4)
   })
 
-  it('migrates a version two document to version three with every node collapsed', () => {
+  it('migrates a version two document to version four with every node collapsed', () => {
     const parsed = parsePersistedState({
       version: 2,
       document: { roots: [{ id: 'a', text: '', children: [{ id: 'b', text: '', children: [] }] }] },
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
 
-    expect(parsed).toMatchObject({ version: 3, view: { expandedIds: [] } })
+    expect(parsed).toMatchObject({ version: 4, view: { expandedIds: [] } })
   })
 
   it('persists only expanded ids of nodes the document contains, with the selected row position', () => {

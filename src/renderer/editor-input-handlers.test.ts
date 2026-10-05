@@ -225,7 +225,16 @@ describe('editor keyboard handler', () => {
     const enter = vi.fn(() => true)
     const move = vi.fn()
     const command = vi.fn()
-    vim.nodeVisual = { enter, move, command, swap: vi.fn(), exit: vi.fn(), shift: vi.fn(), join: vi.fn() }
+    vim.nodeVisual = {
+      enter,
+      move,
+      command,
+      swap: vi.fn(),
+      exit: vi.fn(),
+      shift: vi.fn(),
+      join: vi.fn(),
+      selection: vi.fn(() => undefined),
+    }
     handle(keyEvent(input, 'V'))
     expect(enter).toHaveBeenCalledWith('node')
     expect(vim.mode).toBe('visual-node')
@@ -246,7 +255,16 @@ describe('editor keyboard handler', () => {
     const swap = vi.fn()
     const exit = vi.fn()
     const command = vi.fn()
-    vim.nodeVisual = { enter: vi.fn(() => true), move, swap, exit, command, shift: vi.fn(), join: vi.fn() }
+    vim.nodeVisual = {
+      enter: vi.fn(() => true),
+      move,
+      swap,
+      exit,
+      command,
+      shift: vi.fn(),
+      join: vi.fn(),
+      selection: vi.fn(() => undefined),
+    }
     handle(keyEvent(input, 'G'))
     handle(keyEvent(input, 'g'))
     handle(keyEvent(input, 'g'))
@@ -281,6 +299,7 @@ describe('editor keyboard handler', () => {
       command: vi.fn(),
       shift,
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
     const press = (key: string): ReturnType<typeof keyEvent> => {
       const event = keyEvent(input, key)
@@ -1656,6 +1675,7 @@ describe('editor keyboard handler', () => {
       command: vi.fn(),
       shift: vi.fn(),
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
 
     handle(keyEvent(input, 'g'))
@@ -1681,6 +1701,7 @@ describe('editor keyboard handler', () => {
       command: vi.fn(),
       shift: vi.fn(),
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
 
     handle(keyEvent(input, 'g'))
@@ -1834,6 +1855,137 @@ describe('editor keyboard handler', () => {
     expect(store.applyFold).not.toHaveBeenCalled()
   })
 
+  // @requirement PRODUCT.md §2.5
+  describe('Cmd+Y strikethrough', () => {
+    const node: TreeNode = { id: 'node', text: 'text', children: [] }
+
+    function textInput(): HTMLTextAreaElement {
+      const input = document.createElement('textarea')
+      input.value = 'text'
+      return input
+    }
+
+    it('toggles the node in standard editing', () => {
+      const store = createStore()
+      const input = textInput()
+      const event = keyEvent(input, 'y', { metaKey: true })
+
+      handler(store, node).handle(event)
+
+      expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
+      expect(event.preventDefault).toHaveBeenCalled()
+    })
+
+    it('toggles the node in Normal mode and clears a pending command', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle, vim } = vimHandler(store, node)
+      handle(keyEvent(input, 'd'))
+
+      handle(keyEvent(input, 'y', { metaKey: true }))
+
+      expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
+      expect(vim.commandState.pending).toBeUndefined()
+      expect(vim.mode).toBe('normal')
+      // The aborted `d` must not have taken the key as `dy`, so no text operator ran.
+      expect(store.replaceTextRange).not.toHaveBeenCalled()
+    })
+
+    it('leaves the saved change for . unchanged', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle, vim } = vimHandler(store, node)
+      const saved = { kind: 'structural-join', span: 2, spaced: true } as const
+      vim.commandState.lastChange = saved
+
+      handle(keyEvent(input, 'y', { metaKey: true }))
+
+      expect(vim.commandState.lastChange).toBe(saved)
+    })
+
+    it('toggles the node without leaving Insert mode or finishing its session', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle, vim } = vimHandler(store, node, 'insert')
+
+      handle(keyEvent(input, 'y', { metaKey: true }))
+
+      expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
+      expect(vim.finishInsert).not.toHaveBeenCalled()
+      expect(vim.mode).toBe('insert')
+    })
+
+    it('commits a pending Replace edit without rewriting the DOM, then returns to Normal', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle, vim } = vimHandler(store, node, 'replace')
+      const order: string[] = []
+      vim.finishReplace = vi.fn(() => {
+        order.push('commit')
+        return true
+      })
+      vi.mocked(store.toggleStrikethrough).mockImplementation(() => {
+        order.push('toggle')
+        return true
+      })
+
+      handle(keyEvent(input, 'y', { metaKey: true }))
+
+      expect(vim.finishReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
+      expect(order).toEqual(['commit', 'toggle'])
+      expect(vim.mode).toBe('normal')
+    })
+
+    it('toggles the current node in character Visual mode and keeps the mode', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle, vim } = vimHandler(store, node, 'visual')
+      vim.commandState.visualAnchor = 0
+      vim.commandState.visualFocus = 2
+
+      handle(keyEvent(input, 'y', { metaKey: true }))
+
+      expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
+      expect(vim.mode).toBe('visual')
+      expect(vim.commandState.visualAnchor).toBeUndefined()
+    })
+
+    it('toggles the whole-node Visual range and returns to Normal mode', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle, vim } = vimHandler(store, node, 'visual-node')
+      const exit = vi.fn()
+      vim.nodeVisual = {
+        enter: vi.fn(() => true),
+        move: vi.fn(),
+        swap: vi.fn(),
+        exit,
+        command: vi.fn(),
+        shift: vi.fn(),
+        join: vi.fn(),
+        selection: vi.fn(() => ({ anchorId: 'first', focusId: 'node' })),
+      }
+
+      handle(keyEvent(input, 'y', { metaKey: true }))
+
+      expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('first', 'node')
+      expect(exit).toHaveBeenCalledOnce()
+      expect(vim.mode).toBe('normal')
+    })
+
+    it('ignores Cmd+Shift+Y, Cmd+Option+Y, and plain y as toggles', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle } = vimHandler(store, node, 'insert')
+
+      handle(keyEvent(input, 'y', { metaKey: true, shiftKey: true }))
+      handle(keyEvent(input, 'y', { metaKey: true, altKey: true }))
+      handle(keyEvent(input, 'y'))
+
+      expect(store.toggleStrikethrough).not.toHaveBeenCalled()
+    })
+  })
+
   it('clears a Normal-mode g prefix before Cmd+.', () => {
     const store = createStore()
     const input = document.createElement('textarea')
@@ -1952,6 +2104,7 @@ describe('editor keyboard handler', () => {
       command: vi.fn(),
       shift: vi.fn(),
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
     const event = keyEvent(input, 'z')
 
@@ -2272,6 +2425,7 @@ describe('editor keyboard handler', () => {
       command: vi.fn(),
       shift: vi.fn(),
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'g' }
     vim.commandState.visualAnchor = 0
@@ -2419,6 +2573,7 @@ describe('editor keyboard handler', () => {
       command: vi.fn(),
       shift: vi.fn(),
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
     const pending = { count: '', motionCount: '', prefix: 'g' as const }
     vim.commandState.pending = pending
@@ -3093,6 +3248,7 @@ describe('editor keyboard handler', () => {
       command,
       shift: vi.fn(),
       join: vi.fn(),
+      selection: vi.fn(() => undefined),
     }
     for (const key of ['3', 'p', '2', 'P', '4', 'd', 'p']) handle(keyEvent(input, key))
     expect(command.mock.calls).toEqual([['p', 3], ['P', 2], ['d'], ['p', 1]])

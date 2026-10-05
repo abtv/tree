@@ -581,6 +581,15 @@ export function useNodeInputBindings({
     else if (vimMode !== 'normal') setCaret(input, pending.cursor)
   })
 
+  // A className prop change, such as a strikethrough toggle, rewrites the attribute and drops the
+  // imperative selection class below while the selection itself survives without a
+  // `selectionchange`; restore it on the focused input after every commit.
+  useLayoutEffect(() => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active.classList.contains('node-input'))
+      active.classList.toggle('node-input-text-selected', hasMultiCharacterSelection(active))
+  })
+
   useEffect(() => {
     const update = (): void => {
       for (const input of inputs.current.values()) {

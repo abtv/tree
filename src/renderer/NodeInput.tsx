@@ -75,6 +75,7 @@ export function NodeInput({
     'node-input',
     parent ? 'current-parent-input' : '',
     node.text.length === 0 ? 'node-input-empty' : '',
+    node.struckThrough === true ? 'node-input-struck' : '',
     imageOnly ? 'node-input-image-only' : '',
     imageCaretActive ? 'node-input-image-caret' : '',
     selectedAll ? 'select-all' : '',

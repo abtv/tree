@@ -122,10 +122,13 @@ Node
 ├── text
 ├── links?
 ├── attachment?
+├── struckThrough?
 └── children
 ```
 
 The parent relationship is derived from the tree structure.
+
+`struckThrough` is present, and `true`, only on a struck-through node (`docs/PRODUCT.md` §2.5); a normal node omits it rather than storing `false`. It belongs to the node alone and never changes its children. Every domain operation that rebuilds a node keeps it, and every operation that creates a node leaves it absent, which gives the split, join, copy, and move rules in §2.5. `toggleStrikethrough` changes one sibling range and path-copies only the route to it, like any other edit (§11).
 
 `links` is a list of non-overlapping ranges into `text`. Each range stores its HTTP(S) URL, which must equal the text covered by the range. Version-one persisted documents without links are migrated in memory and are saved using the current format (§13).
 
@@ -388,12 +391,13 @@ Conceptually:
 
 ```json id="x4p9mt"
 {
-  "version": 3,
+  "version": 4,
   "document": {
     "roots": [
       {
         "id": "root-id",
         "text": "Root text",
+        "struckThrough": true,
         "children": []
       }
     ]
@@ -413,6 +417,8 @@ The exact schema is defined by the implementation and product requirements.
 Version 3 added `view`, the persisted view state ([ADR 0017](decisions/0017-persisted-view-state.md)). `serializeState` writes only expanded ids of nodes the saved document contains; the in-memory set keeps ids of deleted nodes so an undo that restores a node also restores its expansion. A choice belongs to the node, not to its current children: a node whose last child is deleted keeps its id, and shows expanded again if it later regains children.
 
 `validatePersistedState` checks the view's shape and tolerates an id that names no node, and `parsePersistedState` drops such ids and migrates version 1 and 2 files to an empty view, so they open collapsed. Performance assessment (`docs/PRODUCT.md` §22.1): an expansion change adds no write of its own; it marks the same pending change a selection change does, so the idle, volume, and quit triggers batch it into the next document save. Serialization filters the expanded ids against the id set the existing validation walk already builds, which adds `O(E)` for `E` remembered ids to a save that is already `O(N)`. Keeping expansion across locations adds no per-command CPU; startup builds one set from the saved ids and one visible-row list, which the windowed list renders in bounded time (`perf/startup.spec.ts` guards startup with every one of 100 roots expanded, about 10,100 visible rows). Memory grows with the remembered ids, bounded by the number of nodes the user expanded in the session plus those loaded. An application build that predates version 3 rejects a version 3 file as unsupported, loads the newest older-version generation instead, and promotes it over the version 3 primary, discarding the newer work; running such a build on data written by a later one is unsupported.
+
+Version 4 added the per-node `struckThrough` field ([ADR 0018](decisions/0018-struck-through-nodes-in-schema-version-4.md)) and keeps the version 3 `view` block unchanged. Both validators reject a `struckThrough` that is present but not `true`, in the same node walk that already checks every node. Versions 1 to 3 load with no struck-through node and are saved as version 4. The version change exists to protect older builds: a build that ignores the field would otherwise load a version 4 file, drop every strikethrough, and write the file back without them, while with version 4 it rejects the file as unsupported and falls back to an older generation, as for version 3. Performance assessment (`docs/PRODUCT.md` §22.1): a toggle adds no write of its own; it marks a pending change like a structural command, so the idle, volume, and quit triggers batch it into the next document save. It path-copies one sibling range and the route to it, `O(range + depth + siblings)`, independent of document size, and the save and load walks gain one field check per node. Memory grows by at most one boolean field per struck-through node, plus the one history snapshot every undoable change already keeps.
 
 `view.selectedRowTop` records the scroll position as the selected row's distance from the top of the window, clamped so the whole row is on screen. A raw page offset was tried first and rejected: the windowed list in `NodeList.tsx` starts each launch with estimated heights for rows it has not measured, and images load after the first render, so the same pixel offset showed different content after a relaunch and a clamped offset was saved back over the real one. The selected row is always rendered, including in a windowed list, so it is a stable anchor. `src/renderer/use-scroll-restoration.ts` owns the renderer side. Called after the input bindings, its layout effect runs after their initial focus has scrolled the selected row into view and scrolls the page so the row sits at the saved distance. It keeps the restore pending and re-aligns on every `ResizeObserver` change of the document element while rows are measured and images load, until the first `wheel`, `keydown`, `pointerdown`, or `touchstart`. `EditorStore` keeps the value outside the snapshot, because no rendered state depends on it; the hook registers a reader that `EditorStore` calls whenever it captures state for a save, returning the pending target during a restore and the live measurement afterwards, so every save, including the quit flush, carries the current value. The saved distance is clamped again against the current window when it is applied and reported, because the window may be shorter than when the value was saved. A `scroll` event marks a pending change through `noteViewportChange` only after user input, so the restore's own scrolling at launch saves nothing. Unlike a selection change, it never resets an idle timer that is already armed, so continuous scrolling cannot hold back the idle save of an earlier text edit. Performance assessment: a scroll event costs at most one timer arm; a capture measures one row; the value adds no write of its own and is batched into the next document save, which is a full document save like the one a selection change causes.
 

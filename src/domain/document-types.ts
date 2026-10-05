@@ -20,6 +20,8 @@ export interface TreeNode {
   readonly text: string
   readonly links?: readonly LinkRange[]
   readonly attachment?: AttachmentReference
+  /** Present only on a struck-through node (`docs/PRODUCT.md` §2.5); it never affects the children. */
+  readonly struckThrough?: true
   readonly children: readonly TreeNode[]
 }
 
@@ -42,7 +44,7 @@ export interface PersistedView {
 }
 
 export interface PersistedEditorState {
-  readonly version: 1 | 2 | 3
+  readonly version: 1 | 2 | 3 | 4
   readonly document: Document
   readonly location: Location
   readonly view?: PersistedView
@@ -63,6 +65,7 @@ export interface BuildNode {
   text: string
   links?: LinkRange[]
   attachment?: AttachmentReference
+  struckThrough?: true
   children: BuildNode[]
 }
 

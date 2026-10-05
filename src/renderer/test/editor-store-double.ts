@@ -116,6 +116,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     applyNodeVisual: vi.fn(() => undefined),
     shiftNodeVisual: vi.fn(() => false),
     joinNodes: vi.fn(() => false),
+    toggleStrikethrough: vi.fn(() => false),
     deleteEmptySelected: vi.fn(),
     moveSelectedTo: vi.fn(),
     moveNodeTo: vi.fn(),

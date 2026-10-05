@@ -135,9 +135,51 @@ const cases: PersistedStateCase[] = [
   },
   {
     name: 'rejects an unsupported version',
-    state: { ...validState, version: 4, view: { expandedIds: [] } },
+    state: { ...validState, version: 5, view: { expandedIds: [] } },
     decision: 'reject',
     error: 'The saved document has an unsupported format.',
+  },
+  {
+    name: 'accepts a version four state with a struck-through node',
+    state: {
+      ...validState,
+      version: 4,
+      document: { roots: [{ id: 'root', text: 'Done', struckThrough: true, children: [] }] },
+      view: { expandedIds: [] },
+    },
+    decision: 'accept',
+  },
+  {
+    name: 'rejects a version four state without a view',
+    state: { ...validState, version: 4 },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects a strikethrough flag that is not true',
+    state: {
+      ...validState,
+      version: 4,
+      document: { roots: [{ id: 'root', text: 'Done', struckThrough: false, children: [] }] },
+      view: { expandedIds: [] },
+    },
+    decision: 'reject',
+    error: 'A saved node is invalid.',
+  },
+  {
+    name: 'rejects a nested strikethrough flag that is not a boolean',
+    state: {
+      ...validState,
+      version: 4,
+      document: {
+        roots: [
+          { id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', struckThrough: 'yes', children: [] }] },
+        ],
+      },
+      view: { expandedIds: [] },
+    },
+    decision: 'reject',
+    error: 'A saved node is invalid.',
   },
   {
     name: 'accepts a version three state with expansion and a selected row position',
@@ -337,6 +379,39 @@ describe('persisted state validator conformance', () => {
     expect(parsed.view).not.toHaveProperty('selectedRowTop')
     expect(parsed.document.roots[0]).not.toHaveProperty('attachment')
     expect(parsed.document.roots[0]).not.toHaveProperty('links')
+    expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
+  })
+
+  it('loads and saves struck-through nodes as version four, leaving their children unchanged', () => {
+    const state = {
+      version: 4,
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: 'Task',
+            struckThrough: true,
+            children: [{ id: 'child', text: 'Step', children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+      view: { expandedIds: ['root'] },
+    }
+    const parsed = parsePersistedState(state)
+    expect(parsed.version).toBe(4)
+    expect(parsed.document.roots[0]).toMatchObject({ struckThrough: true })
+    expect(parsed.document.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
+    expect(parsed.view).toEqual({ expandedIds: ['root'] })
+    const saved = serializeState(parsed.document, parsed.location, parsed.view)
+    expect(saved.version).toBe(4)
+    expect(JSON.parse(JSON.stringify(saved))).toEqual(state)
+  })
+
+  it.each([1, 2, 3])('loads a schema version %i file with no struck-through node', (version) => {
+    const parsed = parsePersistedState({ ...validState, version, view: { expandedIds: [] } })
+    expect(parsed.version).toBe(4)
+    expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
   })
 
   it.each([1, 2])('ignores view fields from schema version %i', (version) => {

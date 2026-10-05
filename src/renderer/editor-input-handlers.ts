@@ -318,6 +318,15 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       clearCommandAssemblyBeforeCommand(vim)
       store.applyFold('toggle', node.id)
+    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
+      // Toggles the strikethrough (PRODUCT §2.5) of the whole-node Visual range, or else of this node.
+      // A pending Replace edit commits first without rewriting the DOM, so the toggle's render cannot
+      // rewind the visible replacement; Insert stays active and the caret stays where it is.
+      event.preventDefault()
+      const range = vim?.mode === 'visual-node' ? vim.nodeVisual.selection() : undefined
+      commitPendingReplace(vim, event.currentTarget)
+      clearCommandAssemblyBeforeCommand(vim)
+      store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id)
     } else if (event.metaKey && event.key === ',') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)

@@ -39,23 +39,28 @@ export function serializeState(
   const expandedIds: NodeId[] = []
   for (const id of view.expandedIds) if (nodeIds.has(id)) expandedIds.push(id)
   return {
-    version: 3,
+    version: 4,
     document,
     location: { ...location },
     view: view.selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop: view.selectedRowTop },
   }
 }
 
-function isSupportedVersion(version: unknown): version is 1 | 2 | 3 {
-  return version === 1 || version === 2 || version === 3
+function isSupportedVersion(version: unknown): version is 1 | 2 | 3 | 4 {
+  return version === 1 || version === 2 || version === 3 || version === 4
+}
+
+/** Version 3 added the view block; version 4 keeps it and adds the per-node strikethrough. */
+function hasView(version: unknown): boolean {
+  return version === 3 || version === 4
 }
 
 /**
- * Checks the view shape of a version 3 state. An expanded id that names no node is tolerated, since
- * it cannot display anything; a malformed view is rejected like any other malformed field.
+ * Checks the view shape of a version 3 or 4 state. An expanded id that names no node is tolerated,
+ * since it cannot display anything; a malformed view is rejected like any other malformed field.
  */
 function assertView(value: Record<string, unknown>): void {
-  if (value.version !== 3) return
+  if (!hasView(value.version)) return
   const view = value.view
   // Number.isFinite already rejects non-numbers; removing only typeof is equivalent.
   if (
@@ -135,7 +140,8 @@ function isLocationReachable(
 
 /**
  * Parses and migrates a saved state to the current schema. A version 1 or 2 file predates persisted
- * view state and loads with every node collapsed; expanded ids that name no node are dropped.
+ * view state and loads with every node collapsed; expanded ids that name no node are dropped. A
+ * version 1 to 3 file predates strikethrough, so none of its nodes is struck through.
  */
 export function parsePersistedState(value: unknown): PersistedEditorState {
   if (
@@ -162,11 +168,11 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
   if (!isValidLocation(document, location)) {
     throw new Error('The saved document location does not match its tree.')
   }
-  return { version: 3, document, location, view: parseView(value, nodeIds) }
+  return { version: 4, document, location, view: parseView(value, nodeIds) }
 }
 
 function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>): PersistedView {
-  if (value.version !== 3 || !isRecord(value.view)) return EMPTY_PERSISTED_VIEW
+  if (!hasView(value.version) || !isRecord(value.view)) return EMPTY_PERSISTED_VIEW
   const expandedIds = (value.view.expandedIds as string[]).filter((id) => nodeIds.has(id))
   const selectedRowTop = value.view.selectedRowTop
   return typeof selectedRowTop === 'number' ? { expandedIds, selectedRowTop } : { expandedIds }
@@ -227,7 +233,8 @@ function walkNodes(
       !isRecord(candidate) ||
       typeof candidate.id !== 'string' ||
       candidate.id.length === 0 ||
-      typeof candidate.text !== 'string'
+      typeof candidate.text !== 'string' ||
+      (candidate.struckThrough !== undefined && candidate.struckThrough !== true)
     ) {
       throw new Error('A saved node is invalid.')
     }
@@ -249,6 +256,7 @@ function walkNodes(
         text: candidate.text,
         ...(links.length === 0 ? {} : { links }),
         ...(attachment === undefined ? {} : { attachment }),
+        ...(candidate.struckThrough === true ? { struckThrough: true as const } : {}),
         children: [],
       }
       frame.output.push(node)

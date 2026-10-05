@@ -985,6 +985,153 @@ describe('EditorStore', () => {
     expect(store.getVisibleRows()[0]).toMatchObject({ node: { id: 'a' }, parentId: null })
   })
 
+  // @requirement PRODUCT.md §2.5
+  describe('strikethrough', () => {
+    const tasks = {
+      roots: [
+        { id: 'a', text: 'Alpha', children: [{ id: 'a1', text: 'Step', children: [] }] },
+        { id: 'b', text: 'Beta', struckThrough: true, children: [] },
+        { id: 'c', text: 'Gamma', children: [] },
+      ],
+    }
+
+    function struck(store: EditorStore): string[] {
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+      const ids: string[] = []
+      const visit = (node: TreeNode): void => {
+        if (node.struckThrough === true) ids.push(node.id)
+        node.children.forEach(visit)
+      }
+      state.document.roots.forEach(visit)
+      return ids
+    }
+
+    it('toggles one node as an undoable change that keeps the location and caret and leaves its children', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(tasks, { currentParentId: null, selectedNodeId: 'a' })
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+      store.selectNode('a', 3)
+      const before = store.getSnapshot()
+      if (before.status !== 'ready') throw new Error('Expected a ready editor.')
+
+      expect(store.toggleStrikethrough('a', 'a')).toBe(true)
+      expect(struck(store)).toEqual(['a', 'b'])
+      const after = store.getSnapshot()
+      if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+      expect(after.location).toEqual(before.location)
+      expect(after.focus).toBe(before.focus)
+      expect(after.document.roots[0]!.children).toBe(before.document.roots[0]!.children)
+      expect(after.document.roots[0]).toMatchObject({ id: 'a', text: 'Alpha' })
+
+      expect(store.toggleStrikethrough('a', 'a')).toBe(true)
+      expect(struck(store)).toEqual(['b'])
+      store.undo()
+      expect(struck(store)).toEqual(['a', 'b'])
+      const undone = store.getSnapshot()
+      expect(undone.status === 'ready' && undone.focus).toMatchObject({ nodeId: 'a', cursor: 0 })
+      store.undo()
+      expect(struck(store)).toEqual(['b'])
+      store.redo()
+      expect(struck(store)).toEqual(['a', 'b'])
+    })
+
+    it('marks a pending change saved by the idle trigger rather than saving immediately', async () => {
+      const clock = new FakeClock()
+      const services = loadedState(tasks, { currentParentId: null, selectedNodeId: 'c' })
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+
+      store.toggleStrikethrough('c', 'c')
+      await tick()
+      expect(services.saves).toHaveLength(0)
+      clock.runAll()
+      await store.flushPersistence()
+      expect(services.saves.at(-1)).toMatchObject({
+        version: 4,
+        document: { roots: [{ id: 'a' }, { id: 'b', struckThrough: true }, { id: 'c', struckThrough: true }] },
+      })
+      expect((services.saves.at(-1) as { document: { roots: TreeNode[] } }).document.roots[0]).not.toHaveProperty(
+        'struckThrough',
+      )
+    })
+
+    it('strikes a mixed range through and returns an all-struck range to normal, in either direction', async () => {
+      const store = new EditorStore(loadedState(tasks, { currentParentId: null, selectedNodeId: 'c' }), ids('unused'))
+      await store.initialize()
+
+      expect(store.toggleStrikethrough('c', 'a')).toBe(true)
+      expect(struck(store)).toEqual(['a', 'b', 'c'])
+      expect(store.toggleStrikethrough('a', 'b')).toBe(true)
+      expect(struck(store)).toEqual(['c'])
+      store.undo()
+      expect(struck(store)).toEqual(['a', 'b', 'c'])
+      const undone = store.getSnapshot()
+      expect(undone.status === 'ready' && undone.focus).toMatchObject({ nodeId: 'a', cursor: 0 })
+    })
+
+    it('strikes the editable current-parent heading without changing its children', async () => {
+      const store = new EditorStore(loadedState(tasks, { currentParentId: 'a', selectedNodeId: 'a' }), ids('unused'))
+      await store.initialize()
+
+      expect(store.toggleStrikethrough('a', 'a')).toBe(true)
+      expect(struck(store)).toEqual(['a', 'b'])
+      const state = store.getSnapshot()
+      expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'a', selectedNodeId: 'a' })
+    })
+
+    it('changes nothing for ends that are not siblings', async () => {
+      const store = new EditorStore(loadedState(tasks, { currentParentId: null, selectedNodeId: 'a' }), ids('unused'))
+      await store.initialize()
+      const before = store.getSnapshot()
+
+      expect(store.toggleStrikethrough('a', 'a1')).toBe(false)
+      expect(store.getSnapshot()).toBe(before)
+    })
+
+    it('is rejected while persistence is locked', async () => {
+      const { store } = await lockEditor(new FakeClock())
+      const before = store.getSnapshot()
+
+      expect(store.toggleStrikethrough('root', 'root')).toBe(false)
+      expect(store.getSnapshot()).toBe(before)
+    })
+
+    it('keeps the strikethrough through a split, a join, a subtree put, and a move', async () => {
+      const store = new EditorStore(
+        loadedState(tasks, { currentParentId: null, selectedNodeId: 'b' }),
+        ids('split', 'copy'),
+      )
+      await store.initialize()
+
+      // Splitting keeps the first part struck through; the new part starts normal.
+      store.selectNode('b', 2)
+      store.createSiblingOrFirstChild(2)
+      expect(struck(store)).toEqual(['b'])
+      const split = store.getSnapshot()
+      expect(split.status === 'ready' && split.document.roots.map((node) => node.text)).toEqual([
+        'Alpha',
+        'Be',
+        'ta',
+        'Gamma',
+      ])
+
+      // A join keeps the first node's state.
+      store.selectNode('b', 0)
+      expect(store.joinNodes({ count: 2 }, false)).toBe(true)
+      expect(struck(store)).toEqual(['b'])
+
+      // A subtree put copies the strikethrough with the node; a move keeps it.
+      const source = store.getSnapshot()
+      if (source.status !== 'ready') throw new Error('Expected a ready editor.')
+      expect(store.pasteSubtree('b', 'after', source.document.roots[1]!)).toBe(true)
+      expect(struck(store)).toEqual(['b', 'copy'])
+      store.moveNodeTo('copy', 0)
+      expect(struck(store)).toEqual(['copy', 'b'])
+    })
+  })
+
   describe('remembered expansion', () => {
     // root ─ child ─ grandchild ─ leaf, plus a second root 'other' with one child.
     const nestedDocument = {
@@ -1220,7 +1367,7 @@ describe('EditorStore', () => {
       expect(services.saves).toHaveLength(0)
       clock.runAll()
       await store.flushPersistence()
-      expect(services.saves.at(-1)).toMatchObject({ version: 3, view: { expandedIds: ['root'] } })
+      expect(services.saves.at(-1)).toMatchObject({ version: 4, view: { expandedIds: ['root'] } })
 
       store.applyFold('open', 'child')
       await store.flushPersistence()

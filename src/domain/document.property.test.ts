@@ -34,6 +34,7 @@ import {
   serializeState,
   shiftSiblingRange,
   splitNode,
+  toggleStrikethrough,
   validatePersistedState,
   MAX_DOCUMENT_DEPTH,
   MAX_DOCUMENT_DEPTH_ERROR,
@@ -47,16 +48,23 @@ import {
 interface RawNode {
   text: string
   hasAttachment: boolean
+  struckThrough: boolean
   children: RawNode[]
 }
 
 function rawNode(depth: number): fc.Arbitrary<RawNode> {
   if (depth === 0) {
-    return fc.record<RawNode>({ text: fc.string(), hasAttachment: fc.boolean(), children: fc.constant<RawNode[]>([]) })
+    return fc.record<RawNode>({
+      text: fc.string(),
+      hasAttachment: fc.boolean(),
+      struckThrough: fc.boolean(),
+      children: fc.constant<RawNode[]>([]),
+    })
   }
   return fc.record<RawNode>({
     text: fc.string(),
     hasAttachment: fc.boolean(),
+    struckThrough: fc.boolean(),
     children: fc.array(rawNode(depth - 1), { maxLength: 3 }),
   })
 }
@@ -71,6 +79,7 @@ function materialize(rawForest: RawNode[]): Document {
       id,
       text: raw.text,
       ...(raw.hasAttachment ? { attachment: { id: `a${id}`, mimeType: 'image/png' as const } } : {}),
+      ...(raw.struckThrough ? { struckThrough: true as const } : {}),
       children: raw.children.map(build),
     }
   }
@@ -572,6 +581,59 @@ describe('document invariants', () => {
     )
   })
 
+  it('toggleStrikethrough changes only the range flags, shares every child subtree, and undoes itself', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.nat(), (rawForest, seed, otherSeed) => {
+        const document = materialize(rawForest)
+        const anchor = pick(document, seed)
+        const located = locateNode(document, anchor.id)!
+        const focus = located.siblings[otherSeed % located.siblings.length]!
+        const start = Math.min(located.index, located.siblings.indexOf(focus))
+        const end = Math.max(located.index, located.siblings.indexOf(focus))
+        const range = located.siblings.slice(start, end + 1)
+        const strike = !range.every((node) => node.struckThrough === true)
+
+        const result = toggleStrikethrough(document, anchor.id, focus.id)!
+        const rangeIds = new Set(range.map((node) => node.id))
+        expect(allIds(result)).toEqual(allIds(document))
+        expect(attachmentSummary(result)).toEqual(attachmentSummary(document))
+        const before = new Map(allNodes(document).map((node) => [node.id, node]))
+        for (const node of allNodes(result)) {
+          const original = before.get(node.id)!
+          if (rangeIds.has(node.id)) {
+            expect(node.struckThrough === true).toBe(strike)
+            expect(node.text).toBe(original.text)
+            expect(node.links).toBe(original.links)
+            expect(node.attachment).toBe(original.attachment)
+            expect(node.children).toBe(original.children)
+          } else if (!located.ancestors.some((ancestor) => ancestor.id === node.id)) {
+            expect(node).toBe(original)
+          }
+        }
+        if (strike && range.length === 1) {
+          expect(toggleStrikethrough(result, anchor.id, focus.id)).toEqual(document)
+        }
+        assertDocument(result)
+        expect(
+          parsePersistedState(JSON.parse(JSON.stringify(serializeState(result, locationFor(result, anchor))))),
+        ).toEqual(serializeState(result, locationFor(result, anchor)))
+      }),
+      { numRuns: propertyRuns(100) },
+    )
+  })
+
+  it('toggleStrikethrough rejects ends that are not siblings', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), fc.nat(), (rawForest, seed, otherSeed) => {
+        const document = materialize(rawForest)
+        const anchor = pick(document, seed)
+        const other = pick(document, otherSeed)
+        if (locateNode(document, anchor.id)!.siblings.includes(other)) return
+        expect(toggleStrikethrough(document, anchor.id, other.id)).toBeUndefined()
+      }),
+    )
+  })
+
   it('moveSibling to the current index is a no-op', () => {
     fc.assert(
       fc.property(forest, fc.nat(), (rawForest, seed) => {
@@ -667,6 +729,7 @@ describe('document invariants', () => {
         pasteText(document, node.id, cursor, text)
         pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node'])
         attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' })
+        toggleStrikethrough(document, node.id, node.id)
         ensureRoot(document, 'new-root')
 
         expect(JSON.parse(JSON.stringify(document))).toEqual(before)
@@ -699,6 +762,7 @@ describe('document invariants', () => {
           pasteText(document, node.id, cursor, text),
           pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node']),
           attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' }),
+          toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
         for (const result of results) {
@@ -745,6 +809,7 @@ describe('document invariants', () => {
           pasteText(document, node.id, cursor, text),
           pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node']),
           attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' }),
+          toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
         for (const result of results) {
@@ -788,6 +853,7 @@ describe('document invariants', () => {
           pasteText(document, node.id, cursor, text),
           pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node']),
           attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' }),
+          toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
         for (const result of results) {
@@ -872,6 +938,7 @@ describe('document invariants', () => {
           pasteText(document, node.id, cursor, text),
           pasteMultilineText(document, node.id, cursor, [text, text], ['pasted-node']),
           attachImage(document, node.id, { id: 'new-attachment', mimeType: 'image/png' }),
+          toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
         for (const result of results) {
