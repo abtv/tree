@@ -294,6 +294,21 @@ Classify the complete change, not only its purpose. For example, a workflow-docu
 
 `npm run format:check:changed` is the canonical scoped formatting check. It checks supported staged, unstaged, and non-ignored untracked files relative to `HEAD`, excludes deleted files, safely passes filenames without shell interpolation, and succeeds with an explicit message when there are no eligible files. The full-repository `npm run format:check` remains part of broader validation.
 
+### Screenshot Rendering Scale
+
+The E2E fixture passes `--force-device-scale-factor=1` in Electron's launch arguments, before the test entry, and asserts `window.devicePixelRatio === 1` after launch. This makes screenshot rasterization independent of the attached display's backing scale. Keep GPU rendering and the existing Playwright comparison settings: CSS-sized output does not by itself fix the scale at which Chromium draws glyphs. The performance fixture retains the native display scale for presented-window measurements.
+
+The investigation on 2026-10-05 at `b47725a` reproduced a scale mismatch without changing application code or baselines: the three light strikethrough screenshots failed at startup scale 1 and passed at startup scale 2. Existing punctuation screenshots passed serial, parallel, and visible runs at scale 1. A screenshot stability regression failed when consecutive launches used startup scales 2 and 1, then passed after the canonical launch override. Setting the scale through `app.commandLine.appendSwitch` in the test entry or through a later CDP metrics override did not reproduce the launch-time scale change. Hidden versus visible windows produced identical diagnostic frames; GPU versus CPU rasterization changed edge pixels but did not resolve the failing strikethrough comparisons. These experiments establish display scale as a reproducible cause; they do not establish the trigger of the failures reported from the earlier session.
+
+`e2e/screenshot-stability.spec.ts` checks both editing modes and appearances, repeated exact PNG captures across conflicting startup scale arguments, the received Chromium switch, and the effective renderer scale. It also verifies that a one-pixel text translation changes the image. Run its serial and parallel repeat guards after changing rendering or launch infrastructure:
+
+```bash
+npx playwright test e2e/screenshot-stability.spec.ts --repeat-each=5 --workers=1
+npx playwright test e2e/screenshot-stability.spec.ts --repeat-each=12 --workers=6
+```
+
+Also repeat an existing `toHaveScreenshot` test, such as `e2e/typed-input.spec.ts --grep 'operator-like punctuation'`, under both worker counts. Do not regenerate baselines merely because a comparison failed: first verify the canonical scale and inspect actual, expected, and diff images. Regenerate only baselines that disagree with confirmed stable rendering, and inspect every changed baseline under the visual workflow below. The scale decision is recorded in [ADR 0019](decisions/0019-canonical-e2e-rendering-scale.md). These checks cover canonical screenshot rendering. Verify native Retina presentation through the regular application (`npm run dev`) on a Retina display during product verification.
+
 ### Validation Evidence and Reuse
 
 Run `npm run validation:snapshot` to identify the repository inputs to a validation result. It reports `HEAD` and a deterministic digest of the tracked binary diff plus the paths, normalized executable modes, and contents of non-ignored untracked regular files; paths use locale-independent UTF-8 byte ordering, and untracked symlinks contribute their link target without reading the target. Regular-file modes are normalized to Git-style `100644` or `100755`, so other permission-bit changes do not affect the digest. The command accepts tracked diffs up to 100 MiB and fails rather than emitting partial evidence above that guard. The temporary root `WORKING_PLAN.md` is excluded to avoid making its recorded digest self-referential; supply the plan separately to review roles. Staging alone does not change the digest when file contents are unchanged. Ignored generated outputs are excluded; when a later check consumes generated artifacts such as `out/`, record the command and snapshot that produced them.

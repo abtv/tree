@@ -409,6 +409,8 @@ async function waitForProcessExit(
 export async function launchTree(
   userDataDir: string,
   options: {
+    /** Simulates a display scale before the canonical E2E scale is applied, for stability coverage. */
+    initialDeviceScaleFactor?: 1 | 2
     expectReady?: boolean
     windows?: WindowMode
     shortcut?: ShortcutMode
@@ -432,6 +434,12 @@ export async function launchTree(
   try {
     app = await electron.launch({
       args: [
+        ...(options.initialDeviceScaleFactor === undefined
+          ? []
+          : [`--force-device-scale-factor=${options.initialDeviceScaleFactor}`]),
+        // Set the backing scale before Electron initializes Chromium. CSS-sized screenshots still
+        // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
+        '--force-device-scale-factor=1',
         `--user-data-dir=${userDataDir}`,
         join(process.cwd(), 'e2e', 'electron-entry.cjs'),
         ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
@@ -456,6 +464,10 @@ export async function launchTree(
     await assertWindowMode(app, windowMode)
     await assertShortcutMode(app, shortcutMode)
     if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
+    const scale = await window.evaluate(() => devicePixelRatio)
+    if (scale !== 1) {
+      throw new Error(`Expected E2E devicePixelRatio 1, got ${scale}. The launch-time rendering scale did not apply.`)
+    }
     // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
     // Vim tests opt into the real Normal-mode startup state. Standard editing has no modes.
     if (
