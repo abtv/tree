@@ -702,7 +702,7 @@ export function handleVimKey(
     }
   } else if (visual && (event.key === '>' || event.key === '<')) {
     // Moves the whole current subtree; the character selection stays selected afterwards.
-    vim.shiftCurrentNode(node.id, event.key === '>' ? 'in' : 'out', count, selection)
+    vim.shiftCurrentNode(node.id, event.key === '>' ? 'in' : 'out', count, selection, cursor)
   } else if (!visual && event.key === 'x') {
     applyTextChange(store, node, input, cursor, vim, { kind: 'delete', motion: 'x', count })
   } else if (!visual && event.key === 'X') {

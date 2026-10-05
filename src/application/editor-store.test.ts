@@ -331,6 +331,66 @@ describe('EditorStore', () => {
       expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'b1' })
     })
 
+    it('confines Tab outdents to the displayed current parent without changing Vim <', async () => {
+      const direct = new EditorStore(
+        loadedState(
+          {
+            roots: [
+              {
+                id: 'a',
+                text: 'A',
+                children: [
+                  { id: 'b', text: 'B', children: [] },
+                  { id: 'c', text: 'C', children: [] },
+                ],
+              },
+            ],
+          },
+          { currentParentId: 'a', selectedNodeId: 'b' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await direct.initialize()
+      const directBefore = ready(direct)
+      expect(direct.canShiftNodeVisualOutWithinCurrentParent('b', 'c')).toBe(false)
+      expect(direct.shiftNodeVisual('out', 'b', 'c', 1, 0, true)).toBe(false)
+      expect(ready(direct)).toBe(directBefore)
+      // The default transition remains Vim `<` behavior and can leave the zoomed location.
+      expect(direct.shiftNodeVisual('out', 'b', 'c')).toBe(true)
+      expect(ready(direct).location.currentParentId).toBeNull()
+
+      const deep = new EditorStore(
+        loadedState(
+          {
+            roots: [
+              {
+                id: 'a',
+                text: 'A',
+                children: [
+                  { id: 'b', text: 'B', children: [{ id: 'b1', text: 'B1', children: [] }] },
+                  { id: 'c', text: 'C', children: [] },
+                ],
+              },
+            ],
+          },
+          { currentParentId: 'a', selectedNodeId: 'b1' },
+        ),
+        ids('unused'),
+        new FakeClock(),
+      )
+      await deep.initialize()
+      const beforeDeepShift = ready(deep)
+      expect(deep.canShiftNodeVisualOutWithinCurrentParent('b1', 'b1')).toBe(true)
+      // The first internal step would make `b1` a direct child of A, so the second would cross A.
+      // The whole counted transition must remain atomic.
+      expect(deep.shiftNodeVisual('out', 'b1', 'b1', 2, 0, true)).toBe(false)
+      expect(ready(deep)).toBe(beforeDeepShift)
+      expect(deep.shiftNodeVisual('out', 'b1', 'b1', 1, 0, true)).toBe(true)
+      expect(ready(deep).document.roots[0]!.children.map((child) => child.id)).toEqual(['b', 'b1', 'c'])
+      expect(ready(deep).location.currentParentId).toBe('a')
+    })
+
     it('applies a count as successive levels in one undo step, or not at all', async () => {
       const store = await load('d')
       const before = ready(store)

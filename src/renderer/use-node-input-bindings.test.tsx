@@ -119,6 +119,24 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
 }
 
 describe('useNodeInputBindings', () => {
+  it('shifts a standard editor node through the store and restores its text selection', async () => {
+    const f = await fixture({
+      vimEnabled: false,
+      document: { roots: [node('a', 'Alpha'), node('b', 'Bravo')] },
+      location: { currentParentId: null, selectedNodeId: 'b' },
+    })
+    const input = f.input()
+    input.setSelectionRange(1, 3)
+
+    f.press('Tab')
+
+    expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
+    expect(f.snapshot().focus.cursor).toBe(1)
+    act(() => vi.runOnlyPendingTimers())
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(3)
+  })
+
   it('turns a typed URL into a link only once the typed word is a valid URL', async () => {
     const f = await fixture({ document: { roots: [node('node', '')] } })
     f.type('see http:/')

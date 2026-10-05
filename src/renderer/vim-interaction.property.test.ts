@@ -86,6 +86,7 @@ function assertImageMotionSequence(
     isComposing: () => false,
     setSelectAllNodeId: vi.fn(),
     onPreviewAttachment: vi.fn(),
+    shiftFocusedNode: () => undefined,
     vim,
   })
 
@@ -294,6 +295,7 @@ function assertSiblingMotionSequence(
       isComposing: () => false,
       setSelectAllNodeId: vi.fn(),
       onPreviewAttachment: vi.fn(),
+      shiftFocusedNode: () => undefined,
       vim,
     })
     const input = inputAt(selectedNodeId)
@@ -310,6 +312,7 @@ function assertSiblingMotionSequence(
           isComposing: () => false,
           setSelectAllNodeId: vi.fn(),
           onPreviewAttachment: vi.fn(),
+          shiftFocusedNode: () => undefined,
           vim,
         })(keyEvent(inputAt(selectedNodeId), String(count)))
       }
@@ -412,6 +415,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
       isComposing: () => false,
       setSelectAllNodeId: vi.fn(),
       onPreviewAttachment: vi.fn(),
+      shiftFocusedNode: () => undefined,
       vim,
     })
     handler(keyEvent(input, key))

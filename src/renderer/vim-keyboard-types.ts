@@ -149,7 +149,7 @@ export interface VimKeyboardState {
     exit: () => void
     command: (command: NodeVisualCommand, count?: number) => void
     /** `>` (`in`) or `<` (`out`) over the selected sibling range, `count` levels. */
-    shift: (direction: 'in' | 'out', count: number) => void
+    shift: (direction: 'in' | 'out', count: number, confineOutdentToCurrentParent?: boolean) => void
     /** `J` (`spaced`) or `gJ` over the selected sibling range; leaves whole-node Visual mode on success. */
     join: (spaced: boolean) => void
     /** The selected whole-node range, for application commands such as `Cmd+Enter` that act on all of it. */
@@ -169,6 +169,8 @@ export interface VimKeyboardState {
     direction: 'in' | 'out',
     count: number,
     selection: { start: number; end: number },
+    cursor?: number,
+    confineOutdentToCurrentParent?: boolean,
   ) => void
   /**
    * `dj`, `dk`, `yj`, `yk`, `cj`, and `ck` (`docs/PRODUCT.md` §20.2.1 T4): the node and the `count`

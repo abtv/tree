@@ -36,6 +36,8 @@ const exclusions: Record<string, string> = {
   pasteSubtree: 'Node-register paste needs generated subtree/register state; clipboard paste is generated instead.',
   pasteNodeForest: 'Forest-register paste needs generated forest/register state.',
   applyNodeVisual: 'Whole-node Visual commands need generated selection spans and register state.',
+  canShiftNodeVisualOutWithinCurrentParent:
+    'Read-only Tab shortcut boundary check is covered by focused store, property, and renderer tests.',
   moveSelectedTo: 'Convenience wrapper around moveNodeTo, which the generator drives directly.',
 }
 

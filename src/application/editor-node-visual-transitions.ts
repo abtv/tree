@@ -85,6 +85,20 @@ export function currentParentAfterMove(
   return stillDisplayed ? location.currentParentId : (requireNode(document, movedId).parent?.id ?? null)
 }
 
+/** True when a Shift+Tab range is a direct child range of the displayed current parent. */
+export function nodeVisualShiftIsAtCurrentParentBoundary(
+  document: Document,
+  location: Location,
+  anchorId: NodeId,
+  focusId: NodeId,
+): boolean {
+  const boundaryId = location.currentParentId
+  if (boundaryId === null) return false
+  const anchor = locateNode(document, anchorId)
+  const focus = locateNode(document, focusId)
+  return anchor?.parent?.id === boundaryId && focus?.parent?.id === boundaryId
+}
+
 export type NodeVisualShiftTransition =
   | { kind: 'none' }
   | { kind: 'rejected'; message: string }
@@ -104,6 +118,7 @@ export function nodeVisualShiftTransition(
   focusId: NodeId,
   count: number,
   cursor: number,
+  confineOutdentToCurrentParent = false,
 ): NodeVisualShiftTransition {
   if (anchorId === location.currentParentId || focusId === location.currentParentId) return { kind: 'none' }
   const anchorLocated = locateNode(document, anchorId)
@@ -116,6 +131,12 @@ export function nodeVisualShiftTransition(
   let next = document
   const expandIds: NodeId[] = []
   for (let level = 0; level < count; level += 1) {
+    if (
+      direction === 'out' &&
+      confineOutdentToCurrentParent &&
+      nodeVisualShiftIsAtCurrentParentBoundary(next, location, anchorId, focusId)
+    )
+      return { kind: 'none' }
     if (direction === 'in') {
       const current = requireNode(next, firstId)
       const destination = current.siblings[current.index - 1]

@@ -87,6 +87,8 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
       isComposing: () => composing,
       setSelectAllNodeId,
       onPreviewAttachment,
+      shiftFocusedNode: (direction, selection) =>
+        store.shiftNodeVisual(direction, node.id, node.id, 1, selection.start, true),
     }),
   }
 }
@@ -112,6 +114,8 @@ function vimHandler(
     isComposing,
     setSelectAllNodeId: vi.fn(),
     onPreviewAttachment,
+    shiftFocusedNode: (direction, selection) =>
+      store.shiftNodeVisual(direction, node.id, node.id, 1, selection.start, true),
     vim,
   })
   return {
@@ -152,6 +156,8 @@ async function textFixture(node: TreeNode, mode: VimKeyboardState['mode'] = 'nor
       isComposing: () => false,
       setSelectAllNodeId: vi.fn(),
       onPreviewAttachment: vi.fn(),
+      shiftFocusedNode: (direction, selection) =>
+        harness.store.shiftNodeVisual(direction, harness.node().id, harness.node().id, 1, selection.start),
       vim: keyboard.vim,
     })
     const event = keyEvent(input, key, options)
@@ -408,12 +414,116 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, '2'))
     handle(keyEvent(input, '<'))
 
-    expect(vim.shiftCurrentNode).toHaveBeenNthCalledWith(1, 'node', 'in', 1, { start: 0, end: 3 })
-    expect(vim.shiftCurrentNode).toHaveBeenNthCalledWith(2, 'node', 'out', 2, { start: 0, end: 3 })
+    expect(vim.shiftCurrentNode).toHaveBeenNthCalledWith(1, 'node', 'in', 1, { start: 0, end: 3 }, 0)
+    expect(vim.shiftCurrentNode).toHaveBeenNthCalledWith(2, 'node', 'out', 2, { start: 0, end: 3 }, 0)
     expect(vim.mode).toBe('visual')
     expect(vim.commandState.visualAnchor).toBe(0)
     expect(vim.commandState.visualFocus).toBe(2)
     expect(vim.commandState.pending).toBeUndefined()
+  })
+
+  it.each(['normal', 'insert', 'replace', 'visual'] as const)(
+    'routes Tab and Shift+Tab through focused subtree shifts in %s mode',
+    (mode) => {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = mode === 'replace' ? 'xBravo' : 'Bravo'
+      input.setSelectionRange(1, 3)
+      const { handle, vim } = vimHandler(store, { id: 'node', text: 'Bravo', children: [] }, mode)
+      if (mode === 'normal') vim.commandState.pending = { count: '2', motionCount: '' }
+      if (mode === 'visual') {
+        vim.commandState.visualAnchor = 1
+        vim.commandState.visualFocus = 2
+      }
+
+      const indent = keyEvent(input, 'Tab')
+      handle(indent)
+      const outdent = keyEvent(input, 'Tab', { shiftKey: true })
+      handle(outdent)
+
+      expect(indent.preventDefault).toHaveBeenCalledOnce()
+      expect(outdent.preventDefault).toHaveBeenCalledOnce()
+      expect(vim.shiftCurrentNode).toHaveBeenNthCalledWith(1, 'node', 'in', 1, { start: 1, end: 3 }, 1, true)
+      expect(vim.shiftCurrentNode).toHaveBeenNthCalledWith(2, 'node', 'out', 1, { start: 1, end: 3 }, 1, true)
+      expect(vim.mode).toBe(mode)
+      expect(vim.commandState.pending).toBeUndefined()
+      if (mode === 'insert') expect(vim.finishInsert).not.toHaveBeenCalled()
+      if (mode === 'replace') {
+        expect(vim.finishReplace).toHaveBeenNthCalledWith(1, input, false, true)
+        expect(vim.beginReplace).toHaveBeenNthCalledWith(1, 'node', input, 'xBravo', 1)
+      }
+      if (mode === 'visual') {
+        expect(vim.commandState.visualAnchor).toBe(1)
+        expect(vim.commandState.visualFocus).toBe(2)
+      }
+    },
+  )
+
+  it('shifts the whole-node Visual range with Tab while retaining its range mode', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    vim.nodeVisual.selection = vi.fn(() => ({ anchorId: 'a', focusId: 'b' }))
+    const event = keyEvent(input, 'Tab')
+
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(vim.nodeVisual.shift).toHaveBeenCalledWith('in', 1, true)
+    expect(vim.shiftCurrentNode).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('visual-node')
+  })
+
+  it('clears a pending whole-node Visual prefix when Shift+Tab is blocked at the zoom boundary', () => {
+    const store = createStore()
+    vi.mocked(store.canShiftNodeVisualOutWithinCurrentParent).mockReturnValue(false)
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual-node')
+    vim.nodeVisual.selection = vi.fn(() => ({ anchorId: 'a', focusId: 'b' }))
+    vim.commandState.pending = { count: '', motionCount: '', prefix: 'g' }
+
+    const event = keyEvent(input, 'Tab', { shiftKey: true })
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(vim.commandState.pending).toBeUndefined()
+    expect(vim.nodeVisual.shift).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('visual-node')
+    expect(vim.nodeVisual.selection).toHaveBeenCalled()
+  })
+
+  it('keeps modified Tab outside the structural command', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'normal')
+    const event = keyEvent(input, 'Tab', { ctrlKey: true })
+
+    handle(event)
+
+    expect(vim.shiftCurrentNode).not.toHaveBeenCalled()
+    expect(store.shiftNodeVisual).not.toHaveBeenCalled()
+  })
+
+  it('dispatches standard Tab to the selection-preserving callback', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Bravo'
+    input.setSelectionRange(1, 4)
+    const shiftFocusedNode = vi.fn()
+    const handle = createEditorKeyDownHandler({
+      store,
+      node: { id: 'node', text: 'Bravo', children: [] },
+      isComposing: () => false,
+      setSelectAllNodeId: vi.fn(),
+      onPreviewAttachment: vi.fn(),
+      shiftFocusedNode,
+    })
+    const event = keyEvent(input, 'Tab', { shiftKey: true })
+
+    handle(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(shiftFocusedNode).toHaveBeenCalledWith('out', { start: 1, end: 4 }, 1)
   })
 
   it('moves and edits in Normal mode without inserting command characters', async () => {

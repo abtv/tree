@@ -207,7 +207,12 @@ interface ShiftNodeVisualDeps {
 
 // Whole-node Visual keeps its endpoint IDs, direction, and mode across `>` and `<`: the moved rows
 // keep their IDs, so only the store changes and the selection state is left alone.
-export function shiftNodeVisual(deps: ShiftNodeVisualDeps, direction: 'in' | 'out', count: number): void {
+export function shiftNodeVisual(
+  deps: ShiftNodeVisualDeps,
+  direction: 'in' | 'out',
+  count: number,
+  confineOutdentToCurrentParent = false,
+): void {
   const { store, commandState, nodeVisualSelection } = deps
   if (nodeVisualSelection === undefined) return
   const { anchorId, focusId } = nodeVisualSelection
@@ -217,7 +222,7 @@ export function shiftNodeVisual(deps: ShiftNodeVisualDeps, direction: 'in' | 'ou
   const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
   if (anchor === undefined || focus < 0) return
   const span = Math.abs(anchor.index - focus) + 1
-  if (store.shiftNodeVisual(direction, anchorId, focusId, count))
+  if (store.shiftNodeVisual(direction, anchorId, focusId, count, undefined, confineOutdentToCurrentParent))
     recordRepeatChange(commandState, { kind: 'structural-shift', direction, span, count })
 }
 
@@ -263,9 +268,11 @@ export function shiftCurrentNode(
   direction: 'in' | 'out',
   count: number,
   selection: { start: number; end: number },
+  cursor?: number,
+  confineOutdentToCurrentParent = false,
 ): void {
   const { store, commandState, schedulePendingVisualSelection } = deps
-  if (!store.shiftNodeVisual(direction, nodeId, nodeId, count)) return
+  if (!store.shiftNodeVisual(direction, nodeId, nodeId, count, cursor, confineOutdentToCurrentParent)) return
   recordRepeatChange(commandState, { kind: 'structural-shift', direction, span: 1, count })
   // The store's focus intent collapses the caret when the moved row renders; the layout effect
   // below restores the selection once it has.

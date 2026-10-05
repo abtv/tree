@@ -112,6 +112,43 @@ function assertInvariants(store: EditorStore): void {
 }
 
 describe('EditorStore invariants under command sequences', () => {
+  it('keeps every direct-child range inside its Tab current-parent boundary', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.array(fc.string(), { minLength: 2, maxLength: 8 }), async (texts) => {
+        const document = {
+          roots: [
+            {
+              id: 'parent',
+              text: 'Parent',
+              children: texts.map((text, index) => ({ id: `child-${index}`, text, children: [] })),
+            },
+          ],
+        }
+        const clipboard: ClipboardRef = { current: { kind: 'text', text: '' } }
+        const store = new EditorStore(
+          createServices(
+            {
+              version: 1,
+              document,
+              location: { currentParentId: 'parent', selectedNodeId: 'child-0' },
+            },
+            () => clipboard.current,
+          ),
+          freshIds(),
+        )
+        await store.initialize()
+        const before = store.getSnapshot()
+        if (before.status !== 'ready') throw new Error('Editor did not load')
+        const lastId = `child-${texts.length - 1}`
+
+        expect(store.canShiftNodeVisualOutWithinCurrentParent('child-0', lastId)).toBe(false)
+        expect(store.shiftNodeVisual('out', 'child-0', lastId, 1, 0, true)).toBe(false)
+        expect(store.getSnapshot()).toBe(before)
+      }),
+      { numRuns: propertyRuns(100) },
+    )
+  })
+
   it('keeps the document and location valid after any command sequence', async () => {
     await fc.assert(
       fc.asyncProperty(forest, fc.array(command, { minLength: 1, maxLength: 30 }), async (rawForest, commands) => {

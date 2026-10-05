@@ -52,6 +52,7 @@ import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import {
   forwardJoinTransition,
   isPasteIntoSourceDescendant,
+  nodeVisualShiftIsAtCurrentParentBoundary,
   nodeVisualJoinTransition,
   nodeVisualShiftTransition,
   nodeVisualTransition,
@@ -848,8 +849,10 @@ export class EditorStore {
 
   /**
    * Whole-node or character Visual `>` / `<` (`docs/PRODUCT.md` §20.2.1): moves the sibling range
-   * between `anchorId` and `focusId` `count` levels as one undoable command. Returns whether it
-   * changed the document; an impossible request changes nothing and a depth failure is reported.
+   * between `anchorId` and `focusId` `count` levels as one undoable command. Tab may opt into
+   * keeping an outdent within the current parent; the default retains Vim `<` behavior. Returns
+   * whether it changed the document; an impossible request changes nothing and a depth failure is
+   * reported.
    */
   public shiftNodeVisual(
     direction: 'in' | 'out',
@@ -857,6 +860,7 @@ export class EditorStore {
     focusId: NodeId,
     count = 1,
     cursor?: number,
+    confineOutdentToCurrentParent = false,
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
@@ -868,6 +872,7 @@ export class EditorStore {
       focusId,
       count,
       cursor ?? (state.focus.nodeId === state.location.selectedNodeId ? state.focus.cursor : 0),
+      confineOutdentToCurrentParent,
     )
     if (result.kind === 'none') return false
     if (result.kind === 'rejected') {
@@ -883,6 +888,12 @@ export class EditorStore {
       expansion,
     )
     return true
+  }
+
+  /** Whether the Tab shortcut's location boundary permits shifting this range outward. */
+  public canShiftNodeVisualOutWithinCurrentParent(anchorId: NodeId, focusId: NodeId): boolean {
+    const state = this.runtime.ready()
+    return !nodeVisualShiftIsAtCurrentParentBoundary(state.document, state.location, anchorId, focusId)
   }
 
   /**

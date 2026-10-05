@@ -134,6 +134,7 @@ async function assertSequence(
       isComposing: () => false,
       setSelectAllNodeId: () => undefined,
       onPreviewAttachment: () => undefined,
+      shiftFocusedNode: () => undefined,
       vim,
     })
     handler({

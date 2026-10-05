@@ -4,7 +4,7 @@ import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
 import { clearCommandAssembly, clearPending } from './vim-command-state'
-import { getCaret, getSelectionRange, selectAll } from './editor-dom'
+import { getCaret, getSelectionRange, readEditableContent, selectAll } from './editor-dom'
 import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 
@@ -135,6 +135,8 @@ export interface EditorKeyboardHandlerDependencies {
   isComposing: () => boolean
   setSelectAllNodeId: (nodeId: string | undefined) => void
   onPreviewAttachment: (attachmentId: string) => void
+  /** Shift the focused subtree while preserving the editor's current text selection. */
+  shiftFocusedNode: (direction: 'in' | 'out', selection: { start: number; end: number }, cursor: number) => void
   /** Absent while Vim editing is disabled: every key then takes the standard editing path. */
   vim?: VimKeyboardState | undefined
 }
@@ -145,6 +147,7 @@ export function createEditorKeyDownHandler({
   isComposing,
   setSelectAllNodeId,
   onPreviewAttachment,
+  shiftFocusedNode,
   vim,
 }: EditorKeyboardHandlerDependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event): void => {
@@ -158,6 +161,42 @@ export function createEditorKeyDownHandler({
     // flag marks as composing" and "clears a pending fold prefix through composition started by a
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
     if (isComposing() || event.nativeEvent?.isComposing) return
+    if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault()
+      const direction = event.shiftKey ? 'out' : 'in'
+      const tabCursor = getCaret(event.currentTarget)
+      if (direction === 'out') {
+        const visualRange = vim?.mode === 'visual-node' ? vim.nodeVisual.selection() : undefined
+        const anchorId = visualRange?.anchorId ?? node.id
+        const focusId = visualRange?.focusId ?? node.id
+        if (!store.canShiftNodeVisualOutWithinCurrentParent(anchorId, focusId)) {
+          if (vim?.mode === 'normal' || vim?.mode === 'visual' || vim?.mode === 'visual-node')
+            clearPending(vim.commandState)
+          return
+        }
+      }
+      if (vim?.mode === 'visual-node') {
+        clearPending(vim.commandState)
+        vim.nodeVisual.shift(direction, 1, true)
+      } else {
+        if (vim?.mode === 'replace') {
+          vim.finishReplace(event.currentTarget, false, true)
+        }
+        if (vim?.mode === 'normal' || vim?.mode === 'visual') clearPending(vim.commandState)
+        const selection = getSelectionRange(event.currentTarget)
+        if (vim !== undefined) {
+          vim.shiftCurrentNode(node.id, direction, 1, selection, tabCursor, true)
+          if (vim.mode === 'replace') {
+            const inputText =
+              event.currentTarget instanceof HTMLTextAreaElement
+                ? event.currentTarget.value
+                : readEditableContent(event.currentTarget).text
+            vim.beginReplace(node.id, event.currentTarget, inputText, getCaret(event.currentTarget))
+          }
+        } else shiftFocusedNode(direction, selection, tabCursor)
+      }
+      return
+    }
     const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
     const copying = event.metaKey && event.key.toLowerCase() === 'c'
     const pasting = event.metaKey && event.key.toLowerCase() === 'v'

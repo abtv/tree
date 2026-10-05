@@ -326,11 +326,12 @@ export function useNodeInputBindings({
   )
 
   const shiftNodeVisual = useCallback(
-    (direction: 'in' | 'out', count: number): void => {
+    (direction: 'in' | 'out', count: number, confineOutdentToCurrentParent = false): void => {
       nodeVisualCommands.shiftNodeVisual(
         { store, commandState: vimCommandState.current, nodeVisualSelection },
         direction,
         count,
+        confineOutdentToCurrentParent,
       )
     },
     [store, nodeVisualSelection],
@@ -354,7 +355,14 @@ export function useNodeInputBindings({
   )
 
   const shiftCurrentNode = useCallback(
-    (nodeId: string, direction: 'in' | 'out', count: number, selection: { start: number; end: number }): void => {
+    (
+      nodeId: string,
+      direction: 'in' | 'out',
+      count: number,
+      selection: { start: number; end: number },
+      cursor?: number,
+      confineOutdentToCurrentParent = false,
+    ): void => {
       nodeVisualCommands.shiftCurrentNode(
         {
           store,
@@ -365,6 +373,8 @@ export function useNodeInputBindings({
         direction,
         count,
         selection,
+        cursor,
+        confineOutdentToCurrentParent,
       )
     },
     [store],
@@ -676,6 +686,10 @@ export function useNodeInputBindings({
         isComposing: () => composing,
         setSelectAllNodeId,
         onPreviewAttachment,
+        shiftFocusedNode: (direction, selection, cursor) => {
+          if (store.shiftNodeVisual(direction, node.id, node.id, 1, cursor, true))
+            schedulePendingVisualSelection({ nodeId: node.id, start: selection.start, end: selection.end })
+        },
         vim: !vimEnabled
           ? undefined
           : createVimKeyboardState(
