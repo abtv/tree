@@ -33,7 +33,7 @@ function caret(input: Locator): Promise<number> {
 
 // @requirement PRODUCT.md §2.5
 describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) => {
-  test('toggles the selected node with Cmd+Y, keeps the caret and typing, and keeps it after relaunch', async ({
+  test('toggles the selected node with Cmd+Enter, keeps the caret and typing, and keeps it after relaunch', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, tasksSeed())
@@ -41,7 +41,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     const alpha = node(first.window, 1)
     await setCursor(alpha, 2)
 
-    await first.window.keyboard.press('Meta+y')
+    await first.window.keyboard.press('Meta+Enter')
     await expect(alpha).toHaveClass(/node-input-struck/)
     await expect(node(first.window, 2)).not.toHaveClass(/node-input-struck/)
     await expect(alpha).toBeFocused()
@@ -62,16 +62,16 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
 
     const second = await launchTree(userDataDir)
     await expect(node(second.window, 1)).toHaveClass(/node-input-struck/)
-    await second.window.keyboard.press('Meta+y')
+    await second.window.keyboard.press('Meta+Enter')
     await expect(node(second.window, 1)).not.toHaveClass(/node-input-struck/)
   })
 
-  test('undoes and redoes a Cmd+Y toggle as one change', async ({ userDataDir }) => {
+  test('undoes and redoes a Cmd+Enter toggle as one change', async ({ userDataDir }) => {
     seedDocument(userDataDir, tasksSeed())
     const { window } = await launchTree(userDataDir)
     await node(window, 2).focus()
 
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
     await expect(node(window, 2)).toHaveClass(/node-input-struck/)
     await window.keyboard.press('Meta+z')
     await expect(node(window, 2)).not.toHaveClass(/node-input-struck/)
@@ -87,7 +87,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     const { window } = await launchTree(userDataDir)
     await parent(window).focus()
 
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
 
     await expect(parent(window)).toHaveClass(/node-input-struck/)
     await expect(node(window, 1)).toHaveValue('Alpha step')
@@ -136,7 +136,7 @@ test.describe('struck-through nodes: Vim editing only', () => {
     seedDocument(userDataDir, tasksSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
 
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -180,7 +180,7 @@ test.describe('struck-through nodes: Vim editing only', () => {
     await window.keyboard.press('Meta+a')
     await expect(node(window, 1)).toHaveClass(/node-input-text-selected/)
 
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
 
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
     await expect(node(window, 1)).toHaveClass(/node-input-text-selected/)
@@ -194,7 +194,7 @@ test.describe('struck-through nodes: Vim editing only', () => {
     await window.keyboard.type('Ze')
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
 
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
     await expect(node(window, 1)).toHaveValue('Zepha')
@@ -211,7 +211,7 @@ test.describe('struck-through nodes: Vim editing only', () => {
     seedDocument(userDataDir, tasksSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     await node(window, 2).focus()
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
     await expect(node(window, 2)).toHaveClass(/node-input-struck/)
 
     // A mixed range becomes struck through; the same range again returns to normal.
@@ -220,20 +220,20 @@ test.describe('struck-through nodes: Vim editing only', () => {
     await window.keyboard.press('j')
     await window.keyboard.press('j')
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     for (const index of [1, 2, 3]) await expect(node(window, index)).toHaveClass(/node-input-struck/)
 
     await pressShifted(window, 'V')
     await window.keyboard.press('k')
     await window.keyboard.press('k')
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
     for (const index of [1, 2, 3]) await expect(node(window, index)).not.toHaveClass(/node-input-struck/)
 
     await window.keyboard.press('v')
     await window.keyboard.press('l')
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
-    await window.keyboard.press('Meta+y')
+    await window.keyboard.press('Meta+Enter')
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
     await expect(node(window, 2)).not.toHaveClass(/node-input-struck/)
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')

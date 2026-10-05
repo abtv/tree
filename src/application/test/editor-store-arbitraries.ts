@@ -306,7 +306,7 @@ export async function applyCommand(
       break
     }
     case 'strike': {
-      // `Cmd+Y` on the selected node, or on a whole-node Visual range ending at the selection.
+      // `Cmd+Enter` on the selected node, or on a whole-node Visual range ending at the selection.
       const siblings = locateNode(state.document, state.location.selectedNodeId)?.siblings ?? []
       const anchor = action.a % 2 === 0 ? undefined : siblings[action.b % Math.max(1, siblings.length)]
       store.toggleStrikethrough(anchor?.id ?? state.location.selectedNodeId, state.location.selectedNodeId)

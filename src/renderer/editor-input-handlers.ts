@@ -318,15 +318,23 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       clearCommandAssemblyBeforeCommand(vim)
       store.applyFold('toggle', node.id)
-    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
-      // Toggles the strikethrough (PRODUCT §2.5) of the whole-node Visual range, or else of this node.
-      // A pending Replace edit commits first without rewriting the DOM, so the toggle's render cannot
-      // rewind the visible replacement; Insert stays active and the caret stays where it is.
+    } else if (event.metaKey && event.key === 'Enter') {
+      // Every Cmd-modified Enter is claimed so it can never fall through to node creation; only the
+      // plain Cmd+Enter toggles the strikethrough (PRODUCT §2.5) of the whole-node Visual range, or
+      // else of this node. A pending Replace edit commits first without rewriting the DOM, so the
+      // toggle's render cannot rewind the visible replacement; Insert stays active and the caret
+      // stays where it is.
       event.preventDefault()
+      if (event.shiftKey || event.altKey) return
       const range = vim?.mode === 'visual-node' ? vim.nodeVisual.selection() : undefined
       commitPendingReplace(vim, event.currentTarget)
       clearCommandAssemblyBeforeCommand(vim)
       store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id)
+    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
+      event.preventDefault()
+      if (node.attachment !== undefined) {
+        onPreviewAttachment(node.attachment.id)
+      }
     } else if (event.metaKey && event.key === ',') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
@@ -352,12 +360,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       void window.treeApi.quit().catch((error: unknown) => store.reportError(error))
     } else if (event.metaKey && event.key === '0') event.preventDefault()
-    else if (event.metaKey && event.key === 'Enter') {
-      event.preventDefault()
-      if (node.attachment !== undefined) {
-        onPreviewAttachment(node.attachment.id)
-      }
-    } else if (event.key === 'Backspace' && node.text === '') {
+    else if (event.key === 'Backspace' && node.text === '') {
       event.preventDefault()
       store.deleteEmptySelected()
     } else if (event.key === 'Enter') {

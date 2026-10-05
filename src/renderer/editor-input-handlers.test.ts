@@ -1856,7 +1856,7 @@ describe('editor keyboard handler', () => {
   })
 
   // @requirement PRODUCT.md §2.5
-  describe('Cmd+Y strikethrough', () => {
+  describe('Cmd+Enter strikethrough', () => {
     const node: TreeNode = { id: 'node', text: 'text', children: [] }
 
     function textInput(): HTMLTextAreaElement {
@@ -1868,7 +1868,7 @@ describe('editor keyboard handler', () => {
     it('toggles the node in standard editing', () => {
       const store = createStore()
       const input = textInput()
-      const event = keyEvent(input, 'y', { metaKey: true })
+      const event = keyEvent(input, 'Enter', { metaKey: true })
 
       handler(store, node).handle(event)
 
@@ -1882,7 +1882,7 @@ describe('editor keyboard handler', () => {
       const { handle, vim } = vimHandler(store, node)
       handle(keyEvent(input, 'd'))
 
-      handle(keyEvent(input, 'y', { metaKey: true }))
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
       expect(vim.commandState.pending).toBeUndefined()
@@ -1898,7 +1898,7 @@ describe('editor keyboard handler', () => {
       const saved = { kind: 'structural-join', span: 2, spaced: true } as const
       vim.commandState.lastChange = saved
 
-      handle(keyEvent(input, 'y', { metaKey: true }))
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(vim.commandState.lastChange).toBe(saved)
     })
@@ -1908,7 +1908,7 @@ describe('editor keyboard handler', () => {
       const input = textInput()
       const { handle, vim } = vimHandler(store, node, 'insert')
 
-      handle(keyEvent(input, 'y', { metaKey: true }))
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
       expect(vim.finishInsert).not.toHaveBeenCalled()
@@ -1929,7 +1929,7 @@ describe('editor keyboard handler', () => {
         return true
       })
 
-      handle(keyEvent(input, 'y', { metaKey: true }))
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(vim.finishReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
       expect(order).toEqual(['commit', 'toggle'])
@@ -1943,7 +1943,7 @@ describe('editor keyboard handler', () => {
       vim.commandState.visualAnchor = 0
       vim.commandState.visualFocus = 2
 
-      handle(keyEvent(input, 'y', { metaKey: true }))
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
       expect(vim.mode).toBe('visual')
@@ -1966,23 +1966,50 @@ describe('editor keyboard handler', () => {
         selection: vi.fn(() => ({ anchorId: 'first', focusId: 'node' })),
       }
 
-      handle(keyEvent(input, 'y', { metaKey: true }))
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('first', 'node')
       expect(exit).toHaveBeenCalledOnce()
       expect(vim.mode).toBe('normal')
     })
 
-    it('ignores Cmd+Shift+Y, Cmd+Option+Y, and plain y as toggles', () => {
+    it('claims Cmd+Shift+Enter and Cmd+Option+Enter without toggling or creating a node', () => {
+      const store = createStore()
+      const input = textInput()
+      const { handle } = vimHandler(store, node, 'insert')
+      const shifted = keyEvent(input, 'Enter', { metaKey: true, shiftKey: true })
+      const optioned = keyEvent(input, 'Enter', { metaKey: true, altKey: true })
+
+      handle(shifted)
+      handle(optioned)
+
+      expect(shifted.preventDefault).toHaveBeenCalled()
+      expect(optioned.preventDefault).toHaveBeenCalled()
+      expect(store.toggleStrikethrough).not.toHaveBeenCalled()
+      expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    })
+
+    it('leaves plain Enter creating a node in Insert mode', () => {
       const store = createStore()
       const input = textInput()
       const { handle } = vimHandler(store, node, 'insert')
 
-      handle(keyEvent(input, 'y', { metaKey: true, shiftKey: true }))
-      handle(keyEvent(input, 'y', { metaKey: true, altKey: true }))
-      handle(keyEvent(input, 'y'))
+      handle(keyEvent(input, 'Enter'))
 
       expect(store.toggleStrikethrough).not.toHaveBeenCalled()
+      expect(store.createSiblingOrFirstChild).toHaveBeenCalledOnce()
+    })
+
+    it('does not open the image preview on an attached node', () => {
+      const store = createStore()
+      const input = textInput()
+      const attached: TreeNode = { ...node, attachment: { id: 'image', mimeType: 'image/png' } }
+      const { handle, onPreviewAttachment } = handler(store, attached)
+
+      handle(keyEvent(input, 'Enter', { metaKey: true }))
+
+      expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
+      expect(onPreviewAttachment).not.toHaveBeenCalled()
     })
   })
 
@@ -3517,7 +3544,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, ',', { metaKey: true }))
     handle(keyEvent(input, 'z', { metaKey: true }))
     handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
-    handle(keyEvent(input, 'Enter', { metaKey: true }))
+    handle(keyEvent(input, 'y', { metaKey: true }))
 
     expect(store.enter).toHaveBeenCalledOnce()
     expect(store.leave).toHaveBeenCalledOnce()
@@ -3664,11 +3691,31 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     const { handle, onPreviewAttachment } = handler(store, { id: 'node', text: 'text', children: [] })
 
-    const event = keyEvent(input, 'Enter', { metaKey: true })
+    const event = keyEvent(input, 'y', { metaKey: true })
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(onPreviewAttachment).not.toHaveBeenCalled()
+    expect(store.toggleStrikethrough).not.toHaveBeenCalled()
+  })
+
+  it('opens the image preview with Cmd+Y in Normal mode without toggling a strikethrough', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    const attached: TreeNode = {
+      id: 'node',
+      text: 'text',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    }
+    const { handle, onPreviewAttachment } = vimHandler(store, attached)
+
+    handle(keyEvent(input, 'y', { metaKey: true }))
+    handle(keyEvent(input, 'y', { metaKey: true, shiftKey: true }))
+
+    expect(onPreviewAttachment).toHaveBeenCalledExactlyOnceWith('image')
+    expect(store.toggleStrikethrough).not.toHaveBeenCalled()
   })
 
   it('prevents the default for Cmd+0 without dispatching a command', () => {

@@ -152,7 +152,7 @@ export interface VimKeyboardState {
     shift: (direction: 'in' | 'out', count: number) => void
     /** `J` (`spaced`) or `gJ` over the selected sibling range; leaves whole-node Visual mode on success. */
     join: (spaced: boolean) => void
-    /** The selected whole-node range, for application commands such as `Cmd+Y` that act on all of it. */
+    /** The selected whole-node range, for application commands such as `Cmd+Enter` that act on all of it. */
     selection: () => { anchorId: string; focusId: string } | undefined
   }
   /**

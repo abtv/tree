@@ -141,7 +141,7 @@ describe('App strikethrough', () => {
     ],
   }
 
-  it('renders a struck-through node and toggles it with Cmd+Y without moving the caret', async () => {
+  it('renders a struck-through node and toggles it with Cmd+Enter without moving the caret', async () => {
     const store = await createSeededStore(tasks, { currentParentId: null, selectedNodeId: 'a' })
     renderReact(<App initialVimEnabled store={store} />)
     const alpha = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
@@ -150,13 +150,13 @@ describe('App strikethrough', () => {
     expect(bravo).toHaveClass('node-input-struck')
     act(() => alpha.setSelectionRange(2, 2))
 
-    fireEvent.keyDown(alpha, { key: 'y', metaKey: true })
+    fireEvent.keyDown(alpha, { key: 'Enter', metaKey: true })
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-struck')
     expect(alpha.value).toBe('Alpha')
     expect(alpha.selectionStart).toBe(2)
     expect(document.activeElement).toBe(alpha)
 
-    fireEvent.keyDown(alpha, { key: 'y', metaKey: true })
+    fireEvent.keyDown(alpha, { key: 'Enter', metaKey: true })
     expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
   })
 
@@ -165,7 +165,7 @@ describe('App strikethrough', () => {
     renderReact(<App initialVimEnabled store={store} />)
     const heading = screen.getByRole('textbox', { name: 'Current parent' })
 
-    fireEvent.keyDown(heading, { key: 'y', metaKey: true })
+    fireEvent.keyDown(heading, { key: 'Enter', metaKey: true })
 
     expect(screen.getByRole('textbox', { name: 'Current parent' })).toHaveClass('node-input-struck')
     expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
@@ -179,7 +179,7 @@ describe('App strikethrough', () => {
     fireEvent.keyDown(alpha, { key: 'j' })
     const bravo = screen.getByRole('textbox', { name: 'Node 2' })
 
-    fireEvent.keyDown(bravo, { key: 'y', metaKey: true })
+    fireEvent.keyDown(bravo, { key: 'Enter', metaKey: true })
 
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-struck')
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveClass('node-input-struck')
@@ -276,7 +276,7 @@ describe('App', () => {
   })
 
   // @requirement PRODUCT.md §17.1
-  it('opens the image preview with Cmd+Enter and closes it on Escape, restoring focus', async () => {
+  it('opens the image preview with Cmd+Y and closes it on Escape, restoring focus', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
     await act(async () => {
       await store.initialize()
@@ -288,7 +288,7 @@ describe('App', () => {
     const node = screen.getByRole('textbox', { name: 'Node 1' })
     await screen.findByRole('button', { name: 'Open image preview' })
 
-    fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
+    fireEvent.keyDown(node, { key: 'y', metaKey: true })
     expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
 
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -353,13 +353,13 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
     await screen.findByRole('button', { name: 'Open image preview' })
-    fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
+    fireEvent.keyDown(node, { key: 'y', metaKey: true })
     await screen.findByAltText('Attached image preview')
 
     expect(readAttachment).toHaveBeenCalledTimes(1)
   })
 
-  it('opens the image preview from the current parent with Cmd+Enter', async () => {
+  it('opens the image preview from the current parent with Cmd+Y', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
     await act(async () => {
       await store.initialize()
@@ -373,19 +373,19 @@ describe('App', () => {
     const parent = screen.getByRole('textbox', { name: 'Current parent' })
     await screen.findByRole('button', { name: 'Open image preview' })
 
-    fireEvent.keyDown(parent, { key: 'Enter', metaKey: true })
+    fireEvent.keyDown(parent, { key: 'y', metaKey: true })
 
     expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
   })
 
-  it('does nothing on Cmd+Enter when the node has no image', async () => {
+  it('does nothing on Cmd+Y when the node has no image', async () => {
     const store = createStore()
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
 
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'Enter', metaKey: true })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'y', metaKey: true })
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -1622,7 +1622,7 @@ describe('App', () => {
       const node = screen.getByRole('textbox', { name: 'Node 1' })
       await screen.findByRole('button', { name: 'Open image preview' })
 
-      fireEvent.keyDown(node, { key: 'Enter', metaKey: true })
+      fireEvent.keyDown(node, { key: 'y', metaKey: true })
       expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
 
       fireEvent.keyDown(window, { key: 'Escape' })

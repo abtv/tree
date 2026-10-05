@@ -87,7 +87,7 @@ describeForEachEditingMode('image preview', () => {
     await expect(dialog).toBeHidden()
   })
 
-  test('opens the preview with Cmd+Enter', async ({ userDataDir }) => {
+  test('opens the preview with Cmd+Y, while Cmd+Enter strikes the node through instead', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
     await writeClipboardImageSized(app, 400, 200)
@@ -95,6 +95,10 @@ describeForEachEditingMode('image preview', () => {
     await expect(window.getByAltText('Attached image')).toBeVisible()
     await node(window, 1).focus()
     await window.keyboard.press('Meta+Enter')
+    await expect(node(window, 1)).toHaveClass(/node-input-struck/)
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeHidden()
+
+    await window.keyboard.press('Meta+y')
 
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
   })
@@ -118,7 +122,7 @@ describeForEachEditingMode('image preview', () => {
     await window.keyboard.press('Escape')
 
     await node(window, 1).focus()
-    await window.keyboard.press('Meta+Enter')
+    await window.keyboard.press('Meta+y')
     await expect(close).toBeFocused()
     const afterKeyboard = await ring()
 

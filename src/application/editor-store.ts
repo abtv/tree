@@ -913,7 +913,7 @@ export class EditorStore {
   }
 
   /**
-   * `Cmd+Y` (`docs/PRODUCT.md` §2.5): toggles the strikethrough of the sibling range between
+   * `Cmd+Enter` (`docs/PRODUCT.md` §2.5): toggles the strikethrough of the sibling range between
    * `anchorId` and `focusId` — one node when they are equal, including the current-parent heading —
    * as one undoable command. The location and the caret stay where they are, and the change is saved
    * by the ordinary pending-change policy. Returns whether it changed the document.
