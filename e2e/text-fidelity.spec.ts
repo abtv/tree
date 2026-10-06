@@ -95,11 +95,20 @@ async function removeBoth(window: Page): Promise<void> {
   )
 }
 
+// Captures an element by its box instead of `locator.screenshot()`, which first waits for the element
+// to be stable across animation frames. These boxes are fixed-position and never move, and that wait
+// can stall for its whole timeout on a loaded CI runner while contributing nothing to a pixel comparison.
+async function captureBox(window: Page, id: string): Promise<Buffer> {
+  const box = await window.locator(`#${id}`).boundingBox()
+  if (box === null) throw new Error(`#${id} was not rendered.`)
+  return window.screenshot({ clip: box })
+}
+
 async function expectDrawnCharacterByCharacter(window: Page, source: Locator): Promise<void> {
   for (const text of RISKY_TEXT) {
     await drawBoth(window, source, text)
-    const shaped = await window.locator(`#${ID_SHAPED}`).screenshot()
-    const reference = await window.locator(`#${ID_REFERENCE}`).screenshot()
+    const shaped = await captureBox(window, ID_SHAPED)
+    const reference = await captureBox(window, ID_REFERENCE)
     expect(shaped.equals(reference), `"${text}" is drawn differently from its character-by-character form`).toBe(true)
     await removeBoth(window)
   }
