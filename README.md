@@ -4,11 +4,11 @@ Tree is a keyboard-first outliner for macOS. Write notes, break ideas into branc
 
 [Watch the demo video](https://abtv.github.io/tree/tree-demo.webm)
 
-![Tree in the light appearance, showing reading club, work, learning, and ideas branches, with some branches expanded and others folded.](docs/images/tree-overview.png)
+![Tree in the light appearance, showing reading club, work, learning, and ideas branches, with some branches expanded and others folded.](https://abtv.github.io/tree/tree-overview.png)
 
 Keep projects, notes, and ideas in one outline. Expand the branches you are working on and keep other details folded away.
 
-![Tree in the dark appearance, focused on the first meetup branch with its breadcrumb path and Vim Normal mode indicator visible.](docs/images/tree-focus-dark.png)
+![Tree in the dark appearance, focused on the first meetup branch with its breadcrumb path and Vim Normal mode indicator visible.](https://abtv.github.io/tree/tree-focus-dark.png)
 
 The same outline, focused on “Plan the first meetup”: the node text and expanded branches are unchanged. The breadcrumb path keeps its place in the larger project visible. Here, the dark appearance and Vim Normal mode are enabled.
 

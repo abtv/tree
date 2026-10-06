@@ -1,5 +1,3 @@
-import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -7,22 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { _electron as electron, expect } from '@playwright/test'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const marker = 'docs/images/refresh.json'
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
-
-function status() {
-  const revision = git('log', '-1', '--format=%H', '--', marker)
-  const pending = git('status', '--porcelain', '--', marker)
-  if (revision === '') {
-    console.log('No committed README screenshot refresh. Initial capture and review are required.')
-  } else {
-    const count = Number(git('rev-list', '--count', `${revision}..HEAD`))
-    console.log(
-      `${count} commits since the last README screenshot refresh; ${count >= 100 ? 'refresh due' : 'refresh not due'}.`,
-    )
-  }
-  if (pending !== '') console.log('A refresh marker is pending review/commit; it has not reset the interval.')
-}
+const output = join(root, 'reports/readme')
 
 async function capture() {
   if (process.platform !== 'darwin') throw new Error('README capture requires macOS.')
@@ -42,6 +25,10 @@ async function capture() {
         '--force-device-scale-factor=1',
         `--user-data-dir=${dataDirectory}`,
         join(root, 'e2e/electron-entry.cjs'),
+        // CI runners have no trackpad, so macOS would draw classic scrollbars that narrow the outline.
+        // The user-defaults argument follows the entry, or Electron takes it for the application path.
+        '-AppleShowScrollBars',
+        'WhenScrolling',
         '--tree-test-appearance=light',
       ],
       cwd: root,
@@ -81,14 +68,13 @@ async function capture() {
     if (JSON.stringify(persisted.document) !== JSON.stringify(demo.document)) {
       throw new Error('Capture changed the synthetic document; refusing to publish images.')
     }
+    // Clean only this command's fixed, ignored output directory, and only after both captures succeed.
+    rmSync(output, { recursive: true, force: true })
+    mkdirSync(output, { recursive: true })
     for (const name of ['tree-overview.png', 'tree-focus-dark.png']) {
-      writeFileSync(join(root, 'docs/images', name), readFileSync(join(staging, name)))
+      writeFileSync(join(output, name), readFileSync(join(staging, name)))
     }
-    writeFileSync(
-      join(root, marker),
-      `${JSON.stringify({ capturedAt: new Date().toISOString(), sourceRevision: git('rev-parse', 'HEAD'), demoSha256: createHash('sha256').update(demoBytes).digest('hex') }, null, 2)}\n`,
-    )
-    console.log('Captured both README screenshots from isolated synthetic data. Inspect images before committing.')
+    console.log(`Captured both README screenshots from isolated synthetic data into ${output}.`)
   } finally {
     try {
       if (app !== undefined) {
@@ -107,9 +93,8 @@ async function capture() {
 }
 
 try {
-  if (process.argv.slice(2).length === 0) await capture()
-  else if (process.argv.length === 3 && process.argv[2] === '--status') status()
-  else throw new Error('Usage: node scripts/readme-screenshots.mjs [--status]')
+  if (process.argv.length !== 2) throw new Error('Usage: node scripts/readme-screenshots.mjs')
+  await capture()
 } catch (error) {
   console.error(error)
   process.exitCode = 1

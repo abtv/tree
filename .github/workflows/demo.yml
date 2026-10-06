@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'scripts/record-demo.mjs'
+      - 'scripts/readme-screenshots.mjs'
       - 'docs/images/demo-document.json'
       - 'e2e/electron-entry.cjs'
       - 'e2e/hidden-windows.cjs'
@@ -27,7 +28,7 @@ concurrency:
 jobs:
   generate:
     runs-on: macos-15
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -40,14 +41,19 @@ jobs:
         run: npm ci
       - name: Record demo video
         run: npm run demo:video
+      - name: Capture README screenshots
+        run: node scripts/readme-screenshots.mjs
+      # Pages replaces the whole site on each deployment, so the video and screenshots publish together.
+      - name: Assemble Pages content
+        run: |
+          mkdir -p reports/site
+          cp -R reports/demo/. reports/site/
+          cp reports/readme/tree-overview.png reports/readme/tree-focus-dark.png reports/site/
       - name: Upload demo
         uses: actions/upload-artifact@v7
         with:
           name: tree-demo
-          path: |
-            reports/demo/tree-demo.webm
-            reports/demo/metadata.json
-            reports/demo/*.png
+          path: reports/site/
           if-no-files-found: error
           retention-days: 1
       - name: Upload capture diagnostics
@@ -55,14 +61,16 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: tree-demo-diagnostics
-          path: reports/demo/
+          path: |
+            reports/demo/
+            reports/readme/
           if-no-files-found: ignore
           retention-days: 3
       - name: Upload Pages content
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v5
         with:
-          path: reports/demo/
+          path: reports/site/
 
   publish:
     if: github.ref == 'refs/heads/main'
@@ -78,6 +86,6 @@ jobs:
     steps:
       - name: Configure Pages
         uses: actions/configure-pages@v6
-      - name: Publish demo video
+      - name: Publish demo video and README screenshots
         id: deployment
         uses: actions/deploy-pages@v5
