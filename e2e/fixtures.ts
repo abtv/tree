@@ -442,6 +442,12 @@ export async function launchTree(
         '--force-device-scale-factor=1',
         `--user-data-dir=${userDataDir}`,
         join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+        // Overlay scrollbars reserve no width, while classic ones narrow the centered outline. macOS
+        // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
+        // through the user-defaults argument domain. It follows the entry, or Electron would take the
+        // value for the application path.
+        '-AppleShowScrollBars',
+        'WhenScrolling',
         ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
       ],
       cwd: process.cwd(),
@@ -467,6 +473,17 @@ export async function launchTree(
     const scale = await window.evaluate(() => devicePixelRatio)
     if (scale !== 1) {
       throw new Error(`Expected E2E devicePixelRatio 1, got ${scale}. The launch-time rendering scale did not apply.`)
+    }
+    const scrollbarWidth = await window.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:absolute;visibility:hidden;width:100px;height:100px;overflow:scroll'
+      document.body.append(probe)
+      const width = probe.offsetWidth - probe.clientWidth
+      probe.remove()
+      return width
+    })
+    if (scrollbarWidth !== 0) {
+      throw new Error(`Expected E2E overlay scrollbars, got a ${scrollbarWidth}px classic scrollbar.`)
     }
     // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
     // Vim tests opt into the real Normal-mode startup state. Standard editing has no modes.
