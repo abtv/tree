@@ -217,10 +217,15 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     const box = await source.boundingBox()
     if (box === null) throw new Error('The third row was not rendered.')
     await window.mouse.move(box.x + 10, box.y + box.height / 2)
+    // The hold timer must not run on wall-clock time here: a slow driver round trip between the press
+    // and the first move would let the hold elapse and start a node drag, which is a different
+    // gesture. A paused clock makes "moved before the hold elapsed" independent of driver latency.
+    await window.clock.install()
+    await window.clock.pauseAt(Date.now() + 60_000)
     await window.mouse.down()
     await window.mouse.move(box.x + 55, box.y + box.height / 2, { steps: 4 })
 
-    await window.waitForTimeout(HOLD_MS)
+    await window.clock.runFor(HOLD_MS)
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     await expect(window.locator('body')).not.toHaveClass(/node-drag-active/)
     expect(
