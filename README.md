@@ -1,6 +1,39 @@
 # Tree
 
-A macOS desktop application for working with a hierarchical tree of text nodes and image attachments. The authoritative product behavior is defined in [Product Requirements](docs/PRODUCT.md).
+Tree is a keyboard-first outliner for macOS. Write notes, break ideas into branches, and focus on a branch while keeping the surrounding structure within reach.
+
+## Features
+
+* **Nested outlines.** Edit text inline, expand branches, or enter a node to focus on its children.
+* **Flexible editing.** Use standard text editing or enable Vim-inspired editing with Normal, Insert, Visual, and Replace modes.
+* **Easy organization.** Move nodes and their branches with keyboard commands or drag-and-drop, and undo or redo edits.
+* **Image attachments.** Paste images into nodes and open them in a larger preview.
+* **Local storage.** Documents and images stay on your machine, with automatic saving and recovery from retained document versions.
+* **Light and dark appearances.** Choose an appearance or follow the macOS setting.
+
+Tree has no cloud document service and sends no telemetry. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
+
+Detailed behavior and editing commands are described in [Product Requirements](docs/PRODUCT.md).
+
+## Running from Source
+
+Tree is currently in development. There is no packaged application release yet; the repository provides the source and development build.
+
+On macOS, install the toolchain listed in the [Development Guide](docs/DEVELOPMENT.md#2-prerequisites), clone this repository, and run these commands from its directory:
+
+```bash
+npm install
+npm run dev
+```
+
+To build and run the production output locally:
+
+```bash
+npm run build
+npm run start
+```
+
+The build produces unpackaged output, not an installable `.app` or `.dmg`. See the [Development Guide](docs/DEVELOPMENT.md) for setup details, checks, and troubleshooting.
 
 ## Documentation
 
@@ -62,10 +95,6 @@ You can say “continue” or “let's continue the work.” The agent checks Gi
 
 When exactly one active initiative has a ready next task, the agent names it and continues. When several do, it asks which to select. When none does, it reports what prevents progress or that no implementation work is ready. It never selects an open product idea for implementation just because the work queue is empty. A remaining “show me before committing” condition survives a session change.
 
-## Getting Started
-
-Prerequisites, dependency installation, the development command, and the full command list are defined in the [Development Guide](docs/DEVELOPMENT.md).
-
 ## Project Structure
 
 Implementation code lives under `src/`. The architectural layers, module structure, and dependency direction are defined in [Architecture](docs/ARCHITECTURE.md).
@@ -75,3 +104,7 @@ Coding-agent role definitions live in [Agent Roles](docs/AGENT_ROLES.md); each t
 ## Development Principles
 
 Product behavior is defined by the Product Owner and documented in [Product Requirements](docs/PRODUCT.md). The repository's operating rules, including domain/UI separation and the test contract, are defined in [Agent Instructions](AGENTS.md). The architectural invariants are defined in [Architecture](docs/ARCHITECTURE.md).
+
+## License
+
+Tree is licensed under the [MIT License](LICENSE).
