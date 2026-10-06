@@ -1,6 +1,7 @@
 // @editing-modes: both
 import {
   describeForEachEditingMode,
+  dragSelectText,
   expect,
   launchTree,
   node,
@@ -448,13 +449,7 @@ test.describe('text selection highlight in standard editing', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
-    const box = await editor.boundingBox()
-    if (box === null) throw new Error('The node was not rendered.')
-    const y = box.y + box.height / 2
-    await window.mouse.move(box.x + 6, y)
-    await window.mouse.down()
-    await window.mouse.move(box.x + 70, y, { steps: 8 })
-    await window.mouse.up()
+    await dragSelectText(window, editor, 6, 70)
 
     expect(
       await editor.evaluate(
