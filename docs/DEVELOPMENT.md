@@ -315,7 +315,7 @@ Recording begins after the renderer and fonts are ready. Playwright's screencast
 
 The WebM video, representative PNG frames, and source metadata are written to ignored `reports/demo/`. Each run replaces that directory. Open `reports/demo/tree-demo.webm` in a compatible browser or video player to review playback and inspect the PNGs for text readability. This documentation demo does not replace visual regression tests. The video must be smaller than 3 MB (3,000,000 bytes) and shorter than 30 seconds. The script rejects empty recordings, missing or invalid WebM duration metadata, and recordings reaching either limit. The measured duration and file size are recorded in the output metadata.
 
-The separate `Generate demo` workflow runs for relevant pushes to `main` and supports manual dispatch. Successful runs upload the video, PNGs, and metadata as a downloadable artifact with seven-day retention. Generation does not commit files, update the README, or publish a Pages site. README screenshots retain their existing maintenance schedule. Pages publication and a stable README link are a separate step.
+The separate `Generate demo` workflow runs for relevant pushes to `main` and supports manual dispatch. Successful runs upload the video, PNGs, and metadata as a downloadable artifact with one-day retention. Runs on `main` also deploy the generated directory to GitHub Pages, keeping the README's video URL stable without storing generated files in Git. Other branches produce downloadable artifacts only. README screenshots retain their existing maintenance schedule.
 
 ### Screenshot Rendering Scale
 

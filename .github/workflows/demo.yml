@@ -27,7 +27,7 @@ concurrency:
 jobs:
   generate:
     runs-on: macos-15
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -49,7 +49,7 @@ jobs:
             reports/demo/metadata.json
             reports/demo/*.png
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       - name: Upload capture diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -58,3 +58,26 @@ jobs:
           path: reports/demo/
           if-no-files-found: ignore
           retention-days: 3
+      - name: Upload Pages content
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: reports/demo/
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: generate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Publish demo video
+        id: deployment
+        uses: actions/deploy-pages@v4

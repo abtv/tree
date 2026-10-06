@@ -2,6 +2,8 @@
 
 Tree is a keyboard-first outliner for macOS. Write notes, break ideas into branches, and focus on a branch while keeping the surrounding structure within reach.
 
+[Watch the demo video](https://abtv.github.io/tree/tree-demo.webm)
+
 ![Tree in the light appearance, showing reading club, work, learning, and ideas branches, with some branches expanded and others folded.](docs/images/tree-overview.png)
 
 Keep projects, notes, and ideas in one outline. Expand the branches you are working on and keep other details folded away.
