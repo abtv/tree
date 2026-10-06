@@ -87,21 +87,20 @@ test('keeps the last windowed row visible after a delayed image loads', async ({
   expect(before.scrollTop).toBe(before.max)
   await window.evaluate(() => {
     const frames: { height: number; gap: number }[] = []
-    const state = window as unknown as { scrollFrames: typeof frames; stopScrollFrames: boolean }
+    const state = window as unknown as { scrollFrames: typeof frames; stopScrollFrames: () => void }
     state.scrollFrames = frames
-    state.stopScrollFrames = false
-    const record = (): void => {
-      if (state.stopScrollFrames) return
-      requestAnimationFrame(() =>
-        setTimeout(() => {
-          const row = document.activeElement!.closest('.node-row')!.getBoundingClientRect()
-          const view = document.querySelector('.scroll-viewport')!.getBoundingClientRect()
-          frames.push({ height: row.height, gap: view.bottom - row.bottom })
-          record()
-        }, 0),
-      )
-    }
-    record()
+    // A timer or animation-frame callback can run between a layout-changing task and the next rendering
+    // update, where it would read geometry that is never painted. Resize observers deliver during the
+    // rendering update, after the application's own observer (created earlier, when the reveal began)
+    // has corrected the scroll position and before the frame is painted, so each sample is a painted state.
+    const viewport = document.querySelector('.scroll-viewport')!
+    const row = document.activeElement!.closest('.node-row')!
+    const observer = new ResizeObserver(() => {
+      const rect = row.getBoundingClientRect()
+      frames.push({ height: rect.height, gap: viewport.getBoundingClientRect().bottom - rect.bottom })
+    })
+    for (const target of [row, viewport.firstElementChild!, viewport]) observer.observe(target)
+    state.stopScrollFrames = () => observer.disconnect()
   })
   await release()
   await expect(window.getByAltText('Attached image')).toBeVisible()
@@ -114,14 +113,20 @@ test('keeps the last windowed row visible after a delayed image loads', async ({
   const after = await geometry(window)
   await painted(window)
   const frames = await window.evaluate(() => {
-    const state = window as unknown as { scrollFrames: { height: number; gap: number }[]; stopScrollFrames: boolean }
-    state.stopScrollFrames = true
+    const state = window as unknown as {
+      scrollFrames: { height: number; gap: number }[]
+      stopScrollFrames: () => void
+    }
+    state.stopScrollFrames()
     return state.scrollFrames
   })
+  await info.attach('geometry', { body: JSON.stringify({ before, after, frames }), contentType: 'application/json' })
   expect(frames.some((frame) => frame.height > 100)).toBe(true)
   expect(frames.filter((frame) => frame.height > 100).every((frame) => frame.gap >= 25)).toBe(true)
-  await info.attach('geometry', { body: JSON.stringify({ before, after, frames }), contentType: 'application/json' })
-  await expect(window).toHaveScreenshot('loaded-last-row.png')
+  // The overlay scrollbar fades out a moment after scrolling, so whether its thumb is in the capture
+  // depends on timing, and page styles do not hide it. This test checks the row geometry, so the
+  // capture stops short of the window's right edge, where the thumb is drawn.
+  await expect(window).toHaveScreenshot('loaded-last-row.png', { clip: { x: 0, y: 0, width: 628, height: 528 } })
   await window.keyboard.type('gg')
   await window.keyboard.press('G')
   await painted(window)

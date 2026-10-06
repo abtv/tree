@@ -256,8 +256,7 @@ It should run:
 6. end-to-end editing-mode categories (`npm run check:e2e-modes`);
 7. OpenCode permission checks (`npm run check:opencode`);
 8. tests with coverage enforcement;
-9. production build;
-10. dependency audit (`npm audit`).
+9. production build.
 
 The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents (including active initiative plans) resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
@@ -267,7 +266,7 @@ The repository must also provide the complete validation command:
 npm run check:full
 ```
 
-This runs `npm run check`, the end-to-end suite, and the performance suite. The matrix below defines when complete validation is required; the normative validation policy is in `AGENTS.md` §10.
+This runs `npm run check`, the end-to-end suite, the performance suite, and finally the dependency audit (`npm audit`), so an advisory without an available fix reports after the suites rather than hiding their results. The matrix below defines when complete validation is required; the normative validation policy is in `AGENTS.md` §10.
 
 ### GitHub Actions
 
@@ -559,7 +558,7 @@ Direct dependencies are declared with exact versions and no range operators (`do
 
 `package.json` `overrides` pins `qs` to a patched version: `@stryker-mutator/core` pins `typed-rest-client` `~2.3.0`, which pins a `qs` release with known advisories. Remove the override when a Stryker release depends on a patched `typed-rest-client`.
 
-`npm audit` runs as the final step of `npm run check`, so known vulnerabilities are reported before a commit. It requires registry access and fails when offline.
+`npm audit` runs as the final step of `npm run check:full`, not of `npm run check`, so known vulnerabilities are reported at the end of complete validation. It requires registry access and fails when offline.
 
 ## Formatting
 

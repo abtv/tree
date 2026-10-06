@@ -78,6 +78,25 @@ async function dragOntoRow(window: Parameters<typeof node>[0], sourceId: string,
   await window.mouse.move(box.x + 30, box.y + box.height / 2, { steps: 5 })
 }
 
+/**
+ * Waits until a pointer held in the bottom auto-scroll zone has scrolled the viewport to its end.
+ *
+ * A held pointer inside the edge margin scrolls the list frame by frame (PRODUCT.md §20.1), moving rows
+ * under it. The 21-row depth fixtures overflow the default window by a few pixels, so a target near the
+ * bottom edge shifts at a frame whose timing the test does not control. Settle the scroll first, then
+ * aim at the target's final position, which lies outside the zone.
+ */
+async function settleAtViewportEnd(window: Parameters<typeof node>[0]): Promise<void> {
+  await expect
+    .poll(() =>
+      window.evaluate(() => {
+        const viewport = document.querySelector('.scroll-viewport') as HTMLElement
+        return Math.abs(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop) <= 1
+      }),
+    )
+    .toBe(true)
+}
+
 function breadcrumbSeed(expanded = false): { version: number; document: unknown; location: unknown; view: unknown } {
   return {
     version: 3,
@@ -446,7 +465,13 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     }
     const message = `Operation failed: Nodes cannot be nested deeper than ${MAX_DOCUMENT_DEPTH} levels.`
     allowRendererError(exactMessage(message))
+    const target = window.locator(`.node-row[data-node-id="depth-${MAX_DOCUMENT_DEPTH}"]`)
     await dragOntoRow(window, 'source', `depth-${MAX_DOCUMENT_DEPTH}`)
+    await settleAtViewportEnd(window)
+    const settled = await target.boundingBox()
+    if (settled === null) throw new Error('The receiving row was not rendered after auto-scroll.')
+    await window.mouse.move(settled.x + 30, settled.y + settled.height / 2)
+    await expect(target).toHaveClass(/node-row-drop-on/)
     await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
     await window.mouse.up()
     await expect(window.getByRole('alert')).toHaveText(message)
@@ -601,6 +626,11 @@ test.describe('hierarchy drag depth limit', () => {
     if (sourceBox === null || lastBox === null) throw new Error('The depth-limit drag rows were not rendered.')
     await startRowDrag(window, source, { xOffset: 8 })
     await window.mouse.move(sourceBox.x + 8 + 20 * 20, lastBox.y + lastBox.height - 2, { steps: 5 })
+    await settleAtViewportEnd(window)
+    const settledBox = await last.boundingBox()
+    if (settledBox === null) throw new Error('The last depth-limit row was not rendered after auto-scroll.')
+    await window.mouse.move(sourceBox.x + 8 + 20 * 20, settledBox.y + settledBox.height - 2)
+    await expect(window.locator('.node-row-drop-after')).toHaveCount(1)
     await window.mouse.up()
 
     await expect(window.getByRole('alert')).toHaveText(

@@ -94,4 +94,4 @@ Every control above has an automated check. The verification map:
 | Content security policy | production build plugin | `e2e/csp.spec.ts` |
 | Domain and layer import boundaries | `eslint.config.mjs` import restrictions | lint step of `npm run check` |
 
-`npm run check:full` runs the unit, contract, end-to-end, and performance suites. `npm audit` runs as the final step of `npm run check`; a registry connectivity failure must be reported rather than treated as a clean audit.
+`npm run check:full` runs the unit, contract, end-to-end, and performance suites. `npm audit` runs as the final step of `npm run check:full`; a registry connectivity failure must be reported rather than treated as a clean audit.
