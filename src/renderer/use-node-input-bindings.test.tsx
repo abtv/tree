@@ -2125,6 +2125,89 @@ describe('useNodeInputBindings', () => {
     f.bindings().inputRef(null)
   })
 
+  it('defers the Normal block caret redraw from a resize notification until the pointer is released', async () => {
+    let callback: ResizeObserverCallback | undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: ResizeObserverCallback) {
+          callback = cb
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
+    // The block caret is a one-character native selection; a press collapses it so the native press
+    // places a caret instead of dragging that character.
+    input.setSelectionRange(2, 3)
+    act(() => {
+      input.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    })
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+    // The press then extends a native selection as the pointer drags; redrawing the block caret
+    // mid-press would replace it.
+    input.setSelectionRange(3, 3)
+    act(() => callback?.([{ target: input } as unknown as ResizeObserverEntry], {} as ResizeObserver))
+    expect([input.selectionStart, input.selectionEnd]).toEqual([3, 3])
+    act(() => {
+      input.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }))
+    })
+    expect([input.selectionStart, input.selectionEnd]).toEqual([3, 4])
+    f.bindings().inputRef(null)
+  })
+
+  it('keeps the selection on presses that do not start a plain Normal-mode text press', async () => {
+    const f = await fixture(),
+      input = f.input()
+    input.focus()
+    const press = (init: MouseEventInit, start: number, end: number): number[] => {
+      input.setSelectionRange(start, end)
+      act(() => {
+        input.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, ...init }))
+      })
+      const selection = [input.selectionStart, input.selectionEnd]
+      act(() => {
+        globalThis.dispatchEvent(new MouseEvent('pointercancel'))
+      })
+      return selection
+    }
+    // A right-click keeps the block for the context menu, Shift extends from it, and a deliberate
+    // selection stays draggable.
+    expect(press({ button: 2 }, 1, 2)).toEqual([1, 2])
+    expect(press({ button: 0, shiftKey: true }, 1, 2)).toEqual([1, 2])
+    expect(press({ button: 0 }, 0, 5)).toEqual([0, 5])
+    // A press elsewhere, such as on a row control that keeps focus in the editor, leaves the block.
+    input.setSelectionRange(1, 2)
+    act(() => {
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    })
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 2])
+    act(() => {
+      globalThis.dispatchEvent(new Event('blur'))
+    })
+    act(() => f.result.current.setVimMode('insert'))
+    expect(press({ button: 0 }, 2, 3)).toEqual([2, 3])
+    // A release without a press, or with focus outside the editors, draws nothing.
+    act(() => f.result.current.setVimMode('normal'))
+    input.setSelectionRange(2, 2)
+    act(() => {
+      globalThis.dispatchEvent(new MouseEvent('pointerup'))
+    })
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+    act(() => {
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+    })
+    input.blur()
+    act(() => {
+      globalThis.dispatchEvent(new MouseEvent('pointerup'))
+    })
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+  })
+
   it('marks deliberate multi-character selection and clears the mark at the block caret', async () => {
     const f = await fixture(),
       input = f.input()

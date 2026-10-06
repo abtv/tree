@@ -614,21 +614,55 @@ export function useNodeInputBindings({
   }, [])
 
   useEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const input = entry.target as HTMLElement
-        if (input.ownerDocument.activeElement !== input || latestVimMode.current !== 'normal') continue
-        // A resize notification can arrive after a mode change; re-drawing the Normal block caret
-        // must not discard a deliberate multi-character selection such as Cmd+A's select-all.
-        if (hasMultiCharacterSelection(input)) continue
-        setNormalCaret(input, getCaret(input))
-      }
-    })
+    const redraw = (input: HTMLElement): void => {
+      if (input.ownerDocument.activeElement !== input || latestVimMode.current !== 'normal') return
+      // A resize notification can arrive after a mode change; re-drawing the Normal block caret
+      // must not discard a deliberate multi-character selection such as Cmd+A's select-all.
+      if (hasMultiCharacterSelection(input)) return
+      setNormalCaret(input, getCaret(input))
+    }
+    // While the primary button is held, the native press owns the selection: it places a collapsed
+    // caret and extends it as the pointer drags. The block caret is itself a one-character native
+    // selection, so a press on it would start a native text drag instead; collapse it before the
+    // press is handled. Re-observing an input after a render reports it again, and redrawing the
+    // block mid-press would replace the selection being extended, so the block is drawn again only
+    // when the press ends.
+    let pressed = false
+    const onPress = (event: PointerEvent): void => {
+      if (event.button !== 0) return
+      pressed = true
+      const input = document.activeElement
+      if (!(input instanceof HTMLElement) || event.shiftKey || latestVimMode.current !== 'normal') return
+      if (!(event.target instanceof Node) || !input.contains(event.target)) return
+      if (![...inputs.current.values()].includes(input) || hasMultiCharacterSelection(input)) return
+      setCaret(input, getCaret(input))
+    }
+    const onRelease = (): void => {
+      if (!pressed) return
+      pressed = false
+      const input = document.activeElement
+      if (input instanceof HTMLElement && [...inputs.current.values()].includes(input)) redraw(input)
+    }
+    document.addEventListener('pointerdown', onPress, true)
+    globalThis.addEventListener('pointerup', onRelease, true)
+    globalThis.addEventListener('pointercancel', onRelease, true)
+    // A release outside an inactive window never arrives, so losing focus also ends the press.
+    globalThis.addEventListener('blur', onRelease)
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver((entries) => {
+            if (pressed) return
+            for (const entry of entries) redraw(entry.target as HTMLElement)
+          })
     normalCaretResizeObserver.current = observer
-    for (const input of inputs.current.values()) observer.observe(input)
+    for (const input of inputs.current.values()) observer?.observe(input)
     return () => {
-      observer.disconnect()
+      observer?.disconnect()
+      document.removeEventListener('pointerdown', onPress, true)
+      globalThis.removeEventListener('pointerup', onRelease, true)
+      globalThis.removeEventListener('pointercancel', onRelease, true)
+      globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
   }, [])

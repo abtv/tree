@@ -2,6 +2,7 @@
 import type { Page } from '@playwright/test'
 import {
   allowRendererError,
+  dragSelectText,
   exactMessage,
   expect,
   launchTree as launchTreeBase,
@@ -36,16 +37,6 @@ const selectionColors = (field: ReturnType<typeof node>) =>
     const style = element.ownerDocument.defaultView?.getComputedStyle(element, '::selection')
     return { background: style?.backgroundColor, color: style?.color }
   })
-
-async function dragSelect(window: Page, field: ReturnType<typeof node>, fromX: number, toX: number): Promise<void> {
-  const box = await field.boundingBox()
-  if (box === null) throw new Error('The node was not rendered.')
-  const y = box.y + box.height / 2
-  await window.mouse.move(box.x + fromX, y)
-  await window.mouse.down()
-  await window.mouse.move(box.x + toX, y, { steps: 8 })
-  await window.mouse.up()
-}
 
 test.describe('Vim editing: navigation and Visual modes', () => {
   test('replays counted dd with complete subtrees and one undo per successful iteration', async ({ userDataDir }) => {
@@ -755,13 +746,16 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
 
     // A pointer drag wider than the block caret is a deliberate text selection and uses the
-    // highlight pair, in both appearances.
-    await dragSelect(window, first, 6, 70)
+    // highlight pair, in both appearances. The press starts on the block caret's character and stays
+    // still before moving: neither the block nor a later render may turn it into a native text drag
+    // or move its anchor.
+    await dragSelectText(window, first, 6, 70, 300)
     expect(
-      await first.evaluate(
-        (element) => (element as HTMLTextAreaElement).selectionEnd - (element as HTMLTextAreaElement).selectionStart,
-      ),
-    ).toBeGreaterThan(1)
+      await first.evaluate((element) => [
+        (element as HTMLTextAreaElement).selectionStart,
+        (element as HTMLTextAreaElement).selectionEnd,
+      ]),
+    ).toEqual([0, 7])
     await expect(first).toHaveClass(/node-input-text-selected/)
     expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
     await expect(first).toHaveScreenshot('vim-normal-text-selection-light.png')

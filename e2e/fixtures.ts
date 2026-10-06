@@ -899,6 +899,37 @@ async function rowDragIsActive(window: Page): Promise<boolean> {
   return (await window.locator('.node-row-dragging').count()) > 0
 }
 
+/**
+ * Drags a text selection across a node field from `fromX` to `toX` pixels (relative to the field),
+ * along its vertical center, optionally keeping the press still for `stillMs` before moving.
+ *
+ * A slow runner can deliver the first move long after the press, which would let the node-drag hold
+ * elapse and turn the gesture into a node drag; the hold therefore runs on a paused page clock, and
+ * `stillMs` only spends wall-clock time.
+ */
+export async function dragSelectText(
+  window: Page,
+  field: ReturnType<Page['locator']>,
+  fromX: number,
+  toX: number,
+  stillMs = 0,
+): Promise<void> {
+  const box = await field.boundingBox()
+  if (box === null) throw new Error('The text field was not rendered.')
+  const y = box.y + box.height / 2
+  await window.mouse.move(box.x + fromX, y)
+  await window.clock.install()
+  await window.clock.pauseAt(Date.now() + 60_000)
+  try {
+    await window.mouse.down()
+    if (stillMs > 0) await window.waitForTimeout(stillMs)
+    await window.mouse.move(box.x + toX, y, { steps: 8 })
+    await window.mouse.up()
+  } finally {
+    await window.clock.resume()
+  }
+}
+
 export async function dragRow(window: Page, fromIndex: number, toIndex: number): Promise<void> {
   const source = window.locator('.node-row').nth(fromIndex)
   await startRowDrag(window, source.locator('.node-input'))
