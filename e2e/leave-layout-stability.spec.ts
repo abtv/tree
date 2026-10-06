@@ -61,22 +61,33 @@ test.describe('Layout stability when leaving a node', () => {
     await window.keyboard.press('g')
     await window.keyboard.press('d')
     await expect(window.locator('.node-row')).toHaveCount(1)
+    // A hidden window on a loaded CI runner can go without animation frames, so the layout is
+    // sampled at every DOM mutation and image load instead; reading the rectangle forces layout.
     await window.evaluate(() => {
-      const observed = globalThis as unknown as { __lastRowTops: number[] }
+      const observed = globalThis as unknown as { __lastRowTops: number[]; __sampleLastRowTop: () => void }
       observed.__lastRowTops = []
-      const sample = (): void => {
+      observed.__sampleLastRowTop = (): void => {
         const top = document.querySelector('[data-node-id="last"]')?.getBoundingClientRect().top
         const tops = observed.__lastRowTops
         if (top !== undefined && tops[tops.length - 1] !== Math.round(top)) tops.push(Math.round(top))
-        requestAnimationFrame(sample)
       }
-      requestAnimationFrame(sample)
+      new MutationObserver(observed.__sampleLastRowTop).observe(document.body, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true,
+      })
+      document.addEventListener('load', observed.__sampleLastRowTop, true)
     })
     await window.keyboard.press('Control+o')
     await expect(window.getByAltText('Attached image')).toBeVisible()
     await window.waitForTimeout(300)
 
-    const tops = await window.evaluate(() => (globalThis as unknown as { __lastRowTops: number[] }).__lastRowTops)
+    const tops = await window.evaluate(() => {
+      const observed = globalThis as unknown as { __lastRowTops: number[]; __sampleLastRowTop: () => void }
+      observed.__sampleLastRowTop()
+      return observed.__lastRowTops
+    })
     expect(tops).toEqual([Math.round(settledTop ?? -1)])
   })
 })
