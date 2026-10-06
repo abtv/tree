@@ -189,9 +189,13 @@ for (const key of ['H', 'M', 'L']) {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
     await setMainWindowContentSize(app, { width: 640, height: 450 })
     await window.keyboard.type('51G')
-    await window.evaluate(() => {
-      ;(document.querySelector('.scroll-viewport') as HTMLElement).scrollTop += 75
-    })
+    // The reveal keeps correcting while the oversized row is measured and ends only on user scrolling
+    // (PRODUCT.md §20.8). A scripted `scrollTop` change is not user input, so a late correction could
+    // undo it and leave the row above fully visible; the wheel cancels the reveal like a user would.
+    await window.mouse.move(400, 250)
+    await window.mouse.wheel(0, 75)
+    // Only the clipped row is visible once the row's start has scrolled out of view.
+    await expect.poll(async () => (await geometry(window)).top).toBe(-50)
     await painted(window)
     const before = await geometry(window)
     await window.keyboard.press(key)
