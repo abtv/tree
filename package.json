@@ -18,6 +18,7 @@
     "prestart": "node scripts/rename-dev-app.mjs",
     "start": "electron-vite preview",
     "build": "electron-vite build",
+    "demo:video": "playwright install ffmpeg && npm run build && node scripts/record-demo.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:renderer": "tsc --noEmit -p tsconfig.web.json",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",

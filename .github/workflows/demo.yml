@@ -1,0 +1,60 @@
+name: Generate demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/record-demo.mjs'
+      - 'docs/images/demo-document.json'
+      - 'e2e/electron-entry.cjs'
+      - 'e2e/hidden-windows.cjs'
+      - 'e2e/shortcut-stub.cjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron.vite.config.ts'
+      - '.nvmrc'
+      - '.github/workflows/demo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Record demo video
+        run: npm run demo:video
+      - name: Upload demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-demo
+          path: |
+            reports/demo/tree-demo.webm
+            reports/demo/metadata.json
+            reports/demo/*.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload capture diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-demo-diagnostics
+          path: reports/demo/
+          if-no-files-found: ignore
+          retention-days: 3
