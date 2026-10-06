@@ -584,6 +584,8 @@ Direct dependencies are declared with exact versions and no range operators (`do
 
 `npm audit` runs as the final step of `npm run check:full`, not of `npm run check`, so known vulnerabilities are reported at the end of complete validation. It requires registry access and fails when offline.
 
+Between validation runs, `.github/dependabot.yml` opens weekly pull requests for npm and GitHub Actions updates (minor and patch updates are grouped, major updates arrive one per pull request), and Dependabot security updates open a pull request when an advisory is published. `.github/workflows/audit.yml` runs `npm audit --audit-level=high` daily and on manual dispatch, so a high or critical advisory fails a visible run even when no fix pull request exists. No update is merged automatically: review each pull request, keep the exact-version rule above, and run `npm run check:full` for a dependency change.
+
 ## Formatting
 
 Code is formatted with Prettier using `semi: false`, `singleQuote: true`, and `printWidth: 120`, and indentation is declared in `.editorconfig`. `prettier --check` runs as part of `npm run check`; use `npm run format` to apply formatting.
