@@ -124,6 +124,7 @@
           "npm run validation:snapshot *": "allow",
           "npm run screenshots:status": "allow",
           "npm run screenshots:readme": "allow",
+          "npm run demo:video": "allow",
           "npm run retire:file": "allow",
           "npm run retire:file *": "allow",
           "npm run fix:history": "allow",
