@@ -45,7 +45,7 @@ Leave the discussion only when the Product Owner asks for the change in words th
 
 ### Interpreting work requests
 
-The Product Owner-facing vocabulary and examples are in `README.md` under Working with the Coding Agent. Infer the kind of work and whether it needs a task or initiative from the request; the Product Owner does not need to supply a formal work type. State the interpretation before substantial work, and ask only when ambiguity affects authorization, product behavior, or a material choice.
+The Product Owner-facing vocabulary and examples are in [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md). Infer the kind of work and whether it needs a task or initiative from the request; the Product Owner does not need to supply a formal work type. State the interpretation before substantial work, and ask only when ambiguity affects authorization, product behavior, or a material choice.
 
 A concrete defect report is a request to investigate and correct the defect within recorded requirements. Follow the defect-first workflow, required validation, and commit policy when the defect is confirmed. A concrete usability problem with a clear result, such as an existing icon being hard to see, likewise authorizes a focused correction consistent with recorded intent; §5 still governs material choices. A tentative concern or an aesthetic preference without a clear result starts with discussion. A request to investigate authorizes evidence gathering, not implementation of newly proposed behavior. A comparison, specification draft, or proposed file text shown in the conversation changes no repository files.
 
@@ -339,6 +339,16 @@ A test suite that cannot launch the application or execute the relevant boundary
 ---
 
 ## 11. Documentation
+
+### README Screenshots
+
+Keep README screenshots representative of the application. Refresh existing screenshots autonomously when a noticeable change affects the interface they show. Minor pixel shifts or slight color changes do not require a refresh. Improvements within an already illustrated interface normally update the existing images rather than add images.
+
+For a major new capability or a separate screen, such as an Agenda module, ask the Product Owner during initial task discussion whether it should appear in the README. Do not ask this for ordinary interface changes or expand the screenshot gallery without authorization.
+
+After completing a task's feature commit, run `npm run screenshots:status`. When at least 100 commits have passed since the last committed screenshot refresh, regenerate and inspect the screenshots without asking, then commit the refresh as a separate documentation change. A standing no-commit or review condition still applies: prepare the refresh and leave it uncommitted until authorized. Record a completed refresh even when the PNG bytes are unchanged, so the interval starts again. The capture command and marker are described in `docs/DEVELOPMENT.md` under README Screenshot Maintenance.
+
+Capture only from the committed synthetic demo document, in a new isolated application data directory. Never use a personal document or the normal application profile. Both images must show the same node identities, text, order, and expansion state within the focused branch; navigation, appearance, and editing mode may differ. Inspect the generated images before handoff or committing.
 
 Keep documentation consistent with the implementation.
 

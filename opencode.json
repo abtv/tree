@@ -122,6 +122,8 @@
           "npm run check:opencode *": "allow",
           "npm run validation:snapshot": "allow",
           "npm run validation:snapshot *": "allow",
+          "npm run screenshots:status": "allow",
+          "npm run screenshots:readme": "allow",
           "npm run retire:file": "allow",
           "npm run retire:file *": "allow",
           "npm run fix:history": "allow",

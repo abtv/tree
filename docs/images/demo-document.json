@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "document": {
+    "roots": [
+      {
+        "id": "project",
+        "text": "Launch a neighborhood reading club",
+        "children": [
+          {
+            "id": "purpose",
+            "text": "Purpose: make time for books and good conversation",
+            "children": []
+          },
+          {
+            "id": "research",
+            "text": "Find the right format",
+            "children": [
+              {
+                "id": "audience",
+                "text": "Ask neighbors what they enjoy reading",
+                "children": []
+              },
+              {
+                "id": "examples",
+                "text": "Compare a monthly meetup with a weekly drop-in",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "meeting",
+            "text": "Plan the first meetup",
+            "children": [
+              {
+                "id": "place",
+                "text": "Place and time",
+                "children": [
+                  {
+                    "id": "library",
+                    "text": "Ask the library about its meeting room",
+                    "children": []
+                  },
+                  {
+                    "id": "time",
+                    "text": "Thursday evening, 18:30 to 20:00",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "id": "book",
+                "text": "Choose a short book everyone can finish",
+                "children": []
+              },
+              {
+                "id": "agenda",
+                "text": "Conversation outline",
+                "children": [
+                  {
+                    "id": "welcome",
+                    "text": "Welcome and introductions - 10 minutes",
+                    "children": []
+                  },
+                  {
+                    "id": "passage",
+                    "text": "Each person shares a favorite passage - 20 minutes",
+                    "children": []
+                  },
+                  {
+                    "id": "discussion",
+                    "text": "Discuss what surprised us - 40 minutes",
+                    "children": []
+                  },
+                  {
+                    "id": "finish",
+                    "text": "Choose the next book together - 10 minutes",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "id": "bring",
+                "text": "Bring tea, name cards, and a few spare copies",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "invite",
+            "text": "Invite the neighborhood",
+            "children": [
+              {
+                "id": "poster",
+                "text": "Make a simple poster",
+                "children": []
+              },
+              {
+                "id": "share",
+                "text": "Share the invitation with the library",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "later",
+            "text": "Ideas for later",
+            "children": [
+              {
+                "id": "walk",
+                "text": "Try a reading walk in the park",
+                "children": []
+              },
+              {
+                "id": "guest",
+                "text": "Invite a local author",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "work",
+        "text": "Work",
+        "children": [
+          {
+            "id": "weekly",
+            "text": "Weekly priorities",
+            "children": [
+              {
+                "id": "proposal",
+                "text": "Review the project proposal",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "notes",
+            "text": "Meeting notes",
+            "children": [
+              {
+                "id": "decisions",
+                "text": "Decisions and follow-ups",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "learning",
+        "text": "Learning",
+        "children": [
+          {
+            "id": "reading",
+            "text": "Books to read",
+            "children": []
+          },
+          {
+            "id": "practice",
+            "text": "Practice a little every day",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "ideas",
+        "text": "Ideas",
+        "children": [
+          {
+            "id": "garden",
+            "text": "A shared neighborhood garden",
+            "children": []
+          },
+          {
+            "id": "newsletter",
+            "text": "A monthly local newsletter",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "location": {
+    "currentParentId": null,
+    "selectedNodeId": "project"
+  }
+}

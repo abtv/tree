@@ -27,6 +27,8 @@
     "format:check": "prettier --check .",
     "format:check:changed": "node scripts/check-format-changed.mjs",
     "validation:snapshot": "node scripts/validation-snapshot.mjs",
+    "screenshots:status": "node scripts/readme-screenshots.mjs --status",
+    "screenshots:readme": "npm run build && node scripts/readme-screenshots.mjs",
     "retire:file": "node scripts/retire-file.mjs",
     "fix:history": "node scripts/fix-history.mjs",
     "check:docs": "node scripts/check-docs.mjs",

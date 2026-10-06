@@ -293,6 +293,16 @@ Classify the complete change, not only its purpose. For example, a workflow-docu
 
 `npm run format:check:changed` is the canonical scoped formatting check. It checks supported staged, unstaged, and non-ignored untracked files relative to `HEAD`, excludes deleted files, safely passes filenames without shell interpolation, and succeeds with an explicit message when there are no eligible files. The full-repository `npm run format:check` remains part of broader validation.
 
+### README Screenshot Maintenance
+
+The README gallery uses [the synthetic demo document](images/demo-document.json). It is a documentation resource, not a copy of a user's application data. Preserve its contents across captures; changes to the example itself should be deliberate and reviewed. The capture script launches the built Electron application with a newly created temporary profile and never opens the normal profile. It captures the overview and then enters the meetup branch in the same running application without editing the document or changing that branch's expanded state.
+
+Run `npm run screenshots:readme` on macOS to build and capture both images. Inspect `docs/images/tree-overview.png` and `docs/images/tree-focus-dark.png`, including matching node text and order. The command updates `docs/images/refresh.json` only after both captures succeed; commit that marker with the inspected images even when their bytes are unchanged. The marker records the captured source revision, demo digest, and capture time. Its committing revision, rather than a timestamp or the PNG's most recent byte change, starts the refresh interval.
+
+Run `npm run screenshots:status` after a feature commit. It reports how many commits follow the last committed refresh marker and whether the interval in `AGENTS.md` requires another capture. A missing marker requires an initial capture; a pending marker must be reviewed and committed before it counts as a completed refresh. These commands never stage or commit files. After a due capture, inspect and commit it separately from the feature, subject to any standing review or no-commit condition.
+
+The README maintenance rules are owned by `AGENTS.md` §11. This documentation gallery is separate from visual regression baselines: it is not a pixel acceptance test, and small cosmetic differences need not trigger a gallery refresh.
+
 ### Screenshot Rendering Scale
 
 The E2E fixture passes `--force-device-scale-factor=1` in Electron's launch arguments, before the test entry, and asserts `window.devicePixelRatio === 1` after launch. This makes screenshot rasterization independent of the attached display's backing scale. Keep GPU rendering and the existing Playwright comparison settings: CSS-sized output does not by itself fix the scale at which Chromium draws glyphs. The performance fixture retains the native display scale for presented-window measurements.
