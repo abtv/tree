@@ -4,7 +4,7 @@
 
 Add an **Agenda**: a temporal projection of the existing tree that arranges nodes containing dates by calendar day, lets the user edit the same nodes there, and navigates between Agenda and Tree.
 
-The work proceeds in four stages: UX consistency review, visual design discovery, final product/UX specification, and implementation planning. This plan records the behavioral specification accepted through the end of the UX consistency review so later sessions start from repository state.
+The work proceeds in four stages: UX consistency review, visual design discovery, final product/UX specification, and implementation planning. This plan records the behavioral specification accepted in the UX consistency review and the visual decisions accepted in visual design discovery, so later sessions start from repository state.
 
 ## Scope and Sources of Truth
 
@@ -15,25 +15,25 @@ The work proceeds in four stages: UX consistency review, visual design discovery
 
 ## Authorization State
 
-* Authorized: recording this specification (AG-1) and running visual design discovery (AG-2) as a discussion that changes no runtime code.
-* Reserved for the Product Owner: the visual direction, every item under Open Items, approval of the final specification, and authorization of implementation.
+* Authorized: recording this specification (AG-1) and running visual design discovery (AG-2) as a discussion that changes no runtime code. The Product Owner accepted the visual direction and decisions V1–V5 on 2026-10-09.
+* Reserved for the Product Owner: every item under Open Items, approval of the final specification, and authorization of implementation.
 
 ## Tasks
 
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | AG-1 | UX consistency review completed and recorded | — | This plan with the accepted specification and decisions D1–D5 | Done |
-| AG-2 | Visual design discovery: a small number of substantially different directions, then one accepted visual system | AG-1 | Accepted visual decisions recorded in this plan; Product Owner accepted the direction | Ready |
-| AG-3 | Final product/UX specification: resolve Open Items, add visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria | AG-2 | Final specification recorded in this plan and approved by the Product Owner | Planned |
+| AG-2 | Visual design discovery: a small number of substantially different directions, then one accepted visual system | AG-1 | Accepted visual decisions recorded in this plan; Product Owner accepted the direction | Done |
+| AG-3 | Final product/UX specification: resolve Open Items, add visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria | AG-2 | Final specification recorded in this plan and approved by the Product Owner | Ready |
 | AG-4 | Implementation planning: ordered, small, testable tasks added to this plan by the planner role | AG-3 | Task table extended with implementation tasks, each naming files, acceptance evidence, and validation tier | Planned |
 
 Task details:
 
 * **AG-2.** Files: `plans/agenda.md`. Mockups, if any, are produced outside the repository or as artifacts and contain only synthetic data. Validation tier: Minimal Risk. Cover the areas listed under Visual Direction. Use real-looking hierarchical examples, not flattened task lists. Keep the Agenda recognizably an outliner. Discuss major visual decisions with the Product Owner before finalizing them.
-* **AG-3.** Files: `plans/agenda.md`. Validation tier: Minimal Risk. Separate accepted behavior from implementation choices; include no speculative features.
+* **AG-3.** Files: `plans/agenda.md`. Validation tier: Minimal Risk. Separate accepted behavior from implementation choices; include no speculative features. Turn the Accepted Visual Decisions and the proposed state treatments into visual contracts, and ask the Product Owner to confirm the proposed treatments.
 * **AG-4.** Files: `plans/agenda.md`. Validation tier: Minimal Risk. May inspect the repository and architecture. Each implementation task updates `docs/PRODUCT.md` for the behavior it implements.
 
-**Next task:** AG-2.
+**Next task:** AG-3.
 
 ## Accepted Specification
 
@@ -175,21 +175,44 @@ Text edits, date conversions, node creation, splitting, date moves, and group mo
 * **D4** — Pending move lifecycle and `p` target (§13).
 * **D5** — Visual selection skips non-qualifying rows (§12).
 
+## Accepted Visual Decisions
+
+Accepted by the Product Owner in AG-2 on 2026-10-09. All colors, the typeface, row geometry, bullets, and chevrons come from the existing Tree editor (`src/renderer/styles.css`); Agenda introduces no new surface, card, border, or badge.
+
+* **V1 — Direction: days as section headers.** A day container is a compact header row: the day in small uppercase letters with slight letter spacing (`WED OCT 14`), in the secondary text color, followed by a thin horizontal rule to the right edge in the location-border color. A day with content has a disclosure chevron left of the label in the ordinary chevron column; an empty day has none and a lighter label weight. When the day container is selected, the ordinary selected-node focus dot appears in the bullet column of the header. The day's nodes start at the first outline level below the header.
+  * **Today:** label and rule in the accent color (light: the warm amber of `--color-drop-marker`; dark: the Zenburn yellow `#f0dfaf`), with ` · TODAY` after the label.
+  * **Gaps:** a row in the header column with a chevron, small secondary text such as `7 empty days · Sep 30 – Oct 6`, and a dashed rule to the right edge. An expanded gap points its chevron down and is followed by the revealed days as empty day headers and, when days remain, a smaller gap.
+* **V2 — Date emphasis.** In node text, the date of the day being displayed is drawn in the accent color at semibold weight. Other recognized canonical dates in the same text use the secondary text color. Emphasis never changes the characters or makes a date an indivisible widget.
+* **V3 — Contextual ancestors.** Drawn in the secondary text color at the ordinary size and row height, so the row rhythm matches Tree. In the dark appearance the secondary color replaces the depth color for ancestors; direct matches keep the Zenburn depth colors (`docs/PRODUCT.md` §20.5).
+* **V4 — Live mirror.** A mirror occurrence shows its bullet as a hollow ring in the gutter color; its text is unchanged. The active occurrence shows the ordinary selected-node bullet and caret.
+* **V5 — Pending move.** The source occurrence's text, bullet, and chevron are dimmed to about 38 % opacity, and the status bar shows a message such as `Moving 1 item · p puts it on the selected day · Esc cancels` next to the Vim mode indicator. This is the first use of the status bar for a transient message.
+
+Proposed state treatments shown in AG-2 and not yet confirmed; AG-3 confirms or changes them:
+
+* **Autocomplete popup:** a compact list anchored below the first column of the recognized expression, on the document surface with a 1px border in the location-border color and a soft shadow; each row shows the canonical date and a short secondary description (`2026-10-09  Fri · tomorrow`); the current suggestion uses the shared selection highlight pair; a one-line footer `Tab accept · ⌃N ⌃P`.
+* **Text resembling a date:** a 1px wavy underline in a muted red (light `#b4554b`, dark `#cc9393`), like a spell-check mark.
+* **Temporarily invalid item:** a hollow bullet and a one-line secondary hint below the text, `Add a date to keep this item in Agenda`.
+* **Vim whole-node selection:** the shared selection highlight pair on qualifying rows only; skipped rows keep their ordinary appearance.
+* **Focused day:** the location path reads `Agenda / Oct 14`, and the day is shown as the current-parent heading (`Wed Oct 14`) above its hierarchy, without a day header.
+
 ## Open Items
 
-Each needs a Product Owner decision in AG-3 unless AG-2 settles it. None blocks visual design.
+Each needs a Product Owner decision in AG-3. None blocks the visual direction.
 
 * Final canonical date format (working candidate `YYYY-MM-DD`).
 * Number of empty days shown around Today.
 * Ordering of year interpretations for expressions such as `Oct 22`, and remaining popup lifecycle details.
 * Whether a compact Go to date control exists, and its behavior.
+* Whether the header of the day at the top of the content area stays pinned while scrolling. Direction C mentioned it as possible; it is additional behavior with no Tree counterpart and was not accepted.
+* Whether the wavy underline appears while the caret is still inside the text, or only after the caret leaves it.
+* Final wording of the pending-move status message.
 
 ## Visual Direction
 
 The existing application uses JetBrains Mono, a warm paper-like light theme, a dark theme, minimal chrome, restrained hierarchy, and no decorative animation. Agenda must feel calm, fast, native to macOS, minimal, and consistent with the Tree editor. Avoid cards, borders, badges, toolbars, panels, modals, heavy date chips, and animations.
 
-Areas to design in AG-2: canonical date highlighting; invalid date indication; autocomplete popup; day containers; Today; focused day; contextual ancestor versus direct match; active occurrence versus live mirror; temporarily invalid item; collapsed and partially expanded gaps; Vim whole-node selection; pending move; light and dark variants.
+AG-2 covered these areas: canonical date highlighting; invalid date indication; autocomplete popup; day containers; Today; focused day; contextual ancestor versus direct match; active occurrence versus live mirror; temporarily invalid item; collapsed and partially expanded gaps; Vim whole-node selection; pending move; light and dark variants. Directions considered and not chosen: day labels in a left margin column, and days as outline rows with a square bullet.
 
 ## Resume Prompt
 
-> Continue the Agenda initiative in `plans/agenda.md` with task AG-2, visual design discovery. Treat the Accepted Specification as binding. Propose a small number of substantially different visual directions for the listed areas, using real hierarchical examples with full node text, and discuss major decisions with me before recording them. Do not change runtime code.
+> Continue the Agenda initiative in `plans/agenda.md` with task AG-3, the final product/UX specification. Treat the Accepted Specification and Accepted Visual Decisions as binding. Put every Open Item and the proposed state treatments to me in one exchange, then record the final specification with visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria. Do not change runtime code.
