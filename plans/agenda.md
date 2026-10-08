@@ -16,7 +16,8 @@ The work proceeds in four stages: UX consistency review, visual design discovery
 ## Authorization State
 
 * Authorized: recording this specification (AG-1) and running visual design discovery (AG-2) as a discussion that changes no runtime code. The Product Owner accepted the visual direction and decisions V1–V5 on 2026-10-09.
-* Reserved for the Product Owner: every item under Open Items, approval of the final specification, and authorization of implementation.
+* AG-3: the Product Owner accepted resolutions F1–F7 and the state treatments S1–S5 on 2026-10-09; the Final Specification below records them.
+* Reserved for the Product Owner: approval of the recorded Final Specification, which completes AG-3, and authorization of implementation.
 
 ## Tasks
 
@@ -24,7 +25,7 @@ The work proceeds in four stages: UX consistency review, visual design discovery
 | --- | --- | --- | --- | --- |
 | AG-1 | UX consistency review completed and recorded | — | This plan with the accepted specification and decisions D1–D5 | Done |
 | AG-2 | Visual design discovery: a small number of substantially different directions, then one accepted visual system | AG-1 | Accepted visual decisions recorded in this plan; Product Owner accepted the direction | Done |
-| AG-3 | Final product/UX specification: resolve Open Items, add visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria | AG-2 | Final specification recorded in this plan and approved by the Product Owner | Ready |
+| AG-3 | Final product/UX specification: resolve Open Items, add visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria | AG-2 | Final specification recorded in this plan and approved by the Product Owner | Recorded; awaiting Product Owner approval |
 | AG-4 | Implementation planning: ordered, small, testable tasks added to this plan by the planner role | AG-3 | Task table extended with implementation tasks, each naming files, acceptance evidence, and validation tier | Planned |
 
 Task details:
@@ -33,7 +34,7 @@ Task details:
 * **AG-3.** Files: `plans/agenda.md`. Validation tier: Minimal Risk. Separate accepted behavior from implementation choices; include no speculative features. Turn the Accepted Visual Decisions and the proposed state treatments into visual contracts, and ask the Product Owner to confirm the proposed treatments.
 * **AG-4.** Files: `plans/agenda.md`. Validation tier: Minimal Risk. May inspect the repository and architecture. Each implementation task updates `docs/PRODUCT.md` for the behavior it implements.
 
-**Next task:** AG-3.
+**Next task:** Product Owner approval of the Final Specification (completes AG-3), then AG-4.
 
 ## Accepted Specification
 
@@ -81,7 +82,7 @@ Oct 14
 ### 4. Dates in text
 
 * Dates are ordinary editable text. A valid canonical date is recognized however the text was produced: typing, pasting, editing, undo, or redo. No confirmation step and no hidden metadata; the current text determines date semantics.
-* Working canonical format: `YYYY-MM-DD` (not yet final).
+* Canonical format: `YYYY-MM-DD` (final, F1).
 * Recognized date → participates in Agenda. Ordinary text → does not. Highlighting never turns a date into an indivisible widget.
 * Editing a date updates recognition immediately (`2026-10-14` valid, `2026-10-1` ordinary text, `2026-10-15` valid).
 * An impossible date such as `2026-02-31` is ordinary text and does not participate. A subtle spell-check-like indicator may mark text that strongly resembles an attempted canonical date; arbitrary text is never flagged.
@@ -187,25 +188,120 @@ Accepted by the Product Owner in AG-2 on 2026-10-09. All colors, the typeface, r
 * **V4 — Live mirror.** A mirror occurrence shows its bullet as a hollow ring in the gutter color; its text is unchanged. The active occurrence shows the ordinary selected-node bullet and caret.
 * **V5 — Pending move.** The source occurrence's text, bullet, and chevron are dimmed to about 38 % opacity, and the status bar shows a message such as `Moving 1 item · p puts it on the selected day · Esc cancels` next to the Vim mode indicator. This is the first use of the status bar for a transient message.
 
-Proposed state treatments shown in AG-2 and not yet confirmed; AG-3 confirms or changes them:
+## Final Specification (AG-3)
 
-* **Autocomplete popup:** a compact list anchored below the first column of the recognized expression, on the document surface with a 1px border in the location-border color and a soft shadow; each row shows the canonical date and a short secondary description (`2026-10-09  Fri · tomorrow`); the current suggestion uses the shared selection highlight pair; a one-line footer `Tab accept · ⌃N ⌃P`.
-* **Text resembling a date:** a 1px wavy underline in a muted red (light `#b4554b`, dark `#cc9393`), like a spell-check mark.
-* **Temporarily invalid item:** a hollow bullet and a one-line secondary hint below the text, `Add a date to keep this item in Agenda`.
-* **Vim whole-node selection:** the shared selection highlight pair on qualifying rows only; skipped rows keep their ordinary appearance.
-* **Focused day:** the location path reads `Agenda / Oct 14`, and the day is shown as the current-parent heading (`Wed Oct 14`) above its hierarchy, without a day header.
+Recorded on 2026-10-09 from the Product Owner's acceptance of F1–F7 and S1–S5. Awaiting the Product Owner's approval of this text. This section completes the Accepted Specification and Accepted Visual Decisions; where it is more precise, it governs.
 
-## Open Items
+### Resolved Open Items
 
-Each needs a Product Owner decision in AG-3. None blocks the visual direction.
+* **F1 — Canonical format.** `YYYY-MM-DD`, final. It is locale-independent and sorts as text.
+* **F2 — Today neighborhood.** The three calendar days before Today and the three after it are always shown as day containers, empty or not, within the current scope. Every other run of consecutive empty days is shown as a gap element (§7). *Agent decision (minor, reported):* a run of one or two empty days outside the neighborhood is shown as empty day headers rather than a gap, because a gap row would save at most one row. A run of three or more is a gap.
+* **F3 — Year interpretation and popup lifecycle.** A month-day expression without a year (`Oct 22`) offers the nearest future occurrence first — the current year when that day is today or later, otherwise the next year — and the other interpretation (the previous year's or current year's occurrence, respectively) second. This follows the rule already accepted for weekday names: upcoming occurrence first, alternative second. The popup closes when the caret leaves the recognized expression, when the Vim mode changes, when the editor loses focus, and when a suggestion is accepted. After closing, it reopens only after the next edit inside an expression that again meets the confidence rule (§5).
+* **F4 — Go to date.** Not part of Agenda. Scrolling and gap expansion are the only ways to reach a day. A future addition is a new capability and needs separate authorization.
+* **F5 — Pinned day header.** None. Day headers scroll with the content like every other row; only the location toolbar stays fixed, as in Tree (`docs/PRODUCT.md` §2.2).
+* **F6 — Date-like text indicator timing.** The wavy underline (S2) appears only when the caret is outside the date-like token or the node is not being edited. While the caret is inside or directly adjacent to the token, no underline is drawn, so intermediate typing states such as `2026-10-1` are never flagged.
+* **F7 — Pending-move message.** `Moving 1 item · p to put · Esc to cancel`; for several items `Moving N items · p to put · Esc to cancel`.
 
-* Final canonical date format (working candidate `YYYY-MM-DD`).
-* Number of empty days shown around Today.
-* Ordering of year interpretations for expressions such as `Oct 22`, and remaining popup lifecycle details.
-* Whether a compact Go to date control exists, and its behavior.
-* Whether the header of the day at the top of the content area stays pinned while scrolling. Direction C mentioned it as possible; it is additional behavior with no Tree counterpart and was not accepted.
-* Whether the wavy underline appears while the caret is still inside the text, or only after the caret leaves it.
-* Final wording of the pending-move status message.
+### Confirmed State Treatments
+
+* **S1 — Autocomplete popup:** a compact list anchored below the first character of the recognized expression, on the document surface, with a 1px border in the location-border color and a soft shadow. Each row shows the canonical date and a short secondary description (`2026-10-09  Fri · tomorrow`). The current suggestion uses the shared selection highlight pair. A one-line footer reads `Tab accept · ⌃N ⌃P`.
+* **S2 — Text resembling a date:** a 1px wavy underline in a muted red (light `#b4554b`, dark `#cc9393`), with the timing in F6.
+* **S3 — Temporarily invalid item:** changed from the AG-2 proposal. The item keeps the ordinary selected-node bullet, because it is always the active item (it disappears when the user leaves it) and a hollow bullet would be indistinguishable from a live mirror (V4). The hint `Add a date to keep this item in Agenda` appears in the status bar, in the same place as the pending-move message (V5), so the row height never changes. The two messages never coexist: any text edit cancels a pending move (D4), and only a text edit makes an item invalid.
+* **S4 — Vim whole-node selection:** the shared selection highlight pair on qualifying rows only (D5); skipped rows keep their ordinary appearance.
+* **S5 — Focused day:** the location path reads `Agenda / Oct 14`, and the day is shown as a non-editable current-parent heading (`Wed Oct 14`) above its hierarchy, without a day header.
+
+### Derived Rules
+
+These follow from accepted decisions and add no behavior; the Product Owner may revisit them.
+
+* **Structural commands are no-ops in Agenda (§10).** `Tab` and `Shift+Tab` without an open popup, Vim `>` and `<`, and every other command that moves a node between parents or reorders siblings do nothing in Agenda. They leave focus, caret, mode, and text unchanged. `Tab` with an open popup accepts the suggestion (§5).
+* **`Cmd+Enter` (strikethrough, `docs/PRODUCT.md` §2.5)** works on direct matches as in Tree and does nothing on contextual ancestors, day containers, and gaps (D2).
+* **Gaps are not days.** On a gap, `Enter`, `o`, `O`, `p`, `P`, `dd`, `Cmd+.`, and `Backspace` do nothing; `Cmd+E` is the only gap command. `p`/`P` on a gap leave a pending move pending (D4).
+* **Synthetic elements are never text-editable.** Day containers, gaps, and the focused-day heading accept no text input; printable keys on them do nothing in standard editing, and Vim `i`/`a`/`R` do not enter Insert or Replace on them.
+
+### Command Matrix
+
+Rows are the selected element. "Tree" means the behavior in `docs/PRODUCT.md` applies unchanged.
+
+| Command | Day container | Gap | Direct match | Contextual ancestor |
+| --- | --- | --- | --- | --- |
+| `↑` `↓` `j` `k` | Moves between visible rows of the timeline (or of the focused day) | Same | Same | Same |
+| `Cmd+E` | Toggles the day's fold | Reveals up to seven days, or collapses the gap when it is expanded (§7) | Toggles the node's fold (Tree) | Toggles the node's fold (Tree) |
+| `Enter` (standard) | Creates a dated node for that day (§9) | Nothing | Splits; the new node inherits the day's date (§9) | Nothing |
+| `Enter` (Vim Normal) | Nothing | Nothing | Tree | Nothing |
+| `o` / `O` (Vim Normal) | New node for that day / the preceding day, at the end of the scope (§9) | Nothing | New sibling after / before, with the day's date (§9) | Nothing |
+| `Backspace` on an empty node | — | — | Deletes it when it has no children; otherwise nothing (D1) | — |
+| `Cmd+Backspace` | Nothing | Nothing | Nothing | Nothing |
+| `Cmd+Enter` | Nothing | Nothing | Toggles strikethrough (Tree) | Nothing |
+| `dd` (Vim Normal) | Nothing | Nothing | Starts a pending move of this occurrence (§13) | Nothing |
+| `p` / `P` with a pending move | Moves the pending items to that day | Nothing; the move stays pending | Moves to this row's day | Moves to this row's day |
+| `p` / `P` without a pending move | Nothing (node register) | Nothing | Text-register put as text editing; node register nothing (D1) | Nothing |
+| `Cmd+.` | Opens the focused day | Nothing | Opens Tree at that node as current parent | Opens Tree at that node as current parent |
+| `Cmd+,` | Returns from the focused day to the timeline (focused day only) | — | Same | Same |
+| `Cmd+P` | Closes Agenda and returns to the originating Tree location | Same | Same | Same |
+| `Tab` / `Shift+Tab`, `>` / `<` | Nothing | Nothing | Nothing (popup open: `Tab` accepts) | Nothing |
+
+### State Descriptions
+
+Each element is in exactly one presentation state for each independent axis below; the visual treatment is in the Visual Contracts.
+
+* **Day container:** {with content, empty} × {expanded, collapsed} × {selected, not selected} × {Today, other day}. An empty day has no chevron and therefore no collapsed state. A day whose only matches are inside collapsed branches counts as with content.
+* **Gap:** {collapsed, expanded} × {selected, not selected}. An expanded gap is followed by the revealed day containers and, when days remain, a smaller collapsed gap.
+* **Real node row:** role {direct match, contextual ancestor} × occurrence {active, live mirror, not edited} × {pending move source, not} × {temporarily invalid, valid}. Only a direct match can be a pending source; only the active occurrence can be temporarily invalid; a mirror is never active.
+* **Editing:** standard editing, or Vim {Normal, Insert, Replace, Visual, Visual Node}. Visual Node selection includes only qualifying rows (D5).
+* **Popup:** {closed, open with N ≥ 1 suggestions, current suggestion index}.
+* **Presentation:** {timeline, focused day `D`}. The timeline keeps its scroll position, selection, and collapse state while a focused day is open, and restores them on `Cmd+,`.
+* **Pending move:** {none, pending with source occurrences}. Lifecycle per D4.
+* **Status bar message:** {none, pending-move message (F7), invalid-item hint (S3)}; at most one at a time.
+
+### Visual Contracts
+
+All tokens come from `src/renderer/styles.css`; no new surface, card, border, badge, or animation. Each contract holds in light and dark appearances unless stated otherwise.
+
+* **VC1 — Day header geometry.** The disclosure chevron sits in the Tree chevron column, the selected-day focus dot in the Tree bullet column, and the label starts in the Tree text column of the same level. The first node level of the day starts one outline level deeper than the header. The header row has the ordinary row height. The rule starts after the label with the ordinary label gap and ends at the content's right edge.
+* **VC2 — Day header type.** Label in small uppercase with slight letter spacing (`WED OCT 14`), in the secondary text color; an empty day uses a lighter weight and has no chevron. The rule is 1px in the location-border color.
+* **VC3 — Today.** Label and rule in the accent color (light `--color-drop-marker` amber, dark `#f0dfaf`), label followed by ` · TODAY`. Today is the initial scroll target when Agenda opens.
+* **VC4 — Gap.** A row in the header column with a chevron, small secondary text `N empty days · Sep 30 – Oct 6`, and a 1px dashed rule in the location-border color to the right edge. The chevron points down when the gap is expanded.
+* **VC5 — Date emphasis.** The displayed day's date in node text is in the accent color at semibold weight; other recognized canonical dates use the secondary text color. Characters, caret positions, and selection behavior are identical to unemphasized text.
+* **VC6 — Contextual ancestor.** Secondary text color, ordinary size and row height; in dark, the secondary color replaces the depth color. Direct matches keep their Tree colors, including Zenburn depth colors.
+* **VC7 — Live mirror.** The bullet is a hollow ring in the gutter color; text unchanged. The active occurrence shows the ordinary selected-node bullet and caret.
+* **VC8 — Pending source.** Text, bullet, and chevron at about 38 % opacity; the status bar shows the F7 message to the right of the Vim mode indicator.
+* **VC9 — Popup (S1).** Its left edge aligns with the first character of the recognized expression, and its top edge is directly below that row. It never covers the row being edited.
+* **VC10 — Date-like underline (S2, F6).**
+* **VC11 — Invalid item (S3).** Ordinary selected bullet; no row-height change; status-bar hint.
+* **VC12 — Vim selection (S4).** Selection highlight pair on qualifying rows only.
+* **VC13 — Focused day (S5).** Location path `Agenda / Oct 14`; non-editable heading `Wed Oct 14` in the current-parent heading position; no day header.
+* **VC14 — No flashes.** Opening and closing Agenda, entering and leaving a focused day, and timeline restructuring show no contrasting flash and no animation (`docs/PRODUCT.md` §20.5).
+
+### End-to-End Scenarios
+
+Each scenario runs in the real Electron application with a synthetic document. Dates are relative to a fixed test clock set to Thursday 2026-10-08.
+
+1. **Open and close.** From Root, `Cmd+P` opens Agenda at Today; `Cmd+P` returns to Root with the previous selection. Repeat from `Work / Team A`: Agenda shows only that subtree, without `Work` and `Team A` rows.
+2. **Hierarchy and full text.** A node `2026-10-14 Prepare rollout` under `Work / Team A / Release` appears under `WED OCT 14` with its ancestors as contextual rows and its full text, the date emphasized.
+3. **Compressed timeline.** Days 2026-10-05 to 2026-10-11 are shown; a run of 11 empty days becomes `11 empty days · …`; a run of two empty days is two headers. `Cmd+E` on the gap reveals seven days and a smaller gap; `Cmd+E` on the original gap collapses the region again.
+4. **Typing a date.** Typing `2026-10-1` shows no Agenda change and no underline while the caret stays in the token; typing `5` makes the node appear under Oct 15 without moving focus or scroll. Typing `2026-02-31` and moving the caret away shows the wavy underline and no Agenda entry.
+5. **Natural-language completion.** In standard editing and in Vim Insert: typing `tomor` opens the popup with one suggestion; `Tab` replaces only `tomorrow` with `2026-10-09`; one `Cmd+Z` restores `tomorrow` without reopening the popup. `Friday` offers 2026-10-09 first and 2026-10-16 second; `Ctrl+N`/`Ctrl+P` move between them. `Esc` in Vim Insert enters Normal and closes the popup with the text unchanged. `t`, `to`, `mar` open nothing. Pasting `next Friday` converts nothing.
+6. **Live occurrences.** A node with dates Oct 14 and Oct 20 appears under both days; editing under Oct 14 updates the Oct 20 mirror immediately, the mirror shows a hollow ring, and focus and scroll stay. Deleting the Oct 14 date moves the active occurrence to Oct 20 with caret and mode kept.
+7. **Removing the last date.** The item stays with the status-bar hint; Vim `Esc` to Normal keeps it; moving to another row removes it from Agenda; `Cmd+Z` restores the date and the occurrence without stealing focus.
+8. **Creating nodes.** `Enter` on a day container (standard) and `o` (Vim) create `2026-10-14 ` as the last child of the scope with the caret after the space, in Insert for Vim; `O` creates a node for Oct 13, revealing it from a gap when needed. `Enter` inside `2026-10-14 Prepare| release` splits into `2026-10-14 Prepare` and `2026-10-14 release`; one Undo restores the original node.
+9. **Structural restrictions.** `Tab`, `Shift+Tab`, `>`, `<`, `Cmd+Backspace`, and `o`/`Enter` on a contextual ancestor change nothing. `Backspace` in an empty childless created node deletes it; with children it does nothing.
+10. **Moving occurrences.** Dragging `2026-10-14 Prepare 2026-10-20` onto Oct 15 yields `2026-10-15 Prepare 2026-10-20` with parent and order unchanged; dragging onto a day already present in the text removes the duplicate and activates that occurrence. Contextual ancestors cannot be dragged. Undo restores the dates.
+11. **Pending move.** `dd` dims the occurrence and shows the F7 message; `j`/`k`, scrolling, collapsing, and `Cmd+E` on a gap keep it; `p` on any row of Oct 16 moves it in one Undo step. `Esc`, a text edit, Undo, `Cmd+P`, and `Cmd+.` cancel it with no Undo entry. The system clipboard and Vim register are unchanged.
+12. **Group move.** Whole-node Visual selection over three direct matches at one level, with a contextual ancestor between them, highlights only the three; moving them to another day replaces only the source dates in one Undo step.
+13. **Focused day.** `Cmd+.` on Oct 14 shows `Agenda / Oct 14` and only that day; `j`/`k` stop at its edges. `Cmd+,` restores the timeline's scroll, selection, and collapse state.
+14. **Navigation to Tree.** `Cmd+.` on a direct match and on a contextual ancestor opens Tree with that node as current parent; `Cmd+P` there opens that node's Agenda at Today.
+15. **Persistence and isolation.** Agenda collapse state does not change Tree expansion; all edits made in Agenda persist across a restart exactly as Tree edits do.
+16. **Visual regression.** Screenshots in light and dark for: a timeline with Today, a collapsed and a partly expanded gap, a direct match with emphasized and secondary dates, contextual ancestors, an active occurrence with a mirror, a pending source with the status message, the open popup, the date-like underline, an invalid item, Vim whole-node selection with a skipped row, and a focused day.
+
+### Acceptance Criteria
+
+* Every rule in the Accepted Specification, the Final Specification, and the Command Matrix is covered by at least one automated test; rules crossing the renderer, persistence, clipboard, or drag-and-drop boundaries also by an end-to-end scenario above (`AGENTS.md` §9).
+* Date recognition, natural-language parsing, projection (scope, hierarchy, compressed timeline), occurrence selection after date removal, and date replacement for moves are domain logic with unit tests and no React or Electron dependency (`AGENTS.md` §7). Projection and move transforms have property tests for: every direct match appears under each of its days; ancestors preserve tree order; a move changes only the moved dates; Undo of any Agenda edit restores the previous document.
+* Geometry assertions in the real renderer cover VC1 and VC9; the screenshots in scenario 16 are inspected and committed as synthetic baselines.
+* The `Cmd+P` deviation from Apple's Print shortcut is recorded next to the requirement in `docs/PRODUCT.md` (D3); no other unrecorded Human Interface Guidelines conflict exists.
+* Performance (`docs/PRODUCT.md` §22): opening Agenda, a keystroke that changes date recognition, and a group move stay within the interactive budgets on the large-document performance fixture; Agenda adds no disk write beyond the ordinary document and view-state saves.
+* Tree behavior is unchanged; the existing Tree test suites pass without modification.
 
 ## Visual Direction
 
@@ -215,4 +311,4 @@ AG-2 covered these areas: canonical date highlighting; invalid date indication; 
 
 ## Resume Prompt
 
-> Continue the Agenda initiative in `plans/agenda.md` with task AG-3, the final product/UX specification. Treat the Accepted Specification and Accepted Visual Decisions as binding. Put every Open Item and the proposed state treatments to me in one exchange, then record the final specification with visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria. Do not change runtime code.
+> Continue the Agenda initiative in `plans/agenda.md`. If I have approved the Final Specification, mark AG-3 Done and run AG-4 with the planner role: add ordered, small, testable implementation tasks to this plan, each naming files, acceptance evidence, and validation tier. Do not change runtime code.
