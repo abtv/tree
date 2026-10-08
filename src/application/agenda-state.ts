@@ -51,7 +51,8 @@ export function applyAgendaCommand(
       selectedKey: row.key,
     }
   }
-  if (row.kind === 'gap' || (row.kind === 'node' && !row.hasProjectedChildren)) return state
+  if (row.kind === 'gap' || (row.kind === 'day' && !row.content) || (row.kind === 'node' && !row.hasProjectedChildren))
+    return state
   const collapsed = new Set(state.collapsed)
   if (collapsed.has(row.key)) collapsed.delete(row.key)
   else collapsed.add(row.key)

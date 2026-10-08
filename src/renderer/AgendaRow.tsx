@@ -25,15 +25,19 @@ export function AgendaRow({
   node,
   today,
   selected,
+  expanded,
   rowRef,
   onSelect,
+  onToggle,
 }: {
   row: Row
   node?: TreeNode | undefined
   today: number
   selected: boolean
+  expanded: boolean
   rowRef: (key: string, element: HTMLDivElement | null) => void
   onSelect: (key: string) => void
+  onToggle: (key: string) => void
 }): React.JSX.Element {
   const depth = row.kind === 'node' ? row.depth + 1 : 0
   return (
@@ -56,7 +60,19 @@ export function AgendaRow({
       {row.kind === 'gap' ||
       (row.kind === 'day' && row.content) ||
       (row.kind === 'node' && row.hasProjectedChildren) ? (
-        <span aria-hidden="true" className="node-disclosure-triangle" aria-expanded={row.kind !== 'gap'} />
+        <button
+          className="node-disclosure-triangle"
+          type="button"
+          aria-expanded={expanded}
+          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${row.kind === 'node' ? node!.text : row.kind === 'day' ? agendaDateLabel(row.day, today, true) : agendaGapLabel(row.startDay, row.endDay, today)}`}
+          tabIndex={-1}
+          onPointerDown={(event) => event.preventDefault()}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggle(row.key)
+          }}
+        />
       ) : null}
       {row.kind === 'node' ? (
         <>

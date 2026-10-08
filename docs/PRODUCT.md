@@ -1168,4 +1168,10 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count and viewport rules as Tree. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Printable text, structural commands, and text-editing commands do nothing in the read-only view.
 
-`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Day focus, editing, and fold interactions are introduced in subsequent Agenda tasks.
+`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Day focus and editing are introduced in subsequent Agenda tasks.
+
+### 23.5 Folding and Gaps
+
+Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles the selected day or node's projected children. Day folds hide all that day's nodes; node folds hide their projected descendants on that day. A day stays non-empty even when its only matches lie in folded branches. Empty days and projected leaves do not fold. Fold choices are keyed by occurrence, independent across days and independent of Tree expansion. If collapsing an ancestor hides the selected row, the ancestor becomes selected and focused; an unrelated collapse keeps selection and focus. Mode and document content are unchanged.
+
+On a gap, the same controls reveal up to seven days from the start. Its original header stays visible with a down chevron, followed by the revealed empty day headers and a smaller collapsed gap when at least three unrevealed days remain. A remaining one or two days use day headers. Toggling the original expanded gap collapses its revealed region again; toggling the smaller gap reveals its next chunk. Reveal choices remain calendar-day choices as the timeline restructures. All folds and revealed gaps are runtime state, never saved to the Tree view or Undo history.

@@ -37,6 +37,95 @@ function seed(userDataDir: string): void {
 }
 
 describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §23.5
+  test('folds occurrences and reveals gaps through pointer and keyboard without changing Tree folds', async ({
+    userDataDir,
+  }) => {
+    seed(userDataDir)
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, screenshotContentSize)
+    await window.getByRole('button', { name: 'Expand node 1', exact: true }).click()
+    await expect.poll(() => readPersisted(userDataDir).view?.expandedIds, { timeout: 20_000 }).toContain('work')
+    const persisted = readPersisted(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    const work = window.locator('.agenda-row[data-node-id="work"]').first()
+    const prepare = window.locator('.agenda-row[data-node-id="prepare"]').first()
+    await prepare.click()
+    await work.getByRole('button').click()
+    await expect(work).toBeFocused()
+    await expect(work.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+    await expect(window.locator('.agenda-row[data-node-id="prepare"]')).toHaveCount(1)
+    await window.keyboard.press('Meta+e')
+    await expect(work.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
+    await expect(window.locator('.agenda-row[data-node-id="prepare"]')).toHaveCount(2)
+    const day = window.locator('.agenda-row-day').filter({ hasText: 'Wed Oct 14' })
+    await day.click()
+    await window.keyboard.press('Meta+e')
+    await expect(day).toBeFocused()
+    await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+    await day.getByRole('button').click()
+    await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.type('za')
+      await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+      await window.keyboard.type('za')
+    }
+    await prepare.click()
+    // Folding the other occurrence must leave this row selected and focused.
+    await window.locator('.agenda-row[data-node-id="work"]').nth(1).getByRole('button').click()
+    await expect(prepare).toBeFocused()
+    await expect(prepare).toHaveAttribute('aria-selected', 'true')
+    const gap = window.locator('.agenda-row-gap').filter({ hasText: '11 empty days · Oct 21 – Oct 31' })
+    await gap.click()
+    await window.keyboard.press('Meta+e')
+    await expect(gap).toBeFocused()
+    await expect(gap.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
+    for (const date of [
+      'Wed Oct 21',
+      'Thu Oct 22',
+      'Fri Oct 23',
+      'Sat Oct 24',
+      'Sun Oct 25',
+      'Mon Oct 26',
+      'Tue Oct 27',
+    ])
+      await expect(window.locator('.agenda-row-day').filter({ hasText: date })).toHaveCount(1)
+    const remainder = window.locator('.agenda-row-gap').filter({ hasText: '4 empty days · Oct 28 – Oct 31' })
+    await expect(remainder).toHaveCount(1)
+    await expect(remainder.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+    const geometry = await gap.evaluate((element) => {
+      const label = element.querySelector('.agenda-label')!.getBoundingClientRect()
+      const triangle = element.querySelector('.node-disclosure-triangle')!.getBoundingClientRect()
+      const focus = element.querySelector('.node-focus-marker')!.getBoundingClientRect()
+      return {
+        triangleY: triangle.y + triangle.height / 2,
+        focusY: focus.y + focus.height / 2,
+        labelY: label.y + label.height / 2,
+      }
+    })
+    expect(geometry.triangleY).toBeCloseTo(geometry.labelY, 1)
+    expect(geometry.focusY).toBeCloseTo(geometry.labelY, 1)
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.emulateMedia({ colorScheme: appearance })
+      await gap.click()
+      await window.mouse.move(500, 20)
+      await expect(window).toHaveScreenshot(screenshotName(`agenda-gap-expanded-${appearance}.png`))
+    }
+    await gap.getByRole('button').click()
+    await expect(gap).toBeFocused()
+    await expect(remainder).toHaveCount(0)
+    await expect(window.locator('.agenda-row-day').filter({ hasText: 'Wed Oct 21' })).toHaveCount(0)
+    await gap.getByRole('button').click()
+    await remainder.getByRole('button').click()
+    await expect(window.locator('.agenda-row-day').filter({ hasText: 'Sat Oct 31' })).toHaveCount(1)
+    await gap.getByRole('button').click()
+    await expect(window.locator('.agenda-row-day').filter({ hasText: 'Sat Oct 31' })).toHaveCount(0)
+    await window.keyboard.press('Meta+p')
+    await expect(window.locator('.node-row[data-node-id="team"]')).toHaveCount(1)
+    expect(readPersisted(userDataDir)).toEqual(persisted)
+  })
   // @requirement PRODUCT.md §23.1
   test('finishes an editing session before opening and preserves its single Undo step', async ({ userDataDir }) => {
     seed(userDataDir)

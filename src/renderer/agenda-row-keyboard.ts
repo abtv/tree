@@ -63,7 +63,12 @@ export function createAgendaKeyDownHandler({
           store.selectNode(row.nodeId, 0)
           store.enter()
         }
-      } else if (['Backspace', 'Enter', ',', 'z', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
+      } else if (event.key.toLowerCase() === 'e' && !event.shiftKey && !event.altKey) {
+        event.preventDefault()
+        if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        beforeSelect?.(false)
+        store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key: row.key })
+      } else if (['backspace', 'enter', ',', 'z', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
       }
@@ -90,8 +95,17 @@ export function createAgendaKeyDownHandler({
       vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', prefix: 'g' }
       return
     }
+    if (normal && !event.ctrlKey && !event.altKey && event.key === 'z' && pending?.prefix === undefined) {
+      vim.commandState.pending = { count: '', motionCount: '', prefix: 'z' }
+      return
+    }
     if (vim !== undefined) clearPending(vim.commandState)
     if (event.altKey) return
+    if (normal && !event.ctrlKey && event.key === 'a' && pending?.prefix === 'z') {
+      beforeSelect?.(false)
+      store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key: row.key })
+      return
+    }
     if (event.ctrlKey) {
       if (!normal || pending?.prefix !== undefined || !['d', 'u'].includes(event.key)) return
       viewportMotion(event.key === 'd' ? 'half-down' : 'half-up', count)

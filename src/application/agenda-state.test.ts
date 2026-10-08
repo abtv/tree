@@ -35,6 +35,28 @@ it('reveals the next chunk and collapses the expanded header without changing th
   expect(restored.revealed.size).toBe(0)
 })
 
+it('does not fold an empty day, but a folded content branch leaves the day non-empty', () => {
+  const state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
+  const projection = [
+    {
+      day: 100,
+      rows: [
+        { nodeId: 'a', depth: 0, role: 'context' as const },
+        { nodeId: 'b', depth: 1, role: 'match' as const },
+      ],
+    },
+  ]
+  const rows = buildAgendaRows(projection, state)
+  expect(applyAgendaCommand(state, { kind: 'toggle-fold', key: 'day:99' }, rows)).toBe(state)
+  const folded = applyAgendaCommand(state, { kind: 'toggle-fold', key: 'node:100:a' }, rows)
+  const nextRows = buildAgendaRows(projection, folded)
+  expect(nextRows.find((row) => row.key === 'day:100')).toMatchObject({ content: true })
+  expect(nextRows.some((row) => row.key === 'node:100:b')).toBe(false)
+  expect(applyAgendaCommand(folded, { kind: 'toggle-fold', key: 'day:100' }, nextRows).collapsed.has('day:100')).toBe(
+    true,
+  )
+})
+
 it('collapses only descendants on the same day and moves a hidden selection to the folding row', () => {
   const state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
   const projection = [

@@ -11,7 +11,7 @@ import * as viewport from './scroll-viewport'
 async function fixture() {
   const harness = await createRealStoreHarness({
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
-    document: { roots: [{ id: 'node', text: '2026-10-14 Prepare', children: [] }] },
+    document: { roots: [{ id: 'node', text: '2026-10-15 Prepare', children: [] }] },
   })
   harness.store.openAgenda(2)
   const vim: VimTextCommandState = {
@@ -31,6 +31,28 @@ async function fixture() {
 }
 
 describe('read-only Agenda keyboard', () => {
+  it('routes Cmd+E and Normal za to occurrence folds and gap reveal with no Tree changes', async () => {
+    const f = await fixture()
+    const before = f.snapshot()
+    f.press('G')
+    const day = f.store.getAgendaRows().find((row) => row.kind === 'day' && row.content)!
+    f.store.applyAgenda({ kind: 'select', key: day.key })
+    f.press('e', { metaKey: true })
+    expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(true)
+    f.press('z')
+    f.press('a')
+    expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(false)
+    const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+    f.store.applyAgenda({ kind: 'select', key: gap.key })
+    f.press('z')
+    f.press('a')
+    expect(f.snapshot().agenda?.revealed.size).toBe(3)
+    f.press('e', { metaKey: true })
+    expect(f.snapshot().agenda?.revealed.size).toBe(0)
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().expansion).toBe(before.expansion)
+    expect(f.saves).toHaveLength(0)
+  })
   it('uses Tree context rows and row counts for viewport motions, preserving line-motion scroll', async () => {
     const f = await fixture()
     const beforeSelect = vi.fn()

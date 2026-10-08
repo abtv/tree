@@ -34,6 +34,13 @@ export function AgendaView({
     if (vim !== undefined) clearCommandAssembly(vim.commandState)
     store.applyAgenda({ kind: 'select', key })
   }
+  const toggle = (key: string): void => {
+    const row = rows.find((candidate) => candidate.key === key)
+    if (row === undefined) return
+    reveal.current = 'pointer'
+    if (vim !== undefined) clearCommandAssembly(vim.commandState)
+    store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key })
+  }
   useLayoutEffect(() => {
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
@@ -67,8 +74,10 @@ export function AgendaView({
           node={row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined}
           today={agenda.today}
           selected={row.key === agenda.selectedKey}
+          expanded={row.kind === 'gap' ? row.expanded : !agenda.collapsed.has(row.key)}
           rowRef={rowRef}
           onSelect={select}
+          onToggle={toggle}
         />
       ))}
     </div>

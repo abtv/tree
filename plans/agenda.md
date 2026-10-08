@@ -37,8 +37,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-8 | Date edit transforms in the domain: move, new-node text, split inheritance, nearest remaining day | AG-5 | Unit and property tests (every §9 and §11 example, a move changes only moved dates, links keep covered text), mutation | Done |
 | AG-9 | Agenda view state in `EditorStore` (open, close, rows, selection, folds, reveal) without UI; new ADR | AG-6, AG-7 | Unit and property tests, no persisted leakage, performance assessment and guard, `npm run check:full`, independent review | Done |
 | AG-10 | `Cmd+P` opens and closes a read-only Agenda timeline (headers, Today, collapsed gaps, hierarchy, full text, `Cmd+.` to Tree) | AG-9 | E2E scenarios 1, 2, 3 (without expansion), 14, 15 (isolation); VC1 geometry; light and dark screenshots; review and product verifier | Done |
-| AG-11 | Folding and gap expansion (`Cmd+E`, chevrons), independent of Tree | AG-10 | Unit tests, E2E scenario 3 remainder and 15, chevron geometry, screenshots | Ready |
-| AG-12 | Windowed Agenda list and large-document performance guard | AG-10 | Component tests (bounded mounted rows), `perf/agenda.spec.ts`, `npm run check:full`, review | Planned |
+| AG-11 | Folding and gap expansion (`Cmd+E`, chevrons), independent of Tree | AG-10 | Unit tests, E2E scenario 3 remainder and 15, chevron geometry, screenshots | Done |
+| AG-12 | Windowed Agenda list and large-document performance guard | AG-10 | Component tests (bounded mounted rows), `perf/agenda.spec.ts`, `npm run check:full`, review | Ready |
 | AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Planned |
 | AG-14 | Edit dated nodes in place with structural restrictions (D1, D2, Command Matrix) | AG-10, AG-13 | E2E scenarios 4 (without underline), 9, 15, clipboard; key-policy tests; emphasis screenshots; review and product verifier | Planned |
 | AG-15 | Live occurrences: mirrors, active switching, invalid last-date item with status hint | AG-14 | E2E scenarios 6 and 7; VC7 and VC11 screenshots; focus and scroll stability assertions | Planned |
@@ -91,7 +91,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-11: Folding and gap expansion. Continue through AG-12 in the same session per C11 so the first exposed Agenda is windowed.
+**Next task:** AG-12: Windowed Agenda list and large-document performance guard. Continue in the same session per C11 so the first exposed Agenda is windowed.
+
+AG-11 implemented occurrence-local day/node folding through chevrons, Cmd+E and Normal za, and seven-day gap expansion with retained headers/remainders. Empty days and projected leaves do not fold. Collapsing a selected descendant focuses its ancestor; unrelated folds preserve focus. Tree expansion and persistence stay unchanged. Independent review and product verification found no meaningful issues; unit checks, ten real-Electron Agenda tests and inspected light/dark screenshots passed.
 
 AG-10 implemented the read-only renderer and application-scoped shortcuts. The Product Owner confirmed the native flow after clarifying the staged `Cmd+.` behavior. Day focus remains AG-21; date editing remains AG-14.
 
