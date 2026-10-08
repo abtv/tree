@@ -3,8 +3,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClipboardPayload, TreeApi } from '../../shared/ipc'
 import { attachmentByteCache, createElectronEditorServices, readAttachment } from './electron-services'
+import { dayNumberOf } from '../../domain/calendar-date'
 
 describe('renderer Electron services', () => {
+  it('provides the current local calendar day without an IPC call', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date(2026, 9, 8, 23, 59))
+      const services = createElectronEditorServices()
+      expect(services.today!()).toBe(dayNumberOf({ year: 2026, month: 10, day: 8 }))
+      vi.setSystemTime(new Date(2026, 9, 9, 0, 1))
+      expect(services.today!()).toBe(dayNumberOf({ year: 2026, month: 10, day: 9 }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
   const api: TreeApi = {
     quit: vi.fn(async () => undefined),
     quitWithoutSaving: vi.fn(async () => undefined),

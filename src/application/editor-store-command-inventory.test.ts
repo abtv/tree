@@ -6,6 +6,10 @@ import generatorSource from './test/editor-store-arbitraries.ts?raw'
 
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
+  openAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
+  closeAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
+  applyAgenda: 'Agenda selection and presentation commands have dedicated property coverage.',
+  getAgendaRows: 'Read-only Agenda projection with dedicated cache and composition tests.',
   getVisibleRows: 'Read-only projection used by the generator to choose displayed targets.',
   getRestoredSelectedRowTop: 'Read-only startup viewport metadata.',
   registerSelectedRowTopReader: 'Renderer measurement registration requires a viewport harness.',

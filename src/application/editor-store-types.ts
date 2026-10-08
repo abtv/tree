@@ -1,10 +1,13 @@
 import type { AttachmentId, Document, Location, NodeId, PersistedEditorState } from '../domain/document'
 import type { ClipboardContent, ClipboardPayload, ClipboardWritePayload } from '../shared/ipc'
 import type { ExpansionState } from './expansion-state'
+import type { DayNumber } from '../domain/calendar-date'
+import type { AgendaState } from './agenda-state'
 
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
+  today?(): DayNumber
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   readClipboard(): Promise<ClipboardValue>
@@ -35,6 +38,7 @@ export type EditorSnapshot =
       focus: FocusIntent
       structuralVersion: number
       expansion: ExpansionState
+      agenda?: AgendaState
       saveError?: string
       operationError?: string
       persistenceLocked?: boolean

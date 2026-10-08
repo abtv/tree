@@ -1,5 +1,6 @@
 import { releaseNodeIndex, type NodeId } from '../domain/document'
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
+import { reconcileAgenda } from './agenda-state'
 
 export type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
 
@@ -34,6 +35,7 @@ export class EditorRuntimeState {
     const previous = this.snapshot
     if (changedStructure) this.structuralVersion += 1
     const next = { ...state, structuralVersion: this.structuralVersion }
+    if (state.agenda !== undefined) next.agenda = reconcileAgenda(state.agenda)
     // Both branches install the same snapshot; the delete only drops an explicit `operationError: undefined` key.
     if (next.operationError === undefined) {
       this.snapshot = next

@@ -26,6 +26,7 @@ export type EditorStoreSnapshotInput =
       focus?: FocusIntent
       structuralVersion?: number
       expansion?: import('../../application/expansion-state').ExpansionState
+      agenda?: import('../../application/agenda-state').AgendaState
       saveError?: string
       operationError?: string
       persistenceLocked?: boolean
@@ -63,6 +64,10 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
   )
 
   const double: EditorStorePublic = {
+    openAgenda: vi.fn(),
+    closeAgenda: vi.fn(),
+    applyAgenda: vi.fn(),
+    getAgendaRows: vi.fn(() => []),
     getSnapshot,
     subscribe: vi.fn(() => () => undefined),
     getVisibleRows: vi.fn(() => {

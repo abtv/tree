@@ -213,6 +213,10 @@ The shutdown handshake uses a request ID, suppresses duplicate requests, and tim
 
 The application layer must not contain React components or JSX.
 
+The Agenda store foundation uses `agenda-state.ts` for pure runtime transitions and `agenda-rows.ts` to compose the domain date projection with the compressed timeline and occurrence folds. `EditorStore` owns one row cache and publishes Agenda selection with real-node location and focus atomically. Rows carry node IDs rather than captured node content, so unchanged date membership can reuse their identities while the document supplies current text. No renderer entry point exists at this stage. The runtime reconciliation seam currently preserves Agenda state; document-edit reconciliation belongs to the later editable Agenda integration. See [ADR 0020](decisions/0020-agenda-derived-projection-and-runtime-view-state.md).
+
+Performance assessment for Agenda state (`docs/PRODUCT.md` §22.1): opening, selection, folds, and gap reveal cause no document writes or syncs and add no undo snapshots. Saves already pending capture the Tree origin location and viewport while Agenda is active. Today is sampled once on open. With Agenda closed, runtime publication does no projection work. With it open, projection reuses immutable-node date summaries; a text edit rescans the changed path, but projection and semantic comparison still scale with dated occurrences and their ancestors. Rows are rebuilt only when that projection, Today, folds, or revealed days change. One store cache retains only its latest document and projection; closing releases them, while domain summary caches have weak keys. The application guard uses a wide dated document to assert a single rescan and stable row-array identity after a same-date keystroke.
+
 ---
 
 ## 8. UI Layer
@@ -294,10 +298,13 @@ May include:
 * undo/redo history;
 * the mounted window of the displayed sibling list, its measured row heights, and drag auto-scroll state;
 * the per-node inline-expansion choices.
+* Agenda origin, scope, captured Today, occurrence selection, folds, and revealed days.
 
 Only the state explicitly required by the product specification should be persisted. Of the runtime state above, the product specification requires the current parent, the selected node, and the expansion choices to survive a restart, so they are also written as view state beside the document (§13). They remain runtime state in every other respect and never enter undo history.
 
 Exact cursor position, focus state, navigation stack, undo/redo history, and the windowed list's mounted range and height table are runtime state unless the product specification changes.
+
+Agenda presentation is runtime-only. The save scheduler excludes it and uses its captured Tree origin location instead of a selected Agenda occurrence. It suppresses Agenda viewport measurements and preserves the stored Tree row position. Closing restores the origin cursor with a fresh focus token; Tree expansion is unchanged.
 
 The hook's `applyCaretState` publishes a complete resolved Normal caret and projects it onto its registered input. Callers choose immediate projection, projection after the edited text renders, or preservation of a deliberate native selection. One bounded pending projection carries its node, focus token, and caret revision; native Insert/contenteditable scheduling also carries the originating element. A newer intent invalidates earlier work, and disconnected, replaced, or wrong-node work is consumed without projection. Mode changes invalidate deferred focus while retaining only a pending projection compatible with the destination mode. The deferred focus pass checks both the focus token and caret revision. Replace completion publishes the resolved cursor, including an explicit retreat when requested, so callers do not retreat the DOM separately. Composition start uses a preserving commit because it retains Replace mode and its native insertion position.
 

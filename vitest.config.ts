@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['src/test/fast-check-setup.ts'],
-    exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts', 'test-results/**'],
+    exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts', 'test-results/**', '.stryker-tmp/**'],
     css: { include: [/styles\.css/] },
     coverage: {
       provider: 'v8',

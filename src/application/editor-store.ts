@@ -79,11 +79,15 @@ import {
   type NodeFoldCommand,
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
+import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
+import { dayNumberOf } from '../domain/calendar-date'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
 export class EditorStore {
+  private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
   private readonly runtime = new EditorRuntimeState()
@@ -112,14 +116,14 @@ export class EditorStore {
         // Normal callers request saves only after initialization; retain this guard for
         // unavailable state rather than exposing the scheduler's callback publicly.
         if (state.status !== 'ready') return undefined
-        const measured = this.readSelectedRowTop?.()
+        const measured = state.agenda === undefined ? this.readSelectedRowTop?.() : undefined
         // Number.isFinite(undefined) is false too; the explicit check narrows the type.
         if (measured !== undefined && Number.isFinite(measured)) this.selectedRowTop = Math.max(0, Math.round(measured))
         const expandedIds = state.expansion.expandedIds
         const selectedRowTop = this.selectedRowTop
         // JSON persistence omits an undefined position even if the key is present.
         const view = selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop }
-        return { document: state.document, location: state.location, view }
+        return { document: state.document, location: state.agenda?.origin.location ?? state.location, view }
       },
       referencedAttachmentIds: () => this.referencedAttachmentIds(),
       isPersistenceLocked: () => this.isPersistenceLocked(),
@@ -130,6 +134,64 @@ export class EditorStore {
   public getSnapshot = this.runtime.getSnapshot
 
   public subscribe = this.runtime.subscribe
+
+  public openAgenda(cursor?: number): void {
+    const state = this.runtime.ready()
+    if (state.agenda !== undefined) return
+    const measured = this.readSelectedRowTop?.()
+    if (measured !== undefined && Number.isFinite(measured)) this.selectedRowTop = Math.max(0, Math.round(measured))
+    const date = new Date()
+    const today =
+      this.services.today?.() ??
+      dayNumberOf({
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        day: date.getDate(),
+      })
+    this.endTextSession()
+    const agenda = openAgendaState(state.location, cursor ?? state.focus.cursor, today)
+    this.runtime.replaceReady({ ...state, agenda })
+  }
+
+  public closeAgenda(): void {
+    const state = this.runtime.ready()
+    if (state.agenda === undefined) return
+    this.endTextSession()
+    const { agenda, ...tree } = state
+    this.agendaRowsCache.clear()
+    this.runtime.replaceReady({
+      ...tree,
+      location: agenda.origin.location,
+      focus: this.runtime.newFocus(agenda.origin.location.selectedNodeId, agenda.origin.cursor),
+    })
+  }
+
+  public getAgendaRows(): readonly AgendaRow[] {
+    const state = this.runtime.ready()
+    return state.agenda === undefined ? [] : this.agendaRowsCache.get(state.document, state.agenda)
+  }
+
+  public applyAgenda(command: AgendaCommand): void {
+    const state = this.runtime.ready()
+    if (state.agenda === undefined) return
+    const rows = this.getAgendaRows()
+    const agenda = applyAgendaCommand(state.agenda, command, rows)
+    const selected = rows.find((row) => row.key === agenda.selectedKey)
+    const realSelection =
+      selected?.kind === 'node' && (agenda.selectedKey !== state.agenda.selectedKey || command.kind === 'select')
+    if (agenda === state.agenda && !realSelection) return
+    if (agenda.selectedKey !== state.agenda.selectedKey || realSelection) this.endTextSession()
+    this.runtime.replaceReady({
+      ...state,
+      agenda,
+      ...(realSelection
+        ? {
+            location: { ...state.location, selectedNodeId: selected.nodeId },
+            focus: this.runtime.newFocus(selected.nodeId, command.kind === 'select' ? (command.cursor ?? 0) : 0),
+          }
+        : {}),
+    })
+  }
 
   public getVisibleRows(): readonly VisibleRow[] {
     const state = this.runtime.ready()

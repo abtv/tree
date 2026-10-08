@@ -35,8 +35,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-6 | Agenda projection in the domain: scope, hierarchy, occurrences, per-node memo | AG-5 | Unit and property tests (spec examples, every match under each day, ancestor order, one-edit rescan proportional to depth), mutation | Done |
 | AG-7 | Compressed timeline in the domain: Today neighborhood, gaps, reveal | AG-5 | Unit and property tests (scenario 3 numbers, every day shown once, no gap shorter than three days, reveal at most seven), mutation | Done |
 | AG-8 | Date edit transforms in the domain: move, new-node text, split inheritance, nearest remaining day | AG-5 | Unit and property tests (every §9 and §11 example, a move changes only moved dates, links keep covered text), mutation | Done |
-| AG-9 | Agenda view state in `EditorStore` (open, close, rows, selection, folds, reveal) without UI; new ADR | AG-6, AG-7 | Unit and property tests, no persisted leakage, performance assessment and guard, `npm run check:full`, independent review | Ready |
-| AG-10 | `Cmd+P` opens and closes a read-only Agenda timeline (headers, Today, collapsed gaps, hierarchy, full text, `Cmd+.` to Tree) | AG-9 | E2E scenarios 1, 2, 3 (without expansion), 14, 15 (isolation); VC1 geometry; light and dark screenshots; review and product verifier | Planned |
+| AG-9 | Agenda view state in `EditorStore` (open, close, rows, selection, folds, reveal) without UI; new ADR | AG-6, AG-7 | Unit and property tests, no persisted leakage, performance assessment and guard, `npm run check:full`, independent review | Done |
+| AG-10 | `Cmd+P` opens and closes a read-only Agenda timeline (headers, Today, collapsed gaps, hierarchy, full text, `Cmd+.` to Tree) | AG-9 | E2E scenarios 1, 2, 3 (without expansion), 14, 15 (isolation); VC1 geometry; light and dark screenshots; review and product verifier | Ready |
 | AG-11 | Folding and gap expansion (`Cmd+E`, chevrons), independent of Tree | AG-10 | Unit tests, E2E scenario 3 remainder and 15, chevron geometry, screenshots | Planned |
 | AG-12 | Windowed Agenda list and large-document performance guard | AG-10 | Component tests (bounded mounted rows), `perf/agenda.spec.ts`, `npm run check:full`, review | Planned |
 | AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Planned |
@@ -91,7 +91,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-9: Agenda view state in `EditorStore` without UI.
+**Next task:** AG-10: Read-only Agenda timeline UI. Continue through AG-12 in the same session per C11 so the first exposed Agenda is windowed.
+
+AG-9 completed the runtime store foundation and [ADR 0020](../docs/decisions/0020-agenda-derived-projection-and-runtime-view-state.md). Today is injected by the existing Electron service factory; `main.tsx` needed no change. The cache returns node identities and reuses its row array when date membership and hierarchy are unchanged. The save path captures the Tree origin location and viewport while Agenda is open. Edit reconciliation remains the AG-13 task; no renderer entry point is exposed by AG-9.
 
 ## Accepted Specification
 

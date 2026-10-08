@@ -1,10 +1,15 @@
 import type { EditorServices } from '../../application/editor-store'
 import { createAttachmentBytesCache } from './attachment-bytes-cache'
+import { dayNumberOf } from '../../domain/calendar-date'
 
 export const ATTACHMENT_BYTES_CACHE_LIMIT = 64 * 1024 * 1024
 
 export function createElectronEditorServices(): EditorServices {
   return {
+    today: () => {
+      const date = new Date()
+      return dayNumberOf({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })
+    },
     load: () => window.treeApi.load(),
     save: (state) => window.treeApi.save(state),
     readClipboard: () => window.treeApi.readClipboard(),
