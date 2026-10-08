@@ -10,7 +10,7 @@ The work proceeded through four design stages — UX consistency review, visual 
 
 * This plan is a coordination record, not a product requirement. `docs/PRODUCT.md` remains the source of truth for implemented behavior; Agenda behavior enters it only together with its implementation and tests (`AGENTS.md` §§5, 9).
 * The accepted behavior below is binding for the later stages unless the Product Owner changes it.
-* Out of scope until the Product Owner authorizes it: task semantics (deadlines, overdue, priority, status, automatic rescheduling), time-of-day semantics, a calendar grid, cloud services, and any implementation work.
+* Out of scope: task semantics (deadlines, overdue, priority, status, automatic rescheduling), time-of-day semantics, a calendar grid, and cloud services.
 * Implementation details — storage, data structures, libraries, list virtualization — are decided during implementation planning, not in the design stages.
 
 ## Authorization State
@@ -20,7 +20,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 * AG-3 is complete: the Product Owner approved the Final Specification on 2026-10-09 and authorized AG-4 (implementation planning).
 * AG-4 is complete: tasks AG-5 to AG-28 were planned on 2026-10-09 and no runtime code changed.
 * The Product Owner answered Q1–Q5 on 2026-10-09 (Implementation Planning (AG-4) below).
-* Reserved for the Product Owner: authorization of implementation; approval of the AG-22 expression table before AG-23. All implementation tasks stay `Planned` until implementation is authorized.
+* The Product Owner authorized Agenda implementation on 2026-10-09 with “start agenda”. Implementation proceeds in task order.
+* Reserved for the Product Owner: approval of the AG-22 expression table before AG-23.
 
 ## Tasks
 
@@ -30,8 +31,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-2 | Visual design discovery: a small number of substantially different directions, then one accepted visual system | AG-1 | Accepted visual decisions recorded in this plan; Product Owner accepted the direction | Done |
 | AG-3 | Final product/UX specification: resolve Open Items, add visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria | AG-2 | Final specification recorded in this plan and approved by the Product Owner | Done |
 | AG-4 | Implementation planning: ordered, small, testable tasks added to this plan by the planner role | AG-3 | Task table extended with implementation tasks, each naming files, acceptance evidence, and validation tier | Done |
-| AG-5 | Calendar date value and canonical `YYYY-MM-DD` recognition in the domain | AG-4, authorization | Unit and property tests, mutation, `npm run check` | Planned |
-| AG-6 | Agenda projection in the domain: scope, hierarchy, occurrences, per-node memo | AG-5 | Unit and property tests (spec examples, every match under each day, ancestor order, one-edit rescan proportional to depth), mutation | Planned |
+| AG-5 | Calendar date value and canonical `YYYY-MM-DD` recognition in the domain | AG-4, authorization | Unit and property tests, mutation, `npm run check` | Done |
+| AG-6 | Agenda projection in the domain: scope, hierarchy, occurrences, per-node memo | AG-5 | Unit and property tests (spec examples, every match under each day, ancestor order, one-edit rescan proportional to depth), mutation | Ready |
 | AG-7 | Compressed timeline in the domain: Today neighborhood, gaps, reveal | AG-5 | Unit and property tests (scenario 3 numbers, every day shown once, no gap shorter than three days, reveal at most seven), mutation | Planned |
 | AG-8 | Date edit transforms in the domain: move, new-node text, split inheritance, nearest remaining day | AG-5 | Unit and property tests (every §9 and §11 example, a move changes only moved dates, links keep covered text), mutation | Planned |
 | AG-9 | Agenda view state in `EditorStore` (open, close, rows, selection, folds, reveal) without UI; new ADR | AG-6, AG-7 | Unit and property tests, no persisted leakage, performance assessment and guard, `npm run check:full`, independent review | Planned |
@@ -90,7 +91,7 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** The Product Owner authorizes implementation; then AG-5.
+**Next task:** AG-6: Agenda projection in the domain.
 
 ## Accepted Specification
 
