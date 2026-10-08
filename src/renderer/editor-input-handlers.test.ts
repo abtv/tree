@@ -1687,6 +1687,36 @@ describe('editor keyboard handler', () => {
     expect(vim.mode).toBe('insert')
   })
 
+  it.each(['insert', 'replace', 'visual', 'visual-node', 'normal'] as const)(
+    'resolves %s and command assembly before Cmd+P opens Agenda at the live cursor',
+    (mode) => {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = 'text'
+      input.setSelectionRange(2, 2)
+      const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, mode)
+      vim.commandState.pending = { count: '2', motionCount: '', prefix: 'g' }
+      vim.commandState.visualAnchor = 0
+      vim.commandState.visualFocus = 2
+      vim.finishReplace = vi.fn(() => true)
+      const event = keyEvent(input, 'p', { metaKey: true })
+      handle(event)
+      expect(event.preventDefault).toHaveBeenCalledOnce()
+      expect(vim.finishInsert).toHaveBeenCalledWith(input)
+      expect(store.openAgenda).toHaveBeenCalledWith(2)
+      expect(vim.commandState.pending).toBeUndefined()
+      expect(vim.commandState.visualAnchor).toBeUndefined()
+      expect(vim.commandState.visualFocus).toBeUndefined()
+      expect(vim.mode).toBe(mode === 'replace' || mode === 'visual-node' ? 'normal' : mode)
+      if (mode === 'replace') {
+        expect(vim.finishReplace).toHaveBeenCalledWith(input, false)
+        expect(vi.mocked(vim.finishReplace).mock.invocationCallOrder[0]).toBeLessThan(
+          vi.mocked(store.openAgenda).mock.invocationCallOrder[0]!,
+        )
+      }
+    },
+  )
+
   it('commits and ends a pending Replace session before Cmd+. enters the selected node', () => {
     const store = createStore()
     const input = document.createElement('textarea')

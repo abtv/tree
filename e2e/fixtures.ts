@@ -126,6 +126,11 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
 
 export { expect }
 
+/** Fix only Date; browser timers and animation frames keep running normally. */
+export async function setAgendaToday(window: Page): Promise<void> {
+  await window.clock.setFixedTime(new Date(2026, 9, 8, 12))
+}
+
 export interface EditingModeContext {
   mode: EditingMode
   /** Adds the mode suffix to a screenshot name so each mode keeps its own baseline. */

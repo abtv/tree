@@ -1143,3 +1143,29 @@ Concrete budgets are not fixed here. When a change can affect performance at sca
 Everyday Vim editing must feel lightweight and consistently responsive on supported documents. Typing, caret movement, moving between nearby nodes, switching modes, and common edit commands must give prompt visible feedback so the user can stay in an editing flow. Repeated interactions must not develop noticeable pauses, and work that only changes the active node or caret must not become slower merely because the document contains more off-screen nodes.
 
 Performance guards must exercise representative sequences in the running application, including key-to-visible-frame latency for Vim interactions and typing, as well as document-scale cases that could expose renderer or React work on the interactive path. Measure both typical and slow interactions; investigate regressions before adding further editing features. This requirement does not imply support for Vim-sized files or prescribe a particular UI implementation.
+
+## 23. Agenda
+
+### 23.1 Opening and Closing
+
+`Cmd+P` opens a read-only Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected and revealed. `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening; Replace returns to Normal, and whole-node Visual ends. Agenda has no text caret in this read-only stage.
+
+This deliberately assigns Apple's standard Print shortcut to Agenda, as approved by the Product Owner: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no menu item or global shortcut.
+
+The location toolbar reads `Agenda`, with no outline-root control. Agenda selection and scrolling do not change the persisted Tree view or create files; restarting opens Tree. Agenda uses the same document, without copying nodes.
+
+### 23.2 Projection and Dates in Text
+
+Only valid canonical `YYYY-MM-DD` dates are recognized, with no touching digit at either end. Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text. A node appears under every distinct date it contains. Its proper ancestors below the scope appear as contextual rows in Tree order, preserving the hierarchy. Full text is shown and wraps as in Tree. The displayed day's date uses the accent color and semibold weight; other recognized dates use secondary text. Contextual ancestors use secondary text, ordinary size, and ordinary row height; direct matches retain Tree colors, including depth colors in dark appearance. An outer bullet ring reflects real children; a chevron reflects projected children.
+
+### 23.3 Timeline
+
+Days are ordered chronologically. The three calendar days before Today and the three after it are always shown, including empty days. Other runs of one or two empty days have individual day headers; longer runs have a collapsed gap labeled `N empty days · Sep 30 – Oct 6`. Labels append the year only when it differs from Today's year.
+
+A day is a compact header with small uppercase text, slight letter spacing, and a thin rule to the content's right edge, all in secondary colors. Empty days have a lighter label and no chevron. Today uses the accent color for label and rule, with ` · TODAY` appended. A gap has small secondary text, a chevron, and a dashed rule. Day and gap rows have the ordinary row height. Their chevrons, selected focus dot, and label align to the Tree chevron, bullet, and text columns; nodes start one outline level deeper. Headers scroll with the content; none is sticky. Transitions between Agenda and Tree have no animation or contrasting background flash.
+
+### 23.4 Navigation
+
+Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count and viewport rules as Tree. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Printable text, structural commands, and text-editing commands do nothing in the read-only view.
+
+`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Day focus, editing, and fold interactions are introduced in subsequent Agenda tasks.

@@ -57,6 +57,7 @@ interface UseNodeInputBindingsOptions {
 }
 
 export interface NodeInputBindingsResult {
+  vimTextCommandState: VimTextCommandState
   bindings: (node: TreeNode) => NodeInputBindings
   dragFreeze: NodeDragCaretFreeze
   /**
@@ -816,5 +817,5 @@ export function useNodeInputBindings({
     [beginFrozenCaret, releaseFrozenCaret],
   )
 
-  return { bindings, dragFreeze, setVimEditing }
+  return { bindings, dragFreeze, setVimEditing, vimTextCommandState }
 }

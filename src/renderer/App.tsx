@@ -8,6 +8,10 @@ import type { VimFoldCommand } from './vim-keyboard-types'
 import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
 import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
+import { AgendaLocationBar } from './AgendaLocationBar'
+import { AgendaView } from './AgendaView'
+import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import { clearCommandAssembly } from './vim-command-state'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
 import { NodeList } from './NodeList'
@@ -47,7 +51,8 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
       .then(setAlwaysOnTop)
       .catch((error: unknown) => store.reportError(error))
   }, [store])
-  const focus = state.status === 'ready' ? state.focus : undefined
+  const agenda = state.status === 'ready' ? state.agenda : undefined
+  const focus = state.status === 'ready' && agenda === undefined ? state.focus : undefined
   const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
   const isExpanded = useCallback(
@@ -79,9 +84,10 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     bindings: nodeInputBindings,
     dragFreeze,
     setVimEditing,
+    vimTextCommandState,
   } = useNodeInputBindings({
     store,
-    selectedNodeId: state.status === 'ready' ? state.location.selectedNodeId : undefined,
+    selectedNodeId: agenda === undefined ? selectedNodeId : undefined,
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
     persistenceLocked,
@@ -113,7 +119,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     }
   }, [setVimEditing])
   // Called after the input bindings so the restore aligns the selected row after their initial focus.
-  useScrollRestoration(store, state.status === 'ready')
+  useScrollRestoration(store, state.status === 'ready' && agenda === undefined)
   const enterNode = useCallback(
     (node: TreeNode): void => {
       // The disclosure control's own mousedown handler calls preventDefault to avoid stealing
@@ -242,65 +248,108 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
   const topLevel = state.location.currentParentId === null
 
   return (
-    <main className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}>
+    <main
+      className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}
+      onKeyDown={(event) => {
+        const target = event.target
+        if (!(target instanceof Element) || target.closest('.node-input, .agenda-list, [role="dialog"]')) return
+        if (agenda !== undefined) {
+          createAgendaKeyDownHandler({ store, vim: vimEnabled ? vimTextCommandState : undefined })(event)
+        } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
+          event.preventDefault()
+          clearCommandAssembly(vimTextCommandState.commandState)
+          if (vimMode === 'visual-node') {
+            setNodeVisualSelection(undefined)
+            setVimMode('normal')
+          }
+          store.openAgenda()
+        }
+      }}
+    >
       <div className="title-bar" aria-hidden="true">
         Tree
       </div>
-      <LocationBar
-        path={path}
-        currentParentId={state.location.currentParentId}
-        onNavigate={navigateToAncestor}
-        dropParentId={breadcrumbTarget}
-      />
+      {agenda !== undefined ? (
+        <AgendaLocationBar />
+      ) : (
+        <LocationBar
+          path={path}
+          currentParentId={state.location.currentParentId}
+          onNavigate={navigateToAncestor}
+          dropParentId={breadcrumbTarget}
+        />
+      )}
       <div className={SCROLL_VIEWPORT_CLASS}>
-        <section className={topLevel ? 'editor-shell editor-shell-top-level' : 'editor-shell'}>
-          {currentParent === undefined ? null : (
-            <section
-              aria-label="Current parent"
-              className="current-parent"
-              data-has-attachment={currentParent.attachment !== undefined}
-              onClick={(event) => {
-                if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
-                const target = event.target
-                if (target instanceof Element && target.closest('.node-input, .attachment-button, a, button') !== null)
-                  return
-                activateNode(currentParent)
-              }}
-            >
-              <NodeInput
-                imageCaretActive={isImageCaretActive(currentParent)}
-                imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
-                node={currentParent}
-                label="Current parent"
-                parent
-                {...nodeInputBindings(currentParent)}
-              />
-              {currentParent.attachment === undefined ? null : (
-                <AttachmentImage
-                  attachmentId={currentParent.attachment.id}
-                  imageCaretActive={isImageCaretActive(currentParent)}
-                  onOpen={setPreviewAttachmentId}
-                />
+        <section
+          className={
+            agenda !== undefined
+              ? 'editor-shell agenda-shell'
+              : topLevel
+                ? 'editor-shell editor-shell-top-level'
+                : 'editor-shell'
+          }
+        >
+          {agenda !== undefined ? (
+            <AgendaView
+              store={store}
+              agenda={agenda}
+              document={state.document}
+              vim={vimEnabled ? vimTextCommandState : undefined}
+            />
+          ) : (
+            <>
+              {currentParent === undefined ? null : (
+                <section
+                  aria-label="Current parent"
+                  className="current-parent"
+                  data-has-attachment={currentParent.attachment !== undefined}
+                  onClick={(event) => {
+                    if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
+                    const target = event.target
+                    if (
+                      target instanceof Element &&
+                      target.closest('.node-input, .attachment-button, a, button') !== null
+                    )
+                      return
+                    activateNode(currentParent)
+                  }}
+                >
+                  <NodeInput
+                    imageCaretActive={isImageCaretActive(currentParent)}
+                    imageOnly={currentParent.text.length === 0 && currentParent.attachment !== undefined}
+                    node={currentParent}
+                    label="Current parent"
+                    parent
+                    {...nodeInputBindings(currentParent)}
+                  />
+                  {currentParent.attachment === undefined ? null : (
+                    <AttachmentImage
+                      attachmentId={currentParent.attachment.id}
+                      imageCaretActive={isImageCaretActive(currentParent)}
+                      onOpen={setPreviewAttachmentId}
+                    />
+                  )}
+                </section>
               )}
-            </section>
+              <NodeList
+                breadcrumbTargets={breadcrumbTargets}
+                onBreadcrumbTarget={setBreadcrumbTarget}
+                dragFreeze={dragFreeze}
+                focusedNodeId={focus?.nodeId}
+                isExpanded={isExpanded}
+                locked={persistenceLocked}
+                nodes={nodes}
+                visibleRows={store.getVisibleRows()}
+                onActivate={activateNode}
+                visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
+                onEnter={enterNode}
+                onDrop={moveNode}
+                onToggleExpansion={onToggleExpansion}
+                renderInput={renderInput}
+                structuralVersion={state.structuralVersion}
+              />
+            </>
           )}
-          <NodeList
-            breadcrumbTargets={breadcrumbTargets}
-            onBreadcrumbTarget={setBreadcrumbTarget}
-            dragFreeze={dragFreeze}
-            focusedNodeId={focus?.nodeId}
-            isExpanded={isExpanded}
-            locked={persistenceLocked}
-            nodes={nodes}
-            visibleRows={store.getVisibleRows()}
-            onActivate={activateNode}
-            visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
-            onEnter={enterNode}
-            onDrop={moveNode}
-            onToggleExpansion={onToggleExpansion}
-            renderInput={renderInput}
-            structuralVersion={state.structuralVersion}
-          />
           {state.saveError === undefined ? null : (
             <p className="save-error" role="status">
               {SAVE_ERROR_PREFIX} {state.saveError}

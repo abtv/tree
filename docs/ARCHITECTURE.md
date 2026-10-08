@@ -236,6 +236,8 @@ The UI layer includes:
 
 React components should translate user interactions into application commands.
 
+`AgendaView.tsx` renders the store's derived Agenda rows instead of the Tree heading and list. Its rows use occurrence keys and `.agenda-row`, separate from `.node-row` DOM queries used by Tree caret and viewport handlers. Read-only row keyboard handling lives in `agenda-row-keyboard.ts` and shares the input hook's Vim command-state owner. The input hook stays mounted to retain editing state, but receives no Tree focus while Agenda is open. Tree scroll restoration and viewport-save listeners suspend during Agenda; closing issues a fresh Tree focus intent. Date labels use domain calendar arithmetic rather than timezone-sensitive formatting.
+
 They should not implement core tree manipulation rules.
 
 For example, an `Enter` key handler should not directly manipulate the tree structure.

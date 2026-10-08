@@ -346,6 +346,10 @@ export function createEditorKeyDownHandler({
         finishVimSessionBeforeTextEdit(vim, event.currentTarget)
         void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
       }
+    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
+      event.preventDefault()
+      finishVimSessionBeforeNavigation(vim, event.currentTarget)
+      store.openAgenda(getCaret(event.currentTarget))
     } else if (event.metaKey && event.key === '.') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)

@@ -1,0 +1,125 @@
+// @vitest-environment jsdom
+import type { KeyboardEvent } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+import { createRealStoreHarness } from './test/real-store-harness'
+import { createVimCommandState } from './vim-command-state'
+import type { VimTextCommandState } from './editor-input-handlers'
+import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import { dayNumberOf } from '../domain/calendar-date'
+import * as viewport from './scroll-viewport'
+
+async function fixture() {
+  const harness = await createRealStoreHarness({
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+    document: { roots: [{ id: 'node', text: '2026-10-14 Prepare', children: [] }] },
+  })
+  harness.store.openAgenda(2)
+  const vim: VimTextCommandState = {
+    mode: 'normal',
+    commandState: createVimCommandState(),
+    setMode: (mode) => {
+      vim.mode = mode
+    },
+  }
+  const handler = createAgendaKeyDownHandler({ store: harness.store, vim })
+  const press = (key: string, options = {}) => {
+    const event = { key, preventDefault: vi.fn(), ...options } as unknown as KeyboardEvent<HTMLElement>
+    handler(event)
+    return event
+  }
+  return { ...harness, vim, press }
+}
+
+describe('read-only Agenda keyboard', () => {
+  it('uses Tree context rows and row counts for viewport motions, preserving line-motion scroll', async () => {
+    const f = await fixture()
+    const beforeSelect = vi.fn()
+    const handler = createAgendaKeyDownHandler({ store: f.store, vim: f.vim, beforeSelect })
+    const bounds = vi.spyOn(viewport, 'viewportBounds').mockReturnValue({ top: 0, bottom: 200 })
+    const edges = vi.spyOn(viewport, 'viewportScrollEdges').mockReturnValue({ atStart: false, atEnd: false })
+    const rows = f.store.getAgendaRows()
+    // One row in each edge context; a wrapped middle row makes pixel-half differ from row-half.
+    const boxes = [
+      [0, 20],
+      [25, 45],
+      [50, 130],
+      [135, 155],
+      [160, 180],
+      [180, 200],
+    ]
+    const elements = boxes.map(([top, bottom], index) => {
+      const element = document.createElement('div')
+      element.className = 'agenda-row'
+      element.dataset.agendaKey = rows[index]!.key
+      element.getBoundingClientRect = () => ({ top: top!, bottom: bottom! }) as DOMRect
+      document.body.append(element)
+      return element
+    })
+    try {
+      handler({ key: 'H', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      expect(f.snapshot().agenda?.selectedKey).toBe(rows[1]!.key)
+      handler({ key: 'M', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      expect(f.snapshot().agenda?.selectedKey).toBe(rows[2]!.key)
+      handler({ key: 'L', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      expect(f.snapshot().agenda?.selectedKey).toBe(rows[3]!.key)
+      expect(beforeSelect.mock.calls).toEqual([[true], [true], [true]])
+      f.store.applyAgenda({ kind: 'select', key: rows[0]!.key })
+      handler({ key: 'd', ctrlKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      expect(f.snapshot().agenda?.selectedKey).toBe(rows[3]!.key)
+      handler({ key: 'u', ctrlKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      expect(f.snapshot().agenda?.selectedKey).toBe(rows[0]!.key)
+    } finally {
+      elements.forEach((element) => element.remove())
+      bounds.mockRestore()
+      edges.mockRestore()
+    }
+  })
+  it('counts motions and boundaries, clamps, and retains repeat memory', async () => {
+    const f = await fixture()
+    f.vim.commandState.lastFind = { character: 'x', kind: 'f' }
+    f.press('2')
+    f.press('j')
+    expect(f.snapshot().agenda?.selectedKey).toBe(`day:${dayNumberOf({ year: 2026, month: 10, day: 10 })}`)
+    f.press('9')
+    f.press('9')
+    f.press('j')
+    expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows().at(-1)!.key)
+    f.press('g')
+    f.press('g')
+    f.press('ArrowUp')
+    expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows()[0]!.key)
+    f.press('3')
+    f.press('G')
+    expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows()[2]!.key)
+    expect(f.vim.commandState.lastFind?.character).toBe('x')
+  })
+
+  it('ignores text, structural commands, modifiers and composition; Escape clears pending', async () => {
+    const f = await fixture()
+    const before = f.snapshot()
+    for (const key of ['i', 'a', 'R', 'o', 'd', 'p', 'Enter', 'Backspace', 'Tab', '>', '<']) f.press(key)
+    f.press('j', { nativeEvent: { isComposing: true } })
+    f.press('2')
+    f.press('Meta')
+    expect(f.vim.commandState.pending?.count).toBe('2')
+    f.press('Escape')
+    expect(f.vim.commandState.pending).toBeUndefined()
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().agenda?.selectedKey).toBe(before.agenda?.selectedKey)
+    expect(f.saves).toHaveLength(0)
+  })
+
+  it('closes at origin and enters Tree only on real rows', async () => {
+    const f = await fixture()
+    f.press('.', { metaKey: true })
+    expect(f.snapshot().agenda).toBeDefined()
+    f.press('G')
+    f.press('.', { metaKey: true })
+    expect(f.snapshot().agenda).toBeUndefined()
+    expect(f.snapshot().location.currentParentId).toBe('node')
+    f.store.openAgenda()
+    f.press('p', { metaKey: true })
+    expect(f.snapshot().location.currentParentId).toBe('node')
+    expect(f.snapshot().agenda).toBeUndefined()
+  })
+})
