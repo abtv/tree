@@ -32,8 +32,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-3 | Final product/UX specification: resolve Open Items, add visual contracts, state descriptions, end-to-end scenarios, and acceptance criteria | AG-2 | Final specification recorded in this plan and approved by the Product Owner | Done |
 | AG-4 | Implementation planning: ordered, small, testable tasks added to this plan by the planner role | AG-3 | Task table extended with implementation tasks, each naming files, acceptance evidence, and validation tier | Done |
 | AG-5 | Calendar date value and canonical `YYYY-MM-DD` recognition in the domain | AG-4, authorization | Unit and property tests, mutation, `npm run check` | Done |
-| AG-6 | Agenda projection in the domain: scope, hierarchy, occurrences, per-node memo | AG-5 | Unit and property tests (spec examples, every match under each day, ancestor order, one-edit rescan proportional to depth), mutation | Ready |
-| AG-7 | Compressed timeline in the domain: Today neighborhood, gaps, reveal | AG-5 | Unit and property tests (scenario 3 numbers, every day shown once, no gap shorter than three days, reveal at most seven), mutation | Planned |
+| AG-6 | Agenda projection in the domain: scope, hierarchy, occurrences, per-node memo | AG-5 | Unit and property tests (spec examples, every match under each day, ancestor order, one-edit rescan proportional to depth), mutation | Done |
+| AG-7 | Compressed timeline in the domain: Today neighborhood, gaps, reveal | AG-5 | Unit and property tests (scenario 3 numbers, every day shown once, no gap shorter than three days, reveal at most seven), mutation | Ready |
 | AG-8 | Date edit transforms in the domain: move, new-node text, split inheritance, nearest remaining day | AG-5 | Unit and property tests (every §9 and §11 example, a move changes only moved dates, links keep covered text), mutation | Planned |
 | AG-9 | Agenda view state in `EditorStore` (open, close, rows, selection, folds, reveal) without UI; new ADR | AG-6, AG-7 | Unit and property tests, no persisted leakage, performance assessment and guard, `npm run check:full`, independent review | Planned |
 | AG-10 | `Cmd+P` opens and closes a read-only Agenda timeline (headers, Today, collapsed gaps, hierarchy, full text, `Cmd+.` to Tree) | AG-9 | E2E scenarios 1, 2, 3 (without expansion), 14, 15 (isolation); VC1 geometry; light and dark screenshots; review and product verifier | Planned |
@@ -91,7 +91,7 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-6: Agenda projection in the domain.
+**Next task:** AG-7: Compressed timeline in the domain.
 
 ## Accepted Specification
 

@@ -94,6 +94,8 @@ The domain owns concepts such as:
 
 Product rules that determine how the tree behaves belong in the domain or application layer rather than in React components.
 
+`agenda-projection.ts` derives day groups of node identifiers, scoped depths, and match/context roles from the immutable document. It is a domain foundation without a runtime entry point. Direct and subtree date sets are memoized in a weak map keyed by `TreeNode`; path copying invalidates only replaced nodes, so date recognition after an edit reuses unchanged branch summaries. Row generation still visits relevant branches for each day. The cache stores day sets rather than flattened row copies, permits collection with its node keys, and adds no persisted fields or disk operations.
+
 ---
 
 ## 5. Domain Model
