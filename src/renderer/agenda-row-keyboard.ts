@@ -4,6 +4,7 @@ import { clearCommandAssembly, clearPending } from './vim-command-state'
 import type { VimTextCommandState } from './editor-input-handlers'
 import { viewportBounds, viewportScrollEdges } from './scroll-viewport'
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
+import { getCaret } from './editor-dom'
 
 interface Dependencies {
   store: EditorStore
@@ -28,7 +29,11 @@ export function createAgendaKeyDownHandler({
     const select = (target: number, preserveViewport = false): void => {
       const destination = rows[Math.max(0, Math.min(rows.length - 1, target))]!
       beforeSelect?.(preserveViewport)
-      store.applyAgenda({ kind: 'select', key: destination.key })
+      store.applyAgenda({
+        kind: 'select',
+        key: destination.key,
+        cursor: event.currentTarget?.classList.contains('node-input') ? getCaret(event.currentTarget) : 0,
+      })
     }
     const viewportMotion = (motion: 'top' | 'middle' | 'bottom' | 'half-down' | 'half-up', count: number): void => {
       const bounds = viewportBounds()
@@ -68,7 +73,12 @@ export function createAgendaKeyDownHandler({
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         beforeSelect?.(false)
         store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key: row.key })
-      } else if (['backspace', 'enter', ',', 'z', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
+      } else if (event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        if (event.shiftKey) store.redo()
+        else store.undo()
+      } else if (['backspace', 'enter', ',', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
       }
@@ -101,17 +111,42 @@ export function createAgendaKeyDownHandler({
     }
     if (vim !== undefined) clearPending(vim.commandState)
     if (event.altKey) return
-    if (normal && !event.ctrlKey && event.key === 'a' && pending?.prefix === 'z') {
+    if (normal && !event.ctrlKey && pending?.prefix === 'z') {
       beforeSelect?.(false)
-      store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key: row.key })
+      const operations = {
+        c: 'close',
+        o: 'open',
+        a: 'toggle',
+        C: 'close-recursive',
+        O: 'open-recursive',
+        M: 'close-all',
+        R: 'open-all',
+      } as const
+      const operation = operations[event.key as keyof typeof operations]
+      if (operation !== undefined) {
+        if (row.kind === 'gap' && operation !== 'close-all' && operation !== 'open-all') {
+          if (
+            operation === 'toggle' ||
+            (operation === 'open' && !row.expanded) ||
+            (operation === 'close' && row.expanded)
+          )
+            store.applyAgenda({ kind: 'toggle-gap', key: row.key })
+        } else store.applyAgenda({ kind: 'fold', key: row.key, operation })
+      }
       return
     }
     if (event.ctrlKey) {
-      if (!normal || pending?.prefix !== undefined || !['d', 'u'].includes(event.key)) return
+      if (!normal || pending?.prefix !== undefined) return
+      if (event.key === 'r') {
+        store.redo()
+        return
+      }
+      if (!['d', 'u'].includes(event.key)) return
       viewportMotion(event.key === 'd' ? 'half-down' : 'half-up', count)
       return
     }
-    if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined))
+    if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
+    else if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined))
       select(index + count)
     else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined))
       select(index - count)

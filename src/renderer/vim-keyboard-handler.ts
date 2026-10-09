@@ -35,6 +35,8 @@ import {
 } from './vim-command-state'
 import { editCaretTransition, horizontalCaretTransition } from './vim-caret-transition'
 import { navigateVertically } from './vim-vertical-navigation'
+import { agendaAllows } from './agenda-key-policy'
+import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 
 /** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2). */
 const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
@@ -288,6 +290,34 @@ export function handleVimKey(
       if (range !== undefined) move(range.target)
     }
     return handled()
+  }
+
+  const snapshot = store.getSnapshot()
+  if (snapshot.status === 'ready' && snapshot.agenda !== undefined) {
+    // Awaited characters and surround delimiters above are text, even when they look like commands.
+    const structural =
+      event.key === '>' ||
+      event.key === '<' ||
+      (!visual && ['o', 'O', 'V', 'J', 'Enter'].includes(event.key)) ||
+      (pending.prefix === 'g' && ['J', 'p', 'P', 'd'].includes(event.key)) ||
+      (pending.operator === 'd' && event.key === 'd') ||
+      (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
+      (!visual && ['p', 'P'].includes(event.key)) ||
+      (!visual && event.key === '.' && commandState.lastChange?.kind.startsWith('structural-'))
+    if (structural && !agendaAllows('match', 'structure')) {
+      clearPending(commandState)
+      return handled()
+    }
+    if (
+      !visual &&
+      pending.operator === undefined &&
+      ((['j', 'k', 'G', 'H', 'M', 'L'].includes(event.key) && pending.prefix === undefined) ||
+        (event.key === 'g' && pending.prefix === 'g') ||
+        pending.prefix === 'z')
+    ) {
+      createAgendaKeyDownHandler({ store, vim })(event)
+      return true
+    }
   }
 
   /** `p`/`P`, or `gp`/`gP` when `past`: put the register and leave the caret after the inserted content. */

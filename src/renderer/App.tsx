@@ -10,6 +10,9 @@ import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
 import { AgendaLocationBar } from './AgendaLocationBar'
 import { AgendaView } from './AgendaView'
+import { findCanonicalDates } from '../domain/date-recognition'
+import { richTextHtml } from './editor-dom'
+import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { clearCommandAssembly } from './vim-command-state'
 import { breadcrumbDropTargets } from '../application/drop-targets'
@@ -52,7 +55,11 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
       .catch((error: unknown) => store.reportError(error))
   }, [store])
   const agenda = state.status === 'ready' ? state.agenda : undefined
-  const focus = state.status === 'ready' && agenda === undefined ? state.focus : undefined
+  const focus =
+    state.status === 'ready' &&
+    (agenda === undefined || agenda.activeOccurrence?.nodeId === state.location.selectedNodeId)
+      ? state.focus
+      : undefined
   const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
   const isExpanded = useCallback(
@@ -87,7 +94,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     vimTextCommandState,
   } = useNodeInputBindings({
     store,
-    selectedNodeId: agenda === undefined ? selectedNodeId : undefined,
+    selectedNodeId,
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
     persistenceLocked,
@@ -222,6 +229,57 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     ),
     [isImageCaretActive, nodeInputBindings],
   )
+  const renderAgendaAttachment = useCallback(
+    (node: TreeNode, editable: boolean): React.JSX.Element | null =>
+      node.attachment === undefined ? null : (
+        <AttachmentImage
+          attachmentId={node.attachment.id}
+          imageCaretActive={editable && isImageCaretActive(node)}
+          onOpen={setPreviewAttachmentId}
+        />
+      ),
+    [isImageCaretActive],
+  )
+
+  const renderAgendaInput = useCallback(
+    (node: TreeNode, day: number): React.JSX.Element => (
+      <>
+        <NodeInput
+          node={node}
+          label={`Agenda node ${node.id}`}
+          imageOnly={node.text.length === 0 && node.attachment !== undefined}
+          imageCaretActive={isImageCaretActive(node)}
+          decorations={findCanonicalDates(node.text, node.links).map((date) => ({
+            start: date.start,
+            end: date.end,
+            className: date.day === day ? 'agenda-date-active' : 'agenda-date-secondary',
+          }))}
+          {...nodeInputBindings(node)}
+        />
+      </>
+    ),
+    [isImageCaretActive, nodeInputBindings],
+  )
+  const renderAgendaText = useCallback(
+    (node: TreeNode, day: number): React.JSX.Element => (
+      <span
+        className={`agenda-text${node.struckThrough ? ' agenda-text-struck' : ''}`}
+        onClick={nodeInputBindings(node).onClick}
+        onMouseDown={preventReadOnlyLinkFocus}
+        dangerouslySetInnerHTML={{
+          __html: richTextHtml(
+            node,
+            findCanonicalDates(node.text, node.links).map((date) => ({
+              start: date.start,
+              end: date.end,
+              className: date.day === day ? 'agenda-date-active' : 'agenda-date-secondary',
+            })),
+          ),
+        }}
+      />
+    ),
+    [nodeInputBindings],
+  )
 
   if (state.status === 'loading')
     return (
@@ -295,6 +353,9 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
               agenda={agenda}
               document={state.document}
               vim={vimEnabled ? vimTextCommandState : undefined}
+              renderInput={renderAgendaInput}
+              renderAttachment={renderAgendaAttachment}
+              renderText={renderAgendaText}
             />
           ) : (
             <>

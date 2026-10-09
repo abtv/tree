@@ -1,6 +1,7 @@
 // @editing-modes: both
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Locator } from '@playwright/test'
 import type { TreeNode } from '../src/domain/document'
 import {
   describeForEachEditingMode,
@@ -13,6 +14,17 @@ import {
   setMainWindowContentSize,
   test,
 } from './fixtures'
+
+async function expectFocused(row: Locator): Promise<void> {
+  await expect
+    .poll(() =>
+      row.evaluate(
+        (element) =>
+          element === document.activeElement || element.querySelector('.node-input') === document.activeElement,
+      ),
+    )
+    .toBe(true)
+}
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const leaf = (id: string, text: string) => ({ id, text, children: [] })
@@ -57,7 +69,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
-    await expect(selected).toBeFocused()
+    await expectFocused(selected)
     await expect(window.locator('.agenda-list-spacer')).toHaveCount(2)
     expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
     await window.keyboard.press('Escape')
@@ -73,7 +85,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await window.keyboard.press('ArrowUp')
       await window.keyboard.press('Meta+e')
     }
-    await expect(selected).toBeFocused()
+    await expectFocused(selected)
     const key = await selected.getAttribute('data-agenda-key')
     await selected.evaluate((element) => {
       ;(globalThis as unknown as { selectedAgendaElement: Element }).selectedAgendaElement = element
@@ -82,7 +94,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       document.querySelector<HTMLElement>('.scroll-viewport')!.scrollTop = 8000
     })
     await expect(selected).toHaveClass(/agenda-row-pinned/u)
-    await expect(selected).toBeFocused()
+    await expectFocused(selected)
     await expect
       .poll(() =>
         selected.evaluate(
@@ -93,7 +105,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
     await setMainWindowContentSize(app, { width: 650, height: 600 })
     await expect(selected).toHaveAttribute('data-agenda-key', key!)
-    await expect(selected).toBeFocused()
+    await expectFocused(selected)
     if (mode === 'vim') {
       await window.keyboard.press('g')
       await window.keyboard.press('g')
@@ -106,13 +118,13 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     const today = window.locator('.agenda-row-day').filter({ hasText: 'TODAY' })
     await today.click()
     await window.keyboard.press('Meta+e')
-    await expect(today).toBeFocused()
+    await expectFocused(today)
     await window.keyboard.press('Meta+e')
-    await expect(today).toBeFocused()
+    await expectFocused(today)
     expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
     await window.keyboard.press('ArrowDown')
     await expect(selected).toHaveAttribute('data-node-id', 'dated-0')
-    await expect(selected).toBeFocused()
+    await expectFocused(selected)
     const neighbor = window.locator('.agenda-row[data-node-id="dated-1"]').first()
     await expect
       .poll(async () => {
@@ -122,9 +134,13 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       })
       .toBeLessThan(1)
     await window.keyboard.press('ArrowDown')
-    await expect(neighbor).toBeFocused()
+    await expectFocused(neighbor)
     await window.keyboard.press('ArrowUp')
     await expect(selected).toHaveAttribute('data-node-id', 'dated-0')
+    // The native overlay scrollbar fades independently of renderer state and window focus.
+    await window.evaluate(() => {
+      document.styleSheets[0]!.insertRule('.scroll-viewport::-webkit-scrollbar { display: none; }')
+    })
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await window.mouse.move(600, 20)
@@ -147,7 +163,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     const prepare = window.locator('.agenda-row[data-node-id="prepare"]').first()
     await prepare.click()
     await work.getByRole('button').click()
-    await expect(work).toBeFocused()
+    await expectFocused(work)
     await expect(work.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
     await expect(window.locator('.agenda-row[data-node-id="prepare"]')).toHaveCount(1)
     await window.keyboard.press('Meta+e')
@@ -156,7 +172,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     const day = window.locator('.agenda-row-day').filter({ hasText: 'Wed Oct 14' })
     await day.click()
     await window.keyboard.press('Meta+e')
-    await expect(day).toBeFocused()
+    await expectFocused(day)
     await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
     await day.getByRole('button').click()
     await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
@@ -169,12 +185,12 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await prepare.click()
     // Folding the other occurrence must leave this row selected and focused.
     await window.locator('.agenda-row[data-node-id="work"]').nth(1).getByRole('button').click()
-    await expect(prepare).toBeFocused()
+    await expectFocused(prepare)
     await expect(prepare).toHaveAttribute('aria-selected', 'true')
     const gap = window.locator('.agenda-row-gap').filter({ hasText: '11 empty days · Oct 21 – Oct 31' })
     await gap.click()
     await window.keyboard.press('Meta+e')
-    await expect(gap).toBeFocused()
+    await expectFocused(gap)
     await expect(gap.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
     for (const date of [
       'Wed Oct 21',
@@ -208,7 +224,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await expect(window).toHaveScreenshot(screenshotName(`agenda-gap-expanded-${appearance}.png`))
     }
     await gap.getByRole('button').click()
-    await expect(gap).toBeFocused()
+    await expectFocused(gap)
     await expect(remainder).toHaveCount(0)
     await expect(window.locator('.agenda-row-day').filter({ hasText: 'Wed Oct 21' })).toHaveCount(0)
     await gap.getByRole('button').click()
@@ -216,6 +232,17 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await expect(window.locator('.agenda-row-day').filter({ hasText: 'Sat Oct 31' })).toHaveCount(1)
     await gap.getByRole('button').click()
     await expect(window.locator('.agenda-row-day').filter({ hasText: 'Sat Oct 31' })).toHaveCount(0)
+    if (mode === 'vim') {
+      await gap.click()
+      await window.keyboard.press('Escape')
+      await window.keyboard.type('zM')
+      await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+      await expectFocused(gap)
+      await window.keyboard.type('zR')
+      await expect(day.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
+      await expect(work.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
+      await expectFocused(gap)
+    }
     await window.keyboard.press('Meta+p')
     await expect(window.locator('.node-row[data-node-id="team"]')).toHaveCount(1)
     expect(readPersisted(userDataDir)).toEqual(persisted)
@@ -241,7 +268,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await expect(window.locator('.agenda-today')).toBeFocused()
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await window.keyboard.press('Meta+p')
-    await expect(input).toBeFocused()
+    await expectFocused(input)
     await expect(input).toHaveValue(edited)
     await window.keyboard.press('Meta+z')
     await expect(input).toHaveValue('Work')
@@ -258,16 +285,16 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     const files = readdirSync(join(userDataDir, 'data')).sort()
     await window.keyboard.press('Meta+p')
     const today = window.locator('.agenda-today')
-    await expect(today).toBeFocused()
+    await expectFocused(today)
     await expect(today).toContainText('Thu Oct 8 · TODAY')
-    await expect(window.locator('.node-input')).toHaveCount(0)
+    await expect(today.locator('.node-input')).toHaveCount(0)
     await window.keyboard.press('ArrowDown')
     await window.keyboard.type('No edit')
     await window.evaluate(() => {
       document.querySelector('.scroll-viewport')!.scrollTop = 300
     })
     await window.keyboard.press('Meta+p')
-    await expect(input).toBeFocused()
+    await expectFocused(input)
     expect(await input.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(2)
     expect(readPersisted(userDataDir)).toEqual(before)
     expect(readdirSync(join(userDataDir, 'data')).sort()).toEqual(files)
@@ -323,7 +350,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       )
     expect(childText - geometry.text).toBe(20)
     await work.click()
-    await expect(work).toBeFocused()
+    await expectFocused(work)
     await window.keyboard.press('Meta+.')
     await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Work')
     await window.keyboard.press('Meta+p')

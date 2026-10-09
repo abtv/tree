@@ -19,15 +19,32 @@ export function setEditableText(input: HTMLElement, text: string): void {
   else input.textContent = text
 }
 
-export function richTextHtml(node: TreeNode): string {
+export interface TextDecoration {
+  start: number
+  end: number
+  className: string
+}
+
+export function richTextHtml(node: TreeNode, decorations: readonly TextDecoration[] = []): string {
   const links = node.links ?? []
   const parts: string[] = []
   let position = 0
-  for (const link of links) {
-    if (link.start > position) parts.push(escapeHtml(node.text.slice(position, link.start)))
-    const label = escapeHtml(node.text.slice(link.start, link.end))
-    parts.push(`<a href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`)
-    position = link.end
+  const ranges = [
+    ...links.map((link) => ({
+      ...link,
+      html: (label: string) => `<a href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`,
+    })),
+    ...decorations
+      .filter((range) => !links.some((link) => range.start < link.end && range.end > link.start))
+      .map((range) => ({
+        ...range,
+        html: (label: string) => `<span class="${escapeHtml(range.className)}">${label}</span>`,
+      })),
+  ].sort((left, right) => left.start - right.start)
+  for (const range of ranges) {
+    if (range.start > position) parts.push(escapeHtml(node.text.slice(position, range.start)))
+    parts.push(range.html(escapeHtml(node.text.slice(range.start, range.end))))
+    position = range.end
   }
   if (position < node.text.length || parts.length === 0) parts.push(escapeHtml(node.text.slice(position)))
   return parts.join('')
@@ -182,7 +199,7 @@ export function setNormalCaret(element: HTMLElement, position: number): void {
 
 /** Whether the element's row owns a terminal image character after its text. */
 export function hasAttachmentCharacter(element: HTMLElement): boolean {
-  return element.closest<HTMLElement>('.node-row, .current-parent')?.dataset.hasAttachment === 'true'
+  return element.closest<HTMLElement>('.node-row, .agenda-row, .current-parent')?.dataset.hasAttachment === 'true'
 }
 
 export function setSelectionRange(element: HTMLElement, anchor: number, focus: number): void {

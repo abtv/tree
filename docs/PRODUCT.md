@@ -1148,7 +1148,7 @@ Performance guards must exercise representative sequences in the running applica
 
 ### 23.1 Opening and Closing
 
-`Cmd+P` opens a read-only Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected and revealed. `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening; Replace returns to Normal, and whole-node Visual ends. Agenda has no text caret in this read-only stage.
+`Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected and revealed. `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
 
 This deliberately assigns Apple's standard Print shortcut to Agenda, as approved by the Product Owner: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no menu item or global shortcut.
 
@@ -1166,9 +1166,9 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 ### 23.4 Navigation
 
-Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count and viewport rules as Tree. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Printable text, structural commands, and text-editing commands do nothing in the read-only view.
+Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count and viewport rules as Tree. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
 
-`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Day focus and editing are introduced in subsequent Agenda tasks.
+`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Focused days are introduced in a subsequent Agenda task.
 
 ### 23.5 Folding and Gaps
 
@@ -1188,7 +1188,7 @@ Removing the last recognized date keeps the item and its contextual ancestors on
 
 If the scope root no longer exists, Agenda closes and returns to the nearest surviving Tree ancestor, or Root. A removed originating selection falls back to its surviving scope heading, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
 
-These occurrence transitions are implemented in application state. Direct editing, invalid-state styling, and editing continuity in the renderer are introduced in subsequent Agenda tasks; Agenda remains read-only at this stage.
+The active editor retains focus, caret, selection and mode when its active day changes. Mirror styling, scroll anchoring and the invalid-item status hint are introduced in a subsequent Agenda task.
 
 ### 23.8 Agenda History Focus
 
@@ -1196,4 +1196,20 @@ Agenda uses the existing document Undo/Redo history. Restored document content u
 
 After Undo or Redo, select the nearest visible occurrence of the change-site node relative to the current occurrence's day, choosing the earlier day on a tie. If none is visible, or the change is outside the Agenda scope, keep the current selection and focus. A selection whose row no longer exists falls back to the nearest displayed day. History focus uses the change-site text cursor when selecting that node. Persistence locking continues to reject document edits and Undo/Redo, while navigation remains available.
 
-The Agenda history policy is implemented in the store; renderer history commands remain inactive in the read-only stage.
+`Cmd+Z` and `Cmd+Shift+Z` work throughout Agenda; Vim Normal `u` and `Ctrl+r` use the same history. Pending Insert and Replace sessions finish by the same rules as Tree before a history command.
+
+### 23.9 Editing in Agenda
+
+Direct matches edit the same real nodes in standard editing and text-oriented Vim modes. Text commands, links, images, strikethrough (`Cmd+Enter`), and ordinary Cut/Paste follow Tree behavior. Contextual ancestors show text only, with no editing or strikethrough command. Day containers and gaps are synthetic and never editable.
+
+Canonical dates are recognized immediately after typing or pasting. Date emphasis preserves every character, caret offset and text-selection operation; dates remain editable text. A single-date node has one editor; a node appearing on several days has an editor only at its active occurrence. Other direct-match occurrences display the current text, hyperlinks and attached image. Native context-menu commands follow keyboard editing rules. Ordinary multiline paste may create nodes, and image paste retains Tree behavior; pasted new nodes receive no additional date.
+
+### 23.10 Structural Restrictions
+
+Agenda does not reorder existing siblings, change their real parents, delete subtrees, or transfer contextual ancestors between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,`, Vim `>`/`<`, `J`/`gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, whole-node Visual, and structural dot repeats do nothing and retain focus, caret, mode, and text. Awaited text characters and surround delimiters still work.
+
+`Backspace` on an empty childless direct match deletes it under the ordinary empty-node deletion rules. Selection moves to the previous sibling occurrence on that day, otherwise its contextual parent, otherwise the day container. If the day itself disappears, selection falls back to the nearest displayed day, earlier on a tie, preserving the compressed timeline. An empty node with children is retained. Removing text or dates never deletes a node automatically.
+
+Vim fold commands `zc`/`zo`, `za`, `zC`/`zO`, and `zM`/`zR` act on Agenda folds using the corresponding Tree fold rules. Recursive commands cover projected descendants; all-fold commands cover Agenda, independently of Tree expansion.
+
+Until the planned creation and occurrence-move tasks land, `Enter`, Vim Normal `o`/`O`, `dd`, and `p`/`P` do nothing on Agenda rows. These temporary restrictions prevent Tree structural semantics from running in Agenda.

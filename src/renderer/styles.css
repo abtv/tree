@@ -768,13 +768,15 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: var(--color-mode-replace-background);
 }
 
-.node-input a {
+.node-input a,
+.agenda-text a {
   color: var(--color-link);
   text-decoration: underline;
   cursor: default;
 }
 
-.left-command-down .node-input a {
+.left-command-down .node-input a,
+.left-command-down .agenda-text a {
   cursor: pointer;
 }
 

@@ -534,7 +534,7 @@ export function useNodeInputBindings({
       // and the reveal below decides how far to scroll (docs/PRODUCT.md §20.8).
       input.focus({ preventScroll: true })
       if (!preserve) {
-        const row = input.closest('.node-row') ?? input
+        const row = input.closest('.node-row, .agenda-row') ?? input
         if (restoring) {
           // Session restoration owns startup alignment and its asynchronous geometry until input.
           if (firstPass) revealInViewport(row, keepContext)

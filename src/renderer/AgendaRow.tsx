@@ -31,6 +31,9 @@ export const AgendaRow = memo(function AgendaRow({
   rowRef,
   onSelect,
   onToggle,
+  renderInput,
+  renderAttachment,
+  renderText,
 }: {
   row: Row
   node?: TreeNode | undefined
@@ -42,6 +45,9 @@ export const AgendaRow = memo(function AgendaRow({
   rowRef: (key: string, element: HTMLDivElement | null) => void
   onSelect: (key: string) => void
   onToggle: (key: string) => void
+  renderInput?: ((node: TreeNode, day: number) => ReactNode) | undefined
+  renderAttachment?: ((node: TreeNode, editable: boolean) => ReactNode) | undefined
+  renderText?: ((node: TreeNode, day: number) => ReactNode) | undefined
 }): React.JSX.Element {
   const depth = row.kind === 'node' ? row.depth + 1 : 0
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
@@ -51,12 +57,16 @@ export const AgendaRow = memo(function AgendaRow({
       data-agenda-key={row.key}
       data-depth={depth}
       data-node-id={row.kind === 'node' ? row.nodeId : undefined}
+      data-has-attachment={row.kind === 'node' && node?.attachment !== undefined}
       aria-selected={selected}
       role="row"
       tabIndex={selected ? 0 : -1}
       ref={ref}
-      onClick={() => onSelect(row.key)}
-      onFocus={() => {
+      onClick={(event) => {
+        if (!selected && !(event.target instanceof Element && event.target.closest('.node-input'))) onSelect(row.key)
+      }}
+      onFocus={(event) => {
+        if (event.target !== event.currentTarget && renderInput !== undefined) return
         if (!selected) onSelect(row.key)
       }}
       style={{ '--row-depth': depth, ...(pinned ? { top: pinnedOffset } : {}) } as CSSProperties}
@@ -85,9 +95,18 @@ export const AgendaRow = memo(function AgendaRow({
             aria-hidden="true"
             className={`node-enter-control${node!.children.length > 0 ? ' node-enter-control-has-children' : ''}`}
           />
-          <span className={`agenda-text${node!.struckThrough ? ' agenda-text-struck' : ''}`}>
-            {datedText(node!, row.day)}
-          </span>
+          {renderInput === undefined ? (
+            row.role === 'match' && renderText !== undefined ? (
+              renderText(node!, row.day)
+            ) : (
+              <span className={`agenda-text${node!.struckThrough ? ' agenda-text-struck' : ''}`}>
+                {datedText(node!, row.day)}
+              </span>
+            )
+          ) : (
+            renderInput(node!, row.day)
+          )}
+          {row.role === 'match' ? renderAttachment?.(node!, renderInput !== undefined) : null}
         </>
       ) : (
         <>

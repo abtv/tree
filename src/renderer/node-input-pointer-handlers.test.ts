@@ -4,7 +4,7 @@ import type { MouseEvent } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import { getCaret, setCaret } from './editor-dom'
-import { createPointerHandlers } from './node-input-pointer-handlers'
+import { createPointerHandlers, preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 import { createRealStoreHarness } from './test/real-store-harness'
 import { beginStructuralOpen, createVimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
@@ -15,6 +15,44 @@ afterEach(() => {
   document.body.replaceChildren()
   window.treeApi = undefined as never
   vi.restoreAllMocks()
+})
+
+it('defers readonly link focus until click without intercepting ordinary text', () => {
+  const input = document.createElement('span')
+  input.innerHTML = '<a href="https://example.com"><span>link</span></a> text'
+  const preventDefault = vi.fn()
+  preventReadOnlyLinkFocus({ currentTarget: input, target: input.querySelector('a span'), preventDefault } as never)
+  expect(preventDefault).toHaveBeenCalledOnce()
+  preventDefault.mockClear()
+  preventReadOnlyLinkFocus({ currentTarget: input, target: input, preventDefault } as never)
+  expect(preventDefault).not.toHaveBeenCalled()
+  preventReadOnlyLinkFocus({ currentTarget: input, target: input.lastChild, preventDefault } as never)
+  const outside = document.createElement('a')
+  outside.href = 'https://example.com'
+  preventReadOnlyLinkFocus({ currentTarget: input, target: outside, preventDefault } as never)
+  expect(preventDefault).not.toHaveBeenCalled()
+})
+
+it('selects the focused Agenda occurrence without issuing Tree selection, and keeps same-occurrence focus stable', async () => {
+  const f = await fixture({ node: { text: '2026-10-14 hello' } })
+  f.store.openAgenda()
+  const row = f.store.getAgendaRows().find((candidate) => candidate.kind === 'node')!
+  const container = document.createElement('div')
+  container.className = 'agenda-row'
+  container.dataset.agendaKey = row.key
+  const input = richInput(f.node().text, 12)
+  container.append(input)
+  document.body.append(container)
+  setCaret(input, 12)
+  f.handlers().onFocus({ currentTarget: input } as never)
+  expect(f.snapshot().agenda?.selectedKey).toBe(row.key)
+  expect(f.snapshot().focus.cursor).toBe(12)
+  const focus = f.snapshot().focus
+  f.handlers().onFocus({ currentTarget: input } as never)
+  expect(f.snapshot().focus).toBe(focus)
+  container.removeAttribute('data-agenda-key')
+  f.handlers().onFocus({ currentTarget: input } as never)
+  expect(f.snapshot().focus).toBe(focus)
 })
 
 function textarea(text: string, cursor = text.length) {

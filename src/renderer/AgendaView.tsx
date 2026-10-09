@@ -3,6 +3,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { AgendaState } from '../application/agenda-state'
 import type { Document } from '../domain/document'
 import { requireNode } from '../domain/document'
+import { findCanonicalDates } from '../domain/date-recognition'
 import type { VimTextCommandState } from './editor-input-handlers'
 import { clearCommandAssembly } from './vim-command-state'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
@@ -18,11 +19,17 @@ export function AgendaView({
   agenda,
   document,
   vim,
+  renderInput,
+  renderAttachment,
+  renderText,
 }: {
   store: EditorStore
   agenda: AgendaState
   document: Document
   vim?: VimTextCommandState | undefined
+  renderInput?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
+  renderAttachment?: ((node: import('../domain/document').TreeNode, editable: boolean) => ReactNode) | undefined
+  renderText?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
 }): React.JSX.Element {
   const elements = useRef(new Map<string, HTMLDivElement>())
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -131,7 +138,7 @@ export function AgendaView({
   useLayoutEffect(() => {
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
-    element.focus({ preventScroll: true })
+    if (element.querySelector('.node-input') === null) element.focus({ preventScroll: true })
     if (reveal.current !== 'none')
       viewportReveal.begin(element, reveal.current === 'keyboard', () => {
         const state = store.getSnapshot()
@@ -144,11 +151,20 @@ export function AgendaView({
   const range = agendaListWindow(rows, layout, viewport, agenda.selectedKey)
   const renderRow = (index: number, pinned = false): React.JSX.Element => {
     const row = rows[index]!
+    const node = row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined
+    const editable =
+      row.kind === 'node' &&
+      row.role === 'match' &&
+      ((agenda.activeOccurrence?.nodeId === row.nodeId && agenda.activeOccurrence.day === row.day) ||
+        new Set(findCanonicalDates(node!.text, node!.links).map((date) => date.day)).size <= 1)
     return (
       <AgendaRow
-        key={row.key}
+        key={editable ? `editor:${row.kind === 'node' ? row.nodeId : ''}` : row.key}
         row={row}
-        node={row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined}
+        node={node}
+        renderInput={editable ? renderInput : undefined}
+        renderAttachment={renderAttachment}
+        renderText={renderText}
         today={agenda.today}
         selected={row.key === agenda.selectedKey}
         expanded={row.kind === 'gap' ? row.expanded : !agenda.collapsed.has(row.key)}
@@ -189,6 +205,8 @@ export function AgendaView({
       role="grid"
       aria-label="Agenda timeline"
       onKeyDown={(event) =>
+        !event.defaultPrevented &&
+        !(event.target instanceof Element && event.target.closest('.node-input')) &&
         createAgendaKeyDownHandler({
           store,
           vim,

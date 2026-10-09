@@ -31,6 +31,23 @@ async function fixture() {
 }
 
 describe('read-only Agenda keyboard', () => {
+  it('applies all-fold commands from a gap and cancels unsupported fold keys', async () => {
+    const f = await fixture()
+    const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+    const day = f.store.getAgendaRows().find((row) => row.kind === 'day' && row.content)!
+    f.store.applyAgenda({ kind: 'select', key: gap.key })
+    f.press('z')
+    f.press('M')
+    expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(true)
+    f.press('z')
+    f.press('R')
+    expect(f.snapshot().agenda?.collapsed.size).toBe(0)
+    f.press('z')
+    f.press('q')
+    expect(f.vim.commandState.pending).toBeUndefined()
+    f.press('a')
+    expect(f.snapshot().agenda?.revealed.size).toBe(0)
+  })
   it('routes Cmd+E and Normal za to occurrence folds and gap reveal with no Tree changes', async () => {
     const f = await fixture()
     const before = f.snapshot()

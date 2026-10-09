@@ -63,11 +63,15 @@ export function createTextEditHandlers(
     onContentInput: (event: FormEvent<HTMLElement>) => {
       const cursor = getCaret(event.currentTarget)
       const content = readEditableContent(event.currentTarget)
-      schedulePendingCaret({
-        nodeId: node.id,
-        input: event.currentTarget,
-        cursor,
-      })
+      const agendaInput = event.currentTarget.closest('.agenda-row') !== null
+      const composingNow = composing || (event.nativeEvent as Partial<InputEvent> | undefined)?.isComposing === true
+      if (!agendaInput || !composingNow)
+        schedulePendingCaret({
+          nodeId: node.id,
+          input: event.currentTarget,
+          cursor,
+          ...(agendaInput ? { refocus: true } : {}),
+        })
       const draft =
         pendingLinkDraft.current?.nodeId === node.id
           ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
@@ -87,6 +91,13 @@ export function createTextEditHandlers(
       store.editContent(node.id, text, edit.links, edit.createsNewLink)
     },
     onCompositionEnd: (event) => {
+      if (event.currentTarget.closest('.agenda-row') !== null)
+        schedulePendingCaret({
+          nodeId: node.id,
+          input: event.currentTarget,
+          cursor: getCaret(event.currentTarget),
+          refocus: true,
+        })
       setComposing(false)
       if (getMode() === 'replace') {
         const baseline =

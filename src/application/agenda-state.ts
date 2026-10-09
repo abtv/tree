@@ -23,6 +23,11 @@ export type AgendaCommand =
   | { readonly kind: 'select'; readonly key: string; readonly cursor?: number }
   | { readonly kind: 'toggle-fold'; readonly key: string }
   | { readonly kind: 'toggle-gap'; readonly key: string }
+  | {
+      readonly kind: 'fold'
+      readonly key: string
+      readonly operation: 'close' | 'open' | 'toggle' | 'close-recursive' | 'open-recursive' | 'close-all' | 'open-all'
+    }
 
 export function dayKey(day: DayNumber): string {
   return `day:${day}`
@@ -59,6 +64,58 @@ export function applyAgendaCommand(
       },
       row,
     )
+  }
+  if (command.kind === 'fold') {
+    if (command.operation === 'toggle') return applyAgendaCommand(state, { kind: 'toggle-fold', key: row.key }, rows)
+    const collapsed = new Set(state.collapsed)
+    const close = command.operation.startsWith('close')
+    const all = command.operation.endsWith('all')
+    const recursive = command.operation.endsWith('recursive')
+    if (all && !close) collapsed.clear()
+    else {
+      const descendants: AgendaRow[] = []
+      if (recursive) {
+        for (const candidate of rows.slice(rowIndex + 1)) {
+          if (
+            candidate.kind !== 'node' ||
+            row.kind === 'gap' ||
+            candidate.day !== row.day ||
+            (row.kind === 'node' && candidate.depth <= row.depth)
+          )
+            break
+          descendants.push(candidate)
+        }
+      }
+      const targets = all ? rows : [row, ...descendants]
+      for (const target of targets) {
+        if (
+          target.kind === 'gap' ||
+          (target.kind === 'day' && !target.content) ||
+          (target.kind === 'node' && !target.hasProjectedChildren)
+        )
+          continue
+        if (close) collapsed.add(target.key)
+        else collapsed.delete(target.key)
+      }
+    }
+    const selectedIndex = rows.findIndex((candidate) => candidate.key === state.selectedKey)
+    const hiding = rows
+      .slice(0, selectedIndex)
+      .find(
+        (candidate, index) =>
+          collapsed.has(candidate.key) &&
+          rows
+            .slice(index + 1, selectedIndex + 1)
+            .every(
+              (child) =>
+                child.kind === 'node' &&
+                candidate.kind !== 'gap' &&
+                child.day === candidate.day &&
+                (candidate.kind === 'day' || child.depth > candidate.depth),
+            ),
+      )
+    const next = { ...state, collapsed }
+    return hiding === undefined ? next : selectAgendaRow(next, hiding)
   }
   if (row.kind === 'gap' || (row.kind === 'day' && !row.content) || (row.kind === 'node' && !row.hasProjectedChildren))
     return state

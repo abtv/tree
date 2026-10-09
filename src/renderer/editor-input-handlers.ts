@@ -4,9 +4,11 @@ import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
 import { clearCommandAssembly, clearPending } from './vim-command-state'
-import { getCaret, getSelectionRange, readEditableContent, selectAll } from './editor-dom'
+import { getCaret, getSelectionRange, nodeTextLength, readEditableContent, selectAll } from './editor-dom'
 import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
+import { agendaAllows } from './agenda-key-policy'
+import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 
 export type {
   VimFindCommand,
@@ -161,6 +163,85 @@ export function createEditorKeyDownHandler({
     // flag marks as composing" and "clears a pending fold prefix through composition started by a
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
     if (isComposing() || event.nativeEvent?.isComposing) return
+    const snapshot = store.getSnapshot()
+    const agenda = snapshot.status === 'ready' ? snapshot.agenda : undefined
+    if (agenda !== undefined) {
+      const row = store.getAgendaRows().find((candidate) => candidate.key === agenda.selectedKey)
+      const element = row?.kind === 'node' ? row.role : row?.kind
+      if (element === undefined) return
+      const block = (action: import('./agenda-key-policy').AgendaAction): boolean => {
+        if (agendaAllows(element, action)) return false
+        event.preventDefault()
+        return true
+      }
+      if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        block('structure')
+        return
+      }
+      if (event.metaKey && (event.key === ',' || event.key === 'Backspace')) {
+        block('structure')
+        return
+      }
+      if (event.key === 'Enter' && !event.metaKey) {
+        block('create')
+        return
+      }
+      if (event.metaKey && event.key === 'Enter' && block('strikethrough')) return
+      if (
+        event.key === 'Backspace' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        node.text === '' &&
+        nodeTextLength(event.currentTarget) === 0
+      ) {
+        event.preventDefault()
+        if (node.children.length === 0) store.deleteEmptySelected()
+        return
+      }
+      if (event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        store.closeAgenda()
+        return
+      }
+      if (event.metaKey && event.key === '.') {
+        event.preventDefault()
+        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        store.closeAgenda()
+        store.selectNode(node.id, getCaret(event.currentTarget))
+        store.enter()
+        vim?.syncImageCaretToFocus()
+        return
+      }
+      if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
+        event.preventDefault()
+        clearCommandAssemblyBeforeCommand(vim)
+        store.applyAgenda({ kind: 'toggle-fold', key: agenda.selectedKey })
+        return
+      }
+      if (
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        vim?.mode === 'normal' &&
+        event.key.toLowerCase() === 'o'
+      ) {
+        event.preventDefault()
+        return
+      }
+      if (
+        !event.metaKey &&
+        !event.altKey &&
+        (event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown' ||
+          (vim?.mode === 'normal' && event.ctrlKey && (event.key === 'd' || event.key === 'u')))
+      ) {
+        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        createAgendaKeyDownHandler({ store, vim })(event)
+        return
+      }
+    }
     if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault()
       const direction = event.shiftKey ? 'out' : 'in'

@@ -10,6 +10,46 @@ import { dayNumberOf } from '../domain/calendar-date'
 
 afterEach(cleanup)
 
+// @requirement PRODUCT.md §23.9
+it('renders attachments on inactive direct matches and excludes contextual ancestors', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: [
+        {
+          id: 'parent',
+          text: '2026-10-20 Parent',
+          children: [
+            {
+              id: 'child',
+              text: '2026-10-14 Child 2026-10-20',
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const state = harness.snapshot()
+  const { container } = render(
+    <AgendaView
+      store={harness.store}
+      agenda={state.agenda!}
+      document={state.document}
+      renderInput={() => <span className="test-editor" />}
+      renderText={(node) => <a href="https://example.com">{node.text}</a>}
+      renderAttachment={(node, editable) => <span data-attachment={node.id} data-editable={editable} />}
+    />,
+  )
+  expect(container.querySelectorAll('[data-attachment="child"]')).toHaveLength(2)
+  expect(container.querySelectorAll('[data-attachment="child"][data-editable="false"]')).toHaveLength(2)
+  expect(container.querySelectorAll('.agenda-role-context [data-attachment]')).toHaveLength(0)
+  expect(container.querySelectorAll('[data-attachment="parent"]')).toHaveLength(1)
+  expect(container.querySelectorAll('.agenda-role-match a')).toHaveLength(2)
+  expect(container.querySelectorAll('.agenda-role-context a')).toHaveLength(0)
+})
+
 function View({ store }: { store: EditorStore }): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   if (state.status !== 'ready' || state.agenda === undefined) return <div />

@@ -56,6 +56,24 @@ async function fixture(text = 'hello', links?: LinkRange[]) {
 }
 
 describe('textarea text edits', () => {
+  it('retains native Agenda composition until completion and then restores the caret', async () => {
+    const f = await fixture('2026-10-14 ')
+    const row = document.createElement('div')
+    row.className = 'agenda-row'
+    const input = richInput('2026-10-14 composed', 18)
+    row.append(input)
+    document.body.append(row)
+    setCaret(input, 18)
+    f.deps.composing = true
+    f.handlers().onContentInput({ currentTarget: input, nativeEvent: { isComposing: true } } as never)
+    expect(f.node().text).toBe('2026-10-14 composed')
+    expect(f.deps.schedulePendingCaret).not.toHaveBeenCalled()
+    f.handlers().onCompositionEnd({ currentTarget: input } as never)
+    expect(f.deps.schedulePendingCaret).toHaveBeenCalledWith({ nodeId: 'node', input, cursor: 18, refocus: true })
+    f.deps.composing = false
+    f.handlers().onContentInput({ currentTarget: input, nativeEvent: { isComposing: false } } as never)
+    expect(f.deps.schedulePendingCaret).toHaveBeenCalledTimes(2)
+  })
   it('keeps incomplete URLs as plain text without scheduling a caret', async () => {
     const f = await fixture('http:')
     f.handlers().onTextChange({ currentTarget: textarea('http:/') } as never)

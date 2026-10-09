@@ -10,7 +10,7 @@ import type {
 } from 'react'
 import { useState } from 'react'
 import type { TreeNode } from '../domain/document'
-import { richTextHtml } from './editor-dom'
+import { richTextHtml, type TextDecoration } from './editor-dom'
 
 export interface NodeInputBindings {
   selectedAll: boolean
@@ -39,6 +39,7 @@ interface NodeInputProps extends NodeInputBindings {
   parent?: boolean
   imageOnly?: boolean
   imageCaretActive?: boolean
+  decorations?: readonly TextDecoration[]
 }
 
 export function NodeInput({
@@ -47,6 +48,7 @@ export function NodeInput({
   parent = false,
   imageOnly = false,
   imageCaretActive = false,
+  decorations,
   selectedAll,
   disabled,
   inputRef,
@@ -67,6 +69,7 @@ export function NodeInput({
   onSelect,
 }: NodeInputProps): React.JSX.Element {
   const hasLinks = (node.links?.length ?? 0) > 0
+  const [compositionHtml, setCompositionHtml] = useState<string>()
   const [richEditor, setRichEditor] = useState<{ nodeId: string; enabled: boolean }>({
     nodeId: node.id,
     enabled: hasLinks,
@@ -86,8 +89,14 @@ export function NodeInput({
     'aria-label': label,
     className,
     onBlur,
-    onCompositionEnd,
-    onCompositionStart,
+    onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {
+      onCompositionEnd(event)
+      setCompositionHtml(undefined)
+    },
+    onCompositionStart: (event: CompositionEvent<HTMLElement>) => {
+      if (decorations !== undefined) setCompositionHtml(richTextHtml(node, decorations))
+      onCompositionStart(event)
+    },
     onContextMenu,
     onClick,
     onCut,
@@ -103,7 +112,7 @@ export function NodeInput({
     spellCheck: true,
   }
 
-  if (!hasLinks && !(richEditor.nodeId === node.id && richEditor.enabled)) {
+  if (decorations === undefined && !hasLinks && !(richEditor.nodeId === node.id && richEditor.enabled)) {
     return (
       <textarea
         {...commonProps}
@@ -129,7 +138,7 @@ export function NodeInput({
         onContentInput(event)
       }}
       suppressContentEditableWarning
-      dangerouslySetInnerHTML={{ __html: richTextHtml(node) }}
+      dangerouslySetInnerHTML={{ __html: compositionHtml ?? richTextHtml(node, decorations) }}
     />
   )
 }

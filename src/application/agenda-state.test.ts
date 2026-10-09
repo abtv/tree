@@ -2,6 +2,102 @@ import { expect, it } from 'vitest'
 import { buildAgendaRows } from './agenda-rows'
 import { applyAgendaCommand, openAgendaState } from './agenda-state'
 
+it('keeps recursive and global folds confined to projected branches and preserves unrelated selections', () => {
+  const state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
+  const projection = [
+    {
+      day: 100,
+      rows: [
+        { nodeId: 'a', depth: 0, role: 'context' as const },
+        { nodeId: 'b', depth: 1, role: 'match' as const },
+        { nodeId: 'c', depth: 2, role: 'match' as const },
+        { nodeId: 'd', depth: 0, role: 'match' as const },
+        { nodeId: 'e', depth: 1, role: 'match' as const },
+      ],
+    },
+    {
+      day: 110,
+      rows: [
+        { nodeId: 'f', depth: 0, role: 'match' as const },
+        { nodeId: 'g', depth: 1, role: 'match' as const },
+      ],
+    },
+  ]
+  const rows = buildAgendaRows(projection, state)
+  for (const selectedKey of ['node:100:c', 'node:100:d', 'node:100:e', 'node:110:g', 'day:99']) {
+    for (const [key, operation, collapsed, hidden] of [
+      [
+        'node:100:a',
+        'close-recursive',
+        ['node:100:a', 'node:100:b'],
+        selectedKey === 'node:100:c' ? 'node:100:a' : selectedKey,
+      ],
+      [
+        'day:100',
+        'close-recursive',
+        ['day:100', 'node:100:a', 'node:100:b', 'node:100:d'],
+        selectedKey.startsWith('node:100:') ? 'day:100' : selectedKey,
+      ],
+      ['node:100:d', 'close', ['node:100:d'], selectedKey === 'node:100:e' ? 'node:100:d' : selectedKey],
+      [
+        'node:110:f',
+        'close-all',
+        ['day:100', 'node:100:a', 'node:100:b', 'node:100:d', 'day:110', 'node:110:f'],
+        selectedKey.startsWith('node:100:') ? 'day:100' : selectedKey === 'node:110:g' ? 'day:110' : selectedKey,
+      ],
+    ] as const) {
+      const next = applyAgendaCommand({ ...state, selectedKey }, { kind: 'fold', key, operation }, rows)
+      expect([...next.collapsed]).toEqual(collapsed)
+      expect(next.selectedKey).toBe(hidden)
+    }
+  }
+  const folded = { ...state, collapsed: new Set(['node:100:a', 'node:100:b', 'node:100:d', 'node:110:f']) }
+  expect([
+    ...applyAgendaCommand(folded, { kind: 'fold', key: 'day:100', operation: 'open-recursive' }, rows).collapsed,
+  ]).toEqual(['node:110:f'])
+  expect([
+    ...applyAgendaCommand(folded, { kind: 'fold', key: 'node:100:b', operation: 'open-recursive' }, rows).collapsed,
+  ]).toEqual(['node:100:a', 'node:100:d', 'node:110:f'])
+})
+
+// @requirement PRODUCT.md §23.10
+it('applies all fold operations only to the requested projected branch and normalizes hidden selection', () => {
+  const state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
+  const projection = [
+    {
+      day: 100,
+      rows: [
+        { nodeId: 'a', depth: 0, role: 'context' as const },
+        { nodeId: 'b', depth: 1, role: 'match' as const },
+        { nodeId: 'c', depth: 2, role: 'match' as const },
+        { nodeId: 'd', depth: 0, role: 'match' as const },
+      ],
+    },
+    { day: 101, rows: [{ nodeId: 'a', depth: 0, role: 'match' as const }] },
+  ]
+  const rows = buildAgendaRows(projection, state)
+  const selected = { ...state, selectedKey: 'node:100:c' }
+  const fold = (
+    operation: 'close' | 'open' | 'toggle' | 'close-recursive' | 'open-recursive' | 'close-all' | 'open-all',
+    initial = selected,
+  ) => applyAgendaCommand(initial, { kind: 'fold', key: 'node:100:a', operation }, rows)
+  const closed = fold('close')
+  expect([...closed.collapsed]).toEqual(['node:100:a'])
+  expect(closed.selectedKey).toBe('node:100:a')
+  expect([...fold('open', closed).collapsed]).toEqual([])
+  expect([...fold('toggle').collapsed]).toEqual(['node:100:a'])
+  const recursive = fold('close-recursive')
+  expect([...recursive.collapsed]).toEqual(['node:100:a', 'node:100:b'])
+  expect(recursive.selectedKey).toBe('node:100:a')
+  expect([...fold('open-recursive', recursive).collapsed]).toEqual([])
+  const all = fold('close-all')
+  expect([...all.collapsed]).toEqual(['day:100', 'node:100:a', 'node:100:b', 'day:101'])
+  expect(all.selectedKey).toBe('day:100')
+  expect([...fold('open-all', all).collapsed]).toEqual([])
+  expect(all.origin).toBe(state.origin)
+  expect(all.revealed).toBe(state.revealed)
+})
+
 it('captures the origin and keeps invalid or inapplicable commands as identity transitions', () => {
   const state = openAgendaState({ currentParentId: 'scope', selectedNodeId: 'origin' }, 7, 100)
   expect(state).toMatchObject({

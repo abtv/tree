@@ -19,6 +19,7 @@ export default {
     'src/renderer/drag-caret-freeze.ts',
     'src/renderer/node-drag.ts',
     'src/renderer/list-window.ts',
+    'src/renderer/agenda-key-policy.ts',
     '!src/**/*.test.ts',
     '!src/application/test/**',
   ],

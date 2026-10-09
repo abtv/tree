@@ -12,6 +12,12 @@ import { clearCommandAssembly, type VimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 import type { VimMode } from './vim-editing'
 
+/** Keep a readonly occurrence mounted until its link click has been dispatched. */
+export function preventReadOnlyLinkFocus(event: MouseEvent<HTMLElement>): void {
+  const link = event.target instanceof Element ? event.target.closest('a[href]') : null
+  if (link !== null && event.currentTarget.contains(link)) event.preventDefault()
+}
+
 interface PointerHandlerDeps {
   store: EditorStore
   selectedNodeId: string | undefined
@@ -107,6 +113,13 @@ export function createPointerHandlers(
     },
     onCut: () => store.markNextTextEditStandalone(),
     onFocus: (event: FocusEvent<HTMLElement>) => {
+      const snapshot = store.getSnapshot()
+      if (snapshot.status === 'ready' && snapshot.agenda !== undefined) {
+        const key = event.currentTarget.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey
+        if (key !== undefined && key !== snapshot.agenda.selectedKey)
+          store.applyAgenda({ kind: 'select', key, cursor: getCaret(event.currentTarget) })
+        return
+      }
       if (selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
       else if (
         getMode() === 'normal' &&

@@ -2,6 +2,44 @@ import { agendaSeed, expect, launchTree, round, seedDocument, test } from './fix
 import { recordPerfResult } from './results'
 import type { TreeApi } from '../src/shared/ipc'
 
+// @requirement PRODUCT.md §22.1
+test('Agenda typing keeps mounted rows bounded and stays within the interactive budget', async ({ userDataDir }) => {
+  seedDocument(userDataDir, agendaSeed(3000))
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await window.keyboard.press('Meta+p')
+  await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
+  const input = window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })
+  await expect(input).toBeFocused()
+  await window.keyboard.press('A')
+  await window.evaluate(() => {
+    const samples: number[] = []
+    ;(window as unknown as { agendaTyping: number[] }).agendaTyping = samples
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key === 'a')
+          requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+      },
+      { capture: true },
+    )
+  })
+  for (let index = 0; index < 30; index += 1) await window.keyboard.press('a')
+  await window.waitForFunction(() => (window as unknown as { agendaTyping: number[] }).agendaTyping.length === 30)
+  const samples = await window.evaluate(() =>
+    (window as unknown as { agendaTyping: number[] }).agendaTyping.toSorted((a, b) => a - b),
+  )
+  recordPerfResult({
+    kind: 'state',
+    scenario: 'agenda-6000-occurrences-typing',
+    samples: samples.length,
+    metrics: { typingP95Ms: round(samples[28]!), typingMaxMs: round(samples[29]!) },
+  })
+  expect(samples[28]).toBeLessThan(100)
+  expect(samples[29]).toBeLessThan(250)
+  expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+  await expect(input).toBeFocused()
+})
+
 test('Agenda open, scroll and vertical motion stay responsive on a large dated document', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

@@ -180,7 +180,10 @@ export class EditorStore {
   public applyAgenda(command: AgendaCommand): void {
     const state = this.runtime.ready()
     if (state.agenda === undefined) return
-    const rows = this.getAgendaRows()
+    const rows =
+      command.kind === 'fold'
+        ? this.agendaRowsCache.get(state.document, { ...state.agenda, collapsed: new Set() })
+        : this.getAgendaRows()
     const agenda = applyAgendaCommand(state.agenda, command, rows)
     const selected = rows.find((row) => row.key === agenda.selectedKey)
     const realSelection =
@@ -1010,6 +1013,20 @@ export class EditorStore {
   public deleteEmptySelected(): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
+    const selected = requireNode(state.document, state.location.selectedNodeId)
+    if (state.agenda !== undefined && selected.node.children.length > 0) return
+    const agendaRow =
+      state.agenda === undefined ? undefined : this.getAgendaRows().find((row) => row.key === state.agenda!.selectedKey)
+    if (state.agenda !== undefined && (agendaRow?.kind !== 'node' || agendaRow.role !== 'match')) return
+    const dayRows =
+      agendaRow?.kind === 'node'
+        ? this.getAgendaRows().filter((row) => row.kind !== 'gap' && row.day === agendaRow.day)
+        : []
+    const previousIds = new Set(selected.siblings.slice(0, selected.index).map((node) => node.id))
+    const destination =
+      dayRows.findLast((row) => row.kind === 'node' && previousIds.has(row.nodeId)) ??
+      dayRows.find((row) => row.kind === 'node' && row.nodeId === selected.parent?.id) ??
+      dayRows.find((row) => row.kind === 'day')
     const transition = deleteEmptySelectedTransition(state.document, state.location)
     if (transition === undefined) return
     this.endTextSession()
@@ -1019,6 +1036,7 @@ export class EditorStore {
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.queueAttachmentCleanup()
+    if (destination !== undefined) this.applyAgenda({ kind: 'select', key: destination.key })
   }
 
   public moveSelectedTo(insertionIndex: number): void {
