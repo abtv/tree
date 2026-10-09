@@ -10,6 +10,8 @@ const exclusions: Record<string, string> = {
   closeAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
   applyAgenda: 'Agenda selection and presentation commands have dedicated property coverage.',
   createAgendaDayNode: 'Agenda day creation is generated in editor-store-agenda.property.test.ts.',
+  splitAgendaNode: 'Agenda splitting is generated in editor-store-agenda.property.test.ts.',
+  createAgendaSibling: 'Agenda sibling creation is generated in editor-store-agenda.property.test.ts.',
   getAgendaRows: 'Read-only Agenda projection with dedicated cache and composition tests.',
   getVisibleRows: 'Read-only projection used by the generator to choose displayed targets.',
   getRestoredSelectedRowTop: 'Read-only startup viewport metadata.',

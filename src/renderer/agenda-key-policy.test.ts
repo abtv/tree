@@ -6,7 +6,7 @@ import { agendaAllows, type AgendaElement, type AgendaAction } from './agenda-ke
 describe('Agenda command policy', () => {
   const elements: AgendaElement[] = ['day', 'gap', 'match', 'context']
   const shared: AgendaAction[] = ['navigate', 'fold', 'history']
-  const editing: AgendaAction[] = ['text', 'clipboard', 'strikethrough', 'empty-delete']
+  const editing: AgendaAction[] = ['text', 'clipboard', 'strikethrough', 'empty-delete', 'split', 'open-sibling']
   const prohibited: AgendaAction[] = ['structure', 'node-put', 'whole-node-visual']
   for (const element of elements) {
     it(`${element} permits create only on days`, () => expect(agendaAllows(element, 'create')).toBe(element === 'day'))

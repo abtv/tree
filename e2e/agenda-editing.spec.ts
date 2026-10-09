@@ -240,29 +240,10 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await window.locator('.agenda-row[data-node-id="first"]').first().click()
     const input = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
     await setCursor(input, 12)
-    for (const key of ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+,', 'Enter']) await window.keyboard.press(key)
+    for (const key of ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+,']) await window.keyboard.press(key)
     if (mode === 'vim') {
       await window.keyboard.press('Escape')
-      for (const command of [
-        '>',
-        '<',
-        'dd',
-        'dj',
-        'dk',
-        'cj',
-        'ck',
-        'yj',
-        'yk',
-        'gp',
-        'gP',
-        'gJ',
-        'o',
-        'O',
-        'p',
-        'P',
-        'V',
-        'J',
-      ])
+      for (const command of ['>', '<', 'dd', 'dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gp', 'gP', 'gJ', 'p', 'P', 'V', 'J'])
         await window.keyboard.type(command)
     }
     await expect(input).toHaveText('2026-10-14 Prepare 2026-10-20')
@@ -369,6 +350,82 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(gap).toBeFocused()
     await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toHaveCount(0)
     expect(readPersisted(userDataDir).document.roots.map((entry) => entry.text)).toEqual(['Context'])
+  })
+
+  // @requirement PRODUCT.md §23.11
+  test('splits a dated node at the caret with the displayed date and one Undo restores it', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [node('context', 'Context', [node('plan', '2026-10-14 Prepare release')])] },
+      location: { currentParentId: null, selectedNodeId: 'context' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row[data-node-id="plan"]').first().click()
+    const plan = window.getByRole('textbox', { name: 'Agenda node plan', exact: true })
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('i')
+    }
+    await setCursor(plan, '2026-10-14 Prepare'.length)
+    await window.keyboard.press('Enter')
+    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
+    await expect(created).toBeFocused()
+    await expect(created).toHaveText('2026-10-14 release')
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    // The contextual `Context` row plus the two dated nodes.
+    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(3)
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), {
+        timeout: 20000,
+      })
+      .toEqual(['2026-10-14 Prepare', '2026-10-14 release'])
+    await window.keyboard.press('Meta+z')
+    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(2)
+    await expect(window.getByRole('textbox', { name: 'Agenda node plan', exact: true })).toHaveText(
+      '2026-10-14 Prepare release',
+    )
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), {
+        timeout: 20000,
+      })
+      .toEqual(['2026-10-14 Prepare release'])
+  })
+
+  // @requirement PRODUCT.md §23.11
+  test('places the caret after the inherited date and ignores Enter on a contextual ancestor', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [node('context', 'Context', [node('plan', '2026-10-14 Prepare release')])] },
+      location: { currentParentId: null, selectedNodeId: 'context' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row[data-node-id="plan"]').first().click()
+    const plan = window.getByRole('textbox', { name: 'Agenda node plan', exact: true })
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('i')
+    }
+    await setCursor(plan, '2026-10-14 Prepare'.length)
+    await window.keyboard.press('Enter')
+    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
+    await expect(created).toBeFocused()
+    await window.keyboard.type('X')
+    await expect(created).toHaveText('2026-10-14 Xrelease')
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), {
+        timeout: 20000,
+      })
+      .toEqual(['2026-10-14 Prepare', '2026-10-14 Xrelease'])
+    const context = window.locator('.agenda-row[data-node-id="context"]').first()
+    await context.click()
+    await window.keyboard.press('Enter')
+    await expect(context).toBeFocused()
+    await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toHaveCount(0)
+    expect(readPersisted(userDataDir).document.roots[0]!.children).toHaveLength(2)
   })
 
   // @requirement PRODUCT.md §23.10

@@ -165,7 +165,6 @@ describe('Agenda editing command boundaries', () => {
         ['Tab', { shiftKey: true }],
         ['Backspace', { metaKey: true }],
         [',', { metaKey: true }],
-        ['Enter', {}],
       ] as const) {
         expect(f.press(key, options).preventDefault).toHaveBeenCalled()
       }
@@ -176,6 +175,52 @@ describe('Agenda editing command boundaries', () => {
       expect(f.vim.mode).toBe(mode ?? 'insert')
     },
   )
+
+  // @requirement PRODUCT.md §23.11
+  it.each([undefined, 'insert'] as const)(
+    'splits at the caret with the displayed date on Enter in %s',
+    async (mode) => {
+      const f = await fixture(mode)
+      const before = f.snapshot().document
+      expect(f.press('Enter').preventDefault).toHaveBeenCalled()
+      expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
+        '2026-10-14 P',
+        '2026-10-14 repare',
+        '2026-10-14 Review',
+      ])
+      expect(f.snapshot().focus).toMatchObject({ nodeId: 'generated-0', cursor: 11 })
+      expect(f.snapshot().agenda?.activeOccurrence?.nodeId).toBe('generated-0')
+      f.store.undo()
+      expect(f.snapshot().document).toBe(before)
+    },
+  )
+
+  // @requirement PRODUCT.md §23.11
+  it.each(['normal', 'replace', 'visual'] as const)('keeps Enter inert in Vim %s', async (mode) => {
+    const f = await fixture(mode)
+    const before = f.snapshot()
+    expect(f.press('Enter').preventDefault).toHaveBeenCalled()
+    expect(f.snapshot().document).toBe(before.document)
+    expect(f.snapshot().location).toBe(before.location)
+    expect(f.vim.mode).toBe(mode)
+  })
+
+  // @requirement PRODUCT.md §23.11
+  it('opens a dated sibling with o, enters Insert, and leaves repeat memory and the register alone', async () => {
+    const f = await fixture('normal')
+    const last = f.commandState.lastChange
+    const register = f.vim.register.current
+    f.press('o')
+    expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
+      '2026-10-14 Prepare',
+      '2026-10-14 ',
+      '2026-10-14 Review',
+    ])
+    expect(f.vim.mode).toBe('insert')
+    expect(f.vim.beginStructuralOpen).not.toHaveBeenCalled()
+    expect(f.commandState.lastChange).toBe(last)
+    expect(f.vim.register.current).toBe(register)
+  })
 
   it('blocks structural Vim commands and Tree structural repeat without changing register or repeat memory', async () => {
     const f = await fixture('normal')
@@ -195,8 +240,6 @@ describe('Agenda editing command boundaries', () => {
       'gP',
       'gJ',
       'gd',
-      'o',
-      'O',
       'V',
       'J',
       '>',
@@ -245,6 +288,20 @@ describe('Agenda editing command boundaries', () => {
     f.press('ArrowDown')
     expect(f.snapshot().agenda?.selectedKey).toContain(':second')
     expect(f.snapshot().focus.cursor).toBe(12)
+  })
+
+  // @requirement PRODUCT.md §23.10
+  it.each([
+    ['zo', 'open'],
+    ['zO', 'open-recursive'],
+    ['zc', 'close'],
+    ['zC', 'close-recursive'],
+    ['za', 'toggle'],
+  ] as const)('dispatches %s on a direct match as an Agenda fold', async (keys, operation) => {
+    const f = await fixture('normal')
+    const apply = vi.spyOn(f.store, 'applyAgenda')
+    for (const key of keys) f.press(key)
+    expect(apply).toHaveBeenCalledWith({ kind: 'fold', key: f.key, operation })
   })
 
   // @requirement PRODUCT.md §23.1

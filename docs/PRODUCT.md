@@ -1216,12 +1216,22 @@ Agenda does not reorder existing siblings, change their real parents, delete sub
 
 Vim fold commands `zc`/`zo`, `za`, `zC`/`zO`, and `zM`/`zR` act on Agenda folds using the corresponding Tree fold rules. Recursive commands cover projected descendants; all-fold commands cover Agenda, independently of Tree expansion.
 
-Until the planned split and occurrence-move tasks land, `Enter`, Vim Normal `o`/`O`, `dd`, and `p`/`P` do nothing on direct matches and contextual ancestors. These temporary restrictions prevent Tree structural semantics from running in Agenda. Creation from a day container is defined in §23.11.
+Until the planned occurrence-move tasks land, `dd` and `p`/`P` do nothing on direct matches and contextual ancestors, and Vim Normal `Enter` does nothing on any row. These temporary restrictions prevent Tree structural semantics from running in Agenda. Creation from a day container, splitting, and sibling creation on direct matches are defined in §23.11; `Enter` and `o`/`O` do nothing on contextual ancestors.
 
 ### 23.11 Creating Nodes
 
-On a day container, standard `Enter` and Vim Normal `o` create a node for that day, and Vim Normal `O` creates one for the preceding calendar day. If that day lies inside a gap, it is revealed. Vim Normal `Enter`, a counted or prefixed `o`/`O`, and every other creation key on a gap, direct match, or contextual ancestor do nothing.
+On a day container, standard `Enter` and Vim Normal `o` create a node for that day, and Vim Normal `O` creates one for the preceding calendar day. If that day lies inside a gap, it is revealed. Vim Normal `Enter`, a counted or prefixed `o`/`O`, and every creation key on a gap or contextual ancestor do nothing; direct matches follow the two subsections below.
 
 The new node is the last child of the Agenda scope, which is a final root when Agenda was opened from Root. Its text is the day's canonical date followed by one space, with the caret after the space. It becomes the active occurrence under that day, unfolding the day if it was collapsed, and Vim enters Insert. Creation is one undoable change that adds only the node, and it saves as any structural change does. If the scope is at the maximum document depth, the ordinary depth error is shown and nothing changes. Creation is rejected while persistence is locked.
 
 Undo removes the node and applies the history focus rule of §23.8.
+
+#### Splitting a Dated Node
+
+In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead. The new part receives the displayed day's date, so the node stays on that day. The date is inserted at the start of the new part and replaces its leading whitespace with the single space after the date, so `2026-10-14 Prepare| release` becomes `2026-10-14 Prepare` and `2026-10-14 release`. Nothing is inserted when the new part already contains that day's date as a recognized date; a date inside a hyperlink does not count. Only the displayed day's date is inherited, and hyperlinks in the new part keep their text. The caret is placed after the inserted date, or at the start when nothing was inserted, and the new node becomes the active occurrence under that day. The split and the inserted date are one undoable change.
+
+Vim Normal `Enter` stays inert, and a counted or prefixed command still does nothing, as for creation from a day container.
+
+#### Creating a Sibling of a Dated Node
+
+Vim Normal `o` creates a real sibling immediately after the selected direct match and after its subtree, and `O` immediately before it, in the Tree. The new node's text is the displayed day's date followed by one space, the caret follows the space, it becomes the active occurrence and Vim enters Insert. It never becomes a child, even when the node has children. A count before `o`/`O` cancels the command. Creation is one undoable change, is rejected while persistence is locked, and is not repeated by `.`.

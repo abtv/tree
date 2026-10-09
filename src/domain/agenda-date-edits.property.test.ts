@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { expect, it } from 'vitest'
 import { propertyRuns } from '../test/property-runs'
-import { moveDayEdits, nextActiveDay, splitDatePrefix } from './agenda-date-edits'
+import { moveDayEdits, nextActiveDay, splitDateEdit } from './agenda-date-edits'
 import { calendarDateOf, formatCanonicalDate } from './calendar-date'
 import { findCanonicalDates } from './date-recognition'
 import { replaceLinkedTextRanges } from './document-links'
@@ -61,9 +61,13 @@ it('inherits the displayed date once and preserves the right-side content', () =
   fc.assert(
     fc.property(days, days, fc.constantFrom('', ' ', '\t  ', '\n'), (day, other, whitespace) => {
       const right = `${whitespace}${canonical(other)} content`
-      const result = splitDatePrefix(right, day)
+      const apply = (text: string): string => {
+        const edit = splitDateEdit(text, [], day)
+        return edit === undefined ? text : replaceLinkedTextRanges(text, [], [edit]).text
+      }
+      const result = apply(right)
       expect(result).toBe(day === other ? right : `${canonical(day)} ${right.trimStart()}`)
-      expect(splitDatePrefix(result, day)).toBe(result)
+      expect(apply(result)).toBe(result)
     }),
     { numRuns: propertyRuns(300) },
   )

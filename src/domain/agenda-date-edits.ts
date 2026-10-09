@@ -34,9 +34,17 @@ export function moveDayEdits(
   return edits
 }
 
-export function splitDatePrefix(rightText: string, day: DayNumber): string {
-  if (findCanonicalDates(rightText).some((date) => date.day === day)) return rightText
-  return `${newDatedNodeText(day)}${rightText.trimStart()}`
+/**
+ * The edit that gives the right part of a split the displayed day's date (m17): its leading whitespace
+ * becomes the single space after the inserted date. `undefined` when the part already contains the day.
+ */
+export function splitDateEdit(
+  rightText: string,
+  links: readonly LinkRange[],
+  day: DayNumber,
+): LinkedTextEdit | undefined {
+  if (findCanonicalDates(rightText, links).some((date) => date.day === day)) return undefined
+  return { start: 0, end: rightText.length - rightText.trimStart().length, inserted: newDatedNodeText(day) }
 }
 
 export function nextActiveDay(remainingDays: Iterable<DayNumber>, previousActive: DayNumber): DayNumber | undefined {

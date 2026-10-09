@@ -298,12 +298,27 @@ export function handleVimKey(
     const structural =
       event.key === '>' ||
       event.key === '<' ||
-      (!visual && ['o', 'O', 'V', 'J', 'Enter'].includes(event.key)) ||
+      (!visual && pending.prefix !== 'z' && ['o', 'O', 'V', 'J', 'Enter'].includes(event.key)) ||
       (pending.prefix === 'g' && ['J', 'p', 'P', 'd'].includes(event.key)) ||
       (pending.operator === 'd' && event.key === 'd') ||
       (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
       (!visual && ['p', 'P'].includes(event.key)) ||
       (!visual && event.key === '.' && commandState.lastChange?.kind.startsWith('structural-'))
+    if (
+      !visual &&
+      (event.key === 'o' || event.key === 'O') &&
+      pending.operator === undefined &&
+      pending.prefix === undefined
+    ) {
+      // A count never reaches creation; the dated sibling starts Insert like the Tree command, without a structural repeat record.
+      const created =
+        pending.count === '' &&
+        agendaAllows('match', 'open-sibling') &&
+        store.createAgendaSibling(event.key === 'o' ? 'after' : 'before')
+      clearPending(commandState)
+      if (created) vim.setMode('insert')
+      return handled()
+    }
     if (structural && !agendaAllows('match', 'structure')) {
       clearPending(commandState)
       return handled()

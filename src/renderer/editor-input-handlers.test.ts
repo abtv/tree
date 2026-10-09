@@ -4228,3 +4228,88 @@ describe('editor keyboard handler', () => {
     expect(store.endTextSession).toHaveBeenCalledOnce()
   })
 })
+
+// @requirement PRODUCT.md §23.11
+describe('Agenda split and sibling keys', () => {
+  const key = 'node:100:node'
+  function agendaStore(role: 'match' | 'context' = 'match') {
+    return createEditorStoreDouble({
+      snapshot: {
+        status: 'ready',
+        location: { currentParentId: null, selectedNodeId: 'node' },
+        agenda: { selectedKey: key },
+      } as never,
+      getAgendaRows: vi.fn(() => [{ kind: 'node', key, day: 100, nodeId: 'node', depth: 0, role }]) as never,
+      splitAgendaNode: vi.fn(() => true),
+      createAgendaSibling: vi.fn(() => true),
+      createSibling: vi.fn(() => true),
+      createSiblingOrFirstChild: vi.fn(),
+    })
+  }
+  const node = { id: 'node', text: 'text', children: [] }
+  const input = (): HTMLTextAreaElement => {
+    const element = document.createElement('textarea')
+    element.value = 'text'
+    element.setSelectionRange(2, 2)
+    return element
+  }
+
+  it('splits a direct match at the caret in standard editing without running the Tree split', () => {
+    const store = agendaStore()
+    const event = keyEvent(input(), 'Enter')
+    handler(store, node).handle(event)
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+  })
+
+  it('splits in Vim Insert and keeps Enter inert in the other Vim modes', () => {
+    const store = agendaStore()
+    vimHandler(store, node, 'insert').handle(keyEvent(input(), 'Enter'))
+    expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
+    for (const mode of ['normal', 'replace', 'visual', 'visual-node'] as const) {
+      const inert = agendaStore()
+      const event = keyEvent(input(), 'Enter')
+      vimHandler(inert, node, mode).handle(event)
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(inert.splitAgendaNode).not.toHaveBeenCalled()
+      expect(inert.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    }
+  })
+
+  it('does nothing on a contextual ancestor', () => {
+    const store = agendaStore('context')
+    const event = keyEvent(input(), 'Enter')
+    handler(store, node).handle(event)
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(store.splitAgendaNode).not.toHaveBeenCalled()
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['o', 'after'],
+    ['O', 'before'],
+  ] as const)('%s opens a dated sibling and enters Insert without the Tree commands', (pressed, position) => {
+    const store = agendaStore()
+    const { handle, vim } = vimHandler(store, node, 'normal')
+    handle(keyEvent(input(), pressed))
+    expect(store.createAgendaSibling).toHaveBeenCalledWith(position)
+    expect(store.createSibling).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('insert')
+  })
+
+  it('stays in Normal when no sibling is created and ignores a counted o', () => {
+    const store = agendaStore()
+    vi.mocked(store.createAgendaSibling).mockReturnValue(false)
+    const failed = vimHandler(store, node, 'normal')
+    failed.handle(keyEvent(input(), 'o'))
+    expect(failed.vim.mode).toBe('normal')
+    const counted = agendaStore()
+    const { handle, vim, commandState } = vimHandler(counted, node, 'normal')
+    commandState.pending = { count: '2', motionCount: '' }
+    handle(keyEvent(input(), 'o'))
+    expect(counted.createAgendaSibling).not.toHaveBeenCalled()
+    expect(vim.mode).toBe('normal')
+    expect(commandState.pending).toBeUndefined()
+  })
+})

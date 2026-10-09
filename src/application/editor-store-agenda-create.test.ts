@@ -135,6 +135,88 @@ it('reports the depth error and changes nothing when the scope cannot take anoth
 })
 
 // @requirement PRODUCT.md §23.11
+it('splits a dated node into two dated nodes as one undoable, persisted change', async () => {
+  const { store, save } = await harness()
+  store.applyAgenda({ kind: 'select', key: `node:${day(10, 20)}:dated` })
+  const before = ready(store)
+  expect(store.splitAgendaNode('2026-10-20 Da'.length)).toBe(true)
+  const after = ready(store)
+  expect(after.document.roots.map((node) => [node.id, node.text])).toEqual([
+    ['scope', 'Scope'],
+    ['dated', '2026-10-20 Da'],
+    ['created-0', '2026-10-20 ted'],
+  ])
+  expect(after.location).toEqual({ currentParentId: null, selectedNodeId: 'created-0' })
+  expect(after.focus).toMatchObject({ nodeId: 'created-0', cursor: 11 })
+  expect(after.agenda).toMatchObject({
+    selectedKey: `node:${day(10, 20)}:created-0`,
+    activeOccurrence: { nodeId: 'created-0', day: day(10, 20) },
+  })
+  expect(store.getAgendaRows().filter((row) => row.kind === 'node' && row.day === day(10, 20))).toHaveLength(2)
+  store.undo()
+  expect(ready(store).document).toBe(before.document)
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${day(10, 20)}:dated`)
+  store.redo()
+  expect(ready(store).document).toBe(after.document)
+  await store.flushPersistence()
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(save.mock.calls[0]![0].document.roots.map((node) => node.text)).toEqual([
+    'Scope',
+    '2026-10-20 Da',
+    '2026-10-20 ted',
+  ])
+})
+
+// @requirement PRODUCT.md §23.11
+it('opens a dated real sibling after or before a dated node, as one undoable change', async () => {
+  const { store } = await harness({ currentParentId: 'scope', selectedNodeId: 'match' })
+  store.applyAgenda({ kind: 'select', key: `node:${day(10, 14)}:match` })
+  const before = ready(store)
+  expect(store.createAgendaSibling('after')).toBe(true)
+  expect(ready(store).document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
+    ['match', '2026-10-14 Match'],
+    ['created-0', '2026-10-14 '],
+  ])
+  expect(ready(store).focus).toMatchObject({ nodeId: 'created-0', cursor: 11 })
+  expect(ready(store).agenda!.activeOccurrence).toEqual({ nodeId: 'created-0', day: day(10, 14) })
+  store.undo()
+  expect(ready(store).document).toBe(before.document)
+  store.applyAgenda({ kind: 'select', key: `node:${day(10, 14)}:match` })
+  expect(store.createAgendaSibling('before')).toBe(true)
+  expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['created-1', 'match'])
+})
+
+// @requirement PRODUCT.md §23.11
+it('does not split or open siblings away from a direct match, outside Agenda, or while locked', async () => {
+  const { store, save } = await harness()
+  const attempt = (): boolean[] => [store.splitAgendaNode(0), store.createAgendaSibling('after')]
+  const unchanged = ready(store)
+  // A day container, a gap, and a contextual ancestor are never splittable.
+  expect(attempt()).toEqual([false, false])
+  const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
+  store.applyAgenda({ kind: 'select', key: gap.key })
+  expect(attempt()).toEqual([false, false])
+  store.applyAgenda({ kind: 'select', key: `node:${day(10, 14)}:scope` })
+  expect(attempt()).toEqual([false, false])
+  expect(ready(store).document).toBe(unchanged.document)
+
+  store.applyAgenda({ kind: 'select', key: `node:${day(10, 20)}:dated` })
+  const runtime = (store as unknown as { runtime: EditorRuntimeState }).runtime
+  runtime.replaceReady({ ...ready(store), persistenceLocked: true })
+  const locked = ready(store)
+  expect(attempt()).toEqual([false, false])
+  expect(ready(store)).toBe(locked)
+  runtime.replaceReady({ ...ready(store), persistenceLocked: false })
+
+  store.closeAgenda()
+  const closed = ready(store)
+  expect(attempt()).toEqual([false, false])
+  expect(ready(store)).toBe(closed)
+  await store.flushPersistence()
+  expect(save).not.toHaveBeenCalled()
+})
+
+// @requirement PRODUCT.md §23.11
 it('does nothing for the day before the earliest canonical date', async () => {
   const first = dayNumberOf({ year: 0, month: 1, day: 1 })
   const { store } = await harness()

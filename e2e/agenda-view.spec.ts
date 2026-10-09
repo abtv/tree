@@ -436,7 +436,8 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     }
     await window.keyboard.press('ArrowUp')
     const selected = await window.locator('[aria-selected="true"]').getAttribute('data-agenda-key')
-    for (const key of ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+Enter', 'Meta+z', 'Enter', 'Backspace'])
+    // `Enter` is excluded: on a direct match it splits the node (PRODUCT.md §23.11).
+    for (const key of ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+Enter', 'Meta+z', 'Backspace'])
       await window.keyboard.press(key)
     expect(await window.locator('[aria-selected="true"]').getAttribute('data-agenda-key')).toBe(selected)
     await window.keyboard.press('Meta+p')

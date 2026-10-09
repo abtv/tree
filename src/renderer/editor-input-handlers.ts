@@ -183,7 +183,10 @@ export function createEditorKeyDownHandler({
         return
       }
       if (event.key === 'Enter' && !event.metaKey) {
-        block('create')
+        event.preventDefault()
+        // Vim Normal, Replace, and Visual keep `Enter` inert in Agenda; splitting is an Insert and standard-editing command.
+        if ((vim === undefined || vim.mode === 'insert') && agendaAllows(element, 'split'))
+          store.splitAgendaNode(getCaret(event.currentTarget))
         return
       }
       if (event.metaKey && event.key === 'Enter' && block('strikethrough')) return

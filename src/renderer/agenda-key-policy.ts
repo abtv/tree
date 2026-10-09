@@ -9,10 +9,12 @@ export type AgendaAction =
   | 'empty-delete'
   | 'structure'
   | 'create'
+  | 'split'
+  | 'open-sibling'
   | 'node-put'
   | 'whole-node-visual'
 
-/** AG-14 policy; creation is enabled on days, later tasks enable splits and occurrence moves explicitly. */
+/** AG-14 policy; creation is enabled on days, splits and sibling creation on matches, and later tasks enable occurrence moves explicitly. */
 const POLICY: Readonly<Record<AgendaAction, readonly AgendaElement[]>> = {
   navigate: ['day', 'gap', 'match', 'context'],
   fold: ['day', 'gap', 'match', 'context'],
@@ -24,6 +26,8 @@ const POLICY: Readonly<Record<AgendaAction, readonly AgendaElement[]>> = {
   // Stryker disable next-line ArrayDeclaration: The injected string is not an AgendaElement, so this still rejects every valid element.
   structure: [],
   create: ['day'],
+  split: ['match'],
+  'open-sibling': ['match'],
   // Stryker disable next-line ArrayDeclaration: The injected string is not an AgendaElement, so this still rejects every valid element.
   'node-put': [],
   // Stryker disable next-line ArrayDeclaration: The injected string is not an AgendaElement, so this still rejects every valid element.

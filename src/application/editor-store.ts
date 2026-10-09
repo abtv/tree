@@ -81,7 +81,12 @@ import {
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { applyAgendaCommand, openAgendaState, type AgendaCommand, type AgendaState } from './agenda-state'
-import { createDayNodeTransition } from './editor-agenda-transitions'
+import {
+  createDayNodeTransition,
+  openDatedSiblingTransition,
+  splitDatedNodeTransition,
+  type AgendaCreateTransition,
+} from './editor-agenda-transitions'
 import { dayNumberOf } from '../domain/calendar-date'
 import { agendaHistorySelection, agendaOriginLocation, reconcileAgenda, selectedAgendaDay } from './agenda-reconcile'
 
@@ -225,15 +230,50 @@ export class EditorStore {
       this.reportError(new Error(transition.message))
       return false
     }
+    this.applyAgendaCreation(state.expansion, transition)
+    return true
+  }
+
+  /** `Enter` in the selected dated Agenda node: split it and date the new part (`plans/agenda.md` §9, m17). */
+  public splitAgendaNode(cursor: number): boolean {
+    const state = this.runtime.ready()
+    const row = this.selectedAgendaMatch()
+    if (row === undefined || this.isPersistenceLocked()) return false
+    this.applyAgendaCreation(
+      state.expansion,
+      splitDatedNodeTransition(state.document, state.location, state.agenda!, row.day, cursor, this.createId),
+    )
+    return true
+  }
+
+  /** Vim `o`/`O` on the selected dated Agenda node: a dated real sibling after or before it. */
+  public createAgendaSibling(position: SiblingInsertionPosition): boolean {
+    const state = this.runtime.ready()
+    const row = this.selectedAgendaMatch()
+    if (row === undefined || this.isPersistenceLocked()) return false
+    this.applyAgendaCreation(
+      state.expansion,
+      openDatedSiblingTransition(state.document, state.location, state.agenda!, row.day, position, this.createId),
+    )
+    return true
+  }
+
+  private selectedAgendaMatch(): Extract<AgendaRow, { kind: 'node' }> | undefined {
+    const agenda = this.runtime.ready().agenda
+    if (agenda === undefined) return undefined
+    const row = this.getAgendaRows().find((candidate) => candidate.key === agenda.selectedKey)
+    return row?.kind === 'node' && row.role === 'match' ? row : undefined
+  }
+
+  private applyAgendaCreation(expansion: ExpansionState, transition: AgendaCreateTransition): void {
     this.endTextSession()
     this.applyStructural(
       transition.document,
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
-      state.expansion,
+      expansion,
       transition.agenda,
     )
-    return true
   }
 
   public getVisibleRows(): readonly VisibleRow[] {

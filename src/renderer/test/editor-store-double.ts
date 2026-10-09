@@ -68,6 +68,8 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     closeAgenda: vi.fn(),
     applyAgenda: vi.fn(),
     createAgendaDayNode: vi.fn(() => true),
+    splitAgendaNode: vi.fn(() => true),
+    createAgendaSibling: vi.fn(() => true),
     getAgendaRows: vi.fn(() => []),
     getSnapshot,
     subscribe: vi.fn(() => () => undefined),
