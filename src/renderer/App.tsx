@@ -361,6 +361,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
               dragFreeze={dragFreeze}
               locked={persistenceLocked}
               vim={vimEnabled ? vimTextCommandState : undefined}
+              visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
               renderInput={renderAgendaInput}
               renderAttachment={renderAgendaAttachment}
               renderText={renderAgendaText}

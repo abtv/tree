@@ -14,6 +14,7 @@ import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node
 import { shouldWindow } from './list-window'
 import { isAgendaMirror } from './agenda-labels'
 import { isPendingMoveSource } from '../application/agenda-pending-move'
+import { agendaVisualSources, type AgendaVisualEndpoints } from '../application/agenda-visual-selection'
 import { notifyViewportLayout, onViewportScroll, scrollViewportBy, viewportBounds } from './scroll-viewport'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { useAgendaDrag } from './use-agenda-drag'
@@ -28,12 +29,14 @@ export function AgendaView({
   renderText,
   dragFreeze,
   locked = false,
+  visualNodeSelection,
 }: {
   store: EditorStore
   agenda: AgendaState
   document: Document
   dragFreeze: NodeDragCaretFreeze
   locked?: boolean
+  visualNodeSelection?: AgendaVisualEndpoints | undefined
   vim?: VimTextCommandState | undefined
   renderInput?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: import('../domain/document').TreeNode, editable: boolean) => ReactNode) | undefined
@@ -50,6 +53,24 @@ export function AgendaView({
   const viewportReveal = useMemo(() => createViewportReveal(), [])
   useEffect(() => viewportReveal.mount(), [viewportReveal])
   const rows = store.getAgendaRows()
+  const visualDocument = useRef(document)
+  useEffect(() => {
+    const changed = visualDocument.current !== document
+    visualDocument.current = document
+    if (visualNodeSelection === undefined || vim === undefined) return
+    const sources = agendaVisualSources(rows, agenda.activeOccurrence?.day ?? NaN, visualNodeSelection)
+    if (changed || agenda.activeOccurrence?.nodeId !== visualNodeSelection.focusId || sources.length === 0) {
+      clearCommandAssembly(vim.commandState)
+      vim.setMode('normal')
+    }
+  }, [rows, agenda.activeOccurrence, visualNodeSelection, vim, document])
+  const visualKeys = new Set(
+    visualNodeSelection === undefined
+      ? []
+      : agendaVisualSources(rows, agenda.activeOccurrence?.day ?? NaN, visualNodeSelection).map(
+          (source) => `node:${source.day}:${source.nodeId}`,
+        ),
+  )
   const windowed = shouldWindow(rows.length)
   const [layoutState, setLayoutState] = useState(() => ({
     rows,
@@ -240,6 +261,7 @@ export function AgendaView({
         renderText={renderText}
         today={agenda.today}
         selected={row.key === agenda.selectedKey}
+        visualSelected={visualKeys.has(row.key)}
         expanded={row.kind === 'gap' ? row.expanded : !agenda.collapsed.has(row.key)}
         pinned={pinned}
         dragging={drag.sourceKey === row.key}

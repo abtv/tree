@@ -14,8 +14,9 @@ describe('Agenda command policy', () => {
     'split',
     'open-sibling',
     'start-move',
+    'whole-node-visual',
   ]
-  const prohibited: AgendaAction[] = ['structure', 'node-put', 'whole-node-visual']
+  const prohibited: AgendaAction[] = ['structure', 'node-put']
   for (const element of elements) {
     it(`${element} permits create only on days`, () => expect(agendaAllows(element, 'create')).toBe(element === 'day'))
     for (const action of shared)

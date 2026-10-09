@@ -3,6 +3,56 @@ import { recordPerfResult } from './results'
 import type { TreeApi } from '../src/shared/ipc'
 
 // @requirement PRODUCT.md §22.1
+// @requirement PRODUCT.md §23.14
+test('Agenda Visual navigation stays responsive with bounded mounted rows and no saves', async ({ userDataDir }) => {
+  seedDocument(userDataDir, agendaSeed(3000))
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await window.keyboard.press('Meta+p')
+  await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
+  await window.keyboard.press('V')
+  await window.evaluate(() => {
+    const probe = { motion: [] as number[], saves: 0 }
+    ;(window as unknown as { agendaVisualProbe: typeof probe }).agendaVisualProbe = probe
+    const api = (globalThis as unknown as { treeApi: TreeApi }).treeApi
+    const save = api.save
+    api.save = (...args) => {
+      probe.saves += 1
+      return save(...args)
+    }
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (['j', 'k'].includes(event.key))
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => probe.motion.push(performance.now() - event.timeStamp)),
+          )
+      },
+      { capture: true },
+    )
+  })
+  for (let index = 0; index < 20; index += 1) await window.keyboard.press('j')
+  for (let index = 0; index < 20; index += 1) await window.keyboard.press('k')
+  await window.waitForFunction(
+    () => (window as unknown as { agendaVisualProbe: { motion: number[] } }).agendaVisualProbe.motion.length === 40,
+  )
+  const probe = await window.evaluate(
+    () => (window as unknown as { agendaVisualProbe: { motion: number[]; saves: number } }).agendaVisualProbe,
+  )
+  const sorted = probe.motion.toSorted((a, b) => a - b)
+  recordPerfResult({
+    kind: 'state',
+    scenario: 'agenda-6000-occurrences-visual-navigation',
+    samples: sorted.length,
+    metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves: probe.saves },
+  })
+  expect(sorted[38]).toBeLessThan(100)
+  expect(sorted[39]).toBeLessThan(250)
+  expect(probe.saves).toBe(0)
+  expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+  await expect(window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })).toBeFocused()
+})
+
+// @requirement PRODUCT.md §22.1
 test('Agenda typing keeps mounted rows bounded and stays within the interactive budget', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

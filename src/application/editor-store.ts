@@ -98,6 +98,7 @@ import {
   withoutPendingMove,
 } from './agenda-reconcile'
 import { pendingMoveSources, pendingMoveTargetDay } from './agenda-pending-move'
+import { agendaVisualSources } from './agenda-visual-selection'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
@@ -284,16 +285,20 @@ export class EditorStore {
   }
 
   /**
-   * Vim `dd` in Agenda: mark the selected direct match and the next `count − 1` qualifying rows for a later
+   * Vim `dd` in Agenda: mark the selected direct match and the next `count − 1` qualifying rows, or the
+   * provided whole-node Visual range for Visual `d`, for a later
    * `p`/`P` (`plans/agenda.md` §13). It changes no document, Vim register, or clipboard, and returns whether
    * anything was marked.
    */
-  public startAgendaMove(count = 1): boolean {
+  public startAgendaMove(count = 1, visual?: import('./agenda-visual-selection').AgendaVisualEndpoints): boolean {
     const state = this.runtime.ready()
     // A temporarily invalid item leaves Agenda when the selection moves, so it cannot be a pending source.
     if (state.agenda === undefined || state.agenda.pinnedOccurrence !== undefined || this.isPersistenceLocked())
       return false
-    const pendingMove = pendingMoveSources(this.getAgendaRows(), state.agenda.selectedKey, count)
+    const pendingMove =
+      visual === undefined
+        ? pendingMoveSources(this.getAgendaRows(), state.agenda.selectedKey, count)
+        : agendaVisualSources(this.getAgendaRows(), state.agenda.activeOccurrence?.day ?? NaN, visual)
     if (pendingMove.length === 0) return false
     this.runtime.replaceReady({ ...state, agenda: { ...state.agenda, pendingMove } })
     return true

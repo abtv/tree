@@ -116,6 +116,7 @@ export function handleVimKey(
       return true
     }
     if (event.key === 'Escape' || event.key === 'V') {
+      if (event.key === 'Escape') store.cancelAgendaMove()
       vim.nodeVisual.exit()
       // Whole-node Visual mode can hold only the pending `g` prefix; a prefix that survived the
       // exit would be read as a Normal-mode continuation (`d` would run `gd`).
@@ -313,7 +314,7 @@ export function handleVimKey(
     const structural =
       event.key === '>' ||
       event.key === '<' ||
-      (!visual && pending.prefix !== 'z' && ['o', 'O', 'V', 'J', 'Enter'].includes(event.key)) ||
+      (!visual && pending.prefix !== 'z' && ['o', 'O', 'J', 'Enter'].includes(event.key)) ||
       (pending.prefix === 'g' && ['J', 'p', 'P', 'd'].includes(event.key)) ||
       (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
       (!visual && ['p', 'P'].includes(event.key) && !textPut) ||

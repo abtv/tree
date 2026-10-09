@@ -495,7 +495,12 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .node-row-visual-selected,
-.node-row-visual-selected .node-input {
+.node-row-visual-selected .node-input,
+.agenda-row-visual-selected,
+.agenda-row-visual-selected .node-input,
+.agenda-row-visual-selected .agenda-text,
+.agenda-row-visual-selected .agenda-date-active,
+.agenda-row-visual-selected .agenda-date-secondary {
   color: var(--highlight-foreground);
   background: var(--highlight-background);
 }
@@ -654,7 +659,8 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 /* Inside the whole-node Visual highlight the struck text takes the highlight pair, keeping its line. */
-.node-row-visual-selected .node-input.node-input-struck {
+.node-row-visual-selected .node-input.node-input-struck,
+.agenda-row-visual-selected .node-input.node-input-struck {
   color: var(--highlight-foreground);
 }
 

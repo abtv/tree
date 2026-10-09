@@ -1,4 +1,5 @@
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
+import { agendaVisualTarget } from '../application/agenda-visual-selection'
 import { locateNode } from '../domain/document'
 import { isNodeExpanded } from '../application/expansion-state'
 import type { NodeVisualSelection, PendingVisualSelection } from './node-input-types'
@@ -37,6 +38,7 @@ export function restoreVisual(deps: RestoreVisualDeps): void {
   )
   if (restore === undefined) return
   if (restore.kind === 'nodes') {
+    if (state.agenda !== undefined) return
     setNodeVisualSelection({ anchorId: restore.anchorId, focusId: restore.focusId })
     store.selectNode(restore.focusId, 0)
     changeVimMode('visual-node')
@@ -66,6 +68,20 @@ export function moveNodeVisual(deps: MoveNodeVisualDeps, direction: 'up' | 'down
   const { store, commandState, nodeVisualSelection, setNodeVisualSelection, syncImageCaretToFocus } = deps
   const state = store.getSnapshot()
   if (state.status !== 'ready' || nodeVisualSelection === undefined) return
+  if (state.agenda !== undefined) {
+    const target = agendaVisualTarget(
+      store.getAgendaRows(),
+      state.agenda.activeOccurrence?.day ?? NaN,
+      nodeVisualSelection,
+      direction,
+      count,
+    )
+    if (target === undefined || target.nodeId === nodeVisualSelection.focusId) return
+    setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.nodeId })
+    store.applyAgenda({ kind: 'select', key: target.key })
+    syncImageCaretToFocus()
+    return
+  }
   // Whole-node Visual extension stays within the focused node's actual sibling array, whatever
   // depth it is displayed at through inline expansion.
   const located = locateNode(state.document, nodeVisualSelection.focusId)
@@ -110,6 +126,14 @@ export function commandNodeVisual(deps: CommandNodeVisualDeps, command: NodeVisu
   if (nodeVisualSelection === undefined) return
   const state = store.getSnapshot()
   if (state.status !== 'ready') return
+  if (state.agenda !== undefined) {
+    if (command !== 'd' || !store.startAgendaMove(1, nodeVisualSelection)) return
+    clearCommandAssembly(commandState)
+    setNodeVisualSelection(undefined)
+    changeVimMode('normal')
+    syncImageCaretToFocus()
+    return
+  }
   // The anchor and focus of a whole-node Visual range always share a real parent (see
   // `moveNodeVisual`), so the anchor's actual siblings resolve the span.
   const anchorLocated = locateNode(state.document, nodeVisualSelection.anchorId)
@@ -218,6 +242,7 @@ export function shiftNodeVisual(
   const { anchorId, focusId } = nodeVisualSelection
   const state = store.getSnapshot()
   if (state.status !== 'ready') return
+  if (state.agenda !== undefined) return
   const anchor = locateNode(state.document, anchorId)
   const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
   if (anchor === undefined || focus < 0) return
@@ -244,6 +269,7 @@ export function joinNodeVisual(deps: JoinNodeVisualDeps, spaced: boolean): void 
   const { anchorId, focusId } = nodeVisualSelection
   const state = store.getSnapshot()
   if (state.status !== 'ready') return
+  if (state.agenda !== undefined) return
   const anchor = locateNode(state.document, anchorId)
   const focus = anchor?.siblings.findIndex((node) => node.id === focusId) ?? -1
   if (anchor === undefined || focus < 0) return

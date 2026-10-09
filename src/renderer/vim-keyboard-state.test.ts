@@ -224,6 +224,22 @@ describe('session and command ports', () => {
 })
 
 describe('whole-node Visual and structural owners', () => {
+  // @requirement PRODUCT.md §23.14
+  it('enters only a valid active Agenda occurrence and swaps Agenda focus without Tree visual memory', async () => {
+    const f = await fixture({ anchorId: 'node', focusId: 'node' }, '2026-10-14 hello')
+    f.store.openAgenda()
+    expect(f.vim.nodeVisual.enter('node')).toBe(false)
+    f.vim.nodeVisual.swap()
+    expect(f.deps.syncImageCaretToFocus).not.toHaveBeenCalled()
+    const key = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'node')!.key
+    f.store.applyAgenda({ kind: 'select', key })
+    expect(f.vim.nodeVisual.enter('node')).toBe(true)
+    expect(f.commandState.lastVisual).toBeUndefined()
+    f.vim.nodeVisual.swap()
+    expect(f.deps.syncImageCaretToFocus).toHaveBeenCalledOnce()
+    f.store.editText('node', 'no date')
+    expect(f.vim.nodeVisual.enter('node')).toBe(false)
+  })
   it('enters and remembers a node range, then exits', async () => {
     const f = await fixture()
     expect(f.vim.nodeVisual.enter('node')).toBe(true)

@@ -189,7 +189,13 @@ export function createEditorKeyDownHandler({
           store.splitAgendaNode(getCaret(event.currentTarget))
         return
       }
-      if (event.metaKey && event.key === 'Enter' && block('strikethrough')) return
+      if (event.metaKey && event.key === 'Enter') {
+        if (vim?.mode === 'visual-node') {
+          event.preventDefault()
+          return
+        }
+        if (block('strikethrough')) return
+      }
       if (
         event.key === 'Backspace' &&
         !event.metaKey &&
