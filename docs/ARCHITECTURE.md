@@ -242,6 +242,8 @@ Live mirrors are derived in the renderer from `activeOccurrence` by `isAgendaMir
 
 Agenda editing reuses document history, clipboard operations and persistence scheduling. Decoration work is bounded by mounted rows and each node's text; it adds no disk write or sync. Unmounted rows release their input and geometry references. Agenda folds remain runtime-only.
 
+Creating a node from a day container is `EditorStore.createAgendaDayNode`, which builds its result with the pure `createDayNodeTransition` and the domain operation `createLastChild`. The transition returns the new document, location, focus, and the Agenda state selecting the new active occurrence, and the store publishes them together through `applyStructural` as one history entry and one ordinary pending save. Performance assessment (`docs/PRODUCT.md` §22.1): the cost is the path copy of one structural insertion plus the existing projection update for one new dated node; no extra write, sync, or persisted field is added.
+
 Agenda windowing reuses `list-window.ts` and the key-based layout helpers in `node-list-layout.ts`, leaving `NodeList` unchanged. `agenda-list-layout.ts` selects the viewport range and optional selected occurrence pin. Heights and DOM elements are keyed by occurrence, not real node id; row changes prune obsolete measurements and width changes invalidate them. Cached offsets rebuild on row or measurement changes, while selection and scrolling reuse them. The selected keyed row remains in the same React parent when switching between the viewport and absolute pin; layout notifications let the existing viewport-reveal owner settle its position after measurement.
 
 They should not implement core tree manipulation rules.

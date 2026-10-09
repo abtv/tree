@@ -136,7 +136,7 @@ describe('read-only Agenda keyboard', () => {
   it('ignores text, structural commands, modifiers and composition; Escape clears pending', async () => {
     const f = await fixture()
     const before = f.snapshot()
-    for (const key of ['i', 'a', 'R', 'o', 'd', 'p', 'Enter', 'Backspace', 'Tab', '>', '<']) f.press(key)
+    for (const key of ['i', 'a', 'R', 'd', 'p', 'Enter', 'Backspace', 'Tab', '>', '<']) f.press(key)
     f.press('j', { nativeEvent: { isComposing: true } })
     f.press('2')
     f.press('Meta')
@@ -146,6 +146,94 @@ describe('read-only Agenda keyboard', () => {
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().agenda?.selectedKey).toBe(before.agenda?.selectedKey)
     expect(f.saves).toHaveLength(0)
+  })
+
+  // @requirement PRODUCT.md §23.11
+  describe('creating dated nodes from a day', () => {
+    const october = (day: number): number => dayNumberOf({ year: 2026, month: 10, day })
+
+    it('creates a node for the selected day with Normal o and enters Insert', async () => {
+      const f = await fixture()
+      const before = f.snapshot()
+      f.press('o')
+      const state = f.snapshot()
+      const created = state.document.roots.at(-1)!
+      expect(state.document.roots.slice(0, -1)).toEqual(before.document.roots)
+      expect(created.text).toBe('2026-10-08 ')
+      expect(state.agenda?.selectedKey).toBe(`node:${october(8)}:${created.id}`)
+      expect(state.agenda?.activeOccurrence).toEqual({ nodeId: created.id, day: october(8) })
+      expect(state.location).toEqual({ currentParentId: null, selectedNodeId: created.id })
+      expect(state.focus).toMatchObject({ nodeId: created.id, cursor: 11 })
+      expect(f.vim.mode).toBe('insert')
+      f.store.undo()
+      expect(f.snapshot().document).toBe(before.document)
+    })
+    it('creates a node for the preceding day with O and reveals it from a gap', async () => {
+      const f = await fixture()
+      f.press('O')
+      expect(f.snapshot().document.roots.at(-1)!.text).toBe('2026-10-07 ')
+      expect(f.vim.mode).toBe('insert')
+      f.vim.mode = 'normal'
+      f.store.undo()
+      const fifteenth = f.store.getAgendaRows().find((row) => row.key === `day:${october(15)}`)!
+      f.store.applyAgenda({ kind: 'select', key: fifteenth.key })
+      expect(f.store.getAgendaRows().some((row) => row.key === `day:${october(14)}`)).toBe(false)
+      f.press('O')
+      const state = f.snapshot()
+      expect(state.document.roots.at(-1)!.text).toBe('2026-10-14 ')
+      expect(state.agenda?.revealed.has(october(14))).toBe(true)
+      expect(state.agenda?.selectedKey).toBe(`node:${october(14)}:${state.document.roots.at(-1)!.id}`)
+    })
+    it('creates with Enter only in standard editing, and unfolds a collapsed day', async () => {
+      const f = await fixture()
+      const handler = createAgendaKeyDownHandler({ store: f.store })
+      const day = f.store.getAgendaRows().find((row) => row.kind === 'day' && row.content)!
+      f.store.applyAgenda({ kind: 'select', key: day.key })
+      f.store.applyAgenda({ kind: 'toggle-fold', key: day.key })
+      expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(true)
+      handler({ key: 'Enter', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      const state = f.snapshot()
+      expect(state.document.roots.at(-1)!.text).toBe('2026-10-15 ')
+      expect(state.agenda?.collapsed.has(day.key)).toBe(false)
+      expect(state.agenda?.selectedKey).toBe(`node:${october(15)}:${state.document.roots.at(-1)!.id}`)
+    })
+    it('does nothing on Vim Enter, counted or prefixed o, gaps, and real rows', async () => {
+      const f = await fixture()
+      const before = f.snapshot()
+      f.press('Enter')
+      f.press('2')
+      f.press('o')
+      f.press('g')
+      f.press('o')
+      f.press('o', { ctrlKey: true })
+      f.press('Enter', { metaKey: true })
+      const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+      f.store.applyAgenda({ kind: 'select', key: gap.key })
+      f.press('o')
+      f.press('O')
+      const node = f.store.getAgendaRows().find((row) => row.kind === 'node')!
+      f.store.applyAgenda({ kind: 'select', key: node.key })
+      f.press('o')
+      f.press('O')
+      handlerEnter(f)
+      expect(f.snapshot().document).toBe(before.document)
+      expect(f.vim.mode).toBe('normal')
+    })
+    function handlerEnter(f: Awaited<ReturnType<typeof fixture>>): void {
+      createAgendaKeyDownHandler({ store: f.store })({
+        key: 'Enter',
+        preventDefault: vi.fn(),
+      } as unknown as KeyboardEvent<HTMLElement>)
+    }
+    it('stays in Normal mode and leaves the document unchanged when creation is rejected', async () => {
+      const f = await fixture()
+      const before = f.snapshot()
+      const create = vi.spyOn(f.store, 'createAgendaDayNode').mockReturnValue(false)
+      f.press('o')
+      expect(create).toHaveBeenCalledWith('selected')
+      expect(f.vim.mode).toBe('normal')
+      expect(f.snapshot().document).toBe(before.document)
+    })
   })
 
   it('closes at origin and enters Tree only on real rows', async () => {

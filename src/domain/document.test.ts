@@ -8,6 +8,7 @@ import {
   collectAttachmentIds,
   createInitialDocument,
   createFirstChild,
+  createLastChild,
   insertSiblingAfter,
   insertSiblingBefore,
   insertSubtreeSibling,
@@ -294,6 +295,36 @@ describe('document operations', () => {
 
     expect(() => createFirstChild(document, deepest.id, 'new')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
     expect(deepest.children).toEqual([])
+  })
+
+  it('appends a last child to a parent or the root list, sharing every other node and the attachment summary', () => {
+    const document: Document = {
+      roots: [
+        { id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] },
+        { id: 'b', text: 'B', children: [] },
+      ],
+    }
+    const underParent = createLastChild(document, 'a', 'new', '2026-10-14 ')
+    expect(underParent.roots[0]!.children.map((node) => node.id)).toEqual(['a1', 'new'])
+    expect(underParent.roots[0]!.children.at(-1)).toEqual({ id: 'new', text: '2026-10-14 ', children: [] })
+    expect(underParent.roots[0]!.children[0]).toBe(document.roots[0]!.children[0])
+    expect(underParent.roots[1]).toBe(document.roots[1])
+    const underRoot = createLastChild(document, null, 'new', 'text')
+    expect(underRoot.roots.map((node) => node.id)).toEqual(['a', 'b', 'new'])
+    expect(underRoot.roots[0]).toBe(document.roots[0])
+    expect(attachmentSummary(underRoot)).toBe(attachmentSummary(document))
+    expect(attachmentSummary(underParent)).toBe(attachmentSummary(document))
+    expect(document.roots).toHaveLength(2)
+  })
+
+  it('rejects appending a last child below the maximum depth without changing the source', () => {
+    let node: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
+    for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1) {
+      node = { id: `n${index}`, text: '', children: [node] }
+    }
+    const document: Document = { roots: [node] }
+    expect(() => createLastChild(document, `n${MAX_DOCUMENT_DEPTH - 1}`, 'new', '')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
+    expect(() => assertDocument(createLastChild(document, `n${MAX_DOCUMENT_DEPTH - 2}`, 'new', ''))).not.toThrow()
   })
 
   it('rejects a subtree paste or sibling range replacement below the maximum depth', () => {

@@ -80,7 +80,8 @@ import {
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
-import { applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
+import { applyAgendaCommand, openAgendaState, type AgendaCommand, type AgendaState } from './agenda-state'
+import { createDayNodeTransition } from './editor-agenda-transitions'
 import { dayNumberOf } from '../domain/calendar-date'
 import { agendaHistorySelection, agendaOriginLocation, reconcileAgenda, selectedAgendaDay } from './agenda-reconcile'
 
@@ -200,6 +201,39 @@ export class EditorStore {
           }
         : {}),
     })
+  }
+
+  /**
+   * Create a dated node from the selected Agenda day: for that day, or for the day before it. The
+   * new node is the last child of the scope and becomes the active occurrence (`plans/agenda.md` §9).
+   */
+  public createAgendaDayNode(day: 'selected' | 'preceding'): boolean {
+    const state = this.runtime.ready()
+    if (state.agenda === undefined || this.isPersistenceLocked()) return false
+    const rows = this.getAgendaRows()
+    const selected = rows.find((row) => row.key === state.agenda!.selectedKey)
+    if (selected?.kind !== 'day') return false
+    const transition = createDayNodeTransition(
+      state.document,
+      state.agenda,
+      rows,
+      day === 'selected' ? selected.day : selected.day - 1,
+      this.createId,
+    )
+    if (transition === undefined) return false
+    if (transition.kind === 'rejected') {
+      this.reportError(new Error(transition.message))
+      return false
+    }
+    this.endTextSession()
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      state.expansion,
+      transition.agenda,
+    )
+    return true
   }
 
   public getVisibleRows(): readonly VisibleRow[] {
@@ -1249,11 +1283,15 @@ export class EditorStore {
     location: Location,
     focus: FocusIntent,
     expansion: ExpansionState = this.runtime.ready().expansion,
+    agenda: AgendaState | undefined = undefined,
   ): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-    this.runtime.replaceReady({ ...state, document, location, focus, expansion }, true)
+    this.runtime.replaceReady(
+      { ...state, document, location, focus, expansion, ...(agenda === undefined ? {} : { agenda }) },
+      true,
+    )
     this.markPersistedChange()
   }
 

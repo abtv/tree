@@ -1216,4 +1216,12 @@ Agenda does not reorder existing siblings, change their real parents, delete sub
 
 Vim fold commands `zc`/`zo`, `za`, `zC`/`zO`, and `zM`/`zR` act on Agenda folds using the corresponding Tree fold rules. Recursive commands cover projected descendants; all-fold commands cover Agenda, independently of Tree expansion.
 
-Until the planned creation and occurrence-move tasks land, `Enter`, Vim Normal `o`/`O`, `dd`, and `p`/`P` do nothing on Agenda rows. These temporary restrictions prevent Tree structural semantics from running in Agenda.
+Until the planned split and occurrence-move tasks land, `Enter`, Vim Normal `o`/`O`, `dd`, and `p`/`P` do nothing on direct matches and contextual ancestors. These temporary restrictions prevent Tree structural semantics from running in Agenda. Creation from a day container is defined in §23.11.
+
+### 23.11 Creating Nodes
+
+On a day container, standard `Enter` and Vim Normal `o` create a node for that day, and Vim Normal `O` creates one for the preceding calendar day. If that day lies inside a gap, it is revealed. Vim Normal `Enter`, a counted or prefixed `o`/`O`, and every other creation key on a gap, direct match, or contextual ancestor do nothing.
+
+The new node is the last child of the Agenda scope, which is a final root when Agenda was opened from Root. Its text is the day's canonical date followed by one space, with the caret after the space. It becomes the active occurrence under that day, unfolding the day if it was collapsed, and Vim enters Insert. Creation is one undoable change that adds only the node, and it saves as any structural change does. If the scope is at the maximum document depth, the ordinary depth error is shown and nothing changes. Creation is rejected while persistence is locked.
+
+Undo removes the node and applies the history focus rule of §23.8.

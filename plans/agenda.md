@@ -42,8 +42,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Done |
 | AG-14 | Edit dated nodes in place with structural restrictions (D1, D2, Command Matrix) | AG-10, AG-13 | E2E scenarios 4 (without underline), 9, 15, clipboard; key-policy tests; emphasis screenshots; review and product verifier | Done |
 | AG-15 | Live occurrences: mirrors, active switching, invalid last-date item with status hint | AG-14 | E2E scenarios 6 and 7; VC7 and VC11 screenshots; focus and scroll stability assertions | Done |
-| AG-16 | Create dated nodes from a day container (`Enter`, `o`, `O`) | AG-8, AG-15 | E2E scenario 8 first half; unit and property tests (one node appended, one history entry) | Ready |
-| AG-17 | Split a dated node with date inheritance; `o`/`O` on dated nodes | AG-16 | E2E scenario 8 second half; one-Undo test | Planned |
+| AG-16 | Create dated nodes from a day container (`Enter`, `o`, `O`) | AG-8, AG-15 | E2E scenario 8 first half; unit and property tests (one node appended, one history entry) | Done |
+| AG-17 | Split a dated node with date inheritance; `o`/`O` on dated nodes | AG-16 | E2E scenario 8 second half; one-Undo test | Ready |
 | AG-18 | Move occurrences between days by mouse drag (single and group store operation) | AG-8, AG-15 | E2E scenario 10 with a real drag; property test (a move changes only moved dates, Undo restores); drop screenshot | Planned |
 | AG-19 | Vim pending move: `dd`, counted `dd`, `p`/`P`, cancel rules, dimming, status message | AG-18 | E2E scenario 11; D4 lifecycle table test; VC8 screenshot; `docs/VIM_CONFORMANCE.md` rows | Planned |
 | AG-20 | Vim whole-node Visual selection and group move | AG-19 | E2E scenario 12; selection-skip property test; VC12 screenshot | Planned |
@@ -91,7 +91,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-16: Create dated nodes from a day container (`Enter`, `o`, `O`). Follow the AG-16 Task details.
+**Next task:** AG-17: Split a dated node with date inheritance; `o`/`O` on dated nodes. Follow the AG-17 Task details.
+
+AG-16 implemented creation from a day container through `EditorStore.createAgendaDayNode`, the pure `createDayNodeTransition`, and the domain operation `createLastChild`; the key policy now allows `create` on days only. The new node becomes the active occurrence, its day is unfolded, and a day inside a gap is revealed. Undo and Redo use the existing m12 history focus, so after Undo the selection moves to the change-site node's visible occurrence (a neighbouring row) rather than back to the day container; this is an observation for the Product Owner, not a change to m12. Agenda-level counted creation (`3o`) is intentionally inert.
 
 AG-15 implemented live mirrors (hollow-ring bullet, derived from the active occurrence), active switching by selection, scroll anchoring of the active row across document-driven moves, and the invalid-item hint in a status-bar message slot that AG-19's pending-move message will share. The slot renders only while a message exists so the Tree live regions are unchanged. A pending-move message must go through `agendaStatusMessage`.
 

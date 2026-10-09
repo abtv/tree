@@ -68,6 +68,81 @@ it('generated Agenda text edits round-trip through history with valid selection 
   )
 })
 
+// @requirement PRODUCT.md §23.11
+it('generated day creations append exactly one dated node each, with one history entry each', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.array(fc.integer({ min: 1, max: 28 }), { maxLength: 6 }),
+      fc.array(fc.record({ target: fc.nat(100), preceding: fc.boolean() }), { minLength: 1, maxLength: 12 }),
+      async (dates, commands) => {
+        let next = 0
+        const store = new EditorStore(
+          {
+            today: () => 100,
+            load: async () => ({
+              version: 4,
+              document: {
+                roots: [
+                  { id: 'first', text: 'First', children: [] },
+                  ...dates.map((date, index) => ({
+                    id: `dated-${index}`,
+                    text: `1970-04-${String(date).padStart(2, '0')} Dated`,
+                    children: [],
+                  })),
+                ],
+              },
+              location: { currentParentId: null, selectedNodeId: 'first' },
+              view: { expandedIds: [] },
+            }),
+            save: async () => undefined,
+            readClipboard: async () => ({ kind: 'text', text: '' }),
+            writeAttachment: async () => undefined,
+            cleanupAttachments: async () => undefined,
+          },
+          () => `created-${next++}`,
+        )
+        await store.initialize()
+        const original = store.getSnapshot() as ReadySnapshot
+        store.openAgenda()
+        let created = 0
+        for (const command of commands) {
+          const rows = store.getAgendaRows()
+          const row = rows[command.target % rows.length]!
+          store.applyAgenda({ kind: 'select', key: row.key })
+          const before = store.getSnapshot() as ReadySnapshot
+          const result = store.createAgendaDayNode(command.preceding ? 'preceding' : 'selected')
+          const after = store.getSnapshot() as ReadySnapshot
+          expect(result).toBe(row.kind === 'day')
+          if (!result) {
+            expect(after.document).toBe(before.document)
+            continue
+          }
+          created += 1
+          const day = (row as Extract<typeof row, { kind: 'day' }>).day - (command.preceding ? 1 : 0)
+          expect(after.document.roots).toHaveLength(before.document.roots.length + 1)
+          before.document.roots.forEach((node, index) => expect(after.document.roots[index]).toBe(node))
+          const node = after.document.roots.at(-1)!
+          expect(node).toEqual({
+            id: `created-${created - 1}`,
+            text: `${formatCanonicalDate(calendarDateOf(day))} `,
+            children: [],
+          })
+          expect(after.agenda!.selectedKey).toBe(`node:${day}:${node.id}`)
+          expect(after.agenda!.activeOccurrence).toEqual({ nodeId: node.id, day })
+          expect(after.location).toEqual({ currentParentId: null, selectedNodeId: node.id })
+          expect(store.getAgendaRows().some((candidate) => candidate.key === after.agenda!.selectedKey)).toBe(true)
+        }
+        for (let step = 0; step < created; step += 1) store.undo()
+        expect((store.getSnapshot() as ReadySnapshot).document).toBe(original.document)
+        const restored = store.getSnapshot() as ReadySnapshot
+        expect(store.getAgendaRows().some((candidate) => candidate.key === restored.agenda!.selectedKey)).toBe(true)
+        await store.flushPersistence()
+      },
+    ),
+    { numRuns: propertyRuns(100) },
+  )
+})
+
 it('generated Agenda commands preserve document, Tree folds, save count, and a visible selection', async () => {
   await fc.assert(
     fc.asyncProperty(

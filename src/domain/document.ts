@@ -39,6 +39,7 @@ export {
   cloneNodeWithNewIds,
   createFirstChild,
   createInitialDocument,
+  createLastChild,
   deleteLink,
   deleteNode,
   displayedNodes,

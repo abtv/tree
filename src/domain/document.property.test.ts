@@ -9,6 +9,7 @@ import {
   cloneNodeWithNewIds,
   collectAttachmentIds,
   createFirstChild,
+  createLastChild,
   deleteLink,
   deleteNode,
   editNodeContent,
@@ -723,6 +724,8 @@ describe('document invariants', () => {
         insertSiblingAfter(document, node.id, 'new-after')
         insertSiblingBefore(document, node.id, 'new-before')
         createFirstChild(document, node.id, 'new-child')
+        createLastChild(document, node.id, 'new-last-child', text)
+        createLastChild(document, null, 'new-last-root', text)
         splitNode(document, node.id, cursor, 'new-split')
         deleteNode(document, node.id)
         moveSibling(document, node.id, cursor)
@@ -756,6 +759,8 @@ describe('document invariants', () => {
           insertSubtreeSibling(document, node.id, 'after', node, () => `copy-${copiedId++}`),
           replaceSiblingRange(document, node.id, 1, [cloneNodeWithNewIds(node, () => `range-${copiedId++}`)]),
           createFirstChild(document, node.id, 'new-child'),
+          createLastChild(document, node.id, 'new-last-child', text),
+          createLastChild(document, null, 'new-last-root', text),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),
           moveSibling(document, node.id, cursor),
@@ -803,6 +808,8 @@ describe('document invariants', () => {
           }),
           insertSiblingBefore(document, node.id, 'new-before'),
           createFirstChild(document, node.id, 'new-child'),
+          createLastChild(document, node.id, 'new-last-child', text),
+          createLastChild(document, null, 'new-last-root', text),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),
           moveSibling(document, node.id, cursor),
@@ -847,6 +854,8 @@ describe('document invariants', () => {
           insertSiblingBefore(document, node.id, 'new-before'),
           insertSubtreeSibling(document, node.id, 'after', node, () => `copy-${copiedId++}`),
           createFirstChild(document, node.id, 'new-child'),
+          createLastChild(document, node.id, 'new-last-child', text),
+          createLastChild(document, null, 'new-last-root', text),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),
           moveSibling(document, node.id, cursor),
@@ -932,6 +941,8 @@ describe('document invariants', () => {
           insertSiblingAfter(document, node.id, 'new-after'),
           insertSiblingBefore(document, node.id, 'new-before'),
           createFirstChild(document, node.id, 'new-child'),
+          createLastChild(document, node.id, 'new-last-child', text),
+          createLastChild(document, null, 'new-last-root', text),
           splitNode(document, node.id, cursor, 'new-split'),
           deleteNode(document, node.id),
           moveSibling(document, node.id, cursor),

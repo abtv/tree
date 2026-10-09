@@ -5,6 +5,7 @@ import type { VimTextCommandState } from './editor-input-handlers'
 import { viewportBounds, viewportScrollEdges } from './scroll-viewport'
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
 import { getCaret } from './editor-dom'
+import { agendaAllows } from './agenda-key-policy'
 
 interface Dependencies {
   store: EditorStore
@@ -107,6 +108,21 @@ export function createAgendaKeyDownHandler({
     }
     if (normal && !event.ctrlKey && !event.altKey && event.key === 'z' && pending?.prefix === undefined) {
       vim.commandState.pending = { count: '', motionCount: '', prefix: 'z' }
+      return
+    }
+    // Creation is a command key, so a count or pending prefix never reaches it.
+    const vimCreate =
+      normal && (event.key === 'o' || event.key === 'O') && !event.ctrlKey && !event.altKey && !pending?.count
+    if (
+      row.kind === 'day' &&
+      agendaAllows('day', 'create') &&
+      pending?.prefix === undefined &&
+      ((vim === undefined && event.key === 'Enter' && !event.ctrlKey && !event.altKey) || vimCreate)
+    ) {
+      if (vim !== undefined) clearPending(vim.commandState)
+      beforeSelect?.(false)
+      if (store.createAgendaDayNode(event.key === 'O' ? 'preceding' : 'selected') && vim !== undefined)
+        vim.setMode('insert')
       return
     }
     if (vim !== undefined) clearPending(vim.commandState)

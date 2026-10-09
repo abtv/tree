@@ -18,6 +18,8 @@ import {
 } from './fixtures'
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
+const dayNumber = (month: number, day: number): number => Math.round(Date.UTC(2026, month - 1, day) / 86_400_000)
+const dayKey = (month: number, day: number): string => `day:${dayNumber(month, day)}`
 function seed(userDataDir: string): void {
   seedDocument(userDataDir, {
     document: {
@@ -311,6 +313,62 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(restarted.window.locator('.agenda-row[data-node-id="first"]').first()).toHaveText(
       '2026-10-14 READY Prepare 2026-10-20',
     )
+  })
+
+  // @requirement PRODUCT.md §23.11
+  test('creates a dated last root from a day container in Insert and persists it', async ({ userDataDir }) => {
+    seed(userDataDir)
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await expect(window.locator(`[data-agenda-key="${dayKey(10, 8)}"]`)).toBeFocused()
+    if (mode === 'vim') await window.keyboard.press('Escape')
+    await window.keyboard.press(mode === 'vim' ? 'o' : 'Enter')
+    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
+    await expect(created).toBeFocused()
+    await expect(created).toHaveText('2026-10-08 ')
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await window.keyboard.type('Plan')
+    await expect(created).toHaveText('2026-10-08 Plan')
+    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 8)}:"]`)).toHaveCount(1)
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots.map((entry) => entry.text), { timeout: 20000 })
+      .toEqual(['Context', '2026-10-08 Plan'])
+    expect(readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.id)).toEqual(['first', 'second'])
+  })
+
+  // @requirement PRODUCT.md §23.11
+  test('creates for the preceding day from a gap, one Undo removes it, and gaps ignore creation keys', async ({
+    userDataDir,
+  }) => {
+    seed(userDataDir)
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.locator(`[data-agenda-key="${dayKey(10, 20)}"]`).click()
+    await expect(window.locator(`[data-agenda-key="${dayKey(10, 19)}"]`)).toHaveCount(0)
+    if (mode === 'vim') await window.keyboard.press('Escape')
+    const day = mode === 'vim' ? 19 : 20
+    const rowsBefore = await window.locator(`[data-agenda-key^="node:${dayNumber(10, day)}:"]`).count()
+    await window.keyboard.press(mode === 'vim' ? 'O' : 'Enter')
+    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
+    await expect(created).toBeFocused()
+    await expect(created).toHaveText(`2026-10-${day} `)
+    await expect(window.locator(`[data-agenda-key="${dayKey(10, day)}"]`)).toHaveCount(1)
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots.map((entry) => entry.text), { timeout: 20000 })
+      .toEqual(['Context', `2026-10-${day} `])
+    await window.keyboard.press('Meta+z')
+    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, day)}:"]`)).toHaveCount(rowsBefore)
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots.map((entry) => entry.text), { timeout: 20000 })
+      .toEqual(['Context'])
+    const gap = window.locator('[data-agenda-key^="gap:"]').first()
+    await gap.click()
+    for (const key of mode === 'vim' ? ['Enter', 'o', 'O'] : ['Enter']) await window.keyboard.press(key)
+    await expect(gap).toBeFocused()
+    await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toHaveCount(0)
+    expect(readPersisted(userDataDir).document.roots.map((entry) => entry.text)).toEqual(['Context'])
   })
 
   // @requirement PRODUCT.md §23.10

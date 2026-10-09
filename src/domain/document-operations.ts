@@ -400,6 +400,23 @@ export function createFirstChild(document: Document, parentId: NodeId, childId: 
   return next
 }
 
+/** Append a plain-text node as the last child of `parentId`, or as the last root when it is `null`. */
+export function createLastChild(document: Document, parentId: NodeId | null, childId: NodeId, text: string): Document {
+  const child: TreeNode = { id: childId, text, children: [] }
+  if (parentId === null) {
+    const next: Document = { roots: [...document.roots, child] }
+    inheritAttachmentIds(document, next)
+    return next
+  }
+  const located = requireNode(document, parentId)
+  if (located.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) {
+    throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
+  }
+  const next = replaceNode(document, located, { ...located.node, children: [...located.node.children, child] })
+  inheritAttachmentIds(document, next)
+  return next
+}
+
 export function splitNode(document: Document, nodeId: NodeId, cursor: number, newNodeId: NodeId): Document {
   const located = requireNode(document, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)
