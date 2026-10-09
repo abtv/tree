@@ -130,6 +130,29 @@ it('reveals the next chunk and collapses the expanded header without changing th
   expect(restored.revealed.size).toBe(0)
 })
 
+// @requirement PRODUCT.md §23.5
+it('selects the expanded region header when a revealed remainder gap disappears', () => {
+  let state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
+  const projection = [{ day: 130, rows: [{ nodeId: 'a', depth: 0, role: 'match' as const }] }]
+  const rowsOf = (current: typeof state) => buildAgendaRows(projection, current)
+  const original = rowsOf(state).find((row) => row.kind === 'gap')!
+  state = applyAgendaCommand(state, { kind: 'toggle-gap', key: original.key }, rowsOf(state))
+  // The first reveal leaves a smaller collapsed remainder beneath the expanded header.
+  for (let reveal = 0; reveal < 2; reveal += 1) {
+    const remainder = rowsOf(state).find((row) => row.kind === 'gap' && !row.expanded)!
+    state = applyAgendaCommand(state, { kind: 'toggle-gap', key: remainder.key }, rowsOf(state))
+    // The revealed remainder is replaced by days and a new remainder, so only the header can stay selected.
+    expect(rowsOf(state).some((row) => row.key === state.selectedKey)).toBe(true)
+    expect(state.selectedKey).toBe(original.key)
+  }
+  // A remainder small enough to reveal completely leaves only the expanded header.
+  const last = rowsOf(state).find((row) => row.kind === 'gap' && !row.expanded)
+  if (last !== undefined) state = applyAgendaCommand(state, { kind: 'toggle-gap', key: last.key }, rowsOf(state))
+  expect(rowsOf(state).filter((row) => row.kind === 'gap' && !row.expanded)).toHaveLength(0)
+  expect(rowsOf(state).some((row) => row.key === state.selectedKey)).toBe(true)
+  expect(state.selectedKey).toBe(original.key)
+})
+
 it('does not fold an empty day, but a folded content branch leaves the day non-empty', () => {
   const state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
   const projection = [

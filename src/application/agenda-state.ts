@@ -57,12 +57,23 @@ export function applyAgendaCommand(
   }
   if (command.kind === 'toggle-gap') {
     if (row.kind !== 'gap') return state
+    // Revealing a remainder replaces it with days and a smaller remainder, so its own row ceases to exist;
+    // the expanded header of its region stays and is the row that remains selectable.
+    const header = row.expanded
+      ? row
+      : (rows.find(
+          (candidate) =>
+            candidate.kind === 'gap' &&
+            candidate.expanded &&
+            candidate.startDay <= row.startDay &&
+            row.endDay <= candidate.endDay,
+        ) ?? row)
     return selectAgendaRow(
       {
         ...state,
         revealed: row.expanded ? collapseGap(state.revealed, row) : revealNext(state.revealed, row),
       },
-      row,
+      header,
     )
   }
   if (command.kind === 'fold') {
