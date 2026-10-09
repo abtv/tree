@@ -28,6 +28,7 @@ export const AgendaRow = memo(function AgendaRow({
   expanded,
   pinned = false,
   pinnedOffset = 0,
+  mirror = false,
   rowRef,
   onSelect,
   onToggle,
@@ -42,6 +43,7 @@ export const AgendaRow = memo(function AgendaRow({
   expanded: boolean
   pinned?: boolean
   pinnedOffset?: number
+  mirror?: boolean
   rowRef: (key: string, element: HTMLDivElement | null) => void
   onSelect: (key: string) => void
   onToggle: (key: string) => void
@@ -53,7 +55,7 @@ export const AgendaRow = memo(function AgendaRow({
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
   return (
     <div
-      className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
+      className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${pinned ? ' agenda-row-pinned' : ''}${mirror ? ' agenda-mirror' : ''}`}
       data-agenda-key={row.key}
       data-depth={depth}
       data-node-id={row.kind === 'node' ? row.nodeId : undefined}

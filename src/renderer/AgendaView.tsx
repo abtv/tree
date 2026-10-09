@@ -12,7 +12,8 @@ import { createViewportReveal } from './viewport-reveal'
 import { agendaListWindow } from './agenda-list-layout'
 import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node-list-layout'
 import { shouldWindow } from './list-window'
-import { notifyViewportLayout, onViewportScroll, viewportBounds } from './scroll-viewport'
+import { isAgendaMirror } from './agenda-labels'
+import { notifyViewportLayout, onViewportScroll, scrollViewportBy, viewportBounds } from './scroll-viewport'
 
 export function AgendaView({
   store,
@@ -117,6 +118,50 @@ export function AgendaView({
       globalThis.removeEventListener('resize', updateViewport)
     }
   }, [updateViewport, windowed])
+  // Rows a document change re-derives keep the selected occurrence at its viewport position, so a
+  // mirror or day change around it never scrolls it away (docs/PRODUCT.md §23.7).
+  const previous = useRef<
+    { key: string; nodeId: string | undefined; document: Document; rows: typeof rows } | undefined
+  >(undefined)
+  const anchorTop = useRef<number | undefined>(undefined)
+  const skipReveal = useRef(false)
+  const activeNodeId = agenda.activeOccurrence?.nodeId
+  // The store publishes before React renders, so the row is still where the user last saw it. A
+  // keystroke that keeps the same rows measures nothing.
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        const state = store.getSnapshot()
+        const last = previous.current
+        if (
+          state.status !== 'ready' ||
+          state.agenda === undefined ||
+          last === undefined ||
+          last.nodeId === undefined ||
+          last.nodeId !== state.agenda.activeOccurrence?.nodeId ||
+          last.document === state.document ||
+          last.rows === store.getAgendaRows()
+        )
+          return
+        anchorTop.current ??= elements.current.get(last.key)?.getBoundingClientRect().top
+      }),
+    [store],
+  )
+  useLayoutEffect(() => {
+    const anchored = anchorTop.current
+    skipReveal.current = anchored !== undefined
+    // A commit rendered with estimated heights is transient: the measured layout follows at once and
+    // moves the rows above, so the correction waits for it.
+    if (anchored !== undefined && layoutState.rows === rows && layoutState.revision === revision) {
+      anchorTop.current = undefined
+      const element = elements.current.get(agenda.selectedKey)
+      if (element !== undefined) {
+        const delta = element.getBoundingClientRect().top - anchored
+        if (Math.abs(delta) >= 1) scrollViewportBy(delta)
+      }
+    }
+    previous.current = { key: agenda.selectedKey, nodeId: activeNodeId, document, rows }
+  })
   const select = useCallback(
     (key: string): void => {
       reveal.current = 'pointer'
@@ -139,7 +184,8 @@ export function AgendaView({
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
     if (element.querySelector('.node-input') === null) element.focus({ preventScroll: true })
-    if (reveal.current !== 'none')
+    if (skipReveal.current) viewportReveal.cancel()
+    else if (reveal.current !== 'none')
       viewportReveal.begin(element, reveal.current === 'keyboard', () => {
         const state = store.getSnapshot()
         return state.status === 'ready' && state.agenda?.selectedKey === agenda.selectedKey
@@ -170,6 +216,7 @@ export function AgendaView({
         expanded={row.kind === 'gap' ? row.expanded : !agenda.collapsed.has(row.key)}
         pinned={pinned}
         pinnedOffset={layout.offsets[index] ?? 0}
+        mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
         rowRef={rowRef}
         onSelect={select}
         onToggle={toggle}

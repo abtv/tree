@@ -473,6 +473,12 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-date-secondary {
   color: var(--color-secondary);
 }
+/* A live mirror shows its bullet as a hollow ring in the gutter color (docs/PRODUCT.md §23.7). */
+.agenda-mirror .node-enter-control::before {
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-gutter-mark);
+  background: transparent;
+}
 .agenda-location-bar {
   padding-left: 42px;
 }
@@ -742,8 +748,24 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: var(--color-background);
 }
 
-.vim-mode {
+/* The transient message sits beside the Vim indicator; with Vim off it starts at the left edge
+   (docs/PRODUCT.md §23.7). Its auto margin keeps the toggles at the right. */
+.status-bar-spacer {
   margin-right: auto;
+}
+
+.status-bar-message {
+  min-width: 0;
+  margin-right: auto;
+  overflow: hidden;
+  color: var(--color-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vim-mode {
+  margin-right: 12px;
   border-radius: 3px;
   padding: 3px 7px;
   color: var(--color-mode-foreground);

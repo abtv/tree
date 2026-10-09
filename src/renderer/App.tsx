@@ -14,6 +14,7 @@ import { findCanonicalDates } from '../domain/date-recognition'
 import { richTextHtml } from './editor-dom'
 import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import { agendaStatusMessage } from './agenda-labels'
 import { clearCommandAssembly } from './vim-command-state'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
@@ -55,6 +56,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
       .catch((error: unknown) => store.reportError(error))
   }, [store])
   const agenda = state.status === 'ready' ? state.agenda : undefined
+  const statusMessage = agendaStatusMessage(agenda)
   const focus =
     state.status === 'ready' &&
     (agenda === undefined || agenda.activeOccurrence?.nodeId === state.location.selectedNodeId)
@@ -434,6 +436,13 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
             {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
           </div>
         ) : null}
+        {statusMessage === undefined ? (
+          <span aria-hidden="true" className="status-bar-spacer" />
+        ) : (
+          <span className="status-bar-message" role="status">
+            {statusMessage}
+          </span>
+        )}
         <VimToggle vimEnabled={vimEnabled} onToggle={toggleVimEnabled} />
         <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
       </footer>

@@ -1188,7 +1188,11 @@ Removing the last recognized date keeps the item and its contextual ancestors on
 
 If the scope root no longer exists, Agenda closes and returns to the nearest surviving Tree ancestor, or Root. A removed originating selection falls back to its surviving scope heading, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
 
-The active editor retains focus, caret, selection and mode when its active day changes. Mirror styling, scroll anchoring and the invalid-item status hint are introduced in a subsequent Agenda task.
+The active editor retains focus, caret, selection and mode when its active day changes.
+
+Every other occurrence of the active node is a live mirror: it shows the current text, links and image, never owns an editor, and draws its bullet as a hollow ring in the gutter color. Selecting a mirror, by pointer or keyboard, makes it the active occurrence. Editing the active occurrence updates its mirrors immediately without moving focus or changing the scroll position. When a document change moves the active occurrence to another row, the scroll position adjusts so that the active row keeps its place in the viewport; selecting a row never takes this adjustment.
+
+While the last date is removed, the status bar shows `Add a date to keep this item in Agenda`. The message sits beside the Vim mode indicator, or at the left edge when Vim is off, is announced as a status, and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
 
 ### 23.8 Agenda History Focus
 

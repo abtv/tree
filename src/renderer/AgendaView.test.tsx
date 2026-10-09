@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import './test/setup'
 import { createRealStoreHarness } from './test/real-store-harness'
 import { AgendaView } from './AgendaView'
@@ -86,4 +86,65 @@ it('bounds mounted rows, pins distant selection and preserves its DOM across a f
   expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
   expect(container.querySelector(`[data-agenda-key="${day.key}"]`)).toBe(document.activeElement)
   expect(harness.saves).toHaveLength(0)
+})
+
+// @requirement PRODUCT.md §23.7
+it('marks only other-day occurrences of the active node as live mirrors', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: [
+        { id: 'multi', text: '2026-10-14 Multi 2026-10-20', children: [] },
+        { id: 'single', text: '2026-10-14 Single', children: [] },
+      ],
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const { container } = render(<View store={harness.store} />)
+  const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
+  const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
+  const isMirror = (key: string): boolean =>
+    container.querySelector(`[data-agenda-key="${key}"]`)!.classList.contains('agenda-mirror')
+  expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(0)
+  act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
+  expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(1)
+  expect(isMirror(`node:${day20}:multi`)).toBe(true)
+  act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day20}:multi` }))
+  expect(isMirror(`node:${day14}:multi`)).toBe(true)
+  expect(isMirror(`node:${day20}:multi`)).toBe(false)
+  act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:single` }))
+  expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(0)
+})
+
+// @requirement PRODUCT.md §23.7
+it('keeps the active occurrence at its viewport position when a document change moves it', async () => {
+  const harness = await createRealStoreHarness({
+    document: { roots: [{ id: 'multi', text: '2026-10-14 Multi 2026-10-20', children: [] }] },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const { container } = render(<View store={harness.store} />)
+  const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
+  const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
+  act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
+  const tops = new Map([
+    [`node:${day14}:multi`, 100],
+    [`node:${day20}:multi`, 340],
+  ])
+  const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    const top = tops.get(this.dataset.agendaKey ?? '') ?? 0
+    return { top, bottom: top + 20, left: 0, right: 0, width: 0, height: 20, x: 0, y: top, toJSON: () => ({}) }
+  })
+  const scroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation(() => undefined)
+  try {
+    act(() => harness.store.editText('multi', 'Multi 2026-10-20'))
+    expect(scroll).toHaveBeenCalledTimes(1)
+    expect(scroll).toHaveBeenCalledWith(0, 240)
+    expect(container.querySelector(`[data-agenda-key="node:${day20}:multi"]`)).not.toBeNull()
+  } finally {
+    rect.mockRestore()
+    scroll.mockRestore()
+  }
 })
