@@ -1179,3 +1179,21 @@ On a gap, the same controls reveal up to seven days from the start. Its original
 ### 23.6 Large Timelines
 
 Agenda uses the windowing behavior of §20.1 above 500 projected rows, including day headers and gaps. The selected occurrence stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Folding, gap reveal and window resizing update the layout without losing selection or focus; windowing adds no document saves.
+
+### 23.7 Active Occurrence and Date Removal
+
+Selecting a direct match makes that node's occurrence on that day active. Adding a date keeps the active occurrence on its day. Removing its date moves it to the chronologically nearest remaining recognized date, choosing the earlier day on a tie. A live edit reveals that destination if folded so editing can continue; unrelated folds remain unchanged.
+
+Removing the last recognized date keeps the item and its contextual ancestors on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
+
+If the scope root no longer exists, Agenda closes and returns to the nearest surviving Tree ancestor, or Root. A removed originating selection falls back to its surviving scope heading, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
+
+These occurrence transitions are implemented in application state. Direct editing, invalid-state styling, and editing continuity in the renderer are introduced in subsequent Agenda tasks; Agenda remains read-only at this stage.
+
+### 23.8 Agenda History Focus
+
+Agenda uses the existing document Undo/Redo history. Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the Tree current parent, Agenda folds, revealed days, or Tree expansion while the scope exists.
+
+After Undo or Redo, select the nearest visible occurrence of the change-site node relative to the current occurrence's day, choosing the earlier day on a tie. If none is visible, or the change is outside the Agenda scope, keep the current selection and focus. A selection whose row no longer exists falls back to the nearest displayed day. History focus uses the change-site text cursor when selecting that node. Persistence locking continues to reject document edits and Undo/Redo, while navigation remains available.
+
+The Agenda history policy is implemented in the store; renderer history commands remain inactive in the read-only stage.

@@ -4,8 +4,11 @@ import { projectAgenda } from '../domain/agenda-projection'
 import * as projectionModule from '../domain/agenda-projection'
 import { editNodeText, type Document } from '../domain/document'
 import * as recognition from '../domain/date-recognition'
-import { AgendaRowsCache, buildAgendaRows } from './agenda-rows'
+import { agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
 import { openAgendaState } from './agenda-state'
+import { reconcileAgenda } from './agenda-reconcile'
+import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
+import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 const location = { currentParentId: null, selectedNodeId: 'parent' }
@@ -23,6 +26,83 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  it('merges a root-scope pin in chronological order, preserves matched ancestors, and ignores stale pins', () => {
+    const unpinnedState = openAgendaState(location, 0, today)
+    const state = { ...unpinnedState, pinnedOccurrence: { nodeId: 'a', day: today + 6 } }
+    const invalid = editNodeText(document, 'a', 'Undated')
+    const cache = new AgendaRowsCache()
+    const unpinned = cache.get(invalid, unpinnedState)
+    const pinned = cache.get(invalid, state)
+    expect(pinned).not.toBe(unpinned)
+    expect(pinned.find((row) => row.kind === 'node' && row.nodeId === 'a')).toMatchObject({ role: 'match' })
+    expect(cache.get(invalid, unpinnedState)).toEqual(unpinned)
+    const solo: Document = {
+      roots: [
+        { id: 'early', text: 'Undated', children: [] },
+        { id: 'later', text: '2026-10-28 Later', children: [] },
+      ],
+    }
+    const early = { ...state, pinnedOccurrence: { nodeId: 'early', day: today + 6 } }
+    expect(agendaProjection(solo, early).map((day) => day.day)).toEqual([today + 6, today + 20])
+    expect(agendaProjection(solo, early)[0]!.rows).toEqual([{ nodeId: 'early', depth: 0, role: 'match' }])
+    const matchedParent = editNodeText(invalid, 'parent', '2026-10-14 Parent')
+    expect(agendaProjection(matchedParent, state)[0]!.rows[0]!.role).toBe('match')
+    expect(agendaProjection(invalid, { ...state, pinnedOccurrence: { nodeId: 'missing', day: today } })).toEqual(
+      projectAgenda(invalid, null),
+    )
+    const scoped = { ...state, scopeParentId: 'a', pinnedOccurrence: { nodeId: 'c', day: today } }
+    expect(agendaProjection(invalid, scoped)).toEqual(projectAgenda(invalid, 'a'))
+  })
+  it('navigation with an active occurrence does not rescan or rebuild a wide Agenda', () => {
+    const wide: Document = {
+      roots: Array.from({ length: 10000 }, (_, index) => ({
+        id: String(index),
+        text: '2026-10-14 Item',
+        children: [],
+      })),
+    }
+    const runtime = new EditorRuntimeState()
+    const agenda = {
+      ...openAgendaState({ currentParentId: null, selectedNodeId: '0' }, 0, today),
+      selectedKey: `node:${today + 6}:0`,
+      activeOccurrence: { nodeId: '0', day: today + 6 },
+    }
+    const snapshot: ReadySnapshot = {
+      status: 'ready',
+      document: wide,
+      location: { currentParentId: null, selectedNodeId: '0' },
+      focus: runtime.newFocus('0', 0),
+      expansion: COLLAPSED_EXPANSION_STATE,
+      structuralVersion: 0,
+      agenda,
+    }
+    runtime.replaceReady(snapshot)
+    const cache = new AgendaRowsCache()
+    const rows = cache.get(wide, agenda)
+    const scan = vi.spyOn(recognition, 'findCanonicalDates')
+    const project = vi.spyOn(projectionModule, 'projectAgenda')
+    try {
+      for (let index = 1; index < 100; index++) {
+        const next = {
+          ...agenda,
+          selectedKey: `node:${today + 6}:${index}`,
+          activeOccurrence: { nodeId: String(index), day: today + 6 },
+        }
+        runtime.replaceReady({ ...snapshot, agenda: next })
+        expect(cache.get(wide, runtime.ready().agenda!)).toBe(rows)
+      }
+      expect(scan).not.toHaveBeenCalled()
+      expect(project).not.toHaveBeenCalled()
+      const edited = editNodeText(wide, '0', '2026-10-14 Item!')
+      const reconciled = reconcileAgenda(edited, agenda)!
+      expect(cache.get(edited, reconciled)).toBe(rows)
+      // One active-text scan and one changed-node domain-summary scan; no scan of unchanged nodes.
+      expect(scan).toHaveBeenCalledTimes(2)
+    } finally {
+      scan.mockRestore()
+      project.mockRestore()
+    }
+  })
   it('uses stable gap keys and distinguishes children from a following sibling', () => {
     const state = openAgendaState(location, 0, 100)
     const rows = buildAgendaRows(

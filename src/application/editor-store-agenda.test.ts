@@ -4,6 +4,7 @@ import type { Location, TreeNode } from '../domain/document'
 import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { AgendaRowsCache } from './agenda-rows'
+import { EditorRuntimeState } from './editor-runtime-state'
 
 export const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 export const roots: TreeNode[] = [
@@ -19,7 +20,7 @@ export const roots: TreeNode[] = [
 ]
 
 export async function agendaHarness(location: Location = { currentParentId: null, selectedNodeId: 'scope' }) {
-  const save = vi.fn(async () => undefined)
+  const save = vi.fn<EditorServices['save']>(async () => undefined)
   const services: EditorServices = {
     today: () => today,
     load: async () => ({ version: 4, document: { roots }, location, view: { expandedIds: [], selectedRowTop: 42 } }),
@@ -40,6 +41,179 @@ export function ready(store: EditorStore): ReadySnapshot {
 }
 
 afterEach(() => vi.useRealTimers())
+
+// @requirement PRODUCT.md §23.7
+// @requirement PRODUCT.md §23.8
+it('pins the last date through Undo/Redo and leaves it only on another selection, without a history entry', async () => {
+  const { store, save } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
+  store.openAgenda()
+  const key = `node:${today + 6}:match`
+  store.applyAgenda({ kind: 'select', key, cursor: 12 })
+  const original = ready(store)
+  store.editText('match', 'Undated')
+  expect(ready(store).agenda).toMatchObject({ selectedKey: key, pinnedOccurrence: { nodeId: 'match', day: today + 6 } })
+  expect(ready(store).focus).toBe(original.focus)
+  expect(store.getAgendaRows().some((row) => row.key === key)).toBe(true)
+  store.undo()
+  expect(ready(store).document).toBe(original.document)
+  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(ready(store).agenda!.selectedKey).toBe(key)
+  store.redo()
+  expect(ready(store).agenda!.pinnedOccurrence).toBeDefined()
+  store.applyAgenda({ kind: 'select', key: `day:${today}` })
+  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(store.getAgendaRows().some((row) => row.key === key)).toBe(false)
+  store.undo()
+  expect(ready(store).document).toBe(original.document)
+  expect(ready(store).agenda!.selectedKey).toBe(key)
+  expect(ready(store).location.currentParentId).toBe('scope')
+  await store.flushPersistence()
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(save.mock.calls[0]![0]).not.toHaveProperty('agenda')
+})
+
+// @requirement PRODUCT.md §23.8
+it('history preserves Agenda folds/reveals and focus for hidden or out-of-scope changes', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
+  store.editText('outside', '2026-10-08 Changed outside')
+  store.openAgenda()
+  const key = `node:${today + 6}:match`
+  store.applyAgenda({ kind: 'select', key, cursor: 7 })
+  const before = ready(store)
+  store.undo()
+  expect(ready(store).agenda).toBe(before.agenda)
+  expect(ready(store).location).toEqual(before.location)
+  expect(ready(store).focus).toBe(before.focus)
+  store.redo()
+  expect(ready(store).agenda).toBe(before.agenda)
+  expect(ready(store).focus).toBe(before.focus)
+  store.editText('match', '2026-10-14 Changed')
+  store.applyAgenda({ kind: 'toggle-fold', key: `node:${today + 6}:context` })
+  const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
+  store.applyAgenda({ kind: 'toggle-gap', key: gap.key })
+  const folded = ready(store)
+  store.undo()
+  expect(ready(store).agenda!.collapsed).toBe(folded.agenda!.collapsed)
+  expect(ready(store).agenda!.revealed).toBe(folded.agenda!.revealed)
+  expect(ready(store).agenda!.selectedKey).toBe(folded.agenda!.selectedKey)
+  expect(ready(store).focus).toBe(folded.focus)
+  expect(ready(store).location.currentParentId).toBe('scope')
+  await store.flushPersistence()
+})
+
+// @requirement PRODUCT.md §23.7
+it('clears a pin when its contextual ancestor is selected, maintaining a valid visible selection', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.editText('match', 'No date')
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:context` })
+  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda!.selectedKey)).toBe(true)
+  store.closeAgenda()
+  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
+  await store.flushPersistence()
+})
+
+it('closes Agenda when its scope disappears and normalizes a deleted origin on close', async () => {
+  const { store } = await agendaHarness()
+  store.createSiblingOrFirstChild(0)
+  store.enter()
+  store.openAgenda()
+  expect(ready(store).agenda!.scopeParentId).toBe('unused')
+  store.undo()
+  expect(ready(store).agenda).toBeUndefined()
+  expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'scope' })
+  expect(ready(store).focus.nodeId).toBe('scope')
+  await store.flushPersistence()
+
+  const origin = await agendaHarness()
+  origin.store.openAgenda()
+  origin.store.deleteSelected()
+  origin.store.closeAgenda()
+  expect(ready(origin.store).location.selectedNodeId).toBe('outside')
+  await origin.store.flushPersistence()
+})
+
+it('rejects edits and history while persistence is locked, but allows leaving a pinned item', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+  store.editText('scope', 'No date')
+  // The lock itself is tested through real save failures elsewhere; inject only its ready state here.
+  const runtime = (store as unknown as { runtime: EditorRuntimeState }).runtime
+  runtime.replaceReady({ ...ready(store), persistenceLocked: true })
+  const before = ready(store)
+  store.editText('scope', '2026-10-08 Forbidden')
+  store.undo()
+  store.redo()
+  expect(ready(store)).toBe(before)
+  store.applyAgenda({ kind: 'select', key: `day:${today}` })
+  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(ready(store).document).toBe(before.document)
+})
+
+// @requirement PRODUCT.md §23.8
+it('publishes the change-site cursor and real-node selection when history switches occurrences', async () => {
+  const { store } = await agendaHarness()
+  store.editText('match', '2026-10-14 2026-10-20 Match')
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:outside`, cursor: 2 })
+  const before = ready(store)
+  store.undo()
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 6}:match`)
+  expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'match' })
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 11 })
+  expect(ready(store).focus.token).toBeGreaterThan(before.focus.token)
+  const undone = ready(store).focus
+  store.redo()
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 11 })
+  expect(ready(store).focus.token).toBeGreaterThan(undone.token)
+  await store.flushPersistence()
+})
+
+// @requirement PRODUCT.md §23.8
+it('uses the selected day for history proximity and focuses contextual change sites', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
+  store.editText('match', '2026-10-14 Match 2026-10-20')
+  store.endTextSession()
+  store.editText('match', '2026-10-14 Changed 2026-10-20')
+  store.openAgenda()
+  const gap = store.getAgendaRows().find((row) => row.kind === 'gap' && row.startDay === today + 7)!
+  store.applyAgenda({ kind: 'toggle-gap', key: gap.key })
+  store.applyAgenda({ kind: 'select', key: `day:${today + 10}` })
+  store.undo()
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 12}:match`)
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 11 })
+  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'match' })
+  store.closeAgenda()
+  store.editText('context', 'Modified context')
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 20}:other`, cursor: 5 })
+  const before = ready(store).focus
+  store.undo()
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 12}:context`)
+  expect(ready(store).agenda!.activeOccurrence).toBeUndefined()
+  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
+  expect(ready(store).focus).toMatchObject({ nodeId: 'context', cursor: 0 })
+  expect(ready(store).focus.token).toBeGreaterThan(before.token)
+  await store.flushPersistence()
+})
+
+it('history keeps a valid Root location when deleting the selected last projected branch', async () => {
+  const { store } = await agendaHarness()
+  store.editText('outside', 'Undated outside')
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+  store.deleteSelected()
+  store.undo()
+  expect(ready(store).location.selectedNodeId).toBe('scope')
+  store.redo()
+  expect(ready(store).agenda!.selectedKey).toBe(`day:${today}`)
+  expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'outside' })
+  expect(ready(store).focus).toMatchObject({ nodeId: 'outside', cursor: 0 })
+  await store.flushPersistence()
+})
 
 it('ends text grouping at open, close, day selection, and real-row reselection', async () => {
   for (const transition of ['open', 'close', 'day', 'real'] as const) {

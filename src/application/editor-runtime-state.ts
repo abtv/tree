@@ -1,6 +1,7 @@
-import { releaseNodeIndex, type NodeId } from '../domain/document'
+import { isValidLocation, normalizeVisibleLocation, releaseNodeIndex, type NodeId } from '../domain/document'
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
-import { reconcileAgenda } from './agenda-state'
+import { agendaOriginLocation, reconcileAgenda } from './agenda-reconcile'
+import { isNodeExpanded } from './expansion-state'
 
 export type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
 
@@ -9,6 +10,8 @@ export class EditorRuntimeState {
   private structuralVersion = 0
   private focusToken = 0
   public snapshot: EditorSnapshot = { status: 'loading' }
+
+  public constructor(private readonly onAgendaClosed: () => void = () => undefined) {}
 
   public getSnapshot = (): EditorSnapshot => this.snapshot
 
@@ -35,7 +38,41 @@ export class EditorRuntimeState {
     const previous = this.snapshot
     if (changedStructure) this.structuralVersion += 1
     const next = { ...state, structuralVersion: this.structuralVersion }
-    if (state.agenda !== undefined) next.agenda = reconcileAgenda(state.agenda)
+    if (
+      state.agenda !== undefined &&
+      (previous.status !== 'ready' ||
+        previous.document !== state.document ||
+        previous.agenda === undefined ||
+        (previous.agenda?.pinnedOccurrence !== undefined && state.agenda.pinnedOccurrence === undefined))
+    ) {
+      const agenda = reconcileAgenda(state.document, state.agenda)
+      if (agenda === undefined) {
+        delete next.agenda
+        next.location = normalizeVisibleLocation(
+          state.document,
+          agendaOriginLocation(
+            state.document,
+            state.agenda,
+            previous.status === 'ready' ? previous.document : state.document,
+          ),
+          (id) => isNodeExpanded(state.expansion, id),
+        )
+        next.focus = this.newFocus(next.location.selectedNodeId, 0)
+      } else {
+        next.agenda = agenda
+        const active = agenda.activeOccurrence
+        // Publication enforces Agenda's active node even when the command already selected that same ID.
+        if (active !== undefined)
+          next.location = { currentParentId: agenda.scopeParentId, selectedNodeId: active.nodeId }
+        else if (!isValidLocation(state.document, { ...next.location, currentParentId: agenda.scopeParentId })) {
+          next.location = {
+            currentParentId: agenda.scopeParentId,
+            selectedNodeId: agenda.scopeParentId ?? state.document.roots[0]!.id,
+          }
+          next.focus = this.newFocus(next.location.selectedNodeId, 0)
+        }
+      }
+    }
     // Both branches install the same snapshot; the delete only drops an explicit `operationError: undefined` key.
     if (next.operationError === undefined) {
       this.snapshot = next
@@ -47,6 +84,7 @@ export class EditorRuntimeState {
     if (previous.status === 'ready' && previous.document !== this.snapshot.document) {
       releaseNodeIndex(previous.document)
     }
+    if (previous.status === 'ready' && previous.agenda !== undefined && next.agenda === undefined) this.onAgendaClosed()
     this.emit()
   }
 

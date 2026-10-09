@@ -82,6 +82,7 @@ import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
 import { dayNumberOf } from '../domain/calendar-date'
+import { agendaHistorySelection, agendaOriginLocation, reconcileAgenda, selectedAgendaDay } from './agenda-reconcile'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
@@ -90,7 +91,7 @@ export class EditorStore {
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
-  private readonly runtime = new EditorRuntimeState()
+  private readonly runtime = new EditorRuntimeState(() => this.agendaRowsCache.clear())
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly textSession: EditorTextSession
@@ -158,11 +159,16 @@ export class EditorStore {
     if (state.agenda === undefined) return
     this.endTextSession()
     const { agenda, ...tree } = state
-    this.agendaRowsCache.clear()
+    const location = normalizeVisibleLocation(state.document, agendaOriginLocation(state.document, agenda), (id) =>
+      isNodeExpanded(state.expansion, id),
+    )
     this.runtime.replaceReady({
       ...tree,
-      location: agenda.origin.location,
-      focus: this.runtime.newFocus(agenda.origin.location.selectedNodeId, agenda.origin.cursor),
+      location,
+      focus: this.runtime.newFocus(
+        location.selectedNodeId,
+        location.selectedNodeId === agenda.origin.location.selectedNodeId ? agenda.origin.cursor : 0,
+      ),
     })
   }
 
@@ -1169,6 +1175,43 @@ export class EditorStore {
    * only when the two snapshots hold no locatable difference.
    */
   private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
+    if (state.agenda !== undefined) {
+      const restored = reconcileAgenda(document, state.agenda, true)
+      if (restored !== undefined) {
+        const target = changeSiteFocus(state.document, document, state.location, () => true)
+        const agenda =
+          target === undefined
+            ? restored
+            : agendaHistorySelection(
+                document,
+                restored,
+                target.focus.nodeId,
+                selectedAgendaDay(state.agenda.selectedKey) ?? state.agenda.today,
+              )
+        const selected = this.agendaRowsCache.get(document, agenda).find((row) => row.key === agenda.selectedKey)
+        const hasTarget = selected?.kind === 'node' && selected.nodeId === target?.focus.nodeId
+        const selectedNodeId = selected?.kind === 'node' ? selected.nodeId : state.location.selectedNodeId
+        const location =
+          locateNode(document, selectedNodeId) === undefined
+            ? { currentParentId: agenda.scopeParentId, selectedNodeId: agenda.scopeParentId ?? document.roots[0]!.id }
+            : { currentParentId: agenda.scopeParentId, selectedNodeId }
+        this.runtime.replaceReady(
+          {
+            ...state,
+            document,
+            agenda,
+            location,
+            focus: hasTarget
+              ? this.runtime.newFocus(target!.focus.nodeId, target!.focus.cursor)
+              : location.selectedNodeId === state.focus.nodeId
+                ? state.focus
+                : this.runtime.newFocus(location.selectedNodeId, 0),
+          },
+          true,
+        )
+        return
+      }
+    }
     const target = changeSiteFocus(state.document, document, state.location, (id) =>
       isNodeExpanded(state.expansion, id),
     )

@@ -39,8 +39,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-10 | `Cmd+P` opens and closes a read-only Agenda timeline (headers, Today, collapsed gaps, hierarchy, full text, `Cmd+.` to Tree) | AG-9 | E2E scenarios 1, 2, 3 (without expansion), 14, 15 (isolation); VC1 geometry; light and dark screenshots; review and product verifier | Done |
 | AG-11 | Folding and gap expansion (`Cmd+E`, chevrons), independent of Tree | AG-10 | Unit tests, E2E scenario 3 remainder and 15, chevron geometry, screenshots | Done |
 | AG-12 | Windowed Agenda list and large-document performance guard | AG-10 | Component tests (bounded mounted rows), `perf/agenda.spec.ts`, `npm run check:full`, review | Done |
-| AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Ready |
-| AG-14 | Edit dated nodes in place with structural restrictions (D1, D2, Command Matrix) | AG-10, AG-13 | E2E scenarios 4 (without underline), 9, 15, clipboard; key-policy tests; emphasis screenshots; review and product verifier | Planned |
+| AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Done |
+| AG-14 | Edit dated nodes in place with structural restrictions (D1, D2, Command Matrix) | AG-10, AG-13 | E2E scenarios 4 (without underline), 9, 15, clipboard; key-policy tests; emphasis screenshots; review and product verifier | Ready |
 | AG-15 | Live occurrences: mirrors, active switching, invalid last-date item with status hint | AG-14 | E2E scenarios 6 and 7; VC7 and VC11 screenshots; focus and scroll stability assertions | Planned |
 | AG-16 | Create dated nodes from a day container (`Enter`, `o`, `O`) | AG-8, AG-15 | E2E scenario 8 first half; unit and property tests (one node appended, one history entry) | Planned |
 | AG-17 | Split a dated node with date inheritance; `o`/`O` on dated nodes | AG-16 | E2E scenario 8 second half; one-Undo test | Planned |
@@ -91,7 +91,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-13: Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store. Start a new session: AG-10 through AG-12 completed the read-only rollout required by C11.
+**Next task:** AG-14: Edit dated nodes in place with structural restrictions. Start a new session with the store reconciliation foundation complete; renderer editing and its caret/mode transfer remain this next task's scope.
+
+AG-13 implemented active occurrence reconciliation, temporary last-date pins, valid origin/scope fallbacks, and Agenda-aware store Undo/Redo. The Product Owner confirmed nearest visible history selection with earlier-day ties; history preserves folds and revealed days. Live migration reveals the destination to preserve editing continuity. The renderer remains read-only until AG-14/AG-15. Independent review and product verification found no remaining meaningful issues.
 
 AG-12 implemented occurrence-keyed measurements and viewport windowing with the selected DOM row retained as a pin, shared layout helpers and unchanged NodeList. Width and fold changes update measurements without losing focus. Component guards, real-Electron scroll/resize/fold/neighbor tests, geometry and inspected synthetic light/dark screenshots passed. Full validation passed (2548 unit tests, 610 Electron tests, 42 performance tests, zero audit vulnerabilities); independent review and product verification found no meaningful issues. A native same-machine comparison passed against the unwindowed AG-11 runtime; the new mounted-row guard rejected that runtime. Agenda windowing adds no saves. Performance budgets and local baseline artifacts remain owned by the suite.
 
@@ -431,7 +433,7 @@ Each is written into `docs/PRODUCT.md` by the named task, with the principle it 
 | m9 | Year in labels | The year is appended only when it differs from Today's year (`WED OCT 14 2027`, gap ranges likewise): minimal visual noise without ambiguity. | AG-10 (Q5) |
 | m10 | Has-children ring versus chevron | The ring reflects real children (`docs/PRODUCT.md` §2.1); the chevron reflects projected children. | AG-10 (Q5) |
 | m11 | Fold keys and selection after collapse | Collapse state is keyed by day and node, because rows are distinct occurrences (§3); collapsing an ancestor of the selection selects the collapsing row (`docs/PRODUCT.md` §2.4). | AG-11 |
-| m12 | Selection after Undo or Redo | Nearest occurrence of the change-site node, the earlier day on a tie (§6); otherwise the current selection stays. A change outside the scope never moves selection ("Undo never steals focus"). | AG-13 |
+| m12 | Selection after Undo or Redo | Nearest visible occurrence of the change-site node, the earlier day on a tie (§6); otherwise the current selection stays. A change outside the scope never moves selection ("Undo never steals focus"). The Product Owner confirmed visible-only eligibility on 2026-10-09; history never changes folds or revealed days to select a hidden occurrence. | AG-13 |
 | m13 | Leaving a temporarily invalid item | The item stays until selection moves, `Cmd+P` or `Cmd+.` is used, or another row is clicked; window blur is not leaving. If the scope root no longer exists, Agenda closes. | AG-13 |
 | m14 | Images, strikethrough, links | Direct matches behave as in Tree; contextual ancestors show text only (D2). | AG-14 |
 | m15 | Selection after D1 deletion | Previous sibling row, else parent row, else the day container (`docs/PRODUCT.md` §8.2 applied to the projection). | AG-14 |

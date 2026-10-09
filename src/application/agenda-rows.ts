@@ -1,6 +1,6 @@
 import type { DayNumber } from '../domain/calendar-date'
-import type { Document, NodeId } from '../domain/document'
-import { projectAgenda, type AgendaProjectionDay } from '../domain/agenda-projection'
+import { locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
+import { projectAgenda, type AgendaProjectionDay, type AgendaProjectionRow } from '../domain/agenda-projection'
 import { buildTimeline, type TimelineDay, type TimelineGap } from '../domain/agenda-timeline'
 import { dayKey, type AgendaState } from './agenda-state'
 
@@ -16,6 +16,36 @@ export type AgendaRow =
       readonly role: 'match' | 'context'
       readonly hasProjectedChildren: boolean
     }
+
+/** Add the one temporarily invalid item and its ancestors without copying document nodes. */
+export function agendaProjection(document: Document, state: AgendaState): readonly AgendaProjectionDay[] {
+  const projection = projectAgenda(document, state.scopeParentId)
+  const pin = state.pinnedOccurrence
+  if (pin === undefined) return projection
+  const located = locateNode(document, pin.nodeId)
+  if (located === undefined) return projection
+  const start =
+    state.scopeParentId === null ? 0 : located.ancestors.findIndex((node) => node.id === state.scopeParentId) + 1
+  if (state.scopeParentId !== null && start === 0) return projection
+  // Stryker disable next-line ArrayDeclaration: A non-row default element has undefined identity and never matches any real tree node.
+  const original = projection.find((entry) => entry.day === pin.day)?.rows ?? []
+  const included = new Map(original.map((row) => [row.nodeId, row.role]))
+  // Stryker disable next-line MethodExpression: Traversal starts below the scope, so extra ancestors in this map are never emitted.
+  for (const ancestor of located.ancestors.slice(start)) {
+    if (!included.has(ancestor.id)) included.set(ancestor.id, 'context')
+  }
+  included.set(pin.nodeId, 'match')
+  const rows: AgendaProjectionRow[] = []
+  const visit = (node: TreeNode, depth: number): void => {
+    const role = included.get(node.id)
+    if (role === undefined) return
+    rows.push({ nodeId: node.id, depth, role })
+    for (const child of node.children) visit(child, depth + 1)
+  }
+  const roots = state.scopeParentId === null ? document.roots : locateNode(document, state.scopeParentId)!.node.children
+  for (const root of roots) visit(root, 0)
+  return [...projection.filter((entry) => entry.day !== pin.day), { day: pin.day, rows }].sort((a, b) => a.day - b.day)
+}
 
 export function buildAgendaRows(projection: readonly AgendaProjectionDay[], state: AgendaState): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
@@ -77,8 +107,13 @@ export class AgendaRowsCache {
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
     let changed = false
-    if (document !== this.document || state.scopeParentId !== this.scope) {
-      const projection = projectAgenda(document, state.scopeParentId)
+    if (
+      document !== this.document ||
+      state.scopeParentId !== this.scope ||
+      // The document/scope guards run first; an equal cached document always has cached state.
+      state.pinnedOccurrence !== this.state?.pinnedOccurrence
+    ) {
+      const projection = agendaProjection(document, state)
       changed = !sameProjection(this.projection, projection)
       this.projection = projection
       this.document = document

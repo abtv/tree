@@ -10,6 +10,13 @@ export interface AgendaState {
   readonly selectedKey: string
   readonly collapsed: ReadonlySet<string>
   readonly revealed: ReadonlySet<DayNumber>
+  readonly activeOccurrence?: AgendaOccurrence
+  readonly pinnedOccurrence?: AgendaOccurrence
+}
+
+export interface AgendaOccurrence {
+  readonly nodeId: NodeId
+  readonly day: DayNumber
 }
 
 export type AgendaCommand =
@@ -41,15 +48,17 @@ export function applyAgendaCommand(
   if (rowIndex < 0) return state
   const row = rows[rowIndex]!
   if (command.kind === 'select') {
-    return state.selectedKey === row.key ? state : { ...state, selectedKey: row.key }
+    return selectAgendaRow(state, row)
   }
   if (command.kind === 'toggle-gap') {
     if (row.kind !== 'gap') return state
-    return {
-      ...state,
-      revealed: row.expanded ? collapseGap(state.revealed, row) : revealNext(state.revealed, row),
-      selectedKey: row.key,
-    }
+    return selectAgendaRow(
+      {
+        ...state,
+        revealed: row.expanded ? collapseGap(state.revealed, row) : revealNext(state.revealed, row),
+      },
+      row,
+    )
   }
   if (row.kind === 'gap' || (row.kind === 'day' && !row.content) || (row.kind === 'node' && !row.hasProjectedChildren))
     return state
@@ -68,10 +77,20 @@ export function applyAgendaCommand(
           candidate.kind === 'node' && candidate.day === row.day && (row.kind === 'day' || candidate.depth > row.depth),
       )
   }
-  return { ...state, collapsed, selectedKey: hidesSelection ? row.key : state.selectedKey }
+  const next = { ...state, collapsed }
+  return hidesSelection ? selectAgendaRow(next, row) : next
 }
 
-/** The document-edit reconciliation arrives with AG-13. */
-export function reconcileAgenda(state: AgendaState): AgendaState {
-  return state
+/** Selecting another row leaves an invalid item; reselection does not. */
+export function selectAgendaRow(state: AgendaState, row: AgendaRow): AgendaState {
+  if (state.selectedKey === row.key) return state
+  const rest = { ...state }
+  delete rest.activeOccurrence
+  delete rest.pinnedOccurrence
+  return {
+    ...rest,
+    selectedKey: row.key,
+    // Day and gap rows have no role, so the role check alone also prevents them becoming active.
+    ...(row.kind === 'node' && row.role === 'match' ? { activeOccurrence: { nodeId: row.nodeId, day: row.day } } : {}),
+  }
 }

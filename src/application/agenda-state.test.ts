@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { buildAgendaRows } from './agenda-rows'
-import { applyAgendaCommand, openAgendaState, reconcileAgenda } from './agenda-state'
+import { applyAgendaCommand, openAgendaState } from './agenda-state'
 
 it('captures the origin and keeps invalid or inapplicable commands as identity transitions', () => {
   const state = openAgendaState({ currentParentId: 'scope', selectedNodeId: 'origin' }, 7, 100)
@@ -11,7 +11,6 @@ it('captures the origin and keeps invalid or inapplicable commands as identity t
     origin: { location: { currentParentId: 'scope', selectedNodeId: 'origin' }, cursor: 7 },
   })
   const rows = buildAgendaRows([{ day: 110, rows: [{ nodeId: 'a', depth: 0, role: 'match' }] }], state)
-  expect(reconcileAgenda(state)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'select', key: state.selectedKey }, rows)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'select', key: 'missing' }, rows)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'select', key: rows[0]!.key }, rows).selectedKey).toBe(rows[0]!.key)
