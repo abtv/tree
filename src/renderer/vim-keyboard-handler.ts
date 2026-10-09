@@ -219,6 +219,7 @@ export function handleVimKey(
 
   if (event.key === 'Escape') {
     clearCommandAssembly(commandState)
+    store.cancelAgendaMove()
     vim.setMode('normal')
     syncImageCaretAtCursor(vim, node, input, selection.start)
     return handled()
@@ -295,14 +296,27 @@ export function handleVimKey(
   const snapshot = store.getSnapshot()
   if (snapshot.status === 'ready' && snapshot.agenda !== undefined) {
     // Awaited characters and surround delimiters above are text, even when they look like commands.
+    const plainPut = !visual && ['p', 'P'].includes(event.key) && !pending.operator && !pending.prefix
+    // `dd` never deletes in Agenda: it marks the node for a move, and a counted form marks the following rows too.
+    if (!visual && pending.operator === 'd' && event.key === 'd' && pending.prefix === undefined) {
+      clearPending(commandState)
+      if (agendaAllows('match', 'start-move')) store.startAgendaMove(totalCount)
+      return handled()
+    }
+    if (plainPut && snapshot.agenda.pendingMove !== undefined) {
+      clearPending(commandState)
+      if (agendaAllows('match', 'put-move')) store.putAgendaMove()
+      return handled()
+    }
+    // Without a pending move a text register puts as ordinary editing; a node register has nothing to put (D1).
+    const textPut = plainPut && vim.register.current.kind === 'text'
     const structural =
       event.key === '>' ||
       event.key === '<' ||
       (!visual && pending.prefix !== 'z' && ['o', 'O', 'V', 'J', 'Enter'].includes(event.key)) ||
       (pending.prefix === 'g' && ['J', 'p', 'P', 'd'].includes(event.key)) ||
-      (pending.operator === 'd' && event.key === 'd') ||
       (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
-      (!visual && ['p', 'P'].includes(event.key)) ||
+      (!visual && ['p', 'P'].includes(event.key) && !textPut) ||
       (!visual && event.key === '.' && commandState.lastChange?.kind.startsWith('structural-'))
     if (
       !visual &&

@@ -12,6 +12,8 @@ export interface AgendaState {
   readonly revealed: ReadonlySet<DayNumber>
   readonly activeOccurrence?: AgendaOccurrence
   readonly pinnedOccurrence?: AgendaOccurrence
+  /** Occurrences `dd` marked for `p`/`P`; runtime only, dropped by every document change (D4). */
+  readonly pendingMove?: readonly AgendaOccurrence[]
 }
 
 export interface AgendaOccurrence {

@@ -293,6 +293,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       if (event.key === 'Escape') {
         const committed = vim.finishReplace(event.currentTarget, true)
+        store.cancelAgendaMove()
         vim.setMode('normal')
         if (!committed) {
           const prior = vim.getCaretState(node.id, cursor, node.attachment !== undefined && cursor === node.text.length)
@@ -376,6 +377,7 @@ export function createEditorKeyDownHandler({
         // finish path below consumes it without recording (PRODUCT §20.2.1 T8).
         vim.finishInsert(event.currentTarget, true)
         clearCommandAssembly(vim.commandState)
+        store.cancelAgendaMove()
         vim.setMode('normal')
         const input = event.currentTarget
         const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))

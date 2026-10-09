@@ -6,12 +6,13 @@ import { createVimCommandState } from './vim-command-state'
 import type { VimTextCommandState } from './editor-input-handlers'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { dayNumberOf } from '../domain/calendar-date'
+import type { Document } from '../domain/document'
 import * as viewport from './scroll-viewport'
 
-async function fixture() {
+async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-10-15 Prepare', children: [] }] }) {
   const harness = await createRealStoreHarness({
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
-    document: { roots: [{ id: 'node', text: '2026-10-15 Prepare', children: [] }] },
+    document,
   })
   harness.store.openAgenda(2)
   const vim: VimTextCommandState = {
@@ -233,6 +234,114 @@ describe('read-only Agenda keyboard', () => {
       expect(create).toHaveBeenCalledWith('selected')
       expect(f.vim.mode).toBe('normal')
       expect(f.snapshot().document).toBe(before.document)
+    })
+  })
+
+  // @requirement PRODUCT.md §23.13
+  describe('pending move keys', () => {
+    const october = (day: number): number => dayNumberOf({ year: 2026, month: 10, day })
+    const nested: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: 'Parent',
+          children: [
+            { id: 'a', text: '2026-10-15 A', children: [] },
+            { id: 'b', text: '2026-10-15 B', children: [] },
+          ],
+        },
+      ],
+    }
+    const select = (f: Awaited<ReturnType<typeof fixture>>, key: string): void =>
+      f.store.applyAgenda({ kind: 'select', key })
+
+    it('marks with dd, shows the count, keeps it through navigation, and puts on any day row', async () => {
+      const f = await fixture(nested)
+      select(f, `node:${october(15)}:a`)
+      f.press('d')
+      f.press('d')
+      expect(f.snapshot().agenda?.pendingMove).toEqual([{ nodeId: 'a', day: october(15) }])
+      expect(f.vim.commandState.pending).toBeUndefined()
+      f.press('j')
+      f.press('k')
+      f.press('z')
+      f.press('a')
+      expect(f.snapshot().agenda?.pendingMove).toHaveLength(1)
+      select(f, `day:${october(9)}`)
+      f.press('p')
+      expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
+        '2026-10-09 A',
+        '2026-10-15 B',
+      ])
+      expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
+      expect(f.saves).toHaveLength(0)
+      f.store.undo()
+      expect(f.snapshot().document.roots[0]!.children[0]!.text).toBe('2026-10-15 A')
+    })
+
+    it('marks a counted dd and puts with P as with p', async () => {
+      const f = await fixture(nested)
+      select(f, `node:${october(15)}:a`)
+      f.press('2')
+      f.press('d')
+      f.press('d')
+      expect(f.snapshot().agenda?.pendingMove?.map((source) => source.nodeId)).toEqual(['a', 'b'])
+      select(f, `node:${october(15)}:parent`)
+      f.press('P')
+      expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
+        '2026-10-15 A',
+        '2026-10-15 B',
+      ])
+      expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
+    })
+
+    it('does nothing on a day, a contextual ancestor, or a gap', async () => {
+      const f = await fixture(nested)
+      const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+      for (const key of [`day:${october(9)}`, `node:${october(15)}:parent`, gap.key]) {
+        select(f, key)
+        f.press('d')
+        f.press('d')
+        expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
+      }
+    })
+
+    it('keeps the move pending when p is pressed on a gap and cancels it with Escape', async () => {
+      const f = await fixture(nested)
+      select(f, `node:${october(15)}:a`)
+      f.press('d')
+      f.press('d')
+      const pending = f.snapshot().agenda?.pendingMove
+      const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+      select(f, gap.key)
+      f.press('p')
+      expect(f.snapshot().agenda?.pendingMove).toBe(pending)
+      f.press('Escape')
+      expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
+      expect(f.snapshot().document.roots[0]!.children[0]!.text).toBe('2026-10-15 A')
+    })
+
+    it('does nothing on p without a pending move and ignores dd outside Normal mode', async () => {
+      const f = await fixture(nested)
+      const before = f.snapshot().document
+      select(f, `node:${october(15)}:a`)
+      f.press('p')
+      f.vim.mode = 'visual'
+      f.press('d')
+      f.press('d')
+      expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
+      expect(f.snapshot().document).toBe(before)
+    })
+
+    it('leaves the system clipboard and the Vim register untouched', async () => {
+      const f = await fixture(nested)
+      const write = vi.spyOn(f.store, 'copy')
+      select(f, `node:${october(15)}:a`)
+      f.press('d')
+      f.press('d')
+      select(f, `day:${october(9)}`)
+      f.press('p')
+      expect(write).not.toHaveBeenCalled()
     })
   })
 

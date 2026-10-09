@@ -12,9 +12,19 @@ export function agendaDateLabel(day: DayNumber, today: DayNumber, weekday = fals
 
 export const AGENDA_INVALID_ITEM_HINT = 'Add a date to keep this item in Agenda'
 
-/** The transient status-bar message; at most one exists at a time. */
-export function agendaStatusMessage(agenda: Pick<AgendaState, 'pinnedOccurrence'> | undefined): string | undefined {
-  return agenda?.pinnedOccurrence === undefined ? undefined : AGENDA_INVALID_ITEM_HINT
+export function agendaPendingMoveMessage(count: number): string {
+  return `Moving ${count} ${count === 1 ? 'item' : 'items'} · p to put · Esc to cancel`
+}
+
+/**
+ * The transient status-bar message; at most one exists at a time. A pending move and an invalid item cannot
+ * coexist, because any text edit cancels the move and only a text edit makes an item invalid.
+ */
+export function agendaStatusMessage(
+  agenda: Pick<AgendaState, 'pinnedOccurrence' | 'pendingMove'> | undefined,
+): string | undefined {
+  if (agenda?.pinnedOccurrence !== undefined) return AGENDA_INVALID_ITEM_HINT
+  return agenda?.pendingMove === undefined ? undefined : agendaPendingMoveMessage(agenda.pendingMove.length)
 }
 
 /** A live mirror is another day's occurrence of the node whose occurrence is active. */

@@ -13,6 +13,7 @@ import { agendaListWindow } from './agenda-list-layout'
 import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node-list-layout'
 import { shouldWindow } from './list-window'
 import { isAgendaMirror } from './agenda-labels'
+import { isPendingMoveSource } from '../application/agenda-pending-move'
 import { notifyViewportLayout, onViewportScroll, scrollViewportBy, viewportBounds } from './scroll-viewport'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { useAgendaDrag } from './use-agenda-drag'
@@ -245,6 +246,7 @@ export function AgendaView({
         dropTarget={drag.dropHeaderKey === row.key}
         pinnedOffset={layout.offsets[index] ?? 0}
         mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
+        pendingSource={row.kind === 'node' && isPendingMoveSource(agenda, row.nodeId, row.day)}
         rowRef={rowRef}
         onSelect={select}
         onToggle={toggle}

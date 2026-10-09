@@ -848,6 +848,14 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   outline-offset: -2px;
 }
 
+/* A pending Vim move keeps the source visible but dimmed; the selection marker stays (docs/PRODUCT.md §23.13). */
+.agenda-row-pending .node-input,
+.agenda-row-pending .agenda-text,
+.agenda-row-pending .node-enter-control,
+.agenda-row-pending .node-disclosure-triangle {
+  opacity: 0.38;
+}
+
 .node-row-drop-before::before,
 .node-row-drop-after::after {
   position: absolute;

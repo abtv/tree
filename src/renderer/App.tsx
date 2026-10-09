@@ -115,6 +115,10 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     // The editing mode already changed for this session; a failed write only loses the saved choice.
     void window.treeApi.setVimEnabled(nextValue).catch((error: unknown) => store.reportError(error))
   }, [vimEnabled, setVimEditing, store])
+  // `p` and `Esc` of a pending Agenda move are Vim commands, so standard editing cannot keep one.
+  useEffect(() => {
+    if (!vimEnabled) store.cancelAgendaMove()
+  }, [vimEnabled, store])
   // The application menu owns its own check marks and persists the value; the renderer only follows it.
   useEffect(() => {
     const stopAlwaysOnTop = window.treeApi.onAlwaysOnTopChanged?.(setAlwaysOnTop)

@@ -13,11 +13,20 @@ export function isInAgendaScope(document: Document, state: AgendaState, nodeId: 
   )
 }
 
+/** A pending move survives navigation only; every document change cancels it without an Undo entry (D4). */
+export function withoutPendingMove(state: AgendaState): AgendaState {
+  if (state.pendingMove === undefined) return state
+  const rest = { ...state }
+  delete rest.pendingMove
+  return rest
+}
+
 export function reconcileAgenda(
   document: Document,
-  state: AgendaState,
+  changed: AgendaState,
   preservePresentation = false,
 ): AgendaState | undefined {
+  const state = withoutPendingMove(changed)
   if (state.scopeParentId !== null && locateNode(document, state.scopeParentId) === undefined) return undefined
   let next = isValidLocation(document, state.origin.location)
     ? state

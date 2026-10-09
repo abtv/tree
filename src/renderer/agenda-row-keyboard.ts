@@ -87,6 +87,7 @@ export function createAgendaKeyDownHandler({
     }
     event.preventDefault()
     if (event.key === 'Escape') {
+      store.cancelAgendaMove()
       if (vim !== undefined) {
         clearCommandAssembly(vim.commandState)
         vim.setMode('normal')
@@ -109,6 +110,22 @@ export function createAgendaKeyDownHandler({
     if (normal && !event.ctrlKey && !event.altKey && event.key === 'z' && pending?.prefix === undefined) {
       vim.commandState.pending = { count: '', motionCount: '', prefix: 'z' }
       return
+    }
+    if (normal && !event.ctrlKey && !event.altKey && pending?.prefix === undefined) {
+      const element = row.kind === 'node' ? row.role : row.kind
+      if (event.key === 'd') {
+        if (pending?.operator === 'd') {
+          clearPending(vim.commandState)
+          if (agendaAllows(element, 'start-move')) store.startAgendaMove(count)
+        } else vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', operator: 'd' }
+        return
+      }
+      // A gap has no day, so `p` there is not allowed and the move stays pending (D4).
+      if ((event.key === 'p' || event.key === 'P') && pending?.operator === undefined) {
+        clearPending(vim.commandState)
+        if (agendaAllows(element, 'put-move')) store.putAgendaMove()
+        return
+      }
     }
     // Creation is a command key, so a count or pending prefix never reaches it.
     const vimCreate =

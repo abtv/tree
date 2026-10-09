@@ -29,6 +29,7 @@ export const AgendaRow = memo(function AgendaRow({
   pinned = false,
   pinnedOffset = 0,
   mirror = false,
+  pendingSource = false,
   dragging = false,
   dropTarget = false,
   rowRef,
@@ -46,6 +47,7 @@ export const AgendaRow = memo(function AgendaRow({
   pinned?: boolean
   pinnedOffset?: number
   mirror?: boolean
+  pendingSource?: boolean
   dragging?: boolean
   dropTarget?: boolean
   rowRef: (key: string, element: HTMLDivElement | null) => void
@@ -59,7 +61,7 @@ export const AgendaRow = memo(function AgendaRow({
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
   return (
     <div
-      className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${pinned ? ' agenda-row-pinned' : ''}${mirror ? ' agenda-mirror' : ''}${dragging ? ' agenda-row-dragging' : ''}${dropTarget ? ' agenda-row-drop-on' : ''}`}
+      className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${pinned ? ' agenda-row-pinned' : ''}${mirror ? ' agenda-mirror' : ''}${pendingSource ? ' agenda-row-pending' : ''}${dragging ? ' agenda-row-dragging' : ''}${dropTarget ? ' agenda-row-drop-on' : ''}`}
       data-agenda-key={row.key}
       data-depth={depth}
       data-node-id={row.kind === 'node' ? row.nodeId : undefined}

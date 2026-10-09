@@ -1216,7 +1216,7 @@ Agenda does not reorder existing siblings, change their real parents, delete sub
 
 Vim fold commands `zc`/`zo`, `za`, `zC`/`zO`, and `zM`/`zR` act on Agenda folds using the corresponding Tree fold rules. Recursive commands cover projected descendants; all-fold commands cover Agenda, independently of Tree expansion.
 
-Until the planned occurrence-move tasks land, `dd` and `p`/`P` do nothing on direct matches and contextual ancestors, and Vim Normal `Enter` does nothing on any row. These temporary restrictions prevent Tree structural semantics from running in Agenda. Creation from a day container, splitting, and sibling creation on direct matches are defined in §23.11; `Enter` and `o`/`O` do nothing on contextual ancestors.
+Vim Normal `Enter` does nothing on any row. Creation from a day container, splitting, and sibling creation on direct matches are defined in §23.11; `Enter` and `o`/`O` do nothing on contextual ancestors. `dd` and `p`/`P` move occurrences instead of deleting or putting nodes, as §23.13 defines.
 
 ### 23.11 Creating Nodes
 
@@ -1245,3 +1245,15 @@ A direct match is moved to another day by pressing and holding it with the prima
 A move replaces the source day's date in the node's text and changes nothing else: the parent, the children, and the position among siblings are unchanged, and other dates in the text stay. If the text already contains the target date, no second copy is added and the source date is removed with one adjacent space, so `2026-10-14 Plan 2026-10-15` dropped on Oct 15 becomes `2026-10-15 Plan`. Links keep their text. Descendants are never changed.
 
 The moved node becomes the selected, active occurrence under the target day, which is unfolded together with the moved node's ancestors there. The caret offset is kept when the node owned the focus, and its editor receives the focus again after the drop. The move is one undoable change that saves as any document edit does. Undo restores the previous dates and applies the history focus rule of §23.8.
+
+### 23.13 Pending Vim Move
+
+In Vim Normal, `dd` on a direct match marks that occurrence for a move and never deletes the node. A count marks the occurrence and the following direct matches of the same day at the same nesting level, skipping rows between them that do not qualify, such as contextual ancestors and nodes at other levels, and stops at the end of the day; fewer rows than the count mark the rows that exist. `dd` on a contextual ancestor, a day container, or a gap does nothing. Marking changes no document text, no Vim register, and not the system clipboard, and it is unavailable while persistence is locked.
+
+While a move is pending, each marked occurrence stays visible with its text, bullet, and disclosure chevron dimmed, and the status bar shows `Moving 1 item · p to put · Esc to cancel`, or `Moving N items · …` for several, beside the Vim mode indicator. The text of the marked nodes does not change until the move is put. A pending move and the invalid-item hint of §23.7 never coexist, because any text edit cancels the move.
+
+Navigation keeps the pending move: `j`/`k`, arrow keys, `gg`, `G`, `H`/`M`/`L`, `Ctrl+d`/`Ctrl+u`, mouse selection, scrolling, folding and unfolding, and expanding or collapsing gaps. `Esc` in any Vim mode (including the `Esc` that leaves Insert or Replace), any change of the document (a text edit or another move), Undo and Redo even when they change nothing, turning Vim off, and leaving the Agenda presentation (`Cmd+P`, `Cmd+.`) cancel it without an edit or an Undo entry. `dd` on a temporarily invalid item (§23.7) does nothing.
+
+`p` or `P` on any row of a day (its day container, a direct match, or a contextual ancestor) moves the marked occurrences to that day by replacing each source day's date as §23.12 defines, and the dimming disappears. The moved nodes keep their parents and positions; the first moved node becomes the selected, active occurrence under the target day. The put is one undoable change. When the target is the marked occurrences' own day nothing changes, no history entry is created, and the pending state ends. `p`/`P` on a gap does nothing and the move stays pending; a gap inside the timeline is reached by expanding it with `Cmd+E` and putting on the revealed day.
+
+Without a pending move, a node-register `p`/`P` does nothing in Agenda and a text-register `p`/`P` on a direct match is ordinary text editing (§23.9). `yy` copies as in Tree.

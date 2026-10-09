@@ -14,6 +14,9 @@ const exclusions: Record<string, string> = {
   createAgendaSibling: 'Agenda sibling creation is generated in editor-store-agenda.property.test.ts.',
   moveAgendaOccurrences:
     'Agenda occurrence moves have dedicated property coverage in editor-store-agenda-move.test.ts.',
+  startAgendaMove: 'Agenda pending moves are covered by editor-store-agenda-pending.test.ts.',
+  cancelAgendaMove: 'Agenda pending moves are covered by editor-store-agenda-pending.test.ts.',
+  putAgendaMove: 'Agenda pending moves are covered by editor-store-agenda-pending.test.ts.',
   getAgendaRows: 'Read-only Agenda projection with dedicated cache and composition tests.',
   getVisibleRows: 'Read-only projection used by the generator to choose displayed targets.',
   getRestoredSelectedRowTop: 'Read-only startup viewport metadata.',

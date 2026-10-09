@@ -124,6 +124,36 @@ it('marks only other-day occurrences of the active node as live mirrors', async 
   expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(0)
 })
 
+// @requirement PRODUCT.md §23.13
+it('dims only the marked occurrence of a pending move, not its mirror or other nodes', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: [
+        { id: 'multi', text: '2026-10-14 Multi 2026-10-20', children: [] },
+        { id: 'single', text: '2026-10-14 Single', children: [] },
+      ],
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const { container } = render(<View store={harness.store} />)
+  const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
+  const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
+  const pendingKeys = (): string[] =>
+    [...container.querySelectorAll('.agenda-row-pending')].map((row) => row.getAttribute('data-agenda-key')!)
+  expect(pendingKeys()).toEqual([])
+  act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
+  act(() => {
+    harness.store.startAgendaMove()
+  })
+  expect(pendingKeys()).toEqual([`node:${day14}:multi`])
+  expect(container.querySelector(`[data-agenda-key="node:${day20}:multi"]`)!.classList.contains('agenda-mirror')).toBe(
+    true,
+  )
+  act(() => harness.store.cancelAgendaMove())
+  expect(pendingKeys()).toEqual([])
+})
+
 // @requirement PRODUCT.md §23.7
 it('keeps the active occurrence at its viewport position when a document change moves it', async () => {
   const harness = await createRealStoreHarness({

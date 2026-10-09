@@ -7,6 +7,7 @@ import {
   reconcileAgenda,
   reconcileAgendaSelection,
   selectedAgendaDay,
+  withoutPendingMove,
 } from './agenda-reconcile'
 import { agendaProjection, buildAgendaRows } from './agenda-rows'
 import { openAgendaState, applyAgendaCommand, type AgendaState } from './agenda-state'
@@ -43,6 +44,20 @@ it('tracks explicit active occurrences, keeps added dates stable, and chooses th
   expect(reconcileAgenda(added, state)).toBe(state)
   const removed = editNodeText(document, 'match', '1970-04-09 1970-04-13')
   expect(reconcileAgenda(removed, state)).toMatchObject({ selectedKey: 'node:98:match', activeOccurrence: { day: 98 } })
+})
+
+// @requirement PRODUCT.md §23.13
+it('drops a pending move on every reconciliation but keeps everything else', () => {
+  const state = { ...selected(), pendingMove: [{ nodeId: 'match', day: 100 }] }
+  const settled = reconcileAgenda(document, state)!
+  expect(settled.pendingMove).toBeUndefined()
+  expect('pendingMove' in settled).toBe(false)
+  expect(settled).toEqual(selected())
+  expect(withoutPendingMove(state)).toEqual(selected())
+  const plain = selected()
+  expect(withoutPendingMove(plain)).toBe(plain)
+  const edited = editNodeText(document, 'other', '1970-04-11 Other!')
+  expect(reconcileAgenda(edited, state)!.pendingMove).toBeUndefined()
 })
 
 // @requirement PRODUCT.md §23.7

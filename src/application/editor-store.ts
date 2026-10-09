@@ -90,7 +90,14 @@ import {
   type AgendaOccurrenceMove,
 } from './editor-agenda-transitions'
 import { dayNumberOf } from '../domain/calendar-date'
-import { agendaHistorySelection, agendaOriginLocation, reconcileAgenda, selectedAgendaDay } from './agenda-reconcile'
+import {
+  agendaHistorySelection,
+  agendaOriginLocation,
+  reconcileAgenda,
+  selectedAgendaDay,
+  withoutPendingMove,
+} from './agenda-reconcile'
+import { pendingMoveSources, pendingMoveTargetDay } from './agenda-pending-move'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
@@ -273,6 +280,44 @@ export class EditorStore {
     const transition = moveOccurrencesTransition(state.document, state.location, state.agenda, moves, targetDay, cursor)
     if (transition === undefined) return false
     this.applyAgendaCreation(state.expansion, transition)
+    return true
+  }
+
+  /**
+   * Vim `dd` in Agenda: mark the selected direct match and the next `count − 1` qualifying rows for a later
+   * `p`/`P` (`plans/agenda.md` §13). It changes no document, Vim register, or clipboard, and returns whether
+   * anything was marked.
+   */
+  public startAgendaMove(count = 1): boolean {
+    const state = this.runtime.ready()
+    // A temporarily invalid item leaves Agenda when the selection moves, so it cannot be a pending source.
+    if (state.agenda === undefined || state.agenda.pinnedOccurrence !== undefined || this.isPersistenceLocked())
+      return false
+    const pendingMove = pendingMoveSources(this.getAgendaRows(), state.agenda.selectedKey, count)
+    if (pendingMove.length === 0) return false
+    this.runtime.replaceReady({ ...state, agenda: { ...state.agenda, pendingMove } })
+    return true
+  }
+
+  /** Drop a pending move without an edit or history entry (D4). */
+  public cancelAgendaMove(): void {
+    const state = this.runtime.snapshot
+    if (state.status !== 'ready' || state.agenda?.pendingMove === undefined) return
+    this.runtime.replaceReady({ ...state, agenda: withoutPendingMove(state.agenda) })
+  }
+
+  /**
+   * `p`/`P` with a pending move: move the marked occurrences to the selected row's day as one undoable change.
+   * A gap has no day, so it leaves the move pending; dropping on the source's own day edits nothing and only
+   * ends the pending state. Returns whether a pending move was consumed.
+   */
+  public putAgendaMove(): boolean {
+    const state = this.runtime.ready()
+    const pending = state.agenda?.pendingMove
+    if (state.agenda === undefined || pending === undefined || this.isPersistenceLocked()) return false
+    const day = pendingMoveTargetDay(this.getAgendaRows().find((row) => row.key === state.agenda!.selectedKey))
+    if (day === undefined) return false
+    if (!this.moveAgendaOccurrences(pending, day)) this.cancelAgendaMove()
     return true
   }
 
@@ -1256,6 +1301,8 @@ export class EditorStore {
 
   public undo(): void {
     this.endTextSession()
+    // Undo cancels a pending Agenda move even when there is nothing to undo (D4).
+    this.cancelAgendaMove()
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const previous = this.history.undo(state.document, state.location)
@@ -1270,6 +1317,7 @@ export class EditorStore {
     // restart one first begins a history entry that discards the redo branch. The session is
     // therefore already closed here; the call states the boundary and removing it changes nothing.
     this.endTextSession()
+    this.cancelAgendaMove()
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const next = this.history.redo(state.document, state.location)
