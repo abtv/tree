@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { memo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import type { AgendaRow as Row } from '../application/agenda-rows'
 import type { TreeNode } from '../domain/document'
 import { findCanonicalDates } from '../domain/date-recognition'
@@ -20,12 +20,14 @@ function datedText(node: TreeNode, day: number): ReactNode[] {
   return parts
 }
 
-export function AgendaRow({
+export const AgendaRow = memo(function AgendaRow({
   row,
   node,
   today,
   selected,
   expanded,
+  pinned = false,
+  pinnedOffset = 0,
   rowRef,
   onSelect,
   onToggle,
@@ -35,26 +37,29 @@ export function AgendaRow({
   today: number
   selected: boolean
   expanded: boolean
+  pinned?: boolean
+  pinnedOffset?: number
   rowRef: (key: string, element: HTMLDivElement | null) => void
   onSelect: (key: string) => void
   onToggle: (key: string) => void
 }): React.JSX.Element {
   const depth = row.kind === 'node' ? row.depth + 1 : 0
+  const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
   return (
     <div
-      className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}`}
+      className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
       data-agenda-key={row.key}
       data-depth={depth}
       data-node-id={row.kind === 'node' ? row.nodeId : undefined}
       aria-selected={selected}
       role="row"
       tabIndex={selected ? 0 : -1}
-      ref={(element) => rowRef(row.key, element)}
+      ref={ref}
       onClick={() => onSelect(row.key)}
       onFocus={() => {
         if (!selected) onSelect(row.key)
       }}
-      style={{ '--row-depth': depth } as CSSProperties}
+      style={{ '--row-depth': depth, ...(pinned ? { top: pinnedOffset } : {}) } as CSSProperties}
     >
       {selected ? <span aria-hidden="true" className="node-focus-marker" /> : null}
       {row.kind === 'gap' ||
@@ -96,4 +101,4 @@ export function AgendaRow({
       )}
     </div>
   )
-}
+})

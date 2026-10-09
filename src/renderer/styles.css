@@ -481,7 +481,8 @@ body:not(.node-drag-active) .location-link:hover {
   min-height: 1px;
 }
 
-.node-row-pinned {
+.node-row-pinned,
+.agenda-row-pinned {
   position: absolute;
   right: 0;
   left: 0;

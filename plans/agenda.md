@@ -38,8 +38,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-9 | Agenda view state in `EditorStore` (open, close, rows, selection, folds, reveal) without UI; new ADR | AG-6, AG-7 | Unit and property tests, no persisted leakage, performance assessment and guard, `npm run check:full`, independent review | Done |
 | AG-10 | `Cmd+P` opens and closes a read-only Agenda timeline (headers, Today, collapsed gaps, hierarchy, full text, `Cmd+.` to Tree) | AG-9 | E2E scenarios 1, 2, 3 (without expansion), 14, 15 (isolation); VC1 geometry; light and dark screenshots; review and product verifier | Done |
 | AG-11 | Folding and gap expansion (`Cmd+E`, chevrons), independent of Tree | AG-10 | Unit tests, E2E scenario 3 remainder and 15, chevron geometry, screenshots | Done |
-| AG-12 | Windowed Agenda list and large-document performance guard | AG-10 | Component tests (bounded mounted rows), `perf/agenda.spec.ts`, `npm run check:full`, review | Ready |
-| AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Planned |
+| AG-12 | Windowed Agenda list and large-document performance guard | AG-10 | Component tests (bounded mounted rows), `perf/agenda.spec.ts`, `npm run check:full`, review | Done |
+| AG-13 | Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store | AG-8, AG-9 | Unit and property tests (Undo restores the previous document, selection valid, presentation unchanged), performance check, review | Ready |
 | AG-14 | Edit dated nodes in place with structural restrictions (D1, D2, Command Matrix) | AG-10, AG-13 | E2E scenarios 4 (without underline), 9, 15, clipboard; key-policy tests; emphasis screenshots; review and product verifier | Planned |
 | AG-15 | Live occurrences: mirrors, active switching, invalid last-date item with status hint | AG-14 | E2E scenarios 6 and 7; VC7 and VC11 screenshots; focus and scroll stability assertions | Planned |
 | AG-16 | Create dated nodes from a day container (`Enter`, `o`, `O`) | AG-8, AG-15 | E2E scenario 8 first half; unit and property tests (one node appended, one history entry) | Planned |
@@ -91,7 +91,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-12: Windowed Agenda list and large-document performance guard. Continue in the same session per C11 so the first exposed Agenda is windowed.
+**Next task:** AG-13: Active occurrence, last-date state, and Agenda-aware Undo/Redo in the store. Start a new session: AG-10 through AG-12 completed the read-only rollout required by C11.
+
+AG-12 implemented occurrence-keyed measurements and viewport windowing with the selected DOM row retained as a pin, shared layout helpers and unchanged NodeList. Width and fold changes update measurements without losing focus. Component guards, real-Electron scroll/resize/fold/neighbor tests, geometry and inspected synthetic light/dark screenshots passed. Full validation passed (2548 unit tests, 610 Electron tests, 42 performance tests, zero audit vulnerabilities); independent review and product verification found no meaningful issues. A native same-machine comparison passed against the unwindowed AG-11 runtime; the new mounted-row guard rejected that runtime. Agenda windowing adds no saves. Performance budgets and local baseline artifacts remain owned by the suite.
 
 AG-11 implemented occurrence-local day/node folding through chevrons, Cmd+E and Normal za, and seven-day gap expansion with retained headers/remainders. Empty days and projected leaves do not fold. Collapsing a selected descendant focuses its ancestor; unrelated folds preserve focus. Tree expansion and persistence stay unchanged. Independent review and product verification found no meaningful issues; unit checks, ten real-Electron Agenda tests and inspected light/dark screenshots passed.
 

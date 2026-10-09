@@ -37,6 +37,100 @@ function seed(userDataDir: string): void {
 }
 
 describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §23.6
+  test('windows occurrences while keeping distant selection focused through scrolling, resizing and folding', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 600 }, (_, index) =>
+          leaf(
+            `dated-${index}`,
+            `2026-10-08 Item ${index} 2026-10-14 ${'Synthetic wrapping details. '.repeat(index % 3 === 0 ? 8 : 1)}`,
+          ),
+        ),
+      },
+      location: { currentParentId: null, selectedNodeId: 'dated-0' },
+    })
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, screenshotContentSize)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    const selected = window.locator('.agenda-row[aria-selected="true"]')
+    await expect(selected).toBeFocused()
+    await expect(window.locator('.agenda-list-spacer')).toHaveCount(2)
+    expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+    await window.keyboard.press('Escape')
+    if (mode === 'vim') await window.keyboard.press('G')
+    else {
+      await window.keyboard.press('Meta+e')
+      await window.keyboard.press('ArrowDown')
+      await window.keyboard.press('ArrowDown')
+      await window.keyboard.press('ArrowDown')
+      await window.keyboard.press('Meta+e')
+      await window.keyboard.press('ArrowUp')
+      await window.keyboard.press('ArrowUp')
+      await window.keyboard.press('ArrowUp')
+      await window.keyboard.press('Meta+e')
+    }
+    await expect(selected).toBeFocused()
+    const key = await selected.getAttribute('data-agenda-key')
+    await selected.evaluate((element) => {
+      ;(globalThis as unknown as { selectedAgendaElement: Element }).selectedAgendaElement = element
+    })
+    await window.evaluate(() => {
+      document.querySelector<HTMLElement>('.scroll-viewport')!.scrollTop = 8000
+    })
+    await expect(selected).toHaveClass(/agenda-row-pinned/u)
+    await expect(selected).toBeFocused()
+    await expect
+      .poll(() =>
+        selected.evaluate(
+          (element) => element === (globalThis as unknown as { selectedAgendaElement: Element }).selectedAgendaElement,
+        ),
+      )
+      .toBe(true)
+    expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+    await setMainWindowContentSize(app, { width: 650, height: 600 })
+    await expect(selected).toHaveAttribute('data-agenda-key', key!)
+    await expect(selected).toBeFocused()
+    if (mode === 'vim') {
+      await window.keyboard.press('g')
+      await window.keyboard.press('g')
+    } else {
+      await window.evaluate(() => {
+        document.querySelector<HTMLElement>('.scroll-viewport')!.scrollTop = 0
+      })
+      await window.locator('.agenda-row-day').filter({ hasText: 'TODAY' }).click()
+    }
+    const today = window.locator('.agenda-row-day').filter({ hasText: 'TODAY' })
+    await today.click()
+    await window.keyboard.press('Meta+e')
+    await expect(today).toBeFocused()
+    await window.keyboard.press('Meta+e')
+    await expect(today).toBeFocused()
+    expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+    await window.keyboard.press('ArrowDown')
+    await expect(selected).toHaveAttribute('data-node-id', 'dated-0')
+    await expect(selected).toBeFocused()
+    const neighbor = window.locator('.agenda-row[data-node-id="dated-1"]').first()
+    await expect
+      .poll(async () => {
+        const bottom = await selected.evaluate((element) => element.getBoundingClientRect().bottom)
+        const top = await neighbor.evaluate((element) => element.getBoundingClientRect().top)
+        return Math.abs(top - bottom)
+      })
+      .toBeLessThan(1)
+    await window.keyboard.press('ArrowDown')
+    await expect(neighbor).toBeFocused()
+    await window.keyboard.press('ArrowUp')
+    await expect(selected).toHaveAttribute('data-node-id', 'dated-0')
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.emulateMedia({ colorScheme: appearance })
+      await window.mouse.move(600, 20)
+      await expect(window).toHaveScreenshot(screenshotName(`agenda-windowed-${appearance}.png`))
+    }
+  })
   // @requirement PRODUCT.md §23.5
   test('folds occurrences and reveals gaps through pointer and keyboard without changing Tree folds', async ({
     userDataDir,

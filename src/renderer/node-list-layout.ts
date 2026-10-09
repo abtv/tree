@@ -41,14 +41,20 @@ export function collectWindowIndices(windowRange: ListWindow): number[] {
   return indices
 }
 
-export function buildLayout(rows: readonly VisibleRow[], heights: ReadonlyMap<string, number>): ListLayout {
-  const rowHeights = rows.map((row) => heights.get(row.node.id) ?? ROW_HEIGHT_ESTIMATE)
+type KeyedRow = VisibleRow | { readonly key: string }
+
+function rowKey(row: KeyedRow): string {
+  return 'key' in row ? row.key : row.node.id
+}
+
+export function buildLayout(rows: readonly KeyedRow[], heights: ReadonlyMap<string, number>): ListLayout {
+  const rowHeights = rows.map((row) => heights.get(rowKey(row)) ?? ROW_HEIGHT_ESTIMATE)
   const { offsets, total } = computeOffsets(rowHeights)
   return { offsets, total, count: rows.length }
 }
 
-export function pruneHeights(heights: Map<string, number>, rows: readonly VisibleRow[]): void {
-  const ids = new Set(rows.map((row) => row.node.id))
+export function pruneHeights(heights: Map<string, number>, rows: readonly KeyedRow[]): void {
+  const ids = new Set(rows.map(rowKey))
   for (const id of heights.keys()) {
     if (!ids.has(id)) heights.delete(id)
   }

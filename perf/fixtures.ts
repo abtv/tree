@@ -232,6 +232,25 @@ export function wideSeed(count: number): Seed {
   }
 }
 
+/** Dated siblings with wrapping text; two occurrences per real node. */
+export function agendaSeed(count: number): Seed {
+  const today = new Date()
+  const later = new Date(today)
+  later.setDate(today.getDate() + 6)
+  const canonical = (date: Date): string =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return {
+    document: {
+      roots: Array.from({ length: count }, (_, index) => ({
+        id: `dated-${index}`,
+        text: `${canonical(today)} Item ${index} ${canonical(later)} ${'Review the synthetic rollout details. '.repeat(index % 3 === 0 ? 5 : 1)}`,
+        children: [],
+      })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'dated-0' },
+  }
+}
+
 export function largeSeed(roots: number, perRoot: number): Seed {
   const rootNodes: BuiltNode[] = Array.from({ length: roots }, (_, rootIndex) => ({
     id: `r${rootIndex}`,
