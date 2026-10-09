@@ -44,8 +44,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-15 | Live occurrences: mirrors, active switching, invalid last-date item with status hint | AG-14 | E2E scenarios 6 and 7; VC7 and VC11 screenshots; focus and scroll stability assertions | Done |
 | AG-16 | Create dated nodes from a day container (`Enter`, `o`, `O`) | AG-8, AG-15 | E2E scenario 8 first half; unit and property tests (one node appended, one history entry) | Done |
 | AG-17 | Split a dated node with date inheritance; `o`/`O` on dated nodes | AG-16 | E2E scenario 8 second half; one-Undo test | Done |
-| AG-18 | Move occurrences between days by mouse drag (single and group store operation) | AG-8, AG-15 | E2E scenario 10 with a real drag; property test (a move changes only moved dates, Undo restores); drop screenshot | Ready |
-| AG-19 | Vim pending move: `dd`, counted `dd`, `p`/`P`, cancel rules, dimming, status message | AG-18 | E2E scenario 11; D4 lifecycle table test; VC8 screenshot; `docs/VIM_CONFORMANCE.md` rows | Planned |
+| AG-18 | Move occurrences between days by mouse drag (single and group store operation) | AG-8, AG-15 | E2E scenario 10 with a real drag; property test (a move changes only moved dates, Undo restores); drop screenshot | Done |
+| AG-19 | Vim pending move: `dd`, counted `dd`, `p`/`P`, cancel rules, dimming, status message | AG-18 | E2E scenario 11; D4 lifecycle table test; VC8 screenshot; `docs/VIM_CONFORMANCE.md` rows | Ready |
 | AG-20 | Vim whole-node Visual selection and group move | AG-19 | E2E scenario 12; selection-skip property test; VC12 screenshot | Planned |
 | AG-21 | Focused day: `Cmd+.` on a day, `Cmd+,` back, `Agenda / Oct 14` heading | AG-11, AG-14 | E2E scenario 13; VC13 screenshot; VC14 observed | Planned |
 | AG-22 | Natural-language date parser in the domain, with the expression table for Product Owner review | AG-5 | Table-driven unit tests from §5, property tests, mutation, Product Owner approves the table (Q2) | Planned |
@@ -91,7 +91,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-18: Move occurrences between days by mouse drag. Follow the AG-18 Task details.
+**Next task:** AG-19: Vim pending move. Follow the AG-19 Task details; it reuses `EditorStore.moveAgendaOccurrences`.
+
+AG-18 implemented mouse dragging of a direct match onto any row of another day through `EditorStore.moveAgendaOccurrences` (a list of moves, so AG-20 reuses it), the pure `moveOccurrencesTransition`, `use-agenda-drag.ts` on the Tree gesture reducer and caret freeze, and `agenda-drop-targets.ts`. The drop is one history entry; the moved node becomes the active occurrence on the target day and scroll anchoring is skipped for the drop so the pointer reveal places it. Observation for the Product Owner: the drop outline is drawn only on the target day's header (m18), so when that header is scrolled off or unmounted, a valid drop on a lower row of a long day shows no outline; a fallback such as outlining the pointed row would be a new product choice. Pending-hold cancel on pointer leave was added after review.
 
 AG-17 implemented splitting with date inheritance (`Enter` in standard editing and Vim Insert) through `EditorStore.splitAgendaNode` and the pure `splitDatedNodeTransition`, and dated real siblings for Vim Normal `o`/`O` through `createAgendaSibling`; the key policy gained `split` and `open-sibling` on direct matches. `splitDatePrefix` was replaced by `splitDateEdit`, which returns a link-aware edit. Vim Normal `Enter` stays inert; observations for the Product Owner: Tree's Normal `Enter` (image preview or hyperlink open) has no Agenda equivalent yet, and splitting with the caret inside a date, such as `2026-1|0-14 x`, leaves the original node undated so it leaves that day (m17 as written). The independent review also found that `zo` and `zO` were swallowed on a direct match by the structural-command filter in `vim-keyboard-handler.ts`; fixed with a regression test. The `Enter`/`o`/`O` inert assertions of AG-14 were updated to the new behavior.
 

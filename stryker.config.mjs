@@ -20,6 +20,7 @@ export default {
     'src/renderer/node-drag.ts',
     'src/renderer/list-window.ts',
     'src/renderer/agenda-key-policy.ts',
+    'src/renderer/agenda-drop-targets.ts',
     '!src/**/*.test.ts',
     '!src/application/test/**',
   ],

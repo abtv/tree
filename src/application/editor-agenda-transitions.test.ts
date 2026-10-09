@@ -5,6 +5,7 @@ import { agendaProjection, buildAgendaRows } from './agenda-rows'
 import { dayKey, openAgendaState, type AgendaState } from './agenda-state'
 import {
   createDayNodeTransition,
+  moveOccurrencesTransition,
   openDatedSiblingTransition,
   splitDatedNodeTransition,
 } from './editor-agenda-transitions'
@@ -220,5 +221,105 @@ describe('opening a dated sibling beside a dated node', () => {
     )
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['kid'])
     expect(result.document.roots.map((node) => node.id)).toEqual(['a', 'new', 'b'])
+  })
+})
+
+// @requirement PRODUCT.md §23.12
+describe('moving occurrences between days', () => {
+  const moveDocument: Document = {
+    roots: [
+      {
+        id: 'parent',
+        text: 'Parent',
+        children: [
+          {
+            id: 'a',
+            text: '2026-10-14 Prepare 2026-10-20',
+            children: [{ id: 'kid', text: '2026-10-14 Kid', children: [] }],
+          },
+          { id: 'b', text: '2026-10-14 Review 2026-10-15', children: [] },
+        ],
+      },
+    ],
+  }
+  const location = { currentParentId: null, selectedNodeId: 'parent' }
+
+  it('replaces only the moved date and leaves parent, order, and children unchanged', () => {
+    const result = moveOccurrencesTransition(
+      moveDocument,
+      location,
+      open(),
+      [{ nodeId: 'a', day: day(10, 14) }],
+      day(10, 15),
+      3,
+    )!
+    const parent = result.document.roots[0]!
+    expect(parent.children.map((node) => node.id)).toEqual(['a', 'b'])
+    expect(parent.children[0]!.text).toBe('2026-10-15 Prepare 2026-10-20')
+    expect(parent.children[0]!.children).toBe(moveDocument.roots[0]!.children[0]!.children)
+    expect(parent.children[1]).toBe(moveDocument.roots[0]!.children[1])
+    expect(moveDocument.roots[0]!.children[0]!.text).toBe('2026-10-14 Prepare 2026-10-20')
+  })
+
+  it('does not duplicate a target date already in the text and activates that occurrence', () => {
+    const result = moveOccurrencesTransition(
+      moveDocument,
+      location,
+      open(),
+      [{ nodeId: 'b', day: day(10, 14) }],
+      day(10, 15),
+      0,
+    )!
+    expect(result.document.roots[0]!.children[1]!.text).toBe('2026-10-15 Review')
+    expect(result.agenda).toMatchObject({
+      selectedKey: `node:${day(10, 15)}:b`,
+      activeOccurrence: { nodeId: 'b', day: day(10, 15) },
+    })
+    expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'b' })
+    expect(result.focus).toEqual({ nodeId: 'b', cursor: 0 })
+  })
+
+  it('moves several nodes in one document and selects the first', () => {
+    const result = moveOccurrencesTransition(
+      moveDocument,
+      location,
+      open(),
+      [
+        { nodeId: 'kid', day: day(10, 14) },
+        { nodeId: 'a', day: day(10, 14) },
+      ],
+      day(10, 16),
+      0,
+    )!
+    expect(result.document.roots[0]!.children[0]!.text).toBe('2026-10-16 Prepare 2026-10-20')
+    expect(result.document.roots[0]!.children[0]!.children[0]!.text).toBe('2026-10-16 Kid')
+    expect(result.agenda.activeOccurrence).toEqual({ nodeId: 'kid', day: day(10, 16) })
+  })
+
+  it('unfolds the target day and the moved path there without changing the original fold set', () => {
+    const state = {
+      ...open(),
+      collapsed: new Set([dayKey(day(10, 15)), `node:${day(10, 15)}:parent`, 'node:other']),
+    }
+    const result = moveOccurrencesTransition(
+      moveDocument,
+      location,
+      state,
+      [{ nodeId: 'a', day: day(10, 14) }],
+      day(10, 15),
+      0,
+    )!
+    expect([...result.agenda.collapsed]).toEqual(['node:other'])
+    expect(state.collapsed.size).toBe(3)
+  })
+
+  it('changes nothing when no text changes', () => {
+    expect(
+      moveOccurrencesTransition(moveDocument, location, open(), [{ nodeId: 'a', day: day(10, 14) }], day(10, 14), 0),
+    ).toBeUndefined()
+    expect(
+      moveOccurrencesTransition(moveDocument, location, open(), [{ nodeId: 'a', day: day(10, 18) }], day(10, 15), 0),
+    ).toBeUndefined()
+    expect(moveOccurrencesTransition(moveDocument, location, open(), [], day(10, 15), 0)).toBeUndefined()
   })
 })

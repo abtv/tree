@@ -14,6 +14,8 @@ import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node
 import { shouldWindow } from './list-window'
 import { isAgendaMirror } from './agenda-labels'
 import { notifyViewportLayout, onViewportScroll, scrollViewportBy, viewportBounds } from './scroll-viewport'
+import type { NodeDragCaretFreeze } from './drag-caret-freeze'
+import { useAgendaDrag } from './use-agenda-drag'
 
 export function AgendaView({
   store,
@@ -23,10 +25,14 @@ export function AgendaView({
   renderInput,
   renderAttachment,
   renderText,
+  dragFreeze,
+  locked = false,
 }: {
   store: EditorStore
   agenda: AgendaState
   document: Document
+  dragFreeze: NodeDragCaretFreeze
+  locked?: boolean
   vim?: VimTextCommandState | undefined
   renderInput?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: import('../domain/document').TreeNode, editable: boolean) => ReactNode) | undefined
@@ -124,6 +130,7 @@ export function AgendaView({
     { key: string; nodeId: string | undefined; document: Document; rows: typeof rows } | undefined
   >(undefined)
   const anchorTop = useRef<number | undefined>(undefined)
+  const dropping = useRef(false)
   const skipReveal = useRef(false)
   const activeNodeId = agenda.activeOccurrence?.nodeId
   // The store publishes before React renders, so the row is still where the user last saw it. A
@@ -134,6 +141,7 @@ export function AgendaView({
         const state = store.getSnapshot()
         const last = previous.current
         if (
+          dropping.current ||
           state.status !== 'ready' ||
           state.agenda === undefined ||
           last === undefined ||
@@ -192,6 +200,24 @@ export function AgendaView({
       })
     else viewportReveal.cancel()
   }, [agenda.selectedKey, store, viewportReveal])
+  const drag = useAgendaDrag({
+    rows,
+    locked,
+    listRef,
+    elementsRef: elements,
+    dragFreeze,
+    onDrop: (source, targetDay) => {
+      reveal.current = 'pointer'
+      // The source row may be far off-screen after a long drag; anchoring to it would scroll the moved
+      // row away from the drop, so the pointer reveal places it instead.
+      dropping.current = true
+      try {
+        store.moveAgendaOccurrences([{ nodeId: source.nodeId, day: source.day }], targetDay)
+      } finally {
+        dropping.current = false
+      }
+    },
+  })
   // A changed row array needs compatible offsets immediately, before the measuring effect commits.
   const layout = layoutState.rows === rows ? layoutState.layout : buildLayout(rows, EMPTY_HEIGHTS)
   const range = agendaListWindow(rows, layout, viewport, agenda.selectedKey)
@@ -215,6 +241,8 @@ export function AgendaView({
         selected={row.key === agenda.selectedKey}
         expanded={row.kind === 'gap' ? row.expanded : !agenda.collapsed.has(row.key)}
         pinned={pinned}
+        dragging={drag.sourceKey === row.key}
+        dropTarget={drag.dropHeaderKey === row.key}
         pinnedOffset={layout.offsets[index] ?? 0}
         mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
         rowRef={rowRef}
@@ -251,6 +279,13 @@ export function AgendaView({
       ref={listRef}
       role="grid"
       aria-label="Agenda timeline"
+      onClickCapture={drag.onListClick}
+      onLostPointerCapture={drag.onLostPointerCapture}
+      onPointerCancel={drag.onListPointerCancel}
+      onPointerDown={drag.onListPointerDown}
+      onPointerLeave={drag.onListPointerLeave}
+      onPointerMove={drag.onListPointerMove}
+      onPointerUp={drag.onListPointerUp}
       onKeyDown={(event) =>
         !event.defaultPrevented &&
         !(event.target instanceof Element && event.target.closest('.node-input')) &&

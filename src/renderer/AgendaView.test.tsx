@@ -37,6 +37,7 @@ it('renders attachments on inactive direct matches and excludes contextual ances
       store={harness.store}
       agenda={state.agenda!}
       document={state.document}
+      dragFreeze={{ begin: vi.fn(), end: vi.fn() }}
       renderInput={() => <span className="test-editor" />}
       renderText={(node) => <a href="https://example.com">{node.text}</a>}
       renderAttachment={(node, editable) => <span data-attachment={node.id} data-editable={editable} />}
@@ -53,7 +54,14 @@ it('renders attachments on inactive direct matches and excludes contextual ances
 function View({ store }: { store: EditorStore }): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   if (state.status !== 'ready' || state.agenda === undefined) return <div />
-  return <AgendaView store={store} agenda={state.agenda} document={state.document} />
+  return (
+    <AgendaView
+      store={store}
+      agenda={state.agenda}
+      document={state.document}
+      dragFreeze={{ begin: vi.fn(), end: vi.fn() }}
+    />
+  )
 }
 
 // @requirement PRODUCT.md §23.6

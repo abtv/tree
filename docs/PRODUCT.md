@@ -1235,3 +1235,13 @@ Vim Normal `Enter` stays inert, and a counted or prefixed command still does not
 #### Creating a Sibling of a Dated Node
 
 Vim Normal `o` creates a real sibling immediately after the selected direct match and after its subtree, and `O` immediately before it, in the Tree. The new node's text is the displayed day's date followed by one space, the caret follows the space, it becomes the active occurrence and Vim enters Insert. It never becomes a child, even when the node has children. A count before `o`/`O` cancels the command. Creation is one undoable change, is rejected while persistence is locked, and is not repeated by `.`.
+
+### 23.12 Moving Occurrences
+
+#### Mouse Drag
+
+A direct match is moved to another day by pressing and holding it with the primary mouse button, using the hold time and movement tolerance of §11, and dropping it on any row of the target day: the day header or any node row beneath it. Contextual ancestors, day headers, and gaps cannot be dragged, nor can the disclosure chevron or the node bullet start a drag. The dragged row takes the Tree drag highlight, and the pointer shows the grabbing cursor. The target day's header is outlined with the inset drop outline of §11; the source's own day shows no outline and a drop there changes nothing. A gap is not a day: over it the pointer shows the not-allowed cursor and a drop changes nothing. `Esc`, a lost pointer, and window blur cancel the drag. Dragging near the top or bottom of the viewport scrolls it as in Tree. Dragging is unavailable while persistence is locked, and a quick click that does not hold selects and places the caret as before.
+
+A move replaces the source day's date in the node's text and changes nothing else: the parent, the children, and the position among siblings are unchanged, and other dates in the text stay. If the text already contains the target date, no second copy is added and the source date is removed with one adjacent space, so `2026-10-14 Plan 2026-10-15` dropped on Oct 15 becomes `2026-10-15 Plan`. Links keep their text. Descendants are never changed.
+
+The moved node becomes the selected, active occurrence under the target day, which is unfolded together with the moved node's ancestors there. The caret offset is kept when the node owned the focus, and its editor receives the focus again after the drop. The move is one undoable change that saves as any document edit does. Undo restores the previous dates and applies the history focus rule of §23.8.

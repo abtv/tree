@@ -870,7 +870,7 @@ export interface DragSourceBox {
 }
 
 /**
- * Presses and holds a node row until drag mode is active and stable.
+ * Presses and holds a node row (or an Agenda occurrence row) until drag mode is active and stable.
  *
  * A visible run happens on a live desktop, so the window can lose focus mid-gesture. Chromium then
  * releases pointer capture and the renderer cancels the drag, which is the intended application
@@ -901,7 +901,7 @@ export async function startRowDrag(
 }
 
 async function rowDragIsActive(window: Page): Promise<boolean> {
-  return (await window.locator('.node-row-dragging').count()) > 0
+  return (await window.locator('.node-row-dragging, .agenda-row-dragging').count()) > 0
 }
 
 /**

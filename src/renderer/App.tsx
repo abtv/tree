@@ -354,6 +354,8 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
               store={store}
               agenda={agenda}
               document={state.document}
+              dragFreeze={dragFreeze}
+              locked={persistenceLocked}
               vim={vimEnabled ? vimTextCommandState : undefined}
               renderInput={renderAgendaInput}
               renderAttachment={renderAgendaAttachment}

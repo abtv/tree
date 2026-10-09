@@ -12,6 +12,8 @@ const exclusions: Record<string, string> = {
   createAgendaDayNode: 'Agenda day creation is generated in editor-store-agenda.property.test.ts.',
   splitAgendaNode: 'Agenda splitting is generated in editor-store-agenda.property.test.ts.',
   createAgendaSibling: 'Agenda sibling creation is generated in editor-store-agenda.property.test.ts.',
+  moveAgendaOccurrences:
+    'Agenda occurrence moves have dedicated property coverage in editor-store-agenda-move.test.ts.',
   getAgendaRows: 'Read-only Agenda projection with dedicated cache and composition tests.',
   getVisibleRows: 'Read-only projection used by the generator to choose displayed targets.',
   getRestoredSelectedRowTop: 'Read-only startup viewport metadata.',

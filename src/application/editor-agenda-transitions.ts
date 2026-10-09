@@ -1,4 +1,4 @@
-import { newDatedNodeText, splitDateEdit } from '../domain/agenda-date-edits'
+import { moveDayEdits, newDatedNodeText, splitDateEdit } from '../domain/agenda-date-edits'
 import { dayNumberOf, type DayNumber } from '../domain/calendar-date'
 import {
   createLastChild,
@@ -92,6 +92,54 @@ export function splitDatedNodeTransition(
     location: { ...location, selectedNodeId: id },
     focus: { nodeId: id, cursor: edit?.inserted.length ?? 0 },
     agenda: activateNewNode(agenda, id, day),
+  }
+}
+
+export interface AgendaOccurrenceMove {
+  readonly nodeId: NodeId
+  readonly day: DayNumber
+}
+
+/**
+ * Move occurrences to `targetDay` by replacing each source day's date in the node's text
+ * (`plans/agenda.md` §11): parent, children, and position never change, and unmoved dates stay. The
+ * first moved node becomes the selected, active occurrence on the target day, with its path unfolded
+ * there. Returns `undefined` when no text changes, such as dropping on the occurrence's own day.
+ */
+export function moveOccurrencesTransition(
+  document: Document,
+  location: Location,
+  agenda: AgendaState,
+  moves: readonly AgendaOccurrenceMove[],
+  targetDay: DayNumber,
+  cursor: number,
+): AgendaCreateTransition | undefined {
+  let next = document
+  let first: NodeId | undefined
+  for (const move of moves) {
+    const node = requireNode(next, move.nodeId).node
+    // Stryker disable next-line ArrayDeclaration: An element without offsets is not a link range, so recognition and remapping ignore it like an empty list.
+    const links = node.links ?? []
+    const edits = moveDayEdits(node.text, links, move.day, targetDay)
+    if (edits.length === 0) continue
+    const moved = replaceLinkedTextRanges(node.text, links, edits)
+    next = editNodeContent(next, move.nodeId, moved.text, moved.links)
+    first ??= move.nodeId
+  }
+  if (first === undefined) return undefined
+  const collapsed = new Set(agenda.collapsed)
+  collapsed.delete(dayKey(targetDay))
+  for (const ancestor of requireNode(next, first).ancestors) collapsed.delete(`node:${targetDay}:${ancestor.id}`)
+  return {
+    document: next,
+    location: { ...location, selectedNodeId: first },
+    focus: { nodeId: first, cursor },
+    agenda: {
+      ...agenda,
+      collapsed,
+      selectedKey: `node:${targetDay}:${first}`,
+      activeOccurrence: { nodeId: first, day: targetDay },
+    },
   }
 }
 

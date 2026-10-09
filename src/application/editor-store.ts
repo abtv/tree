@@ -83,9 +83,11 @@ import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { applyAgendaCommand, openAgendaState, type AgendaCommand, type AgendaState } from './agenda-state'
 import {
   createDayNodeTransition,
+  moveOccurrencesTransition,
   openDatedSiblingTransition,
   splitDatedNodeTransition,
   type AgendaCreateTransition,
+  type AgendaOccurrenceMove,
 } from './editor-agenda-transitions'
 import { dayNumberOf } from '../domain/calendar-date'
 import { agendaHistorySelection, agendaOriginLocation, reconcileAgenda, selectedAgendaDay } from './agenda-reconcile'
@@ -255,6 +257,22 @@ export class EditorStore {
       state.expansion,
       openDatedSiblingTransition(state.document, state.location, state.agenda!, row.day, position, this.createId),
     )
+    return true
+  }
+
+  /**
+   * Move dated occurrences to `targetDay` by replacing their source days' dates (`plans/agenda.md` §11).
+   * It is one undoable change that selects the first moved node on the target day, and returns whether
+   * any text changed.
+   */
+  public moveAgendaOccurrences(moves: readonly AgendaOccurrenceMove[], targetDay: number): boolean {
+    const state = this.runtime.ready()
+    if (state.agenda === undefined || this.isPersistenceLocked()) return false
+    const first = moves[0]
+    const cursor = first !== undefined && state.focus.nodeId === first.nodeId ? state.focus.cursor : 0
+    const transition = moveOccurrencesTransition(state.document, state.location, state.agenda, moves, targetDay, cursor)
+    if (transition === undefined) return false
+    this.applyAgendaCreation(state.expansion, transition)
     return true
   }
 

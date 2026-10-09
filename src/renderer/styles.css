@@ -599,6 +599,10 @@ body.node-drag-active,
 body.node-drag-active .node-row,
 body.node-drag-active .node-row .node-input,
 body.node-drag-active .node-row .node-input a,
+body.node-drag-active .agenda-row,
+body.node-drag-active .agenda-row .node-input,
+body.node-drag-active .agenda-row .node-input a,
+body.node-drag-active .agenda-text a,
 body.node-drag-active .node-enter-control,
 body.node-drag-active .location-root,
 body.node-drag-active .location-link,
@@ -823,6 +827,25 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .node-row.node-row-dragging {
   background: var(--color-drag-highlight);
+}
+
+/* Dragging an Agenda occurrence onto another day (docs/PRODUCT.md §23.12). */
+.agenda-row.agenda-row-dragging .node-input:focus {
+  background: transparent;
+}
+
+.agenda-row.agenda-row-dragging .node-input,
+.agenda-row.agenda-row-dragging .agenda-text {
+  user-select: none;
+}
+
+.agenda-row.agenda-row-dragging {
+  background: var(--color-drag-highlight);
+}
+
+.agenda-row-drop-on {
+  outline: 2px solid var(--color-drop-marker);
+  outline-offset: -2px;
 }
 
 .node-row-drop-before::before,
