@@ -405,6 +405,19 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-shell {
   padding-top: 48px;
 }
+
+.agenda-shell-focused {
+  padding-top: 10px;
+}
+
+.agenda-focused-heading {
+  margin: 0 0 6px 24px;
+  padding: 0 6px 2px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 30px;
+  letter-spacing: -0.45px;
+}
 .agenda-row {
   outline: none;
 }

@@ -94,6 +94,7 @@ import {
   agendaHistorySelection,
   agendaOriginLocation,
   reconcileAgenda,
+  reconcileAgendaSelection,
   selectedAgendaDay,
   withoutPendingMove,
 } from './agenda-reconcile'
@@ -200,12 +201,19 @@ export class EditorStore {
       command.kind === 'fold'
         ? this.agendaRowsCache.get(state.document, { ...state.agenda, collapsed: new Set() })
         : this.getAgendaRows()
-    const agenda = applyAgendaCommand(state.agenda, command, rows)
-    const selected = rows.find((row) => row.key === agenda.selectedKey)
+    const changed = applyAgendaCommand(state.agenda, command, rows)
+    const nextRows = command.kind === 'return-timeline' ? this.agendaRowsCache.get(state.document, changed) : rows
+    const agenda = command.kind === 'return-timeline' ? reconcileAgendaSelection(changed, nextRows) : changed
+    const selected = nextRows.find((row) => row.key === agenda.selectedKey)
     const realSelection =
       selected?.kind === 'node' && (agenda.selectedKey !== state.agenda.selectedKey || command.kind === 'select')
     if (agenda === state.agenda && !realSelection) return
-    if (agenda.selectedKey !== state.agenda.selectedKey || realSelection) this.endTextSession()
+    if (
+      agenda.selectedKey !== state.agenda.selectedKey ||
+      realSelection ||
+      agenda.focusedDay !== state.agenda.focusedDay
+    )
+      this.endTextSession()
     this.runtime.replaceReady({
       ...state,
       agenda,

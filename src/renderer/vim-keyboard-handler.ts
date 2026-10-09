@@ -311,6 +311,10 @@ export function handleVimKey(
     }
     // Without a pending move a text register puts as ordinary editing; a node register has nothing to put (D1).
     const textPut = plainPut && vim.register.current.kind === 'text'
+    if (!visual && pending.operator === undefined && pending.prefix === 'g' && event.key === 'd') {
+      createAgendaKeyDownHandler({ store, vim })(event)
+      return true
+    }
     const structural =
       event.key === '>' ||
       event.key === '<' ||

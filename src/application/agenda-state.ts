@@ -10,6 +10,13 @@ export interface AgendaState {
   readonly selectedKey: string
   readonly collapsed: ReadonlySet<string>
   readonly revealed: ReadonlySet<DayNumber>
+  readonly focusedDay?: DayNumber
+  readonly timelineReturn?: {
+    readonly selectedKey: string
+    readonly collapsed: ReadonlySet<string>
+    readonly revealed: ReadonlySet<DayNumber>
+    readonly scrollTop: number
+  }
   readonly activeOccurrence?: AgendaOccurrence
   readonly pinnedOccurrence?: AgendaOccurrence
   /** Occurrences `dd` marked for `p`/`P`; runtime only, dropped by every document change (D4). */
@@ -23,6 +30,8 @@ export interface AgendaOccurrence {
 
 export type AgendaCommand =
   | { readonly kind: 'select'; readonly key: string; readonly cursor?: number }
+  | { readonly kind: 'focus-day'; readonly key: string; readonly scrollTop: number }
+  | { readonly kind: 'return-timeline'; readonly key: string }
   | { readonly kind: 'toggle-fold'; readonly key: string }
   | { readonly kind: 'toggle-gap'; readonly key: string }
   | {
@@ -51,9 +60,45 @@ export function applyAgendaCommand(
   command: AgendaCommand,
   rows: readonly AgendaRow[],
 ): AgendaState {
+  if (command.kind === 'return-timeline') {
+    if (state.timelineReturn === undefined) return state
+    const timelineReturn = state.timelineReturn
+    const rest = { ...state }
+    delete rest.focusedDay
+    delete rest.timelineReturn
+    delete rest.activeOccurrence
+    delete rest.pinnedOccurrence
+    delete rest.pendingMove
+    return {
+      ...rest,
+      selectedKey: timelineReturn.selectedKey,
+      collapsed: timelineReturn.collapsed,
+      revealed: timelineReturn.revealed,
+    }
+  }
   const rowIndex = rows.findIndex((row) => row.key === command.key)
   if (rowIndex < 0) return state
   const row = rows[rowIndex]!
+  if (command.kind === 'focus-day') {
+    if (row.kind !== 'day' || state.focusedDay !== undefined) return state
+    const rest = { ...state }
+    delete rest.pendingMove
+    delete rest.activeOccurrence
+    delete rest.pinnedOccurrence
+    return {
+      ...rest,
+      focusedDay: row.day,
+      selectedKey: row.key,
+      collapsed: new Set(state.collapsed),
+      revealed: new Set(state.revealed),
+      timelineReturn: {
+        selectedKey: state.selectedKey,
+        collapsed: state.collapsed,
+        revealed: state.revealed,
+        scrollTop: Math.max(0, command.scrollTop),
+      },
+    }
+  }
   if (command.kind === 'select') {
     return selectAgendaRow(state, row)
   }

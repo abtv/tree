@@ -52,6 +52,7 @@ export function createDayNodeTransition(
       ...agenda,
       collapsed,
       revealed: shown ? agenda.revealed : new Set(agenda.revealed).add(day),
+      ...(agenda.focusedDay === undefined ? {} : { focusedDay: day }),
       selectedKey: `node:${day}:${id}`,
       activeOccurrence: { nodeId: id, day },
     },

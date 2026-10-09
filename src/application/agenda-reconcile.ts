@@ -59,6 +59,7 @@ export function reconcileAgenda(
         // A live edit continues in the nearest remaining occurrence. History never unfolds it.
         // If the day is unchanged, the active path is already visible; deleting its absent folds is equivalent.
         if (day !== active.day && !preservePresentation) {
+          if (next.focusedDay !== undefined) next = { ...next, focusedDay: day }
           const collapsed = new Set(next.collapsed)
           collapsed.delete(dayKey(day))
           for (const ancestor of located.ancestors) collapsed.delete(`node:${day}:${ancestor.id}`)

@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import { clearCommandAssembly, clearPending } from './vim-command-state'
 import type { VimTextCommandState } from './editor-input-handlers'
-import { viewportBounds, viewportScrollEdges } from './scroll-viewport'
+import { viewportBounds, viewportScrollEdges, viewportScroller } from './scroll-viewport'
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
 import { getCaret } from './editor-dom'
 import { agendaAllows } from './agenda-key-policy'
@@ -68,7 +68,15 @@ export function createAgendaKeyDownHandler({
           store.closeAgenda()
           store.selectNode(row.nodeId, 0)
           store.enter()
+        } else if (row.kind === 'day') {
+          beforeSelect?.(false)
+          store.applyAgenda({ kind: 'focus-day', key: row.key, scrollTop: viewportScroller()?.scrollTop ?? 0 })
         }
+      } else if (event.key === ',') {
+        event.preventDefault()
+        if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        beforeSelect?.(true)
+        store.applyAgenda({ kind: 'return-timeline', key: row.key })
       } else if (event.key.toLowerCase() === 'e' && !event.shiftKey && !event.altKey) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
@@ -170,6 +178,11 @@ export function createAgendaKeyDownHandler({
     }
     if (event.ctrlKey) {
       if (!normal || pending?.prefix !== undefined) return
+      if (event.key === 'o') {
+        beforeSelect?.(true)
+        store.applyAgenda({ kind: 'return-timeline', key: row.key })
+        return
+      }
       if (event.key === 'r') {
         store.redo()
         return
@@ -178,7 +191,16 @@ export function createAgendaKeyDownHandler({
       viewportMotion(event.key === 'd' ? 'half-down' : 'half-up', count)
       return
     }
-    if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
+    if (normal && event.key === 'd' && pending?.prefix === 'g') {
+      if (row.kind === 'day') {
+        beforeSelect?.(false)
+        store.applyAgenda({ kind: 'focus-day', key: row.key, scrollTop: viewportScroller()?.scrollTop ?? 0 })
+      } else if (row.kind === 'node') {
+        store.closeAgenda()
+        store.selectNode(row.nodeId, 0)
+        store.enter()
+      }
+    } else if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
     else if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined))
       select(index + count)
     else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined))

@@ -12,10 +12,16 @@ import { createViewportReveal } from './viewport-reveal'
 import { agendaListWindow } from './agenda-list-layout'
 import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node-list-layout'
 import { shouldWindow } from './list-window'
-import { isAgendaMirror } from './agenda-labels'
+import { agendaDateLabel, isAgendaMirror } from './agenda-labels'
 import { isPendingMoveSource } from '../application/agenda-pending-move'
 import { agendaVisualSources, type AgendaVisualEndpoints } from '../application/agenda-visual-selection'
-import { notifyViewportLayout, onViewportScroll, scrollViewportBy, viewportBounds } from './scroll-viewport'
+import {
+  notifyViewportLayout,
+  onViewportScroll,
+  scrollViewportBy,
+  viewportBounds,
+  viewportScroller,
+} from './scroll-viewport'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { useAgendaDrag } from './use-agenda-drag'
 
@@ -53,6 +59,20 @@ export function AgendaView({
   const viewportReveal = useMemo(() => createViewportReveal(), [])
   useEffect(() => viewportReveal.mount(), [viewportReveal])
   const rows = store.getAgendaRows()
+  const lastPresentation = useRef(agenda)
+  const restoreScroll = useRef<number | undefined>(undefined)
+  useLayoutEffect(() => {
+    const last = lastPresentation.current
+    if (last.focusedDay !== undefined && agenda.focusedDay === undefined) {
+      restoreScroll.current = last.timelineReturn?.scrollTop
+      reveal.current = 'none'
+      viewportReveal.cancel()
+    } else if (last.focusedDay !== agenda.focusedDay && last.focusedDay === undefined) {
+      viewportScroller()?.scrollTo({ top: 0 })
+      reveal.current = 'keyboard'
+    }
+    lastPresentation.current = agenda
+  }, [agenda, viewportReveal])
   const visualDocument = useRef(document)
   useEffect(() => {
     const changed = visualDocument.current !== document
@@ -137,6 +157,12 @@ export function AgendaView({
     if (windowed) updateViewport()
     notifyViewportLayout()
   }, [layoutState, updateViewport, windowed])
+  useLayoutEffect(() => {
+    if (restoreScroll.current === undefined || layoutState.rows !== rows || layoutState.revision !== revision) return
+    viewportScroller()?.scrollTo({ top: restoreScroll.current })
+    restoreScroll.current = undefined
+    updateViewport()
+  }, [layoutState, rows, revision, updateViewport])
   useEffect(() => {
     if (!windowed) return undefined
     const unsubscribe = onViewportScroll(updateViewport)
@@ -221,7 +247,7 @@ export function AgendaView({
         return state.status === 'ready' && state.agenda?.selectedKey === agenda.selectedKey
       })
     else viewportReveal.cancel()
-  }, [agenda.selectedKey, store, viewportReveal])
+  }, [agenda.selectedKey, agenda.focusedDay, store, viewportReveal])
   const drag = useAgendaDrag({
     rows,
     locked,
@@ -245,6 +271,26 @@ export function AgendaView({
   const range = agendaListWindow(rows, layout, viewport, agenda.selectedKey)
   const renderRow = (index: number, pinned = false): React.JSX.Element => {
     const row = rows[index]!
+    if (row.kind === 'day' && agenda.focusedDay !== undefined) {
+      return (
+        <div
+          key={row.key}
+          className={`current-parent agenda-row agenda-focused-heading${pinned ? ' agenda-row-pinned' : ''}`}
+          style={pinned ? { top: layout.offsets[index] ?? 0 } : undefined}
+          data-agenda-key={row.key}
+          role="row"
+          aria-selected={row.key === agenda.selectedKey}
+          tabIndex={row.key === agenda.selectedKey ? 0 : -1}
+          ref={(element) => rowRef(row.key, element)}
+          onClick={() => select(row.key)}
+          onFocus={() => {
+            if (row.key !== agenda.selectedKey) select(row.key)
+          }}
+        >
+          {agendaDateLabel(row.day, agenda.today, true)}
+        </div>
+      )
+    }
     const node = row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined
     const editable =
       row.kind === 'node' &&
@@ -302,7 +348,7 @@ export function AgendaView({
       className="agenda-list"
       ref={listRef}
       role="grid"
-      aria-label="Agenda timeline"
+      aria-label={agenda.focusedDay === undefined ? 'Agenda timeline' : 'Focused Agenda day'}
       onClickCapture={drag.onListClick}
       onLostPointerCapture={drag.onLostPointerCapture}
       onPointerCancel={drag.onListPointerCancel}

@@ -239,7 +239,6 @@ describe('Agenda editing command boundaries', () => {
       'gp',
       'gP',
       'gJ',
-      'gd',
       'V',
       'J',
       '>',

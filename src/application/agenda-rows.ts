@@ -49,7 +49,17 @@ export function agendaProjection(document: Document, state: AgendaState): readon
 
 export function buildAgendaRows(projection: readonly AgendaProjectionDay[], state: AgendaState): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
-  const timeline = buildTimeline({ contentDays: new Set(days.keys()), today: state.today, revealed: state.revealed })
+  const timeline =
+    state.focusedDay === undefined
+      ? buildTimeline({ contentDays: new Set(days.keys()), today: state.today, revealed: state.revealed })
+      : [
+          {
+            kind: 'day' as const,
+            day: state.focusedDay,
+            content: days.has(state.focusedDay),
+            isToday: state.focusedDay === state.today,
+          },
+        ]
   const rows: AgendaRow[] = []
   for (const entry of timeline) {
     if (entry.kind === 'gap') {
@@ -122,6 +132,7 @@ export class AgendaRowsCache {
     if (
       changed ||
       this.state?.today !== state.today ||
+      this.state.focusedDay !== state.focusedDay ||
       this.state.collapsed !== state.collapsed ||
       this.state.revealed !== state.revealed
     ) {

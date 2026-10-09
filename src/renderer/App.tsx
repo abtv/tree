@@ -334,7 +334,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
         Tree
       </div>
       {agenda !== undefined ? (
-        <AgendaLocationBar />
+        <AgendaLocationBar agenda={agenda} />
       ) : (
         <LocationBar
           path={path}
@@ -347,7 +347,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
         <section
           className={
             agenda !== undefined
-              ? 'editor-shell agenda-shell'
+              ? `editor-shell agenda-shell${agenda.focusedDay === undefined ? '' : ' agenda-shell-focused'}`
               : topLevel
                 ? 'editor-shell editor-shell-top-level'
                 : 'editor-shell'

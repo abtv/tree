@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Agenda](agenda.md) | Implementation authorized; AG-20 complete | AG-21: Focused day |
+| [Agenda](agenda.md) | Implementation authorized; AG-21 complete | AG-22: Natural-language parser and expression table |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

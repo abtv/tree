@@ -178,7 +178,7 @@ export function createEditorKeyDownHandler({
         block('structure')
         return
       }
-      if (event.metaKey && (event.key === ',' || event.key === 'Backspace')) {
+      if (event.metaKey && event.key === 'Backspace') {
         block('structure')
         return
       }
@@ -223,6 +223,14 @@ export function createEditorKeyDownHandler({
         vim?.syncImageCaretToFocus()
         return
       }
+      if (event.metaKey && event.key === ',') {
+        event.preventDefault()
+        if (agenda.focusedDay !== undefined) {
+          finishVimSessionBeforeNavigation(vim, event.currentTarget)
+          store.applyAgenda({ kind: 'return-timeline', key: agenda.selectedKey })
+        }
+        return
+      }
       if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
         event.preventDefault()
         clearCommandAssemblyBeforeCommand(vim)
@@ -237,6 +245,8 @@ export function createEditorKeyDownHandler({
         event.key.toLowerCase() === 'o'
       ) {
         event.preventDefault()
+        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        store.applyAgenda({ kind: 'return-timeline', key: agenda.selectedKey })
         return
       }
       if (
