@@ -1538,7 +1538,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 #### Opening Tree and Scoped Agenda
 
-`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Focused days are introduced in a subsequent Agenda task.
+`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today.
 
 ### 23.5 Folding and Gaps
 
