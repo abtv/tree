@@ -47,7 +47,9 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
         element.getBoundingClientRect().top - document.querySelector('.agenda-list')!.getBoundingClientRect().top,
     )
     expect(Math.abs(offset)).toBeLessThan(1)
-    await expect(window).toHaveScreenshot(screenshotName('agenda-focused-windowed.png'))
+    // The native overlay scrollbar fades independently of renderer state. Exclude only its edge.
+    const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+    await expect(window).toHaveScreenshot(screenshotName('agenda-focused-windowed.png'), { clip })
     await window.keyboard.press(mode === 'vim' ? 'j' : 'ArrowDown')
     await expect(window.locator(`[data-agenda-key="node:${day}:item-0"] .node-input`)).toBeFocused()
     await window.keyboard.press('Meta+,')
