@@ -7,24 +7,7 @@ import { productOwnText, scanProductBlocks, scanProductSections } from './produc
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 export const PRODUCT_LIMITS = { block: 700, section: 8000 }
-export const PRODUCT_BLOCK_EXEMPTIONS = new Set([
-  '2.1',
-  '2.2',
-  '2.4',
-  '2.5',
-  '10',
-  '11',
-  '13',
-  '16.1',
-  '20.5',
-  '20.8',
-  '20.9',
-  '23.2',
-  '23.4',
-  '23.5',
-  '23.11',
-  '23.12',
-])
+export const PRODUCT_BLOCK_EXEMPTIONS = new Set(['20.5', '20.8', '20.9', '23.2', '23.4', '23.5', '23.11', '23.12'])
 export const PRODUCT_SECTION_EXEMPTIONS = new Set()
 
 export function findOversizedProductText({

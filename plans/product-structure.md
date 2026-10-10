@@ -49,7 +49,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Complete |
 | PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Complete |
 | PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Complete |
-| PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Planned |
+| PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Complete |
 | PS-7 | Batch B split verbatim: §20.5, §20.8, §20.9, §23.2, §23.4, §23.5, §23.11, §23.12 | PS-6 | Same as PS-6 | Planned |
 | PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Planned |
 | PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Planned |
@@ -59,7 +59,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-6. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-7. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -139,6 +139,22 @@ and the Visual shifts in `editor-store.ts` and
 §20.2.15, composition §20.2.27, `h`/`l` and image positions §20.2.9, first-run
 default §20.2.1. A search for `§20.2` followed by anything other than a
 subsection number, and for `§20.2.1 T`, returns nothing.
+
+PS-6 completed (2026-10-10): the nine over-limit paragraphs in §2.1, §2.2, §2.4
+(two), §2.5, §10, §11, §13, and §16.1 are `*` list items with no wording change,
+no lead-in, and no move across sections. `npm run check:docs -- --verbatim HEAD`
+reported before 1,485, after 1,485, unchanged 1,485, removed 0, added 0. The
+eight exemptions for those sections are deleted from `PRODUCT_BLOCK_EXEMPTIONS`.
+Sentences that qualify another stay in its item ("It", "The same presentation",
+"instead", "its end"); "The rule is the same whether undo or redo was invoked…"
+in §10 is the last item and refers to the whole preceding group. The second
+paragraph of §2.4 and the launch-scroll paragraph of §16.1 follow an existing
+list, so they are split into separate paragraphs instead of items, which would
+have merged into that list. Observation: in §2.2 "macOS may still impose
+limitations…" is its own item and now sits two items after the always-on-top
+sentence it qualifies; the original order is kept. `npm run check` and
+`npm run format:check:changed` passed; independent review found only the
+list-merge issue, now fixed. No product decision was made.
 
 ## Conventions
 

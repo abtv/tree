@@ -5,6 +5,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 | Initiative | Status | Next task |
 | --- | --- | --- |
 | [Agenda](agenda.md) | Implementation authorized; AG-27 complete | AG-28: close the initiative (Product Owner confirmation) |
-| [PRODUCT.md structure](product-structure.md) | PS-5 complete; tasks run on the Product Owner's request to continue | PS-6: split dense paragraphs in sections 2.1 to 16.1 verbatim |
+| [PRODUCT.md structure](product-structure.md) | PS-6 complete; tasks run on the Product Owner's request to continue | PS-7: split dense paragraphs in sections 20.5 to 23.12 verbatim |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
