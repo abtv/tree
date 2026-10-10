@@ -96,7 +96,7 @@ export function moveNodeVisual(deps: MoveNodeVisualDeps, direction: 'up' | 'down
         ? nodes.length - 1
         : Math.max(0, Math.min(nodes.length - 1, index + (direction === 'down' ? count : -count)))
   const target = nodes[targetIndex]
-  if (target === undefined) return
+  if (target === undefined || target.id === nodeVisualSelection.focusId) return
   setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.id })
   rememberNodeRange(commandState, state.document, nodeVisualSelection.anchorId, target.id)
   store.selectNode(target.id, 0)

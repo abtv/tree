@@ -153,11 +153,29 @@ describe('whole-node Visual restoration and movement', () => {
     expect(deps.syncImageCaretToFocus).not.toHaveBeenCalled()
   })
 
-  it('synchronizes even when movement clamps to the same node', async () => {
+  // @requirement PRODUCT.md §20.2.23
+  it.each([
+    ['up', 1, 'a', 'c'],
+    ['up', 99, 'a', 'c'],
+    ['first', 1, 'a', 'c'],
+    ['down', 1, 'c', 'a'],
+    ['down', 99, 'c', 'a'],
+    ['last', 1, 'c', 'a'],
+  ] as const)('preserves the range and focus when %s/%s clamps at %s', async (direction, count, focusId, anchorId) => {
     const deps = await setup()
-    moveNodeVisual({ ...deps, nodeVisualSelection: { anchorId: 'c', focusId: 'a' } }, 'up')
-    expect(deps.setNodeVisualSelection).toHaveBeenCalledWith({ anchorId: 'c', focusId: 'a' })
-    expect(deps.syncImageCaretToFocus).toHaveBeenCalledOnce()
+    deps.store.selectNode(focusId, 2)
+    rememberNodeRange(deps.commandState, deps.snapshot().document, anchorId, focusId)
+    const before = deps.snapshot()
+    const memory = deps.commandState.lastVisual
+    const publish = vi.fn()
+    const unsubscribe = deps.store.subscribe(publish)
+    moveNodeVisual({ ...deps, nodeVisualSelection: { anchorId, focusId } }, direction, count)
+    expect(deps.snapshot()).toBe(before)
+    expect(deps.commandState.lastVisual).toBe(memory)
+    expect(deps.setNodeVisualSelection).not.toHaveBeenCalled()
+    expect(deps.syncImageCaretToFocus).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+    unsubscribe()
   })
 
   it.each([undefined, { anchorId: 'a', focusId: 'missing' }])(

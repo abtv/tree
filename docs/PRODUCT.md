@@ -1242,6 +1242,7 @@ Normal mode also supports:
 
 * Whole-node Visual mode (`V`) selects a contiguous range of siblings at the currently displayed level — not the location's visible rows (§2.4) — including every selected node's descendants.
 * `j`, `k`, `gg`, and `G` extend the range, and `j` and `k` accept a count that moves the active end that many siblings, clamped at the first and last sibling, without changing the selection's direction; `o` exchanges its ends.
+* A motion clamped at the active end keeps the range, caret position, and any active image caret with its saved text return position.
 * The current-parent heading is excluded.
 * `y` copies the selected subtrees into the local register; `d` and `x` copy and delete them; `c` and `s` copy and replace them with one empty node before entering Insert mode; `u` and `U` change the case of text in the selected subtrees.
 * `p` replaces the selected subtrees with fresh-ID copies of the node register and then stores the removed subtrees as the new register; `P` performs the same replacement and keeps the incoming register. A count repeats the whole incoming register that many times, with fresh IDs for every copy, in the same replacement. A put rejected by the depth limit (§2.3) or by ancestry changes neither the document nor the register.

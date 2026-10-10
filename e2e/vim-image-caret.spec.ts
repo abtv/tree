@@ -33,6 +33,121 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: image caret', () => {
+  // @requirement PRODUCT.md §20.2.23
+  for (const boundary of ['first', 'last'] as const) {
+    test(`preserves text and image return carets when Visual Node motion clamps at the ${boundary} sibling`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'first', text: 'First text', attachment: { id: 'first-image', mimeType: 'image/png' }, children: [] },
+            { id: 'peer', text: 'Middle text', children: [] },
+            { id: 'last', text: 'Last text', attachment: { id: 'last-image', mimeType: 'image/png' }, children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: boundary },
+      })
+      seedAttachmentImage(userDataDir, 'first-image')
+      seedAttachmentImage(userDataDir, 'last-image')
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, boundary === 'first' ? 1 : 3)
+      await editor.focus()
+      const motions = boundary === 'first' ? [['k'], ['9', '9', 'k'], ['g', 'g']] : [['j'], ['9', '9', 'j'], ['G']]
+      for (const imageActive of [false, true]) {
+        await setCursor(editor, 2)
+        if (imageActive) {
+          await editor.press('j')
+          await expect(editor).toHaveClass(/node-input-image-caret/)
+        }
+        await window.keyboard.press('V')
+        const cursor = imageActive ? (boundary === 'first' ? 'First text' : 'Last text').length : 2
+        for (const keys of [...motions, ...motions]) {
+          for (const key of keys) await window.keyboard.press(key)
+          await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+          await expect(editor).toBeFocused()
+          await expect(editor).toHaveJSProperty('selectionStart', cursor)
+          await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
+          await expect(editor).not.toHaveClass(/node-input-image-caret/)
+        }
+        if (imageActive && boundary === 'first')
+          await expect(window.locator('.node-list')).toHaveScreenshot('vim-clamped-visual-node-range.png')
+        await window.keyboard.press('Escape')
+        if (imageActive) {
+          await expect(editor).toHaveClass(/node-input-image-caret/)
+          if (boundary === 'first')
+            await expect(window.locator('.node-list')).toHaveScreenshot('vim-clamped-visual-node-image.png')
+          await editor.press('k')
+          await expect(editor).toHaveJSProperty('selectionStart', 2)
+          await expect(editor).not.toHaveClass(/node-input-image-caret/)
+        }
+      }
+    })
+  }
+
+  test('preserves forward and reverse Visual Node ranges at their boundaries', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First text', children: [] },
+          { id: 'middle', text: 'Middle text', children: [] },
+          { id: 'last', text: 'Last text', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'middle' },
+    })
+    const { window } = await launchTree(userDataDir)
+    for (const boundary of ['first', 'last'] as const) {
+      await node(window, 2).focus()
+      await window.keyboard.press('V')
+      await window.keyboard.press(boundary === 'first' ? 'k' : 'j')
+      const editor = node(window, boundary === 'first' ? 1 : 3)
+      await setCursor(editor, 2)
+      const selected = window.locator('.node-row-visual-selected')
+      const ids = await selected.evaluateAll((rows) => rows.map((row) => (row as HTMLElement).dataset.nodeId))
+      const motions =
+        boundary === 'first'
+          ? [
+              ['9', 'k'],
+              ['g', 'g'],
+            ]
+          : [['9', 'j'], ['G']]
+      for (const keys of motions) {
+        for (const key of keys) await window.keyboard.press(key)
+        await expect(editor).toBeFocused()
+        await expect(editor).toHaveJSProperty('selectionStart', 2)
+        expect(await selected.evaluateAll((rows) => rows.map((row) => (row as HTMLElement).dataset.nodeId))).toEqual(
+          ids,
+        )
+      }
+      await expect(selected).toHaveCount(2)
+      await window.keyboard.press('Escape')
+    }
+  })
+
+  test('preserves the sole image through every clamped Visual Node motion', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'picture', text: '', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'picture' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await window.keyboard.press('V')
+    for (const keys of [['j'], ['k'], ['9', 'j'], ['9', 'k'], ['g', 'g'], ['G']]) {
+      for (const key of keys) await window.keyboard.press(key)
+      await expect(editor).toBeFocused()
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+      await expect(editor).toHaveJSProperty('selectionStart', 0)
+      await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
+    }
+    await window.keyboard.press('Escape')
+    await editor.press('k')
+    await expect(editor).toHaveClass(/node-input-image-caret/)
+  })
+
   test('uses the image only for textless boundary and viewport destinations', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

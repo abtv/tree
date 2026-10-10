@@ -12,8 +12,8 @@ VC-1 to VC-3 corrections are complete.
 | ID | Outcome and expected files | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- |
 | NR-1 | First-nonblank text destinations for G/gg, H/M/L and Ctrl+d/u in Tree and Agenda; renderer keyboard, viewport and Agenda adapters, focused tests, Vim navigation/image and Agenda E2E, PRODUCT §§20.2.9 and 23.4 and VIM_CONFORMANCE | Indented text, text with image, empty/image-only nodes, same-node and counted destinations; one focus publication; real-renderer caret screenshots; check and affected E2E; independent review and verification | Moderate Risk | Done |
-| NR-2 | Clamped Visual Node motion preserves caret and range; vim-node-visual-commands, focused and hook tests, image-caret E2E, PRODUCT §20.2.23 and matrix | Both boundaries, counted j/k and gg/G, text/image caret and saved return; failing regression, inspected screenshot, check and affected E2E; review and verifier | Moderate Risk | Ready after NR-1 |
-| NR-3 | Replace continues through word selection and Agenda row clicks; edit-session, pointer and Agenda adapters, focused tests, text-editing/Agenda E2E, PRODUCT §§20.2.5–6 and 23.4, matrix | Double-click with empty/pending buffer, plain/rich input, selection preserved until typing, one selected-word replacement then continued overwrite, Escape/Undo; editable/read-only/editable Agenda path without read-only edits; check and affected E2E, screenshots, review and verifier | Moderate Risk unless boundary changes raise it | Ready after NR-2 |
+| NR-2 | Clamped Visual Node motion preserves caret and range; vim-node-visual-commands, focused and hook tests, image-caret E2E, PRODUCT §20.2.23 and matrix | Both boundaries, counted j/k and gg/G, text/image caret and saved return; failing regression, inspected screenshot, check and affected E2E; review and verifier | Moderate Risk | Done |
+| NR-3 | Replace continues through word selection and Agenda row clicks; edit-session, pointer and Agenda adapters, focused tests, text-editing/Agenda E2E, PRODUCT §§20.2.5–6 and 23.4, matrix | Double-click with empty/pending buffer, plain/rich input, selection preserved until typing, one selected-word replacement then continued overwrite, Escape/Undo; editable/read-only/editable Agenda path without read-only edits; check and affected E2E, screenshots, review and verifier | Moderate Risk unless boundary changes raise it | Ready |
 
 ## Decisions and Gaps
 
@@ -28,7 +28,7 @@ preserving it across arbitrary blur.
 
 ## Resume
 
-Next task: NR-2. Keep the affected-path matrix and exact validation record in
+Next task: NR-3. Keep the affected-path matrix and exact validation record in
 WORKING_PLAN.md. Update this plan in each task's commit. After NR-3, resume PS-11
 in `product-structure.md`; its migration must not restore superseded matrix rules.
 Remove this correction plan after the Product Owner confirms no further tasks
@@ -59,3 +59,26 @@ caret authority is retained and G's extra image guess is removed; no additional
 structural initiative is indicated. AGENTS §12 ends this session after resolving
 the broader-suite failures. Continue NR-2, then NR-3 and PS-11; no new permission
 is required for those already authorized tasks.
+
+NR-2 completed: Tree whole-node Visual motions now return before updating range,
+Visual memory, focus or image synchronization when the destination is the active
+endpoint. Clamped j/k (including counts), gg/G and repeated motions preserve text
+carets, image carets and saved text return positions. Successful movement and
+mutations retain their existing rules; Agenda already had the equivalent guard.
+PRODUCT §20.2.23 and the conformance matrix record the correction. No additional
+product decision, persistence change, write, sync or retained state was added;
+the guard reduces work on clamped motions.
+
+Validation passed: 3269 unit tests and coverage/static/governance/build checks
+under the same temporary single-worker condition as NR-1 (configuration restored),
+and all 154 affected Electron cases through the broader run and focused reruns.
+The Visual Node range and Normal image-caret screenshots were inspected. The
+initial default-parallel natural-date timing failure and existing pointer-drag
+selection failure passed on their respective serial/focused reruns without a
+runtime or threshold change. Independent review and product verification found
+no meaningful issues. No unresolved validation failure remains.
+
+The fix-history report again flags repeated Vim/Agenda fixes. This correction
+uses the existing caret authority and avoids a needless focus publication in its
+existing Visual owner; no additional structural initiative is indicated. Continue
+NR-3 in a new session, then PS-11.

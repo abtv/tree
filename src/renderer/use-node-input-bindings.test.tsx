@@ -1422,15 +1422,40 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
   })
 
-  it('resyncs the image caret after a Visual Node move clamps at the same node', async () => {
-    const f = await fixture({ document: { roots: [image()] } })
-    f.input().setSelectionRange(1, 1)
-    f.press('l')
-    f.press('V')
-    f.press('j')
-    expect(f.snapshot().focus).toMatchObject({ nodeId: 'node', cursor: 0 })
-    expect(f.result.current.imageCaretNodeId).toBeUndefined()
-  })
+  // @requirement PRODUCT.md §20.2.23
+  it.each(['text-start', 'text-middle', 'text-final', 'empty', 'image', 'image-only'] as const)(
+    'preserves %s caret and return state across repeated clamped Visual Node motions',
+    async (kind) => {
+      const attached = kind === 'image' || kind === 'image-only'
+      const text = kind === 'empty' || kind === 'image-only' ? '' : 'abcd'
+      const f = await fixture({ document: { roots: [attached ? image(text) : node('node', text)] } })
+      const cursor = kind === 'text-start' || text === '' ? 0 : kind === 'text-final' ? 3 : 1
+      f.input().focus()
+      f.input().setSelectionRange(cursor, cursor)
+      if (kind === 'image') f.press('j')
+      if (kind === 'image-only') f.press('h')
+      f.press('V')
+      const before = f.snapshot()
+      const selection = f.result.current.selection
+      const caret = [f.input().selectionStart, f.input().selectionEnd]
+      const authority = f.result.current.vimTextCommandState.getCaretState!('node', cursor, attached)
+      for (const keys of [['j'], ['k'], ['9', '9', 'j'], ['9', '9', 'k'], ['g', 'g'], ['G']]) {
+        for (const key of keys) f.press(key)
+        expect(f.snapshot()).toBe(before)
+        expect(f.result.current.selection).toBe(selection)
+        expect(f.result.current.vimMode).toBe('visual-node')
+        expect([f.input().selectionStart, f.input().selectionEnd]).toEqual(caret)
+        expect(f.result.current.imageCaretNodeId).toBe(attached ? 'node' : undefined)
+        expect(f.result.current.vimTextCommandState.getCaretState!('node', cursor, attached)).toEqual(authority)
+      }
+      f.press('Escape')
+      if (kind === 'image') {
+        f.press('k')
+        expect(f.input().selectionStart).toBe(1)
+        expect(f.result.current.imageCaretNodeId).toBeUndefined()
+      }
+    },
+  )
 
   it('keeps a non-final image return position across commands without a new focus intent', async () => {
     const f = await fixture({ document: { roots: [image('abcd')] } })
