@@ -528,6 +528,15 @@ Record ambiguities as Product Owner questions instead of editing the sentence;
 a sentence exceeding the block limit also requires a question. Keep blank lines
 around lists and run `npm run format:check:changed`.
 
+Each table in `docs/VIM_CONFORMANCE.md` has the columns PRODUCT (the precise
+`§20.2.n` or other section that states the behavior), Case (a short title of the
+tested case), Vim divergence (empty, or the marker with what Vim does differently
+and the reason), and evidence (cited test paths and names, verified by
+`npm run check:docs`). A row cites PRODUCT instead of restating a rule. A clause
+that no PRODUCT sentence states stays in the Case cell tagged `matrix-only (Mn)`
+and is listed under "Open matrix-only rules" until the Product Owner decides or a
+named test asserts it; moving it into PRODUCT.md follows `AGENTS.md` §5.
+
 A refactoring that preserves behavior should not require unnecessary test changes.
 
 Store interaction tests use `createRealStoreHarness` from `src/renderer/test/real-store-harness.ts` by default for outcome assertions. It builds a real `EditorStore` over the shared application property-test load/save fakes, with in-memory clipboard and attachments. Assert the resulting document, location, focus, and renderer mode; use current snapshot nodes rather than supplying content that differs from the store. Tests own pending save timers with fake timers or an injected clock. Typed doubles in `src/renderer/test/` (`vim-keyboard-double.ts`, `editor-store-double.ts`) are for failure injection and calls that are themselves the contract, such as error reporting or lifecycle registration. A double supplies every member of its owner, so adding, removing, or renaming a member fails `npm run typecheck` at the double, while an unchecked literal can silently diverge and exercise a path the application never takes — the failure class [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md) removed for the interaction-state owners. When a double is needed, supply its snapshot and exercised behaviors through `createEditorStoreDouble`; do not recreate an `as unknown as EditorStore` literal.
