@@ -64,6 +64,16 @@ async function capture() {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(860, 520))
     await page.emulateMedia({ colorScheme: 'dark' })
     await page.screenshot({ path: join(staging, 'tree-focus-dark.png'), animations: 'disabled' })
+    // Fix only Date so the demo's dated nodes fall around a stable Today (Thursday 2026-10-08).
+    await page.clock.setFixedTime(new Date(2026, 9, 8, 12))
+    await page.emulateMedia({ colorScheme: 'light' })
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(860, 680))
+    // The pointer still rests on the Vim toggle from the earlier click and would show its tooltip.
+    await page.mouse.move(0, 0)
+    await page.keyboard.press('Meta+p')
+    await expect(page.locator('.agenda-row').first()).toBeVisible()
+    await page.locator('main.tree-app').evaluate((element) => element.ownerDocument.fonts.ready)
+    await page.screenshot({ path: join(staging, 'agenda-light.png'), animations: 'disabled' })
     const persisted = JSON.parse(readFileSync(join(dataDirectory, 'data/document.json'), 'utf8'))
     if (JSON.stringify(persisted.document) !== JSON.stringify(demo.document)) {
       throw new Error('Capture changed the synthetic document; refusing to publish images.')
@@ -71,10 +81,10 @@ async function capture() {
     // Clean only this command's fixed, ignored output directory, and only after both captures succeed.
     rmSync(output, { recursive: true, force: true })
     mkdirSync(output, { recursive: true })
-    for (const name of ['tree-overview.png', 'tree-focus-dark.png']) {
+    for (const name of ['tree-overview.png', 'tree-focus-dark.png', 'agenda-light.png']) {
       writeFileSync(join(output, name), readFileSync(join(staging, name)))
     }
-    console.log(`Captured both README screenshots from isolated synthetic data into ${output}.`)
+    console.log(`Captured the README screenshots from isolated synthetic data into ${output}.`)
   } finally {
     try {
       if (app !== undefined) {

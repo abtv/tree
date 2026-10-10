@@ -48,7 +48,7 @@ jobs:
         run: |
           mkdir -p reports/site
           cp -R reports/demo/. reports/site/
-          cp reports/readme/tree-overview.png reports/readme/tree-focus-dark.png reports/site/
+          cp reports/readme/tree-overview.png reports/readme/tree-focus-dark.png reports/readme/agenda-light.png reports/site/
       - name: Upload demo
         uses: actions/upload-artifact@v7
         with:

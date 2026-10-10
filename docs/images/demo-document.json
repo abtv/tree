@@ -37,12 +37,12 @@
                 "children": [
                   {
                     "id": "library",
-                    "text": "Ask the library about its meeting room",
+                    "text": "2026-10-09 Ask the library about its meeting room",
                     "children": []
                   },
                   {
                     "id": "time",
-                    "text": "Thursday evening, 18:30 to 20:00",
+                    "text": "2026-10-15 Thursday evening, 18:30 to 20:00",
                     "children": []
                   }
                 ]
@@ -80,7 +80,7 @@
               },
               {
                 "id": "bring",
-                "text": "Bring tea, name cards, and a few spare copies",
+                "text": "2026-10-14 Bring tea, name cards, and a few spare copies",
                 "children": []
               }
             ]
@@ -91,7 +91,7 @@
             "children": [
               {
                 "id": "poster",
-                "text": "Make a simple poster",
+                "text": "2026-10-12 Make a simple poster",
                 "children": []
               },
               {
@@ -129,7 +129,7 @@
             "children": [
               {
                 "id": "proposal",
-                "text": "Review the project proposal",
+                "text": "2026-10-08 Review the project proposal",
                 "children": []
               }
             ]

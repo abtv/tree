@@ -54,7 +54,7 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-24 | Date-like text indicator (S2, F6, VC10) | AG-14 | E2E scenario 4 underline; screenshots; resemblance-rule tests | Done |
 | AG-25 | Command Matrix conformance test and completion of visual regression (scenario 16) | AG-10 to AG-24 | Every Command Matrix and Derived Rule cell asserted; every scenario 16 state inspected in light and dark; `npm run check:requirements` | Done |
 | AG-26 | Performance guards for the edit and group-move paths | AG-12, AG-14, AG-20 | `perf/agenda.spec.ts` scenarios against a same-machine baseline; save-count assertion | Done |
-| AG-27 | Agenda in the README screenshots (Q4) | AG-25 | Updated capture script; `npm run screenshots:readme` output inspected in light and dark | Planned |
+| AG-27 | Agenda in the README screenshots (Q4) | AG-25 | Updated capture script; `npm run screenshots:readme` output inspected in light and dark | Complete |
 | AG-28 | Close the initiative: verify documentation, extract knowledge, remove this plan and its index row | AG-26, AG-27, Product Owner confirmation | `npm run check:docs`; removal commit | Planned |
 
 Task details:
@@ -115,7 +115,9 @@ No suggestion for `t`, `to`, `tomo`, bare `mar` or `may`, abbreviated weekdays, 
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** AG-27: Agenda in the README screenshots. Outstanding from AG-23: the manual native-keyboard check of Tab, Ctrl+N and Ctrl+P could not run because macOS Automation access was denied; run it once access is granted.
+**Next task:** AG-28: close the initiative (needs Product Owner confirmation that no further tasks remain). Outstanding from AG-23: the manual native-keyboard check of Tab, Ctrl+N and Ctrl+P could not run because macOS Automation access was denied; run it once access is granted.
+
+AG-27 added five dated nodes (2026-10-08 to 2026-10-15) to `docs/images/demo-document.json`, leaving every text that `scripts/record-demo.mjs` asserts or edits unchanged, and an Agenda capture to `scripts/readme-screenshots.mjs` (fixed `Date` of 2026-10-08, `Cmd+P`, light appearance, pointer moved off the Vim toggle so no tooltip shows). It publishes `agenda-light.png` through `demo.yml` and the README. The three images were inspected against the stored text; only the light Agenda image was inspected, because the README publishes one Agenda image and dark Agenda rendering is covered by the committed E2E baselines. `npm run demo:video` was not rerun; the document edits do not touch its assertions. No product decisions were made.
 
 AG-26 added three scenarios to `perf/agenda.spec.ts` on the 6000-occurrence fixture: keystrokes that complete and break a canonical date (30 samples), typing in an active occurrence whose mirror is mounted (`agendaSeed(count, true)` adds a `pair` node dated yesterday and today), and a 100-node Visual group move followed by Undo. Measured on this machine: date-edit and mirror p95 about 33 ms, one save across 150 date-edit keystrokes, group move 17–22 ms with Undo 75–150 ms and exactly two saves (move and Undo). The scenarios record their metrics, so `PERF_BASELINE` compares them like the others; no baseline was committed. While adding them I found that the renderer-side `treeApi.save` patch used by the earlier Agenda scenarios counts nothing (the preload object cannot be patched), so their `saves === 0` assertions were vacuous. All Agenda scenarios now count `tree:save` in the main process through `__treeIpc.wrap`, as `perf/state.spec.ts` does, and the zero-save assertions pass on real counts. No product decisions were made.
 
