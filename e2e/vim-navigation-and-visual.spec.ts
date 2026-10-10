@@ -5,6 +5,7 @@ import {
   dragSelectText,
   exactMessage,
   expect,
+  firePaste,
   launchTree as launchTreeBase,
   lockSystemClipboard,
   node,
@@ -661,9 +662,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 2)).toHaveValue('New')
     await expect(node(window, 3)).toHaveValue('New')
   })
-  test('captures structural text typed in its own node when a pointer click lands elsewhere', async ({
-    userDataDir,
-  }) => {
+  // @requirement PRODUCT.md §20.2.19
+  test('discards structural dot recording when a pointer click lands elsewhere', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -682,8 +682,69 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('.')
     await expect(node(window, 2)).toHaveValue('Opened')
     await expect(node(window, 3)).toHaveValue('bee')
-    await expect(node(window, 4)).toHaveValue('Opened')
+    await expect.poll(() => nodeTexts(window)).toEqual(['A', 'Opened', 'bee'])
   })
+
+  // @requirement PRODUCT.md §20.2.19
+  for (const command of ['Meta+a', 'Meta+x', 'Meta+v', 'native-paste']) {
+    test(`keeps the prior dot change after ${command} interrupts structural Insert`, async ({ userDataDir }) => {
+      await lockSystemClipboard()
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'a', text: 'ABC', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await node(window, 1).focus()
+      await window.keyboard.press('x')
+      await expect(node(window, 1)).toHaveValue('BC')
+      await window.keyboard.press('o')
+      const opened = node(window, 2)
+      await window.keyboard.type('Opened')
+      await opened.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 2))
+      await writeClipboardText(app, 'P')
+      if (command === 'native-paste') await firePaste(opened)
+      else await window.keyboard.press(command)
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      if (command === 'Meta+a') {
+        await expect(opened).toHaveValue('Opened')
+        await expect(opened).toHaveJSProperty('selectionStart', 0)
+        await expect(opened).toHaveJSProperty('selectionEnd', 6)
+      } else await expect(opened).toHaveValue(command === 'Meta+x' ? 'ened' : 'POpened')
+      await window.keyboard.press('Escape')
+      await node(window, 1).focus()
+      await setCursor(node(window, 1), 0)
+      await window.keyboard.press('.')
+      await expect(node(window, 1)).toHaveValue('C')
+      await expect(window.locator('.node-row')).toHaveCount(2)
+    })
+  }
+
+  // @requirement PRODUCT.md §20.2.19
+  for (const command of ['o', 'O', 'c', 's']) {
+    test(`preserves the previous dot change after a pointer interrupts structural ${command}`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'a', text: 'ABC', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await node(window, 1).focus()
+      await window.keyboard.press('x')
+      if (command === 'c' || command === 's') await pressShifted(window, 'V')
+      if (command === 'O') await pressShifted(window, 'O')
+      else await window.keyboard.press(command)
+      const editor = node(window, command === 'o' ? 2 : 1)
+      await window.keyboard.type('Opened')
+      await editor.click()
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      await window.keyboard.press('Escape')
+      await setCursor(editor, 0)
+      await window.keyboard.press('.')
+      await expect(editor).toHaveValue('pened')
+      await expect(window.locator('.node-row')).toHaveCount(command === 'o' || command === 'O' ? 2 : 1)
+    })
+  }
   test('starts in Normal mode', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)

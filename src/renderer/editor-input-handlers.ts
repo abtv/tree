@@ -61,6 +61,7 @@ export interface VimTextCommandState {
   mode: VimKeyboardState['mode']
   commandState: VimKeyboardState['commandState']
   finishReplace?: VimKeyboardState['finishReplace']
+  finishInsert?: VimKeyboardState['finishInsert']
   getCaretState?: VimKeyboardState['getCaretState']
   applyCaretState?: VimKeyboardState['applyCaretState']
   /** The unnamed register; Agenda rows without an editor yank their selected text into it. */
@@ -83,15 +84,19 @@ function commitPendingReplace(vim: VimTextCommandState | undefined, input: HTMLE
  * Resolve renderer-local session state before an application command that edits the focused node's
  * text through the store (`Cmd+V`/`Cmd+X`, context-menu Paste/Cut, and the native paste fallback).
  * A pending Replace edit commits as one edit first and returns to Normal without rewriting the DOM,
- * so a following Cut or Paste acts on what the user still sees selected. Insert sessions and
- * whole-node Visual mode and its range are untouched; otherwise the unfinished command and both
+ * so a following Cut or Paste acts on what the user still sees selected. Insert repeat bookkeeping
+ * is discarded while Insert mode stays active. Whole-node Visual mode and its range are untouched;
+ * otherwise the unfinished command and both
  * character Visual endpoints clear while character Visual mode stays active.
  */
 export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefined, input: HTMLElement): void {
   if (vim === undefined) return
   if (vim.mode === 'replace') {
     commitPendingReplace(vim, input)
-  } else if (vim.mode === 'insert' || vim.mode === 'visual-node') return
+  } else if (vim.mode === 'insert') {
+    vim.finishInsert?.(input)
+    return
+  } else if (vim.mode === 'visual-node') return
   clearCommandAssembly(vim.commandState)
 }
 
@@ -121,6 +126,7 @@ export function executeEditorContextMenuCommand(
 ): void {
   const selection = getSelectionRange(input)
   if (command === 'selectAll') {
+    if (vim?.mode === 'insert') vim.finishInsert?.(input)
     selectAll(input)
     return
   }
@@ -302,6 +308,7 @@ export function createEditorKeyDownHandler({
       return
     }
     const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
+    if (selectingAll && vim?.mode === 'insert') vim.finishInsert(event.currentTarget)
     const copying = event.metaKey && event.key.toLowerCase() === 'c'
     const pasting = event.metaKey && event.key.toLowerCase() === 'v'
     if (!selectingAll && !copying && !pasting) {

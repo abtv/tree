@@ -90,23 +90,25 @@ export function finishReplaceSession(
 // another pass when this call committed an edit.
 export function finishPendingEditSessions(deps: {
   session: VimEditSessionState
+  commandState: VimCommandState
   finishVimReplace: FinishReplace
   getMode: () => VimMode
   changeVimMode: (mode: VimMode) => void
 }): boolean {
-  const { session, finishVimReplace, getMode, changeVimMode } = deps
+  const { session, commandState, finishVimReplace, getMode, changeVimMode } = deps
   // A shutdown flush interrupts a pending plain Insert session: consume it without recording, so a
   // later Escape cannot capture the session the flush already ended (PRODUCT §20.2.19). The
-  // structural session needs its input's text to capture, so it stays pending for a later finish.
+  // structural session is interrupted by the same flush and must not be captured later either.
   takeInsertSession(session)
+  takeStructuralInsert(commandState)
   const committed = finishVimReplace()
   if (getMode() === 'replace') changeVimMode('normal')
   return committed
 }
 
 /**
- * Finish the pending Insert session. The structural session always captures; the plain session
- * is recorded for `.` only when Escape completed it on its own node. Every other finish (blur,
+ * Finish the pending Insert session. Structural and plain sessions are recorded for `.` only
+ * when Escape completes them. Every other finish (blur,
  * pointer, navigation, shortcut, toggle, flush) consumes it and keeps the previous repeatable
  * change (PRODUCT §20.2.19). The registered-input check is the fail-closed backstop against a
  * session that crossed to another node without a blur consuming it first.
@@ -122,7 +124,8 @@ export function finishInsertSession(
   completed = false,
 ): void {
   const { finishStructuralInsert, session: sessionState, commandState, getInput } = deps
-  finishStructuralInsert(input)
+  if (completed) finishStructuralInsert(input)
+  else takeStructuralInsert(commandState)
   const session = takeInsertSession(sessionState)
   if (session === undefined) return
   if (!completed) return

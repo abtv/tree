@@ -6,6 +6,7 @@ import {
   launchTree,
   lockSystemClipboard,
   node,
+  seedDocument,
   setCursor,
   test,
   typeInto,
@@ -102,6 +103,34 @@ describeForEachEditingMode('editable node context menu', () => {
 // The menu label does not pass through an editing-mode divergence, so this test runs once.
 // @requirement PRODUCT.md §13.2
 test.describe('editable node context menu (mode-independent)', () => {
+  // @requirement PRODUCT.md §20.2.19
+  for (const command of ['Select All', 'Cut', 'Paste']) {
+    test(`keeps the prior dot change after menu ${command} interrupts Insert`, async ({ userDataDir }) => {
+      await lockSystemClipboard()
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'a', text: 'ABC', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'a' },
+      })
+      const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const editor = node(window, 1)
+      await editor.focus()
+      await window.keyboard.press('x')
+      await window.keyboard.press('i')
+      await window.keyboard.type('Z')
+      await expect(editor).toHaveValue('ZBC')
+      await editor.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 1))
+      await writeClipboardText(app, 'P')
+      await chooseEditorMenuItem(app, command)
+      await editor.click({ button: 'right' })
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      await expect(editor).toHaveValue(command === 'Cut' ? 'BC' : command === 'Paste' ? 'PZBC' : 'ZBC')
+      await window.keyboard.press('Escape')
+      await setCursor(editor, 0)
+      await window.keyboard.press('.')
+      await expect(editor).toHaveValue(command === 'Cut' ? 'C' : command === 'Paste' ? 'ZBC' : 'BC')
+    })
+  }
+
   test('bounds long selections in the native Look Up menu label', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     await lockSystemClipboard()

@@ -144,12 +144,9 @@ export function createPointerHandlers(
       setSelectAllNodeId(undefined)
       getInput(node.id)?.classList.remove('select-all')
       store.endTextSession()
-      // A structural session's typed text lives in the node `o`/`O`/Visual `c`/`s` created, not in
-      // the node under the pointer. This mousedown runs before the focused input's blur, so let
-      // that blur finish the structural session rather than capturing the clicked node's text; a
-      // plain session is still consumed here, so a pointer focus interruption records nothing
-      // (PRODUCT §20.2.19).
-      if (commandState.structuralInsert === undefined) finishVimInsert(event.currentTarget)
+      // Pointer interruption consumes both kinds of Insert bookkeeping without capturing text,
+      // including a same-input press that never produces blur (PRODUCT §20.2.19).
+      finishVimInsert(event.currentTarget)
       // A right-click opens the context menu, which will run Cut or Paste against the visible
       // selection, so this commit must not rewrite the DOM; a left click keeps the existing
       // reset-to-typed-end behavior.

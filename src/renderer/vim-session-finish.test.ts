@@ -84,7 +84,8 @@ describe('structural and plain Insert completion', () => {
       const finishStructuralInsert = vi.fn()
       const deps = { ...f.deps, finishStructuralInsert, getInput: () => (matching ? element : undefined) }
       finishInsertSession(deps, element, completed)
-      expect(finishStructuralInsert).toHaveBeenCalledWith(element)
+      if (completed) expect(finishStructuralInsert).toHaveBeenCalledWith(element)
+      else expect(finishStructuralInsert).not.toHaveBeenCalled()
       expect(f.session.insert).toBeUndefined()
       if (records)
         expect(f.commandState.lastChange).toEqual({
@@ -146,7 +147,7 @@ describe('Replace completion', () => {
 })
 
 describe('pending edit flush', () => {
-  it('commits a real Replace session once while leaving structural capture pending', async () => {
+  it('commits a real Replace session once while discarding structural capture', async () => {
     const f = await fixture()
     beginStructuralOpen(f.commandState, 'node', 'after')
     beginReplaceSession(f.session, { nodeId: 'node', baseline: 'hello', position: 0 })
@@ -154,6 +155,7 @@ describe('pending edit flush', () => {
     const changeVimMode = vi.fn()
     const deps = {
       session: f.session,
+      commandState: f.commandState,
       finishVimReplace: () => finishReplaceSession(f.deps),
       getMode: () => 'replace' as const,
       changeVimMode,
@@ -161,7 +163,7 @@ describe('pending edit flush', () => {
     expect(finishPendingEditSessions(deps)).toBe(true)
     expect(finishPendingEditSessions(deps)).toBe(false)
     expect(f.node().text).toBe('Xello')
-    expect(f.commandState.structuralInsert).toBeDefined()
+    expect(f.commandState.structuralInsert).toBeUndefined()
     expect(f.applyCaretState).toHaveBeenCalledTimes(1)
   })
   it.each([true, false])('consumes plain Insert and forwards the commit flag (%s)', (committed) => {
@@ -180,6 +182,7 @@ describe('pending edit flush', () => {
     expect(
       finishPendingEditSessions({
         session,
+        commandState: createVimCommandState(),
         finishVimReplace,
         getMode: () => (committed ? 'replace' : 'insert'),
         changeVimMode,
@@ -226,7 +229,7 @@ describe('Vim editing switch', () => {
       false,
     )
     expect(events).toEqual(['insert', 'replace', 'visual', 'caret', 'mode'])
-    expect(f.commandState.lastChange).toEqual({ kind: 'structural-open', position: 'after', text: 'created' })
+    expect(f.commandState.lastChange).toBeUndefined()
     expect(f.applyCaretState).toHaveBeenCalledWith(
       'node',
       { cursor: 5, imageActive: false },

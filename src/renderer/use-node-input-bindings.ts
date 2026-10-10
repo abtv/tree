@@ -426,11 +426,12 @@ export function useNodeInputBindings({
   const finishPendingEdits = useCallback((): boolean => {
     return sessionFinish.finishPendingEditSessions({
       session: vimSession.current,
+      commandState: vimCommandState.current,
       finishVimReplace,
       getMode: () => latestVimMode.current,
       changeVimMode,
     })
-  }, [finishVimReplace, changeVimMode, vimSession])
+  }, [finishVimReplace, changeVimMode, vimSession, vimCommandState])
 
   useEffect(() => store.registerPendingEditFinisher(finishPendingEdits), [store, finishPendingEdits])
 
@@ -463,6 +464,7 @@ export function useNodeInputBindings({
       },
       finishReplace: (input, retreatCursor, preserveDomSelection) =>
         finishVimReplace(input, retreatCursor, preserveDomSelection),
+      finishInsert: finishVimInsert,
       register: registerHandle,
       getCaretState: (nodeId, cursor, imageActive) =>
         caretAuthority.current.nodeId === nodeId
@@ -471,7 +473,7 @@ export function useNodeInputBindings({
       applyCaretState,
       setMode: changeVimMode,
     }),
-    [finishVimReplace, changeVimMode, vimCommandState, registerHandle, applyCaretState],
+    [finishVimReplace, finishVimInsert, changeVimMode, vimCommandState, registerHandle, applyCaretState],
   )
 
   const moveVimViewport = useCallback(

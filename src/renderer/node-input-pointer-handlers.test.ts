@@ -214,12 +214,12 @@ describe('mouse down', () => {
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
   })
 
-  it('leaves a structural session to the focused input blur', async () => {
+  it('interrupts a structural session even when there is no blur', async () => {
     const f = await fixture()
     beginStructuralOpen(f.commandState, 'node', 'after')
-    f.handlers().onMouseDown(mouse(textarea('hello')))
-    expect(f.deps.finishVimInsert).not.toHaveBeenCalled()
-    expect(f.commandState.structuralInsert).toBeDefined()
+    const input = textarea('hello')
+    f.handlers().onMouseDown(mouse(input))
+    expect(f.deps.finishVimInsert).toHaveBeenCalledExactlyOnceWith(input)
   })
 
   it('reads the caret authority at event time', async () => {

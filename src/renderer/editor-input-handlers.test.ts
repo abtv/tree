@@ -2753,17 +2753,21 @@ describe('editor keyboard handler', () => {
     expect(store.paste).toHaveBeenCalledOnce()
   })
 
-  it('keeps an Insert session and mode before Cmd+V', () => {
+  // @requirement PRODUCT.md §20.2.19
+  it.each(['a', 'v', 'x'])('discards Insert recording and keeps Insert mode before Cmd+%s', (key) => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
+    input.setSelectionRange(0, 2)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
 
-    handle(keyEvent(input, 'v', { metaKey: true }))
+    handle(keyEvent(input, key, { metaKey: true }))
 
-    expect(vim.finishInsert).not.toHaveBeenCalled()
+    expect(vim.finishInsert).toHaveBeenCalledExactlyOnceWith(input)
     expect(vim.setMode).not.toHaveBeenCalled()
-    expect(store.paste).toHaveBeenCalledOnce()
+    if (key === 'v') expect(store.paste).toHaveBeenCalledOnce()
+    else if (key === 'x') expect(store.cut).toHaveBeenCalledWith('node', 0, 2)
+    else expect([input.selectionStart, input.selectionEnd]).toEqual([0, 4])
   })
 
   function textCommandState(vim: VimKeyboardState): VimTextCommandState {
@@ -2772,10 +2776,24 @@ describe('editor keyboard handler', () => {
         return vim.mode
       },
       commandState: vim.commandState,
+      finishInsert: vim.finishInsert,
       finishReplace: vim.finishReplace,
       setMode: vim.setMode,
     }
   }
+
+  // @requirement PRODUCT.md §20.2.19
+  it.each(['selectAll', 'cut', 'paste'] as const)('discards Insert recording before menu %s', (command) => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'text'
+    input.setSelectionRange(0, 2)
+    const treeNode = { id: 'node', text: 'text', children: [] }
+    const { vim } = vimHandler(store, treeNode, 'insert')
+    executeEditorContextMenuCommand(command, store, treeNode, input, textCommandState(vim))
+    expect(vim.finishInsert).toHaveBeenCalledExactlyOnceWith(input)
+    expect(vim.setMode).not.toHaveBeenCalled()
+  })
 
   it('commits and ends a pending Replace session before the context-menu Paste', async () => {
     const { node, store, input, clipboard, vim } = await pendingReplaceFixture()

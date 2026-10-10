@@ -1465,7 +1465,7 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.imageCaretNodeId).toBe('parent')
   })
 
-  it.each(['Escape', 'blur'])('captures opened child text for structural dot repeat after %s', async (finish) => {
+  it('captures opened child text for structural dot repeat after Escape', async () => {
     const f = await fixture({
       document: { roots: [node('a', 'A')] },
       location: { currentParentId: 'a', selectedNodeId: 'a' },
@@ -1476,7 +1476,6 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.vimMode).toBe('insert')
     act(() => f.bindings('a').onBlur())
     f.type('Opened')
-    if (finish === 'blur') act(() => f.bindings(childId).onBlur())
     f.press('Escape')
     f.press('.')
     expect(f.node('a').children.map((item) => item.text)).toEqual(['Opened'])
@@ -1484,21 +1483,73 @@ describe('useNodeInputBindings', () => {
     expect(f.node().id).not.toBe(childId)
   })
 
-  it('captures a structural session from its own node when a pointer click lands on another node', async () => {
+  // @requirement PRODUCT.md §20.2.19
+  it.each(['a', 'b'])('discards structural recording when a pointer click lands on %s', async (targetId) => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'bee')] } })
     f.input('a')
     f.press('o')
     const openedId = f.node().id
     f.type('Opened', openedId)
-    // The pointer mousedown on another node must not capture that node's text for the structural session.
-    act(() => f.bindings('b').onMouseDown({ currentTarget: f.input('b'), button: 0 } as never))
+    act(() => f.bindings(targetId).onMouseDown({ currentTarget: f.input(targetId), button: 0 } as never))
     act(() => f.bindings(openedId).onBlur())
-    f.press('Escape', {}, 'b')
+    f.press('Escape', {}, targetId)
     act(() => f.store.selectNode('a', 0))
     f.press('.')
     const texts = f.snapshot().document.roots.map((item) => item.text)
-    expect(texts.filter((text) => text === 'Opened').length).toBe(2)
+    expect(texts.filter((text) => text === 'Opened').length).toBe(1)
     expect(texts.filter((text) => text === 'bee').length).toBe(1)
+  })
+
+  // @requirement PRODUCT.md §20.2.19
+  it('discards structural recording after a same-node pointer interruption without blur', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'A')] } })
+    f.press('o')
+    const openedId = f.node().id
+    f.type('Opened', openedId)
+    act(() => f.bindings(openedId).onMouseDown({ currentTarget: f.input(openedId), button: 0 } as never))
+    f.press('Escape')
+    f.press('.')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'Opened'])
+  })
+
+  // @requirement PRODUCT.md §20.2.19
+  it.each(['o', 'O', 'c', 's'])(
+    'preserves the previous repeat after a pointer interrupts structural %s',
+    async (command) => {
+      const f = await fixture({ document: { roots: [node('a', 'ABC'), node('b', 'bee')] } })
+      f.input('a').setSelectionRange(0, 0)
+      f.press('x')
+      if (command === 'c' || command === 's') f.press('V')
+      f.press(command)
+      const createdId = f.node().id
+      f.type('Opened')
+      act(() => f.bindings(createdId).onMouseDown({ currentTarget: f.input(createdId), button: 0 } as never))
+      f.press('Escape')
+      f.input(createdId).setSelectionRange(0, 0)
+      const roots = f.snapshot().document.roots.length
+      f.press('.')
+      expect(f.node(createdId).text).toBe('pened')
+      expect(f.snapshot().document.roots).toHaveLength(roots)
+      expect(f.node('b').text).toBe('bee')
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.19
+  it.each(['a', 'x', 'v'])('keeps the previous repeat after Cmd+%s interrupts structural Insert', async (key) => {
+    const f = await fixture({ document: { roots: [node('a', 'ABC')] } })
+    f.input('a').setSelectionRange(0, 0)
+    f.press('x')
+    expect(f.node('a').text).toBe('BC')
+    f.press('o')
+    f.type('Opened')
+    f.input().setSelectionRange(0, 2)
+    f.press(key, { metaKey: true })
+    expect(f.result.current.vimMode).toBe('insert')
+    f.press('Escape')
+    act(() => f.store.selectNode('a', 0))
+    f.press('.')
+    expect(f.node('a').text).toBe('C')
+    expect(f.snapshot().document.roots).toHaveLength(2)
   })
 
   it.each(['blur', 'pointer'])('does not record a plain Insert session finished by %s', async (finish) => {
@@ -2363,7 +2414,7 @@ describe('Vim editing switch', () => {
     expect(document.activeElement).toBe(input)
   })
 
-  it('finishes a structural Insert session when Vim editing is disabled', async () => {
+  it('discards structural recording when Vim editing is disabled', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abc')] } })
     const input = f.input()
     act(() => f.store.selectNode('node', 0))
@@ -2379,8 +2430,7 @@ describe('Vim editing switch', () => {
     act(() => f.store.selectNode(opened, 0))
     f.press('.', {}, opened)
 
-    // The finished `o` session is the repeatable change, so `.` opens another sibling with its text.
-    expect(f.snapshot().document.roots.map((root) => root.text)).toEqual(['abc', 'new', 'new'])
+    expect(f.snapshot().document.roots.map((root) => root.text)).toEqual(['abc', 'new'])
   })
 
   it('keeps a multi-character selection when Vim editing is enabled', async () => {

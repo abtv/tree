@@ -294,6 +294,14 @@ The native window surface is the exception to renderer color ownership: `src/mai
 
 ## 9. UI State vs Document State
 
+Insert interruption consumes renderer-local plain and structural repeat
+bookkeeping through `vim-session-finish.ts`. Text commands share that rule across
+keyboard, context-menu, and native-paste adapters. Escape alone captures the
+completed session. This adds no document edit, disk write, sync, or history entry;
+it clears bounded session references in constant time and retains the previous
+repeat payload. Existing typing, clipboard, and structural-repeat performance
+guards cover the unchanged command work at scale (PRODUCT §22.1).
+
 The application distinguishes between document state and transient UI/runtime state.
 
 ### Document state
