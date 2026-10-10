@@ -26,6 +26,46 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  it('reuses unchanged day rows when dates are added and releases them when cleared', () => {
+    const cache = new AgendaRowsCache()
+    const state = openAgendaState(location, 0, today)
+    const before = cache.get(document, state)
+    const oldNode = before.find((row) => row.kind === 'node' && row.nodeId === 'a')!
+    const edited = editNodeText(document, 'a', '2026-10-14 2026-10-20 Added')
+    const after = cache.get(edited, state)
+    expect(after.find((row) => row.key === oldNode.key)).toBe(oldNode)
+    expect(after).toEqual(buildAgendaRows(projectAgenda(edited, null), state))
+    const folded = cache.get(edited, { ...state, collapsed: new Set([oldNode.key]) })
+    expect(folded.filter((row) => row.kind === 'node' && row.nodeId === 'b' && row.day === today + 6)).toEqual([])
+    expect(cache.get(document, state)).toEqual(before)
+    cache.clear()
+    expect(cache.get(document, state).find((row) => row.key === oldNode.key)).not.toBe(oldNode)
+  })
+  it('publication and rendering share one projection and stable rows for a same-date edit', () => {
+    const cache = new AgendaRowsCache()
+    const runtime = new EditorRuntimeState(undefined, cache)
+    const agenda = openAgendaState(location, 0, today)
+    const snapshot: ReadySnapshot = {
+      status: 'ready',
+      document,
+      location,
+      agenda,
+      focus: runtime.newFocus('parent', 0),
+      expansion: COLLAPSED_EXPANSION_STATE,
+      structuralVersion: 0,
+    }
+    runtime.replaceReady(snapshot)
+    const rows = cache.get(document, runtime.ready().agenda!)
+    const project = vi.spyOn(projectionModule, 'projectAgenda')
+    try {
+      const edited = editNodeText(document, 'a', '2026-10-14 Changed')
+      runtime.replaceReady({ ...snapshot, document: edited })
+      expect(cache.get(edited, runtime.ready().agenda!)).toBe(rows)
+      expect(project).toHaveBeenCalledTimes(1)
+    } finally {
+      project.mockRestore()
+    }
+  })
   it('merges a root-scope pin in chronological order, preserves matched ancestors, and ignores stale pins', () => {
     const unpinnedState = openAgendaState(location, 0, today)
     const state = { ...unpinnedState, pinnedOccurrence: { nodeId: 'a', day: today + 6 } }

@@ -18,8 +18,12 @@ export type AgendaRow =
     }
 
 /** Add the one temporarily invalid item and its ancestors without copying document nodes. */
-export function agendaProjection(document: Document, state: AgendaState): readonly AgendaProjectionDay[] {
-  const projection = projectAgenda(document, state.scopeParentId)
+export function agendaProjection(
+  document: Document,
+  state: AgendaState,
+  previous?: { document: Document; projection: readonly AgendaProjectionDay[] },
+): readonly AgendaProjectionDay[] {
+  const projection = projectAgenda(document, state.scopeParentId, previous)
   const pin = state.pinnedOccurrence
   if (pin === undefined) return projection
   const located = locateNode(document, pin.nodeId)
@@ -47,7 +51,17 @@ export function agendaProjection(document: Document, state: AgendaState): readon
   return [...projection.filter((entry) => entry.day !== pin.day), { day: pin.day, rows }].sort((a, b) => a.day - b.day)
 }
 
-export function buildAgendaRows(projection: readonly AgendaProjectionDay[], state: AgendaState): readonly AgendaRow[] {
+interface DayRows {
+  projected: readonly AgendaProjectionRow[]
+  collapsed: ReadonlySet<string>
+  rows: readonly AgendaRow[]
+}
+
+export function buildAgendaRows(
+  projection: readonly AgendaProjectionDay[],
+  state: AgendaState,
+  cache?: Map<DayNumber, DayRows>,
+): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
   const timeline =
     state.focusedDay === undefined
@@ -61,6 +75,7 @@ export function buildAgendaRows(projection: readonly AgendaProjectionDay[], stat
           },
         ]
   const rows: AgendaRow[] = []
+  const anyCollapsed = state.collapsed.size > 0
   for (const entry of timeline) {
     if (entry.kind === 'gap') {
       rows.push({ ...entry, key: `gap:${entry.startDay}:${entry.endDay}` })
@@ -70,6 +85,12 @@ export function buildAgendaRows(projection: readonly AgendaProjectionDay[], stat
     rows.push({ ...entry, key })
     if (state.collapsed.has(key)) continue
     const projected = days.get(entry.day) ?? []
+    const cached = cache?.get(entry.day)
+    if (cached?.projected === projected && cached.collapsed === state.collapsed) {
+      for (const row of cached.rows) rows.push(row)
+      continue
+    }
+    const dayRows: AgendaRow[] = []
     let hiddenBelow: number | undefined
     for (let index = 0; index < projected.length; index++) {
       const node = projected[index]!
@@ -77,32 +98,35 @@ export function buildAgendaRows(projection: readonly AgendaProjectionDay[], stat
       if (hiddenBelow !== undefined && node.depth > hiddenBelow) continue
       hiddenBelow = undefined
       const nodeKey = `node:${entry.day}:${node.nodeId}`
-      rows.push({
-        ...node,
+      dayRows.push({
         kind: 'node',
         key: nodeKey,
         day: entry.day,
+        nodeId: node.nodeId,
+        depth: node.depth,
+        role: node.role,
         hasProjectedChildren: (projected[index + 1]?.depth ?? -1) > node.depth,
       })
-      if (state.collapsed.has(nodeKey)) hiddenBelow = node.depth
+      // Hashing each freshly built key is measurable at 100,000 rows, and most Agendas have no folds.
+      if (anyCollapsed && state.collapsed.has(nodeKey)) hiddenBelow = node.depth
     }
+    cache?.set(entry.day, { projected, collapsed: state.collapsed, rows: dayRows })
+    for (const row of dayRows) rows.push(row)
+  }
+  if (cache !== undefined) {
+    for (const day of cache.keys()) if (!days.has(day)) cache.delete(day)
   }
   return rows
 }
 
-function sameProjection(left: readonly AgendaProjectionDay[], right: readonly AgendaProjectionDay[]): boolean {
+function sameDay(left: AgendaProjectionDay, right: AgendaProjectionDay): boolean {
+  if (left === right) return true
   return (
-    left.length === right.length &&
-    left.every((day, index) => {
-      const other = right[index]!
-      return (
-        day.day === other.day &&
-        day.rows.length === other.rows.length &&
-        day.rows.every((row, rowIndex) => {
-          const candidate = other.rows[rowIndex]!
-          return row.nodeId === candidate.nodeId && row.depth === candidate.depth && row.role === candidate.role
-        })
-      )
+    left.day === right.day &&
+    left.rows.length === right.rows.length &&
+    left.rows.every((row, index) => {
+      const other = right.rows[index]!
+      return row.nodeId === other.nodeId && row.depth === other.depth && row.role === other.role
     })
   )
 }
@@ -114,6 +138,7 @@ export class AgendaRowsCache {
   private projection: readonly AgendaProjectionDay[] = []
   private state: AgendaState | undefined
   private rows: readonly AgendaRow[] = []
+  private readonly dayRows = new Map<DayNumber, DayRows>()
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
     let changed = false
@@ -123,8 +148,20 @@ export class AgendaRowsCache {
       // The document/scope guards run first; an equal cached document always has cached state.
       state.pinnedOccurrence !== this.state?.pinnedOccurrence
     ) {
-      const projection = agendaProjection(document, state)
-      changed = !sameProjection(this.projection, projection)
+      const previous = new Map(this.projection.map((day) => [day.day, day]))
+      const reusable =
+        this.document !== undefined &&
+        state.scopeParentId === this.scope &&
+        state.pinnedOccurrence === undefined &&
+        this.state?.pinnedOccurrence === undefined
+          ? { document: this.document, projection: this.projection }
+          : undefined
+      const projection = agendaProjection(document, state, reusable).map((day) => {
+        const old = previous.get(day.day)
+        return old !== undefined && sameDay(old, day) ? old : day
+      })
+      changed =
+        projection.length !== this.projection.length || projection.some((day, index) => day !== this.projection[index])
       this.projection = projection
       this.document = document
       this.scope = state.scopeParentId
@@ -136,7 +173,7 @@ export class AgendaRowsCache {
       this.state.collapsed !== state.collapsed ||
       this.state.revealed !== state.revealed
     ) {
-      this.rows = buildAgendaRows(this.projection, state)
+      this.rows = buildAgendaRows(this.projection, state, this.dayRows)
     }
     this.state = state
     return this.rows
@@ -150,5 +187,6 @@ export class AgendaRowsCache {
     this.projection = []
     this.state = undefined
     this.rows = []
+    this.dayRows.clear()
   }
 }

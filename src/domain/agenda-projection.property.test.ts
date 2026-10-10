@@ -89,10 +89,14 @@ it('rescans only the replaced root path after a text edit, independent of siblin
       })
       const scan = vi.spyOn(recognition, 'findCanonicalDates')
       try {
-        projectAgenda(document, null)
+        const projection = projectAgenda(document, null)
         scan.mockClear()
-        const edited = projectAgenda({ roots: [edit(document.roots[0]!)] }, null)
+        const changed = { roots: [edit(document.roots[0]!)] }
+        const edited = projectAgenda(changed, null, { document, projection })
         expect(scan).toHaveBeenCalledTimes(depth)
+        expect(edited).toEqual(projectAgenda(changed, null))
+        const unchangedDay = projection.find((entry) => entry.day === day(20))
+        if (unchangedDay !== undefined) expect(edited.find((entry) => entry.day === day(20))).toBe(unchangedDay)
         expect(edited.some((entry) => entry.day === day(14))).toBe(false)
         expect(edited.find((entry) => entry.day === day(15))!.rows.at(-1)).toEqual({
           nodeId: `p${depth - 1}`,

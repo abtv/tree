@@ -2,6 +2,7 @@ import { isValidLocation, normalizeVisibleLocation, releaseNodeIndex, type NodeI
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
 import { agendaOriginLocation, reconcileAgenda } from './agenda-reconcile'
 import { isNodeExpanded } from './expansion-state'
+import type { AgendaRowsCache } from './agenda-rows'
 
 export type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
 
@@ -11,7 +12,10 @@ export class EditorRuntimeState {
   private focusToken = 0
   public snapshot: EditorSnapshot = { status: 'loading' }
 
-  public constructor(private readonly onAgendaClosed: () => void = () => undefined) {}
+  public constructor(
+    private readonly onAgendaClosed: () => void = () => undefined,
+    private readonly agendaRowsCache?: AgendaRowsCache,
+  ) {}
 
   public getSnapshot = (): EditorSnapshot => this.snapshot
 
@@ -45,7 +49,7 @@ export class EditorRuntimeState {
         previous.agenda === undefined ||
         (previous.agenda?.pinnedOccurrence !== undefined && state.agenda.pinnedOccurrence === undefined))
     ) {
-      const agenda = reconcileAgenda(state.document, state.agenda)
+      const agenda = reconcileAgenda(state.document, state.agenda, false, this.agendaRowsCache)
       if (agenda === undefined) {
         delete next.agenda
         next.location = normalizeVisibleLocation(

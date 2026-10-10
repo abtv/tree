@@ -1,7 +1,7 @@
 import { nextActiveDay } from '../domain/agenda-date-edits'
 import { findCanonicalDates } from '../domain/date-recognition'
 import { isValidLocation, locateNode, type Document, type NodeId, type Location } from '../domain/document'
-import { agendaProjection, buildAgendaRows, type AgendaRow } from './agenda-rows'
+import { agendaProjection, buildAgendaRows, type AgendaRow, type AgendaRowsCache } from './agenda-rows'
 import { dayKey, selectAgendaRow, type AgendaState } from './agenda-state'
 
 /** Scope membership excludes the scope node itself, just like the domain projection. */
@@ -25,6 +25,7 @@ export function reconcileAgenda(
   document: Document,
   changed: AgendaState,
   preservePresentation = false,
+  cache?: AgendaRowsCache,
 ): AgendaState | undefined {
   const state = withoutPendingMove(changed)
   if (state.scopeParentId !== null && locateNode(document, state.scopeParentId) === undefined) return undefined
@@ -68,7 +69,10 @@ export function reconcileAgenda(
       }
     }
   }
-  return reconcileAgendaSelection(next, buildAgendaRows(agendaProjection(document, next), next))
+  return reconcileAgendaSelection(
+    next,
+    cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next),
+  )
 }
 
 /** Prefer the old day before Today when a deleted row or gap no longer exists. */
@@ -116,10 +120,11 @@ export function agendaHistorySelection(
   state: AgendaState,
   nodeId: NodeId,
   reference = selectedAgendaDay(state.selectedKey) ?? state.today,
+  cache?: AgendaRowsCache,
 ): AgendaState {
   if (!isInAgendaScope(document, state, nodeId)) return state
   // The projection is scoped too, so removing the preceding scope guard cannot find an outside occurrence.
-  const rows = buildAgendaRows(agendaProjection(document, state), state)
+  const rows = cache?.get(document, state) ?? buildAgendaRows(agendaProjection(document, state), state)
   const occurrences = rows.filter(
     // The ID test alone excludes day/gap rows, which have no nodeId; the kind guard narrows the union.
     (row): row is Extract<AgendaRow, { kind: 'node' }> => row.kind === 'node' && row.nodeId === nodeId,
@@ -134,5 +139,8 @@ export function agendaHistorySelection(
   // Rechecking visible selection when no pin changed is equivalent; avoid that extra projection work.
   return next.pinnedOccurrence === state.pinnedOccurrence
     ? next
-    : reconcileAgendaSelection(next, buildAgendaRows(agendaProjection(document, next), next))
+    : reconcileAgendaSelection(
+        next,
+        cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next),
+      )
 }

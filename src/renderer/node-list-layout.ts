@@ -54,10 +54,12 @@ export function buildLayout(rows: readonly KeyedRow[], heights: ReadonlyMap<stri
 }
 
 export function pruneHeights(heights: Map<string, number>, rows: readonly KeyedRow[]): void {
-  const ids = new Set(rows.map(rowKey))
-  for (const id of heights.keys()) {
-    if (!ids.has(id)) heights.delete(id)
+  const missing = new Set(heights.keys())
+  for (const row of rows) {
+    if (missing.size === 0) return
+    missing.delete(rowKey(row))
   }
+  for (const id of missing) heights.delete(id)
 }
 
 export function measureElement(

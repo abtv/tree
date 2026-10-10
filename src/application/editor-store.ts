@@ -108,7 +108,7 @@ export class EditorStore {
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
-  private readonly runtime = new EditorRuntimeState(() => this.agendaRowsCache.clear())
+  private readonly runtime = new EditorRuntimeState(() => this.agendaRowsCache.clear(), this.agendaRowsCache)
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly textSession: EditorTextSession
@@ -1347,7 +1347,7 @@ export class EditorStore {
    */
   private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
     if (state.agenda !== undefined) {
-      const restored = reconcileAgenda(document, state.agenda, true)
+      const restored = reconcileAgenda(document, state.agenda, true, this.agendaRowsCache)
       if (restored !== undefined) {
         const target = changeSiteFocus(state.document, document, state.location, () => true)
         const agenda =
@@ -1358,6 +1358,7 @@ export class EditorStore {
                 restored,
                 target.focus.nodeId,
                 selectedAgendaDay(state.agenda.selectedKey) ?? state.agenda.today,
+                this.agendaRowsCache,
               )
         const selected = this.agendaRowsCache.get(document, agenda).find((row) => row.key === agenda.selectedKey)
         const hasTarget = selected?.kind === 'node' && selected.nodeId === target?.focus.nodeId

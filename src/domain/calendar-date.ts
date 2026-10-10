@@ -11,10 +11,13 @@ function leapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
 }
 
+// Hoisted so date recognition over very large documents allocates nothing per call.
+const commonYearMonthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
 function monthLength(year: number, month: number): number {
   // An out-of-range month yields undefined, so the final day comparison also
   // rejects it. Mutating either explicit month bound is therefore equivalent.
-  return [31, leapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]!
+  return month === 2 && leapYear(year) ? 29 : commonYearMonthLengths[month - 1]!
 }
 
 /** Four-digit canonical years, including astronomical year zero. */
