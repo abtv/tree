@@ -769,6 +769,43 @@ describe('editor keyboard handler', () => {
     row.remove()
   })
 
+  // @requirement PRODUCT.md §20.2.20
+  it.each(['Escape', 'v'])('leaves Visual at the active character with %s', (exitKey) => {
+    for (const attachment of [undefined, { id: 'image', mimeType: 'image/png' as const }]) {
+      for (const keys of [
+        ['0', 'l', 'v', 'l', 'l'],
+        ['$', 'h', 'v', 'h', 'h'],
+        ['0', 'l', 'v', 'l', 'l', 'o'],
+      ]) {
+        const store = createStore()
+        const input = document.createElement('textarea')
+        input.value = 'abcdef'
+        const row = document.createElement('div')
+        row.className = 'node-row'
+        if (attachment !== undefined) row.dataset.hasAttachment = 'true'
+        row.append(input)
+        document.body.append(row)
+        const { handle, vim, commandState, caret, caretNodeId } = vimHandler(store, {
+          id: 'node',
+          text: input.value,
+          children: [],
+          ...(attachment === undefined ? {} : { attachment }),
+        })
+        if (attachment !== undefined) handle(keyEvent(input, 'j'))
+        for (const key of keys) handle(keyEvent(input, key))
+        const activeEnd = commandState.visualFocus!
+        expect(activeEnd).toBeGreaterThan(0)
+        handle(keyEvent(input, exitKey))
+        expect(vim.mode).toBe('normal')
+        expect(input.selectionStart).toBe(activeEnd)
+        expect(input.selectionEnd).toBe(activeEnd + 1)
+        expectImageCaret(caretNodeId, caret, 'node', false)
+        expect(vim.imageTextCursor.current).toBeUndefined()
+        row.remove()
+      }
+    }
+  })
+
   it.each(['Escape', 'v'])('clears image state when Visual %s returns to text', (exitKey) => {
     const store = createStore()
     const input = document.createElement('textarea')

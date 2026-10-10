@@ -225,10 +225,9 @@ export function createAgendaKeyDownHandler({
     if (event.key === 'Escape') {
       store.cancelAgendaMove()
       if (rowText !== undefined && vim?.mode === 'visual') {
-        // Leaving Visual puts the caret at the start of the selection, as in Tree.
+        // Leaving Visual keeps its active endpoint, as in Tree.
         const caret = rowText.caret()
-        const start = Math.min(caret.anchor, caret.focus)
-        rowText.setCaret({ ...caret, anchor: start, focus: start })
+        rowText.setCaret({ ...caret, anchor: caret.focus, focus: caret.focus })
       }
       if (vim !== undefined) {
         clearCommandAssembly(vim.commandState)

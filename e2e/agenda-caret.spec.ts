@@ -226,6 +226,21 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await window.keyboard.press('l')
       await window.keyboard.press('Meta+c')
       await expect.poll(clipboard).toBe('h')
+      for (const exitKey of ['Escape', 'v']) {
+        for (const [keys, endpoint] of [
+          ['0lvll', 3],
+          ['0llllvhh', 2],
+          ['0lvllo', 1],
+        ] as const) {
+          await window.keyboard.type(keys)
+          expect(await selectionText(today)).toBeTruthy()
+          await window.keyboard.press(exitKey)
+          await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+          expect((await caretMark(today))!.before).toBe(endpoint)
+          expect(await selectionText(today)).toBeUndefined()
+        }
+      }
+      await window.screenshot({ path: 'test-results/vc2-agenda-normal.png' })
     } else {
       await window.keyboard.press('ArrowRight')
       await window.keyboard.press('ArrowRight')

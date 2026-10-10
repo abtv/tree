@@ -40,6 +40,49 @@ const selectionColors = (field: ReturnType<typeof node>) =>
   })
 
 test.describe('Vim editing: navigation and Visual modes', () => {
+  // @requirement PRODUCT.md §20.2.20
+  test('leaves character Visual at its active endpoint', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.press('i')
+    await typeInto(editor, 'abcdef')
+    await window.keyboard.press('Escape')
+    for (const exitKey of ['Escape', 'v']) {
+      for (const [keys, endpoint] of [
+        ['0lvll', 3],
+        ['$hvhh', 2],
+        ['0lvllo', 1],
+      ] as const) {
+        await window.keyboard.type(keys)
+        if (exitKey === 'Escape' && endpoint === 3) {
+          await window.screenshot({ path: 'test-results/vc2-tree-visual.png' })
+          await expect(window).toHaveScreenshot('vim-visual-active-endpoint.png')
+        }
+        await window.keyboard.press(exitKey)
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        const offset = await editor.evaluate((element) => {
+          if (element instanceof HTMLTextAreaElement) {
+            return {
+              cursor: element.selectionStart,
+              selected: element.value.slice(element.selectionStart, element.selectionEnd),
+            }
+          }
+          const selection = element.ownerDocument.getSelection()!
+          const range = element.ownerDocument.createRange()
+          range.selectNodeContents(element)
+          range.setEnd(selection.anchorNode!, selection.anchorOffset)
+          return { cursor: range.toString().length, selected: selection.toString() }
+        })
+        expect(offset).toEqual({ cursor: endpoint, selected: 'abcdef'[endpoint] })
+        if (exitKey === 'Escape' && endpoint === 3) {
+          await window.screenshot({ path: 'test-results/vc2-tree-normal.png' })
+          await expect(window).toHaveScreenshot('vim-normal-active-endpoint.png')
+        }
+        await expect(editor).toHaveValue('abcdef')
+      }
+    }
+  })
+
   test('replays counted dd with complete subtrees and one undo per successful iteration', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

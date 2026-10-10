@@ -1206,7 +1206,7 @@ Normal mode also supports:
 
 * Visual mode selects characters only within the current node and uses the same yellow highlight as whole-node Visual mode. A deliberate multi-character selection in Normal mode — a pointer drag or `Cmd+A` — uses that highlight too, while the one-character Normal-mode block caret keeps its own block styling.
 * The Normal-mode character and word motions extend the selection.
-* `o` exchanges the active and anchored ends, and `v` returns to Normal mode.
+* `o` exchanges the active and anchored ends. `v` and `Esc` return to Normal mode with the caret at the active endpoint, in either selection direction and after exchanging ends. When an image selection's active endpoint is on text, exiting leaves the image caret hidden and clears the saved image return position.
 * `y` copies the selection into an application-local plain-text register; `d` and `x` copy and delete it; and `c` and `s` copy and delete it before entering Insert mode.
 * When Visual deletion removes the final text character before an attached image, the Normal caret lands on the image.
 * Visual `u`, `U`, and `~` lowercase, uppercase, or toggle the case of the selection and return to Normal mode with the caret at the start of the operated range.
@@ -1502,7 +1502,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 * The caret moves over that text without changing it.
 * In Vim Normal and Visual, `h`, `l`, `0`, `^`, `$`, `w`, `W`, `b`, `B`, `e`, `E`, `ge`, `f`, `F`, `t`, `T`, `;` and `,` work with counts and stop at the first and last character; they never cross to another row.
-* `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the start of the selection, and `y` copies the selected text to the system clipboard and the Vim register.
+* `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the active endpoint, and `y` copies the selected text to the system clipboard and the Vim register.
 * In standard editing and Vim Insert, `Left`, `Right`, `Home`, `End`, `Option+Left`, `Option+Right`, `Cmd+Left`, `Cmd+Right` and `Shift` with any of them move or extend a selection, clamped at both ends, and an arrow with a selection collapses it to the matching end.
 * `Cmd+C` copies the selection, or in Vim Normal the character under the block; `Cmd+A` selects the whole text, entering Visual in Vim.
 * The arrow keys, `Home` and `End` do nothing in Vim Normal and Visual, as in Tree.

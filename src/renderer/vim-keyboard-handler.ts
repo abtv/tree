@@ -219,10 +219,11 @@ export function handleVimKey(
   }
 
   if (event.key === 'Escape') {
+    const exitCursor = visual ? motionCursor : selection.start
     clearCommandAssembly(commandState)
     store.cancelAgendaMove()
     vim.setMode('normal')
-    syncImageCaretAtCursor(vim, node, input, selection.start)
+    syncImageCaretAtCursor(vim, node, input, exitCursor)
     return handled()
   }
   const pending = commandState.pending ?? { count: '', motionCount: '' }
@@ -681,7 +682,7 @@ export function handleVimKey(
       applyCaretState: vim.applyCaretState,
     })
   } else if (visual && event.key === 'v') {
-    leaveVisual(vim, node, input, selection.start, node.text.length)
+    leaveVisual(vim, node, input, motionCursor, node.text.length)
   } else if (visual && event.key === 'o') {
     const anchor = commandState.visualAnchor ?? selection.start
     const focus = commandState.visualFocus ?? selection.end - 1

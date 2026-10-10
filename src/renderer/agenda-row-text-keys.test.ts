@@ -116,7 +116,7 @@ describe('Agenda row text keys', () => {
   })
 
   // @requirement PRODUCT.md §23.4
-  it('selects in Visual with both end characters, swaps ends, yanks to the register and clipboard, and leaves at the start', async () => {
+  it('selects both Visual endpoints, yanks at the start, and exits at the active endpoint', async () => {
     const f = await fixture(true)
     f.selectKind('context')
     f.press('l')
@@ -134,12 +134,34 @@ describe('Agenda row text keys', () => {
     expect(f.caret()).toMatchObject({ anchor: 1, focus: 1 })
     f.press('v')
     f.press('$')
+    const activeEnd = f.caret().focus
     f.press('Escape')
     expect(f.vim.mode).toBe('normal')
-    expect(f.caret()).toMatchObject({ anchor: 1, focus: 1 })
+    expect(f.caret()).toMatchObject({ anchor: activeEnd, focus: activeEnd })
     f.press('v')
     f.press('v')
     expect(f.vim.mode).toBe('normal')
+    expect(f.saves).toHaveLength(0)
+  })
+
+  // @requirement PRODUCT.md §23.4
+  it.each(['Escape', 'v'])('leaves character Visual at its active endpoint with %s', async (exitKey) => {
+    const f = await fixture(true)
+    f.selectKind('context')
+    for (const motions of [
+      ['l', 'l'],
+      ['l', 'l', 'o'],
+      ['l', 'l', 'o', 'h'],
+    ]) {
+      f.press('0')
+      f.press('l')
+      f.press('v')
+      for (const key of motions) f.press(key)
+      const activeEnd = f.caret().focus
+      f.press(exitKey)
+      expect(f.vim.mode).toBe('normal')
+      expect(f.caret()).toMatchObject({ anchor: activeEnd, focus: activeEnd })
+    }
     expect(f.saves).toHaveLength(0)
   })
 

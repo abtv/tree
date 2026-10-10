@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim matrix corrections](vim-matrix-corrections.md) | Implementation authorized; VC-1 complete | VC-2: leave character Visual at its active endpoint (M22) |
+| [Vim matrix corrections](vim-matrix-corrections.md) | Implementation authorized; VC-2 complete | VC-3: preserve Replace during ordinary text clicks (M25) |
 | [Agenda](agenda.md) | Implementation authorized; AG-27 complete | AG-28: close the initiative (Product Owner confirmation) |
 | [PRODUCT.md structure](product-structure.md) | PS-10 complete; PS-11 blocked on Product Owner answers | PS-11: write the approved matrix-only rules (queue M1 to M28) into PRODUCT.md; needs the Product Owner's decisions first |
 

@@ -119,9 +119,8 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
   if (key === 'v') {
     clearPending(commandState)
     if (visual) {
-      const start = Math.min(caret.anchor, caret.focus)
       vim!.setMode('normal')
-      place(start, start)
+      place(caret.focus, caret.focus)
     } else {
       vim!.setMode('visual')
       place(caret.focus, caret.focus)

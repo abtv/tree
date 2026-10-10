@@ -251,6 +251,24 @@ test.describe('Vim editing: image caret', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 0)
+
+    for (const exitKey of ['Escape', 'v']) {
+      for (const [keys, endpoint] of [
+        ['0ll', 2],
+        ['0o0llo', 0],
+        ['$h', 2],
+      ] as const) {
+        await editor.press('j')
+        await editor.press('v')
+        await window.keyboard.type(keys)
+        await editor.press(exitKey)
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        await expect(editor).not.toHaveClass(/node-input-image-caret/)
+        await expect(editor).toHaveJSProperty('selectionStart', endpoint)
+        await expect(editor).toHaveJSProperty('selectionEnd', endpoint + 1)
+      }
+    }
+    await window.screenshot({ path: 'test-results/vc2-image-normal.png' })
   })
 
   test('keeps the attached image caret and indicator through a cancelled drag', async ({ userDataDir }) => {

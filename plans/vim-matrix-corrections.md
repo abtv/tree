@@ -21,7 +21,7 @@ Keep the changes separate from the documentation migration PS-11.
 | ID | Outcome | Expected files | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- | --- |
 | VC-1 | Interrupted Insert preserves the previous repeat, including structural sessions and text commands | `src/renderer/vim-session-finish.ts`, `node-input-pointer-handlers.ts`, `editor-input-handlers.ts`, `use-node-input-bindings.ts`, focused tests, `e2e/vim-navigation-and-visual.spec.ts`, clipboard tests, PRODUCT §20.2.19, VIM_CONFORMANCE matrix | Failing regression before fix; Escape still records; pointer and shortcut interruptions do not; native/menu paths covered; full validation; independent review and verification | High Risk (clipboard paths) | Done |
-| VC-2 | Character Visual exit uses its active endpoint | `src/renderer/vim-keyboard-handler.ts`, `agenda-row-caret.ts`, corresponding unit/property tests and E2E specs, PRODUCT §§20.2.20 and 23.4, VIM_CONFORMANCE matrix | Both selection directions, exchanged endpoints, text/image exit, Escape and `v`, noneditable Agenda parity, inspected Electron screenshots; `npm run check` and affected E2E; review and verifier | Moderate Risk | Ready after VC-1 |
+| VC-2 | Character Visual exit uses its active endpoint | `src/renderer/vim-keyboard-handler.ts`, Agenda row keyboard/text key adapters, corresponding unit tests and E2E specs, PRODUCT §§20.2.20 and 23.4, VIM_CONFORMANCE matrix | Both selection directions, exchanged endpoints, text/image exit, Escape and `v`, noneditable Agenda parity, inspected Electron screenshots; `npm run check` and affected E2E; review and verifier | Moderate Risk | Done |
 | VC-3 | Ordinary text clicks preserve Replace and move the next overwrite position | `src/renderer/node-input-pointer-handlers.ts`, `vim-edit-session.ts`, `use-node-input-bindings.ts` as needed, tests and `e2e/vim-text-editing.spec.ts`, PRODUCT §§20.2.5–6, ARCHITECTURE state assessment, VIM_CONFORMANCE matrix | Same-node and other-node clicks with pending/empty replacement, subsequent typing at clicked position, Escape/undo, rich input/image cases, existing control and blur behavior, inspected screenshots; applicable full validation; review and verifier | High Risk if attachments or buffered-edit boundary changes; otherwise Moderate Risk | Ready after VC-2 |
 
 ## Decisions and Next Task
@@ -70,9 +70,20 @@ failures rather than starting another task.
   images, Escape/history, and a click on an Agenda direct match. The original
   pending buffer must never be lost or applied to the destination node.
 
-Next task: VC-2. After VC-3, return to PS-11 and obtain decisions for the remaining
+VC-2 changed the explicit Tree and noneditable Agenda exit paths to use the
+inclusive active endpoint before clearing Visual state. Existing clamp and
+rendering owners are reused; yank and operated-range commands retain their
+documented behavior. Regression tests failed before the fix and passed after it.
+Both directions, exchanged ends, Escape and `v`, and image-to-text exits are
+covered. `npm run check` and all 121 affected Electron tests passed. Independent
+review and product verification found no meaningful issues. Tree, Agenda, and
+image screenshots were inspected; deterministic Tree baselines cover the Visual
+selection and Normal caret at the active end. No additional product decision or
+structural refactor was needed. No unresolved validation failures remain.
+
+Next task: VC-3. After VC-3, return to PS-11 and obtain decisions for the remaining
 matrix queue. Remove this correction plan after the Product Owner confirms no
 further correction tasks remain.
 
 Resume prompt: Continue the Vim matrix corrections in
-`plans/vim-matrix-corrections.md`, starting with VC-2 (M22).
+`plans/vim-matrix-corrections.md`, starting with VC-3 (M25).
