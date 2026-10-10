@@ -401,13 +401,18 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
     expect(await target.boundingBox()).toEqual(before)
-    await expect(window.locator('.node-list')).toHaveScreenshot(`hierarchy-row-target-${mode}-light.png`)
+    const captureNodeList = async (appearance: 'light' | 'dark') => {
+      const bounds = await window.locator('.node-list').boundingBox()
+      if (bounds === null) throw new Error('The node list was not visible for its screenshot.')
+      await expect(window).toHaveScreenshot(`hierarchy-row-target-${mode}-${appearance}.png`, { clip: bounds })
+    }
+    await captureNodeList('light')
     await window.emulateMedia({ colorScheme: 'dark' })
     const darkBox = await target.boundingBox()
     if (darkBox === null) throw new Error('The dark receiving row was not rendered.')
     await window.mouse.move(darkBox.x + 30, darkBox.y + darkBox.height / 2)
     await expect(target).toHaveClass(/node-row-drop-on/)
-    await expect(window.locator('.node-list')).toHaveScreenshot(`hierarchy-row-target-${mode}-dark.png`)
+    await captureNodeList('dark')
     await expect(target).toHaveClass(/node-row-drop-on/)
     await window.emulateMedia({ colorScheme: 'light' })
 
