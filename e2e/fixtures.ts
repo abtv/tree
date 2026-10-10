@@ -2,7 +2,11 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { acquireSystemClipboardLock, releaseSystemClipboardLock } from './clipboard-lock'
+import {
+  acquireSystemClipboardLock,
+  releaseSystemClipboardLock,
+  SYSTEM_CLIPBOARD_LOCK_TIMEOUT_MS,
+} from './clipboard-lock'
 import { cleanupStaleElectronProcesses } from './electron-process'
 
 export interface PersistedNode {
@@ -754,16 +758,30 @@ export function documentGenerations(userDataDir: string): string[] {
     .sort((left, right) => Number(left.slice(9, -5)) - Number(right.slice(9, -5)))
 }
 
+// A clipboard waiter can be blocked behind long-running holders (docs/decisions/0012), so give the
+// waiting test enough room to outlast the lock bound and still run its body.
+const CLIPBOARD_WAIT_TEST_TIMEOUT_MS = SYSTEM_CLIPBOARD_LOCK_TIMEOUT_MS + 30_000
+
+/**
+ * Acquire the system clipboard lock for the current test. The test holds the lock until its
+ * fixture teardown releases it, so under hidden parallelism a waiter can sit behind several
+ * holders; its Playwright timeout is raised to cover that wait.
+ */
+async function acquireClipboardLockForTest(): Promise<void> {
+  if (test.info().timeout < CLIPBOARD_WAIT_TEST_TIMEOUT_MS) test.setTimeout(CLIPBOARD_WAIT_TEST_TIMEOUT_MS)
+  await acquireSystemClipboardLock()
+}
+
 // Tests that make the application read or write the system clipboard outside these helpers (for
 // example by pressing Cmd+C, Cmd+X, or a context-menu Copy item) must hold the clipboard lock for
 // the whole test. The helpers below acquire it automatically, and the fixture teardown releases it
 // after every test.
 export async function lockSystemClipboard(): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
 }
 
 export async function writeClipboardText(app: ElectronApplication, text: string): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
   await app.evaluate(async ({ clipboard }, value) => {
     clipboard.clear()
     await clipboard.writeText(value)
@@ -771,7 +789,7 @@ export async function writeClipboardText(app: ElectronApplication, text: string)
 }
 
 export async function writeClipboardTextAndHtml(app: ElectronApplication, text: string, html: string): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
   await app.evaluate(
     async ({ clipboard, ClipboardItem }, value) => {
       clipboard.clear()
@@ -782,7 +800,7 @@ export async function writeClipboardTextAndHtml(app: ElectronApplication, text: 
 }
 
 export async function writeClipboardImage(app: ElectronApplication): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
   await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
     const png = nativeImage.createFromBitmap(Buffer.from([40, 90, 200, 255]), { width: 1, height: 1 }).toPNG()
     const item = new ClipboardItem({ 'public.png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })
@@ -792,7 +810,7 @@ export async function writeClipboardImage(app: ElectronApplication): Promise<voi
 }
 
 export async function writeClipboardImageAndText(app: ElectronApplication): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
   await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
     const png = nativeImage.createFromBitmap(Buffer.from([40, 90, 200, 255]), { width: 1, height: 1 }).toPNG()
     const item = new ClipboardItem({
@@ -805,7 +823,7 @@ export async function writeClipboardImageAndText(app: ElectronApplication): Prom
 }
 
 export async function writeClipboardImageSized(app: ElectronApplication, width: number, height: number): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
   await app.evaluate(
     async ({ clipboard, ClipboardItem, nativeImage }, size) => {
       const pixels = Buffer.alloc(size.width * size.height * 4)
@@ -825,7 +843,7 @@ export async function writeClipboardImageSized(app: ElectronApplication, width: 
 }
 
 export async function firePaste(input: ReturnType<Page['locator']>): Promise<void> {
-  await acquireSystemClipboardLock()
+  await acquireClipboardLockForTest()
   await input.evaluate((element) => {
     element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true }))
   })

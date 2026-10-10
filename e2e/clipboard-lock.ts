@@ -20,7 +20,12 @@ const OWNER_FILE = 'owner.json'
 // as stale once the directory has outlived this grace period, so a concurrent acquisition is not
 // mistaken for a crash.
 const OWNER_FILE_GRACE_MS = 2_000
-const ACQUIRE_TIMEOUT_MS = 30_000
+// A clipboard test holds the lock for its whole body (docs/decisions/0012), and under hidden
+// parallelism several clipboard tests queue behind one holder, whose own body can stretch
+// well past the 30 s the bound used to allow on a loaded machine. The bound is raised so a waiter
+// outlasts any realistic holder; `fixtures.ts` raises the waiting test's own Playwright timeout to
+// cover this bound plus its body, so the wait is not charged against the normal 60 s budget.
+export const SYSTEM_CLIPBOARD_LOCK_TIMEOUT_MS = 90_000
 const POLL_INTERVAL_MS = 25
 
 interface LockOwner {
@@ -33,7 +38,7 @@ let heldToken: string | undefined
 
 export async function acquireSystemClipboardLock(): Promise<void> {
   if (heldToken !== undefined) return
-  const deadline = Date.now() + ACQUIRE_TIMEOUT_MS
+  const deadline = Date.now() + SYSTEM_CLIPBOARD_LOCK_TIMEOUT_MS
   for (;;) {
     const token = `${process.pid}-${Date.now()}-${randomUUID()}`
     try {
@@ -54,7 +59,7 @@ export async function acquireSystemClipboardLock(): Promise<void> {
     if (breakStaleLock()) continue
     if (Date.now() >= deadline) {
       throw new Error(
-        `Timed out after ${ACQUIRE_TIMEOUT_MS} ms waiting for the system clipboard lock at ${LOCK_DIRECTORY} ` +
+        `Timed out after ${SYSTEM_CLIPBOARD_LOCK_TIMEOUT_MS} ms waiting for the system clipboard lock at ${LOCK_DIRECTORY} ` +
           `(${describeLockOwner()}; this worker pid ${process.pid}). ` +
           'Another E2E worker is using the system clipboard, or a stale lock could not be broken.',
       )
