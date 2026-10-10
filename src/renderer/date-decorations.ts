@@ -17,8 +17,15 @@ export function agendaDecorations(node: TreeNode, day: number): TextDecoration[]
   ].sort((left, right) => left.start - right.start)
 }
 
-/** Tree rows keep the plain textarea unless a token resembles a date, so ordinary text is unchanged. */
+/** Tree dates use Agenda's active-date styling; undecorated rows keep the plain textarea. */
 export function treeDecorations(node: TreeNode): TextDecoration[] | undefined {
-  const decorations = dateLikeDecorations(node)
+  const decorations = [
+    ...findCanonicalDates(node.text, node.links).map((date) => ({
+      start: date.start,
+      end: date.end,
+      className: 'agenda-date-active',
+    })),
+    ...dateLikeDecorations(node),
+  ].sort((left, right) => left.start - right.start)
   return decorations.length === 0 ? undefined : decorations
 }

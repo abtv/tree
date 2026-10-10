@@ -1130,6 +1130,12 @@ While a node is being edited, a token is not underlined when the caret or select
 
 ---
 
+### 20.11 Date Visualization in Tree
+
+Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, uses the same accent color and semibold weight as Agenda's displayed-day date. Tree has no displayed day, so all recognized dates receive that styling. Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text or caret offsets. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
+
+---
+
 ## 21. Unexpected Renderer Errors
 
 If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.

@@ -578,6 +578,7 @@ body:not(.node-drag-active) .location-link:hover {
 
 .node-row-visual-selected,
 .node-row-visual-selected .node-input,
+.node-row-visual-selected .agenda-date-active,
 .agenda-row-visual-selected,
 .agenda-row-visual-selected .node-input,
 .agenda-row-visual-selected .agenda-text,

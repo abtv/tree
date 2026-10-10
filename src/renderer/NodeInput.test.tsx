@@ -40,7 +40,7 @@ function view(text: string): React.JSX.Element {
 // @requirement PRODUCT.md §20.10
 describe('date-like text in a Tree input', () => {
   it('keeps the plain textarea for ordinary text', () => {
-    render(view('2026-10-14 plain'))
+    render(view('ordinary plain text'))
     expect(screen.getByLabelText('Node 1').tagName).toBe('TEXTAREA')
   })
   it('renders resembling text through the rich element with the marker class', () => {
@@ -78,7 +78,29 @@ describe('date-like text in a Tree input', () => {
   it('stays rich after the last resembling token is removed, so a focused row is never swapped back', () => {
     const { rerender } = render(view('2026-10-1'))
     expect(screen.getByLabelText('Node 1').tagName).toBe('DIV')
-    rerender(view('2026-10-14'))
+    rerender(view('ordinary text'))
     expect(screen.getByLabelText('Node 1').tagName).toBe('DIV')
+  })
+})
+
+// @requirement PRODUCT.md §20.11
+describe('valid dates in a Tree input', () => {
+  it('renders valid dates with Agenda styling', () => {
+    render(view('due 2026-10-14'))
+    expect(screen.getByLabelText('Node 1').querySelector('.agenda-date-active')?.textContent).toBe('2026-10-14')
+  })
+  it('preserves focus and selection when a valid date first requires rich rendering', () => {
+    const { rerender } = render(view('abc'))
+    const textarea = screen.getByLabelText('Node 1') as HTMLTextAreaElement
+    textarea.focus()
+    textarea.setSelectionRange(1, 2)
+    fireEvent.select(textarea)
+    rerender(view('abc 2026-10-14'))
+    const input = screen.getByLabelText('Node 1')
+    expect(document.activeElement).toBe(input)
+    expect(getSelectionRange(input)).toEqual({ start: 1, end: 2 })
+    rerender(view('abc'))
+    expect(screen.getByLabelText('Node 1')).toBe(input)
+    expect(document.activeElement).toBe(input)
   })
 })
