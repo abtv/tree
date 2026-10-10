@@ -36,7 +36,7 @@ describe('natural date expression table proposed in AG-22', () => {
     ['in one week', ['2026-10-15']],
     ['twenty-five weeks ago', ['2026-04-16']],
     ['in 0 weeks', ['2026-10-08']],
-    ['in October', ['2027-10-01']],
+    ['in October', ['2026-10-15']],
     ['last October', ['2026-10-01']],
     ['IN   NOVEMBER', ['2026-11-01']],
     ['last January', ['2026-01-01']],
@@ -94,9 +94,9 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(dates('Friday', day('2026-10-09'))).toEqual(['2026-10-09', '2026-10-16'])
   })
 
-  it('uses the nearest month start in each direction, including calendar boundaries', () => {
+  it('uses month starts outside the current month, including calendar boundaries', () => {
     expect(dates('in October', day('2026-09-30'))).toEqual(['2026-10-01'])
-    expect(dates('in October', day('2026-10-01'))).toEqual(['2026-10-01'])
+    expect(dates('in October', day('2026-10-01'))).toEqual(['2026-10-15'])
     expect(dates('last October', day('2026-10-01'))).toEqual(['2025-10-01'])
     expect(dates('in January', day('9999-12-31'))).toBeUndefined()
     expect(dates('last January', day('0000-01-01'))).toBeUndefined()
@@ -108,6 +108,22 @@ describe('natural date expression table proposed in AG-22', () => {
       expect(text.slice(match.start, match.end)).toBe(expression)
       expect(suggestDates(`${expression}suffix`, expression.length, today)).toBeUndefined()
     }
+  })
+
+  it('offers the fifteenth through the tenth, then the last day of the current month', () => {
+    for (const date of ['01', '09', '10']) {
+      expect(dates('in October', day(`2026-10-${date}`))).toEqual(['2026-10-15'])
+    }
+    for (const date of ['11', '15', '30', '31']) {
+      expect(dates('in October', day(`2026-10-${date}`))).toEqual(['2026-10-31'])
+    }
+    expect(dates('in February', day('2028-02-10'))).toEqual(['2028-02-15'])
+    expect(dates('in February', day('2028-02-11'))).toEqual(['2028-02-29'])
+    expect(dates('in February', day('2027-02-11'))).toEqual(['2027-02-28'])
+    expect(dates('in April', day('2026-04-11'))).toEqual(['2026-04-30'])
+    expect(dates('in December', day('9999-12-31'))).toEqual(['9999-12-31'])
+    expect(dates('in October', day('2026-11-01'))).toEqual(['2027-10-01'])
+    expect(dates('last October', day('2026-10-11'))).toEqual(['2026-10-01'])
   })
 
   it('offers the end of the current named month before rolling into the next year', () => {

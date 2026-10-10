@@ -121,6 +121,11 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
   const namedMonth = /^(in|last) (.+)$/.exec(expression)
   const monthIndex = namedMonth ? months.indexOf(namedMonth[2]!) : -1
   if (monthIndex !== -1) {
+    const reference = calendarDateOf(today)
+    if (namedMonth![1] === 'in' && monthIndex + 1 === reference.month) {
+      if (reference.day <= 10) return [dayNumberOf({ ...reference, day: 15 })]
+      return daysFor(`in the end of ${months[monthIndex]}`, today)
+    }
     const occurrences = monthDays(monthIndex + 1, 1, today)
     return occurrences.filter((day) => (namedMonth![1] === 'in' ? day >= today : day < today))
   }

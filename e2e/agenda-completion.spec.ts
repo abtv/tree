@@ -44,7 +44,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         ['in one hundred days', '2027-01-16'],
         ['in 3 weeks', '2026-10-29'],
         ['three weeks ago', '2026-09-17'],
-        ['in October', '2027-10-01'],
+        ['in October', '2026-10-15'],
         ['last October', '2026-10-01'],
         ['in the end of October', '2026-10-31'],
       ]) {
@@ -57,6 +57,9 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         await expect(popup.getByRole('option')).toContainText(date!)
         if (expression === 'in one hundred days') {
           await window.screenshot({ path: testInfo.outputPath('english-relative-date.png') })
+        }
+        if (expression === 'in October') {
+          await window.screenshot({ path: testInfo.outputPath('current-month-date.png') })
         }
         if (expression === 'in the end of October') {
           await window.screenshot({ path: testInfo.outputPath('month-end-date.png') })
