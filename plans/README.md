@@ -5,6 +5,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 | Initiative | Status | Next task |
 | --- | --- | --- |
 | [Agenda](agenda.md) | Implementation authorized; AG-27 complete | AG-28: close the initiative (Product Owner confirmation) |
-| [PRODUCT.md structure](product-structure.md) | PS-9 complete; tasks run on the Product Owner's request to continue | PS-10: cite PRODUCT subsections in the interaction-state and image tables; send the matrix-only queue to the Product Owner |
+| [PRODUCT.md structure](product-structure.md) | PS-10 complete; PS-11 blocked on Product Owner answers | PS-11: write the approved matrix-only rules (queue M1 to M28) into PRODUCT.md; needs the Product Owner's decisions first |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
