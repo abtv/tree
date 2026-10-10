@@ -1,4 +1,5 @@
 // @editing-modes: both
+import type { Locator } from '@playwright/test'
 import {
   describeForEachEditingMode,
   expect,
@@ -9,6 +10,27 @@ import {
   setMainWindowContentSize,
   test,
 } from './fixtures'
+
+/**
+ * True while `input` shows the Vim Normal block caret: a one-character selection covering the
+ * character at `offset`. The renderer owns this caret, so a screenshot taken before it draws the
+ * block would capture no caret; the test waits for it after moving with the renderer's own motion.
+ */
+async function blockCaretAt(input: Locator, offset: number): Promise<boolean> {
+  return input.evaluate((element, target) => {
+    if (element instanceof HTMLTextAreaElement) {
+      return element.selectionStart === target && element.selectionEnd === target + 1
+    }
+    const selection = element.ownerDocument.getSelection()
+    if (selection === null || selection.rangeCount === 0) return false
+    const range = selection.getRangeAt(0)
+    if (!element.contains(range.startContainer) || !element.contains(range.endContainer)) return false
+    const before = element.ownerDocument.createRange()
+    before.selectNodeContents(element)
+    before.setEnd(range.startContainer, range.startOffset)
+    return before.toString().length === target && range.toString().length === 1
+  }, offset)
+}
 
 describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.11
@@ -48,9 +70,17 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await first.click()
-      if (mode === 'vim') await window.keyboard.press('Escape')
-      await setCursor(first, 0)
+      if (mode === 'vim') {
+        // The renderer owns the Normal-mode block caret; moving to the first character with `0`
+        // draws it deterministically. `setCursor` would collapse the selection outside the
+        // renderer's caret model, so the block reappears only on a timing-dependent redraw.
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('0')
+      } else {
+        await setCursor(first, 0)
+      }
       await expect(first.locator('.agenda-date-active').first()).toHaveCSS('font-weight', '600')
+      if (mode === 'vim') await expect.poll(() => blockCaretAt(first, 0)).toBe(true)
       await window.mouse.move(600, 20)
       await expect(window).toHaveScreenshot(screenshotName(`tree-dates-${appearance}.png`))
       await second.click()
