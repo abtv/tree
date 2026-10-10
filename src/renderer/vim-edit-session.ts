@@ -78,10 +78,26 @@ export interface VimEditSessionState {
   register: VimRegister
   insert?: VimInsertSession | undefined
   replace?: VimReplaceSession | undefined
+  /** True from an ordinary primary press in Replace mode until its release (PRODUCT §20.2.6). */
+  replaceClick?: boolean | undefined
+  /** True once the press moved focus away from another node, so Replace must end if no click follows. */
+  replaceClickMoved?: boolean | undefined
 }
 
 export function createVimEditSessionState(): VimEditSessionState {
   return { register: { kind: 'empty' } }
+}
+
+export function beginReplaceClick(state: VimEditSessionState): void {
+  state.replaceClick = true
+}
+
+/** End the press intent, reporting whether one was pending. */
+export function takeReplaceClick(state: VimEditSessionState): boolean {
+  const pending = state.replaceClick === true
+  state.replaceClick = undefined
+  state.replaceClickMoved = undefined
+  return pending
 }
 
 export function beginInsertSession(state: VimEditSessionState, session: VimInsertSession): void {

@@ -29,7 +29,7 @@ import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
 import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
-import { createVimEditSessionState } from './vim-edit-session'
+import { createVimEditSessionState, takeReplaceClick } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
@@ -192,6 +192,9 @@ export function useNodeInputBindings({
   // (for example after Escape already ended the visual freeze).
   const beginFrozenCaret = useCallback(
     (nodeId: string, pointerId: number): void => {
+      // A press held long enough to move the node is a drag, not a text click (PRODUCT §20.2.6),
+      // so the blur below must end Replace mode as before.
+      takeReplaceClick(vimSession.current)
       const existing = frozenCaret.current
       if (existing !== undefined && existing.pointerId === pointerId) return
       if (existing !== undefined) {
@@ -675,6 +678,13 @@ export function useNodeInputBindings({
       setCaret(input, getCaret(input))
     }
     const onRelease = (): void => {
+      // The input's mouseup follows this event in the same task; a release it never receives
+      // (outside any input, a cancelled pointer, a lost window) must not leave the click pending.
+      globalThis.setTimeout(() => {
+        const moved = vimSession.current.replaceClickMoved === true
+        if (takeReplaceClick(vimSession.current) && moved && latestVimMode.current === 'replace')
+          changeVimMode('normal')
+      })
       if (!pressed) return
       pressed = false
       const input = document.activeElement
@@ -702,7 +712,7 @@ export function useNodeInputBindings({
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [])
+  }, [changeVimMode])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>
@@ -740,6 +750,7 @@ export function useNodeInputBindings({
             persistenceLocked,
             vimMode,
             commandState: vimCommandState.current,
+            session: vimSession.current,
             vimTextCommandState,
             getMode: () => latestVimMode.current,
             getInput: (id) => inputs.current.get(id),

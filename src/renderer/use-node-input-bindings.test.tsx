@@ -2486,6 +2486,31 @@ describe('drag caret freeze', () => {
     expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1])
   })
 
+  it.each([
+    ['an ordinary text click keeps Replace mode through the blur', false, 'replace'],
+    ['a held press that becomes a node drag ends Replace mode at the blur', true, 'normal'],
+  ] as const)('%s', async (_name, dragged, expected) => {
+    const f = await fixture({ mode: 'replace' })
+    f.input().focus()
+    act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
+    if (dragged) act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.bindings().onBlur())
+    expect(f.result.current.vimMode).toBe(expected)
+  })
+
+  it.each(['pointerup', 'pointercancel'])(
+    'ends a Replace click intent on a %s that no input receives, so the next blur returns to Normal',
+    async (type) => {
+      const f = await fixture({ mode: 'replace' })
+      f.input().focus()
+      act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
+      globalThis.dispatchEvent(new Event(type))
+      act(() => vi.advanceTimersByTime(1))
+      act(() => f.bindings().onBlur())
+      expect(f.result.current.vimMode).toBe('normal')
+    },
+  )
+
   it('ignores other pointers and restores exactly once for its own pointer', async () => {
     const f = await fixture(),
       input = f.input()

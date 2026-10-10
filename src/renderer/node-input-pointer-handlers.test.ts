@@ -8,6 +8,7 @@ import { createPointerHandlers, preventReadOnlyLinkFocus } from './node-input-po
 import { createRealStoreHarness } from './test/real-store-harness'
 import { beginStructuralOpen, createVimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
+import { beginReplaceClick, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
 import type { VimMode } from './vim-editing'
 import type { VimTextCommandState } from './editor-input-handlers'
 
@@ -89,6 +90,7 @@ async function fixture(
   let authority: { nodeId?: string; caret: VimCaretState } = { caret: { cursor: 0, imageActive: false } }
   const inputs = new Map<string, HTMLElement>()
   const commandState = createVimCommandState()
+  const session = createVimEditSessionState()
   const vimTextCommandState: VimTextCommandState = {
     get mode() {
       return mode
@@ -103,6 +105,7 @@ async function fixture(
     persistenceLocked: false as boolean,
     vimMode: mode,
     commandState,
+    session,
     vimTextCommandState,
     getMode: () => mode,
     getInput: (id: string) => inputs.get(id),
@@ -120,6 +123,7 @@ async function fixture(
     deps,
     inputs,
     commandState,
+    session,
     handlers: () => createPointerHandlers(deps, harness.node()),
     setMode: (value: VimMode) => {
       mode = value
@@ -178,6 +182,24 @@ describe('blur', () => {
     if (expected === undefined) expect(f.deps.changeVimMode).not.toHaveBeenCalled()
     else expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith(expected)
   })
+
+  it('keeps Replace mode while an ordinary text click is pending, but still commits the replacement', async () => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    f.handlers().onBlur()
+    expect(f.deps.finishVimReplace).toHaveBeenCalledOnce()
+    expect(f.deps.changeVimMode).not.toHaveBeenCalled()
+    expect(f.session.replaceClickMoved).toBe(true)
+  })
+
+  it('ends Replace when the window lost focus during the press', async () => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    f.handlers().onBlur()
+    expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith('normal')
+  })
 })
 
 describe('mouse down', () => {
@@ -214,6 +236,26 @@ describe('mouse down', () => {
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
   })
 
+  it('leaves a pending replacement of another node to that node’s blur', async () => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceSession(f.session, { nodeId: 'other', baseline: 'other', position: 0 })
+    f.handlers().onMouseDown(mouse(textarea('hello')))
+    expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
+    expect(f.session.replaceClick).toBe(true)
+  })
+
+  it.each([
+    ['a primary click in Replace', 'replace', { button: 0 }, true],
+    ['a right click in Replace', 'replace', { button: 2 }, false],
+    ['a Control-click in Replace', 'replace', { button: 0, ctrlKey: true }, false],
+    ['a primary click in Insert', 'insert', { button: 0 }, false],
+    ['a primary click in Normal', 'normal', { button: 0 }, false],
+  ] as const)('marks the click intent for %s: %s', async (_name, mode, extra, marked) => {
+    const f = await fixture({ mode })
+    f.handlers().onMouseDown(mouse(textarea('hello'), extra))
+    expect(f.session.replaceClick === true).toBe(marked)
+  })
+
   it('interrupts a structural session even when there is no blur', async () => {
     const f = await fixture()
     beginStructuralOpen(f.commandState, 'node', 'after')
@@ -235,10 +277,73 @@ describe('mouse down', () => {
 })
 
 describe('mouse up', () => {
-  it.each(['insert', 'replace', 'visual'] as const)('does nothing outside Normal mode (%s)', async (mode) => {
-    const f = await fixture({ mode })
-    f.handlers().onMouseUp(mouse(textarea('hello')))
-    expect(f.deps.applyCaretState).not.toHaveBeenCalled()
+  it.each(['insert', 'replace', 'visual'] as const)(
+    'does nothing outside Normal mode without a pending Replace click (%s)',
+    async (mode) => {
+      const f = await fixture({ mode })
+      f.handlers().onMouseUp(mouse(textarea('hello')))
+      expect(f.deps.applyCaretState).not.toHaveBeenCalled()
+      expect(f.session.replace).toBeUndefined()
+    },
+  )
+
+  it('continues Replace with a new session at the clicked caret and the current text', async () => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    const input = textarea('hello', 2)
+    input.focus()
+    f.handlers().onMouseUp(mouse(input))
+    expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 2, typed: '' })
+    expect(f.session.replaceClick).toBeUndefined()
+    expect(f.deps.applyCaretState).toHaveBeenCalledExactlyOnceWith(
+      'node',
+      expect.objectContaining({ cursor: 2 }),
+      false,
+      'preserve-selection',
+    )
+  })
+
+  it('reads rich input text for the new session', async () => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    const input = richInput('hello', 4)
+    input.tabIndex = 0
+    input.focus()
+    setCaret(input, 4)
+    f.handlers().onMouseUp(mouse(input))
+    expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 4, typed: '' })
+  })
+
+  it('starts no session for a same-node dragged selection and keeps the mode', async () => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    const input = textarea('hello')
+    input.focus()
+    input.setSelectionRange(1, 3)
+    f.handlers().onMouseUp(mouse(input))
+    expect(f.session.replace).toBeUndefined()
+    expect(f.session.replaceClick).toBeUndefined()
+    expect(f.deps.changeVimMode).not.toHaveBeenCalled()
+  })
+
+  it('ends Replace for a selection dragged in a node the press moved to', async () => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    f.session.replaceClickMoved = true
+    const input = textarea('hello')
+    input.focus()
+    input.setSelectionRange(1, 3)
+    f.handlers().onMouseUp(mouse(input))
+    expect(f.session.replace).toBeUndefined()
+    expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith('normal')
+  })
+
+  it('starts no session when the release lands on an input that is not focused', async () => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    f.handlers().onMouseUp(mouse(textarea('hello', 2)))
+    expect(f.session.replace).toBeUndefined()
+    expect(f.session.replaceClick).toBeUndefined()
   })
 
   it('publishes the pointer caret in Normal mode', async () => {

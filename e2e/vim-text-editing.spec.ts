@@ -605,6 +605,114 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 6)
   })
 
+  // @requirement PRODUCT.md §20.2.6
+  test('continues Replace at the clicked caret of the same node and undoes each click-separated edit', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'abcdef', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await editor.click({ position: { x: 1, y: 8 } })
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.keyboard.type('Y')
+    await expect(editor).toHaveValue('YbXdef')
+
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.keyboard.press('Meta+z')
+    await expect(editor).toHaveValue('abXdef')
+    await window.keyboard.press('Meta+z')
+    await expect(editor).toHaveValue('abcdef')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  test('continues Replace in another node after committing the pending replacement', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'abcd', children: [] },
+          { id: 'peer', text: 'peer', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await node(window, 2).click({ position: { x: 1, y: 8 } })
+    await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.keyboard.type('Y')
+
+    await expect(editor).toHaveValue('Xbcd')
+    await expect(node(window, 2)).toHaveValue('Yeer')
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(node(window, 2)).toHaveValue('Yeer')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  test('continues Replace in another node when nothing was typed yet', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'abcd', children: [] },
+          { id: 'peer', text: 'peer', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('R')
+    await node(window, 2).click({ position: { x: 1, y: 8 } })
+    await window.keyboard.type('Y')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await expect(editor).toHaveValue('abcd')
+    await expect(node(window, 2)).toHaveValue('Yeer')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  test('ends Replace when a press in another node drags a text selection', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: 'abcd', children: [] },
+          { id: 'peer', text: 'peer text here', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 0)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    const box = await node(window, 2).boundingBox()
+    if (box === null) throw new Error('The peer node was not rendered.')
+    await window.mouse.move(box.x + 2, box.y + box.height / 2)
+    await window.mouse.down()
+    await window.mouse.move(box.x + 60, box.y + box.height / 2, { steps: 5 })
+    await window.mouse.up()
+
+    await expect(editor).toHaveValue('Xbcd')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
   test('clears the image caret when a pending Replace session commits on blur', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -628,7 +736,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('abcdX')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(node(window, 2)).toBeFocused()
-    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
   })
 
   test('activates the image caret when a same-node pointer click commits a Replace session', async ({

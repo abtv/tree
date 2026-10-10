@@ -1044,13 +1044,14 @@ At or below 500 visible rows, the list renders every row, including inline desce
 
 #### 20.2.5 Pending Replace and Insert Sessions
 
-* If the user invokes an application undo or redo shortcut, selects all text, cuts or pastes, toggles a strikethrough (§2.5), enters or leaves a node (including with the mouse), or deletes the selected node while Replace mode has a pending replacement, finish that replacement as one edit before running the command, then return to Normal mode; a select-all, cut, paste, or strikethrough toggle commits it without disturbing the visible text or selection, so the command still acts on what the user selected.
+* If the user invokes an application undo or redo shortcut, selects all text, cuts or pastes, toggles a strikethrough (§2.5), enters or leaves a node (including with a navigation control), or deletes the selected node while Replace mode has a pending replacement, finish that replacement as one edit before running the command, then return to Normal mode; a select-all, cut, paste, or strikethrough toggle commits it without disturbing the visible text or selection, so the command still acts on what the user selected.
 * Quitting the application or closing the window while Replace mode has a pending replacement completes that replacement as one edit before the quit save, so the saved document includes it; a failed save leaves the replacement committed and the application open for a retry.
 * The same interruptions during Insert mode leave Insert mode active, since Insert already behaves like other application commands run normally within it.
 
 #### 20.2.6 Pointer Presses and Application Commands
 
 * Mouse clicks and pointer presses place focus or a text selection without changing the Vim mode, except that navigation through the location breadcrumb or a node's enter control, and an application command that changes focus or replaces the selection, end whole-node Visual mode for Normal mode and clear its selected range.
+* An ordinary primary-button click on node text, in the same node or another, keeps Replace mode. Any pending replacement completes as one edit first; the caret then moves to the clicked position, and the next typed characters overwrite from there. Text typed after the click is a separate edit, so Undo reverts it on its own. A click on a navigation control, a click outside node text, a right-click, and a drag that selects text keep their existing behavior.
 * A select-all, cut, or paste drops an unfinished Normal-mode command and both character-wise Visual endpoints before it runs; character Visual mode stays active, while a cut or paste leaves whole-node Visual mode and its selected range unchanged.
 
 #### 20.2.7 Mode Indicator and Status Bar
