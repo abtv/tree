@@ -185,8 +185,14 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         await window.keyboard.press('i')
       }
       const assertText = async (text: string): Promise<void> => {
-        if (view === 'Tree') await expect(input).toHaveValue(text)
-        else await expect(input).toHaveText(text)
+        // A Tree row that once held date-like text keeps its rich element, so read either kind.
+        await expect
+          .poll(() =>
+            input.evaluate((element) =>
+              element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+            ),
+          )
+          .toBe(text)
       }
       await setCursor(input, 16)
       await window.keyboard.type('tomor')

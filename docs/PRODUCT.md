@@ -1122,6 +1122,12 @@ The popup uses the document surface, a thin location-border-colored border and a
 
 Escape closes the popup and retains its ordinary editing behavior: in Vim Insert it enters Normal without changing the expression. Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
 
+### 20.10 Date-Like Text Indicator
+
+Text that strongly resembles an attempted date but is not a valid canonical date (§23.2) is marked with a 1px wavy underline in a muted red (`#b4554b` in the light appearance, `#cc9393` in the dark appearance), in Tree and Agenda alike. Text resembles a date only when it has a four-digit year, a hyphen, a one- or two-digit month, a hyphen and a one- or two-digit day, with no digit touching either end, and is not a valid `YYYY-MM-DD` date. Impossible dates such as `2026-02-31` and incomplete forms such as `2026-10-1` qualify; arbitrary text, hyperlink text and valid dates never do. The mark changes no text, caret position or Agenda membership.
+
+While a node is being edited, a token is not underlined when the caret or selection is inside it or directly adjacent to it, so intermediate typing states such as `2026-10-1` are never flagged; the underline appears when the caret leaves the token or the node is no longer being edited. The rule is the same in standard editing and in every Vim mode. Occurrences that are not being edited, including live mirrors in Agenda, always show the underline.
+
 ---
 
 ## 21. Unexpected Renderer Errors

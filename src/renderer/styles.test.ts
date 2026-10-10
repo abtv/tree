@@ -83,6 +83,17 @@ it('declares color values only as custom properties', () => {
   }
 })
 
+// @requirement PRODUCT.md §20.10
+it('draws the date-like underline as a 1px wavy muted-red line that the caret rule can hide', () => {
+  const light = /:root\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(light).toMatch(/--color-date-like:\s*#b4554b/i)
+  const dark = /@media \(prefers-color-scheme: dark\)\s*\{[\s\S]*?:root\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(dark).toMatch(/--color-date-like:\s*#cc9393/i)
+  const rule = /\.date-like-text:not\(\[data-caret\]\)\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+  expect(rule).toMatch(/text-decoration:\s*underline wavy var\(--color-date-like\)/)
+  expect(rule).toMatch(/text-decoration-thickness:\s*1px/)
+})
+
 // @requirement PRODUCT.md §20.4
 // @requirement PRODUCT.md §20.6
 it('keeps application styles free of time-based animations and transitions that delay interaction feedback', () => {

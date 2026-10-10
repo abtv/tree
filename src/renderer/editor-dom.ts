@@ -1,4 +1,5 @@
 import type { LinkRange, TreeNode } from '../domain/document'
+import { findDateLikeTokens } from '../domain/date-recognition'
 
 /** Measure a UTF-16 text offset without disturbing the live selection. */
 export function expressionPosition(
@@ -84,6 +85,36 @@ export interface TextDecoration {
   start: number
   end: number
   className: string
+}
+
+export const DATE_LIKE_CLASS = 'date-like-text'
+
+/** Decoration ranges for text that resembles a date without being one (docs/PRODUCT.md §20.10). */
+export function dateLikeDecorations(node: TreeNode): TextDecoration[] {
+  return findDateLikeTokens(node.text, node.links).map(({ start, end }) => ({ start, end, className: DATE_LIKE_CLASS }))
+}
+
+/**
+ * Hides the date-like underline on every token the focused element's selection is in or directly
+ * adjacent to, so intermediate typing states such as `2026-10-1` are never flagged. An element that
+ * is not focused shows every underline. Toggles an attribute only, so no re-render is needed.
+ */
+export function updateDateLikeUnderline(element: HTMLElement): void {
+  const spans = element.querySelectorAll<HTMLElement>(`.${DATE_LIKE_CLASS}`)
+  if (spans.length === 0) return
+  const range = element.ownerDocument.activeElement === element ? getSelectionRange(element) : undefined
+  // The Vim Normal block caret is a one-character selection that stands for the caret before that
+  // character, so it is treated as that collapsed caret.
+  const selection =
+    range !== undefined && range.end - range.start === 1 ? { start: range.start, end: range.start } : range
+  const measure = document.createRange()
+  for (const span of spans) {
+    measure.selectNodeContents(element)
+    measure.setEndBefore(span)
+    const start = measure.toString().length
+    const end = start + (span.textContent?.length ?? 0)
+    span.toggleAttribute('data-caret', selection !== undefined && selection.start <= end && selection.end >= start)
+  }
 }
 
 export function richTextHtml(node: TreeNode, decorations: readonly TextDecoration[] = []): string {

@@ -121,4 +121,20 @@ describe('pending caret currency', () => {
       currentPendingCaretInput({ ...request, input: document.createElement('textarea') }, state, 3, input),
     ).toBeUndefined()
   })
+
+  // @requirement PRODUCT.md §20.10
+  it('follows a removed textarea to the rich element that replaced it, and only then', async () => {
+    const { state, request } = await fixture()
+    const removed = document.createElement('textarea')
+    const rich = document.createElement('div')
+    document.body.append(rich)
+    expect(currentPendingCaretInput({ ...request, input: removed }, state, 3, rich)).toBe(rich)
+    document.body.append(removed)
+    expect(currentPendingCaretInput({ ...request, input: removed }, state, 3, rich)).toBeUndefined()
+    removed.remove()
+    const otherTextarea = document.createElement('textarea')
+    document.body.append(otherTextarea)
+    expect(currentPendingCaretInput({ ...request, input: removed }, state, 3, otherTextarea)).toBeUndefined()
+    expect(currentPendingCaretInput({ ...request, input: rich }, state, 3, otherTextarea)).toBeUndefined()
+  })
 })

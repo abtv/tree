@@ -11,6 +11,7 @@ import {
   setCaret,
   setNormalCaret,
   setSelectionRange,
+  updateDateLikeUnderline,
   updateSelectedLinks,
 } from './editor-dom'
 import { createEditorKeyDownHandler, type VimTextCommandState } from './editor-input-handlers'
@@ -613,21 +614,32 @@ export function useNodeInputBindings({
   // `selectionchange`; restore it on the focused input after every commit.
   useLayoutEffect(() => {
     const active = document.activeElement
-    if (active instanceof HTMLElement && active.classList.contains('node-input'))
+    if (active instanceof HTMLElement && active.classList.contains('node-input')) {
       active.classList.toggle('node-input-text-selected', hasMultiCharacterSelection(active))
+      // Re-rendered text replaces the underline spans, so the caret rule is applied again after a commit.
+      if (!(active instanceof HTMLTextAreaElement)) updateDateLikeUnderline(active)
+    }
   })
 
   useEffect(() => {
     const update = (): void => {
       for (const input of inputs.current.values()) {
-        if (!(input instanceof HTMLTextAreaElement)) updateSelectedLinks(input)
+        if (!(input instanceof HTMLTextAreaElement)) {
+          updateSelectedLinks(input)
+          updateDateLikeUnderline(input)
+        }
         if (input === document.activeElement) {
           input.classList.toggle('node-input-text-selected', hasMultiCharacterSelection(input))
         }
       }
     }
     document.addEventListener('selectionchange', update)
-    return () => document.removeEventListener('selectionchange', update)
+    // Blur does not always report a selection change, but it ends the caret rule for the element.
+    document.addEventListener('focusout', update)
+    return () => {
+      document.removeEventListener('selectionchange', update)
+      document.removeEventListener('focusout', update)
+    }
   }, [])
 
   useEffect(() => {

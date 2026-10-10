@@ -1,20 +1,20 @@
 import { memo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import type { AgendaRow as Row } from '../application/agenda-rows'
 import type { TreeNode } from '../domain/document'
-import { findCanonicalDates } from '../domain/date-recognition'
+import { agendaDecorations } from './date-decorations'
 import { agendaDateLabel, agendaGapLabel } from './agenda-labels'
 
 function datedText(node: TreeNode, day: number): ReactNode[] {
   const parts: ReactNode[] = []
   let start = 0
-  for (const date of findCanonicalDates(node.text, node.links)) {
-    parts.push(node.text.slice(start, date.start))
+  for (const decoration of agendaDecorations(node, day)) {
+    parts.push(node.text.slice(start, decoration.start))
     parts.push(
-      <span key={date.start} className={date.day === day ? 'agenda-date-active' : 'agenda-date-secondary'}>
-        {node.text.slice(date.start, date.end)}
+      <span key={decoration.start} className={decoration.className}>
+        {node.text.slice(decoration.start, decoration.end)}
       </span>,
     )
-    start = date.end
+    start = decoration.end
   }
   parts.push(node.text.slice(start))
   return parts

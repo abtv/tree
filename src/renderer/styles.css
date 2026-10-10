@@ -76,6 +76,7 @@
   --color-disclosure-hover-background: #e3dccb;
   --color-drag-highlight: #f1ebdd;
   --color-drop-marker: #9b4d00;
+  --color-date-like: #b4554b;
   --color-disclosure-background: #efe9da;
   --color-enter-ring-background: #ddd5c2;
   --color-enter-ring-hover-background: #cfc6b0;
@@ -525,6 +526,13 @@ body:not(.node-drag-active) .location-link:hover {
 }
 .agenda-date-secondary {
   color: var(--color-secondary);
+}
+/* Text that resembles a date without being one gets a 1px wavy muted-red underline. The underline is
+   hidden while the caret is in or directly adjacent to the token (docs/PRODUCT.md §20.10). */
+.date-like-text:not([data-caret]) {
+  text-decoration: underline wavy var(--color-date-like);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 /* A live mirror shows its bullet as a hollow ring in the gutter color (docs/PRODUCT.md §23.7). */
 .agenda-mirror .node-enter-control::before {
@@ -1135,6 +1143,7 @@ body.node-drag-invalid * {
     --color-disclosure-arrow: #656555;
     --color-drag-highlight: #4f4f4f;
     --color-drop-marker: #f0dfaf;
+    --color-date-like: #cc9393;
     --color-overlay-button-background: rgba(220, 220, 204, 0.12);
     --color-overlay-button-hover-background: rgba(220, 220, 204, 0.24);
     --color-overlay-button-foreground: #dcdccc;

@@ -11,7 +11,7 @@ import { LocationBar } from './LocationBar'
 import { AgendaLocationBar } from './AgendaLocationBar'
 import { AgendaView } from './AgendaView'
 import { DatePopup } from './DatePopup'
-import { findCanonicalDates } from '../domain/date-recognition'
+import { agendaDecorations, treeDecorations } from './date-decorations'
 import { richTextHtml } from './editor-dom'
 import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
@@ -225,6 +225,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           node={node}
           label={label}
+          decorations={treeDecorations(node)}
           {...nodeInputBindings(node)}
         />
         {node.attachment === undefined ? null : (
@@ -258,11 +259,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
           label={`Agenda node ${node.id}`}
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           imageCaretActive={isImageCaretActive(node)}
-          decorations={findCanonicalDates(node.text, node.links).map((date) => ({
-            start: date.start,
-            end: date.end,
-            className: date.day === day ? 'agenda-date-active' : 'agenda-date-secondary',
-          }))}
+          decorations={agendaDecorations(node, day)}
           {...nodeInputBindings(node)}
         />
       </>
@@ -276,14 +273,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
         onClick={nodeInputBindings(node).onClick}
         onMouseDown={preventReadOnlyLinkFocus}
         dangerouslySetInnerHTML={{
-          __html: richTextHtml(
-            node,
-            findCanonicalDates(node.text, node.links).map((date) => ({
-              start: date.start,
-              end: date.end,
-              className: date.day === day ? 'agenda-date-active' : 'agenda-date-secondary',
-            })),
-          ),
+          __html: richTextHtml(node, agendaDecorations(node, day)),
         }}
       />
     ),
@@ -393,6 +383,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
                     node={currentParent}
                     label="Current parent"
                     parent
+                    decorations={treeDecorations(currentParent)}
                     {...nodeInputBindings(currentParent)}
                   />
                   {currentParent.attachment === undefined ? null : (

@@ -1,7 +1,52 @@
 import fc from 'fast-check'
 import { expect, it } from 'vitest'
 import { propertyRuns } from '../test/property-runs'
-import { findCanonicalDates } from './date-recognition'
+import { findCanonicalDates, findDateLikeTokens } from './date-recognition'
+
+// @requirement PRODUCT.md §20.10
+it('flags exactly the digit-bounded year-month-day shapes that are not canonical dates', () => {
+  const part = (min: number, max: number) => fc.integer({ min, max })
+  const token = fc
+    .tuple(part(0, 9999), part(0, 120), part(0, 120), fc.boolean(), fc.boolean())
+    .map(
+      ([year, month, day, padMonth, padDay]) =>
+        `${String(year).padStart(4, '0')}-${padMonth ? String(month).padStart(2, '0') : month}-${padDay ? String(day).padStart(2, '0') : day}`,
+    )
+  fc.assert(
+    fc.property(
+      fc.array(fc.tuple(fc.constantFrom('', 'a', '9', '😀', ' '), token), { maxLength: 12 }),
+      fc.nat(150),
+      fc.nat(20),
+      (parts, offset, length) => {
+        const text = parts.map(([prefix, value]) => prefix + value).join('')
+        const range = { start: offset, end: offset + length + 1 }
+        const flagged = findDateLikeTokens(text, [range])
+        const canonical = findCanonicalDates(text, [range])
+        for (const { start, end } of flagged) {
+          const value = text.slice(start, end)
+          expect(value).toMatch(/^\d{4}-\d{1,2}-\d{1,2}$/)
+          expect(/[0-9]/.test(text[start - 1] ?? '')).toBe(false)
+          expect(/[0-9]/.test(text[end] ?? '')).toBe(false)
+          expect(start < range.end && end > range.start).toBe(false)
+          expect(canonical.some((date) => date.start < end && date.end > start)).toBe(false)
+        }
+        for (let index = 1; index < flagged.length; index++)
+          expect(flagged[index]!.start).toBeGreaterThanOrEqual(flagged[index - 1]!.end)
+        // Every digit-bounded shape outside the range is either canonical or flagged.
+        for (const match of text.matchAll(/[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}/g)) {
+          const start = match.index
+          const end = start + match[0].length
+          if (/[0-9]/.test(text[start - 1] ?? '') || /[0-9]/.test(text[end] ?? '')) continue
+          if (start < range.end && end > range.start) continue
+          const isCanonical = canonical.some((date) => date.start === start && date.end === end)
+          const isFlagged = flagged.some((token) => token.start === start && token.end === end)
+          expect(isCanonical !== isFlagged).toBe(true)
+        }
+      },
+    ),
+    { numRuns: propertyRuns(1000) },
+  )
+})
 
 it('finds exactly valid canonical substrings outside digit boundaries and excluded ranges', () => {
   const token = fc
