@@ -320,6 +320,15 @@ From test titles only; read each test's assertions before re-pointing. Numbers r
 
 ## Matrix-Only Rule Queue
 
+### Product Owner decisions (2026-10-10)
+
+* M3: a pointer interruption must prevent recording the structural Insert session for dot repeat.
+* M4: select-all, cut, and paste must prevent recording the interrupted Insert session for dot repeat; this decision does not authorize ending Insert mode.
+* M22: leaving character Visual mode must place the Normal caret at the active end, following Vim.
+* M25: an ordinary text click must move the caret and preserve Replace mode, following Vim. The Product Owner confirmed this after the comparison with Vim was explained. This does not decide the behavior of a click outside the editor, a navigation control, or a drag.
+
+These decisions must not be represented as current behavior merely by migrating the matrix clauses. Existing tests explicitly expect structural-session capture after a pointer click and Replace completion on blur and same-node clicks (`use-node-input-bindings.test.tsx` and `e2e/vim-text-editing.spec.ts`, inspected at `53c0146`). Runtime corrections are outside this documentation-only initiative and require separate implementation tasks. The remaining queue proposals have not yet been confirmed.
+
 Seeds found by reading during planning; PS-9 and PS-10 complete the audit. Row numbers are line numbers of `docs/VIM_CONFORMANCE.md` at `e94a74b`; the clause stays in its matrix row tagged `matrix-only (Mn)`.
 
 PS-9 entries (tables "Mode and command families" and "Completed Tree operation replay"). Classification is the agent's proposal under D4; the Product Owner decides.
