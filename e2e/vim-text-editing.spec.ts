@@ -893,9 +893,13 @@ test.describe('Vim editing: text editing', () => {
     // caret lands back on the image the replacement was typed from.
     await expect(editor).toHaveClass(/node-input-image-caret/)
     const restoredList = window.locator('.node-list')
-    await expect(restoredList).toHaveScreenshot('vim-replace-undo-light.png')
+    const lightBounds = await restoredList.boundingBox()
+    expect(lightBounds).not.toBeNull()
+    await expect(window).toHaveScreenshot('vim-replace-undo-light.png', { clip: lightBounds! })
     await window.emulateMedia({ colorScheme: 'dark' })
-    await expect(restoredList).toHaveScreenshot('vim-replace-undo-dark.png')
+    const darkBounds = await restoredList.boundingBox()
+    expect(darkBounds).not.toBeNull()
+    await expect(window).toHaveScreenshot('vim-replace-undo-dark.png', { clip: darkBounds! })
   })
 
   test('ends a pending Replace session on Cmd+Shift+Z with a valid Normal caret', async ({ userDataDir }) => {

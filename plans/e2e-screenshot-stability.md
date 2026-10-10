@@ -18,7 +18,7 @@ Source of truth: [E2E validation and visual-regression workflow](../docs/DEVELOP
 | ID | Outcome | Dependencies | Files expected to change | Acceptance evidence | Validation tier | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | S1 | Exclude only the native scrollbar strip from the large virtualized Agenda screenshot. | None | `e2e/agenda-focused-day.spec.ts`; its screenshot baselines | The focused test passes in both editing modes; the updated baseline is visually inspected and preserves the focused heading and surrounding rows. | Low Risk | Done |
-| S2 | Avoid locator scroll-into-view for light/dark Vim undo screenshots. | S1 | `e2e/vim-text-editing.spec.ts`; its screenshot baselines if changed | The focused test passes; screenshot dimensions and inspected contents preserve the node-list image caret in both appearances. | Low Risk | Ready |
+| S2 | Avoid locator scroll-into-view for light/dark Vim undo screenshots. | S1 | `e2e/vim-text-editing.spec.ts`; its screenshot baselines if changed | The focused test passes; screenshot dimensions and inspected contents preserve the node-list image caret in both appearances. | Low Risk | Done |
 
 ## Findings and status
 
@@ -26,8 +26,9 @@ Source of truth: [E2E validation and visual-regression workflow](../docs/DEVELOP
 - S2 repeats the locator screenshot plus appearance-switch sequence implicated in the prior CI timeout.
 - No runtime implementation change is planned.
 - S1 completed in the current worktree: both editing modes pass the focused test with snapshot comparison, and both updated images were visually inspected.
-- Current status: S2 is the exact next task. After both tasks are done, keep this review-batch record until the Product Owner confirms no further tasks remain; then remove this file and its index row in a separate completion commit.
+- S2 completed in the current worktree: the focused undo screenshot test passes with baseline comparison in light and dark appearance. The existing baselines were inspected; capture dimensions and image-caret rendering are unchanged.
+- Current status: both authorized tasks are done. Keep this review-batch record until the Product Owner confirms no further tasks remain; then remove this file and its index row in a separate completion commit. The separate fixed wheel-wait observation remains outside scope.
 
 ## Resume prompt
 
-Continue the authorized E2E screenshot stability batch. Read `AGENTS.md`, this plan, and `plans/README.md`. Take the next Ready task only. Preserve the one-fix-per-commit rule, run its focused E2E check, inspect any changed baseline, update this plan with the task commit, and stop for Product Owner confirmation before retiring the completed batch plan.
+The two authorized tasks are complete. Ask the Product Owner whether any further task should be added; do not start work on the separate wheel-wait observation without explicit authorization. After confirmation that no tasks remain, remove this plan and its index row in a separate completion commit.
