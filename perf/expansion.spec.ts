@@ -65,8 +65,8 @@ test.describe('inline expansion at scale', () => {
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
-    expect(paintP95Ms).toBeLessThan(100)
-    expect(paintMaxMs).toBeLessThan(250)
+    expect(paintP95Ms).toBeLessThan(50)
+    expect(paintMaxMs).toBeLessThan(100)
 
     // Counted motion issues one visible-row scan per step (`vim-vertical-navigation.ts`), so a
     // 50-step count exercises the O(count × visible rows) path directly rather than 50 independent
@@ -103,7 +103,7 @@ test.describe('inline expansion at scale', () => {
       samples: countedSamples.length,
       metrics: { paintMaxMs: round(countedMaxMs) },
     })
-    expect(countedMaxMs).toBeLessThan(250)
+    expect(countedMaxMs).toBeLessThan(100)
   })
 
   test('keeps fold-all keyboard commands responsive across many collapsed branches', async ({ userDataDir }) => {
@@ -155,8 +155,8 @@ test.describe('inline expansion at scale', () => {
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
-    expect(paintP95Ms).toBeLessThan(100)
-    expect(paintMaxMs).toBeLessThan(250)
+    expect(paintP95Ms).toBeLessThan(50)
+    expect(paintMaxMs).toBeLessThan(100)
   })
 
   test('does not grow the renderer heap unboundedly when expanding many branches', async ({ userDataDir }) => {

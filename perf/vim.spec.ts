@@ -49,8 +49,8 @@ test.describe('Vim interactions at scale', () => {
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
-    expect(paintP95Ms).toBeLessThan(100)
-    expect(paintMaxMs).toBeLessThan(250)
+    expect(paintP95Ms).toBeLessThan(50)
+    expect(paintMaxMs).toBeLessThan(100)
   })
 
   test('whole-node Visual selection responds through repeated motions', async ({ userDataDir }) => {
@@ -95,8 +95,8 @@ test.describe('Vim interactions at scale', () => {
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
-    expect(paintP95Ms).toBeLessThan(100)
-    expect(paintMaxMs).toBeLessThan(250)
+    expect(paintP95Ms).toBeLessThan(50)
+    expect(paintMaxMs).toBeLessThan(100)
   })
 
   for (const siblingCount of [1_000, 10_000]) {
@@ -133,7 +133,7 @@ test.describe('Vim interactions at scale', () => {
         scenario: `vim-dd-wide-${siblingCount}`,
         metrics: { deletePaintMs: round(deletePaintMs) },
       })
-      expect(deletePaintMs).toBeLessThan(250)
+      expect(deletePaintMs).toBeLessThan(100)
     })
   }
 
@@ -171,7 +171,7 @@ test.describe('Vim interactions at scale', () => {
       scenario: 'vim-counted-dd-wide-10000',
       metrics: { deletePaintMs: round(deletePaintMs) },
     })
-    expect(deletePaintMs).toBeLessThan(250)
+    expect(deletePaintMs).toBeLessThan(100)
   })
 
   test('counted d100j responds in a 10000-sibling level', async ({ userDataDir }) => {
@@ -209,7 +209,7 @@ test.describe('Vim interactions at scale', () => {
       scenario: 'vim-vertical-operator-wide-10000',
       metrics: { deletePaintMs: round(deletePaintMs) },
     })
-    expect(deletePaintMs).toBeLessThan(250)
+    expect(deletePaintMs).toBeLessThan(100)
   })
 
   test('counted 100J responds in a 10000-sibling level', async ({ userDataDir }) => {
@@ -247,7 +247,7 @@ test.describe('Vim interactions at scale', () => {
       scenario: 'vim-counted-join-wide-10000',
       metrics: { joinPaintMs: round(joinPaintMs) },
     })
-    expect(joinPaintMs).toBeLessThan(250)
+    expect(joinPaintMs).toBeLessThan(100)
     await window.keyboard.press('u')
     await expect(input).toHaveValue('Child 100')
     await window.keyboard.press('.')
@@ -260,7 +260,7 @@ test.describe('Vim interactions at scale', () => {
       metrics: { originalPaintMs: round(joinPaintMs), repeatPaintMs: round(repeatPaintMs) },
     })
     // Replay uses the same atomic range transition, so it shares the measured original-command budget.
-    expect(repeatPaintMs).toBeLessThan(250)
+    expect(repeatPaintMs).toBeLessThan(100)
   })
 
   test('whole-node Visual J over a whole 10000-sibling level responds', async ({ userDataDir }) => {
@@ -304,7 +304,7 @@ test.describe('Vim interactions at scale', () => {
     })
     // Three same-machine runs measured 811-819 ms, of which the join itself is about 4 ms; the rest is
     // laying out one node of about 108,000 characters, so the budget is that baseline plus headroom.
-    expect(joinPaintMs).toBeLessThan(1_500)
+    expect(joinPaintMs).toBeLessThan(100)
   })
 
   for (const siblingCount of [1_000, 10_000]) {
@@ -346,8 +346,8 @@ test.describe('Vim interactions at scale', () => {
         scenario: `vim-node-visual-shift-wide-${siblingCount}`,
         metrics: { indentPaintMs: round(indentPaintMs!), outdentPaintMs: round(outdentPaintMs!) },
       })
-      expect(indentPaintMs).toBeLessThan(250)
-      expect(outdentPaintMs).toBeLessThan(250)
+      expect(indentPaintMs).toBeLessThan(100)
+      expect(outdentPaintMs).toBeLessThan(100)
     })
   }
 
@@ -383,7 +383,7 @@ test.describe('Vim interactions at scale', () => {
       scenario: 'sibling-move-wide-1000',
       metrics: { movePaintMs: round(movePaintMs) },
     })
-    expect(movePaintMs).toBeLessThan(250)
+    expect(movePaintMs).toBeLessThan(100)
   })
 
   for (const targetKind of ['gap', 'row'] as const) {
@@ -473,8 +473,8 @@ test.describe('Vim interactions at scale', () => {
           moveToPaintMs: round(metrics.crossParentMovePaintMs),
         },
       })
-      expect(metrics.hoverPaintMs).toBeLessThan(250)
-      expect(metrics.crossParentMovePaintMs).toBeLessThan(250)
+      expect(metrics.hoverPaintMs).toBeLessThan(100)
+      expect(metrics.crossParentMovePaintMs).toBeLessThan(100)
       await window.evaluate(() => {
         const observeUndo = (event: KeyboardEvent): void => {
           if (event.key !== 'z') return
@@ -501,7 +501,7 @@ test.describe('Vim interactions at scale', () => {
         scenario: `cross-parent-${targetKind}-undo-windowed-1000`,
         metrics: { undoToPaintMs: round(undoPaintMs) },
       })
-      expect(undoPaintMs).toBeLessThan(250)
+      expect(undoPaintMs).toBeLessThan(100)
     })
   }
 
@@ -569,8 +569,8 @@ test.describe('Vim interactions at scale', () => {
           paintMaxMs: round(paintMaxMs),
         },
       })
-      expect(paintP95Ms).toBeLessThan(100)
-      expect(paintMaxMs).toBeLessThan(250)
+      expect(paintP95Ms).toBeLessThan(50)
+      expect(paintMaxMs).toBeLessThan(100)
     }
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     await expect(input).toBeFocused()
@@ -589,7 +589,7 @@ test.describe('Vim interactions at scale', () => {
       scenario: 'vim-throttled-dd-wide-1000',
       metrics: { deletePaintMs: round(deletePaintMs) },
     })
-    expect(deletePaintMs).toBeLessThan(250)
+    expect(deletePaintMs).toBeLessThan(100)
     await session.detach()
   })
 
@@ -634,8 +634,8 @@ test.describe('Vim interactions at scale', () => {
       samples: paints.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
-    expect(paintP95Ms).toBeLessThan(100)
-    expect(paintMaxMs).toBeLessThan(250)
+    expect(paintP95Ms).toBeLessThan(50)
+    expect(paintMaxMs).toBeLessThan(100)
   })
 
   test('large-10000 cross-parent subtree relocation with dd and P', async ({ userDataDir }) => {
@@ -713,7 +713,7 @@ test.describe('Vim interactions at scale', () => {
       metrics: { selectionMs: round(selectionMs), mountedRows, highlightedRows },
     })
 
-    expect(selectionMs).toBeLessThan(3_000)
+    expect(selectionMs).toBeLessThan(500)
     expect(mountedRows).toBeLessThan(100)
     expect(highlightedRows).toBeGreaterThan(0)
     expect(highlightedRows).toBeLessThanOrEqual(41)
@@ -775,9 +775,9 @@ test.describe('Vim interactions at scale', () => {
         },
       })
 
-      expect(navigationMs).toBeLessThan(2_000)
-      expect(paintP95Ms).toBeLessThan(100)
-      expect(paintMaxMs).toBeLessThan(250)
+      expect(navigationMs).toBeLessThan(200)
+      expect(paintP95Ms).toBeLessThan(50)
+      expect(paintMaxMs).toBeLessThan(100)
       expect(mountedRows).toBeLessThan(100)
 
       if (siblingCount !== 30_000) return
@@ -799,7 +799,7 @@ test.describe('Vim interactions at scale', () => {
         scenario: 'vim-mode-wide-30000',
         metrics: { modeSwitchMs: round(modeSwitchMs) },
       })
-      expect(modeSwitchMs).toBeLessThan(1_000)
+      expect(modeSwitchMs).toBeLessThan(300)
 
       await window.keyboard.press('x')
       await expect(middleInput).toHaveValue(`hild ${middle}`)
@@ -819,7 +819,7 @@ test.describe('Vim interactions at scale', () => {
         scenario: 'vim-repeat-wide-30000',
         metrics: { repeatMs: round(repeatMs), mountedRows: repeatMountedRows },
       })
-      expect(repeatMs).toBeLessThan(1_000)
+      expect(repeatMs).toBeLessThan(250)
       expect(repeatMountedRows).toBeLessThan(100)
 
       for (let index = 0; index < 10; index += 1) await window.keyboard.press('k')
@@ -842,7 +842,7 @@ test.describe('Vim interactions at scale', () => {
         scenario: 'vim-boundary-wide-30000',
         metrics: { boundaryMs: round(boundaryMs), mountedRows: boundaryMountedRows },
       })
-      expect(boundaryMs).toBeLessThan(1_000)
+      expect(boundaryMs).toBeLessThan(100)
       expect(boundaryMountedRows).toBeLessThan(100)
     })
   }

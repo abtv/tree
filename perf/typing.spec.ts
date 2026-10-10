@@ -83,8 +83,8 @@ async function measureTyping(
 
   expect(measured.paints.length).toBeGreaterThan(0)
   expect(measured.paints.length).toBeGreaterThanOrEqual(100)
-  expect(paint.p95).toBeLessThan(100)
-  expect(paint.max).toBeLessThan(250)
+  expect(paint.p95).toBeLessThan(50)
+  expect(paint.max).toBeLessThan(100)
   return typingMs
 }
 
@@ -103,7 +103,7 @@ test.describe('typing latency', () => {
       initialText: 'Child 0',
       parentLabel: 'Current parent',
     })
-    expect(typingMs).toBeLessThan(8_000)
+    expect(typingMs).toBeLessThan(1_000)
   })
 
   test('wide-30000', async ({ userDataDir }) => {
@@ -112,7 +112,7 @@ test.describe('typing latency', () => {
       initialText: 'Child 0',
       parentLabel: 'Current parent',
     })
-    expect(typingMs).toBeLessThan(2_000)
+    expect(typingMs).toBeLessThan(1_000)
   })
 
   // @requirement PRODUCT.md §22.1
@@ -128,7 +128,7 @@ test.describe('typing latency', () => {
       },
       false,
     )
-    expect(typingMs).toBeLessThan(8_000)
+    expect(typingMs).toBeLessThan(1_000)
   })
 
   test('large-10000', async ({ userDataDir }) => {
@@ -146,6 +146,6 @@ test.describe('typing latency', () => {
       initialText: 'Node 315.315',
       parentLabel: 'Current parent',
     })
-    expect(typingMs).toBeLessThan(1_500)
+    expect(typingMs).toBeLessThan(1_000)
   })
 })

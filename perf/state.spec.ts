@@ -152,12 +152,12 @@ test.describe('state and persistence work', () => {
     })
 
     expect(structuralBurstMs).toBeLessThan(2_000)
-    expect(typingMs).toBeLessThan(1_000)
+    expect(typingMs).toBeLessThan(500)
     expect(saveCount).toBeGreaterThan(0)
     expect(saveCount).toBeLessThanOrEqual(Math.ceil(wordCount / 10) + 2)
     expect(documentBytesWritten).toBeLessThan(20_000_000)
     expect(cleanupScanMs).toBeGreaterThan(0)
-    expect(cleanupScanMs).toBeLessThan(1_000)
+    expect(cleanupScanMs).toBeLessThan(100)
   })
 
   test('large-10000 attachment history through edits and undo/redo', async ({ userDataDir }) => {
@@ -210,9 +210,9 @@ test.describe('state and persistence work', () => {
     })
 
     expect(saveCount).toBeGreaterThan(0)
-    expect(historyMs).toBeLessThan(5_000)
+    expect(historyMs).toBeLessThan(3_000)
     expect(cleanupScanMs).toBeGreaterThan(0)
-    expect(cleanupScanMs).toBeLessThan(1_000)
+    expect(cleanupScanMs).toBeLessThan(100)
   })
 
   test('sustained-10000 structural edits keep renderer memory bounded', async ({ userDataDir }) => {
@@ -314,7 +314,7 @@ test.describe('state and persistence work', () => {
     })
 
     expect(measurements['small']).toBeGreaterThan(0)
-    expect(measurements['small']).toBeLessThan(1_000)
-    expect(measurements['large']).toBeLessThan(3_000)
+    expect(measurements['small']).toBeLessThan(100)
+    expect(measurements['large']).toBeLessThan(100)
   })
 })

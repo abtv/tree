@@ -51,8 +51,8 @@ test('typing in a large dated Tree stays responsive with bounded mounted rows', 
     samples: samples.length,
     metrics: { typingP95Ms: round(samples[28]!), typingMaxMs: round(samples[29]!), mountedRows },
   })
-  expect(samples[28]).toBeLessThan(100)
-  expect(samples[29]).toBeLessThan(250)
+  expect(samples[28]).toBeLessThan(50)
+  expect(samples[29]).toBeLessThan(100)
   expect(mountedRows).toBeLessThan(100)
   await expect(input).toHaveText(`Child 0 2026-10-14${'a'.repeat(30)}`)
   await expect(input).toBeFocused()

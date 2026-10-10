@@ -59,8 +59,8 @@ test('Agenda Visual navigation stays responsive with bounded mounted rows and no
     samples: sorted.length,
     metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
   })
-  expect(sorted[38]).toBeLessThan(100)
-  expect(sorted[39]).toBeLessThan(250)
+  expect(sorted[38]).toBeLessThan(50)
+  expect(sorted[39]).toBeLessThan(100)
   expect(saves).toBe(0)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
   await expect(window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })).toBeFocused()
@@ -98,8 +98,8 @@ test('Agenda typing keeps mounted rows bounded and stays within the interactive 
     samples: samples.length,
     metrics: { typingP95Ms: round(samples[28]!), typingMaxMs: round(samples[29]!) },
   })
-  expect(samples[28]).toBeLessThan(100)
-  expect(samples[29]).toBeLessThan(250)
+  expect(samples[28]).toBeLessThan(50)
+  expect(samples[29]).toBeLessThan(100)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
   await expect(input).toBeFocused()
 })
@@ -147,8 +147,8 @@ test('Agenda keystrokes that change date recognition stay within the interactive
     samples: samples.length,
     metrics: { dateEditP95Ms: round(samples[28]!), dateEditMaxMs: round(samples[29]!), saves },
   })
-  expect(samples[28]).toBeLessThan(100)
-  expect(samples[29]).toBeLessThan(250)
+  expect(samples[28]).toBeLessThan(50)
+  expect(samples[29]).toBeLessThan(100)
   // Recognition changes must not save per keystroke: 150 keystrokes make no more than a handful of saves.
   expect(saves).toBeLessThan(10)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
@@ -189,8 +189,8 @@ test('Agenda mirror updates keep focus and stay within the interactive budget', 
     samples: samples.length,
     metrics: { mirrorP95Ms: round(samples[28]!), mirrorMaxMs: round(samples[29]!) },
   })
-  expect(samples[28]).toBeLessThan(100)
-  expect(samples[29]).toBeLessThan(250)
+  expect(samples[28]).toBeLessThan(50)
+  expect(samples[29]).toBeLessThan(100)
   // Both occurrences show the typed text while the active one keeps focus.
   await expect(occurrences).toHaveCount(2)
   await expect(occurrences.nth(1)).toContainText('a'.repeat(30))
@@ -250,8 +250,11 @@ test('Agenda group move of a Visual selection completes within budget as one sav
     samples: 2,
     metrics: { moveMs: round(probe.move[0]!), undoMs: round(probe.undo[0]!), saves },
   })
-  expect(probe.move[0]).toBeLessThan(1000)
-  expect(probe.undo[0]).toBeLessThan(1000)
+  // Single-sample group operations over 6000 occurrences: the same machine measured
+  // 26-35 ms for the move and 35, 108, and 180 ms for the undo in three runs, so the
+  // ceiling keeps about a threefold margin over the worst sample seen.
+  expect(probe.move[0]).toBeLessThan(500)
+  expect(probe.undo[0]).toBeLessThan(500)
   // One save for the move and one for its Undo at most; a per-node save would reach one hundred.
   expect(saves).toBeLessThanOrEqual(2)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
@@ -320,11 +323,11 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
       saves,
     },
   })
-  expect(probe.open[0]).toBeLessThan(1000)
-  expect(scroll).toBeLessThan(250)
-  expect(countedMotionMs).toBeLessThan(250)
-  expect(sorted[38]).toBeLessThan(100)
-  expect(sorted[39]).toBeLessThan(250)
+  expect(probe.open[0]).toBeLessThan(100)
+  expect(scroll).toBeLessThan(100)
+  expect(countedMotionMs).toBeLessThan(100)
+  expect(sorted[38]).toBeLessThan(50)
+  expect(sorted[39]).toBeLessThan(100)
   expect(saves).toBe(0)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
   await expect(window.locator('.agenda-row[aria-selected="true"]')).toBeFocused()
@@ -371,8 +374,8 @@ test('Agenda caret motion over a row without an editor stays within the interact
     samples: sorted.length,
     metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
   })
-  expect(sorted[38]).toBeLessThan(100)
-  expect(sorted[39]).toBeLessThan(250)
+  expect(sorted[38]).toBeLessThan(50)
+  expect(sorted[39]).toBeLessThan(100)
   expect(saves).toBe(0)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
   expect(await window.locator('.agenda-caret').count()).toBe(1)

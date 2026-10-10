@@ -81,8 +81,8 @@ async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): 
     scenario: `typing-during-save-large-10000-cpu-${cpuRate}x`,
     metrics: { triggerPaintMs: round(paints['z']!), inFlightPaintMs: round(paints['x']!) },
   })
-  expect(paints['z']).toBeLessThan(250)
-  expect(paints['x']).toBeLessThan(250)
+  expect(paints['z']).toBeLessThan(100)
+  expect(paints['x']).toBeLessThan(100)
   await cpuSession?.detach()
 }
 
