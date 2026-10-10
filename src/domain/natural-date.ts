@@ -50,7 +50,7 @@ const smallCounts = [
 ]
 const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
-const relativeExpression = new RegExp(`^(?:in (${countPattern}) days?|(${countPattern}) days? ago)$`)
+const relativeExpression = /^(?:in (.+) days?|(.+) days? ago)$/
 const expressions = new RegExp(
   `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +days?|${countPattern} +days? +ago|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
   'gi',
@@ -61,6 +61,28 @@ const expressions = new RegExp(
 // not an equivalent mutation of the calendar bounds.
 const minimumDay = dayNumberOf({ year: 0, month: 1, day: 1 })
 const maximumDay = dayNumberOf({ year: 9999, month: 12, day: 31 })
+
+function relativeDaysFor(expression: string, today: DayNumber): DayNumber[] | undefined {
+  const relative = relativeExpression.exec(expression)
+  // Require the whole expression. With the anchored recognizer this check is
+  // redundant; it also keeps anchor-removal mutants output-equivalent.
+  if (relative === null || relative[0] !== expression) return undefined
+  const value = relative[1] ?? relative[2]!
+  const [first, second, extra] = value.split(/[ -]/)
+  const small = smallCounts.indexOf(first!)
+  const tens = tensCounts.indexOf(first!)
+  const unit = smallCounts.slice(0, 9).indexOf(second!)
+  let count: number
+  if (/^[0-9]+$/.test(value)) count = Number(value)
+  else if (value === 'one hundred') count = 100
+  else if (small >= 0 && second === undefined) count = small + 1
+  // With no unit, unit is -1, so replacing the final ternary's condition with
+  // false is equivalent: unit + 1 still contributes zero.
+  else if (tens >= 0 && extra === undefined && (second === undefined || unit >= 0))
+    count = (tens + 2) * 10 + (second === undefined ? 0 : unit + 1)
+  else return undefined
+  return [today + (relative[1] === undefined ? -count : count)]
+}
 
 function monthDays(month: number, date: number, today: DayNumber): DayNumber[] {
   const year = calendarDateOf(today).year
@@ -99,20 +121,8 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
     return current >= today ? [current, current + 7] : [current + 7, current]
   }
   // The same outer-recognizer invariant makes anchor mutations equivalent.
-  const relative = relativeExpression.exec(expression)
-  if (relative) {
-    const value = relative[1] ?? relative[2]!
-    const [first, second] = value.split(/[ -]/)
-    const small = smallCounts.indexOf(first!) + 1
-    const tens = tensCounts.indexOf(first!)
-    const count =
-      value === 'one hundred'
-        ? 100
-        : tens >= 0
-          ? (tens + 2) * 10 + (second === undefined ? 0 : smallCounts.indexOf(second) + 1)
-          : small || Number(value)
-    return [today + (relative[1] === undefined ? -count : count)]
-  }
+  const relative = relativeDaysFor(expression, today)
+  if (relative !== undefined) return relative
   const [month, date] = expression.split(' ')
   return monthDays(months.findIndex((name) => name === month || name.slice(0, 3) === month) + 1, Number(date), today)
 }
@@ -126,6 +136,22 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
   if (!Number.isInteger(caret) || caret < 0 || caret > text.length) return undefined
   // Validate the caller's calendar value through the existing domain primitive.
   calendarDateOf(today)
+  // A node consisting of a relative expression needs no span search. Avoid
+  // compiling the much larger general recognizer on this first typing path.
+  // Mutants that disable this path (including case/spacing changes that make
+  // its predicate fail) preserve results through the general fallback. The
+  // uninstrumented performance guard checks the optimization separately.
+  const completeExpression = text.toLowerCase().replace(/ +/g, ' ')
+  const completeDays = relativeDaysFor(completeExpression, today)
+  if (completeDays !== undefined) {
+    const days = completeDays.filter((day) => day >= minimumDay && day <= maximumDay)
+    if (days.length === 0) return undefined
+    return {
+      start: 0,
+      end: text.length,
+      suggestions: days.map((day) => ({ day, expression: completeExpression })),
+    }
+  }
   for (const match of text.matchAll(expressions)) {
     const start = match.index
     const end = start + match[0].length

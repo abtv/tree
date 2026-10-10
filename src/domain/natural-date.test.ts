@@ -132,6 +132,10 @@ describe('natural date expression table proposed in AG-22', () => {
       'in twentyfive days',
       'in twohundred days',
       'in twenty--five days',
+      'in twenty ten days',
+      'in twenty eleven days',
+      'in twenty five six days',
+      'in twenty-five-six days',
       'in twoday',
       'in fivedays',
       'two days agone',
@@ -144,6 +148,8 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(match.suggestions).toEqual([{ day: today + 25, expression: 'in twenty five days' }])
     expect(dates('one day ago', day('0000-01-01'))).toBeUndefined()
     expect(dates('in one day', day('9999-12-31'))).toBeUndefined()
+    expect(dates('one day ago', day('0000-01-02'))).toEqual(['0000-01-01'])
+    expect(dates('in one day', day('9999-12-30'))).toEqual(['9999-12-31'])
   })
 
   it.each(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])(
@@ -197,6 +203,21 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(suggestDates('tomorr', 6, today)?.suggestions[0]?.expression).toBe('tomorrow')
     expect(suggestDates('tomorro', 7, today)?.suggestions[0]?.expression).toBe('tomorrow')
     expect(suggestDates('today', 0, today)?.start).toBe(0)
+  })
+
+  it('keeps a trailing newline outside a complete relative expression', () => {
+    expect(suggestDates('two days ago\n', 12, today)).toEqual({
+      start: 0,
+      end: 12,
+      suggestions: [{ day: today - 2, expression: 'two days ago' }],
+    })
+    expect(suggestDates('two days ago\n', 13, today)).toBeUndefined()
+  })
+
+  it('finds numeric relative counts inside surrounding words and other expressions', () => {
+    expect(dates('Plan 2 days ago')).toEqual(['2026-10-06'])
+    expect(dates('in 2 days 3 days ago')).toEqual(['2026-10-05'])
+    expect(dates('2 3 days ago')).toEqual(['2026-10-05'])
   })
 
   it('rejects invalid caret offsets and calendar references', () => {

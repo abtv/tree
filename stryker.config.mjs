@@ -3,6 +3,9 @@
 export default {
   testRunner: 'vitest',
   vitest: { configFile: 'vitest.config.ts' },
+  // Instrumentation measures mutated code, so submillisecond timing guards
+  // run in ordinary Vitest validation instead of mutation workers.
+  ignorePatterns: ['src/**/*.performance.test.ts'],
   coverageAnalysis: 'perTest',
   mutate: [
     'src/domain/**/*.ts',
