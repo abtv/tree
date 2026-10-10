@@ -59,6 +59,22 @@ export function compareMetrics(
   return failures
 }
 
+/**
+ * Lists the metrics of `current` that exceed `tolerance` times their value in
+ * `baseline`, as `scenario: metric ...` lines. Scenarios and metrics that the
+ * baseline never recorded are new rather than regressed, so they are skipped.
+ */
+export function compareArtifacts(current: PerfArtifact, baseline: PerfArtifact, tolerance: number): string[] {
+  const lines: string[] = []
+  for (const [scenario, metrics] of Object.entries(current.metrics)) {
+    const baselineMetrics = baseline.metrics[scenario]
+    if (baselineMetrics === undefined) continue
+    const comparable = Object.fromEntries(Object.entries(metrics).filter(([key]) => key in baselineMetrics))
+    for (const failure of compareMetrics(comparable, baselineMetrics, tolerance)) lines.push(`${scenario}: ${failure}`)
+  }
+  return lines
+}
+
 export function readArtifact(path: string): PerfArtifact {
   let parsed: unknown
   try {
@@ -107,7 +123,7 @@ function compareWithBaseline(kind: string, scenario: string, metrics: Record<str
   }
 }
 
-function readTolerance(): number {
+export function readTolerance(): number {
   const raw = process.env['PERF_REGRESSION_TOLERANCE']
   if (raw === undefined || raw === '') return DEFAULT_TOLERANCE
   const tolerance = Number(raw)

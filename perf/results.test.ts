@@ -2,7 +2,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { compareMetrics, flattenMetrics, readArtifact, recordPerfResult, type PerfArtifact } from './results'
+import {
+  compareArtifacts,
+  compareMetrics,
+  flattenMetrics,
+  readArtifact,
+  recordPerfResult,
+  type PerfArtifact,
+} from './results'
 
 const temporaryDirectories: string[] = []
 const originalEnvironment = { ...process.env }
@@ -45,6 +52,38 @@ describe('compareMetrics', () => {
 
   it('ignores non-positive baselines', () => {
     expect(compareMetrics({ zeroMetric: 100 }, { zeroMetric: 0 }, 1.5)).toEqual([])
+  })
+})
+
+describe('compareArtifacts', () => {
+  const artifactOf = (metrics: PerfArtifact['metrics']): PerfArtifact => ({
+    createdAt: new Date(0).toISOString(),
+    environment: { platform: 'darwin', arch: 'arm64', node: 'v24' },
+    metrics,
+  })
+
+  it('prefixes each regression with its scenario', () => {
+    const baseline = artifactOf({ 'typing:a': { paintP95Ms: 10 }, 'typing:b': { paintP95Ms: 10 } })
+    const current = artifactOf({ 'typing:a': { paintP95Ms: 11 }, 'typing:b': { paintP95Ms: 20 } })
+
+    expect(compareArtifacts(current, baseline, 1.5)).toEqual(['typing:b: paintP95Ms: 20 vs baseline 10 (2.00x > 1.5x)'])
+  })
+
+  it('skips scenarios and metrics that the baseline never recorded', () => {
+    const baseline = artifactOf({ 'typing:a': { paintP95Ms: 10 } })
+    const current = artifactOf({
+      'typing:a': { paintP95Ms: 10, popupInsertMaxMs: 99 },
+      'typing:new': { typingMs: 500 },
+    })
+
+    expect(compareArtifacts(current, baseline, 1.5)).toEqual([])
+  })
+
+  it('ignores scenarios that only the baseline recorded', () => {
+    const baseline = artifactOf({ 'typing:a': { paintP95Ms: 10 }, 'typing:gone': { paintP95Ms: 1 } })
+    const current = artifactOf({ 'typing:a': { paintP95Ms: 10 } })
+
+    expect(compareArtifacts(current, baseline, 1.5)).toEqual([])
   })
 })
 

@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -16,7 +17,7 @@ jobs:
   performance:
     name: Performance
     runs-on: macos-15
-    timeout-minutes: 2
+    timeout-minutes: 5
 
     steps:
       - name: Check out repository
@@ -31,8 +32,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Report-only drift check: the previous successful run's artifact is the
+      # comparison point. It lives outside test-results/, which Playwright clears.
+      - name: Download previous performance results
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previous=$(gh run list --workflow performance.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -n "$previous" ]; then
+            gh run download "$previous" --name performance-results --dir perf-baseline
+          fi
+
       - name: Run performance tests
         run: npm run test:perf
+
+      - name: Report performance drift
+        if: always()
+        continue-on-error: true
+        run: node scripts/perf-report.mjs test-results/perf-results.json perf-baseline/perf-results.json
 
       - name: Upload performance results
         if: always()
