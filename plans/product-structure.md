@@ -52,14 +52,14 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Complete |
 | PS-7 | Batch B split verbatim: §20.5, §20.8, §20.9, §23.2, §23.4, §23.5, §23.11, §23.12 | PS-6 | Same as PS-6 | Complete |
 | PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Complete |
-| PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Planned |
+| PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Complete |
 | PS-10 | Same for "Interaction-state contract" and "Image and caret transitions"; queue complete; one Product Owner message sent | PS-9 | Same as PS-9; queue recorded here | Planned |
 | PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Planned |
 | PS-12 | Close: lasting knowledge moved to `docs/DEVELOPMENT.md`; plan and index row removed | PS-8, PS-11, Product Owner confirmation | `npm run check:docs`; `npm run format:check:changed` | Planned |
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-9. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-10. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -186,6 +186,22 @@ subsection, and one that `runChecks` fails on an over-limit PRODUCT paragraph.
 `docs/DEVELOPMENT.md` §12 no longer mentions exemptions. PRODUCT.md is unchanged.
 No product decision was made.
 
+PS-9 completed (2026-10-10): the two tables "Mode and command families" and
+"Completed Tree operation replay" in `docs/VIM_CONFORMANCE.md` now have the
+columns PRODUCT, Case, Vim divergence, and Representative automated evidence; the
+first table's mixed two- and three-cell rows are all four-cell rows. Each row cites
+the precise §20.2.n (or §2.5, §4, §10, §23.13, §23.14) that states its behavior.
+Evidence cells are unchanged (checked: no test path or quoted test name in the
+removed text); the `**Vim divergence:**` marker count is 32 before and after, each
+reduced to what Vim does differently and the reason. Clauses that no PRODUCT
+sentence states stay in the row's Case cell tagged `matrix-only (Mn)` and are
+queued below as M1 to M14. The paragraph above the second table keeps its marker
+and now cites §20.2.19. `npm run check:docs` passed. The verbatim report treats a
+table row as one block, so its removed list only confirms that every deleted
+behavior cell is a row head; the audit of each clause was done by reading each
+row against PRODUCT §20.2. No product decision was made; M3 and M4 are possible
+conflicts with §20.2.19 for the Product Owner.
+
 ## Conventions
 
 * Tier names are those of `docs/DEVELOPMENT.md` §9. A task that deletes an exemption edits a validation script, so it is Low Risk and runs `npm run check` even when its text change is documentation only.
@@ -285,10 +301,26 @@ From test titles only; read each test's assertions before re-pointing. Numbers r
 
 ## Matrix-Only Rule Queue
 
-Seeds found by reading during planning; PS-9 and PS-10 complete the audit.
+Seeds found by reading during planning; PS-9 and PS-10 complete the audit. Row numbers are line numbers of `docs/VIM_CONFORMANCE.md` at `e94a74b`; the clause stays in its matrix row tagged `matrix-only (Mn)`.
 
-* Row 23: a structural `o`/`O` session captures its dot-repeat payload from the node it created, not from a node a pointer landed on. PRODUCT.md line 1025 states the recording rule only for plain sessions and lists "an application shortcut" among interruptions, while row 23 says select-all, cut, and paste leave the session untouched. Possible conflict; a Product Owner question.
-* Rows 41 to 43: focus-changing application commands during character Visual mode and pending Normal commands. PRODUCT.md states this for select-all, cut, paste, `Cmd+E`, and `Cmd+Enter`, not for `Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo, breadcrumb, and enter-control clicks.
+PS-9 entries (tables "Mode and command families" and "Completed Tree operation replay"). Classification is the agent's proposal under D4; the Product Owner decides.
+
+* M1, row 16: after Tab or Shift+Tab the whole-node Visual range and the active image caret, with its saved text position, survive the move. PRODUCT §20.2.24 states that mode, focus, caret, and text selection are kept. Tests: `editor-input-handlers.test.ts` “shifts the whole-node Visual range with Tab while retaining its range mode”; `e2e/tab-structure.spec.ts` “moves an active image caret with Tab and restores its saved text position”. Proposal: move into §20.2.24.
+* M2, row 21: after a pending Replace edit is committed for a quit, the editor returns to Normal mode. §20.2.5 states the Normal-mode return only for the application commands in its first item. Tests: `App.test.tsx` “commits a pending Replace edit when the store flushes persistence for quit”. Proposal: move into §20.2.5.
+* M3, row 23: a structural Insert session (`o`/`O`, Visual `c`/`s`) captures its dot-repeat payload from the node it created, not from a node a pointer landed on. §20.2.19 lists "pointer focus" among the interruptions that stop an Insert session from being recorded and does not exempt structural sessions, while item 1 lists `o` and `O` among the recorded changes. Tests: `use-node-input-bindings.test.tsx` “captures a structural session from its own node when a pointer click lands on another node”; `e2e/vim-navigation-and-visual.spec.ts` “captures structural text typed in its own node when a pointer click lands elsewhere”. Possible conflict with §20.2.19; Product Owner question.
+* M4, row 23: a select-all, cut, or paste leaves a pending Insert session and mode untouched. §20.2.5 says Insert mode stays active; §20.2.19 lists "an application shortcut" among the interruptions that prevent recording. Tests: `editor-input-handlers.test.ts` “keeps an Insert session and mode before Cmd+V”. Possible conflict with §20.2.19; Product Owner question.
+* M5, row 26: `G` and the half-page motions keep the caret column and can activate the destination image. §20.2.9 states the image destination for `G`, `H`, `M`, and `L`, not the caret column and not `Ctrl+d`/`Ctrl+u`. Tests: `e2e/vim-navigation-and-visual.spec.ts` “supports line and viewport motions”. Proposal: move into §20.2.9.
+* M6, row 27: word motions clamp at the ends of the node instead of crossing to another line. §20.2.9 does not say so. Tests: `vim-editing.test.ts` “Vim text motions”. Proposal: move into §20.2.9.
+* M7, rows 29 and 32: a structural command anchors the destination caret at text position `0`, and a clamped whole-node Visual move reselects at text position `0`. No §20.2 subsection states it. The tests in rows 29 and 32 are the evidence; the test that asserts position `0` for each command was not identified (unverified). Proposal: move into §20.2.12 and §20.2.23 after the Product Owner confirms which commands it covers.
+* M8, row 34: `gp` and `gP` with an empty register change nothing. §20.2.13 says they share the rejections of `p` and `P`, which does not name an empty register. Tests: `editor-input-handlers.test.ts` “leaves the caret and the document alone for gp with an empty register”. Proposal: move into §20.2.13.
+* M9, row 36: a rejected or locked whole-node Visual put changes neither mode nor selection. §20.2.23 states that the document and register stay unchanged; §20.2.20 states the mode rule for character Visual only. Tests: `use-node-input-bindings.test.tsx` “exchanges the register on whole-node Visual p, keeps it on P, and applies the count to both”; `editor-store.test.ts` “blocks a Visual put and a Visual text replacement while locked and reports the rejection”. Proposal: move into §20.2.23.
+* M10, row 38: a case operator followed by `j` or `k` does nothing. §20.2.11 states `d`, `y`, and `c` with `j`/`k` only. Tests: `editor-input-handlers.test.ts` “leaves the document and the repeatable change alone for a case operator that matches nothing”. Proposal: move into §20.2.11.
+* M11, row 41: leaving whole-node Visual with an unfinished `g` prefix (Escape, `V`, or a mutation command) clears the prefix, so a later Normal-mode `d` starts a delete instead of running `gd`. Not stated. `V` as an exit from whole-node Visual is not stated for Tree either (only as the entry key, and for Agenda in §23.14); §20.2.23 states Insert for `c`/`s` only. Tests: `editor-input-handlers.test.ts` “clears a whole-node Visual g prefix on Escape so a following d does not run gd”. Proposal: move into §20.2.23.
+* M12, rows 42 and 43: focus-changing application commands during character Visual mode and a pending Normal command. §20.2.6 states this for select-all, cut, and paste only; the matrix also states it for `Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo, and breadcrumb and enter-control clicks, with character Visual mode staying active. Tests: the “keeps character Visual mode but clears its command assembly before …” and “clears a Normal-mode pending command before …” tests in `editor-input-handlers.test.ts`. §2.4 (`Cmd+E`) and §2.5 (`Cmd+Enter`) already say "like the other `Cmd` commands" they discard a pending Normal command and clear the endpoints, which presupposes a general rule. Proposal: extend §20.2.6 with that general rule.
+* M13, row 44: the Ctrl-modified keys are dispatched before `handleVimKey` and must apply the discard rule for themselves. Mechanism statement; §20.2.16 states the behavior. Proposal: not a product rule; delete, or send to `docs/ARCHITECTURE.md` only if absent there.
+* M14, row 45: after `Cmd+A` ends whole-node Visual mode, the whole-text selection survives the exit. §20.2.6 says the application command ends the mode and replaces the selection. Tests: `App.test.tsx` “keeps the text select-all after Cmd+A exits whole-node Visual mode”. Proposal: move into §20.2.6.
+* Also kept in row 45 Case, not a rule: the explanation that the range is relative to the displayed level and cannot survive a level or focus change. Proposal: delete with D6 history text or keep as rationale.
+
 * Rows 72 to 76: saved image return position and focus intent.
 * Rows 104 to 108: Replace mode and the image caret.
 * Rows 110 and 112: caret at text position 0 after `gd` on a childless node with an attachment, and after whole-node Visual moves.
