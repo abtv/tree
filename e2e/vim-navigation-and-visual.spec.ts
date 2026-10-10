@@ -471,14 +471,16 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(window.getByRole('textbox', { name: 'Node 61', exact: true })).toBeFocused()
       await window.mouse.move(400, 300)
       await window.mouse.wheel(0, 3000)
-      // Wait for the wheel's smooth scrolling to settle, so it cannot move the content after gg.
+      // Wait for wheel momentum to stop, so it cannot move the content after gg. A single stable
+      // sample can land between native scroll updates on a loaded CI runner.
+      let lastChange = Date.now()
       let previous = -1
       await expect
         .poll(async () => {
           const top = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
-          const settled = top === previous && top > 1000
+          if (top !== previous) lastChange = Date.now()
           previous = top
-          return settled
+          return top > 1000 && Date.now() - lastChange >= 300
         })
         .toBe(true)
 

@@ -854,9 +854,14 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('abcdX')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(editor).toHaveClass(/node-input-image-caret/)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-click-image-caret-light.png')
+    const nodeList = window.locator('.node-list')
+    const nodeListBounds = await nodeList.boundingBox()
+    expect(nodeListBounds).not.toBeNull()
+    await expect(window).toHaveScreenshot('vim-replace-click-image-caret-light.png', { clip: nodeListBounds! })
     await window.emulateMedia({ colorScheme: 'dark' })
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-click-image-caret-dark.png')
+    const darkNodeListBounds = await nodeList.boundingBox()
+    expect(darkNodeListBounds).not.toBeNull()
+    await expect(window).toHaveScreenshot('vim-replace-click-image-caret-dark.png', { clip: darkNodeListBounds! })
   })
 
   test('undoes a pending Replace-mode edit and focuses the restored text', async ({ userDataDir }) => {

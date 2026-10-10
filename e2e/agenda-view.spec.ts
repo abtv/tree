@@ -221,7 +221,9 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await window.emulateMedia({ colorScheme: appearance })
       await gap.click()
       await window.mouse.move(500, 20)
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-gap-expanded-${appearance}.png`))
+      // Native macOS scrollbars fade independently of CSS animations. Exclude only their edge.
+      const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+      await expect(window).toHaveScreenshot(screenshotName(`agenda-gap-expanded-${appearance}.png`), { clip })
     }
     await gap.getByRole('button').click()
     await expectFocused(gap)

@@ -283,7 +283,9 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await window.mouse.move(600, 20)
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-editing-${appearance}.png`))
+      // Native macOS scrollbars fade independently of CSS animations. Exclude only their edge.
+      const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+      await expect(window).toHaveScreenshot(screenshotName(`agenda-editing-${appearance}.png`), { clip })
     }
     const geometry = await input.evaluate((element) => ({
       text: element.textContent,
