@@ -54,12 +54,16 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Complete |
 | PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Complete |
 | PS-10 | Same for "Interaction-state contract" and "Image and caret transitions"; queue complete; one Product Owner message sent | PS-9 | Same as PS-9; queue recorded here | Complete |
-| PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Blocked: waiting for the Product Owner's answers on the queue M1 to M28 |
+| PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Blocked: five additional behavior decisions confirmed; runtime corrections need separate authorization |
 | PS-12 | Close: lasting knowledge moved to `docs/DEVELOPMENT.md`; plan and index row removed | PS-8, PS-11, Product Owner confirmation | `npm run check:docs`; `npm run format:check:changed` | Planned |
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-11, blocked until the Product Owner answers the queue M1 to M28 (D4). Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** Obtain authorization for the runtime corrections below before
+completing PS-11. These corrections are outside this documentation-only
+initiative. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`;
+if PRODUCT.md changed since the last update of this plan, rerun the guard report
+before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -335,6 +339,60 @@ remaining matrix-only queue. The queue entries below describe the original audit
 the four implemented decisions above supersede their earlier conflicting claims.
 
 Seeds found by reading during planning; PS-9 and PS-10 complete the audit. Row numbers are line numbers of `docs/VIM_CONFORMANCE.md` at `e94a74b`; the clause stays in its matrix row tagged `matrix-only (Mn)`.
+
+### Additional Product Owner decisions (2026-10-10)
+
+The Product Owner confirmed these recommendations in the conversation. They
+settle intended behavior, not authorization for runtime implementation. Do not
+migrate contrary matrix clauses into PRODUCT.md as current behavior. Apply D4
+to the other entries without asking again about routine documentation choices.
+
+1. M5: `G`, `gg`, and `Ctrl+d`/`Ctrl+u` land on the destination's first nonblank
+   text character, following Vim's default `startofline` behavior.
+2. M24: these motions land on text when it exists and on the image only when the
+   node has no text. Apply the same destination rule to `H`/`M`/`L`, replacing
+   their existing image-first rule for consistency.
+3. M7: a whole-node Visual movement clamped at the list boundary preserves the
+   existing caret position. This does not decide different placement after
+   successful movement or mutation.
+4. A double-click selecting a word in Replace keeps Replace, a working session,
+   and the visible word selection; subsequent typing acts predictably on that
+   selection. Do not silently ignore typed text or claim exact Vim mouse parity.
+5. Clicking another Agenda row preserves Replace. An editable destination starts
+   replacement at the clicked position; a read-only destination permits no edits
+   and retains the mode until replacement can resume on an editable row.
+
+Expected correction work, pending separate authorization:
+
+* Motion destinations (M5/M24): renderer Vim motion/caret owners, their focused
+  tests, `e2e/vim-navigation-and-visual.spec.ts`, `e2e/vim-image-caret.spec.ts`,
+  PRODUCT §20.2.9, and the conformance matrix. Evidence: text with indentation,
+  text plus image, image-only and empty nodes; counted and uncounted commands;
+  Tree and Agenda adapters. Tier: Moderate Risk; independent review and product
+  verification, navigation inventory, and inspected renderer screenshots.
+* Clamped Visual Node motion (M7): renderer whole-node Visual/focus owners,
+  focused tests and `e2e/vim-image-caret.spec.ts`, PRODUCT §20.2.23, and the
+  conformance matrix. Evidence: both boundaries, counts, text and image caret,
+  unchanged range and saved return position. Tier: Moderate Risk; independent
+  review and product verification, navigation inventory, inspected screenshots.
+* Replace word selection: pointer and edit-session owners, focused tests and
+  `e2e/vim-text-editing.spec.ts`, PRODUCT §§20.2.5–6, and the conformance matrix.
+  Evidence: real double-click, selected-word replacement, pending/empty buffer,
+  continued typing, Escape and Undo, plain and rich inputs. Tier: Moderate Risk
+  unless boundary work raises it; independent review and product verification.
+  Exact overwrite behavior for selected text must be resolved during planning
+  against existing selection rules; this confirmation grants no extra command.
+* Replace across Agenda rows: Agenda pointer/focus and session adapters, focused
+  tests and `e2e/agenda-vim.spec.ts`, PRODUCT §§20.2.6 and 23.4, and the matrix.
+  Evidence: editable-to-editable, editable-to-read-only-to-editable, retained
+  buffer, no read-only mutation, Escape and Undo. Tier: Moderate Risk unless
+  boundary work raises it; independent review and product verification.
+
+Runtime corrections must use the defect-first workflow where a defect is
+confirmed and their applicable validation tier. Create a separate initiative
+with fully scoped tasks when implementation is authorized; keep this complete
+follow-up list until then. PS-11 resumes after the conflicting behavior is
+corrected and validated. No PRODUCT.md behavior was changed by this record.
 
 PS-9 entries (tables "Mode and command families" and "Completed Tree operation replay"). Classification is the agent's proposal under D4; the Product Owner decides.
 
