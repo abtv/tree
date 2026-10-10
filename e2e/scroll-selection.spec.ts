@@ -243,6 +243,9 @@ for (const appearance of ['light', 'dark'] as const) {
     )
     expect(fades[0]).toBeLessThanOrEqual(state.top)
     expect(fades[1]).toBeLessThanOrEqual(state.gap)
-    await expect(window).toHaveScreenshot(`short-viewport-${appearance}.png`)
+    // Native overlay scrollbars fade independently of CSS animations. Keep both context fades
+    // in the capture, excluding only the right edge where the scrollbar thumb is drawn.
+    const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+    await expect(window).toHaveScreenshot(`short-viewport-${appearance}.png`, { clip })
   })
 }
