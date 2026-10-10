@@ -46,7 +46,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | --- | --- | --- | --- | --- |
 | PS-1 | Shared section scanner accepts numbered `####` headings; `check:docs` enforces block and leaf-section limits on PRODUCT.md with shrinking per-section exemptions; a marker may not cite a section that has numbered children and no text of its own | — | `npm run check`; unit tests; exact sizes and longest sentence recorded here; a trial over-limit paragraph fails the guard | Complete |
 | PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Complete |
-| PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Ready |
+| PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Complete |
 | PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Planned |
 | PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Planned |
 | PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Planned |
@@ -59,7 +59,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-3. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-4. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -83,6 +83,35 @@ reported no meaningful issues after comment/fence edge fixes and explicit
 documentation of the prescribed punctuation and order limits. PRODUCT.md stays
 unchanged; no product decisions or unresolved wording questions arose. PS-3 is
 a larger restructuring task and starts in a fresh session.
+
+PS-3 completed (2026-10-10): §20.2 now has 27 unnumbered `####` subsections of
+one-rule items; no sentence was reworded. `npm run check:docs -- --verbatim
+ff29955 --allow-added 6` reported before 1,479, after 1,485, unchanged 1,479,
+removed 0, added 6; the six added clauses are the lead-in "Normal mode also
+supports" (the original "Normal mode supports:" opens the first list). The `20.2`
+block exemption is deleted; no §20.2 block exceeds 700 characters. Deviations
+from Appendix A, all keeping the original sentence order (S3 rule 3): the
+mouse-click sentence stays after the Insert-interruption sentence, under its own
+"Pointer Presses and Application Commands"; the Put, Join, and Fold commands and
+Text Objects and Surround Delimiters are separate subsections; "Local Vim
+Register" is its own final subsection and was not moved. Rule 2 exception: "These
+structural mutations are each one undoable command." is a separate last item of
+the whole-node Visual group, because joining it to the four preceding sentences
+would exceed 700 characters and joining it to the put sentences would narrow its
+scope. PRODUCT.md stays the only behavior source; no product decision was made.
+
+Subsections for PS-4, in document order (Appendix A number in parentheses): Toggle
+and Preference (1); Standard Editing While Vim Is Disabled (2); Switching Vim
+Editing On and Off (3); Modes and Escape (4); Pending Replace and Insert
+Sessions (5); Pointer Presses and Application Commands (4, 5); Mode Indicator and
+Status Bar (6); Drops and Whole-Node Visual Mode (7); Motions and Undo (8);
+Insert, Node Creation and Character Edits (9); Operators (10); Node Commands
+(11); Put Commands, Join Commands, and Fold Commands (12); Counts (13); Text
+Objects and Surround Delimiters (14, two subsections); Dot Repeat (15); Character
+Visual Mode (16); Registers and Puts in Normal Mode (17); System Clipboard (18);
+Whole-Node Visual Mode and Shifts (19); Tab and Shift+Tab (20); Restoring a
+Selection with gv (21); Local Vim Register (17, 18); Unsupported Keys,
+Composition and Selection Offsets (22).
 
 ## Conventions
 
@@ -205,7 +234,8 @@ Seeds found by reading during planning; PS-9 and PS-10 complete the audit.
 
 ## Questions for the Product Owner
 
-None yet. Restructuring tasks add ambiguities here.
+* **Q1. "This section" inside §20.2 (PS-3).** Three sentences use "this section" meaning all of §20.2: "…defined outside this section…" and "The commands that exist only as Vim keys in this section…" under Standard Editing While Vim Is Disabled, and "The rest of this section describes the editor while Vim editing is enabled." under Switching Vim Editing On and Off. Once PS-4 numbers the subsections, a reader could take "this section" as the subsection. Decision D5 leaves the wording unchanged. The Product Owner can approve rewording to "§20.2" in PS-4, or accept the reading as is.
+* **Q2. Rules listed under "Normal mode also supports:" (PS-3, from review).** Two items state exclusions rather than commands: "In Visual modes `gp` and `gP` are not commands." (Put Commands) and "Character-wise Visual `J` and `gJ` are not commands." (end of the Visual `J` item, Join Commands). Under the lead-in they can be read as something Normal mode supports. "Counts follow the underlying motion…" and the case-command items beginning "A hyperlink's text…" and "`gu` takes the `u` key…" are rules that qualify the item above them. Fixing the first two needs a wording or lead-in change, which D5 forbids; the Product Owner can approve a lead-in such as "Normal mode supports these commands and rules:" or accept the reading.
 
 ## Risks
 

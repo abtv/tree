@@ -16,7 +16,6 @@ export const PRODUCT_BLOCK_EXEMPTIONS = new Set([
   '11',
   '13',
   '16.1',
-  '20.2',
   '20.5',
   '20.8',
   '20.9',
