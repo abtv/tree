@@ -494,7 +494,12 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     await dragToGap(window, 'b', 'b', 'top', 1)
     const movedRow = window.locator('.node-row[data-node-id="b"]')
     await expect(movedRow).toHaveClass(/node-row-drop-before/)
-    await expect(window.locator('.node-list')).toHaveScreenshot(`hierarchy-level-marker-${mode}-light.png`)
+    const captureNodeList = async (appearance: 'light' | 'dark') => {
+      const bounds = await window.locator('.node-list').boundingBox()
+      if (bounds === null) throw new Error('The node list was not visible for its screenshot.')
+      await expect(window).toHaveScreenshot(`hierarchy-level-marker-${mode}-${appearance}.png`, { clip: bounds })
+    }
+    await captureNodeList('light')
 
     const geometry = await movedRow.evaluate((row) => {
       const listBox = row.closest('.node-list')!.getBoundingClientRect()
@@ -504,7 +509,7 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     })
     expect(geometry.rowLeft + geometry.markerLeft).toBeCloseTo(geometry.listLeft + 48, 0)
     await window.emulateMedia({ colorScheme: 'dark' })
-    await expect(window.locator('.node-list')).toHaveScreenshot(`hierarchy-level-marker-${mode}-dark.png`)
+    await captureNodeList('dark')
     await window.emulateMedia({ colorScheme: 'light' })
     await window.mouse.up()
 

@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [E2E screenshot stability follow-ups](e2e-screenshot-stability.md) | Awaiting Product Owner confirmation | Confirm no further tasks remain; then retire the completed batch |
+| [E2E screenshot stability follow-ups](e2e-screenshot-stability.md) | Awaiting Product Owner confirmation | Retire the completed batch |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

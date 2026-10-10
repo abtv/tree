@@ -2,15 +2,16 @@
 
 ## Objective and scope
 
-Stabilize the screenshot and scroll-settlement cases identified in the read-only follow-up scans after commit `bb3da39`. The Product Owner authorized all reported candidates on 2026-10-11. This batch changes E2E capture mechanics and waits only; it does not change application behavior.
+Stabilize the screenshot and scroll-settlement cases identified in the read-only follow-up scans after commit `bb3da39`. The Product Owner authorized the original six candidates on 2026-10-11 and later authorized the hierarchy level-marker captures. This batch changes E2E capture mechanics and waits only; it does not change application behavior.
 
 Source of truth: [E2E validation and visual-regression workflow](../docs/DEVELOPMENT.md#9-full-validation), [E2E fixture rules](../e2e/AGENTS.md).
 
 ## Authorization and decisions
 
 - Authorized: exclude transient scrollbar pixels from full-window captures; capture affected Vim and drag-and-drop screenshots from measured element bounds instead of asking Playwright to scroll locators into view; wait for wheel scrolling to become quiet before releasing delayed image loading.
+- Also authorized: capture the light and dark hierarchy level-marker screenshots by measured `.node-list` bounds while the drag remains active.
 - No Product Owner decisions are reserved.
-- No unverified remainder exists within the candidates reported and authorized so far.
+- The other lower-confidence candidates identified in discussion remain outside the authorized scope.
 
 ## Tasks
 
@@ -22,6 +23,7 @@ Source of truth: [E2E validation and visual-regression workflow](../docs/DEVELOP
 | S4 | Capture Vim image-caret screenshots from measured node-list bounds. | S3 | `e2e/vim-image-caret.spec.ts`; its screenshot baselines if changed | The focused test passes with light/dark baseline comparison and preserves the focused and peer image-caret states. | Low Risk | Done |
 | S5 | Capture hierarchy drag feedback screenshots from measured node-list bounds. | S4 | `e2e/drag-and-drop-hierarchy.spec.ts`; its screenshot baselines if changed | The focused test passes in both editing modes and appearances; existing captures compare unchanged. | Low Risk | Done |
 | S6 | Replace the fixed post-wheel delay with a quiet-scroll wait before releasing image loading. | S5 | `e2e/scroll-selection.spec.ts` | The focused test passes three consecutive runs and still proves image loading does not pull the viewport back after wheel input. | Low Risk | Done |
+| S7 | Capture the light and dark hierarchy level-marker screenshots from measured `.node-list` bounds during the active drag. | S6 | `e2e/drag-and-drop-hierarchy.spec.ts`; its screenshot baselines if changed | The focused test passes three times in both editing modes; existing screenshot comparisons preserve the drop-before marker. | Low Risk | Done |
 
 ## Findings and status
 
@@ -31,8 +33,8 @@ Source of truth: [E2E validation and visual-regression workflow](../docs/DEVELOP
 - S1 completed in the current worktree: both editing modes pass the focused test with snapshot comparison, and both updated images were visually inspected.
 - S2 completed in the current worktree: the focused undo screenshot test passes with baseline comparison in light and dark appearance. The existing baselines were inspected; capture dimensions and image-caret rendering are unchanged.
 - The Product Owner authorized the four additional candidates after the follow-up scan: a second scrolled full-window screenshot, two groups of locator screenshots, and the fixed wheel wait.
-- Current status: all six authorized tasks are done. Keep this review-batch record until the Product Owner confirms no further tasks remain; then remove this file and its index row in a separate completion commit.
+- Current status: all authorized tasks are done. The Product Owner limited the final follow-up to S7, so the lower-confidence candidates remain excluded. Remove this file and its index row in a separate completion commit.
 
 ## Resume prompt
 
-All six authorized E2E stability tasks are complete. Ask the Product Owner to confirm no further tasks remain before removing this plan and its index row in a separate completion commit.
+All authorized E2E stability follow-ups are complete. The Product Owner excluded the lower-confidence candidates identified in discussion. Remove this plan and its index row in a separate completion commit.
