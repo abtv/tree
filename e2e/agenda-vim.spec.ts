@@ -68,6 +68,51 @@ function seed(userDataDir: string): void {
 }
 
 test.describe('Agenda Vim commands', () => {
+  test('lands boundary and viewport motions on destination text before its image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ ...node('image', '  2026-10-14 Image'), attachment: { id: 'image', mimeType: 'image/png' } }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'image' },
+    })
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    writeFileSync(
+      attachmentPath(userDataDir, 'image'),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    )
+    const { window } = await launchTree(userDataDir)
+    await openAndSelect(window, nodeKey(10, 14, 'image'))
+    await row(window, dayKey(10, 14)).click()
+    await window.keyboard.press('Meta+.')
+    const editor = row(window, nodeKey(10, 14, 'image')).locator('.node-input')
+    await editor.click()
+    await window.keyboard.press('Escape')
+    const cursor = () =>
+      editor.evaluate((element) => {
+        const selection = document.getSelection()!
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return range.toString().length
+      })
+    for (const keys of [['G'], ['L'], ['Control+d']]) {
+      await setCursor(editor, 8)
+      for (const key of keys) await window.keyboard.press(key)
+      await expect(editor).toBeFocused()
+      await expect.poll(cursor).toBe(2)
+      await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    }
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.press('Control+d')
+    await expect(editor).toBeFocused()
+    await expect.poll(cursor).toBe(2)
+  })
+
   // @requirement PRODUCT.md §23.4
   test('vertical navigation enters and leaves images and preserves a clamped image return position', async ({
     userDataDir,
@@ -142,6 +187,9 @@ test.describe('Agenda Vim commands', () => {
       [...document.querySelectorAll('.agenda-row')].indexOf(element),
     )
     await window.keyboard.type(`${imageIndex + 1}G`)
+    await expect(image).not.toHaveClass(/attachment-image-caret/)
+    expect(await offset()).toBe(0)
+    await window.keyboard.press('j')
     await expect(image).toHaveClass(/attachment-image-caret/)
     await window.keyboard.press('L')
     await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')

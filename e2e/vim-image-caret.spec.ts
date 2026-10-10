@@ -33,6 +33,24 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: image caret', () => {
+  test('uses the image only for textless boundary and viewport destinations', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'picture', text: '', children: [], attachment: { id: 'image', mimeType: 'image/png' } }],
+      },
+      location: { currentParentId: 'picture', selectedNodeId: 'picture' },
+    })
+    seedAttachmentImage(userDataDir, 'image')
+    const { window } = await launchTree(userDataDir)
+    const input = window.locator('.node-input')
+    for (const keys of [['g', 'g'], ['G'], ['H'], ['M'], ['L'], ['Control+d'], ['Control+u']]) {
+      for (const key of keys) await window.keyboard.press(key)
+      await expect(input).toBeFocused()
+      await expect(input).toHaveClass(/node-input-image-caret/)
+      await expect(input).toHaveJSProperty('selectionStart', 0)
+    }
+  })
+
   test('replays gp onto an image and a Visual shift without losing the image caret', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -510,7 +528,7 @@ test.describe('Vim editing: image caret', () => {
     await expect.poll(async () => (await next.inputValue()).length).toBe(3)
   })
 
-  test('moves G to the image on the last node when it has one', async ({ userDataDir }) => {
+  test('moves G to text before the last node image', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -526,10 +544,10 @@ test.describe('Vim editing: image caret', () => {
     await window.keyboard.press('G')
 
     await expect(node(window, 2)).toBeFocused()
-    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 4)
-    await expect(node(window, 2)).toHaveJSProperty('selectionEnd', 4)
-    await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
-    await expect(window.locator('.node-row[data-node-id="last"] .attachment-image-caret')).toHaveCount(1)
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 2)).toHaveJSProperty('selectionEnd', 1)
+    await expect(node(window, 2)).not.toHaveClass(/node-input-image-caret/)
+    await expect(window.locator('.node-row[data-node-id="last"] .attachment-image-caret')).toHaveCount(0)
   })
 
   test('moves from a root image to the next node text caret', async ({ userDataDir }) => {
@@ -683,6 +701,8 @@ test.describe('Vim editing: image caret', () => {
 
     await editor.press('G')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
+    await expect(node(window, 2)).not.toHaveClass(/node-input-image-caret/)
+    await node(window, 2).press('j')
     await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-peer-dark.png')
     await window.emulateMedia({ colorScheme: 'light' })
@@ -768,7 +788,7 @@ test.describe('Vim editing: image caret', () => {
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
   })
 
-  test('synchronizes image caret destinations after gg and viewport motions', async ({ userDataDir }) => {
+  test('synchronizes text caret destinations after gg and viewport motions', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -788,13 +808,23 @@ test.describe('Vim editing: image caret', () => {
     await last.press('g')
     await last.press('g')
     await expect(first).toBeFocused()
-    await expect(first).toHaveClass(/node-input-image-caret/)
-    await expect(window.locator('.node-row[data-node-id="first"] .attachment-image-caret')).toHaveCount(1)
+    await expect(first).not.toHaveClass(/node-input-image-caret/)
+    await expect(first).toHaveJSProperty('selectionStart', 0)
+    await expect(window.locator('.node-row[data-node-id="first"] .attachment-image-caret')).toHaveCount(0)
 
     await first.press('G')
     await last.press('H')
     await expect(first).toBeFocused()
-    await expect(first).toHaveClass(/node-input-image-caret/)
+    await expect(first).not.toHaveClass(/node-input-image-caret/)
+    await expect(first).toHaveJSProperty('selectionStart', 0)
+    await first.press('Control+d')
+    await expect(last).toBeFocused()
+    await expect(last).toHaveJSProperty('selectionStart', 0)
+    await expect(last).not.toHaveClass(/node-input-image-caret/)
+    await last.press('Control+u')
+    await expect(first).toBeFocused()
+    await expect(first).toHaveJSProperty('selectionStart', 0)
+    await window.screenshot({ path: 'test-results/nr1-text-before-image.png' })
   })
 
   test('does not restore a different image’s saved text position after G', async ({ userDataDir }) => {
@@ -816,10 +846,13 @@ test.describe('Vim editing: image caret', () => {
     await setCursor(first, 1)
     await first.press('j')
     await first.press('G')
+    await expect(last).not.toHaveClass(/node-input-image-caret/)
+    await expect(last).toHaveJSProperty('selectionStart', 0)
+    await last.press('j')
     await expect(last).toHaveClass(/node-input-image-caret/)
-    await last.press('k')
-    await expect(last).toHaveJSProperty('selectionStart', 5)
-    await expect(last).toHaveJSProperty('selectionEnd', 6)
+    await last.press('h')
+    await expect(last).toHaveJSProperty('selectionStart', 0)
+    await expect(last).toHaveJSProperty('selectionEnd', 1)
   })
 
   test('moves k onto an attached current-parent image from its first child', async ({ userDataDir }) => {

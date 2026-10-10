@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
 import { vimNormalClipboardContent, vimSelectionClipboardContent } from '../application/vim-clipboard-content'
-import { cloneNode, displayedNodes, linkAtPosition, locateNode, requireNode, type TreeNode } from '../domain/document'
+import { cloneNode, linkAtPosition, locateNode, type TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, setCaret, setSelectionRange } from './editor-dom'
 import {
   calculateSurround,
@@ -835,18 +835,6 @@ export function handleVimKey(
     // digits pending would let the following key be read as a command continuation.
     commandState.pending = { count: pending.count, motionCount: '', prefix: 'z' }
   } else if (!visual && event.key === 'G') {
-    const state = store.getSnapshot()
-    if (state.status === 'ready') {
-      // `G` targets the focused node's own actual sibling level, not the current parent's
-      // children, except when the editable current-parent heading itself is selected.
-      const nodes =
-        state.location.selectedNodeId === state.location.currentParentId
-          ? displayedNodes(state.document, state.location.currentParentId)
-          : requireNode(state.document, state.location.selectedNodeId).siblings
-      const targetIndex = pending.count === '' ? nodes.length - 1 : Math.min(nodes.length - 1, Math.max(0, count - 1))
-      const target = nodes[targetIndex]
-      if (target !== undefined) vim.setImageCaret(target.id, target.attachment !== undefined)
-    }
     if (pending.count === '') vim.moveBoundary('last', cursor)
     else vim.moveBoundary('last', cursor, count)
   } else if (!visual && event.key === 'u') {

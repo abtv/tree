@@ -1071,12 +1071,13 @@ At or below 500 visible rows, the list renders every row, including inline desce
 
 Normal mode supports:
 
-* `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last visible row of the location (or the counted visible row) and its image when it has one.
+* `gg` to focus the current parent when one exists, or the first displayed root node at the root level, and `G` to select the last visible row of the location (or the counted visible row).
+* `gg`, `G`, `H`, `M`, `L`, `Ctrl+d`, and `Ctrl+u` place the caret on the destination's first non-whitespace text character. An attached image is the destination only when the node has no text; an empty node without an image uses its sole insertion position. These commands clear any saved image return position.
 * `h` and `l` to move by character within the current node; when the node has an image, it acts as a final character after the text, and an image-only node's sole character is its image.
 * `j` and `k` to move between the location's visible rows, walking through an expanded node's visible children rather than skipping them; for a node with text and an image, the text and image are separate rows, so `j` moves from text to image and `k` returns to the previous text position; when `k` moves from the first child to a current parent with an image, the image is the destination; `j` on the image moves to the next visible row, while `k` on an image-only node moves to the previous visible row.
 * When no previous visible row exists and there is no current parent, `k` on an image-only node leaves it selected with its image caret active.
 * Only one caret is visible at a time: the text caret is hidden while the image caret is active.
-* `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport, without scrolling: a node clipped by the viewport edge, or lying within the edge context of §20.8, is skipped while any node lies wholly outside it, and the remaining nodes are used only when none does. As line motions they place the caret on the destination's first non-blank character, or on its image when it has one.
+* `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport, without scrolling: a node clipped by the viewport edge, or lying within the edge context of §20.8, is skipped while any node lies wholly outside it, and the remaining nodes are used only when none does.
 * `{count}H` selects the count-th visible node from the top and `{count}L` the count-th from the bottom, stopping at the last or first visible node when the count exceeds them; `M` ignores a count, as in Vim.
 * `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows.
 * `u` to undo and `Ctrl+r` to redo the most recent undoable change.
@@ -1489,7 +1490,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 * In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count, caret and viewport rules as Tree.
 * Vertical movement preserves the horizontal text offset, clamped to the destination text, including when crossing day containers, gaps and contextual ancestors.
 * Normal `j`/`k` treat a direct match's attached image as Tree does: moving down from text enters the image and records the text caret, moving up from that image restores it, and arriving from below activates the image with the originating text position remembered. A counted motion applies the originating node's image transition first, then follows Tree's counted row and column rules for the remaining steps.
-* `H`/`M`/`L` land at the first nonblank character, or on a direct match's image; `G` also lands on the destination image when one exists.
+* `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` land on the destination's first non-whitespace text character, using a direct match's image only when it has no text, as in §20.2.9.
 * A vertical motion that clamps at the current row preserves its caret and image return position.
 * Clicking a row selects and focuses it with the same focus dot.
 * `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda.

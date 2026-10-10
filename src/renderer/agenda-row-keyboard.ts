@@ -158,12 +158,8 @@ export function createAgendaKeyDownHandler({
         select(
           rows.findIndex((candidate) => candidate.key === key),
           lineMotion,
-          lineMotion
-            ? hasImage(destination)
-              ? textOf(destination).length
-              : firstNonWhitespace(textOf(destination))
-            : sourceCursor(),
-          lineMotion,
+          firstNonWhitespace(textOf(destination)),
+          true,
         )
       }
     }
@@ -357,10 +353,12 @@ export function createAgendaKeyDownHandler({
       vertical('down', count)
     else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined))
       vertical('up', count)
-    else if (normal && event.key === 'g' && pending?.prefix === 'g') select(count - 1)
-    else if (normal && event.key === 'G' && pending?.prefix === undefined) {
+    else if (normal && event.key === 'g' && pending?.prefix === 'g') {
+      const target = Math.min(rows.length - 1, count - 1)
+      select(target, false, firstNonWhitespace(textOf(rows[target]!)), true)
+    } else if (normal && event.key === 'G' && pending?.prefix === undefined) {
       const target = Math.max(0, Math.min(rows.length - 1, pending?.count ? count - 1 : rows.length - 1))
-      select(target, false, hasImage(rows[target]!) ? textOf(rows[target]!).length : sourceCursor(), true)
+      select(target, false, firstNonWhitespace(textOf(rows[target]!)), true)
     } else if (normal && ['H', 'M', 'L'].includes(event.key) && pending?.prefix === undefined) {
       viewportMotion(event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', count)
     }

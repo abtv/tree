@@ -80,13 +80,11 @@ export function moveViewportSelection(
   const choiceViewport = rows.some((row) => row.top >= inner.top && row.bottom <= inner.bottom) ? inner : viewport
   const targetId = viewportMotionTarget(rows, choiceViewport, nodeId, motion, count)
   if (targetId !== undefined) {
-    // H, M, and L are line motions: they land on the first non-blank character, or on the image of a
-    // node that has one (the position after its text), where the half-page motions keep the caret column.
+    // Vim's default startofline rule applies to both line and half-page motions.
     const state = store.getSnapshot()
     let column = cursor
-    if (lineMotion && state.status === 'ready') {
-      const { text, attachment } = requireNode(state.document, targetId).node
-      column = attachment === undefined ? firstNonWhitespace(text) : text.length
+    if (state.status === 'ready') {
+      column = firstNonWhitespace(requireNode(state.document, targetId).node.text)
     }
     deps.beforeSelect?.(lineMotion)
     store.selectNode(targetId, column)

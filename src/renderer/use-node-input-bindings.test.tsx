@@ -457,8 +457,8 @@ describe('useNodeInputBindings', () => {
     ['H', false, 'a', 0],
     ['M', false, 'b', 0],
     ['L', false, 'c', 0],
-    ['d', true, 'c', 2],
-    ['u', true, 'a', 2],
+    ['d', true, 'c', 0],
+    ['u', true, 'a', 0],
   ] as const)('moves the viewport caret with %s, Ctrl: %s', async (key, ctrlKey, expected, column) => {
     const f = await fixture({
       document: { roots: [node('a', 'Alpha'), node('b', 'Beta'), node('c', 'Gamma'), node('off', 'Offscreen')] },
@@ -509,7 +509,7 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().location.selectedNodeId).toBe(expected)
   })
 
-  it('lands H on the image of a destination that has one', async () => {
+  it('lands H on text before a destination image', async () => {
     const withImage = { ...image('  text'), id: 'a' }
     const f = await fixture({
       document: { roots: [withImage, node('b', 'B')] },
@@ -526,7 +526,8 @@ describe('useNodeInputBindings', () => {
     }
     f.press('H')
     expect(f.snapshot().location.selectedNodeId).toBe('a')
-    expect(f.result.current.imageCaretNodeId).toBe('a')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    expect(getCaret(f.input('a'))).toBe(2)
   })
 
   it('lands H, M, and L on the first non-blank character of the destination', async () => {

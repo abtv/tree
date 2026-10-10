@@ -183,8 +183,8 @@ describe('viewport selection dispatch', () => {
     ['top', 'a', 2],
     ['middle', 'b', 2],
     ['bottom', 'd', 3],
-    ['half-down', 'd', 9],
-    ['half-up', 'a', 9],
+    ['half-down', 'd', 3],
+    ['half-up', 'a', 2],
   ])('applies the %s column rule and synchronizes after selection', (motion, target, column) => {
     mountRows(rows)
     const store = createEditorStoreDouble({
@@ -213,12 +213,12 @@ describe('viewport selection dispatch', () => {
   })
 
   it.each<[VimViewportMotion, number]>([
-    ['top', 5],
-    ['middle', 5],
-    ['bottom', 5],
-    ['half-up', 9],
-    ['half-down', 9],
-  ])('lands %s on an attached image only for a line motion', (motion, column) => {
+    ['top', 2],
+    ['middle', 2],
+    ['bottom', 2],
+    ['half-up', 2],
+    ['half-down', 2],
+  ])('lands %s on text before an attached image', (motion, column) => {
     mountRows([{ nodeId: 'image', top: 0, bottom: 20 }])
     const store = createEditorStoreDouble({
       snapshot: {

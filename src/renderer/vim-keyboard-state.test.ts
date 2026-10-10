@@ -188,6 +188,29 @@ describe('session and command ports', () => {
     expect(f.deps.syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
 
+  it('does not publish a boundary caret while unavailable or without a destination', async () => {
+    const unavailable = await fixture(undefined, 'hello', true)
+    unavailable.vim.moveBoundary('last', 2)
+    expect(unavailable.deps.syncImageCaretToFocus).not.toHaveBeenCalled()
+    const f = await fixture()
+    f.store.enter()
+    f.store.selectNode('child', 0)
+    f.store.enter()
+    f.vim.moveBoundary('last', 2)
+    expect(f.deps.syncImageCaretToFocus).not.toHaveBeenCalled()
+  })
+
+  it.each(['parent', 'last'] as const)(
+    'lands the %s boundary on the first nonblank destination character',
+    async (boundary) => {
+      const f = await fixture(undefined, '  heading')
+      if (boundary === 'parent') f.store.enter()
+      f.vim.moveBoundary(boundary, 7)
+      expect(f.snapshot().focus?.cursor).toBe(2)
+      expect(f.deps.syncImageCaretToFocus).toHaveBeenCalledOnce()
+    },
+  )
+
   it('forwards navigation, attachment, caret and Visual command arguments', async () => {
     const f = await fixture()
     const caret = { cursor: 2, imageActive: false }

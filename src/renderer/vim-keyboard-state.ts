@@ -1,4 +1,5 @@
 import type { EditorStore } from '../application/editor-store'
+import { moveSelectionBoundaryTransition } from '../application/editor-command-transitions'
 import { requireNode, type TreeNode } from '../domain/document'
 import { setCaret, setEditableText } from './editor-dom'
 import type { NodeVisualSelection, PendingCaret } from './node-input-types'
@@ -12,6 +13,7 @@ import {
 import { applyReplaceKey, beginInsertSession, beginReplaceSession, type VimEditSessionState } from './vim-edit-session'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { rememberNodeRange } from './vim-visual-memory'
+import { firstNonWhitespace } from './vim-editing'
 
 interface VimKeyboardStateDeps {
   store: EditorStore
@@ -113,7 +115,19 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
         : { cursor, imageActive, imageTextReturnCursor: undefined },
     applyCaretState,
     moveBoundary: (boundary, cursor, count) => {
-      store.moveSelectionBoundary(boundary, cursor, count)
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      const target = moveSelectionBoundaryTransition(
+        state.document,
+        state.location,
+        store.getVisibleRows(),
+        boundary,
+        cursor,
+        count,
+      )
+      if (target === undefined) return
+      const destination = requireNode(state.document, target.nodeId).node
+      store.selectNode(target.nodeId, firstNonWhitespace(destination.text))
       syncImageCaretToFocus()
     },
     moveViewport: moveVimViewport,
