@@ -66,7 +66,10 @@ describeForEachEditingMode('Agenda live occurrences', ({ mode, screenshotName })
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await window.mouse.move(600, 20)
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-live-mirror-${appearance}.png`))
+      // Native overlay scrollbars fade independently of CSS animations. Exclude the right edge,
+      // where the scrollbar thumb may or may not be drawn during the capture.
+      const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+      await expect(window).toHaveScreenshot(screenshotName(`agenda-live-mirror-${appearance}.png`), { clip })
     }
     await input.evaluate((element) => {
       ;(globalThis as unknown as { originalAgendaInput: Element }).originalAgendaInput = element
