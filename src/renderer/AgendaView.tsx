@@ -239,7 +239,11 @@ export function AgendaView({
   useLayoutEffect(() => {
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
-    if (element.querySelector('.node-input') === null) element.focus({ preventScroll: true })
+    if (element.querySelector('.node-input') === null) {
+      element.focus({ preventScroll: true })
+      // The editor that lost focus keeps its native selection, which would paint a second caret.
+      globalThis.getSelection()?.removeAllRanges()
+    }
     if (skipReveal.current) viewportReveal.cancel()
     else if (reveal.current !== 'none')
       viewportReveal.begin(element, reveal.current === 'keyboard', () => {

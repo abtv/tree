@@ -90,4 +90,34 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode }) 
     await expectCaret(work)
     await expectNoCaret(gap)
   })
+
+  // @requirement PRODUCT.md §23.4
+  test('leaves no second caret in the editor that selection moved away from', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [leaf('item', '2026-10-09 Item'), leaf('other', '2026-10-10 Other')] },
+      location: { currentParentId: null, selectedNodeId: 'item' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.keyboard.press('Escape')
+    const selected = window.locator('.agenda-row[aria-selected="true"]')
+    const nativeSelectionInEditor = (): Promise<boolean> =>
+      window.evaluate(() => {
+        const selection = document.getSelection()
+        return (
+          selection !== null &&
+          selection.rangeCount > 0 &&
+          selection.anchorNode?.parentElement?.closest('.node-input') != null
+        )
+      })
+    await window.keyboard.press('ArrowDown')
+    await window.keyboard.press('ArrowDown')
+    await expect(selected).toHaveAttribute('data-node-id', 'item')
+    expect(await nativeSelectionInEditor()).toBe(true)
+    for (const key of mode === 'vim' ? ['k'] : ['ArrowUp']) await window.keyboard.press(key)
+    await expect(selected).toHaveClass(/agenda-row-day/u)
+    await expect(selected).toBeFocused()
+    expect(await nativeSelectionInEditor()).toBe(false)
+  })
 })
