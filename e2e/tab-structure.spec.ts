@@ -34,6 +34,7 @@ const imageBytes = Buffer.from(
   'base64',
 )
 
+// @requirement PRODUCT.md §20.2.24
 describeForEachEditingMode('node editor Tab structure commands', ({ mode }) => {
   const states =
     mode === 'vim' ? (['normal', 'insert', 'replace', 'visual', 'visual-node'] as const) : (['standard'] as const)

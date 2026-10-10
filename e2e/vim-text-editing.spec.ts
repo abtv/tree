@@ -30,6 +30,7 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: text editing', () => {
+  // @requirement PRODUCT.md §20.2.17
   test('uses word, quote, and bracket text objects in Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one (two) "three"', children: [] }] },
@@ -57,7 +58,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('one  "four"')
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.4
   test('switches modes and applies Normal-mode motions and edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -82,6 +83,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('one Two')
   })
 
+  // @requirement PRODUCT.md §20.2.9
   test('undoes with u and redoes with Ctrl+r in Normal mode', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -249,6 +251,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('qb')
   })
 
+  // @requirement PRODUCT.md §20.2.10
   test('A enters Insert mode at the end of the node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -281,6 +284,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('  Xone')
   })
 
+  // @requirement PRODUCT.md §20.2.21
   test('puts the local register after the current character with p', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -299,6 +303,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('abcab')
   })
 
+  // @requirement PRODUCT.md §20.2.16
   test('uses counted text operators while preserving the node and its subtree', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -342,6 +347,8 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('one.NEW NEW')
   })
 
+  // @requirement PRODUCT.md §20.2.10
+  // @requirement PRODUCT.md §20.2.11
   test('replaces, substitutes, and changes through the end of node text', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -365,6 +372,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('Ybc tai')
   })
 
+  // @requirement PRODUCT.md §20.2.19
   test('repeats inserted text and honors a count before dot', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
@@ -939,6 +947,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(rootEditor).toHaveValue('Root')
   })
 
+  // @requirement PRODUCT.md §20.2.18
   test('adds, changes, and deletes surrounding pairs in Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one two three', children: [] }] },
@@ -1046,7 +1055,8 @@ test.describe('Vim editing: text editing', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.11
+  // @requirement PRODUCT.md §20.2.20
   test('changes case with gu, gU, g~, and Visual ~ around a hyperlink', async ({ userDataDir }) => {
     const url = 'https://example.test/Page'
     const text = `alpha ${url} beta gamma`
@@ -1123,7 +1133,7 @@ test.describe('Vim editing: text editing', () => {
     await expectText(text)
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.13
   test('puts with gp and gP and leaves the caret on the character after the inserted text', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one two', children: [] }] },
@@ -1159,7 +1169,7 @@ test.describe('Vim editing: text editing', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.13
   test('selects the node after a gp subtree put, or the last copy when none follows', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -1197,7 +1207,8 @@ test.describe('Vim editing: text editing', () => {
     await expect(node(window, 5)).toBeFocused()
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.11
+  // @requirement PRODUCT.md §20.2.19
   test('yanks to the end of the node with Y without disturbing the repeatable change', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'one two three', children: [] }] },

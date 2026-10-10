@@ -1435,7 +1435,8 @@ describe('App', () => {
       return state.status === 'ready' ? state.document.roots[0]?.text : undefined
     }
 
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.1
+    // @requirement PRODUCT.md §20.2.2
     it('starts as a standard editor without the Vim mode indicator when Vim editing is disabled', async () => {
       const store = await seededRoot('abc')
       renderReact(<App initialVimEnabled={false} store={store} />)
@@ -1461,7 +1462,8 @@ describe('App', () => {
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('bc')
     })
 
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.1
+    // @requirement PRODUCT.md §20.2.3
     it('enables Vim editing in Normal mode, saves the choice, and keeps editor focus', async () => {
       const store = await seededRoot('abc')
       const setVimEnabled = vi.spyOn(window.treeApi, 'setVimEnabled')
@@ -1483,7 +1485,7 @@ describe('App', () => {
       expect(rootText(store)).toBe('ac')
     })
 
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.3
     it('commits a pending replacement as one edit when Vim editing is disabled', async () => {
       const store = await seededRoot('abc')
       const setVimEnabled = vi.spyOn(window.treeApi, 'setVimEnabled')
@@ -1506,7 +1508,7 @@ describe('App', () => {
       expect(rootText(store)).toBe('abc')
     })
 
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.3
     it('drops a whole-node Visual range and an unfinished command when Vim editing is disabled', async () => {
       const store = await seededRoot('abc')
       renderReact(<App initialVimEnabled store={store} />)
@@ -1530,7 +1532,7 @@ describe('App', () => {
     })
 
     // @requirement PRODUCT.md §2.1
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.3
     it('moves between the image caret and the Insert presentation when Vim editing switches', async () => {
       const store = await createSeededStore(
         { roots: [{ id: 'root', text: '', attachment: { id: 'root-image', mimeType: 'image/png' }, children: [] }] },
@@ -1571,7 +1573,7 @@ describe('App', () => {
   // observe; pointer and rendered-caret differences (D4, D5) and the status-bar layout (D6, covered
   // by the toggle block above) are exercised by the both-mode end-to-end specs.
   describe('standard editing counterparts', () => {
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.2
     it('starts in Insert mode with the caret when Vim editing is disabled', async () => {
       const store = createStore()
       await act(async () => {
@@ -1587,7 +1589,7 @@ describe('App', () => {
       expect(root.selectionEnd).toBe(0)
     })
 
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.2
     it('leaves the text and undo grouping unchanged on Escape when Vim editing is disabled', async () => {
       const store = createStore()
       await act(async () => {
@@ -1630,7 +1632,7 @@ describe('App', () => {
       expect(node).toHaveFocus()
     })
 
-    // @requirement PRODUCT.md §20.2
+    // @requirement PRODUCT.md §20.2.2
     it('routes Cmd+Backspace and Cmd+Z through the store when Vim editing is disabled', async () => {
       const store = await createSeededStore(
         {

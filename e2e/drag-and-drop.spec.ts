@@ -405,6 +405,7 @@ test.describe('drag and drop (mode-independent)', () => {
 })
 
 test.describe('drag and drop (Vim editing only)', () => {
+  // @requirement PRODUCT.md §20.2.6
   test('keeps Normal mode after clicking or moving a node with the mouse', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -438,7 +439,7 @@ test.describe('drag and drop (Vim editing only)', () => {
 test.describe('text selection highlight in standard editing', () => {
   test.use({ editingMode: 'standard' })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.5
   test('renders a multi-character text selection with the shared highlight pair in both appearances', async ({
     userDataDir,
   }) => {

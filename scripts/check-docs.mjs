@@ -25,7 +25,7 @@ export const PRODUCT_BLOCK_EXEMPTIONS = new Set([
   '23.11',
   '23.12',
 ])
-export const PRODUCT_SECTION_EXEMPTIONS = new Set(['20.2'])
+export const PRODUCT_SECTION_EXEMPTIONS = new Set()
 
 export function findOversizedProductText({
   content,

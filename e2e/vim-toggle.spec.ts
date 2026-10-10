@@ -19,7 +19,8 @@ const seed = {
 }
 
 test.describe('Vim editing toggle', () => {
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.1
+  // @requirement PRODUCT.md §20.2.2
   test('starts a first run with standard editing and no Vim mode indicator', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir, { vimPreference: 'saved' })
     const editor = node(window, 1)
@@ -88,7 +89,8 @@ test.describe('Vim editing toggle', () => {
     await expect.poll(() => readVimPreference(userDataDir)).toBe(false)
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.1
+  // @requirement PRODUCT.md §20.2.3
   test('switches Vim editing on and off, keeps the caret, and restores the choice after restart', async ({
     userDataDir,
   }) => {
@@ -123,7 +125,7 @@ test.describe('Vim editing toggle', () => {
     await expect(third.window.getByLabel('Vim mode')).toHaveCount(0)
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.3
   test('commits a pending replacement when Vim editing is switched off', async ({ userDataDir }) => {
     seedDocument(userDataDir, seed)
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })

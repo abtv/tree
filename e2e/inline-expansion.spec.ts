@@ -449,6 +449,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await expect(node(window, 1)).toBeFocused()
   })
 
+  // @requirement PRODUCT.md §20.2.15
   test('folds inline expansion with the Vim fold keys, moving the caret to the displayed ancestor it hides', async ({
     userDataDir,
   }) => {

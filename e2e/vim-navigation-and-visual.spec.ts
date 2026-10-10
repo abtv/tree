@@ -153,7 +153,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(window.locator('.node-row')).toHaveCount(9)
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.13
+  // @requirement PRODUCT.md §20.2.19
   test('puts a subtree as the first child of a node with children, like o, and repeats it', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -246,6 +247,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect.poll(() => nodeTexts(window)).toEqual(['red', 'redred', 'redred', 'changed', 'last', 'end'])
   })
 
+  // @requirement PRODUCT.md §20.2.10
   test('uses o to create and focus a child node', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -302,6 +304,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 1)
   })
 
+  // @requirement PRODUCT.md §20.2.16
   test('applies counts to node motions and subtree puts', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -406,7 +409,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toBeFocused()
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.9
   for (const nested of [false, true]) {
     test(`scrolls to the first row with gg after wheel scrolling away (${nested ? 'nested' : 'top level'})`, async ({
       userDataDir,
@@ -497,6 +500,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toHaveValue('C')
   })
 
+  // @requirement PRODUCT.md §20.2.23
   test('selects complete sibling subtrees with V and repeats their deletion', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -525,6 +529,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 2)).toHaveValue('D')
   })
 
+  // @requirement PRODUCT.md §20.2.20
   test('uses the whole-node yellow highlight for character-wise Visual mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'Visual selection', children: [] }] },
@@ -1122,6 +1127,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     expect((await selectedCharacter())?.height).toBeLessThanOrEqual(21)
   })
 
+  // @requirement PRODUCT.md §20.2.12
   test('leaves the current node with Ctrl+o', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -1576,6 +1582,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
   })
 
+  // @requirement PRODUCT.md §20.2.21
   test('yanks and puts a node subtree with yy, p, and P', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -1793,6 +1800,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toHaveValue('Bravo')
   })
 
+  // @requirement PRODUCT.md §20.2.6
   test('drops a pending Normal-mode command before Cmd+A and undo', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -2009,6 +2017,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(window.getByRole('alert')).toHaveCount(0)
   })
 
+  // @requirement PRODUCT.md §20.2.25
   test('restores the latest whole-node Visual selection with gv and ignores one that was invalidated', async ({
     userDataDir,
   }) => {
@@ -2094,7 +2103,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toHaveValue('f bar')
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.25
+  // @requirement PRODUCT.md §20.2.27
   test('preserves backward rich-text Visual direction through idle observation and gv', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -2178,6 +2188,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
   })
 
+  // @requirement PRODUCT.md §20.2.11
   test('deletes, yanks, and changes sibling subtrees with dj, d2j, dk, yj, and cj, each as one undo', async ({
     userDataDir,
   }) => {
@@ -2367,6 +2378,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 5)
   })
 
+  // @requirement PRODUCT.md §20.2.6
   test('exits whole-node Visual on a breadcrumb click and an enter-control click', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

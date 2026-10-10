@@ -47,7 +47,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-1 | Shared section scanner accepts numbered `####` headings; `check:docs` enforces block and leaf-section limits on PRODUCT.md with shrinking per-section exemptions; a marker may not cite a section that has numbered children and no text of its own | — | `npm run check`; unit tests; exact sizes and longest sentence recorded here; a trial over-limit paragraph fails the guard | Complete |
 | PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Complete |
 | PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Complete |
-| PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Planned |
+| PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Complete |
 | PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Planned |
 | PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Planned |
 | PS-7 | Batch B split verbatim: §20.5, §20.8, §20.9, §23.2, §23.4, §23.5, §23.11, §23.12 | PS-6 | Same as PS-6 | Planned |
@@ -59,7 +59,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-4. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-5. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -100,18 +100,33 @@ the whole-node Visual group, because joining it to the four preceding sentences
 would exceed 700 characters and joining it to the put sentences would narrow its
 scope. PRODUCT.md stays the only behavior source; no product decision was made.
 
-Subsections for PS-4, in document order (Appendix A number in parentheses): Toggle
-and Preference (1); Standard Editing While Vim Is Disabled (2); Switching Vim
-Editing On and Off (3); Modes and Escape (4); Pending Replace and Insert
-Sessions (5); Pointer Presses and Application Commands (4, 5); Mode Indicator and
-Status Bar (6); Drops and Whole-Node Visual Mode (7); Motions and Undo (8);
-Insert, Node Creation and Character Edits (9); Operators (10); Node Commands
-(11); Put Commands, Join Commands, and Fold Commands (12); Counts (13); Text
-Objects and Surround Delimiters (14, two subsections); Dot Repeat (15); Character
-Visual Mode (16); Registers and Puts in Normal Mode (17); System Clipboard (18);
-Whole-Node Visual Mode and Shifts (19); Tab and Shift+Tab (20); Restoring a
-Selection with gv (21); Local Vim Register (17, 18); Unsupported Keys,
-Composition and Selection Offsets (22).
+PS-4 completed (2026-10-10): the 27 §20.2 headings are numbered 20.2.1 to
+20.2.27; no other PRODUCT.md text changed. The 33 `§20.2` markers were
+re-pointed and 28 markers were added to tests that had none, after reading each
+test's assertions; every subsection has at least one marker, so D8 did not apply.
+One marker left §20.2: the standard-editing selection-highlight test in
+`e2e/drag-and-drop.spec.ts` now cites §20.5, because it runs with Vim disabled
+and §20.2.20 states the highlight only for Vim selections. Boundary subsections,
+each with an `e2e/` marker: 20.2.1 (preference persistence), 20.2.5 (quit and
+close save), 20.2.8 (drag-and-drop), 20.2.12 (`Enter` opens a hyperlink through
+the Electron shell), 20.2.22 (system clipboard), and 20.2.26 (register separate
+from the system clipboard). 20.2.24 is not a boundary subsection but has an E2E
+marker. The `20.2` section exemption is deleted. Q1 stays open: its three "this
+section" sentences now sit in numbered subsections 20.2.2 and 20.2.3. Validation:
+static checks of `npm run check` passed (90 numbered requirements); its default
+concurrency run failed only the known date-parser wall-clock guard, which passed
+alone; `npm run test:coverage -- --maxWorkers=1` passed 3,220 tests with coverage,
+and `npm run build` passed. Independent review found no meaningful issues; it
+noted that the `editor-store.test.ts` "text-bearing structural creation" marker
+(§20.2.19) tests the store primitive behind repeated `o` and `O`, not `.` itself,
+and was kept because other tests cover §20.2.19 directly. Until PS-5 lands, the
+24 `§20.2.1 T…` code comments resolve to Toggle and Preference.
+
+Subsection numbers for PS-5 labels: T1 counts §20.2.16; T2 Visual shifts
+§20.2.23; T3 register exchange and puts §20.2.13 for `gp` and `gP`, §20.2.20 for
+character Visual `p` and `P`, §20.2.23 for whole-node Visual `p` and `P` (read the
+comment's code); T4 vertical operators and T5 text commands §20.2.11; T6 joins
+§20.2.14; T7 `gv` §20.2.25; T8 dot repeat §20.2.19.
 
 ## Conventions
 

@@ -77,7 +77,8 @@ async function harness(roots: TreeNode[]) {
   return { ...real, press, select, texts, dispose: () => (hook.unmount(), input.remove()) }
 }
 
-// @requirement PRODUCT.md §20.2
+// @requirement PRODUCT.md §20.2.13
+// @requirement PRODUCT.md §20.2.19
 describe('p on a node with children, repeated with .', () => {
   it('puts a yanked sibling subtree as the first child and repeats the rule on the current node', async () => {
     const f = await harness([parent(), { id: 'other', text: 'other', children: [] }])

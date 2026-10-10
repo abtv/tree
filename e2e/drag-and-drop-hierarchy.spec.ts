@@ -312,6 +312,7 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
 
 // @requirement PRODUCT.md §2.4
 // @requirement PRODUCT.md §11
+// @requirement PRODUCT.md §20.2.8
 describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   const states = mode === 'vim' ? ['normal', 'insert', 'replace', 'visual', 'visual-node'] : ['insert']
   for (const state of states) {

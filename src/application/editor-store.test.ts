@@ -246,7 +246,7 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toBe(before)
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.23
   describe('Visual shift (> and <)', () => {
     const roots: TreeNode[] = [
       { id: 'a', text: 'A', children: [] },
@@ -636,7 +636,7 @@ describe('EditorStore', () => {
     })
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.14
   // @requirement PRODUCT.md §16.2
   describe('sibling joins (J and gJ)', () => {
     const image = { id: 'image', mimeType: 'image/png' as const }
@@ -762,7 +762,7 @@ describe('EditorStore', () => {
   })
 
   // @requirement PRODUCT.md §16.1
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.19
   describe('text-bearing structural creation', () => {
     // Opaque text may equal a mutation placeholder; it must still be inserted and counted.
     it.each(['sibling', 'child'] as const)('inserts and counts literal diagnostic text in a %s', async (kind) => {
@@ -809,7 +809,7 @@ describe('EditorStore', () => {
     })
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.21
   it('does not fabricate source provenance for a subtree put with opaque ancestor IDs', async () => {
     const store = new EditorStore(
       loadedState(
@@ -851,7 +851,7 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root' }, { id: 'empty' }] } })
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.23
   it.each(['subtree', 'forest'] as const)('reports a source-descendant %s put independently', async (kind) => {
     const source: TreeNode = { id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }
     const store = new EditorStore(
@@ -1805,7 +1805,7 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'a' }, { id: 'b' }] } })
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.13
   describe('put on a node with children', () => {
     const source: TreeNode = { id: 'x', text: 'X', children: [{ id: 'x-child', text: 'XC', children: [] }] }
     const forest = { nodes: [source], sourceIds: ['x'] }

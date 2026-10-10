@@ -48,7 +48,7 @@ test.describe('sticky location toolbar', () => {
 })
 
 describeForEachEditingMode('sticky status bar', ({ mode }) => {
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.7
   test('keeps the status bar below the scrolling content', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

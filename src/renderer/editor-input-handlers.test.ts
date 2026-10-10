@@ -1362,7 +1362,7 @@ describe('editor keyboard handler', () => {
     expect(snapshot().document.roots).toEqual([node])
   })
 
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.13
   describe('p on a node with children', () => {
     const parent = (): TreeNode => ({
       id: 'parent',
@@ -2829,6 +2829,7 @@ describe('editor keyboard handler', () => {
     expect(store.paste).toHaveBeenCalledOnce()
   })
 
+  // @requirement PRODUCT.md §20.2.27
   it('blocks unsupported editing keys in Normal mode', () => {
     const store = createStore()
     const input = document.createElement('textarea')

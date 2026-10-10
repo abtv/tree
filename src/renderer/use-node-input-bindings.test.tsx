@@ -1396,6 +1396,7 @@ describe('useNodeInputBindings', () => {
     expect(empty.clipboard.content).toBeUndefined()
   })
 
+  // @requirement PRODUCT.md §20.2.26
   it('does not export vertical-operator yanks or text deletes to the system clipboard', async () => {
     const f = await fixture({ document: { roots: [node('a', 'ABC'), node('b', 'B')] } })
     f.press('y')

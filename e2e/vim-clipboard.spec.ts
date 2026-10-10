@@ -65,7 +65,7 @@ async function content(app: ElectronApplication) {
   })
 }
 
-// @requirement PRODUCT.md §20.2
+// @requirement PRODUCT.md §20.2.22
 test('copies dd text and images by the pre-deletion caret while preserving undo and local puts', async ({
   userDataDir,
 }) => {
@@ -139,7 +139,7 @@ test('keeps dd deletion and local put available when the native clipboard reject
   await expect.poll(() => nodeTexts(window)).toEqual(['', 'see https://example.com', '', 'Last'])
 })
 
-// @requirement PRODUCT.md §20.2
+// @requirement PRODUCT.md §20.2.22
 test('copies yy text and character Visual y as plain text while retaining local subtree puts', async ({
   userDataDir,
 }) => {
@@ -247,6 +247,7 @@ test('preserves the system clipboard for empty single nodes and counted multiple
   await expect.poll(() => content(app)).toMatchObject({ text: 'Last', html: false, image: null })
 })
 
+// @requirement PRODUCT.md §20.2.26
 test('reports native copy failure, preserves the old clipboard and local yank, then retries', async ({
   userDataDir,
 }) => {

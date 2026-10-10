@@ -970,7 +970,7 @@ At or below 500 visible rows, the list renders every row, including inline desce
 
 ### 20.2 Vim-Inspired Editing
 
-#### Toggle and Preference
+#### 20.2.1 Toggle and Preference
 
 * Vim-inspired editing is optional.
 * A `VIM` toggle in the status bar, immediately to the left of the always-on-top pin (§2.2), switches it on and off.
@@ -980,19 +980,19 @@ At or below 500 visible rows, the list renders every row, including inline desce
 * The choice persists across application restarts as a user preference stored apart from the document; it is not a document edit, creates no undo entry, and does not trigger a document save.
 * On first launch, and whenever no saved choice exists — including installations from before the toggle existed — Vim editing is disabled.
 
-#### Standard Editing While Vim Is Disabled
+#### 20.2.2 Standard Editing While Vim Is Disabled
 
 * While Vim editing is disabled, the editor is a standard text editor: it has no modes and no mode indicator, every key that inserts text inserts it, `Escape` does nothing, the caret is the normal thin text caret, and the application commands and editing behavior defined outside this section apply unchanged.
 * The commands that exist only as Vim keys in this section — among them the local Vim register with `yy` and `p`, whole-node Visual mode, the Normal-mode image caret, `.` repeat, `Ctrl+d` and `Ctrl+u`, and the `z` fold keys — are unavailable; `Cmd+E` (§2.4), `Cmd+Enter` (§2.5), and `Cmd+Y` (§17.1) remain.
 
-#### Switching Vim Editing On and Off
+#### 20.2.3 Switching Vim Editing On and Off
 
 * Disabling Vim editing completes a pending Replace-mode replacement as one undoable edit, discards an unfinished Normal-mode command, and clears a character-wise or whole-node Visual selection; a Visual selection or Normal-mode block caret collapses to its start while a text selection made in Insert mode is kept, and a Normal-mode caret on an attached image moves to the end of the node's text.
 * Enabling Vim editing enters Normal mode with the block caret on the character at the caret, clamped to the final text character or the attached image; a deliberate multi-character selection is kept instead.
 * The local Vim register, the last repeatable change, and the last character find belong to the running session and survive switching Vim editing off and on.
 * The rest of this section describes the editor while Vim editing is enabled.
 
-#### Modes and Escape
+#### 20.2.4 Modes and Escape
 
 * The editor starts in Normal mode, with a block caret on the current character.
 * When the current node is empty, Normal mode displays a non-blinking block caret at its only insertion position.
@@ -1000,31 +1000,31 @@ At or below 500 visible rows, the list renders every row, including inline desce
 * Pressing `R` enters Replace mode, where printable input overwrites existing characters and appends after the end of the node.
 * Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode.
 
-#### Pending Replace and Insert Sessions
+#### 20.2.5 Pending Replace and Insert Sessions
 
 * If the user invokes an application undo or redo shortcut, selects all text, cuts or pastes, toggles a strikethrough (§2.5), enters or leaves a node (including with the mouse), or deletes the selected node while Replace mode has a pending replacement, finish that replacement as one edit before running the command, then return to Normal mode; a select-all, cut, paste, or strikethrough toggle commits it without disturbing the visible text or selection, so the command still acts on what the user selected.
 * Quitting the application or closing the window while Replace mode has a pending replacement completes that replacement as one edit before the quit save, so the saved document includes it; a failed save leaves the replacement committed and the application open for a retry.
 * The same interruptions during Insert mode leave Insert mode active, since Insert already behaves like other application commands run normally within it.
 
-#### Pointer Presses and Application Commands
+#### 20.2.6 Pointer Presses and Application Commands
 
 * Mouse clicks and pointer presses place focus or a text selection without changing the Vim mode, except that navigation through the location breadcrumb or a node's enter control, and an application command that changes focus or replaces the selection, end whole-node Visual mode for Normal mode and clear its selected range.
 * A select-all, cut, or paste drops an unfinished Normal-mode command and both character-wise Visual endpoints before it runs; character Visual mode stays active, while a cut or paste leaves whole-node Visual mode and its selected range unchanged.
 
-#### Mode Indicator and Status Bar
+#### 20.2.7 Mode Indicator and Status Bar
 
 * A persistent indicator displays `INSERT`, `REPLACE`, `NORMAL`, `VISUAL`, or `VISUAL NODE`.
 * The indicator sits at the left end of a status bar fixed at the bottom of the window, while the `VIM` toggle and the always-on-top pin toggle (§2.2) stay at the right end.
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
 
-#### Drops and Whole-Node Visual Mode
+#### 20.2.8 Drops and Whole-Node Visual Mode
 
 * Whole-node Visual mode ends and returns to Normal mode when a drop changes the selected node's parent, whether it lands between rows, onto a row, or onto a breadcrumb entry.
 * Same-parent reordering does not end the mode.
 * The Vim register and `.` repeat are unchanged by drag-and-drop.
 
-#### Motions and Undo
+#### 20.2.9 Motions and Undo
 
 Normal mode supports:
 
@@ -1043,7 +1043,7 @@ Normal mode supports:
 * `;` to repeat the most recently issued `f`, `F`, `t`, or `T` motion and `,` to repeat it in the opposite direction; repeated finds support counts and never wrap or cross a node.
 * `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final text character; `$` stops at the end of the text row even when an image occupies a second row.
 
-#### Insert, Node Creation and Character Edits
+#### 20.2.10 Insert, Node Creation and Character Edits
 
 Normal mode also supports:
 
@@ -1051,7 +1051,7 @@ Normal mode also supports:
 * `o` to create an empty first child of the current parent when its heading is selected, an empty first child of the selected node when that node has at least one child, or otherwise an empty sibling below the selected node, and enter Insert mode. A first child created from a selected node keeps the displayed location unchanged and opens that node's fold so the new child is visible; `O` creates an empty sibling above the selected node, but does nothing when the editable current-parent heading is selected.
 * `x` to delete the current character, `X` to delete the character before it, `r{character}` to replace it without entering Insert mode, and `s` to delete it and enter Insert mode; when deleting the final text character before an attached image, the Normal caret lands on the image, including when that was the node's only text character.
 
-#### Operators
+#### 20.2.11 Operators
 
 Normal mode also supports:
 
@@ -1067,7 +1067,7 @@ Normal mode also supports:
 * `cc` and `S` to clear the current node's text and enter Insert mode without deleting its subtree or metadata.
 * `~` to toggle the case of the current character and advance, with a count toggling additional characters without crossing the node boundary; it advances onto an attached image when the changed text ends immediately before the image.
 
-#### Node Commands
+#### 20.2.12 Node Commands
 
 Normal mode also supports:
 
@@ -1079,7 +1079,7 @@ Normal mode also supports:
 * `v` to enter character-wise Visual mode.
 * `V` to enter whole-node Visual mode when a displayed sibling is selected; the editable current-parent heading cannot be selected with `V`.
 
-#### Put Commands
+#### 20.2.13 Put Commands
 
 Normal mode also supports:
 
@@ -1089,7 +1089,7 @@ Normal mode also supports:
 * `gp` and `gP` put like `p` and `P`, with the same counts and rejections, but leave the caret immediately after the inserted content. For text, the Normal caret is on the character after the inserted text, clamped to the final text character, or to the attached image when the inserted text ends immediately before it. For a node put, the node that follows the inserted forest is selected, or the last inserted node when none follows; after a put into the children of a node, that is the node's former first child.
 * In Visual modes `gp` and `gP` are not commands.
 
-#### Join Commands
+#### 20.2.14 Join Commands
 
 Normal mode also supports:
 
@@ -1100,7 +1100,7 @@ Normal mode also supports:
 * A join is one undoable command, leaves the local Vim register unchanged, and puts the Normal caret at the first join point after trimming: on the inserted space for `J` when one is inserted, otherwise on the first character of the appended text, clamped to the final text character or the attached image.
 * Whole-node Visual `J` and `gJ` join the selected range the same way and return to Normal mode; a range that cannot join keeps whole-node Visual mode and its selection. Character-wise Visual `J` and `gJ` are not commands.
 
-#### Fold Commands
+#### 20.2.15 Fold Commands
 
 Normal mode also supports:
 
@@ -1109,7 +1109,7 @@ Normal mode also supports:
 * Fold commands never move the caret, except that `zM` selects the displayed ancestor of the caret with its caret at the beginning when closing the folds would hide the caret (§2.4).
 * Counts do not apply to fold commands.
 
-#### Counts and Operator Scope
+#### 20.2.16 Counts and Operator Scope
 
 * Numeric prefixes repeat in-node motions and text edits, including operator motions (`3w`, `2dw`, `3x`, and `2r{character}`). They also count node commands: `3j` and `5k` move by that many visible rows while clamping at the first and last visible row of the location; `10G` selects the tenth visible row of the location, clamped to the last visible row; `3dd` deletes the current node and the next two displayed sibling subtrees, clamped at the last sibling, as one undoable command, and `2yy` copies the current node and the next sibling subtree into the local register as an ordered forest.
 * `dd` and `yy` cover every descendant, whether or not it is expanded.
@@ -1123,7 +1123,7 @@ Normal mode also supports:
 * Text operators affect only the current node's text, preserving the node, children, hyperlinks outside the edited range, and attachment.
 * `dd` and `yy` remain whole-subtree commands, with counted forms operating on a forward sibling range.
 
-#### Text Objects
+#### 20.2.17 Text Objects
 
 * Text objects may follow `d`, `y`, or `c`, and may be selected in character-wise Visual mode.
 * `iw`, `aw`, `iW`, and `aW` select a word or whitespace-delimited WORD, with `a` including adjacent whitespace where available.
@@ -1133,7 +1133,7 @@ Normal mode also supports:
 * Unmatched objects make no change.
 * Text objects stay within the current node.
 
-#### Surround Delimiters
+#### 20.2.18 Surround Delimiters
 
 * Surround delimiters are `(`, `[`, `{`, `<`, their closing counterparts, `"`, `'`, and backtick, with `b`, `r`, `B`, and `a` accepted as aliases for `)`, `]`, `}`, and `>`.
 * An opening bracket adds one space inside the pair, while its closing counterpart adds none; removing or changing a pair named by an opening bracket also strips one such space from each side when present.
@@ -1143,7 +1143,7 @@ Normal mode also supports:
 * In character-wise Visual mode, `S` followed by a delimiter surrounds the selection and returns to Normal mode; a surround that makes no change leaves the selection intact and remains in Visual mode.
 * Surround commands stay within the current node.
 
-#### Dot Repeat
+#### 20.2.19 Dot Repeat
 
 * `.` repeats the last completed Vim change at the current caret or node, including text changes, surround commands, counted `dd`, subtree puts, shifts, joins, case commands, `o` and `O` with text typed before Escape, and whole-node Visual mutations.
 * A completed Insert, change, or substitute session that ended with Escape is recorded as a text change and repeats at the current caret in any node, including a different one.
@@ -1158,7 +1158,7 @@ Normal mode also supports:
 * Motions, yanks, and failed changes do not replace the saved change.
 * Every individual command and repetition is atomic: when it cannot complete in full, it changes neither the document, the register, the history, the focus, nor the saved change for `.`.
 
-#### Character Visual Mode
+#### 20.2.20 Character Visual Mode
 
 * Visual mode selects characters only within the current node and uses the same yellow highlight as whole-node Visual mode. A deliberate multi-character selection in Normal mode — a pointer drag or `Cmd+A` — uses that highlight too, while the one-character Normal-mode block caret keeps its own block styling.
 * The Normal-mode character and word motions extend the selection.
@@ -1170,7 +1170,7 @@ Normal mode also supports:
 * Visual `p` replaces the selection with a non-empty plain-text register and then stores the removed selection as the new register; Visual `P` performs the same replacement and keeps the incoming register. A count repeats the incoming text before the replacement, in one edit. A successful put returns to Normal mode with the caret on the final inserted character.
 * A Visual put with an empty or structured subtree register, or one the application cannot apply, does nothing, leaves the register unchanged, and remains in Visual mode.
 
-#### Registers and Puts in Normal Mode
+#### 20.2.21 Registers and Puts in Normal Mode
 
 * In Normal mode, `yy` copies the selected node and its entire subtree, while `dd` copies it before deleting it.
 * If the most recent register action was Visual-mode text yank/delete or a character deletion, `p` and `P` insert that text after or before the current character.
@@ -1178,7 +1178,7 @@ Normal mode also supports:
 * Subtree puts preserve text, hyperlinks, and attachments and assign fresh node IDs to every pasted node.
 * Yank, delete, change, case, and successful plain-text put commands return to Normal mode.
 
-#### System Clipboard
+#### 20.2.22 System Clipboard
 
 * Vim yanks and Normal-mode `dd` also copy content to the system clipboard for external applications under the rules below.
 * Descendants are excluded from the system clipboard even when the local register includes the node's subtree.
@@ -1192,7 +1192,7 @@ Normal mode also supports:
 * An operation on a single node with neither text nor an image, or an empty character-wise text selection, leaves the system clipboard unchanged; copying nothing never clears it.
 * Empty entries within a multi-node whole-node Visual yank follow the newline rule above.
 
-#### Whole-Node Visual Mode and Shifts
+#### 20.2.23 Whole-Node Visual Mode and Shifts
 
 * Whole-node Visual mode (`V`) selects a contiguous range of siblings at the currently displayed level — not the location's visible rows (§2.4) — including every selected node's descendants.
 * `j`, `k`, `gg`, and `G` extend the range, and `j` and `k` accept a count that moves the active end that many siblings, clamped at the first and last sibling, without changing the selection's direction; `o` exchanges its ends.
@@ -1210,7 +1210,7 @@ Normal mode also supports:
 * A node put whose target is a descendant of any source node reports an operation error and leaves the document unchanged.
 * Empty or plain-text registers cannot be put in whole-node Visual mode.
 
-#### Tab and Shift+Tab
+#### 20.2.24 Tab and Shift+Tab
 
 * When a node editor has keyboard focus, plain Tab moves the focused node and its whole subtree in one level, and Shift+Tab moves it out one level. In whole-node Visual mode, these keys move the selected sibling range; in every other Vim mode and in standard editing, they move only the focused node.
 * The move keeps the editing mode, focus, caret, and text selection. In Normal mode it discards an unfinished command. In Replace mode it commits any buffered replacement as one undoable edit, performs the move as a separate command, and continues in Replace mode with a new replacement session at the same caret. In Insert mode the move ends the current text undo session and keeps Insert mode active.
@@ -1218,7 +1218,7 @@ Normal mode also supports:
 * When the current parent is a zoomed node, Shift+Tab does not move a direct child of that node, or a selected range of its direct children, outside the current location; it is a no-op that preserves the pending edit session and editor state. A deeper descendant may move out one level when it remains inside the current parent's subtree. This location boundary applies to Tab shortcuts only; Vim `<` retains its separately specified behavior.
 * Outside a node editor, Tab and Shift+Tab retain native focus traversal, including navigation to the status-bar controls. This node-focused Tab behavior is a deliberate exception to macOS focus traversal, in service of the keyboard-first editing model (§1.1).
 
-#### Restoring a Selection with gv
+#### 20.2.25 Restoring a Selection with gv
 
 * Normal `gv` restores the most recent character-wise or whole-node Visual selection with its direction. After a Visual put it selects the incoming content, and after a shift it selects the moved range.
 * The selection is remembered by node identity, only for the latest selection and only within the running renderer session.
@@ -1226,12 +1226,12 @@ Normal mode also supports:
 * When the restored range is hidden by a collapsed fold or is not displayed at the current location, `gv` does nothing.
 * `gv` does nothing in a Visual mode.
 
-#### Local Vim Register
+#### 20.2.26 Local Vim Register
 
 * The local Vim register is held only for the running renderer session and does not persist across application restarts. It is separate from the system clipboard; character-wise Visual `y`, Normal `yy` and `dd`, and whole-node Visual `y` also copy content to the system clipboard under the rules above, while other register-producing Vim commands do not modify the system clipboard. It holds either one plain-text value, one structured node subtree, or an ordered set of sibling subtrees, with only the most recent register-producing action retained.
 * Document search, named registers, macros, and marks are not supported.
 
-#### Unsupported Keys, Composition and Selection Offsets
+#### 20.2.27 Unsupported Keys, Composition and Selection Offsets
 
 * Unsupported unmodified keys do not edit text in Normal or Visual mode.
 * Application shortcuts using modifier keys retain their existing behavior.

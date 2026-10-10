@@ -226,6 +226,7 @@ test.describe('external hyperlinks (mode-independent)', () => {
 })
 
 test.describe('external hyperlinks (Vim editing only)', () => {
+  // @requirement PRODUCT.md §20.2.12
   test('opens the hyperlink under the Normal-mode caret with Enter', async ({ userDataDir }) => {
     const url = 'https://example.com/page'
     const text = `A${url}B`

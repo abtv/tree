@@ -182,7 +182,7 @@ test('gg reaches the document start with an oversized first row', async ({ userD
 })
 
 for (const key of ['H', 'M', 'L']) {
-  // @requirement PRODUCT.md §20.2
+  // @requirement PRODUCT.md §20.2.9
   // @requirement PRODUCT.md §20.8
   test(`${key} keeps scrolling unchanged when only a clipped row is visible`, async ({ userDataDir }) => {
     seedRows(userDataDir, { tall: [50] })

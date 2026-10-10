@@ -202,6 +202,7 @@ test.describe('shutdown failure handling', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('aXYd')
   })
 
+  // @requirement PRODUCT.md §20.2.5
   test('persists a pending Replace edit when Cmd+Q is pressed in the editor', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
@@ -221,6 +222,7 @@ test.describe('shutdown failure handling', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('aXYd')
   })
 
+  // @requirement PRODUCT.md §20.2.5
   test('retains a pending Replace edit across a failed window-close save and persists it after a retry', async ({
     userDataDir,
   }) => {
