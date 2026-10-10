@@ -140,8 +140,18 @@ test('does not pull the viewport back after wheel scrolling during image loading
   await painted(window)
   await window.mouse.move(400, 250)
   await window.mouse.wheel(0, -500)
-  await expect.poll(async () => (await geometry(window)).scrollTop).toBeLessThan((await geometry(window)).max - 200)
-  await window.waitForTimeout(200)
+  let previousScrollTop = Number.NaN
+  let lastScrollChangeAt = Date.now()
+  await expect
+    .poll(async () => {
+      const { scrollTop, max } = await geometry(window)
+      if (scrollTop !== previousScrollTop) {
+        previousScrollTop = scrollTop
+        lastScrollChangeAt = Date.now()
+      }
+      return scrollTop < max - 200 && Date.now() - lastScrollChangeAt >= 300
+    })
+    .toBe(true)
   const before = await geometry(window)
   await release()
   await expect.poll(async () => (await geometry(window)).height).toBeGreaterThan(100)
