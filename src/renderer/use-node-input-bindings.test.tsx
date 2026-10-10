@@ -120,6 +120,121 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
 }
 
 describe('useNodeInputBindings', () => {
+  it.each(['outside', 'window'])('ends Replace when a read-only Agenda row loses focus to %s', async (path) => {
+    const f = await fixture({ mode: 'replace' })
+    const row = document.createElement('div')
+    row.className = 'agenda-row'
+    row.tabIndex = 0
+    document.body.append(row)
+    row.focus()
+    act(() => {
+      if (path === 'outside') document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      else globalThis.dispatchEvent(new Event('blur'))
+    })
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  it.each([false, true])(
+    'continues Replace from an Agenda row surface after focus settles (pending: %s)',
+    async (pending) => {
+      const f = await fixture({
+        document: { roots: [node('node', '2026-10-14 First'), node('peer', '2026-10-14 Other')] },
+      })
+      act(() => f.store.openAgenda())
+      const key = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'node')!.key
+      act(() => f.store.applyAgenda({ kind: 'select', key }))
+      const source = f.input('node')
+      source.focus()
+      setCaret(source, 11)
+      f.press('R')
+      if (pending) f.press('X')
+      const day = document.createElement('div')
+      day.className = 'agenda-row'
+      day.dataset.agendaKey = 'day'
+      day.tabIndex = 0
+      document.body.append(day)
+      act(() => day.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })))
+      act(() => {
+        day.focus()
+        f.bindings('node').onBlur()
+        day.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+        vi.advanceTimersByTime(1)
+      })
+      expect(f.result.current.vimMode).toBe('replace')
+      expect(f.node('node').text).toBe(`2026-10-14 ${pending ? 'X' : 'F'}irst`)
+      const destination = f.input('peer')
+      const row = destination.parentElement!
+      row.classList.add('agenda-row')
+      row.dataset.agendaKey = 'peer'
+      destination.classList.add('node-input')
+      act(() => row.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })))
+      act(() => {
+        destination.focus()
+        setCaret(destination, 11)
+        destination.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+        // The new editor can receive mouseup from a press on its former read-only row surface.
+        f.bindings('peer').onMouseUp({ currentTarget: destination, button: 0 } as never)
+        vi.advanceTimersByTime(1)
+      })
+      f.press('Y', {}, 'peer')
+      expect(destination.value).toBe('2026-10-14 Yther')
+      f.press('Escape', {}, 'peer')
+      expect(f.node('peer').text).toBe('2026-10-14 Yther')
+    },
+  )
+
+  it.each(['pointercancel', 'blur', 'outside', 'drag'])(
+    'ends Replace when an Agenda row press becomes %s',
+    async (release) => {
+      const f = await fixture({ mode: 'replace' })
+      const source = f.input()
+      source.focus()
+      const row = document.createElement('div')
+      row.className = 'agenda-row'
+      row.dataset.agendaKey = 'day'
+      document.body.append(row)
+      act(() => row.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })))
+      if (release === 'drag') act(() => f.result.current.dragFreeze.begin('node', 7))
+      act(() => f.bindings().onBlur())
+      act(() => {
+        if (release === 'outside') document.body.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+        else if (release === 'drag') row.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+        else globalThis.dispatchEvent(new Event(release))
+        vi.advanceTimersByTime(1)
+      })
+      expect(f.result.current.vimMode).toBe('normal')
+    },
+  )
+
+  it.each([false, true])(
+    'replaces a double-clicked word once and continues overwrite (pending: %s)',
+    async (pending) => {
+      const f = await fixture({ document: { roots: [node('node', 'one word tail')] } })
+      const input = f.input()
+      input.focus()
+      setCaret(input, 0)
+      f.press('R')
+      if (pending) f.press('X')
+      act(() => f.bindings().onMouseDown({ currentTarget: input, button: 0, detail: 2 } as never))
+      input.setSelectionRange(4, 8)
+      act(() => f.bindings().onMouseUp({ currentTarget: input, button: 0, detail: 2 } as never))
+      expect([input.selectionStart, input.selectionEnd]).toEqual([4, 8])
+      expect(f.result.current.vimMode).toBe('replace')
+      f.press('Y')
+      expect(input.value).toBe(`${pending ? 'X' : 'o'}ne Y tail`)
+      f.press('Z')
+      expect(input.value).toBe(`${pending ? 'X' : 'o'}ne YZtail`)
+      f.press('Escape')
+      expect(f.node().text).toBe(input.value)
+      f.press('z', { metaKey: true })
+      expect(f.node().text).toBe(`${pending ? 'X' : 'o'}ne word tail`)
+      if (pending) {
+        f.press('z', { metaKey: true })
+        expect(f.node().text).toBe('one word tail')
+      }
+    },
+  )
+
   // @requirement PRODUCT.md §23.4
   it('shares the editor image return position with Agenda row navigation', async () => {
     const text = '2026-10-15 Image'

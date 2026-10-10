@@ -121,6 +121,11 @@ Upward cross-node image navigation also needs agreement between the resolved car
 
 ## Insert and Replace completion policy
 
+| PRODUCT | Pointer continuation case | Representative automated evidence |
+| --- | --- | --- |
+| §20.2.5–6 | Replace word selection, overwrite and Undo; empty/pending buffer, plain/rich text, same/other node | `src/renderer/use-node-input-bindings.test.tsx`: “replaces a double-clicked word once and continues overwrite (pending: %s)”; `src/renderer/vim-edit-session.property.test.ts`: “replaces a selected range once, overwrites its suffix, and restores the baseline after Backspace”; `e2e/vim-text-editing.spec.ts`: “continues Replace after double-click word selection”, “continues Replace after double-clicking another node's word” |
+| §23.4 | Replace row-click continuation, read-only rows, non-click exits and Undo | `src/renderer/use-node-input-bindings.test.tsx`: “continues Replace from an Agenda row surface after focus settles (pending: %s)”, “ends Replace when an Agenda row press becomes %s”; `src/renderer/vim-keyboard-state.test.ts`: “starts Replace synchronously when typing precedes the Agenda release timer (rich: %s)”; `src/renderer/agenda-row-keyboard.test.ts`: “ends click-preserved Replace before %s”; `e2e/agenda-vim.spec.ts`: “preserves Replace through Agenda row clicks and read-only rows”, “keeps Replace through an inactive occurrence and a focused-day heading, then resumes editing”, “ends read-only Replace before keyboard command” |
+
 Historical implementation notes below describe earlier fixes. For current Insert
 recording behavior, PRODUCT §20.2.19 supersedes their claims of unconditional
 structural capture or untouched Insert bookkeeping during text commands.

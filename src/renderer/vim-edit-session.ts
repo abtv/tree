@@ -40,9 +40,10 @@ export function resolveReplaceCommit(session: {
   baseline: string
   position: number
   typed: string
+  selectionEnd?: number
 }): VimReplaceCommit | undefined {
   if (session.typed === '') return undefined
-  const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
+  const replaced = replaceLength(session)
   const finalText =
     session.baseline.slice(0, session.position) + session.typed + session.baseline.slice(session.position + replaced)
   return {
@@ -65,6 +66,14 @@ export interface VimReplaceSession {
   baseline: string
   position: number
   typed: string
+  /** A pointer-selected word is replaced by the first character, before overwrite continues. */
+  selectionEnd?: number
+}
+
+function replaceLength(session: Pick<VimReplaceSession, 'baseline' | 'position' | 'typed' | 'selectionEnd'>): number {
+  if (session.typed === '') return 0
+  const selected = (session.selectionEnd ?? session.position) - session.position
+  return Math.min(session.typed.length + Math.max(0, selected - 1), session.baseline.length - session.position)
 }
 
 /**
@@ -82,14 +91,17 @@ export interface VimEditSessionState {
   replaceClick?: boolean | undefined
   /** True once the press moved focus away from another node, so Replace must end if no click follows. */
   replaceClickMoved?: boolean | undefined
+  /** The row surface that began an Agenda click, whose editor may mount before release. */
+  replaceClickAgendaKey?: string | undefined
 }
 
 export function createVimEditSessionState(): VimEditSessionState {
   return { register: { kind: 'empty' } }
 }
 
-export function beginReplaceClick(state: VimEditSessionState): void {
+export function beginReplaceClick(state: VimEditSessionState, agendaKey?: string): void {
   state.replaceClick = true
+  state.replaceClickAgendaKey = agendaKey
 }
 
 /** End the press intent, reporting whether one was pending. */
@@ -97,6 +109,7 @@ export function takeReplaceClick(state: VimEditSessionState): boolean {
   const pending = state.replaceClick === true
   state.replaceClick = undefined
   state.replaceClickMoved = undefined
+  state.replaceClickAgendaKey = undefined
   return pending
 }
 
@@ -137,7 +150,7 @@ export function applyReplaceKey(
   else return undefined
   // Mutation triage: a larger bound only matters once it exceeds the remaining baseline, where
   // `slice` past the end is already empty, so the working text is unchanged.
-  const replaced = Math.min(session.typed.length, session.baseline.length - session.position)
+  const replaced = replaceLength(session)
   return {
     workingText:
       session.baseline.slice(0, session.position) + session.typed + session.baseline.slice(session.position + replaced),

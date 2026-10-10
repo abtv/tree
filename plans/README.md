@@ -4,8 +4,8 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim navigation and Replace corrections](vim-navigation-replace-corrections.md) | Implementation authorized; NR-2 complete | NR-3: preserve Replace through word selection and Agenda row clicks |
+| [Vim navigation and Replace corrections](vim-navigation-replace-corrections.md) | NR-1 to NR-3 complete | Product Owner confirmation that no further corrections remain |
 | [Agenda](agenda.md) | Implementation authorized; AG-27 complete | AG-28: close the initiative (Product Owner confirmation) |
-| [PRODUCT.md structure](product-structure.md) | PS-10 complete; NR-2 complete | Finish NR-3, then complete PS-11 migration |
+| [PRODUCT.md structure](product-structure.md) | PS-10 and NR-1 to NR-3 complete | PS-11: complete the approved migration |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

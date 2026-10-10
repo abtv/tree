@@ -189,3 +189,46 @@ it('keeps the incremental Replace working text equal to the splice its commit wo
     ),
   )
 })
+
+it('replaces a selected range once, overwrites its suffix, and restores the baseline after Backspace', () => {
+  fc.assert(
+    fc.property(
+      fc.string({ maxLength: 40 }),
+      fc.nat(1000),
+      fc.nat(1000),
+      fc.array(replaceKey, { maxLength: 30 }),
+      (baseline, startSeed, endSeed, keys) => {
+        const position = startSeed % (baseline.length + 1)
+        const selectionEnd = position + (endSeed % (baseline.length - position + 1))
+        const session = { nodeId: 'a', baseline, position, selectionEnd, typed: '' }
+        let typed = ''
+        for (const key of keys) {
+          if (key === 'Backspace') typed = typed.slice(0, -1)
+          else if (key.length === 1) typed += key
+          const result = applyReplaceKey(session, key)
+          if (key !== 'Backspace' && key.length !== 1) {
+            expect(result).toBeUndefined()
+            continue
+          }
+          const end =
+            typed === '' ? position : Math.min(baseline.length, Math.max(position + 1, selectionEnd) + typed.length - 1)
+          const expected = baseline.slice(0, position) + typed + baseline.slice(end)
+          expect(result).toEqual({ workingText: expected, cursor: position + typed.length })
+          expect(resolveReplaceCommit(session)).toEqual(
+            typed === ''
+              ? undefined
+              : {
+                  finalText: expected,
+                  replacedStart: position,
+                  replacedEnd: end,
+                  rawCursor: position + typed.length,
+                },
+          )
+        }
+        while (session.typed !== '') applyReplaceKey(session, 'Backspace')
+        expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: baseline, cursor: position })
+        expect(resolveReplaceCommit(session)).toBeUndefined()
+      },
+    ),
+  )
+})

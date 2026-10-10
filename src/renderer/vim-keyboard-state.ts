@@ -1,7 +1,7 @@
 import type { EditorStore } from '../application/editor-store'
 import { moveSelectionBoundaryTransition } from '../application/editor-command-transitions'
 import { requireNode, type TreeNode } from '../domain/document'
-import { setCaret, setEditableText } from './editor-dom'
+import { getCaret, readEditableContent, setCaret, setEditableText } from './editor-dom'
 import type { NodeVisualSelection, PendingCaret } from './node-input-types'
 import type { VimCaretState } from './vim-caret-transition'
 import {
@@ -10,7 +10,13 @@ import {
   swapNodeVisual,
   type VimCommandState,
 } from './vim-command-state'
-import { applyReplaceKey, beginInsertSession, beginReplaceSession, type VimEditSessionState } from './vim-edit-session'
+import {
+  applyReplaceKey,
+  beginInsertSession,
+  beginReplaceSession,
+  takeReplaceClick,
+  type VimEditSessionState,
+} from './vim-edit-session'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { rememberNodeRange } from './vim-visual-memory'
 import { firstNonWhitespace } from './vim-editing'
@@ -85,6 +91,18 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
       beginReplaceSession(session, { nodeId, baseline, position })
     },
     handleReplaceKey: (input, key) => {
+      // A key can arrive before the row-click release timer. Start from the now-focused editor
+      // synchronously so the first typed character is never lost while waiting for that timer.
+      if (
+        session.replace === undefined &&
+        session.replaceClickAgendaKey !== undefined &&
+        input.ownerDocument.activeElement === input &&
+        input.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey === session.replaceClickAgendaKey
+      ) {
+        takeReplaceClick(session)
+        const baseline = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
+        beginReplaceSession(session, { nodeId: node.id, baseline, position: getCaret(input) })
+      }
       const result = applyReplaceKey(session.replace, key)
       if (result === undefined) return false
       setEditableText(input, result.workingText)

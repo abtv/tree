@@ -1051,7 +1051,9 @@ At or below 500 visible rows, the list renders every row, including inline desce
 #### 20.2.6 Pointer Presses and Application Commands
 
 * Mouse clicks and pointer presses place focus or a text selection without changing the Vim mode, except that navigation through the location breadcrumb or a node's enter control, and an application command that changes focus or replaces the selection, end whole-node Visual mode for Normal mode and clear its selected range.
-* An ordinary primary-button click on node text, in the same node or another, keeps Replace mode. Any pending replacement completes as one edit first; the caret then moves to the clicked position, and the next typed characters overwrite from there. Text typed after the click is a separate edit, so Undo reverts it on its own. A click on a navigation control, a click outside node text, a right-click, and a drag that selects text keep their existing behavior.
+* An ordinary primary-button click on node text, in the same node or another, keeps Replace mode. Any pending replacement completes as one edit first; the caret then moves to the clicked position, and the next typed characters overwrite from there. Text typed after the click is a separate edit, so Undo reverts it on its own.
+* A double-click keeps the selected word visible and Replace active until typing: the first typed character replaces the selected range once, then subsequent characters overwrite from the resulting caret. This applies to plain and rich text with or without a pending replacement.
+* A click on a navigation control, a click outside node text or an Agenda row (§23.4), a right-click, and a drag that selects text keep their existing behavior.
 * A select-all, cut, or paste drops an unfinished Normal-mode command and both character-wise Visual endpoints before it runs; character Visual mode stays active, while a cut or paste leaves whole-node Visual mode and its selected range unchanged.
 
 #### 20.2.7 Mode Indicator and Status Bar
@@ -1494,6 +1496,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 * `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` land on the destination's first non-whitespace text character, using a direct match's image only when it has no text, as in §20.2.9.
 * A vertical motion that clamps at the current row preserves its caret and image return position.
 * Clicking a row selects and focuses it with the same focus dot.
+* An ordinary primary-button row click keeps Replace mode and completes any pending replacement as one edit before changing rows. A row without an editor retains Replace without accepting text edits; clicking an editable occurrence then resumes overwrite at its focused caret. Text typed after changing rows is a separate edit for Undo. This includes day containers, gaps, contextual ancestors, inactive occurrences and the focused-day heading; it does not extend Replace to navigation controls or other focus losses.
 * `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda.
 * Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
 * The caret never disappears while selection moves.

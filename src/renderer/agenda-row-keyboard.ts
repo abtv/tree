@@ -46,6 +46,9 @@ export function createAgendaKeyDownHandler({
     const index = rows.findIndex((row) => row.key === state.agenda!.selectedKey)
     const row = rows[index]
     if (row === undefined) return
+    const finishClickReplace = (): void => {
+      if (vim?.mode === 'replace') vim.setMode('normal')
+    }
     const textOf = (candidate: AgendaRow): string =>
       candidate.kind === 'node'
         ? requireNode(state.document, candidate.nodeId).node.text
@@ -181,10 +184,12 @@ export function createAgendaKeyDownHandler({
       } else if (event.key.toLowerCase() === 'p' && !event.shiftKey && !event.altKey) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        finishClickReplace()
         store.closeAgenda()
       } else if (event.key === '.') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        finishClickReplace()
         if (row.kind === 'node') {
           store.closeAgenda()
           store.selectNode(row.nodeId, 0)
@@ -198,6 +203,7 @@ export function createAgendaKeyDownHandler({
       } else if (event.key === ',') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        if (state.agenda.focusedDay !== undefined) finishClickReplace()
         beforeSelect?.(true)
         rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'return-timeline', key: row.key })
@@ -209,6 +215,7 @@ export function createAgendaKeyDownHandler({
       } else if (event.key.toLowerCase() === 'z') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        finishClickReplace()
         if (event.shiftKey) store.redo()
         else store.undo()
       } else if (['backspace', 'enter', ',', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
@@ -349,11 +356,13 @@ export function createAgendaKeyDownHandler({
         store.enter()
       }
     } else if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
-    else if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined))
+    else if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined)) {
+      finishClickReplace()
       vertical('down', count)
-    else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined))
+    } else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined)) {
+      finishClickReplace()
       vertical('up', count)
-    else if (normal && event.key === 'g' && pending?.prefix === 'g') {
+    } else if (normal && event.key === 'g' && pending?.prefix === 'g') {
       const target = Math.min(rows.length - 1, count - 1)
       select(target, false, firstNonWhitespace(textOf(rows[target]!)), true)
     } else if (normal && event.key === 'G' && pending?.prefix === undefined) {

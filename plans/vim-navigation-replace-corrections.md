@@ -13,7 +13,7 @@ VC-1 to VC-3 corrections are complete.
 | --- | --- | --- | --- | --- |
 | NR-1 | First-nonblank text destinations for G/gg, H/M/L and Ctrl+d/u in Tree and Agenda; renderer keyboard, viewport and Agenda adapters, focused tests, Vim navigation/image and Agenda E2E, PRODUCT §§20.2.9 and 23.4 and VIM_CONFORMANCE | Indented text, text with image, empty/image-only nodes, same-node and counted destinations; one focus publication; real-renderer caret screenshots; check and affected E2E; independent review and verification | Moderate Risk | Done |
 | NR-2 | Clamped Visual Node motion preserves caret and range; vim-node-visual-commands, focused and hook tests, image-caret E2E, PRODUCT §20.2.23 and matrix | Both boundaries, counted j/k and gg/G, text/image caret and saved return; failing regression, inspected screenshot, check and affected E2E; review and verifier | Moderate Risk | Done |
-| NR-3 | Replace continues through word selection and Agenda row clicks; edit-session, pointer and Agenda adapters, focused tests, text-editing/Agenda E2E, PRODUCT §§20.2.5–6 and 23.4, matrix | Double-click with empty/pending buffer, plain/rich input, selection preserved until typing, one selected-word replacement then continued overwrite, Escape/Undo; editable/read-only/editable Agenda path without read-only edits; check and affected E2E, screenshots, review and verifier | Moderate Risk unless boundary changes raise it | Ready |
+| NR-3 | Replace continues through word selection and Agenda row clicks; edit-session, pointer and Agenda adapters, focused tests, text-editing/Agenda E2E, PRODUCT §§20.2.5–6 and 23.4, matrix | Double-click with empty/pending buffer, plain/rich input, selection preserved until typing, one selected-word replacement then continued overwrite, Escape/Undo; editable/read-only/editable Agenda path without read-only edits; check and affected E2E, screenshots, review and verifier | Moderate Risk | Done |
 
 ## Decisions and Gaps
 
@@ -28,9 +28,8 @@ preserving it across arbitrary blur.
 
 ## Resume
 
-Next task: NR-3. Keep the affected-path matrix and exact validation record in
-WORKING_PLAN.md. Update this plan in each task's commit. After NR-3, resume PS-11
-in `product-structure.md`; its migration must not restore superseded matrix rules.
+Next task: PS-11 in `product-structure.md`; its migration must not restore
+superseded matrix rules. All runtime corrections are complete.
 Remove this correction plan after the Product Owner confirms no further tasks
 remain. Four task commits maximum in one session includes PS-11; plan creation
 lands with NR-1.
@@ -82,3 +81,33 @@ The fix-history report again flags repeated Vim/Agenda fixes. This correction
 uses the existing caret authority and avoids a needless focus publication in its
 existing Visual owner; no additional structural initiative is indicated. Continue
 NR-3 in a new session, then PS-11.
+
+NR-3 completed: double-clicked words retain their visible selection and Replace
+mode with empty or pending buffers in plain and rich text, within or across
+nodes. The first character replaces the selected range once, then overwrite
+continues. Agenda row clicks commit the old buffer once and resume Replace on
+the focused editable occurrence, retaining the mode through read-only rows
+without editing them. Non-click keyboard navigation/application commands and
+outside/window focus loss retain their existing Normal-mode exit boundary.
+Pre-click and post-click edits remain separate for Undo. PRODUCT §§20.2.6 and
+23.4 and the matrix's representative evidence inventory record these rules.
+No additional product decision or persistence/process boundary change was made.
+
+Validation passed: `npm run check` with 3295 unit tests and coverage/static/
+governance/build checks; all 227 distinct affected Electron cases through the
+expanded run and focused command/startup reruns; four focused performance cases.
+Three synthetic word-selection and Agenda focus screenshots were inspected.
+The initial timing failure, absent new baselines, overlapping-run interference,
+and one isolated Electron startup timeout were resolved without weakening tests
+or budgets. Independent review found a read-only keyboard exit gap, which was
+reproduced and corrected; final review and product verification found no
+meaningful issues. No unresolved validation failure remains.
+
+The new repeated Replace-click performance guard verifies paint latency, bounded
+mounted rows and zero saves on a large Agenda. No new disk writes/syncs, retained
+collections or unbounded document traversal were added. The fix-history report
+flags repeated Vim/Agenda corrections; NR-3 uses the existing session and mode
+authorities, so no additional structural initiative is indicated. Stop this
+session under AGENTS §12 after the validation surprises. Suggested next prompt:
+`Continue PS-11.` Keep this correction plan until the Product Owner confirms no
+further tasks remain.

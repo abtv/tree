@@ -5,6 +5,7 @@ import {
   applyReplaceKey,
   beginInsertSession,
   beginReplaceSession,
+  beginReplaceClick,
   createVimEditSessionState,
   diffTypedText,
   insertRepeatChange,
@@ -13,6 +14,7 @@ import {
   resolveReplaceCommit,
   takeInsertSession,
   takeReplaceSession,
+  takeReplaceClick,
   visualCommandRegister,
   type VimReplaceSession,
 } from './vim-edit-session'
@@ -51,6 +53,21 @@ describe('diffTypedText', () => {
 })
 
 describe('resolveReplaceCommit', () => {
+  it('replaces the selected word before overwriting subsequent characters', () => {
+    const session = { nodeId: 'a', baseline: 'one word tail', position: 4, selectionEnd: 8, typed: '' }
+    expect(applyReplaceKey(session, 'X')).toEqual({ workingText: 'one X tail', cursor: 5 })
+    expect(applyReplaceKey(session, 'Y')).toEqual({ workingText: 'one XYtail', cursor: 6 })
+    expect(resolveReplaceCommit(session)).toEqual({
+      finalText: 'one XYtail',
+      replacedStart: 4,
+      replacedEnd: 9,
+      rawCursor: 6,
+    })
+    expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: 'one X tail', cursor: 5 })
+    expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: 'one word tail', cursor: 4 })
+    expect(resolveReplaceCommit(session)).toBeUndefined()
+  })
+
   it('returns undefined when nothing was typed', () => {
     expect(resolveReplaceCommit({ baseline: 'abc', position: 1, typed: '' })).toBeUndefined()
   })
@@ -86,6 +103,19 @@ describe('resolveReplaceCommit', () => {
 })
 
 describe('VimEditSessionState', () => {
+  it('consumes an Agenda row click once and clears its destination and blur state', () => {
+    const state = createVimEditSessionState()
+    beginReplaceClick(state, 'day:1')
+    state.replaceClickMoved = true
+    expect(state.replaceClickAgendaKey).toBe('day:1')
+    expect(takeReplaceClick(state)).toBe(true)
+    expect(state.replaceClickAgendaKey).toBeUndefined()
+    expect(state.replaceClickMoved).toBeUndefined()
+    expect(takeReplaceClick(state)).toBe(false)
+    beginReplaceClick(state)
+    expect(state.replaceClickAgendaKey).toBeUndefined()
+  })
+
   it('starts with an empty register and no pending session', () => {
     const state = createVimEditSessionState()
     expect(state.register).toEqual({ kind: 'empty' })

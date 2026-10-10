@@ -5,7 +5,8 @@ import { createRealStoreHarness } from './test/real-store-harness'
 import type { NodeVisualSelection } from './node-input-types'
 import type { VimCaretState } from './vim-caret-transition'
 import { createVimCommandState } from './vim-command-state'
-import { createVimEditSessionState } from './vim-edit-session'
+import { beginReplaceClick, createVimEditSessionState } from './vim-edit-session'
+import { setCaret } from './editor-dom'
 import { createVimKeyboardState } from './vim-keyboard-state'
 
 afterEach(() => document.body.replaceChildren())
@@ -177,6 +178,49 @@ describe('session and command ports', () => {
     expect(element.selectionEnd).toBe(2)
     expect(f.vim.finishReplace(element, true, true)).toBe(true)
     expect(f.deps.finishVimReplace).toHaveBeenCalledWith(element, true, true)
+  })
+
+  it.each([false, true])(
+    'starts Replace synchronously when typing precedes the Agenda release timer (rich: %s)',
+    async (rich) => {
+      const f = await fixture()
+      const row = document.createElement('div')
+      row.className = 'agenda-row'
+      row.dataset.agendaKey = 'destination'
+      const element = rich ? document.createElement('div') : input()
+      if (element instanceof HTMLTextAreaElement) element.value = 'hello'
+      else {
+        element.contentEditable = 'true'
+        element.tabIndex = 0
+        element.textContent = 'hello'
+      }
+      row.append(element)
+      document.body.append(row)
+      element.focus()
+      setCaret(element, 1)
+      beginReplaceClick(f.session, 'destination')
+      expect(f.vim.handleReplaceKey(element, 'X')).toBe(true)
+      expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 1, typed: 'X' })
+      expect(f.session.replaceClickAgendaKey).toBeUndefined()
+      expect(f.vim.handleReplaceKey(element, 'Y')).toBe(true)
+      expect(f.session.replace?.typed).toBe('XY')
+    },
+  )
+
+  it('does not resume an Agenda click in an unfocused editor or a different row', async () => {
+    const f = await fixture()
+    const element = input()
+    beginReplaceClick(f.session, 'destination')
+    expect(f.vim.handleReplaceKey(element, 'X')).toBe(false)
+    element.focus()
+    expect(f.vim.handleReplaceKey(element, 'X')).toBe(false)
+    const row = document.createElement('div')
+    row.className = 'agenda-row'
+    row.dataset.agendaKey = 'other'
+    row.append(element)
+    document.body.append(row)
+    element.focus()
+    expect(f.vim.handleReplaceKey(element, 'X')).toBe(false)
   })
 
   it('moves the real store boundary before synchronizing image focus', async () => {

@@ -236,6 +236,14 @@ describe('mouse down', () => {
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
   })
 
+  it('commits without rewriting a double-click selection', async () => {
+    const f = await fixture({ mode: 'replace' })
+    const input = textarea('hello word')
+    input.setSelectionRange(6, 10)
+    f.handlers().onMouseDown(mouse(input, { detail: 2 }))
+    expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
+  })
+
   it('leaves a pending replacement of another node to that node’s blur', async () => {
     const f = await fixture({ mode: 'replace' })
     beginReplaceSession(f.session, { nodeId: 'other', baseline: 'other', position: 0 })
@@ -277,6 +285,25 @@ describe('mouse down', () => {
 })
 
 describe('mouse up', () => {
+  it.each([false, true])('keeps a double-clicked word as the new Replace range (cross-node: %s)', async (moved) => {
+    const f = await fixture({ mode: 'replace' })
+    beginReplaceClick(f.session)
+    f.session.replaceClickMoved = moved
+    const input = textarea('hello word tail')
+    input.focus()
+    input.setSelectionRange(6, 10)
+    f.handlers().onMouseUp(mouse(input, { detail: 2 }))
+    expect(f.session.replace).toEqual({
+      nodeId: 'node',
+      baseline: 'hello word tail',
+      position: 6,
+      selectionEnd: 10,
+      typed: '',
+    })
+    expect([input.selectionStart, input.selectionEnd]).toEqual([6, 10])
+    expect(f.deps.changeVimMode).not.toHaveBeenCalled()
+  })
+
   it.each(['insert', 'replace', 'visual'] as const)(
     'does nothing outside Normal mode without a pending Replace click (%s)',
     async (mode) => {

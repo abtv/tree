@@ -68,6 +68,123 @@ function seed(userDataDir: string): void {
 }
 
 test.describe('Agenda Vim commands', () => {
+  for (const command of ['ArrowDown', 'ArrowUp', 'Meta+p', 'Meta+.', 'Meta+z', 'Meta+Shift+z', 'Meta+,']) {
+    test(`ends read-only Replace before keyboard command ${command}`, async ({ userDataDir }) => {
+      seedPending(userDataDir)
+      const { window } = await launchTree(userDataDir)
+      await openAndSelect(window, nodeKey(10, 14, 'plan'))
+      if (command === 'Meta+,') {
+        await row(window, dayKey(10, 14)).click()
+        await window.keyboard.press('Meta+.')
+        await row(window, nodeKey(10, 14, 'plan')).click()
+        await row(window, nodeKey(10, 14, 'plan'))
+          .locator('.node-input')
+          .focus()
+      }
+      await window.keyboard.press('R')
+      await row(window, command === 'ArrowDown' ? nodeKey(10, 14, 'context') : dayKey(10, 14)).click()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await window.keyboard.press(command)
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      if (command === 'ArrowDown') {
+        await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toBeFocused()
+        await window.keyboard.press('i')
+        await window.keyboard.type('Q')
+        await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toContainText('Q')
+      }
+    })
+  }
+
+  for (const pending of [false, true]) {
+    test(`preserves Replace through Agenda row clicks and read-only rows (pending ${pending})`, async ({
+      userDataDir,
+    }) => {
+      seedPending(userDataDir)
+      const { window } = await launchTree(userDataDir)
+      await openAndSelect(window, nodeKey(10, 14, 'plan'))
+      const editor = row(window, nodeKey(10, 14, 'plan')).locator('.node-input')
+      await setCursor(editor, 11)
+      await window.keyboard.press('R')
+      if (pending) await window.keyboard.type('X')
+      await row(window, dayKey(10, 14)).locator('.agenda-label').click()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await expect(row(window, dayKey(10, 14))).toBeFocused()
+      await window.keyboard.type('ZY')
+      await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+      await row(window, nodeKey(10, 14, 'context'))
+        .locator('.agenda-text')
+        .click()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await window.keyboard.type('Z')
+      await expect(row(window, nodeKey(10, 14, 'context')).locator('.agenda-text')).toHaveText('Context')
+      if (pending) await expect(window.locator('.agenda-list')).toHaveScreenshot('agenda-replace-readonly-row.png')
+      await row(window, gapKey).locator('.agenda-label').click()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await window.keyboard.type('X')
+      await expect(row(window, gapKey)).toHaveAttribute('aria-selected', 'true')
+      const destination = row(window, nodeKey(10, 14, 'other'))
+      await destination.locator('.node-enter-control').click()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      const nextInput = destination.locator('.node-input')
+      await expect(nextInput).toBeFocused()
+      if (pending) await expect(window.locator('.agenda-list')).toHaveScreenshot('agenda-replace-editable-row.png')
+      await window.keyboard.type('Y')
+      await expect(nextInput).toHaveText('Y026-10-14 Other')
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('Meta+z')
+      await expect(destination.locator('.node-input')).toHaveText('2026-10-14 Other')
+      await row(window, nodeKey(10, 14, 'plan')).click()
+      await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toHaveText(
+        `2026-10-14 ${pending ? 'X' : 'P'}repare`,
+      )
+    })
+  }
+
+  test('keeps Replace through an inactive occurrence and a focused-day heading, then resumes editing', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [node('multi', '2026-10-14 2026-10-16 Shared'), node('other', '2026-10-14 Other')] },
+      location: { currentParentId: null, selectedNodeId: 'multi' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await openAndSelect(window, nodeKey(10, 14, 'multi'))
+    await window.keyboard.press('R')
+    await row(window, nodeKey(10, 16, 'multi'))
+      .locator('.node-enter-control')
+      .click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    const active = row(window, nodeKey(10, 16, 'multi')).locator('.node-input')
+    await expect(active).toBeFocused()
+    await window.keyboard.type('X')
+    await expect(active).toHaveText('X026-10-14 2026-10-16 Shared')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('Meta+z')
+    await row(window, dayKey(10, 14)).click()
+    await window.keyboard.press('Meta+.')
+    const editor = row(window, nodeKey(10, 14, 'other')).locator('.node-input')
+    await row(window, nodeKey(10, 14, 'other')).click()
+    await editor.focus()
+    await window.keyboard.press('R')
+    await row(window, dayKey(10, 14)).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.keyboard.type('Z')
+    await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+    await row(window, nodeKey(10, 14, 'other'))
+      .locator('.node-enter-control')
+      .click()
+    await expect(editor).toBeFocused()
+    await window.keyboard.type('Y')
+    await expect(editor).toHaveText('Y026-10-14 Other')
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.keyboard.press('R')
+    await row(window, dayKey(10, 14)).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.getByLabel('Vim mode').click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
   test('lands boundary and viewport motions on destination text before its image', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

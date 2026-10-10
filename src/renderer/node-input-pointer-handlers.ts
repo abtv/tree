@@ -161,26 +161,30 @@ export function createPointerHandlers(
       // reset-to-typed-end behavior. A pending replacement of another node is committed by that
       // node's blur, which must not write its text into this input.
       const foreignSession = session.replace !== undefined && session.replace.nodeId !== node.id
-      if (!foreignSession) finishVimReplace(event.currentTarget, false, event.button === 2)
+      if (!foreignSession) finishVimReplace(event.currentTarget, false, event.button === 2 || event.detail >= 2)
       takeReplaceClick(session)
       if (getMode() === 'replace' && event.button === 0 && !event.ctrlKey) beginReplaceClick(session)
       clearCommandAssembly(commandState)
     },
     onMouseUp: (event: MouseEvent<HTMLElement>) => {
       if (getMode() === 'replace') {
+        // An Agenda row press can mount this editor before release. Its row-click adapter waits
+        // until selection and focus have settled before starting the destination session.
+        if (session.replaceClickAgendaKey !== undefined) return
         // The release completes an ordinary text click: the replacement continues at the clicked
-        // caret as a new session. A selection made by a press that left another node ends Replace,
-        // as the blur did before; a same-node selection leaves the mode without a session.
+        // caret or double-clicked word as a new session. A dragged selection keeps its existing
+        // interruption rule; a word selection stays visible until the first replacement key.
         const moved = session.replaceClickMoved === true
         if (!takeReplaceClick(session)) return
         const input = event.currentTarget
         const selection = getSelectionRange(input)
         // A drag that began elsewhere and was released over this input must not start its session.
-        if (input.ownerDocument.activeElement !== input || selection.start !== selection.end) {
+        const selectedWord = event.detail === 2 && selection.start !== selection.end
+        if (input.ownerDocument.activeElement !== input || (selection.start !== selection.end && !selectedWord)) {
           if (moved) changeVimMode('normal')
           return
         }
-        const cursor = getCaret(input)
+        const cursor = selectedWord ? selection.start : getCaret(input)
         applyCaretState(
           node.id,
           pointerCaretTransition(readAuthority().caret, cursor, node.text.length, node.attachment !== undefined),
@@ -188,7 +192,12 @@ export function createPointerHandlers(
           'preserve-selection',
         )
         const baseline = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-        beginReplaceSession(session, { nodeId: node.id, baseline, position: cursor })
+        beginReplaceSession(session, {
+          nodeId: node.id,
+          baseline,
+          position: cursor,
+          ...(selectedWord ? { selectionEnd: selection.end } : {}),
+        })
         return
       }
       if (getMode() !== 'normal') return

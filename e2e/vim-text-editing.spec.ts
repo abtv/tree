@@ -574,6 +574,97 @@ test.describe('Vim editing: text editing', () => {
     await expect(editor).toHaveValue('XYYd')
   })
 
+  for (const rich of [false, true]) {
+    for (const pending of [false, true]) {
+      test(`continues Replace after double-click word selection (${rich ? 'rich' : 'plain'}, pending ${pending})`, async ({
+        userDataDir,
+      }) => {
+        const suffix = rich ? ' https://example.com' : ''
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'root', text: `one word tail${suffix}`, children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        await editor.focus()
+        await setCursor(editor, 0)
+        await window.keyboard.press('R')
+        if (pending) await window.keyboard.type('X')
+        await editor.dblclick({ position: { x: 55, y: 8 } })
+        const selectedWord = () =>
+          editor.evaluate((element) =>
+            element instanceof HTMLTextAreaElement
+              ? element.value.slice(element.selectionStart, element.selectionEnd)
+              : document.getSelection()?.toString(),
+          )
+        await expect.poll(selectedWord).toBe('word')
+        await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+        if (rich && pending)
+          await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-word-selection.png')
+        await window.keyboard.type('Y')
+        const text = () =>
+          editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : element.textContent))
+        await expect.poll(text).toBe(`${pending ? 'X' : 'o'}ne Y tail${suffix}`)
+        await window.keyboard.type('Z')
+        await expect.poll(text).toBe(`${pending ? 'X' : 'o'}ne YZtail${suffix}`)
+        await window.keyboard.press('Escape')
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        await window.keyboard.press('Meta+z')
+        await expect.poll(text).toBe(`${pending ? 'X' : 'o'}ne word tail${suffix}`)
+        if (pending) {
+          await window.keyboard.press('Meta+z')
+          await expect.poll(text).toBe(`one word tail${suffix}`)
+        }
+      })
+    }
+  }
+
+  for (const rich of [false, true]) {
+    test(`continues Replace after double-clicking another node's word (${rich ? 'rich' : 'plain'})`, async ({
+      userDataDir,
+    }) => {
+      const suffix = rich ? ' https://example.com' : ''
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'root', text: 'start', children: [] },
+            { id: 'peer', text: `one word tail${suffix}`, children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const source = node(window, 1)
+      await source.focus()
+      await setCursor(source, 0)
+      await window.keyboard.press('R')
+      await window.keyboard.type('X')
+      const destination = node(window, 2)
+      await destination.dblclick({ position: { x: 55, y: 8 } })
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await expect(source).toHaveValue('Xtart')
+      await window.keyboard.type('YZ')
+      await expect
+        .poll(() =>
+          destination.evaluate((element) =>
+            element instanceof HTMLTextAreaElement ? element.value : element.textContent,
+          ),
+        )
+        .toBe(`one YZtail${suffix}`)
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('Meta+z')
+      await expect
+        .poll(() =>
+          destination.evaluate((element) =>
+            element instanceof HTMLTextAreaElement ? element.value : element.textContent,
+          ),
+        )
+        .toBe(`one word tail${suffix}`)
+      await window.keyboard.press('Meta+z')
+      await expect(source).toHaveValue('start')
+    })
+  }
+
   test('leaves an image caret on replacement text after Escape', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

@@ -54,14 +54,14 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Complete |
 | PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Complete |
 | PS-10 | Same for "Interaction-state contract" and "Image and caret transitions"; queue complete; one Product Owner message sent | PS-9 | Same as PS-9; queue recorded here | Complete |
-| PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Blocked on completion of the separately authorized NR-1 to NR-3 runtime corrections |
+| PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Ready; NR-1 to NR-3 complete |
 | PS-12 | Close: lasting knowledge moved to `docs/DEVELOPMENT.md`; plan and index row removed | PS-8, PS-11, Product Owner confirmation | `npm run check:docs`; `npm run format:check:changed` | Planned |
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** Complete the separately authorized runtime corrections in
-[Vim navigation and Replace corrections](vim-navigation-replace-corrections.md),
-then finish PS-11. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`;
+**Next task:** PS-11. The separately authorized runtime corrections in
+[Vim navigation and Replace corrections](vim-navigation-replace-corrections.md)
+are complete. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`;
 if PRODUCT.md changed since the last update of this plan, rerun the guard report
 before trusting the section lists here.
 

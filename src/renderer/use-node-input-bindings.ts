@@ -7,6 +7,7 @@ import {
   hasMultiCharacterSelection,
   nodeTextLength,
   getCaret,
+  readEditableContent,
   hasAttachmentCharacter,
   setCaret,
   setNormalCaret,
@@ -29,7 +30,7 @@ import { repeatStructural as replayStructural } from './vim-structural-repeat'
 import * as nodeVisualCommands from './vim-node-visual-commands'
 import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn, pendingCaretAfterModeChange } from './caret-projection-rules'
-import { createVimEditSessionState, takeReplaceClick } from './vim-edit-session'
+import { beginReplaceClick, beginReplaceSession, createVimEditSessionState, takeReplaceClick } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
@@ -671,19 +672,65 @@ export function useNodeInputBindings({
     const onPress = (event: PointerEvent): void => {
       if (event.button !== 0) return
       pressed = true
+      const target = event.target instanceof Element ? event.target : undefined
+      const row = target?.closest<HTMLElement>('.agenda-row')
+      // A read-only row has no input blur handler. Leaving its row surface must still end
+      // Replace, just as blur to an outside control does when an editor owns focus.
+      if (latestVimMode.current === 'replace' && document.activeElement?.matches('.agenda-row') && !row) {
+        takeReplaceClick(vimSession.current)
+        changeVimMode('normal')
+      }
+      if (
+        latestVimMode.current === 'replace' &&
+        !event.ctrlKey &&
+        row !== undefined &&
+        row !== null &&
+        !target?.closest('.node-input, button, a[href]')
+      ) {
+        // Row surfaces can replace an editor during selection, before it receives blur. Resolve
+        // its buffer here and keep the click intent through focus changes to read-only rows.
+        // Defer native focus until the row's click selects it; focusing on press could unmount
+        // the pressed row and send its release to the list instead of the destination row.
+        event.preventDefault()
+        finishVimReplace(undefined, false, true)
+        beginReplaceClick(vimSession.current, row.dataset.agendaKey)
+      }
       const input = document.activeElement
       if (!(input instanceof HTMLElement) || event.shiftKey || latestVimMode.current !== 'normal') return
       if (!(event.target instanceof Node) || !input.contains(event.target)) return
       if (![...inputs.current.values()].includes(input) || hasMultiCharacterSelection(input)) return
       setCaret(input, getCaret(input))
     }
-    const onRelease = (): void => {
+    const onRelease = (event: Event): void => {
+      if (
+        event.type === 'blur' &&
+        latestVimMode.current === 'replace' &&
+        document.activeElement?.matches('.agenda-row')
+      ) {
+        takeReplaceClick(vimSession.current)
+        changeVimMode('normal')
+      }
+      const target = event.target instanceof Element ? event.target : undefined
+      const agendaPressedKey = vimSession.current.replaceClickAgendaKey
+      const agendaClick =
+        event.type === 'pointerup' &&
+        agendaPressedKey !== undefined &&
+        target?.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey === agendaPressedKey
       // The input's mouseup follows this event in the same task; a release it never receives
       // (outside any input, a cancelled pointer, a lost window) must not leave the click pending.
       globalThis.setTimeout(() => {
         const moved = vimSession.current.replaceClickMoved === true
-        if (takeReplaceClick(vimSession.current) && moved && latestVimMode.current === 'replace')
-          changeVimMode('normal')
+        if (!takeReplaceClick(vimSession.current) || latestVimMode.current !== 'replace') return
+        if (!agendaClick) {
+          if (moved) changeVimMode('normal')
+          return
+        }
+        const input = document.activeElement
+        const entry = [...inputs.current.entries()].find(([, candidate]) => candidate === input)
+        if (entry === undefined) return // A read-only row retains the mode without an edit session.
+        const [nodeId, editor] = entry
+        const baseline = editor instanceof HTMLTextAreaElement ? editor.value : readEditableContent(editor).text
+        beginReplaceSession(vimSession.current, { nodeId, baseline, position: getCaret(editor) })
       })
       if (!pressed) return
       pressed = false
@@ -712,7 +759,7 @@ export function useNodeInputBindings({
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [changeVimMode])
+  }, [changeVimMode, finishVimReplace])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>

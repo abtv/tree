@@ -34,6 +34,31 @@ async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-
 }
 
 describe('read-only Agenda keyboard', () => {
+  it.each([
+    ['ArrowDown', {}],
+    ['ArrowUp', {}],
+    ['p', { metaKey: true }],
+    ['.', { metaKey: true }],
+    ['z', { metaKey: true }],
+    ['z', { metaKey: true, shiftKey: true }],
+  ])('ends click-preserved Replace before %s', async (key, options) => {
+    const f = await fixture()
+    const day = f.store.getAgendaRows().find((row) => row.kind === 'day')!
+    f.store.applyAgenda({ kind: 'select', key: day.key })
+    f.vim.mode = 'replace'
+    f.press(key as string, options)
+    expect(f.vim.mode).toBe('normal')
+  })
+
+  it('ends click-preserved Replace when returning from a focused day', async () => {
+    const f = await fixture()
+    const day = f.store.getAgendaRows().find((row) => row.kind === 'day')!
+    f.store.applyAgenda({ kind: 'focus-day', key: day.key, scrollTop: 0 })
+    f.vim.mode = 'replace'
+    f.press(',', { metaKey: true })
+    expect(f.vim.mode).toBe('normal')
+  })
+
   it('lands viewport line motions at the first nonblank or image, including on the current row', async () => {
     const f = await fixture({
       roots: [

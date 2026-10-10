@@ -67,6 +67,53 @@ test('Agenda Visual navigation stays responsive with bounded mounted rows and no
 })
 
 // @requirement PRODUCT.md §22.1
+test('Agenda Replace row clicks stay responsive with bounded mounted rows and no saves', async ({ userDataDir }) => {
+  seedDocument(userDataDir, agendaSeed(3000))
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await installSaveProbe(app)
+  await window.keyboard.press('Meta+p')
+  const destination = window.locator('.agenda-row[data-node-id="dated-0"]').first()
+  await destination.click()
+  const input = window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })
+  await expect(input).toBeFocused()
+  await window.keyboard.press('R')
+  await window.evaluate(() => {
+    const samples: number[] = []
+    ;(window as unknown as { agendaReplaceClicks: number[] }).agendaReplaceClicks = samples
+    document.addEventListener(
+      'pointerup',
+      (event) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+      },
+      { capture: true },
+    )
+  })
+  for (let index = 0; index < 10; index += 1) {
+    await window.locator('.agenda-row-day').first().click()
+    await destination.locator('.node-enter-control').click()
+    await expect(input).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+  }
+  await window.waitForFunction(
+    () => (window as unknown as { agendaReplaceClicks: number[] }).agendaReplaceClicks.length === 20,
+  )
+  const samples = await window.evaluate(() =>
+    (window as unknown as { agendaReplaceClicks: number[] }).agendaReplaceClicks.toSorted((a, b) => a - b),
+  )
+  const saves = await readSaves(app)
+  recordPerfResult({
+    kind: 'state',
+    scenario: 'agenda-6000-occurrences-replace-clicks',
+    samples: samples.length,
+    metrics: { clickP95Ms: round(samples[18]!), clickMaxMs: round(samples[19]!), saves },
+  })
+  expect(samples[18]).toBeLessThan(50)
+  expect(samples[19]).toBeLessThan(100)
+  expect(saves).toBe(0)
+  expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+})
+
+// @requirement PRODUCT.md §22.1
 test('Agenda typing keeps mounted rows bounded and stays within the interactive budget', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
