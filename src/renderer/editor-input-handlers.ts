@@ -99,7 +99,7 @@ export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefi
  * Finishes a pending Insert or Replace session before a command that moves focus off the current
  * node (`Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo). A pending Insert session's text is already
  * live in the store, so consuming it without `completed` records nothing and keeps the previous
- * repeatable change, per PRODUCT §20.2.1 T8; a pending Replace session commits its buffered text and
+ * repeatable change, per PRODUCT §20.2.19; a pending Replace session commits its buffered text and
  * returns to Normal mode, matching the documented undo/redo rule. Character Visual mode's stale
  * command assembly clears while the mode stays active, and whole-node Visual mode ends because its
  * range belongs to the displayed level being left.
@@ -157,7 +157,7 @@ export function createEditorKeyDownHandler({
   vim,
 }: EditorKeyboardHandlerDependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event): void => {
-    // PRODUCT §20.2 suspends Vim handling during native text composition. The `composing` state is
+    // PRODUCT §20.2.27 suspends Vim handling during native text composition. The `composing` state is
     // set by `onCompositionStart`, but the keydown that begins composition can arrive before that
     // handler runs, so the browser's own flag on the native event is honored as well: a composing
     // key must not run a command, move the caret, or edit text. The optional read keeps the partial
@@ -394,7 +394,7 @@ export function createEditorKeyDownHandler({
       if (vim.mode === 'insert' && event.key === 'Escape') {
         event.preventDefault()
         // Escape is the one completion that records the plain session's diff for `.`; every other
-        // finish path below consumes it without recording (PRODUCT §20.2.1 T8).
+        // finish path below consumes it without recording (PRODUCT §20.2.19).
         vim.finishInsert(event.currentTarget, true)
         clearCommandAssembly(vim.commandState)
         store.cancelAgendaMove()

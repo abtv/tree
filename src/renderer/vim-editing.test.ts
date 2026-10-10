@@ -18,7 +18,7 @@ import {
 } from './vim-editing'
 
 // @requirement PRODUCT.md §20.2.9
-describe('Vim image character positions (PRODUCT §4.3 and §20.2)', () => {
+describe('Vim image character positions (PRODUCT §4.3 and §20.2.9)', () => {
   it.each([
     {
       name: 'plain text ends on its final character',

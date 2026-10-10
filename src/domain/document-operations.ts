@@ -561,7 +561,7 @@ export type SiblingRangeJoin =
 
 /**
  * Joins `count` consecutive siblings starting at `firstId` into the first one (`docs/PRODUCT.md`
- * §20.2.1 T6). The first node keeps its ID, attachment, and links; the texts are concatenated, with
+ * §20.2.14). The first node keeps its ID, attachment, and links; the texts are concatenated, with
  * hyperlink ranges moving with their text, and the children of every joined node follow in sibling
  * order with their IDs and subtrees intact. With `spaced`, each join first removes the earlier text's
  * trailing and the later text's leading whitespace and then inserts one space when both remain

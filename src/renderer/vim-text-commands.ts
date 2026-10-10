@@ -157,7 +157,7 @@ export function transformCase(text: string, mode: 'toggle' | 'lower' | 'upper'):
 /**
  * The edits that change the case of `[start, end)` outside every hyperlink. A link's text is its URL,
  * so recasing it would change the address and drop the link; the case commands leave link text as it
- * is (`docs/PRODUCT.md` §20.2) and rewrite only the segments between links. Segments whose case does
+ * is (`docs/PRODUCT.md` §20.2.11) and rewrite only the segments between links. Segments whose case does
  * not change produce no edit.
  */
 export function caseEdits(

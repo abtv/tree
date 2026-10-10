@@ -7,7 +7,7 @@ describeForEachEditingMode('initial state', ({ mode }) => {
   // @requirement PRODUCT.md §20.3
   test('first launch creates one empty focused root that is persisted', async ({ userDataDir }) => {
     // The standard variant is a true first run with no saved preference, so it also covers the
-    // first-run default (PRODUCT.md §20.2).
+    // first-run default (PRODUCT.md §20.2.1).
     const { window } = await launchTree(userDataDir, mode === 'standard' ? { vimPreference: 'saved' } : {})
 
     await expect(window.getByLabel('Vim mode')).toHaveCount(mode === 'vim' ? 1 : 0)

@@ -38,7 +38,7 @@ import { navigateVertically } from './vim-vertical-navigation'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 
-/** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2). */
+/** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2.15). */
 const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
   c: 'close',
   o: 'open',
@@ -49,7 +49,7 @@ const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
   R: 'open-all',
 }
 
-/** The case operators after the `g` prefix: `gu`, `gU`, and `g~` (`docs/PRODUCT.md` §20.2.1 T5). */
+/** The case operators after the `g` prefix: `gu`, `gU`, and `g~` (`docs/PRODUCT.md` §20.2.11). */
 const CASE_OPERATOR_MODES = { u: 'lower', U: 'upper', '~': 'toggle' } as const
 
 /**
@@ -740,7 +740,7 @@ export function handleVimKey(
   } else if (visual && (event.key === 'p' || event.key === 'P')) {
     const register = vim.register.current
     if (register.kind === 'text' && register.value !== '' && selection.start !== selection.end) {
-      // A count repeats the incoming value once, before the replacement (`docs/PRODUCT.md` §20.2.1).
+      // A count repeats the incoming value once, before the replacement (`docs/PRODUCT.md` §20.2.20).
       const incoming = register.value.repeat(count)
       const removed = node.text.slice(selection.start, selection.end)
       // A rejected edit (persistence lock) leaves the register, the mode, and the selection alone.
@@ -816,7 +816,7 @@ export function handleVimKey(
         return handled()
       }
       // A completed Insert-session change (insert/change/substitute) replays at the current caret in
-      // whatever node is current, including another one (PRODUCT §20.2.1 T8). Whether the session was
+      // whatever node is current, including another one (PRODUCT §20.2.19). Whether the session was
       // recorded at all is decided when it finishes, so no origin-node guard belongs here.
       let text = node.text
       let position = cursor

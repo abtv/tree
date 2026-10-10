@@ -6,7 +6,7 @@ export type VimStructuralInsertSession =
   | { kind: 'visual'; originNodeId: string; command: 'c' | 's'; span: number }
 
 /**
- * The latest Visual selection, remembered for `gv` (`docs/PRODUCT.md` §20.2.1 T7). A character-wise
+ * The latest Visual selection, remembered for `gv` (`docs/PRODUCT.md` §20.2.25). A character-wise
  * selection is the node and its two character offsets; a whole-node selection is its two endpoint
  * IDs plus the IDs of the sibling range between them in ascending order, so a node inserted,
  * deleted, or replaced inside the range is detected when the memory is resolved.

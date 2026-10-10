@@ -243,7 +243,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
   test('crosses an expanded branch boundary with ArrowLeft and ArrowRight', async ({ userDataDir }) => {
     // ArrowLeft/ArrowRight boundary crossing is an Insert-mode arrow-key path (PRODUCT §4.3); Normal
-    // mode's h/l stay within the node's own text (§20.2) and never cross a node boundary.
+    // mode's h/l stay within the node's own text (§20.2.9) and never cross a node boundary.
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir)
 

@@ -937,7 +937,7 @@ export class EditorStore {
   }
 
   /**
-   * Vim `p` (`docs/PRODUCT.md` §20.2): on a node with children, "after" puts the content before its
+   * Vim `p` (`docs/PRODUCT.md` §20.2.13): on a node with children, "after" puts the content before its
    * first child, like `o`, and `expandId` names the node whose fold must open to show it. `P` keeps
    * the plain sibling-before insertion.
    */
@@ -1069,7 +1069,7 @@ export class EditorStore {
   }
 
   /**
-   * Whole-node or character Visual `>` / `<` (`docs/PRODUCT.md` §20.2.1): moves the sibling range
+   * Whole-node or character Visual `>` / `<` (`docs/PRODUCT.md` §20.2.23): moves the sibling range
    * between `anchorId` and `focusId` `count` levels as one undoable command. Tab may opt into
    * keeping an outdent within the current parent; the default retains Vim `<` behavior. Returns
    * whether it changed the document; an impossible request changes nothing and a depth failure is
@@ -1118,7 +1118,7 @@ export class EditorStore {
   }
 
   /**
-   * Normal `J` / `gJ` (`docs/PRODUCT.md` §20.2.1 T6) joins the selected node with the following
+   * Normal `J` / `gJ` (`docs/PRODUCT.md` §20.2.14) joins the selected node with the following
    * siblings, and whole-node Visual `J` / `gJ` joins the range between `range.anchorId` and
    * `range.focusId`. Either is one undoable command; returns whether it changed the document. A
    * range with two attached nodes is reported and changes nothing.

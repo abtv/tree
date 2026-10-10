@@ -100,8 +100,8 @@ export interface VimPendingCommand {
 }
 
 /**
- * The fold transitions the `z` keys request (`docs/PRODUCT.md` §20.2). The per-node commands act on
- * the selected node's own fold; the `-all` forms act on every fold in the current location.
+ * The fold transitions the `z` keys request (`docs/PRODUCT.md` §20.2.15). The per-node commands act
+ * on the selected node's own fold; the `-all` forms act on every fold in the current location.
  */
 export type VimFoldCommand = NodeFoldCommand | 'close-all' | 'open-all'
 
@@ -114,7 +114,7 @@ export interface VimKeyboardState {
   /**
    * Finish the pending Insert session. Only Escape completes it (`completed = true`) and records its
    * diff for `.`; every other caller passes no flag, consumes the plain session, and keeps the
-   * previous repeatable change (PRODUCT §20.2.1 T8). Structural sessions always capture.
+   * previous repeatable change (PRODUCT §20.2.19). Structural sessions always capture.
    */
   finishInsert: (input: HTMLElement, completed?: boolean) => void
   beginReplace: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void
@@ -156,7 +156,7 @@ export interface VimKeyboardState {
     selection: () => { anchorId: string; focusId: string } | undefined
   }
   /**
-   * Normal `gv` (`docs/PRODUCT.md` §20.2.1 T7): re-enter the remembered Visual selection when it is
+   * Normal `gv` (`docs/PRODUCT.md` §20.2.25): re-enter the remembered Visual selection when it is
    * still valid and displayed; otherwise do nothing.
    */
   restoreVisual: () => void
@@ -173,7 +173,7 @@ export interface VimKeyboardState {
     confineOutdentToCurrentParent?: boolean,
   ) => void
   /**
-   * `dj`, `dk`, `yj`, `yk`, `cj`, and `ck` (`docs/PRODUCT.md` §20.2.1 T4): the node and the `count`
+   * `dj`, `dk`, `yj`, `yk`, `cj`, and `ck` (`docs/PRODUCT.md` §20.2.11): the node and the `count`
    * sibling subtrees beyond it in `direction`, clamped at the first and last sibling.
    */
   verticalOperator: (nodeId: string, operator: 'd' | 'y' | 'c', direction: 'down' | 'up', count: number) => void

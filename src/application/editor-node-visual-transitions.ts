@@ -107,7 +107,7 @@ export type NodeVisualShiftTransition =
 /**
  * `>` and `<` over the sibling range between `anchorId` and `focusId` (a single node for character
  * Visual mode): `count` successive one-level moves that either all happen or leave the document
- * alone (`docs/PRODUCT.md` §20.2.1). The selected node and caret offset stay as they are; only the
+ * alone (`docs/PRODUCT.md` §20.2.23). The selected node and caret offset stay as they are; only the
  * displayed location changes, and only when `out` takes the range above it.
  */
 export function nodeVisualShiftTransition(
@@ -188,7 +188,7 @@ function joinTransition(
 /**
  * Normal `J` and `gJ`: joins the selected node with the `count - 1` siblings after it, at least one,
  * clamped at the last sibling. A node with no following sibling and the current-parent heading
- * change nothing (`docs/PRODUCT.md` §20.2.1 T6).
+ * change nothing (`docs/PRODUCT.md` §20.2.14).
  */
 export function forwardJoinTransition(
   document: Document,

@@ -104,7 +104,7 @@ export function createFirstChildTransition(
 }
 
 /**
- * Vim `o` on a selected node (`docs/PRODUCT.md` §20.2): a node with children gets an empty first child
+ * Vim `o` on a selected node (`docs/PRODUCT.md` §20.2.10): a node with children gets an empty first child
  * in place, without changing the displayed location; a leaf, or the current-parent heading, keeps the
  * plain sibling-below creation. `expandId` names the node whose fold must open to show the new child.
  */
@@ -390,7 +390,7 @@ export function deleteSelectedTransition(
 }
 
 /**
- * Counted `dd` (`docs/PRODUCT.md` §20.2.1 T1): deletes the selected node and the following real
+ * Counted `dd` (`docs/PRODUCT.md` §20.2.16): deletes the selected node and the following real
  * siblings, up to `count` and clamped at the last one, as one document change. Returns the removed
  * subtrees so the caller can publish them to the register only after the change succeeded. The
  * selection moves to the sibling after the range, else the one before it, else the parent.

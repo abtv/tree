@@ -1195,7 +1195,7 @@ describe('editor keyboard handler', () => {
       'Second',
     ])
     expect(new Set(children.map(({ id }) => id)).size).toBe(8)
-    // A counted put is one undoable command (PRODUCT §20.2.1 T1).
+    // A counted put is one undoable command (PRODUCT §20.2.16).
     store.undo()
     expect(snapshot().document).toEqual(treeDocument)
     const deletion = await textFixture(node, 'normal', options)

@@ -2,7 +2,7 @@ import { locateNode, type Document, type Location } from '../domain/document'
 import { rememberNodeVisual, type VimCommandState, type VimVisualMemory } from './vim-command-state'
 
 /**
- * What `gv` restores: a validated Visual selection (`docs/PRODUCT.md` §20.2.1 T7). Kept free of
+ * What `gv` restores: a validated Visual selection (`docs/PRODUCT.md` §20.2.25). Kept free of
  * React, DOM, Electron, and store dependencies so every validity rule is unit-testable.
  */
 export type VisualRestore =

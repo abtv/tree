@@ -48,7 +48,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Complete |
 | PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Complete |
 | PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Complete |
-| PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Planned |
+| PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Complete |
 | PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Planned |
 | PS-7 | Batch B split verbatim: §20.5, §20.8, §20.9, §23.2, §23.4, §23.5, §23.11, §23.12 | PS-6 | Same as PS-6 | Planned |
 | PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Planned |
@@ -59,7 +59,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-5. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-6. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -127,6 +127,18 @@ Subsection numbers for PS-5 labels: T1 counts §20.2.16; T2 Visual shifts
 character Visual `p` and `P`, §20.2.23 for whole-node Visual `p` and `P` (read the
 comment's code); T4 vertical operators and T5 text commands §20.2.11; T6 joins
 §20.2.14; T7 `gv` §20.2.25; T8 dot repeat §20.2.19.
+
+PS-5 completed (2026-10-10): the 24 dangling `§20.2.1` and 9 plain `§20.2`
+code-comment references in 19 files now cite numbered subsections; comments
+only, no code change. Labels followed the mapping above, after reading each
+comment's code: the count before a Visual put (`vim-keyboard-handler.ts`) is
+character Visual §20.2.20, and the register exchange in `vim-edit-session.ts`
+and the Visual shifts in `editor-store.ts` and
+`editor-node-visual-transitions.ts` are §20.2.23. Plain references: `o`
+§20.2.10, Normal `p` §20.2.13, case around hyperlinks §20.2.11, `z` folds
+§20.2.15, composition §20.2.27, `h`/`l` and image positions §20.2.9, first-run
+default §20.2.1. A search for `§20.2` followed by anything other than a
+subsection number, and for `§20.2.1 T`, returns nothing.
 
 ## Conventions
 

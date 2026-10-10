@@ -96,7 +96,7 @@ export function finishPendingEditSessions(deps: {
 }): boolean {
   const { session, finishVimReplace, getMode, changeVimMode } = deps
   // A shutdown flush interrupts a pending plain Insert session: consume it without recording, so a
-  // later Escape cannot capture the session the flush already ended (PRODUCT §20.2.1 T8). The
+  // later Escape cannot capture the session the flush already ended (PRODUCT §20.2.19). The
   // structural session needs its input's text to capture, so it stays pending for a later finish.
   takeInsertSession(session)
   const committed = finishVimReplace()
@@ -108,7 +108,7 @@ export function finishPendingEditSessions(deps: {
  * Finish the pending Insert session. The structural session always captures; the plain session
  * is recorded for `.` only when Escape completed it on its own node. Every other finish (blur,
  * pointer, navigation, shortcut, toggle, flush) consumes it and keeps the previous repeatable
- * change (PRODUCT §20.2.1 T8). The registered-input check is the fail-closed backstop against a
+ * change (PRODUCT §20.2.19). The registered-input check is the fail-closed backstop against a
  * session that crossed to another node without a blur consuming it first.
  */
 export function finishInsertSession(

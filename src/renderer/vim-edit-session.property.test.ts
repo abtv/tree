@@ -95,7 +95,7 @@ it('captures an Insert session as a diff that reconstructs its final text on the
         }
         if (captured === undefined) throw new Error('expected a captured text change')
         // The payload carries no origin node, so the same diff can replay at another caret in another
-        // node (PRODUCT §20.2.1 T8).
+        // node (PRODUCT §20.2.19).
         expect(captured).not.toHaveProperty('nodeId')
         const capture = captured as {
           insertedText?: string

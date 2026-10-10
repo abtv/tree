@@ -133,7 +133,7 @@ export function applyReplaceKey(
  * The repeat-change payload a completed Insert session captures, or undefined when a plain
  * `i`/`a`/`I`/`A` session is unchanged or the session's kind is not text-capturing. The payload is
  * node-agnostic so `.` can replay the same typed diff at the current caret in another node; whether
- * a session is recorded at all is decided at the finish site (PRODUCT §20.2.1 T8).
+ * a session is recorded at all is decided at the finish site (PRODUCT §20.2.19).
  */
 export function insertRepeatChange(session: VimInsertSession, finalText: string): VimTextChange | undefined {
   const { baseline, position, change } = session
@@ -151,7 +151,7 @@ export function registerSource(register: VimRegister): NodeForest | undefined {
 
 /**
  * The register update for a whole-node Visual command that produced a result. `p` exchanges: the
- * removed selection becomes the register; `P` keeps the incoming register (`docs/PRODUCT.md` §20.2.1).
+ * removed selection becomes the register; `P` keeps the incoming register (`docs/PRODUCT.md` §20.2.23).
  */
 export function visualCommandRegister(command: NodeVisualCommand, result: NodeForest): VimRegister | undefined {
   return 'ydxcsp'.includes(command) ? { kind: 'nodes', value: result } : undefined
