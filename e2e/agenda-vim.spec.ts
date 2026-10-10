@@ -68,6 +68,85 @@ function seed(userDataDir: string): void {
 }
 
 test.describe('Agenda Vim commands', () => {
+  // @requirement PRODUCT.md §23.4
+  test('vertical navigation enters and leaves images and preserves a clamped image return position', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          node('before', '2026-10-14 Before'),
+          { ...node('image', '2026-10-14 Image'), attachment: { id: 'image', mimeType: 'image/png' } },
+          node('after', '2026-10-14 After'),
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'before' },
+    })
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    writeFileSync(
+      attachmentPath(userDataDir, 'image'),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    )
+    const { window } = await launchTree(userDataDir)
+    await openAndSelect(window, nodeKey(10, 14, 'image'))
+    const imageRow = row(window, nodeKey(10, 14, 'image'))
+    const input = imageRow.locator('.node-input')
+    const image = imageRow.getByRole('button', { name: 'Open image preview' })
+    const offset = async (): Promise<number> =>
+      input.evaluate((element) => {
+        if (element instanceof HTMLTextAreaElement) return element.selectionStart
+        const selection = document.getSelection()!
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return range.toString().length
+      })
+    await window.keyboard.type('05l')
+    expect(await offset()).toBe(5)
+    await window.keyboard.press('j')
+    await expect(image).toHaveClass(/attachment-image-caret/)
+    await expect(imageRow).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.press('k')
+    await expect(image).not.toHaveClass(/attachment-image-caret/)
+    expect(await offset()).toBe(5)
+    await window.keyboard.type('2j')
+    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.press('k')
+    await expect(image).toHaveClass(/attachment-image-caret/)
+    await window.keyboard.press('k')
+    await expect(image).not.toHaveClass(/attachment-image-caret/)
+    expect(await offset()).toBe('2026-10-14 Image'.length - 1)
+    await window.keyboard.press('G')
+    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.type('07l')
+    await window.keyboard.press('j')
+    await window.keyboard.press('j')
+    const afterInput = row(window, nodeKey(10, 14, 'after')).locator('.node-input')
+    expect(
+      await afterInput.evaluate((element) => {
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        const selection = document.getSelection()!
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return range.toString().length
+      }),
+    ).toBe(7)
+    await window.keyboard.type('2k')
+    await expect(row(window, nodeKey(10, 14, 'before'))).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.type('2j')
+    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    const imageIndex = await imageRow.evaluate((element) =>
+      [...document.querySelectorAll('.agenda-row')].indexOf(element),
+    )
+    await window.keyboard.type(`${imageIndex + 1}G`)
+    await expect(image).toHaveClass(/attachment-image-caret/)
+    await window.keyboard.press('L')
+    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+  })
+
   // @requirement PRODUCT.md §23.9
   // @requirement PRODUCT.md §23.10
   test('Normal Enter opens links and images without splitting or leaving Agenda', async ({ userDataDir }) => {

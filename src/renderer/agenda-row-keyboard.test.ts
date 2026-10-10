@@ -8,6 +8,8 @@ import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { dayNumberOf } from '../domain/calendar-date'
 import type { Document } from '../domain/document'
 import * as viewport from './scroll-viewport'
+import { getCaret, setCaret } from './editor-dom'
+import type { VimCaretState } from './vim-caret-transition'
 
 async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-10-15 Prepare', children: [] }] }) {
   const harness = await createRealStoreHarness({
@@ -32,6 +34,142 @@ async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-
 }
 
 describe('read-only Agenda keyboard', () => {
+  it('lands viewport line motions at the first nonblank or image, including on the current row', async () => {
+    const f = await fixture({
+      roots: [
+        { id: 'first', text: '  2026-10-15 First', children: [] },
+        { id: 'image', text: '2026-10-15 Image', children: [], attachment: { id: 'image', mimeType: 'image/png' } },
+        { id: 'last', text: '   2026-10-15 Last', children: [] },
+      ],
+    })
+    const rows = f.store.getAgendaRows().filter((row) => row.kind === 'node')
+    f.store.applyAgenda({ kind: 'select', key: rows[0]!.key, cursor: 5 })
+    const bounds = vi.spyOn(viewport, 'viewportBounds').mockReturnValue({ top: 0, bottom: 100 })
+    const edges = vi.spyOn(viewport, 'viewportScrollEdges').mockReturnValue({ atStart: true, atEnd: true })
+    const elements = rows.map((row, index) => {
+      const element = document.createElement('div')
+      element.className = 'agenda-row'
+      element.dataset.agendaKey = row.key
+      element.getBoundingClientRect = () => ({ top: index * 25, bottom: (index + 1) * 25 }) as DOMRect
+      document.body.append(element)
+      return element
+    })
+    try {
+      f.press('H')
+      expect(f.snapshot().focus.cursor).toBe(2)
+      f.press('M')
+      expect(f.snapshot().focus).toMatchObject({ nodeId: 'image', cursor: '2026-10-15 Image'.length })
+      f.press('L')
+      expect(f.snapshot().focus).toMatchObject({ nodeId: 'last', cursor: 3 })
+    } finally {
+      elements.forEach((element) => element.remove())
+      bounds.mockRestore()
+      edges.mockRestore()
+    }
+  })
+
+  it.each(['down', 'up'] as const)(
+    'matches Tree when a counted motion passes an intermediate image moving %s',
+    async (direction) => {
+      const f = await fixture({
+        roots: [
+          { id: 'before', text: '2026-10-15 Before', children: [] },
+          { id: 'image', text: '2026-10-15 Image', children: [], attachment: { id: 'image', mimeType: 'image/png' } },
+          { id: 'after', text: '2026-10-15 After', children: [] },
+        ],
+      })
+      const source = direction === 'down' ? 'before' : 'after'
+      const destination = direction === 'down' ? 'after' : 'before'
+      const row = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === source)!
+      f.store.applyAgenda({ kind: 'select', key: row.key, cursor: 4 })
+      const input = document.createElement('textarea')
+      input.className = 'node-input'
+      input.value = `2026-10-15 ${source}`
+      document.body.append(input)
+      setCaret(input, 4)
+      const handler = createAgendaKeyDownHandler({ store: f.store, vim: f.vim })
+      try {
+        handler({ key: '2', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+        handler({
+          key: direction === 'down' ? 'j' : 'k',
+          currentTarget: input,
+          preventDefault: vi.fn(),
+        } as unknown as KeyboardEvent<HTMLElement>)
+        expect(f.snapshot().location.selectedNodeId).toBe(destination)
+        expect(f.snapshot().focus.cursor).toBe(4)
+      } finally {
+        input.remove()
+      }
+    },
+  )
+
+  it('keeps caret and focus token when vertical navigation clamps on an editor', async () => {
+    const f = await fixture()
+    const last = f.store.getAgendaRows().at(-1)!
+    f.store.applyAgenda({ kind: 'select', key: last.key, cursor: 5 })
+    const before = f.snapshot().focus
+    f.press('j')
+    f.press('j')
+    expect(f.snapshot().focus).toBe(before)
+  })
+
+  it('counts image entry as a vertical step and restores a non-final text position', async () => {
+    const f = await fixture({
+      roots: [
+        {
+          id: 'image',
+          text: '2026-10-15 Image',
+          children: [],
+          attachment: { id: 'attachment', mimeType: 'image/png' },
+        },
+        { id: 'after', text: '2026-10-15 After', children: [] },
+      ],
+    })
+    const image = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'image')!
+    f.store.applyAgenda({ kind: 'select', key: image.key, cursor: 4 })
+    const input = document.createElement('textarea')
+    input.className = 'node-input'
+    input.value = '2026-10-15 Image'
+    document.body.append(input)
+    setCaret(input, 4)
+    let caret: VimCaretState = { cursor: 4, imageActive: false }
+    f.vim.getCaretState = (_id, cursor) => ({ ...caret, cursor })
+    f.vim.applyCaretState = (_id, next) => {
+      caret = next
+      setCaret(input, next.cursor)
+    }
+    const handler = createAgendaKeyDownHandler({ store: f.store, vim: f.vim })
+    const press = (key: string): void =>
+      handler({ key, currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+    try {
+      press('j')
+      expect(f.snapshot().agenda?.selectedKey).toBe(image.key)
+      expect(caret).toEqual({ cursor: input.value.length, imageActive: true, imageTextReturnCursor: 4 })
+      press('k')
+      expect(caret).toEqual({ cursor: 4, imageActive: false })
+      expect(getCaret(input)).toBe(4)
+      press('2')
+      press('j')
+      expect(f.snapshot().location.selectedNodeId).toBe('after')
+      expect(f.snapshot().focus.cursor).toBe(input.value.length - 1)
+      press('k')
+      expect(f.snapshot().location.selectedNodeId).toBe('image')
+      expect(caret.imageActive).toBe(true)
+      expect(caret.imageTextReturnCursor).toBe(input.value.length - 1)
+    } finally {
+      input.remove()
+    }
+  })
+
+  it('clamps an oversized counted G before resolving its destination caret', async () => {
+    const f = await fixture()
+    f.press('9')
+    f.press('9')
+    f.press('9')
+    f.press('G')
+    expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows().at(-1)!.key)
+  })
+
   it('applies all-fold commands from a gap and cancels unsupported fold keys', async () => {
     const f = await fixture()
     const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!

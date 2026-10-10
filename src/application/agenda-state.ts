@@ -4,6 +4,8 @@ import { collapseGap, revealNext } from '../domain/agenda-timeline'
 import type { AgendaRow } from './agenda-rows'
 
 export interface AgendaState {
+  /** Explicit arrival offset for the selected row; runtime only, never persisted. */
+  readonly selectionCursor?: number
   readonly origin: { readonly location: Location; readonly cursor: number }
   readonly scopeParentId: NodeId | null
   readonly today: DayNumber
@@ -100,7 +102,8 @@ export function applyAgendaCommand(
     }
   }
   if (command.kind === 'select') {
-    return selectAgendaRow(state, row)
+    const next = selectAgendaRow(state, row)
+    return command.cursor === undefined ? next : { ...next, selectionCursor: command.cursor }
   }
   if (command.kind === 'toggle-gap') {
     if (row.kind !== 'gap') return state
@@ -202,6 +205,7 @@ export function selectAgendaRow(state: AgendaState, row: AgendaRow): AgendaState
   const rest = { ...state }
   delete rest.activeOccurrence
   delete rest.pinnedOccurrence
+  delete rest.selectionCursor
   return {
     ...rest,
     selectedKey: row.key,

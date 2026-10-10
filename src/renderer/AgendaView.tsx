@@ -68,10 +68,11 @@ export function AgendaView({
 }): React.JSX.Element {
   const elements = useRef(new Map<string, HTMLDivElement>())
   // The caret of a row without an editor is renderer state: it changes on every motion key, so it
-  // stays out of the store and the document. A selection change resets it to offset zero.
-  const [caretState, setCaretState] = useState<RowCaret>(() => arrivalCaret(agenda.selectedKey))
-  if (caretState.key !== agenda.selectedKey) setCaretState(arrivalCaret(agenda.selectedKey))
-  const caret = caretState.key === agenda.selectedKey ? caretState : arrivalCaret(agenda.selectedKey)
+  // stays out of the store and the document. Navigation supplies the arrival offset.
+  const arrival = { key: agenda.selectedKey, anchor: agenda.selectionCursor ?? 0, focus: agenda.selectionCursor ?? 0 }
+  const [caretState, setCaretState] = useState<RowCaret>(() => arrival)
+  if (caretState.key !== agenda.selectedKey) setCaretState(arrival)
+  const caret = caretState.key === agenda.selectedKey ? caretState : arrival
   // Key handlers read the caret between renders, so a ref mirrors it and every write updates both.
   const caretRef = useRef(caret)
   useLayoutEffect(() => {

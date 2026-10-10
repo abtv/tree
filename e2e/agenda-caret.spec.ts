@@ -63,6 +63,60 @@ const selectionText = (row: Locator): Promise<string | undefined> =>
 
 describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.4
+  test('carries the caret through a day and contextual ancestor into another editor', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          leaf('first', '2026-10-09 First'),
+          node('parent', 'Context ancestor', [leaf('second', '2026-10-10 Second')]),
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, screenshotContentSize)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('ArrowDown')
+    await window.keyboard.press('ArrowDown')
+    const selected = window.locator('.agenda-row[aria-selected="true"]')
+    await expect(selected).toHaveAttribute('data-node-id', 'first')
+    if (mode === 'vim') await window.keyboard.type('0' + '5l')
+    else {
+      await window.keyboard.press('Home')
+      await window.keyboard.press('ArrowRight')
+      await window.keyboard.press('ArrowRight')
+      await window.keyboard.press('ArrowRight')
+      await window.keyboard.press('ArrowRight')
+      await window.keyboard.press('ArrowRight')
+    }
+    const down = mode === 'vim' ? 'j' : 'ArrowDown'
+    await window.keyboard.press(down)
+    await expect(selected).toHaveClass(/agenda-row-day/u)
+    expect((await caretMark(selected))!.before).toBe(5)
+    await expect(window).toHaveScreenshot(screenshotName('agenda-caret-arrival-light.png'))
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(window).toHaveScreenshot(screenshotName('agenda-caret-arrival-dark.png'))
+    await window.emulateMedia({ colorScheme: 'light' })
+    await window.keyboard.press(down)
+    await expect(selected).toHaveAttribute('data-node-id', 'parent')
+    expect((await caretMark(selected))!.before).toBe(5)
+    await window.keyboard.press(down)
+    await expect(selected).toHaveAttribute('data-node-id', 'second')
+    expect(
+      await selected.locator('.node-input').evaluate((input) => {
+        if (input instanceof HTMLTextAreaElement) return input.selectionStart
+        const selection = document.getSelection()!
+        const range = document.createRange()
+        range.selectNodeContents(input)
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return range.toString().length
+      }),
+    ).toBe(5)
+  })
+
+  // @requirement PRODUCT.md §23.4
   test('shows the caret on days, gaps and contextual ancestors but not on unselected rows', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
@@ -134,9 +188,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
   })
 
   // @requirement PRODUCT.md §23.4
-  test('moves, selects and copies over the text of a day, then resets on arrival and never edits', async ({
-    userDataDir,
-  }) => {
+  test('moves, selects and copies over the text of a day without editing', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
     await lockSystemClipboard()
@@ -201,10 +253,11 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await expect(today.locator('.agenda-label')).toHaveText(TODAY_LABEL)
     await expect(today.locator('.node-input')).toHaveCount(0)
     expect(await window.locator('.agenda-row').allTextContents()).toEqual(texts)
-    // Leaving the row and coming back puts the caret at offset zero.
+    // Vertical navigation carries the current position rather than resetting it.
+    const beforeNavigation = (await caretMark(today))!.before
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowUp')
     await expect(today).toHaveAttribute('aria-selected', 'true')
-    expect((await caretMark(today))!.before).toBe(0)
+    expect((await caretMark(today))!.before).toBe(beforeNavigation)
   })
 })

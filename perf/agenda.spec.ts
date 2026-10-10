@@ -296,11 +296,17 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   await window.waitForFunction(
     () => (window as unknown as { agendaProbe: { motion: number[] } }).agendaProbe.motion.length === 40,
   )
+  await window.keyboard.type('99j')
+  await window.keyboard.type('99k')
+  await window.waitForFunction(
+    () => (window as unknown as { agendaProbe: { motion: number[] } }).agendaProbe.motion.length === 42,
+  )
   const probe = await window.evaluate(
     () => (window as unknown as { agendaProbe: { open: number[]; motion: number[] } }).agendaProbe,
   )
   const saves = await readSaves(app)
-  const sorted = probe.motion.toSorted((a, b) => a - b)
+  const sorted = probe.motion.slice(0, 40).toSorted((a, b) => a - b)
+  const countedMotionMs = Math.max(...probe.motion.slice(40))
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences',
@@ -308,6 +314,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
     metrics: {
       openPaintMs: round(probe.open[0]!),
       scrollPaintMs: round(scroll),
+      countedMotionMs: round(countedMotionMs),
       motionP95Ms: round(sorted[38]!),
       motionMaxMs: round(sorted[39]!),
       saves,
@@ -315,6 +322,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   })
   expect(probe.open[0]).toBeLessThan(1000)
   expect(scroll).toBeLessThan(250)
+  expect(countedMotionMs).toBeLessThan(250)
   expect(sorted[38]).toBeLessThan(100)
   expect(sorted[39]).toBeLessThan(250)
   expect(saves).toBe(0)

@@ -7,8 +7,12 @@ import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
 import { getCaret } from './editor-dom'
 import { agendaAllows } from './agenda-key-policy'
 import type { AgendaRow } from '../application/agenda-rows'
-import { handleRowTextKey } from './agenda-row-text-keys'
-import { arrivalCaret, type RowCaret } from './agenda-row-caret'
+import { handleRowTextKey, rowCaretMode } from './agenda-row-text-keys'
+import { arrivalCaret, clampCaret, type RowCaret } from './agenda-row-caret'
+import { requireNode } from '../domain/document'
+import { agendaRowLabel } from './agenda-labels'
+import { firstNonWhitespace } from './vim-editing'
+import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
 
 /** The text and caret of the selected row when it has no editor, owned by the Agenda view. */
 export interface AgendaRowText {
@@ -42,14 +46,98 @@ export function createAgendaKeyDownHandler({
     const index = rows.findIndex((row) => row.key === state.agenda!.selectedKey)
     const row = rows[index]
     if (row === undefined) return
-    const select = (target: number, preserveViewport = false): void => {
+    const textOf = (candidate: AgendaRow): string =>
+      candidate.kind === 'node'
+        ? requireNode(state.document, candidate.nodeId).node.text
+        : agendaRowLabel(
+            candidate,
+            state.agenda!.today,
+            candidate.kind === 'day' && state.agenda!.focusedDay !== undefined,
+          )
+    const hasImage = (candidate: AgendaRow): boolean =>
+      candidate.kind === 'node' &&
+      candidate.role === 'match' &&
+      requireNode(state.document, candidate.nodeId).node.attachment !== undefined
+    const sourceCursor = (): number =>
+      event.currentTarget?.classList.contains('node-input')
+        ? getCaret(event.currentTarget)
+        : clampCaret(
+            rowText?.caret() ?? {
+              key: row.key,
+              anchor: state.agenda!.selectionCursor ?? 0,
+              focus: state.agenda!.selectionCursor ?? 0,
+            },
+            textOf(row).length,
+            rowCaretMode(vim),
+          ).focus
+    const select = (target: number, preserveViewport = false, cursor = sourceCursor(), explicit = false): void => {
       const destination = rows[Math.max(0, Math.min(rows.length - 1, target))]!
+      if (destination.key === row.key && !explicit) return
+      if (destination.key === row.key && rowText !== undefined && !rowText.hasEditor(destination)) {
+        rowText.setCaret(
+          clampCaret(
+            { key: destination.key, anchor: cursor, focus: cursor },
+            textOf(destination).length,
+            rowCaretMode(vim),
+          ),
+        )
+        return
+      }
       beforeSelect?.(preserveViewport)
       store.applyAgenda({
         kind: 'select',
         key: destination.key,
-        cursor: event.currentTarget?.classList.contains('node-input') ? getCaret(event.currentTarget) : 0,
+        cursor,
       })
+    }
+    const vertical = (direction: 'up' | 'down', count: number): void => {
+      if (vim?.mode !== 'normal') {
+        select(index + (direction === 'down' ? count : -count))
+        return
+      }
+      let current = row
+      let position = index
+      let navigationCursor = sourceCursor()
+      let caret: VimCaretState =
+        current.kind === 'node' && current.role === 'match' && vim.getCaretState !== undefined
+          ? vim.getCaretState(
+              current.nodeId,
+              navigationCursor,
+              event.currentTarget?.classList.contains('node-input-image-caret') ?? false,
+            )
+          : { cursor: navigationCursor, imageActive: false }
+      for (let stepIndex = 0; stepIndex < count; stepIndex += 1) {
+        const nextIndex = Math.max(0, Math.min(rows.length - 1, position + (direction === 'down' ? 1 : -1)))
+        const step = verticalCaretTransition(
+          caret,
+          direction,
+          textOf(current).length,
+          stepIndex === 0 && hasImage(current),
+          nextIndex !== position,
+        )
+        if (!step.crossNode) {
+          if (step.caret === caret) break
+          caret = step.caret
+          navigationCursor = caret.cursor
+          if (current.kind === 'node' && current.role === 'match') vim.applyCaretState?.(current.nodeId, caret)
+          continue
+        }
+        const cursor = stepIndex === 0 ? step.focusCursor : navigationCursor
+        if (stepIndex === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
+        current = rows[nextIndex]!
+        position = nextIndex
+        caret = focusCaretTransition(
+          caret,
+          cursor,
+          textOf(current).length,
+          hasImage(current),
+          true,
+          direction === 'up' && hasImage(current),
+        )
+        beforeSelect?.(false)
+        store.applyAgenda({ kind: 'select', key: current.key, cursor: caret.cursor })
+        if (current.kind === 'node' && current.role === 'match') vim.applyCaretState?.(current.nodeId, caret, true)
+      }
     }
     const viewportMotion = (motion: 'top' | 'middle' | 'bottom' | 'half-down' | 'half-up', count: number): void => {
       const bounds = viewportBounds()
@@ -65,11 +153,19 @@ export function createAgendaKeyDownHandler({
         ? inner
         : bounds
       const key = viewportMotionTarget(mounted, choice, row.key, motion, count)
-      if (key !== undefined)
+      if (key !== undefined) {
+        const destination = rows.find((candidate) => candidate.key === key)!
         select(
           rows.findIndex((candidate) => candidate.key === key),
           lineMotion,
+          lineMotion
+            ? hasImage(destination)
+              ? textOf(destination).length
+              : firstNonWhitespace(textOf(destination))
+            : sourceCursor(),
+          lineMotion,
         )
+      }
     }
     const rowTextKey = (): boolean =>
       rowText !== undefined &&
@@ -259,13 +355,14 @@ export function createAgendaKeyDownHandler({
       }
     } else if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
     else if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined))
-      select(index + count)
+      vertical('down', count)
     else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined))
-      select(index - count)
+      vertical('up', count)
     else if (normal && event.key === 'g' && pending?.prefix === 'g') select(count - 1)
-    else if (normal && event.key === 'G' && pending?.prefix === undefined)
-      select(pending?.count ? count - 1 : rows.length - 1)
-    else if (normal && ['H', 'M', 'L'].includes(event.key) && pending?.prefix === undefined) {
+    else if (normal && event.key === 'G' && pending?.prefix === undefined) {
+      const target = Math.max(0, Math.min(rows.length - 1, pending?.count ? count - 1 : rows.length - 1))
+      select(target, false, hasImage(rows[target]!) ? textOf(rows[target]!).length : sourceCursor(), true)
+    } else if (normal && ['H', 'M', 'L'].includes(event.key) && pending?.prefix === undefined) {
       viewportMotion(event.key === 'H' ? 'top' : event.key === 'M' ? 'middle' : 'bottom', count)
     }
   }

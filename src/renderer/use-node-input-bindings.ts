@@ -464,9 +464,14 @@ export function useNodeInputBindings({
       finishReplace: (input, retreatCursor, preserveDomSelection) =>
         finishVimReplace(input, retreatCursor, preserveDomSelection),
       register: registerHandle,
+      getCaretState: (nodeId, cursor, imageActive) =>
+        caretAuthority.current.nodeId === nodeId
+          ? { ...caretAuthority.current.caret, cursor }
+          : { cursor, imageActive },
+      applyCaretState,
       setMode: changeVimMode,
     }),
-    [finishVimReplace, changeVimMode, vimCommandState, registerHandle],
+    [finishVimReplace, changeVimMode, vimCommandState, registerHandle, applyCaretState],
   )
 
   const moveVimViewport = useCallback(

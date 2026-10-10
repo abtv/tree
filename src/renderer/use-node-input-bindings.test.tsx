@@ -10,6 +10,7 @@ import { createRealStoreHarness, type RealStoreOptions } from './test/real-store
 import { useNodeInputBindings } from './use-node-input-bindings'
 import type { VimMode } from './vim-editing'
 import { getCaret, setCaret } from './editor-dom'
+import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }))
 
@@ -119,6 +120,40 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
 }
 
 describe('useNodeInputBindings', () => {
+  // @requirement PRODUCT.md §23.4
+  it('shares the editor image return position with Agenda row navigation', async () => {
+    const text = '2026-10-15 Image'
+    const f = await fixture({ document: { roots: [image(text)] } })
+    const input = f.input()
+    input.classList.add('node-input')
+    input.focus()
+    act(() => {
+      f.store.openAgenda()
+      const row = f.store.getAgendaRows().find((row) => row.kind === 'node')!
+      f.store.applyAgenda({ kind: 'select', key: row.key, cursor: 3 })
+    })
+    const press = (key: string): void => {
+      act(() =>
+        createAgendaKeyDownHandler({ store: f.store, vim: f.result.current.vimTextCommandState })({
+          key,
+          currentTarget: input,
+          preventDefault: vi.fn(),
+        } as never),
+      )
+      f.sync()
+    }
+    press('j')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    expect(f.result.current.vimTextCommandState.getCaretState!('node', text.length, true).imageTextReturnCursor).toBe(3)
+    expect(f.result.current.vimTextCommandState.getCaretState!('other', 2, false)).toEqual({
+      cursor: 2,
+      imageActive: false,
+    })
+    press('k')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    expect(getCaret(input)).toBe(3)
+  })
+
   // @requirement PRODUCT.md §20.9
   it('suspends date completion throughout native composition and recognizes the committed expression', async () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
