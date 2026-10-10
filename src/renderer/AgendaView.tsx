@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { EditorStore } from '../application/editor-store'
+import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
 import type { AgendaState } from '../application/agenda-state'
-import type { Document } from '../domain/document'
+import type { Document, TreeNode } from '../domain/document'
 import { requireNode } from '../domain/document'
 import { findCanonicalDates } from '../domain/date-recognition'
 import type { VimTextCommandState } from './editor-input-handlers'
 import { clearCommandAssembly } from './vim-command-state'
-import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import { createAgendaKeyDownHandler, type AgendaRowText } from './agenda-row-keyboard'
+import { arrivalCaret, caretMarks, clampCaret, type CaretMark, type RowCaret } from './agenda-row-caret'
+import { rowCaretMode } from './agenda-row-text-keys'
 import { AgendaRow } from './AgendaRow'
+import { markedNodes } from './marked-nodes'
 import { createViewportReveal } from './viewport-reveal'
 import { agendaListWindow } from './agenda-list-layout'
 import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node-list-layout'
 import { shouldWindow } from './list-window'
-import { agendaDateLabel, isAgendaMirror } from './agenda-labels'
+import { agendaRowLabel, isAgendaMirror } from './agenda-labels'
 import { isPendingMoveSource } from '../application/agenda-pending-move'
 import { agendaVisualSources, type AgendaVisualEndpoints } from '../application/agenda-visual-selection'
 import {
@@ -24,6 +28,19 @@ import {
 } from './scroll-viewport'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { useAgendaDrag } from './use-agenda-drag'
+
+/** A direct match owns an editor when it is the active occurrence or has at most one date. */
+function isEditableOccurrence(
+  row: Extract<AgendaRowModel, { kind: 'node' }>,
+  node: TreeNode,
+  active: AgendaState['activeOccurrence'],
+): boolean {
+  return (
+    row.role === 'match' &&
+    ((active?.nodeId === row.nodeId && active.day === row.day) ||
+      new Set(findCanonicalDates(node.text, node.links).map((date) => date.day)).size <= 1)
+  )
+}
 
 export function AgendaView({
   store,
@@ -46,9 +63,62 @@ export function AgendaView({
   vim?: VimTextCommandState | undefined
   renderInput?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: import('../domain/document').TreeNode, editable: boolean) => ReactNode) | undefined
-  renderText?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
+  renderText?:
+    ((node: import('../domain/document').TreeNode, day: number, marks: readonly CaretMark[]) => ReactNode) | undefined
 }): React.JSX.Element {
   const elements = useRef(new Map<string, HTMLDivElement>())
+  // The caret of a row without an editor is renderer state: it changes on every motion key, so it
+  // stays out of the store and the document. A selection change resets it to offset zero.
+  const [caretState, setCaretState] = useState<RowCaret>(() => arrivalCaret(agenda.selectedKey))
+  if (caretState.key !== agenda.selectedKey) setCaretState(arrivalCaret(agenda.selectedKey))
+  const caret = caretState.key === agenda.selectedKey ? caretState : arrivalCaret(agenda.selectedKey)
+  // Key handlers read the caret between renders, so a ref mirrors it and every write updates both.
+  const caretRef = useRef(caret)
+  useLayoutEffect(() => {
+    caretRef.current = caret
+  })
+  const textOfRow = useCallback(
+    (row: AgendaRowModel): string => {
+      const state = store.getSnapshot()
+      if (state.status !== 'ready' || state.agenda === undefined) return ''
+      if (row.kind === 'node') return requireNode(state.document, row.nodeId).node.text
+      return agendaRowLabel(row, state.agenda.today, row.kind === 'day' && state.agenda.focusedDay !== undefined)
+    },
+    [store],
+  )
+  const rowText = useMemo<AgendaRowText>(
+    () => ({
+      textOf: textOfRow,
+      hasEditor: (row) => {
+        const state = store.getSnapshot()
+        return (
+          state.status === 'ready' &&
+          state.agenda !== undefined &&
+          row.kind === 'node' &&
+          isEditableOccurrence(row, requireNode(state.document, row.nodeId).node, state.agenda.activeOccurrence)
+        )
+      },
+      caret: () => {
+        const state = store.getSnapshot()
+        const key = state.status === 'ready' ? (state.agenda?.selectedKey ?? '') : ''
+        return caretRef.current.key === key ? caretRef.current : arrivalCaret(key)
+      },
+      setCaret: (next) => {
+        caretRef.current = next
+        setCaretState(next)
+      },
+      copy: (text) => {
+        void store.copyVimContent({ kind: 'text', text }).catch((error: unknown) => store.reportError(error))
+      },
+    }),
+    [store, textOfRow],
+  )
+  const marksFor = (row: AgendaRowModel): readonly CaretMark[] | undefined => {
+    if (row.key !== agenda.selectedKey) return undefined
+    const text = textOfRow(row)
+    const mode = rowCaretMode(vim)
+    return caretMarks(clampCaret(caret, text.length, mode), text.length, mode)
+  }
   const listRef = useRef<HTMLDivElement | null>(null)
   const heights = useRef(new Map<string, number>())
   const observer = useRef<ResizeObserver | undefined>(undefined)
@@ -291,16 +361,15 @@ export function AgendaView({
             if (row.key !== agenda.selectedKey) select(row.key)
           }}
         >
-          {agendaDateLabel(row.day, agenda.today, true)}
+          {(() => {
+            const label = agendaRowLabel(row, agenda.today, true)
+            return markedNodes(label, 0, label.length, marksFor(row) ?? [], true)
+          })()}
         </div>
       )
     }
     const node = row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined
-    const editable =
-      row.kind === 'node' &&
-      row.role === 'match' &&
-      ((agenda.activeOccurrence?.nodeId === row.nodeId && agenda.activeOccurrence.day === row.day) ||
-        new Set(findCanonicalDates(node!.text, node!.links).map((date) => date.day)).size <= 1)
+    const editable = row.kind === 'node' && isEditableOccurrence(row, node!, agenda.activeOccurrence)
     return (
       <AgendaRow
         key={editable ? `editor:${row.kind === 'node' ? row.nodeId : ''}` : row.key}
@@ -317,6 +386,7 @@ export function AgendaView({
         dragging={drag.sourceKey === row.key}
         dropTarget={drag.dropHeaderKey === row.key}
         pinnedOffset={layout.offsets[index] ?? 0}
+        marks={editable ? undefined : marksFor(row)}
         mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
         pendingSource={row.kind === 'node' && isPendingMoveSource(agenda, row.nodeId, row.day)}
         rowRef={rowRef}
@@ -366,6 +436,7 @@ export function AgendaView({
         createAgendaKeyDownHandler({
           store,
           vim,
+          rowText,
           beforeSelect: (preserve) => {
             reveal.current = preserve ? 'none' : 'keyboard'
           },

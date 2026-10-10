@@ -463,9 +463,10 @@ export function useNodeInputBindings({
       },
       finishReplace: (input, retreatCursor, preserveDomSelection) =>
         finishVimReplace(input, retreatCursor, preserveDomSelection),
+      register: registerHandle,
       setMode: changeVimMode,
     }),
-    [finishVimReplace, changeVimMode, vimCommandState],
+    [finishVimReplace, changeVimMode, vimCommandState, registerHandle],
   )
 
   const moveVimViewport = useCallback(

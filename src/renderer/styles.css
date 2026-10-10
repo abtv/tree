@@ -513,16 +513,26 @@ body:not(.node-drag-active) .location-link:hover {
   overflow-wrap: anywhere;
   line-height: 20px;
 }
-/* A selected row without an editor (day, gap, contextual ancestor, mirror) has no native caret, so its
-   first letter stands in for it, painted like the Tree caret: a block in Vim Normal and a thin line in
-   Insert and standard editing. Whole-node Visual keeps its row highlight instead. */
-.vim-state-normal .agenda-row[aria-selected='true'] :is(.agenda-label, .agenda-text)::first-letter {
+/* A selected row without an editor (day, gap, contextual ancestor, mirror) has no native caret, so the
+   renderer draws one as marks in its text (docs/PRODUCT.md §23.4), like the Tree caret: a block in Vim
+   Normal and a thin line in Insert and standard editing. Whole-node Visual draws no mark. */
+.vim-state-normal .agenda-caret {
   color: var(--color-white);
   background: var(--color-ink);
 }
-.vim-state-insert .agenda-row[aria-selected='true'] :is(.agenda-label, .agenda-text)::first-letter {
-  margin-left: -1px;
+.vim-state-normal .agenda-caret:empty {
+  display: inline-block;
+  width: 1ch;
+  height: 1.3em;
+  vertical-align: text-bottom;
+}
+.vim-state-insert .agenda-caret {
+  margin-right: -1px;
   border-left: 1px solid var(--color-caret);
+}
+.agenda-selection {
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
 }
 .agenda-text-struck {
   text-decoration: line-through;
@@ -1211,7 +1221,7 @@ body.node-drag-invalid * {
     background: var(--color-caret);
   }
 
-  .vim-state-normal .agenda-row[aria-selected='true'] :is(.agenda-label, .agenda-text)::first-letter {
+  .vim-state-normal .agenda-caret {
     color: var(--color-background);
     background: var(--color-caret);
   }

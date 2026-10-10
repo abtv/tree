@@ -1,3 +1,4 @@
+import type { AgendaRow } from '../application/agenda-rows'
 import type { AgendaState } from '../application/agenda-state'
 import { calendarDateOf, weekdayOf, type DayNumber } from '../domain/calendar-date'
 
@@ -38,4 +39,17 @@ export function isAgendaMirror(
 
 export function agendaGapLabel(start: DayNumber, end: DayNumber, today: DayNumber): string {
   return `${end - start + 1} empty days · ${agendaDateLabel(start, today)} – ${agendaDateLabel(end, today)}`
+}
+
+/**
+ * The source text of a day or gap row as drawn: CSS only changes its case, so these offsets are the
+ * caret offsets of the row (`docs/PRODUCT.md` §23.4). The focused-day heading has no `· TODAY` suffix.
+ */
+export function agendaRowLabel(
+  row: AgendaRow & { readonly kind: 'day' | 'gap' },
+  today: DayNumber,
+  heading = false,
+): string {
+  if (row.kind === 'gap') return agendaGapLabel(row.startDay, row.endDay, today)
+  return `${agendaDateLabel(row.day, today, true)}${row.isToday && !heading ? ' · TODAY' : ''}`
 }

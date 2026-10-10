@@ -61,6 +61,8 @@ export interface VimTextCommandState {
   mode: VimKeyboardState['mode']
   commandState: VimKeyboardState['commandState']
   finishReplace?: VimKeyboardState['finishReplace']
+  /** The unnamed register; Agenda rows without an editor yank their selected text into it. */
+  register?: VimKeyboardState['register']
   setMode: VimKeyboardState['setMode']
 }
 

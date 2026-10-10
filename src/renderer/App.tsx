@@ -16,6 +16,7 @@ import { richTextHtml } from './editor-dom'
 import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
+import type { CaretMark } from './agenda-row-caret'
 import { clearCommandAssembly } from './vim-command-state'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
@@ -267,13 +268,13 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     [isImageCaretActive, nodeInputBindings],
   )
   const renderAgendaText = useCallback(
-    (node: TreeNode, day: number): React.JSX.Element => (
+    (node: TreeNode, day: number, marks: readonly CaretMark[]): React.JSX.Element => (
       <span
         className={`agenda-text${node.struckThrough ? ' agenda-text-struck' : ''}`}
         onClick={nodeInputBindings(node).onClick}
         onMouseDown={preventReadOnlyLinkFocus}
         dangerouslySetInnerHTML={{
-          __html: richTextHtml(node, agendaDecorations(node, day)),
+          __html: richTextHtml(node, agendaDecorations(node, day), marks),
         }}
       />
     ),

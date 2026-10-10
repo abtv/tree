@@ -321,3 +321,51 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
   await expect(window.locator('.agenda-row[aria-selected="true"]')).toBeFocused()
 })
+
+// @requirement PRODUCT.md §22.1
+// @requirement PRODUCT.md §23.4
+test('Agenda caret motion over a row without an editor stays within the interactive budget and saves nothing', async ({
+  userDataDir,
+}) => {
+  seedDocument(userDataDir, agendaSeed(3000))
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await installSaveProbe(app)
+  await window.keyboard.press('Meta+p')
+  const day = window.locator('.agenda-row-day').first()
+  await day.click()
+  await expect(day).toHaveAttribute('aria-selected', 'true')
+  await window.evaluate(() => {
+    const probe = { motion: [] as number[] }
+    ;(window as unknown as { agendaCaretProbe: typeof probe }).agendaCaretProbe = probe
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (['l', 'h', 'w', 'b'].includes(event.key))
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => probe.motion.push(performance.now() - event.timeStamp)),
+          )
+      },
+      { capture: true },
+    )
+  })
+  for (let index = 0; index < 10; index += 1) for (const key of ['l', 'w', 'h', 'b']) await window.keyboard.press(key)
+  await window.waitForFunction(
+    () => (window as unknown as { agendaCaretProbe: { motion: number[] } }).agendaCaretProbe.motion.length === 40,
+  )
+  const probe = await window.evaluate(
+    () => (window as unknown as { agendaCaretProbe: { motion: number[] } }).agendaCaretProbe,
+  )
+  const saves = await readSaves(app)
+  const sorted = probe.motion.toSorted((a, b) => a - b)
+  recordPerfResult({
+    kind: 'state',
+    scenario: 'agenda-6000-occurrences-row-caret',
+    samples: sorted.length,
+    metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
+  })
+  expect(sorted[38]).toBeLessThan(100)
+  expect(sorted[39]).toBeLessThan(250)
+  expect(saves).toBe(0)
+  expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+  expect(await window.locator('.agenda-caret').count()).toBe(1)
+})

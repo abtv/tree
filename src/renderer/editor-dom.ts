@@ -1,5 +1,6 @@
 import type { LinkRange, TreeNode } from '../domain/document'
 import { findDateLikeTokens } from '../domain/date-recognition'
+import { markedPieces, type CaretMark } from './agenda-row-caret'
 
 /** Measure a UTF-16 text offset without disturbing the live selection. */
 export function expressionPosition(
@@ -117,10 +118,23 @@ export function updateDateLikeUnderline(element: HTMLElement): void {
   }
 }
 
-export function richTextHtml(node: TreeNode, decorations: readonly TextDecoration[] = []): string {
+export function richTextHtml(
+  node: TreeNode,
+  decorations: readonly TextDecoration[] = [],
+  marks: readonly CaretMark[] = [],
+): string {
   const links = node.links ?? []
   const parts: string[] = []
   let position = 0
+  // Marks nest inside links and decorations, so Tree's markup is unchanged when there are none.
+  const markedHtml = (start: number, end: number, includeEnd: boolean): string =>
+    markedPieces(node.text, start, end, marks, includeEnd)
+      .map((piece) =>
+        piece.className === undefined
+          ? escapeHtml(piece.text)
+          : `<span class="${piece.className}">${escapeHtml(piece.text)}</span>`,
+      )
+      .join('')
   const ranges = [
     ...links.map((link) => ({
       ...link,
@@ -134,11 +148,16 @@ export function richTextHtml(node: TreeNode, decorations: readonly TextDecoratio
       })),
   ].sort((left, right) => left.start - right.start)
   for (const range of ranges) {
-    if (range.start > position) parts.push(escapeHtml(node.text.slice(position, range.start)))
-    parts.push(range.html(escapeHtml(node.text.slice(range.start, range.end))))
+    if (range.start > position) parts.push(markedHtml(position, range.start, false))
+    parts.push(range.html(markedHtml(range.start, range.end, false)))
     position = range.end
   }
-  if (position < node.text.length || parts.length === 0) parts.push(escapeHtml(node.text.slice(position)))
+  if (
+    position < node.text.length ||
+    parts.length === 0 ||
+    marks.some((mark) => mark.start === node.text.length && mark.end === node.text.length)
+  )
+    parts.push(markedHtml(position, node.text.length, true))
   return parts.join('')
 }
 

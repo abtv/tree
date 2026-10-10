@@ -6,11 +6,25 @@ import { viewportBounds, viewportScrollEdges, viewportScroller } from './scroll-
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
 import { getCaret } from './editor-dom'
 import { agendaAllows } from './agenda-key-policy'
+import type { AgendaRow } from '../application/agenda-rows'
+import { handleRowTextKey } from './agenda-row-text-keys'
+import { arrivalCaret, type RowCaret } from './agenda-row-caret'
+
+/** The text and caret of the selected row when it has no editor, owned by the Agenda view. */
+export interface AgendaRowText {
+  textOf: (row: AgendaRow) => string
+  /** A row with an editor keeps its text commands in the editor; focus on its padding stays inert. */
+  hasEditor: (row: AgendaRow) => boolean
+  caret: () => RowCaret
+  setCaret: (caret: RowCaret) => void
+  copy: (text: string) => void
+}
 
 interface Dependencies {
   store: EditorStore
   vim?: VimTextCommandState | undefined
   beforeSelect?: ((preserveViewport: boolean) => void) | undefined
+  rowText?: AgendaRowText | undefined
 }
 
 /** Navigation over occurrence keys; Tree text and structural handlers never see these keys. */
@@ -18,6 +32,7 @@ export function createAgendaKeyDownHandler({
   store,
   vim,
   beforeSelect,
+  rowText,
 }: Dependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event) => {
     if (event.nativeEvent?.isComposing || ['Shift', 'Control', 'Meta', 'Alt'].includes(event.key)) return
@@ -56,8 +71,22 @@ export function createAgendaKeyDownHandler({
           lineMotion,
         )
     }
+    const rowTextKey = (): boolean =>
+      rowText !== undefined &&
+      !rowText.hasEditor(row) &&
+      handleRowTextKey({
+        event,
+        vim,
+        text: rowText.textOf(row),
+        caret: rowText.caret(),
+        setCaret: rowText.setCaret,
+        copy: rowText.copy,
+      })
     if (event.metaKey) {
-      if (event.key.toLowerCase() === 'p' && !event.shiftKey && !event.altKey) {
+      if (rowTextKey()) {
+        event.preventDefault()
+        if (vim !== undefined) clearCommandAssembly(vim.commandState)
+      } else if (event.key.toLowerCase() === 'p' && !event.shiftKey && !event.altKey) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         store.closeAgenda()
@@ -70,12 +99,15 @@ export function createAgendaKeyDownHandler({
           store.enter()
         } else if (row.kind === 'day') {
           beforeSelect?.(false)
+          // The row key survives the change of presentation, but its text does not.
+          rowText?.setCaret(arrivalCaret(row.key))
           store.applyAgenda({ kind: 'focus-day', key: row.key, scrollTop: viewportScroller()?.scrollTop ?? 0 })
         }
       } else if (event.key === ',') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         beforeSelect?.(true)
+        rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'return-timeline', key: row.key })
       } else if (event.key.toLowerCase() === 'e' && !event.shiftKey && !event.altKey) {
         event.preventDefault()
@@ -96,6 +128,12 @@ export function createAgendaKeyDownHandler({
     event.preventDefault()
     if (event.key === 'Escape') {
       store.cancelAgendaMove()
+      if (rowText !== undefined && vim?.mode === 'visual') {
+        // Leaving Visual puts the caret at the start of the selection, as in Tree.
+        const caret = rowText.caret()
+        const start = Math.min(caret.anchor, caret.focus)
+        rowText.setCaret({ ...caret, anchor: start, focus: start })
+      }
       if (vim !== undefined) {
         clearCommandAssembly(vim.commandState)
         vim.setMode('normal')
@@ -105,7 +143,11 @@ export function createAgendaKeyDownHandler({
     const pending = vim?.commandState.pending
     const count = Math.min(rows.length, Math.max(1, Number(pending?.count || '1')))
     const normal = vim?.mode === 'normal'
-    if (normal && !event.ctrlKey && !event.altKey && /^[0-9]$/u.test(event.key)) {
+    // Counts and the `g` prefix also serve the text motions of a Visual selection over a row's text.
+    const textMode = normal || vim?.mode === 'visual'
+    // The character after `f`, `F`, `t`, `T` or `r` is data, never a count or a prefix.
+    if (pending?.awaiting !== undefined && rowTextKey()) return
+    if (textMode && !event.ctrlKey && !event.altKey && /^[0-9]$/u.test(event.key)) {
       if (event.key !== '0' || pending?.count) {
         vim.commandState.pending =
           pending?.operator === undefined
@@ -114,7 +156,7 @@ export function createAgendaKeyDownHandler({
         return
       }
     }
-    if (normal && !event.ctrlKey && !event.altKey && event.key === 'g' && pending?.prefix === undefined) {
+    if (textMode && !event.ctrlKey && !event.altKey && event.key === 'g' && pending?.prefix === undefined) {
       vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', prefix: 'g' }
       return
     }
@@ -162,6 +204,7 @@ export function createAgendaKeyDownHandler({
         vim.setMode('insert')
       return
     }
+    if (rowTextKey()) return
     if (vim !== undefined) clearPending(vim.commandState)
     if (event.altKey) return
     if (normal && !event.ctrlKey && pending?.prefix === 'z') {
@@ -192,6 +235,7 @@ export function createAgendaKeyDownHandler({
       if (!normal || pending?.prefix !== undefined) return
       if (event.key === 'o') {
         beforeSelect?.(true)
+        rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'return-timeline', key: row.key })
         return
       }
@@ -206,6 +250,7 @@ export function createAgendaKeyDownHandler({
     if (normal && event.key === 'd' && pending?.prefix === 'g') {
       if (row.kind === 'day') {
         beforeSelect?.(false)
+        rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'focus-day', key: row.key, scrollTop: viewportScroller()?.scrollTop ?? 0 })
       } else if (row.kind === 'node') {
         store.closeAgenda()

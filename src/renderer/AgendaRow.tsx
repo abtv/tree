@@ -2,23 +2,27 @@ import { memo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import type { AgendaRow as Row } from '../application/agenda-rows'
 import type { TreeNode } from '../domain/document'
 import { agendaDecorations } from './date-decorations'
-import { agendaDateLabel, agendaGapLabel } from './agenda-labels'
+import { agendaDateLabel, agendaGapLabel, agendaRowLabel } from './agenda-labels'
+import type { CaretMark } from './agenda-row-caret'
+import { markedNodes } from './marked-nodes'
 
-function datedText(node: TreeNode, day: number): ReactNode[] {
+function datedText(node: TreeNode, day: number, marks: readonly CaretMark[]): ReactNode[] {
   const parts: ReactNode[] = []
   let start = 0
   for (const decoration of agendaDecorations(node, day)) {
-    parts.push(node.text.slice(start, decoration.start))
+    parts.push(...markedNodes(node.text, start, decoration.start, marks, false))
     parts.push(
       <span key={decoration.start} className={decoration.className}>
-        {node.text.slice(decoration.start, decoration.end)}
+        {markedNodes(node.text, decoration.start, decoration.end, marks, false)}
       </span>,
     )
     start = decoration.end
   }
-  parts.push(node.text.slice(start))
+  parts.push(...markedNodes(node.text, start, node.text.length, marks, true))
   return parts
 }
+
+const NO_MARKS: readonly CaretMark[] = []
 
 export const AgendaRow = memo(function AgendaRow({
   row,
@@ -33,6 +37,7 @@ export const AgendaRow = memo(function AgendaRow({
   pendingSource = false,
   dragging = false,
   dropTarget = false,
+  marks = NO_MARKS,
   rowRef,
   onSelect,
   onToggle,
@@ -52,12 +57,14 @@ export const AgendaRow = memo(function AgendaRow({
   pendingSource?: boolean
   dragging?: boolean
   dropTarget?: boolean
+  /** The caret and selection marks of the selected row when it has no editor. */
+  marks?: readonly CaretMark[] | undefined
   rowRef: (key: string, element: HTMLDivElement | null) => void
   onSelect: (key: string) => void
   onToggle: (key: string) => void
   renderInput?: ((node: TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: TreeNode, editable: boolean) => ReactNode) | undefined
-  renderText?: ((node: TreeNode, day: number) => ReactNode) | undefined
+  renderText?: ((node: TreeNode, day: number, marks: readonly CaretMark[]) => ReactNode) | undefined
 }): React.JSX.Element {
   const depth = row.kind === 'node' ? row.depth + 1 : 0
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
@@ -107,10 +114,10 @@ export const AgendaRow = memo(function AgendaRow({
           />
           {renderInput === undefined ? (
             row.role === 'match' && renderText !== undefined ? (
-              renderText(node!, row.day)
+              renderText(node!, row.day, marks)
             ) : (
               <span className={`agenda-text${node!.struckThrough ? ' agenda-text-struck' : ''}`}>
-                {datedText(node!, row.day)}
+                {datedText(node!, row.day, marks)}
               </span>
             )
           ) : (
@@ -121,9 +128,7 @@ export const AgendaRow = memo(function AgendaRow({
       ) : (
         <>
           <span className={`agenda-label${row.kind === 'day' && !row.content ? ' agenda-label-empty' : ''}`}>
-            {row.kind === 'day'
-              ? `${agendaDateLabel(row.day, today, true)}${row.isToday ? ' · TODAY' : ''}`
-              : agendaGapLabel(row.startDay, row.endDay, today)}
+            {markedNodes(agendaRowLabel(row, today), 0, agendaRowLabel(row, today).length, marks, true)}
           </span>
           <span aria-hidden="true" className="agenda-rule" />
         </>
