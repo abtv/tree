@@ -1184,7 +1184,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 ### 23.4 Navigation
 
-Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count and viewport rules as Tree. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
+Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count and viewport rules as Tree. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace. The caret never disappears while selection moves: a selected row without an editor (a day container, a gap, a contextual ancestor, or an occurrence that is not the active one) shows the caret on the first letter of its text, drawn as in Tree: a block in Vim Normal, and a thin line in Vim Insert and standard editing. Whole-node Visual shows its row highlight instead. The caret is only displayed; the row stays read-only.
 
 `Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Focused days are introduced in a subsequent Agenda task.
 

@@ -513,6 +513,17 @@ body:not(.node-drag-active) .location-link:hover {
   overflow-wrap: anywhere;
   line-height: 20px;
 }
+/* A selected row without an editor (day, gap, contextual ancestor, mirror) has no native caret, so its
+   first letter stands in for it, painted like the Tree caret: a block in Vim Normal and a thin line in
+   Insert and standard editing. Whole-node Visual keeps its row highlight instead. */
+.vim-state-normal .agenda-row[aria-selected='true'] :is(.agenda-label, .agenda-text)::first-letter {
+  color: var(--color-white);
+  background: var(--color-ink);
+}
+.vim-state-insert .agenda-row[aria-selected='true'] :is(.agenda-label, .agenda-text)::first-letter {
+  margin-left: -1px;
+  border-left: 1px solid var(--color-caret);
+}
 .agenda-text-struck {
   text-decoration: line-through;
   color: var(--color-struck-text);
@@ -1196,6 +1207,11 @@ body.node-drag-invalid * {
      would be invisible on the Zenburn surface. */
   .vim-state-normal .node-input::selection,
   .vim-state-normal .node-input *::selection {
+    color: var(--color-background);
+    background: var(--color-caret);
+  }
+
+  .vim-state-normal .agenda-row[aria-selected='true'] :is(.agenda-label, .agenda-text)::first-letter {
     color: var(--color-background);
     background: var(--color-caret);
   }
