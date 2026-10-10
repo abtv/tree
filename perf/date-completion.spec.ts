@@ -23,12 +23,22 @@ for (const vimEnabled of [true, false]) {
     else await window.keyboard.press('Meta+ArrowRight')
 
     await window.evaluate(() => {
-      const probe = { paints: [] as number[], completed: [] as boolean[] }
+      const probe = { paints: [] as number[], completed: [] as boolean[], inserted: [] as number[] }
       ;(window as unknown as { dateCompletionProbe: typeof probe }).dateCompletionProbe = probe
+      // Key-to-DOM latency isolates the application's own work from the two
+      // animation frames the paint metric waits for, so it does not depend on the
+      // display refresh rate.
+      let pendingKeyTime: number | null = null
+      new MutationObserver(() => {
+        if (pendingKeyTime === null || document.querySelector('[role="listbox"] [role="option"]') === null) return
+        probe.inserted.push(performance.now() - pendingKeyTime)
+        pendingKeyTime = null
+      }).observe(document.body, { childList: true, subtree: true })
       globalThis.addEventListener(
         'keydown',
         (event) => {
           if (event.key !== 'o') return
+          pendingKeyTime = event.timeStamp
           requestAnimationFrame(() =>
             requestAnimationFrame(() => {
               probe.paints.push(performance.now() - event.timeStamp)
@@ -59,9 +69,14 @@ for (const vimEnabled of [true, false]) {
     }
     const probe = await window.evaluate(
       () =>
-        (window as unknown as { dateCompletionProbe: { paints: number[]; completed: boolean[] } }).dateCompletionProbe,
+        (
+          window as unknown as {
+            dateCompletionProbe: { paints: number[]; completed: boolean[]; inserted: number[] }
+          }
+        ).dateCompletionProbe,
     )
     const sorted = probe.paints.toSorted((a, b) => a - b)
+    const insertedSorted = probe.inserted.toSorted((a, b) => a - b)
     recordPerfResult({
       kind: 'typing',
       scenario: `relative-date-10000-${vimEnabled ? 'vim' : 'standard'}`,
@@ -70,11 +85,18 @@ for (const vimEnabled of [true, false]) {
         firstPopupPaintMs: round(probe.paints[0]!),
         popupPaintP95Ms: round(sorted[28]!),
         popupPaintMaxMs: round(sorted[29]!),
+        popupInsertP95Ms: round(insertedSorted[28]!),
+        popupInsertMaxMs: round(insertedSorted[29]!),
       },
     })
     expect(probe.completed.every(Boolean)).toBe(true)
-    expect(sorted[28]).toBeLessThan(100)
-    expect(sorted[29]).toBeLessThan(250)
+    expect(probe.inserted).toHaveLength(30)
+    // The paint metric waits two animation frames (about 33 ms at 60 Hz), so these
+    // ceilings leave roughly a frame and a half of margin rather than a tenfold one.
+    expect(sorted[28]).toBeLessThan(50)
+    expect(sorted[29]).toBeLessThan(100)
+    // Measured near 1 ms; the first, cold keystroke is about 5 ms.
+    expect(insertedSorted[29]).toBeLessThan(10)
     await expect(input).toHaveValue(`${prefix}o`)
     await expect(input).toBeFocused()
     await expect(heading).toHaveValue('Root')

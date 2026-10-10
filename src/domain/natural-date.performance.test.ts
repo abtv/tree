@@ -58,7 +58,22 @@ it('recognizes relative dates well below one millisecond, including incremental 
     samples.push((performance.now() - start) / workloads.length)
   }
   samples.sort((a, b) => a - b)
+  // Batch means hide isolated slow calls, so the same workloads are also timed one
+  // call at a time. Timer overhead (well under a microsecond) is small next to the
+  // measured calls.
+  const callSamples: number[] = []
+  for (let round = 0; round < 100; round++) {
+    for (const { text, caret } of workloads) {
+      const start = performance.now()
+      matched += suggestDates(text, caret, today)?.suggestions.length ?? 0
+      callSamples.push(performance.now() - start)
+    }
+  }
+  callSamples.sort((a, b) => a - b)
   console.log('PERF natural-date', {
+    perCallP50Ms: callSamples[Math.floor(callSamples.length * 0.5)],
+    perCallP99Ms: callSamples[Math.floor(callSamples.length * 0.99)],
+    perCallMaxMs: callSamples[callSamples.length - 1],
     firstMs,
     mixedCalls: workloads.length * samples.length,
     completeExpressionCalls: completeExpressionSamples.length * 50,
@@ -69,6 +84,11 @@ it('recognizes relative dates well below one millisecond, including incremental 
   expect(matched).toBeGreaterThanOrEqual(cases.length * samples.length)
   expect(completeMatches).toBe(completeExpressionSamples.length * 50)
   expect(firstMs).toBeLessThan(1)
+  // Individual calls: p99 is about 0.17 ms alone and 0.36 ms while the whole unit
+  // suite runs in parallel, from the long-text cases. The single slowest call
+  // reached 1.3 ms under that load (garbage collection and neighboring workers), so
+  // only the p99 is guarded and the maximum is reported.
+  expect(callSamples[Math.floor(callSamples.length * 0.99)]).toBeLessThan(1)
   // A tenfold margin to the requested 1 ms budget; each batch is guarded.
   expect(samples[99]).toBeLessThan(0.1)
   // Long-text batches independently enforce the requested ceiling, so the
