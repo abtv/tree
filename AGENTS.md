@@ -10,6 +10,7 @@ At the start of a session:
 1. Read this file and `WORKING_PLAN.md` when an approved task is in progress. For a multi-session initiative, read `plans/README.md` and its linked active plan before selecting the next task.
 2. Read only the sections of `docs/PRODUCT.md` and `docs/ARCHITECTURE.md` that the task references. Read `docs/OPEN_QUESTIONS.md` only when working on an open question, when an approved task references one, or when a handoff must list them because no plan has a ready task.
 3. When working inside a source directory, read its nested `AGENTS.md` for layer-specific rules.
+4. Before substantial work, identify the capabilities the task needs and check the current session's tools and permissions against them. Use the procedure in `docs/DEVELOPMENT.md` §10. Check only capabilities needed for this task; reuse successful operations from this session. Configuration is evidence of intent, not proof of runtime access. Report a missing capability early with its effect on completion and the supported next action. Continue independent authorized work while resolving it; do not claim completion while required validation or review remains blocked.
 
 Prefer the narrowest referenced section over reading an entire document.
 
@@ -412,7 +413,13 @@ For a multi-session initiative, decide after each committed task whether to cont
 
 For a multi-session initiative, commit the updated task status and next task with the completed change. A later session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 
-Before ending a session or authorized outcome, provide an explicit handoff that states:
+Before ending a session or authorized outcome, provide an explicit handoff.
+
+Start with a short Product Owner summary, in this order: what was delivered and its completion status; how to try or inspect the result; what remains unverified or blocked; and whether a Product Owner decision or action is needed. For a completed task requiring no action, say so rather than requesting confirmation. For documentation or internal changes, link the relevant result instead of inventing a manual application check. For interface changes, link representative inspected screenshots or recordings from the required visual evidence when available, using synthetic data. Reuse those artifacts rather than producing an extra demonstration solely for the handoff.
+
+Put the technical evidence below this summary, or link to an accessible temporary evidence artifact. Keep failures, blockers, and the next action visible in the summary even when details are linked. A link must remain usable at handoff; never link to a deleted working plan. Detailed evidence remains required under §10 and the list below. Do not create a permanent validation archive.
+
+The complete handoff states:
 
 * what was completed;
 * for a defect fix, the output of `npm run fix:history`, and, when it reports a possible shared cause, a proposed structural initiative under §8 or a stated reason why none is needed;

@@ -397,6 +397,16 @@ File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttach
 
 ## 10. Development Workflow
 
+### Task capability check
+
+At bootstrap, apply the capability policy in `AGENTS.md` to the selected task. Identify the needed file inspection and editing tools, validation commands and environment, artifact inspection or native interaction tools, external evidence access, and any required independent roles. Omit capabilities the task does not use. `npm run doctor` checks development-environment prerequisites when relevant; it does not establish the agent's runtime permissions or ability to inspect a native interface.
+
+For each needed capability, distinguish **configured** (declared by settings or exposed tools), **verified in this session** (a successful operation with the relevant scope), and **unavailable** (a missing tool or observed denial/failure). Record the operation or limitation in the conversation plan, or in `WORKING_PLAN.md` when one is required. Update the record when ordinary task operations provide new evidence. Do not repeat a successful check unless the relevant session, permissions, environment, or scope changes.
+
+Use inspection and the first necessary operation as evidence rather than launching full suites or all roles merely to probe access. Confirm required role availability before implementation and its actual access on its first authorized invocation. An exposed editing tool is configured until an authorized edit succeeds; do not write disposable files just to test permissions. A successful command establishes access to that command and scope only. Automated Electron interaction, screenshot inspection, and manual native input are distinct capabilities.
+
+When access is missing, use an already authorized supported alternative if it satisfies the same requirement. Follow the tool's approval mechanism when additional permission is necessary; never bypass a denial, broaden permissions, or weaken role restrictions to complete the check. Report the blocked requirement and supported next action early, and continue work that does not depend on it. The Product Owner should be asked only when their action or decision is needed under `AGENTS.md` §14.
+
 The root `CLAUDE.md` imports `AGENTS.md` so Claude Code sessions load the same repository policy as Codex and OpenCode, including versions that do not load `AGENTS.md` directly. Keep the shared policy in `AGENTS.md`; the import is only a compatibility adapter.
 
 OpenCode uses the project configuration in `opencode.json`. Start a task with the `develop` primary agent. The normative task lifecycle, approval rules, review requirements, completion criteria, and Git discipline are owned by `AGENTS.md`. The role prompts in `.opencode/agents/` define only the inputs and actions specific to each role. Use the matrix and evidence rules in §9 when executing that lifecycle.

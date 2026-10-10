@@ -45,3 +45,9 @@ Prototyping is a separate stage from completing an implementation. A request to 
 You can say “continue” or “let's continue the work.” The agent checks Git state, any `WORKING_PLAN.md`, and Active Plans to recover unfinished authorized work before starting another task. A temporary plan or uncommitted change is checked against actual repository state; it is not proof that a task was completed, and unrelated user changes are preserved.
 
 When exactly one active initiative has a ready next task, the agent names it and continues. When several do, it asks which to select. When none does, it reports what prevents progress or that no implementation work is ready. It never selects an open product idea for implementation just because the work queue is empty. A remaining “show me before committing” condition survives a session change.
+
+### What to Expect During Delivery
+
+Before substantial work, the agent checks the current session's capabilities needed for your task. If a required tool, validation environment, or independent role is unavailable, it explains the effect and next action early, and continues authorized work that can proceed. Settings alone do not prove access. You do not need to select tools or supervise this check.
+
+The final answer starts with what was delivered, how you can try or inspect it, anything unverified or blocked, and whether you need to decide or do something. Interface results include links to representative inspected visual evidence when available. Documentation and internal changes link to the relevant result. Technical validation evidence follows or is linked from that answer, while failures and blockers remain visible in the short summary. A completed task requiring no action says so; it does not ask you to approve work already authorized. The detailed policy is in [Agent Instructions §12](../AGENTS.md#12-git).
