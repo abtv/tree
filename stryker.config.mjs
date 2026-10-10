@@ -21,6 +21,7 @@ export default {
     'src/renderer/list-window.ts',
     'src/renderer/agenda-key-policy.ts',
     'src/renderer/agenda-drop-targets.ts',
+    'src/renderer/date-assist.ts',
     '!src/**/*.test.ts',
     '!src/application/test/**',
   ],

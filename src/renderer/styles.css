@@ -1,4 +1,44 @@
+.date-popup {
+  position: fixed;
+  z-index: 20;
+  background: var(--color-background);
+  color: var(--color-text);
+  border: 1px solid var(--color-location-border);
+  box-shadow: 0 3px 10px var(--color-popup-shadow);
+  font-size: 13px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.date-popup [role='option'] {
+  display: flex;
+  gap: 14px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.date-popup-selected {
+  background: var(--highlight-background);
+  color: var(--highlight-foreground);
+}
+
+.date-popup-description,
+.date-popup-footer {
+  color: var(--color-secondary);
+}
+
+.date-popup-selected .date-popup-description {
+  color: inherit;
+}
+
+.date-popup-footer {
+  border-top: 1px solid var(--color-location-border);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 :root {
+  --color-popup-shadow: rgba(0, 0, 0, 0.12);
   /* Every color is defined once here or in the single dark override. The selection highlight is
      one background/foreground pair per appearance, shared by the Visual row, Visual text
      selection, selected hyperlinks, and the Vim mode badge. */

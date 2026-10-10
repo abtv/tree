@@ -21,7 +21,7 @@ The work proceeded through four design stages — UX consistency review, visual 
 * AG-4 is complete: tasks AG-5 to AG-28 were planned on 2026-10-09 and no runtime code changed.
 * The Product Owner answered Q1–Q5 on 2026-10-09 (Implementation Planning (AG-4) below).
 * The Product Owner authorized Agenda implementation on 2026-10-09 with “start agenda”. Implementation proceeds in task order.
-* Reserved for the Product Owner: approval of the AG-22 expression table before AG-23.
+* The Product Owner approved the AG-22 expression table on 2026-10-10. AG-23 may proceed.
 
 ## Tasks
 
@@ -48,8 +48,8 @@ The work proceeded through four design stages — UX consistency review, visual 
 | AG-19 | Vim pending move: `dd`, counted `dd`, `p`/`P`, cancel rules, dimming, status message | AG-18 | E2E scenario 11; D4 lifecycle table test; VC8 screenshot; `docs/VIM_CONFORMANCE.md` rows | Done |
 | AG-20 | Vim whole-node Visual selection and group move | AG-19 | E2E scenario 12; selection-skip property test; VC12 screenshot | Done |
 | AG-21 | Focused day: `Cmd+.` on a day, `Cmd+,` back, `Agenda / Oct 14` heading | AG-11, AG-14 | E2E scenario 13; VC13 screenshot; VC14 observed | Done |
-| AG-22 | Natural-language date parser in the domain, with the expression table for Product Owner review | AG-5 | Table-driven unit tests from §5, property tests, mutation, Product Owner approves the table (Q2) | Parser implemented; table approval pending |
-| AG-23 | Natural-language completion popup (S1, VC9, F3) in standard editing and Vim Insert | AG-14, AG-22 | E2E scenario 5; VC9 geometry; S1 screenshot; lifecycle tests; manual native-keyboard check | Planned |
+| AG-22 | Natural-language date parser in the domain, with the expression table for Product Owner review | AG-5 | Table-driven unit tests from §5, property tests, mutation, Product Owner approves the table (Q2) | Done |
+| AG-23 | Natural-language completion popup (S1, VC9, F3) in standard editing and Vim Insert | AG-14, AG-22 | E2E scenario 5; VC9 geometry; S1 screenshot; lifecycle tests; manual native-keyboard check | Done; manual native-keyboard check pending (macOS Automation denied) |
 | AG-24 | Date-like text indicator (S2, F6, VC10) | AG-14 | E2E scenario 4 underline; screenshots; resemblance-rule tests | Planned |
 | AG-25 | Command Matrix conformance test and completion of visual regression (scenario 16) | AG-10 to AG-24 | Every Command Matrix and Derived Rule cell asserted; every scenario 16 state inspected in light and dark; `npm run check:requirements` | Planned |
 | AG-26 | Performance guards for the edit and group-move paths | AG-12, AG-14, AG-20 | `perf/agenda.spec.ts` scenarios against a same-machine baseline; save-count assertion | Planned |
@@ -83,9 +83,9 @@ Conventions for AG-5 to AG-28: tier names are those of `docs/DEVELOPMENT.md` §9
 * **AG-21.** Files: `src/application/agenda-state.ts` (presentation and saved timeline anchor, selection, folds), `src/renderer/AgendaView.tsx`, `src/renderer/AgendaLocationBar.tsx`, `src/renderer/agenda-row-keyboard.ts`, `src/renderer/agenda-key-policy.ts` (`Cmd+.` on a day, `Cmd+,`, Vim `gd` and `Ctrl+o`), `src/renderer/styles.css` (S5 heading), tests, `e2e/agenda-view.spec.ts`, `docs/PRODUCT.md`. Implements §8 focused day, S5/VC13. Evidence: E2E scenario 13 (`j`/`k` stop at the edges, `Cmd+,` restores scroll, selection, and folds without re-targeting Today); VC13 screenshot; VC14 observed in a visible window. Tier: Moderate Risk. Review, Verify, WP. PO: none.
 * **AG-22.** Files (new): `src/domain/natural-date.ts` with unit and property tests. Content: `suggestDates(text, caret, today)` returns the replacement span and ordered suggestions; weeks start Monday; covers every §5 expression, the ambiguity ordering, and F3; returns nothing for `t`, `to`, `mar`, `may` and inside a canonical date. The handoff lists the proposed expression table and thresholds. Evidence: table-driven tests for every §5 example; property (suggestions are valid dates, the first is the upcoming one, only the recognized span is replaced); mutation. Tier: Low Risk. PO: Q2 (approve the table before AG-23).
 
-### AG-22 Proposed Expression Table
+### AG-22 Approved Expression Table
 
-Pending Product Owner approval under Q2. Recognition is case-insensitive, uses complete words bounded by punctuation or whitespace, permits repeated ordinary spaces between words, and requires the caret inside or at either edge of the expression. Offsets are UTF-16 with exclusive ends. Words before and after the expression are preserved. The parser provides suggestions only; AG-23 owns explicit acceptance and popup lifecycle.
+Approved by the Product Owner on 2026-10-10 under Q2. Recognition is case-insensitive, uses complete words bounded by punctuation or whitespace, permits repeated ordinary spaces between words, and requires the caret inside or at either edge of the expression. Offsets are UTF-16 with exclusive ends. Words before and after the expression are preserved. The parser provides suggestions only; AG-23 owns explicit acceptance and popup lifecycle.
 
 | Expression | Threshold | Ordered suggestions |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ Pending Product Owner approval under Q2. Recognition is case-insensitive, uses c
 | `in N day` / `in N days` | Complete expression, nonnegative integer N | Today plus N days |
 | `N day ago` / `N days ago` | Complete expression, nonnegative integer N | Today minus N days |
 
-No suggestion for `t`, `to`, `tomo`, bare `mar` or `may`, abbreviated weekdays, bare month names, canonical dates, or expressions embedded in a word. Relative counts must be safe integers and resulting dates must fit the canonical calendar; at calendar limits, unavailable alternatives are omitted. Numeric dates, explicit years, ordinals, time expressions, tabs/newlines within expressions, and other natural-language forms are outside this proposed grammar. For Thursday 2026-10-08: `Friday` offers Oct 9 then Oct 16; `next Friday` offers Oct 16; `Oct 22` offers 2026-10-22 then 2025-10-22; `Feb 29` offers 2028-02-29 then 2024-02-29. These grammar and edge-case choices are proposals for approval, not additional implemented UI requirements.
+No suggestion for `t`, `to`, `tomo`, bare `mar` or `may`, abbreviated weekdays, bare month names, canonical dates, or expressions embedded in a word. Relative counts must be safe integers and resulting dates must fit the canonical calendar; at calendar limits, unavailable alternatives are omitted. Numeric dates, explicit years, ordinals, time expressions, tabs/newlines within expressions, and other natural-language forms are outside this proposed grammar. For Thursday 2026-10-08: `Friday` offers Oct 9 then Oct 16; `next Friday` offers Oct 16; `Oct 22` offers 2026-10-22 then 2025-10-22; `Feb 29` offers 2028-02-29 then 2024-02-29. The Product Owner approved these grammar and edge-case choices under Q2; AG-23 records the corresponding UI behavior in PRODUCT §20.9.
 
 ### Remaining Task Details
 
@@ -114,9 +114,11 @@ No suggestion for `t`, `to`, `tomo`, bare `mar` or `may`, abbreviated weekdays, 
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): AG-5–AG-8; AG-9; AG-10–AG-12, so the first user-visible state is windowed; AG-13–AG-14; AG-15–AG-17; AG-18–AG-21; AG-22–AG-24; AG-25–AG-28.
 
-**Next task:** Product Owner approval of the AG-22 Proposed Expression Table under Q2. After approval, mark AG-22 Done and begin AG-23: Natural-language completion popup. No completion UI is authorized before this reserved decision.
+**Next task:** AG-24: Date-like text indicator (S2, F6, VC10). Outstanding from AG-23: the manual native-keyboard check of Tab, Ctrl+N and Ctrl+P could not run because macOS Automation access was denied; run it once access is granted.
 
-AG-22 implements the pure `suggestDates` parser and UTF-16 replacement spans without wiring it into the renderer. Table-driven tests cover the accepted examples and proposed thresholds, calendar-week ordering, month/year rollover, leap-day alternatives, invalid counts/dates, Unicode word boundaries, and calendar limits. Property tests cover upcoming weekday ordering, valid month/day alternatives, and replacement isolation. Grammar choices remain proposals in the table above; no additional user-visible requirement or persistence/state behavior has been introduced.
+AG-23 wires the parser into Tree and Agenda in standard editing and Vim Insert. The popup opens below the edited row, flips above it when the window has too little room below, and shifts left at the right edge (Product Owner agreed on 2026-10-10; PRODUCT §20.9). Not covered by an E2E test: accepting a suggestion in Agenda when the new date moves the row to another day group.
+
+AG-22 implements the pure `suggestDates` parser and UTF-16 replacement spans without wiring it into the renderer. Table-driven tests cover the accepted examples and proposed thresholds, calendar-week ordering, month/year rollover, leap-day alternatives, invalid counts/dates, Unicode word boundaries, and calendar limits. Property tests cover upcoming weekday ordering, valid month/day alternatives, and replacement isolation. The Product Owner approved the grammar choices above on 2026-10-10. The domain parser itself adds no persistence or state behavior.
 
 AG-21 implemented the focused-day presentation, selectable heading, independent focused folds, and timeline selection/scroll/fold restoration. The Product Owner confirmed on 2026-10-10 that live date migration follows the nearest remaining day and that the heading supports existing day-container creation/folding commands. Preceding-day creation follows the new node. If edits removed the saved timeline row, return uses the existing nearest-visible-day reconciliation rule. Product behavior is in §23.15; bounded state ownership and performance assessment are in ARCHITECTURE.md. Light/dark focused-day screenshots and real renderer transition frames cover VC13/VC14. Independent code review and product verification found no remaining meaningful issues after fixes.
 

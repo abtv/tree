@@ -172,6 +172,8 @@ Hidden mode still requires a macOS GUI session; it does not make the suite headl
 
 Agenda scenarios call `setAgendaToday(window)` after launch and before opening Agenda. The helper fixes the renderer's `Date` to the synthetic calendar date used by the Agenda specification while leaving timers and animation frames running normally.
 
+Date-completion scenarios use the same clock in Tree and Agenda. `e2e/agenda-completion.spec.ts` checks both editing modes, popup geometry, explicit keyboard and mouse acceptance, suffix preservation, history, uncertain fragments and paste suppression. Composition is verified with renderer-level event contract sequences. When completion shortcuts change, also check `Ctrl+N`, `Ctrl+P`, Tab and Escape through a native macOS keyboard in a visible isolated synthetic profile; Playwright key events alone do not establish native routing.
+
 Drag tests start a gesture through `startRowDrag` in `e2e/fixtures.ts`. A visible run happens on a live desktop, so that helper verifies the active drag survives a short settling window and retries the gesture a bounded number of times, since a window that loses focus releases pointer capture and the application cancels the drag by design. The hidden default removes desktop focus changes from the gesture, and the bounded retries remain for visible runs.
 
 Breadcrumb drag coverage in `e2e/drag-and-drop-hierarchy.spec.ts` checks toolbar destinations, focus/mode transitions, and both visible and hidden restored move sites after undo. Native pointer capture can also fail without a lost-capture event; renderer tests exercise outside-list move, release, invalid-target, and cancellation events through the same gesture handlers, so toolbar coverage does not assume capture succeeded.
@@ -507,6 +509,7 @@ Mutation testing measures assertion strength, which coverage does not: Stryker c
 When a task changes logic in `src/domain`, `src/application`, or one of the renderer modules named above, run mutation testing on the changed files and read their surviving mutants before handoff. Read the weekly report when the score drops. Treat a survivor as a question about a missing assertion, not a target to chase: kill it with an assertion on behavior, or leave an equivalent mutant (one that cannot change observable behavior) with a Stryker disable comment stating why. The Stryker Vitest runner does not yet work with Vitest 5, which is why `vitest` is pinned to 4.x; upgrade Vitest only together with a runner release that supports the new version, and confirm that a narrow run still kills mutants.
 
 Run ordinary Vitest validation after Stryker has finished and removed its sandbox.
+The pure date-completion lifecycle owner `date-assist.ts` is also in the renderer mutation scope.
 The temporary `.stryker-tmp/` tree contains copied and mutated tests, which the
 normal test configuration can collect while it exists. Read a mutant against the
 source recorded in its report, and confirm its exact expression before manually

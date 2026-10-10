@@ -1,4 +1,65 @@
 import type { LinkRange, TreeNode } from '../domain/document'
+
+/** Measure a UTF-16 text offset without disturbing the live selection. */
+export function expressionPosition(
+  element: HTMLElement,
+  offset: number,
+): { left: number; top: number; rowTop: number } {
+  const rect = element.getBoundingClientRect()
+  const row = element.closest('.node-row, .agenda-row') ?? element
+  const { top: rowTop, bottom: top } = row.getBoundingClientRect()
+  if (element instanceof HTMLTextAreaElement) {
+    const mirror = document.createElement('div')
+    const style = getComputedStyle(element)
+    for (const property of [
+      'font-family',
+      'font-size',
+      'font-weight',
+      'font-style',
+      'font-variant',
+      'font-stretch',
+      'line-height',
+      'letter-spacing',
+      'padding',
+      'border',
+      'box-sizing',
+      'word-break',
+      'overflow-wrap',
+    ])
+      mirror.style.setProperty(property, style.getPropertyValue(property))
+    Object.assign(mirror.style, {
+      position: 'fixed',
+      visibility: 'hidden',
+      whiteSpace: 'pre-wrap',
+      width: `${rect.width}px`,
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+    })
+    mirror.textContent = element.value.slice(0, offset)
+    const marker = document.createElement('span')
+    marker.textContent = '\u200b'
+    mirror.append(marker, element.value.slice(offset))
+    document.body.append(mirror)
+    const left = marker.getBoundingClientRect().left - element.scrollLeft
+    mirror.remove()
+    return { left, top, rowTop }
+  }
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let remaining = offset
+  let text = walker.nextNode()
+  while (text !== null) {
+    const length = text.textContent?.length ?? 0
+    if (remaining <= length) {
+      const range = document.createRange()
+      range.setStart(text, remaining)
+      range.collapse(true)
+      return { left: range.getBoundingClientRect().left, top, rowTop }
+    }
+    remaining -= length
+    text = walker.nextNode()
+  }
+  return { left: rect.left, top, rowTop }
+}
 import { normalCaretTarget } from './link-caret'
 
 export function nodeTextLength(input: HTMLElement): number {

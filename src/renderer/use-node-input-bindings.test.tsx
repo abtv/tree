@@ -119,6 +119,74 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
 }
 
 describe('useNodeInputBindings', () => {
+  // @requirement PRODUCT.md §20.9
+  it('suspends date completion throughout native composition and recognizes the committed expression', async () => {
+    const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
+    const input = f.input()
+    input.focus()
+    f.type('tomor')
+    expect(f.result.current.datePopup?.popup.suggestions).toHaveLength(1)
+    act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type('tomorrow')
+    f.press('Tab')
+    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.node().text).toBe('tomorrow')
+    act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
+    expect(f.result.current.datePopup?.popup.text).toBe('tomorrow')
+    act(() => f.bindings().onBlur())
+    expect(f.result.current.datePopup).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §20.9
+  it('accepts the selected suggestion with Tab, closes the popup and keeps the caret in the editor', async () => {
+    const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
+    const input = f.input()
+    input.focus()
+    f.type('tomor')
+    expect(f.result.current.datePopup).toBeDefined()
+    f.press('Tab')
+    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.node().text).not.toBe('tomor')
+    expect(f.node().text).toMatch(/\d{4}-\d{2}-\d{2}/)
+    expect(f.node().children).toHaveLength(0)
+  })
+
+  // @requirement PRODUCT.md §20.9
+  it('keeps completion closed for native paste, composing key flags, mode changes and external history', async () => {
+    const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
+    const input = f.input()
+    input.focus()
+    input.value = 'tomorrow'
+    input.setSelectionRange(8, 8)
+    act(() =>
+      f.bindings().onTextChange({ currentTarget: input, nativeEvent: { inputType: 'insertFromPaste' } } as never),
+    )
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type('tomor')
+    expect(f.result.current.datePopup).toBeDefined()
+    act(() =>
+      f.bindings().onKeyDown({
+        currentTarget: input,
+        key: 'Tab',
+        nativeEvent: { isComposing: true },
+        preventDefault: () => undefined,
+      } as never),
+    )
+    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.node().text).toBe('tomor')
+    f.type('tomorr')
+    expect(f.result.current.datePopup).toBeDefined()
+    act(() => f.result.current.setVimMode('normal'))
+    expect(f.result.current.datePopup).toBeUndefined()
+    act(() => f.result.current.setVimMode('insert'))
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type('tomorro')
+    expect(f.result.current.datePopup).toBeDefined()
+    act(() => f.store.undo())
+    expect(f.result.current.datePopup).toBeUndefined()
+  })
+
   it('shifts a standard editor node through the store and restores its text selection', async () => {
     const f = await fixture({
       vimEnabled: false,

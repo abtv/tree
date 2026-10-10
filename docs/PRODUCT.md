@@ -1112,6 +1112,18 @@ The content area is the scrolling region between the location toolbar and the st
 
 ---
 
+### 20.9 Natural-Language Date Completion
+
+Tree and Agenda node editors offer explicit date completion in standard editing and Vim Insert. Natural-language expressions remain ordinary text until accepted. A compact popup opens only after an edit inside a recognized expression; it never opens for paste, Undo, or programmatic text changes. Hyperlink text is excluded. Vim Normal, Visual and Replace do not offer completion.
+
+Recognition ignores case and permits repeated spaces between words. `today` and `yesterday` require complete words; `tomor`, `tomorr`, `tomorro` and `tomorrow` offer tomorrow. Full English weekday names offer the upcoming occurrence first, including Today, followed by the next week's occurrence when the current week's is Today or future, otherwise by the current week's past occurrence. `this`, `next` and `last` plus a full weekday name offer that weekday in the current, next or previous Monday-based calendar week. `next week` offers next Monday first and then the remaining days in order. A full English month name or three-letter abbreviation followed by a one- or two-digit day offers the nearest upcoming occurrence and then the nearest past occurrence; February 29 uses valid leap years. `in N day(s)` and `N day(s) ago` offer the date N days after or before Today, with a nonnegative integer count. Suggestions stay within the canonical calendar; unavailable alternatives are omitted. Short uncertain fragments, including `t`, `to`, `mar` and `may`, bare month names and abbreviated weekdays offer nothing. The recognized span never includes adjacent words or time expressions.
+
+The popup uses the document surface, a thin location-border-colored border and a soft shadow. It aligns its left edge with the expression's first character and sits directly below the edited row without covering it. When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge. Each suggestion shows its canonical date and secondary weekday/expression description; the selected suggestion uses the shared selection highlight pair. The footer reads `Tab accept · ⌃N ⌃P`. `Ctrl+N` and `Ctrl+P` cycle suggestions, `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. These popup shortcuts deliberately override ordinary text or indentation commands only while the popup is open, supporting the keyboard-first model (§1.1); without it, Tab retains §20.2 behavior.
+
+Escape closes the popup and retains its ordinary editing behavior: in Vim Insert it enters Normal without changing the expression. Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
+
+---
+
 ## 21. Unexpected Renderer Errors
 
 If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.

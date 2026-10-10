@@ -10,6 +10,7 @@ import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
 import { AgendaLocationBar } from './AgendaLocationBar'
 import { AgendaView } from './AgendaView'
+import { DatePopup } from './DatePopup'
 import { findCanonicalDates } from '../domain/date-recognition'
 import { richTextHtml } from './editor-dom'
 import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
@@ -94,6 +95,8 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     dragFreeze,
     setVimEditing,
     vimTextCommandState,
+    datePopup,
+    acceptDate,
   } = useNodeInputBindings({
     store,
     selectedNodeId,
@@ -437,6 +440,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
           ) : null}
         </section>
       </div>
+      <DatePopup presentation={datePopup} accept={acceptDate} />
       <footer className="status-bar">
         {vimEnabled ? (
           <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">

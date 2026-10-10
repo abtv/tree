@@ -32,6 +32,8 @@ import { createVimEditSessionState } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
+import { useDateAssist } from './use-date-assist'
+import type { DatePopupPresentation } from './DatePopup'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -57,6 +59,8 @@ interface UseNodeInputBindingsOptions {
 }
 
 export interface NodeInputBindingsResult {
+  datePopup: DatePopupPresentation | undefined
+  acceptDate: (index: number) => void
   vimTextCommandState: VimTextCommandState
   bindings: (node: TreeNode) => NodeInputBindings
   dragFreeze: NodeDragCaretFreeze
@@ -134,6 +138,18 @@ export function useNodeInputBindings({
   function schedulePendingVisualSelection(pending: PendingVisualSelection): void {
     pendingVisualSelection.current = pending
   }
+
+  const scheduleDateCaret = useCallback((nodeId: string, cursor: number): void => {
+    schedulePendingCaret({ nodeId, cursor, refocus: true })
+  }, [])
+  const dateAssist = useDateAssist(
+    store,
+    vimEnabled ? vimMode : 'insert',
+    persistenceLocked,
+    scheduleDateCaret,
+    vimEnabled,
+  )
+  const decorateDateBindings = dateAssist.decorate
 
   const changeVimMode = useCallback(
     (mode: VimMode): void => {
@@ -669,97 +685,99 @@ export function useNodeInputBindings({
   }, [])
 
   const bindings = useCallback(
-    (node: TreeNode): NodeInputBindings => ({
-      selectedAll: selectAllNodeId === node.id,
-      disabled: persistenceLocked,
-      inputRef: (input: HTMLElement | null) => {
-        if (input === null) {
-          const previous = inputs.current.get(node.id)
-          if (previous !== undefined) normalCaretResizeObserver.current?.unobserve(previous)
-          inputs.current.delete(node.id)
-        } else {
-          inputs.current.set(node.id, input)
-          normalCaretResizeObserver.current?.observe(input)
-        }
-      },
-      ...createTextEditHandlers(
-        {
-          store,
-          composing,
-          pendingLinkDraft,
-          schedulePendingCaret,
-          getMode: () => latestVimMode.current,
-          session: vimSession.current,
-          commandState: vimCommandState.current,
-          finishVimReplace,
-          setComposing,
+    (node: TreeNode): NodeInputBindings =>
+      decorateDateBindings(node, {
+        selectedAll: selectAllNodeId === node.id,
+        disabled: persistenceLocked,
+        inputRef: (input: HTMLElement | null) => {
+          if (input === null) {
+            const previous = inputs.current.get(node.id)
+            if (previous !== undefined) normalCaretResizeObserver.current?.unobserve(previous)
+            inputs.current.delete(node.id)
+          } else {
+            inputs.current.set(node.id, input)
+            normalCaretResizeObserver.current?.observe(input)
+          }
         },
-        node,
-      ),
-      ...createPointerHandlers(
-        {
+        ...createTextEditHandlers(
+          {
+            store,
+            composing,
+            pendingLinkDraft,
+            schedulePendingCaret,
+            getMode: () => latestVimMode.current,
+            session: vimSession.current,
+            commandState: vimCommandState.current,
+            finishVimReplace,
+            setComposing,
+          },
+          node,
+        ),
+        ...createPointerHandlers(
+          {
+            store,
+            selectedNodeId,
+            persistenceLocked,
+            vimMode,
+            commandState: vimCommandState.current,
+            vimTextCommandState,
+            getMode: () => latestVimMode.current,
+            getInput: (id) => inputs.current.get(id),
+            readAuthority: () => caretAuthority.current,
+            applyCaretState,
+            changeVimMode,
+            finishVimInsert,
+            finishVimReplace,
+            setSelectAllNodeId,
+          },
+          node,
+        ),
+        onKeyDown: createEditorKeyDownHandler({
           store,
-          selectedNodeId,
-          persistenceLocked,
-          vimMode,
-          commandState: vimCommandState.current,
-          vimTextCommandState,
-          getMode: () => latestVimMode.current,
-          getInput: (id) => inputs.current.get(id),
-          readAuthority: () => caretAuthority.current,
-          applyCaretState,
-          changeVimMode,
-          finishVimInsert,
-          finishVimReplace,
+          node,
+          isComposing: () => composing,
           setSelectAllNodeId,
-        },
-        node,
-      ),
-      onKeyDown: createEditorKeyDownHandler({
-        store,
-        node,
-        isComposing: () => composing,
-        setSelectAllNodeId,
-        onPreviewAttachment,
-        shiftFocusedNode: (direction, selection, cursor) => {
-          if (store.shiftNodeVisual(direction, node.id, node.id, 1, cursor, true))
-            schedulePendingVisualSelection({ nodeId: node.id, start: selection.start, end: selection.end })
-        },
-        vim: !vimEnabled
-          ? undefined
-          : createVimKeyboardState(
-              {
-                store,
-                vimMode,
-                registerHandle,
-                commandState: vimCommandState.current,
-                session: vimSession.current,
-                readAuthority: () => caretAuthority.current,
-                finishVimInsert,
-                finishVimReplace,
-                applyCaretState,
-                moveVimViewport,
-                syncImageCaretToFocus,
-                changeVimMode,
-                onPreviewAttachment,
-                schedulePendingCaret,
-                nodeVisualSelection,
-                setNodeVisualSelection,
-                moveNodeVisual,
-                commandNodeVisual,
-                shiftNodeVisual,
-                joinNodeVisual,
-                shiftCurrentNode,
-                restoreVisual,
-                verticalOperator,
-                repeatStructural,
-                onFoldCommand,
-              },
-              node,
-            ),
+          onPreviewAttachment,
+          shiftFocusedNode: (direction, selection, cursor) => {
+            if (store.shiftNodeVisual(direction, node.id, node.id, 1, cursor, true))
+              schedulePendingVisualSelection({ nodeId: node.id, start: selection.start, end: selection.end })
+          },
+          vim: !vimEnabled
+            ? undefined
+            : createVimKeyboardState(
+                {
+                  store,
+                  vimMode,
+                  registerHandle,
+                  commandState: vimCommandState.current,
+                  session: vimSession.current,
+                  readAuthority: () => caretAuthority.current,
+                  finishVimInsert,
+                  finishVimReplace,
+                  applyCaretState,
+                  moveVimViewport,
+                  syncImageCaretToFocus,
+                  changeVimMode,
+                  onPreviewAttachment,
+                  schedulePendingCaret,
+                  nodeVisualSelection,
+                  setNodeVisualSelection,
+                  moveNodeVisual,
+                  commandNodeVisual,
+                  shiftNodeVisual,
+                  joinNodeVisual,
+                  shiftCurrentNode,
+                  restoreVisual,
+                  verticalOperator,
+                  repeatStructural,
+                  onFoldCommand,
+                },
+                node,
+              ),
+        }),
       }),
-    }),
     [
+      decorateDateBindings,
       composing,
       applyCaretState,
       commandNodeVisual,
@@ -817,5 +835,16 @@ export function useNodeInputBindings({
     [beginFrozenCaret, releaseFrozenCaret],
   )
 
-  return { bindings, dragFreeze, setVimEditing, vimTextCommandState }
+  useLayoutEffect(() => {
+    dateAssist.reconcile()
+  })
+
+  return {
+    bindings,
+    dragFreeze,
+    setVimEditing,
+    vimTextCommandState,
+    datePopup: dateAssist.presentation,
+    acceptDate: dateAssist.accept,
+  }
 }
