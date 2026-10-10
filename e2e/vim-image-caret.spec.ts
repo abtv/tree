@@ -810,18 +810,23 @@ test.describe('Vim editing: image caret', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 1)
     await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-row[data-node-id="root"] .attachment-image-caret')).toHaveCount(1)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-focused-light.png')
+    const captureNodeList = async (name: string) => {
+      const bounds = await window.locator('.node-list').boundingBox()
+      if (bounds === null) throw new Error('The node list was not visible for its screenshot.')
+      await expect(window).toHaveScreenshot(name, { clip: bounds })
+    }
+    await captureNodeList('vim-edited-image-caret-focused-light.png')
     await window.emulateMedia({ colorScheme: 'dark' })
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-focused-dark.png')
+    await captureNodeList('vim-edited-image-caret-focused-dark.png')
 
     await editor.press('G')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(node(window, 2)).not.toHaveClass(/node-input-image-caret/)
     await node(window, 2).press('j')
     await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-peer-dark.png')
+    await captureNodeList('vim-edited-image-caret-peer-dark.png')
     await window.emulateMedia({ colorScheme: 'light' })
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-edited-image-caret-peer-light.png')
+    await captureNodeList('vim-edited-image-caret-peer-light.png')
   })
 
   test('advances onto the image after toggling the final text character', async ({ userDataDir }) => {
