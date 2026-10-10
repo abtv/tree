@@ -233,21 +233,30 @@ export function wideSeed(count: number): Seed {
 }
 
 /** Dated siblings with wrapping text; two occurrences per real node. */
-export function agendaSeed(count: number): Seed {
+export function agendaSeed(count: number, withMirrorPair = false): Seed {
   const today = new Date()
   const later = new Date(today)
   later.setDate(today.getDate() + 6)
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
   const canonical = (date: Date): string =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  // The optional first node is dated yesterday and today, so both of its occurrences are mounted together.
+  const pair = withMirrorPair
+    ? [{ id: 'pair', text: `${canonical(yesterday)} ${canonical(today)} Pair `, children: [] }]
+    : []
   return {
     document: {
-      roots: Array.from({ length: count }, (_, index) => ({
-        id: `dated-${index}`,
-        text: `${canonical(today)} Item ${index} ${canonical(later)} ${'Review the synthetic rollout details. '.repeat(index % 3 === 0 ? 5 : 1)}`,
-        children: [],
-      })),
+      roots: [
+        ...pair,
+        ...Array.from({ length: count }, (_, index) => ({
+          id: `dated-${index}`,
+          text: `${canonical(today)} Item ${index} ${canonical(later)} ${'Review the synthetic rollout details. '.repeat(index % 3 === 0 ? 5 : 1)}`,
+          children: [],
+        })),
+      ],
     },
-    location: { currentParentId: null, selectedNodeId: 'dated-0' },
+    location: { currentParentId: null, selectedNodeId: withMirrorPair ? 'pair' : 'dated-0' },
   }
 }
 
