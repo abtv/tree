@@ -2094,6 +2094,51 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toHaveValue('f bar')
   })
 
+  // @requirement PRODUCT.md §20.2
+  test('preserves backward rich-text Visual direction through idle observation and gv', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'a',
+            text: 'foo bar',
+            links: [{ start: 0, end: 3, url: 'https://example.test' }],
+            children: [],
+          },
+          { id: 'b', text: 'xyz', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const selectedText = () => editor.evaluate(() => globalThis.getSelection()?.toString())
+    await editor.focus()
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+    await window.keyboard.press('o')
+    // Give document selection observers time to run before testing the anchored end.
+    await window.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 100)))
+    await expect.poll(selectedText).toBe('foo')
+    await window.locator('.node-list').screenshot({ path: test.info().outputPath('backward-rich-visual-light.png') })
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await window.locator('.node-list').screenshot({ path: test.info().outputPath('backward-rich-visual-dark.png') })
+    await window.emulateMedia({ colorScheme: 'light' })
+    await window.keyboard.press('Escape')
+    await node(window, 2).focus()
+    await window.locator('.node-list').screenshot({ path: test.info().outputPath('rich-focus-neighbor.png') })
+    await window.keyboard.press('g')
+    await window.keyboard.press('v')
+    await expect(editor).toBeFocused()
+    await expect.poll(selectedText).toBe('foo')
+    await window.keyboard.press('l')
+    await expect.poll(selectedText).toBe('oo')
+    await lockSystemClipboard()
+    await window.keyboard.press('d')
+    await expect(editor).toHaveText('f bar')
+  })
+
   test('selects the incoming nodes after a Visual put and the moved range after a shift', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

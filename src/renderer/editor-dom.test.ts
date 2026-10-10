@@ -154,7 +154,58 @@ describe('editor DOM adapters', () => {
     getSelection.mockRestore()
   })
 
-  it('reads a contenteditable range in document order and restores the selection', () => {
+  it.each(['forward', 'backward'] as const)(
+    'reads a %s contenteditable range without mutating the selection',
+    (direction) => {
+      const element = document.createElement('div')
+      element.contentEditable = 'true'
+      element.innerHTML = 'one<a href="https://example.test">two<strong>three</strong></a>four'
+      document.body.append(element)
+      const first = element.firstChild!
+      const last = element.querySelector('strong')!.firstChild!
+      const selection = window.getSelection()!
+      if (direction === 'forward') selection.setBaseAndExtent(first, 1, last, 2)
+      else selection.setBaseAndExtent(last, 2, first, 1)
+      const anchor = { node: selection.anchorNode, offset: selection.anchorOffset }
+      const focus = { node: selection.focusNode, offset: selection.focusOffset }
+      const remove = vi.spyOn(selection, 'removeAllRanges')
+      const add = vi.spyOn(selection, 'addRange')
+      try {
+        expect(getSelectionRange(element)).toEqual({ start: 1, end: 8 })
+        expect(remove).not.toHaveBeenCalled()
+        expect(add).not.toHaveBeenCalled()
+        expect({ node: selection.anchorNode, offset: selection.anchorOffset }).toEqual(anchor)
+        expect({ node: selection.focusNode, offset: selection.focusOffset }).toEqual(focus)
+      } finally {
+        vi.restoreAllMocks()
+        selection.removeAllRanges()
+        element.remove()
+      }
+    },
+  )
+
+  it('reads element-container boundaries without mutating the selection', () => {
+    const element = document.createElement('div')
+    element.contentEditable = 'true'
+    element.innerHTML = 'one<a href="https://example.test">two<strong>three</strong></a>four'
+    document.body.append(element)
+    const link = element.querySelector('a')!
+    setDomSelection(element, 1, link, 1)
+    const selection = window.getSelection()!
+    const remove = vi.spyOn(selection, 'removeAllRanges')
+    const add = vi.spyOn(selection, 'addRange')
+    try {
+      expect(getSelectionRange(element)).toEqual({ start: 3, end: 6 })
+      expect(remove).not.toHaveBeenCalled()
+      expect(add).not.toHaveBeenCalled()
+    } finally {
+      vi.restoreAllMocks()
+      selection.removeAllRanges()
+      element.remove()
+    }
+  })
+
+  it('reads a contenteditable range in document order and preserves the selection', () => {
     const element = document.createElement('div')
     const first = document.createTextNode('one')
     const second = document.createTextNode('two')

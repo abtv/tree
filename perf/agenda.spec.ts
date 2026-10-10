@@ -250,11 +250,11 @@ test('Agenda group move of a Visual selection completes within budget as one sav
     samples: 2,
     metrics: { moveMs: round(probe.move[0]!), undoMs: round(probe.undo[0]!), saves },
   })
-  // Single-sample group operations over 6000 occurrences: the same machine measured
-  // 26-35 ms for the move and 35, 108, and 180 ms for the undo in three runs, so the
-  // ceiling keeps about a threefold margin over the worst sample seen.
+  // Ten runs without forced GC after making selection measurement read-only measured
+  // 17-34.3 ms for the move and 30.9-41.7 ms for Undo (including two animation frames).
+  // The Undo ceiling leaves over twice the measured maximum without allowing the old pauses.
   expect(probe.move[0]).toBeLessThan(500)
-  expect(probe.undo[0]).toBeLessThan(500)
+  expect(probe.undo[0]).toBeLessThan(100)
   // One save for the move and one for its Undo at most; a per-node save would reach one hundred.
   expect(saves).toBeLessThanOrEqual(2)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)

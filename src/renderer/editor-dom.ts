@@ -187,17 +187,22 @@ export function getCaret(element: HTMLElement): number {
   const selection = globalThis.getSelection()
   if (selection === null || selection.rangeCount === 0) return 0
   const range = selection.getRangeAt(0)
-  if (!element.contains(range.startContainer)) return 0
-  if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
-    const children = range.startContainer.childNodes
+  return textOffsetAtBoundary(element, range.startContainer, range.startOffset)
+}
+
+/** Read a boundary's UTF-16 text offset without changing the live selection. */
+function textOffsetAtBoundary(element: HTMLElement, container: Node, boundaryOffset: number): number {
+  if (!element.contains(container)) return 0
+  if (container.nodeType === Node.ELEMENT_NODE) {
+    const children = container.childNodes
     let offset = 0
-    for (let index = 0; index < range.startOffset; index += 1) offset += children[index]?.textContent?.length ?? 0
-    const prefix = range.startContainer === element ? 0 : getCaretPrefix(element, range.startContainer)
+    for (let index = 0; index < boundaryOffset; index += 1) offset += children[index]?.textContent?.length ?? 0
+    const prefix = container === element ? 0 : getCaretPrefix(element, container)
     return prefix + offset
   }
-  const before = range.cloneRange()
+  const before = element.ownerDocument.createRange()
   before.selectNodeContents(element)
-  before.setEnd(range.startContainer, range.startOffset)
+  before.setEnd(container, boundaryOffset)
   return before.toString().length
 }
 
@@ -211,15 +216,9 @@ export function getSelectionRange(element: HTMLElement): { start: number; end: n
     return { start: cursor, end: cursor }
   }
   const range = selection.getRangeAt(0)
-  const start = getCaret(element)
+  const start = textOffsetAtBoundary(element, range.startContainer, range.startOffset)
   if (range.collapsed) return { start, end: start }
-  const endRange = range.cloneRange()
-  endRange.collapse(false)
-  selection.removeAllRanges()
-  selection.addRange(endRange)
-  const end = getCaret(element)
-  selection.removeAllRanges()
-  selection.addRange(range)
+  const end = textOffsetAtBoundary(element, range.endContainer, range.endOffset)
   return { start: Math.min(start, end), end: Math.max(start, end) }
 }
 
