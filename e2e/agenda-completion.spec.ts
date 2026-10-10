@@ -17,7 +17,7 @@ import {
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
   for (const view of ['Tree', 'Agenda'] as const) {
     // @requirement PRODUCT.md §20.9
-    test(`accepts English relative day counts in ${view}`, async ({ userDataDir }, testInfo) => {
+    test(`accepts relative dates and named months in ${view}`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'n' },
@@ -42,6 +42,10 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         ['in five days', '2026-10-13'],
         ['in twenty-five days', '2026-11-02'],
         ['in one hundred days', '2027-01-16'],
+        ['in 3 weeks', '2026-10-29'],
+        ['three weeks ago', '2026-09-17'],
+        ['in October', '2027-10-01'],
+        ['last October', '2026-10-01'],
       ]) {
         await window.keyboard.press('Meta+a')
         await window.keyboard.type(`2026-10-08 Plan ${expression} at noon`)

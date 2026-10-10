@@ -9,6 +9,10 @@ const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 it('recognizes relative dates well below one millisecond, including incremental typing and long text', () => {
   const expressions = [
     ['two days ago', -2],
+    ['in three weeks', 21],
+    ['3 weeks ago', -21],
+    ['in October', dayNumberOf({ year: 2027, month: 10, day: 1 }) - today],
+    ['last October', -7],
     ['in five days', 5],
     ['2 days ago', -2],
     ['in twenty-five days', 25],

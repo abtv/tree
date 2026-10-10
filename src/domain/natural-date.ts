@@ -50,9 +50,9 @@ const smallCounts = [
 ]
 const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
-const relativeExpression = /^(?:in (.+) days?|(.+) days? ago)$/
+const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
 const expressions = new RegExp(
-  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +days?|${countPattern} +days? +ago|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
+  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|(?:in|last) +(?:${months.join('|')})|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
   'gi',
 )
 // Stryker reports the module-initializer ObjectLiteral mutants as survivors.
@@ -67,7 +67,7 @@ function relativeDaysFor(expression: string, today: DayNumber): DayNumber[] | un
   // Require the whole expression. With the anchored recognizer this check is
   // redundant; it also keeps anchor-removal mutants output-equivalent.
   if (relative === null || relative[0] !== expression) return undefined
-  const value = relative[1] ?? relative[2]!
+  const value = relative[1] ?? relative[3]!
   const [first, second, extra] = value.split(/[ -]/)
   const small = smallCounts.indexOf(first!)
   const tens = tensCounts.indexOf(first!)
@@ -81,7 +81,8 @@ function relativeDaysFor(expression: string, today: DayNumber): DayNumber[] | un
   else if (tens >= 0 && extra === undefined && (second === undefined || unit >= 0))
     count = (tens + 2) * 10 + (second === undefined ? 0 : unit + 1)
   else return undefined
-  return [today + (relative[1] === undefined ? -count : count)]
+  const offset = count * ((relative[2] ?? relative[4]!).startsWith('week') ? 7 : 1)
+  return [today + (relative[1] === undefined ? -offset : offset)]
 }
 
 function monthDays(month: number, date: number, today: DayNumber): DayNumber[] {
@@ -108,6 +109,12 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
   if (expression === 'yesterday') return [today - 1]
   const monday = today - weekdayOf(today)
   if (expression === 'next week') return Array.from({ length: 7 }, (_, index) => monday + 7 + index)
+  const namedMonth = /^(in|last) (.+)$/.exec(expression)
+  const monthIndex = namedMonth ? months.indexOf(namedMonth[2]!) : -1
+  if (monthIndex !== -1) {
+    const occurrences = monthDays(monthIndex + 1, 1, today)
+    return occurrences.filter((day) => (namedMonth![1] === 'in' ? day >= today : day < today))
+  }
   // Anchor mutations are equivalent: the outer recognizer supplies only a
   // complete expression, never its surrounding text.
   const qualified = /^(this|next|last) (.+)$/.exec(expression)

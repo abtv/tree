@@ -31,6 +31,15 @@ describe('natural date expression table proposed in AG-22', () => {
     ['Oct 8', ['2026-10-08', '2025-10-08']],
     ['Feb 29', ['2028-02-29', '2024-02-29']],
     ['in 3 days', ['2026-10-11']],
+    ['in 3 weeks', ['2026-10-29']],
+    ['3 weeks ago', ['2026-09-17']],
+    ['in one week', ['2026-10-15']],
+    ['twenty-five weeks ago', ['2026-04-16']],
+    ['in 0 weeks', ['2026-10-08']],
+    ['in October', ['2027-10-01']],
+    ['last October', ['2026-10-01']],
+    ['IN   NOVEMBER', ['2026-11-01']],
+    ['last January', ['2026-01-01']],
     ['3 days ago', ['2026-10-05']],
     ['in 12 days', ['2026-10-20']],
     ['12 days ago', ['2026-09-26']],
@@ -83,6 +92,22 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(dates('Friday', day('2026-10-06'))).toEqual(['2026-10-09', '2026-10-16'])
     expect(dates('Friday', day('2026-10-10'))).toEqual(['2026-10-16', '2026-10-09'])
     expect(dates('Friday', day('2026-10-09'))).toEqual(['2026-10-09', '2026-10-16'])
+  })
+
+  it('uses the nearest month start in each direction, including calendar boundaries', () => {
+    expect(dates('in October', day('2026-09-30'))).toEqual(['2026-10-01'])
+    expect(dates('in October', day('2026-10-01'))).toEqual(['2026-10-01'])
+    expect(dates('last October', day('2026-10-01'))).toEqual(['2025-10-01'])
+    expect(dates('in January', day('9999-12-31'))).toBeUndefined()
+    expect(dates('last January', day('0000-01-01'))).toBeUndefined()
+    expect(dates('in 1 week', day('9999-12-31'))).toBeUndefined()
+    expect(dates('1 week ago', day('0000-01-01'))).toBeUndefined()
+    for (const expression of ['in October', 'last October', 'in three weeks', 'three weeks ago']) {
+      const text = `Plan ${expression} at noon`
+      const match = suggestDates(text, 5 + expression.length, today)!
+      expect(text.slice(match.start, match.end)).toBe(expression)
+      expect(suggestDates(`${expression}suffix`, expression.length, today)).toBeUndefined()
+    }
   })
 
   it('recognizes every English count from one through one hundred like its digits', () => {
