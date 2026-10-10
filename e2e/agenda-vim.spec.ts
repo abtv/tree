@@ -1,6 +1,8 @@
 // @editing-modes: vim
 import type { Page } from '@playwright/test'
 import type { TreeNode } from '../src/domain/document'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   expect,
   launchTree,
@@ -11,6 +13,8 @@ import {
   setMainWindowContentSize,
   test,
   writeClipboardText,
+  attachmentPath,
+  setCursor,
 } from './fixtures'
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
@@ -64,6 +68,68 @@ function seed(userDataDir: string): void {
 }
 
 test.describe('Agenda Vim commands', () => {
+  // @requirement PRODUCT.md §23.9
+  // @requirement PRODUCT.md §23.10
+  test('Normal Enter opens links and images without splitting or leaving Agenda', async ({ userDataDir }) => {
+    const url = 'https://example.com'
+    const text = `2026-10-14 ${url}`
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'linked',
+            text,
+            children: [],
+            links: [{ start: 11, end: text.length, url }],
+            attachment: { id: 'image', mimeType: 'image/png' },
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'linked' },
+    })
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    writeFileSync(
+      attachmentPath(userDataDir, 'image'),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    )
+    const { window, app } = await launchTree(userDataDir)
+    await app.evaluate(({ shell }) => {
+      const state = globalThis as typeof globalThis & { agendaOpenedUrls?: string[] }
+      state.agendaOpenedUrls = []
+      shell.openExternal = async (url) => {
+        state.agendaOpenedUrls!.push(url)
+      }
+    })
+    await openAndSelect(window, nodeKey(10, 14, 'linked'))
+    const input = row(window, nodeKey(10, 14, 'linked')).locator('.node-input')
+    await setCursor(input, 12)
+    await window.keyboard.press('Enter')
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as { agendaOpenedUrls?: string[] }).agendaOpenedUrls))
+      .toEqual(['https://example.com/'])
+    await expect(input).toBeFocused()
+    await window.keyboard.press('2')
+    await window.keyboard.press('Enter')
+    expect(await app.evaluate(() => (globalThis as { agendaOpenedUrls?: string[] }).agendaOpenedUrls)).toHaveLength(1)
+    await window.keyboard.press('$')
+    await window.keyboard.press('l')
+    await expect(
+      row(window, nodeKey(10, 14, 'linked')).getByRole('button', { name: 'Open image preview' }),
+    ).toHaveClass(/attachment-image-caret/)
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+    await expect(window.getByRole('img', { name: 'Attached image preview' })).toBeVisible()
+    await window.keyboard.press('Escape')
+    await expect(input).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(window.locator('.agenda-list')).toBeVisible()
+    expect(readPersisted(userDataDir).document.roots).toHaveLength(1)
+    expect(readPersisted(userDataDir).document.roots[0]!.text).toBe(text)
+  })
+
   // @requirement PRODUCT.md §23.14
   test('Visual group selection skips contextual rows and other levels and moves across real parents in one Undo', async ({
     userDataDir,

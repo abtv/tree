@@ -107,7 +107,10 @@ export function createAgendaKeyDownHandler({
     const normal = vim?.mode === 'normal'
     if (normal && !event.ctrlKey && !event.altKey && /^[0-9]$/u.test(event.key)) {
       if (event.key !== '0' || pending?.count) {
-        vim.commandState.pending = { count: `${pending?.count ?? ''}${event.key}`, motionCount: '' }
+        vim.commandState.pending =
+          pending?.operator === undefined
+            ? { count: `${pending?.count ?? ''}${event.key}`, motionCount: '' }
+            : { ...pending, motionCount: `${pending.motionCount}${event.key}` }
         return
       }
     }
@@ -126,6 +129,15 @@ export function createAgendaKeyDownHandler({
           clearPending(vim.commandState)
           if (agendaAllows(element, 'start-move')) store.startAgendaMove(count)
         } else vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', operator: 'd' }
+        return
+      }
+      // Consume unsupported operator sequences as one command; their j/k suffix is not navigation.
+      if (pending?.operator !== undefined) {
+        clearPending(vim.commandState)
+        return
+      }
+      if (event.key === 'c' || event.key === 'y') {
+        vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', operator: event.key }
         return
       }
       // A gap has no day, so `p` there is not allowed and the move stays pending (D4).

@@ -182,9 +182,9 @@ export function createEditorKeyDownHandler({
         block('structure')
         return
       }
-      if (event.key === 'Enter' && !event.metaKey) {
+      if (event.key === 'Enter' && !event.metaKey && !(vim?.mode === 'normal' && element === 'match')) {
         event.preventDefault()
-        // Vim Normal, Replace, and Visual keep `Enter` inert in Agenda; splitting is an Insert and standard-editing command.
+        // Normal direct matches use Tree's link/image command below; splitting is standard/Insert only.
         if ((vim === undefined || vim.mode === 'insert') && agendaAllows(element, 'split'))
           store.splitAgendaNode(getCaret(event.currentTarget))
         return

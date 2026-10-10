@@ -1234,7 +1234,7 @@ Agenda does not reorder existing siblings, change their real parents, delete sub
 
 Vim fold commands `zc`/`zo`, `za`, `zC`/`zO`, and `zM`/`zR` act on Agenda folds using the corresponding Tree fold rules. Recursive commands cover projected descendants; all-fold commands cover Agenda, independently of Tree expansion.
 
-Vim Normal `Enter` does nothing on any row. Creation from a day container, splitting, and sibling creation on direct matches are defined in §23.11; `Enter` and `o`/`O` do nothing on contextual ancestors. `dd` and `p`/`P` move occurrences instead of deleting or putting nodes, as §23.13 defines.
+Vim Normal `Enter` on a direct match follows Tree: it opens the hyperlink under the caret or previews the attached image when the image is the active character; elsewhere it does nothing. It never creates or splits a node. A counted `Enter` does nothing, as in Tree. On day containers, gaps and contextual ancestors it does nothing. Creation from a day container, splitting, and sibling creation on direct matches are defined in §23.11; `o`/`O` do nothing on contextual ancestors. `dd` and `p`/`P` move occurrences instead of deleting or putting nodes, as §23.13 defines.
 
 ### 23.11 Creating Nodes
 
@@ -1248,7 +1248,7 @@ Undo removes the node and applies the history focus rule of §23.8.
 
 In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead. The new part receives the displayed day's date, so the node stays on that day. The date is inserted at the start of the new part and replaces its leading whitespace with the single space after the date, so `2026-10-14 Prepare| release` becomes `2026-10-14 Prepare` and `2026-10-14 release`. Nothing is inserted when the new part already contains that day's date as a recognized date; a date inside a hyperlink does not count. Only the displayed day's date is inherited, and hyperlinks in the new part keep their text. The caret is placed after the inserted date, or at the start when nothing was inserted, and the new node becomes the active occurrence under that day. The split and the inserted date are one undoable change.
 
-Vim Normal `Enter` stays inert, and a counted or prefixed command still does nothing, as for creation from a day container.
+Vim Normal `Enter` follows the link/image behavior in §23.10 without creating a node. Replace and Visual `Enter` do nothing.
 
 #### Creating a Sibling of a Dated Node
 

@@ -4263,11 +4263,11 @@ describe('Agenda split and sibling keys', () => {
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
   })
 
-  it('splits in Vim Insert and keeps Enter inert in the other Vim modes', () => {
+  it('splits in Vim Insert and keeps Enter inert in Replace and Visual modes', () => {
     const store = agendaStore()
     vimHandler(store, node, 'insert').handle(keyEvent(input(), 'Enter'))
     expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
-    for (const mode of ['normal', 'replace', 'visual', 'visual-node'] as const) {
+    for (const mode of ['replace', 'visual', 'visual-node'] as const) {
       const inert = agendaStore()
       const event = keyEvent(input(), 'Enter')
       vimHandler(inert, node, mode).handle(event)
@@ -4275,6 +4275,46 @@ describe('Agenda split and sibling keys', () => {
       expect(inert.splitAgendaNode).not.toHaveBeenCalled()
       expect(inert.createSiblingOrFirstChild).not.toHaveBeenCalled()
     }
+  })
+
+  // @requirement PRODUCT.md §23.9
+  it('opens the hyperlink under the Normal caret in Agenda without splitting or moving the caret', () => {
+    const store = agendaStore()
+    const url = 'https://example.com'
+    const linked = { ...node, text: url, links: [{ start: 0, end: url.length, url }] }
+    const keyboard = vimHandler(store, linked, 'normal')
+    const element = input()
+    element.value = url
+    element.setSelectionRange(2, 2)
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    try {
+      keyboard.handle(keyEvent(element, 'Enter'))
+      expect(open).toHaveBeenCalledWith('https://example.com', '_blank')
+      expect(store.splitAgendaNode).not.toHaveBeenCalled()
+      expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+      expect(element.selectionStart).toBe(2)
+      expect(keyboard.vim.mode).toBe('normal')
+    } finally {
+      open.mockRestore()
+    }
+  })
+
+  // @requirement PRODUCT.md §23.9
+  it('opens the attached image at the Normal image caret in Agenda without creating a node', () => {
+    const store = agendaStore()
+    const attached: TreeNode = {
+      ...node,
+      attachment: { id: 'image', mimeType: 'image/png' },
+    }
+    const keyboard = vimHandler(store, attached, 'normal')
+    const element = input()
+    element.setSelectionRange(4, 4)
+    keyboard.vim.applyCaretState(node.id, { cursor: 4, imageActive: true }, false, 'preserve-selection')
+    keyboard.handle(keyEvent(element, 'Enter'))
+    expect(keyboard.onPreviewAttachment).toHaveBeenCalledWith('image')
+    expect(store.splitAgendaNode).not.toHaveBeenCalled()
+    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+    expect(keyboard.vim.mode).toBe('normal')
   })
 
   it('does nothing on a contextual ancestor', () => {

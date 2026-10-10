@@ -35,6 +35,78 @@ function seed(userDataDir: string): void {
 }
 
 describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §23.4
+  // @requirement PRODUCT.md §23.9
+  // @requirement PRODUCT.md §23.10
+  // @requirement PRODUCT.md §23.13
+  test('Command Matrix no-ops preserve each selected non-editable row and direct-match caret', async ({
+    userDataDir,
+  }) => {
+    seed(userDataDir)
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    const original = readPersisted(userDataDir).document
+    if (mode === 'vim') await window.keyboard.press('Escape')
+    const day = window.locator(`.agenda-row[data-agenda-key="${dayKey(10, 14)}"]`)
+    const gap = window.locator('.agenda-row-gap').first()
+    const context = window.locator('.agenda-role-context').first()
+    for (const target of [day, gap, context]) {
+      await target.click()
+      const keys = ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+Enter', 'Backspace']
+      if (target !== day || mode === 'vim') keys.push('Enter')
+      if (mode === 'vim') {
+        keys.push('>', '<', 'i', 'a', 'R', 'd', 'd', 'p', 'P')
+        if (target !== day) keys.push('o', 'O')
+      } else keys.push('q')
+      if (target === gap) keys.push('Meta+.')
+      for (const key of keys) {
+        await window.keyboard.press(key)
+        await expect(target).toBeFocused()
+        await expect(target).toHaveAttribute('aria-selected', 'true')
+        if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      }
+      if (mode === 'vim') {
+        for (const sequence of ['dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gJ', 'gp', 'gP', 'd2j', 'c2k', 'y2j']) {
+          for (const key of sequence) await window.keyboard.press(key)
+          await expect(target).toBeFocused()
+          await expect(target).toHaveAttribute('aria-selected', 'true')
+          await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        }
+      }
+      expect(readPersisted(userDataDir).document).toEqual(original)
+    }
+    await window.locator('.agenda-role-match').first().click()
+    const input = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
+    if (mode === 'vim') await window.keyboard.press('Escape')
+    await setCursor(input, 12)
+    const cursor = () =>
+      input.evaluate((element) => {
+        const selection = document.getSelection()!
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return range.toString().length
+      })
+    const before = await cursor()
+    const keys = ['Tab', 'Shift+Tab', 'Meta+Backspace']
+    if (mode === 'vim') keys.push('>', '<')
+    for (const key of keys) {
+      await window.keyboard.press(key)
+      await expect(input).toBeFocused()
+      expect(await cursor()).toBe(before)
+    }
+    if (mode === 'vim') {
+      for (const sequence of ['dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'd2j', 'c2k', 'y2j', 'gJ', 'gp', 'gP']) {
+        for (const key of sequence) await window.keyboard.press(key)
+        await expect(input).toBeFocused()
+        expect(await cursor()).toBe(before)
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      }
+    }
+    expect(readPersisted(userDataDir).document).toEqual(original)
+  })
+
   // @requirement PRODUCT.md §23.9
   test('retains hyperlinks on inactive direct matches and opens them with Cmd-click', async ({ userDataDir }) => {
     const url = 'https://example.com'

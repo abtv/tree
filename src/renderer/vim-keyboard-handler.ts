@@ -318,7 +318,7 @@ export function handleVimKey(
     const structural =
       event.key === '>' ||
       event.key === '<' ||
-      (!visual && pending.prefix !== 'z' && ['o', 'O', 'J', 'Enter'].includes(event.key)) ||
+      (!visual && pending.prefix !== 'z' && ['o', 'O', 'J'].includes(event.key)) ||
       (pending.prefix === 'g' && ['J', 'p', 'P', 'd'].includes(event.key)) ||
       (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
       (!visual && ['p', 'P'].includes(event.key) && !textPut) ||
