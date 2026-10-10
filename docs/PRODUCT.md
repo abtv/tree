@@ -1050,6 +1050,8 @@ At or below 500 visible rows, the list renders every row, including inline desce
 * Quitting the application or closing the window while Replace mode has a pending replacement completes that replacement as one edit before the quit save, so the saved document includes it; a failed save leaves the replacement committed and the application open for a retry.
 * The same interruptions during Insert mode leave Insert mode active, since Insert already behaves like other application commands run normally within it.
 * After a pending Replace replacement is completed for a quit, the editor is in Normal mode.
+* A cut with no selected text leaves a pending Replace replacement uncommitted and Replace mode active.
+* When the input blurs to a target that is not a node, a pending Replace replacement is completed as one edit at its typed end, with no step back as `Escape` makes; if the text then ends at the attached image's position, the image caret is active once Normal mode shows.
 
 #### 20.2.6 Pointer Presses and Application Commands
 
@@ -1274,6 +1276,7 @@ Normal mode also supports:
 * Empty or plain-text registers cannot be put in whole-node Visual mode.
 * A whole-node Visual put that is rejected, or blocked while persistence is locked, changes neither the mode nor the selection.
 * Leaving whole-node Visual mode with `Escape`, or by a mutation command that ends it, clears an unfinished `g` prefix, so a later Normal-mode `d` starts a delete instead of running `gd`.
+* `V` also leaves whole-node Visual mode for Normal mode, clearing an unfinished `g` prefix the same way.
 
 #### 20.2.24 Tab and Shift+Tab
 

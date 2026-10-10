@@ -60,8 +60,8 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
 **Next task:** PS-12 (close), once the Product Owner confirms that no further
-tasks remain and answers the items under "Open matrix-only rules" in
-`docs/VIM_CONFORMANCE.md` (or accepts them as they stand). Start every task with
+tasks remain. The four items under "Open matrix-only rules" in
+`docs/VIM_CONFORMANCE.md` stay there and do not block it. Start every task with
 `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the
 last update of this plan, rerun the guard report before trusting the section lists
 here.
@@ -239,7 +239,10 @@ structural commands and successful Visual movement), M11 (`V` as an exit), M12
 (any other blur), M20 (thin Replace caret, no named test), M25 (blur commits), M28
 (caret at `0` on entry; §6.1 says only "keep the text cursor"), plus a cut with no
 selection during Replace (found by review; its clause was in a deleted paragraph).
-Review also moved the M12 breadcrumb and enter-control clicks to the character
+Follow-up (same day, per D4 without asking the Product Owner): M11 (`V` as an
+exit), the blur half of M25, and the no-selection cut moved into PRODUCT §20.2.23
+and §20.2.5; only M7, M12, M20, and M28 remain open, because no named test asserts
+their rule, so they need no answer for PS-12. Review also moved the M12 breadcrumb and enter-control clicks to the character
 Visual clause only (no Normal-mode test) and limited M2 to quit. Observation:
 `docs/ARCHITECTURE.md:749` still says a pointer press leaves a structural Insert
 session for its node's blur, which the M3 decision changed. VIM_CONFORMANCE.md:
