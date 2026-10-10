@@ -274,13 +274,13 @@ describe('PRODUCT scanning and size limits', () => {
     ])
   })
 
-  it('runs without PRODUCT and reports stale exemptions for a title-only PRODUCT', () => {
+  it('runs without PRODUCT and passes a title-only PRODUCT while no size exemption remains', () => {
     const root = createTemporaryRoot()
     expect(runChecks({ rootDirectory: root }).issues).toEqual([])
     writeFile(root, 'docs/PRODUCT.md', '# Product\n')
-    const issues = runChecks({ rootDirectory: root }).issues
-    expect(issues.length).toBeGreaterThan(0)
-    expect(issues.every((issue) => issue.includes('stale size exemption'))).toBe(true)
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([])
+    const stale = runChecks({ rootDirectory: root, blockExemptions: new Set(['1']) }).issues
+    expect(stale).toEqual(['docs/PRODUCT.md §1: stale size exemption; delete it.'])
   })
 })
 

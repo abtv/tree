@@ -1306,7 +1306,11 @@ The window's top strip, which holds the window controls (close, minimize, zoom) 
 
 The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors. In the dark appearance the text of a node is colored by its depth below the current parent: the current parent's children use the first of eight colors, their expanded children the second, and so on in order. Rows nested deeper than the eighth level use the ordinary text color. The light appearance does not color text by depth. The depth color gives way to the selection highlight, so a selected row keeps the highlight's text color.
 
-The light appearance is an original palette, not adapted from a published color scheme. Its direction is a soft, paper-like notebook surface, set by a reference screenshot the Product Owner supplied (a note-taking application with a cream background and muted accents) and by the dotted-page look of a bullet journal. It uses a warm cream document surface, warm graphite text, warm gray-beige secondary text and rules, and a muted amber selection highlight with dark text. The gutter dots of node rows are light warm gray, so they stay quiet beside the text. The outer ring of a node with children is a darker warm beige than the surface and its disclosure chevron is a mid warm gray, so both stay visible on the cream surface. Links are a muted blue. The content area of the light appearance carries a faint dot grid with a 20px pitch, like dotted notebook paper; the grid scrolls with the content, stays beneath the toolbar and status bar, and is absent from the dark appearance.
+* The light appearance is an original palette, not adapted from a published color scheme. Its direction is a soft, paper-like notebook surface, set by a reference screenshot the Product Owner supplied (a note-taking application with a cream background and muted accents) and by the dotted-page look of a bullet journal. It uses a warm cream document surface, warm graphite text, warm gray-beige secondary text and rules, and a muted amber selection highlight with dark text.
+* The gutter dots of node rows are light warm gray, so they stay quiet beside the text.
+* The outer ring of a node with children is a darker warm beige than the surface and its disclosure chevron is a mid warm gray, so both stay visible on the cream surface.
+* Links are a muted blue.
+* The content area of the light appearance carries a faint dot grid with a 20px pitch, like dotted notebook paper; the grid scrolls with the content, stays beneath the toolbar and status bar, and is absent from the dark appearance.
 
 In the dark appearance, Vim mode indicators share a dark gray background and use muted text colors from the document palette: green for Normal, cyan for Insert, sandy yellow for Visual and whole-node Visual, and red for Replace. The Visual indicators retain the shared selection highlight pair.
 
@@ -1330,15 +1334,34 @@ A difference between paths is allowed only where this document records it and it
 
 The content area is the scrolling region between the location toolbar and the status bar (§2.2, §20.2). When the selection or the caret moves to another node, the content scrolls so the destination is visible and the position it ends in does not depend on the key or direction that led there.
 
-**Context.** After a keyboard command that reveals a node, the selected node lies at least one context away from the top and bottom edge of the content area, so a node that fits between those contexts never sits in the scroll-edge fades (§20.6) and the next `j` or `k` does not have to scroll first. The context is the height of one single-line node (25 px), not the height of the selected node, so a node that wraps over several lines does not enlarge it. It is capped at a quarter of the content area. A keyboard command moves the content by the smallest distance that restores the context, so `j` and `k` at the edge of the window move it by about one node instead of re-centering it, and the stop positions at the top and at the bottom are mirror images. A node already clear of both edges never causes scrolling. A node taller than the content area minus both contexts shows its start below the top context; its bottom may clip and enter the bottom fade. A node whose start is already at that position does not scroll again.
+#### Context
 
-**Distant destinations.** A destination more than half the height of the content area beyond its nearest edge, such as the target of `G` in a long list, is centered in the content area instead, since the surrounding nodes matter more than a small shift. A node that cannot fit between the contexts keeps the start priority above instead of being centered.
+* After a keyboard command that reveals a node, the selected node lies at least one context away from the top and bottom edge of the content area, so a node that fits between those contexts never sits in the scroll-edge fades (§20.6) and the next `j` or `k` does not have to scroll first.
+* The context is the height of one single-line node (25 px), not the height of the selected node, so a node that wraps over several lines does not enlarge it. It is capped at a quarter of the content area.
+* A keyboard command moves the content by the smallest distance that restores the context, so `j` and `k` at the edge of the window move it by about one node instead of re-centering it, and the stop positions at the top and at the bottom are mirror images.
+* A node already clear of both edges never causes scrolling.
+* A node taller than the content area minus both contexts shows its start below the top context; its bottom may clip and enter the bottom fade. A node whose start is already at that position does not scroll again.
 
-**Document edges.** When a move in one direction would stop within two contexts of the start or end of the content, the content scrolls all the way to that edge. Reaching the first node by walking with `k` or with `gg` reaches the document start, including when that node is taller than the area between the contexts. Reaching the last node by walking with `j` or with `G` reaches the document end when that node fits between the contexts; otherwise its visible start takes priority over reaching the end. These paths end at the same scroll position instead of leaving part of the document's own padding unscrolled. The content never scrolls against the direction of the move. At the start or end of the content the selected node may lie closer to the edge than the context, because nothing can scroll further.
+#### Distant Destinations
 
-**Changing geometry.** While a reveal remains current, image loading, row measurement and viewport resizing apply the same rule again so its destination remains visible. A new reveal replaces the previous one. Deliberate scrolling with the wheel, touch, scrollbar or a page-scroll key cancels this correction, so later image loads and measurements do not move the content back under the user. Geometry correction changes neither focus nor the caret, text selection, Vim mode or document history.
+A destination more than half the height of the content area beyond its nearest edge, such as the target of `G` in a long list, is centered in the content area instead, since the surrounding nodes matter more than a small shift. A node that cannot fit between the contexts keeps the start priority above instead of being centered.
 
-**Pointer.** A click or press that selects a node does not move a node that is fully visible, even next to an edge, so the content never shifts under the pointer. A node that is not fully visible scrolls into view by the same rules.
+#### Document Edges
+
+* When a move in one direction would stop within two contexts of the start or end of the content, the content scrolls all the way to that edge.
+* Reaching the first node by walking with `k` or with `gg` reaches the document start, including when that node is taller than the area between the contexts. Reaching the last node by walking with `j` or with `G` reaches the document end when that node fits between the contexts; otherwise its visible start takes priority over reaching the end. These paths end at the same scroll position instead of leaving part of the document's own padding unscrolled.
+* The content never scrolls against the direction of the move.
+* At the start or end of the content the selected node may lie closer to the edge than the context, because nothing can scroll further.
+
+#### Changing Geometry
+
+While a reveal remains current, image loading, row measurement and viewport resizing apply the same rule again so its destination remains visible. A new reveal replaces the previous one. Deliberate scrolling with the wheel, touch, scrollbar or a page-scroll key cancels this correction, so later image loads and measurements do not move the content back under the user. Geometry correction changes neither focus nor the caret, text selection, Vim mode or document history.
+
+#### Pointer
+
+A click or press that selects a node does not move a node that is fully visible, even next to an edge, so the content never shifts under the pointer. A node that is not fully visible scrolls into view by the same rules.
+
+#### `H`, `M`, and `L`
 
 **`H`, `M`, and `L`** (§20.2) choose among the nodes that lie wholly outside the contexts, except at an edge where the content is scrolled to its start or end, which keeps no context. They do not scroll, including during later geometry changes. When no node lies outside the contexts, they choose among the nodes in the whole content area as §20.2 describes; this fallback may select a node within a context or a clipped node and preserves the scroll position.
 
@@ -1348,13 +1371,36 @@ The content area is the scrolling region between the location toolbar and the st
 
 Tree and Agenda node editors offer explicit date completion in standard editing and Vim Insert. Natural-language expressions remain ordinary text until accepted. A compact popup opens only after an edit inside a recognized expression; it never opens for paste, Undo, or programmatic text changes. Hyperlink text is excluded. Vim Normal, Visual and Replace do not offer completion.
 
-Recognition ignores case and permits repeated spaces between words. `today` and `yesterday` require complete words; `tomor`, `tomorr`, `tomorro` and `tomorrow` offer tomorrow. Full English weekday names offer the upcoming occurrence first, including Today, followed by the next week's occurrence when the current week's is Today or future, otherwise by the current week's past occurrence. `this`, `next` and `last` plus a full weekday name offer that weekday in the current, next or previous Monday-based calendar week. `next week` offers next Monday first and then the remaining days in order. A full English month name or three-letter abbreviation followed by a one- or two-digit day offers the nearest upcoming occurrence and then the nearest past occurrence; February 29 uses valid leap years. `in N day(s)` and `N day(s) ago` offer the date N days after or before Today, with a nonnegative integer count written in digits or an English count from `one` through `one hundred`. Compound counts accept spaces or a hyphen between tens and units, such as `twenty five` and `twenty-five`; `one hundred` uses spaces. Thus `two days ago` and `in five days` offer the same dates as `2 days ago` and `in 5 days`. Suggestions stay within the canonical calendar; unavailable alternatives are omitted. Short uncertain fragments, including `t`, `to`, `mar` and `may`, bare month names and abbreviated weekdays offer nothing. The recognized span never includes adjacent words or time expressions.
+#### Recognized Expressions
 
-`in N week(s)` and `N week(s) ago` use the same counts as relative days and offer the date exactly N × 7 days after or before Today. `in` plus a full English month name offers one date: when it names the current month, the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward; when it names another month, the nearest month start on or after Today. `last` plus a full English month name offers the nearest month start strictly before Today. For example, on October 8, 2026, `in 3 weeks` offers `2026-10-29`, `3 weeks ago` offers `2026-09-17`, `in October` offers `2026-10-15`, and `last October` offers `2026-10-01`. On October 10, `in October` still offers `2026-10-15`; on October 11 it offers `2026-10-31`. The same case, spacing, expression-boundary and canonical-calendar rules apply.
+* Recognition ignores case and permits repeated spaces between words.
+* `today` and `yesterday` require complete words; `tomor`, `tomorr`, `tomorro` and `tomorrow` offer tomorrow.
+* Full English weekday names offer the upcoming occurrence first, including Today, followed by the next week's occurrence when the current week's is Today or future, otherwise by the current week's past occurrence.
+* `this`, `next` and `last` plus a full weekday name offer that weekday in the current, next or previous Monday-based calendar week.
+* `next week` offers next Monday first and then the remaining days in order.
+* A full English month name or three-letter abbreviation followed by a one- or two-digit day offers the nearest upcoming occurrence and then the nearest past occurrence; February 29 uses valid leap years.
+* `in N day(s)` and `N day(s) ago` offer the date N days after or before Today, with a nonnegative integer count written in digits or an English count from `one` through `one hundred`. Compound counts accept spaces or a hyphen between tens and units, such as `twenty five` and `twenty-five`; `one hundred` uses spaces. Thus `two days ago` and `in five days` offer the same dates as `2 days ago` and `in 5 days`.
+* Suggestions stay within the canonical calendar; unavailable alternatives are omitted.
+* Short uncertain fragments, including `t`, `to`, `mar` and `may`, bare month names and abbreviated weekdays offer nothing.
+* The recognized span never includes adjacent words or time expressions.
+
+#### Weeks and Months
+
+* `in N week(s)` and `N week(s) ago` use the same counts as relative days and offer the date exactly N × 7 days after or before Today.
+* `in` plus a full English month name offers one date: when it names the current month, the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward; when it names another month, the nearest month start on or after Today.
+* `last` plus a full English month name offers the nearest month start strictly before Today.
+* For example, on October 8, 2026, `in 3 weeks` offers `2026-10-29`, `3 weeks ago` offers `2026-09-17`, `in October` offers `2026-10-15`, and `last October` offers `2026-10-01`. On October 10, `in October` still offers `2026-10-15`; on October 11 it offers `2026-10-31`.
+* The same case, spacing, expression-boundary and canonical-calendar rules apply.
 
 `in the end of` plus a full English month name offers the nearest month end on or after Today. During October, `in the end of October` offers October 31 of the current year, including on October 31 itself; after October it offers October 31 of the next year. The suggestion uses the month's actual last day, including February 29 in leap years. The same case, spacing, expression-boundary and canonical-calendar rules apply.
 
-The popup uses the document surface, a thin location-border-colored border and a soft shadow. It aligns its left edge with the expression's first character and sits directly below the edited row without covering it. When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge. Each suggestion shows its canonical date and secondary weekday/expression description; the selected suggestion uses the shared selection highlight pair. The footer reads `Tab accept · ⌃N ⌃P`. `Ctrl+N` and `Ctrl+P` cycle suggestions, `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. These popup shortcuts deliberately override ordinary text or indentation commands only while the popup is open, supporting the keyboard-first model (§1.1); without it, Tab retains §20.2 behavior.
+#### Popup
+
+* The popup uses the document surface, a thin location-border-colored border and a soft shadow. It aligns its left edge with the expression's first character and sits directly below the edited row without covering it.
+* When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge.
+* Each suggestion shows its canonical date and secondary weekday/expression description; the selected suggestion uses the shared selection highlight pair.
+* The footer reads `Tab accept · ⌃N ⌃P`.
+* `Ctrl+N` and `Ctrl+P` cycle suggestions, `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. These popup shortcuts deliberately override ordinary text or indentation commands only while the popup is open, supporting the keyboard-first model (§1.1); without it, Tab retains §20.2 behavior.
 
 Escape closes the popup and retains its ordinary editing behavior: in Vim Insert it enters Normal without changing the expression. Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
 
@@ -1418,7 +1464,13 @@ The location toolbar reads `Agenda`, with no outline-root control. Agenda select
 
 ### 23.2 Projection and Dates in Text
 
-Only valid canonical `YYYY-MM-DD` dates are recognized, with no touching digit at either end. Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text. A node appears under every distinct date it contains. Its proper ancestors below the scope appear as contextual rows in Tree order, preserving the hierarchy. Full text is shown and wraps as in Tree. The displayed day's date uses the accent color and semibold weight; other recognized dates use secondary text. Contextual ancestors use secondary text, ordinary size, and ordinary row height; direct matches retain Tree colors, including depth colors in dark appearance. An outer bullet ring reflects real children; a chevron reflects projected children.
+* Only valid canonical `YYYY-MM-DD` dates are recognized, with no touching digit at either end.
+* Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text.
+* A node appears under every distinct date it contains. Its proper ancestors below the scope appear as contextual rows in Tree order, preserving the hierarchy.
+* Full text is shown and wraps as in Tree.
+* The displayed day's date uses the accent color and semibold weight; other recognized dates use secondary text.
+* Contextual ancestors use secondary text, ordinary size, and ordinary row height; direct matches retain Tree colors, including depth colors in dark appearance.
+* An outer bullet ring reflects real children; a chevron reflects projected children.
 
 ### 23.3 Timeline
 
@@ -1428,9 +1480,35 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 ### 23.4 Navigation
 
-Up and Down move over visible Agenda rows and clamp at either edge. In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count, caret and viewport rules as Tree. Vertical movement preserves the horizontal text offset, clamped to the destination text, including when crossing day containers, gaps and contextual ancestors. Normal `j`/`k` treat a direct match's attached image as Tree does: moving down from text enters the image and records the text caret, moving up from that image restores it, and arriving from below activates the image with the originating text position remembered. A counted motion applies the originating node's image transition first, then follows Tree's counted row and column rules for the remaining steps. `H`/`M`/`L` land at the first nonblank character, or on a direct match's image; `G` also lands on the destination image when one exists. A vertical motion that clamps at the current row preserves its caret and image return position. Clicking a row selects and focuses it with the same focus dot. `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda. Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace. The caret never disappears while selection moves. A selected row without an editor (a day container, a gap, a contextual ancestor, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert and standard editing, and the shared selection highlight for a selection. Whole-node Visual shows its row highlight instead. Explicit pointer selection of a different row without an editor places its caret at offset zero; keyboard navigation carries its offset as above. An empty text shows the caret at its end.
+#### Moving Between Rows
 
-The caret moves over that text without changing it. In Vim Normal and Visual, `h`, `l`, `0`, `^`, `$`, `w`, `W`, `b`, `B`, `e`, `E`, `ge`, `f`, `F`, `t`, `T`, `;` and `,` work with counts and stop at the first and last character; they never cross to another row. `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the start of the selection, and `y` copies the selected text to the system clipboard and the Vim register. In standard editing and Vim Insert, `Left`, `Right`, `Home`, `End`, `Option+Left`, `Option+Right`, `Cmd+Left`, `Cmd+Right` and `Shift` with any of them move or extend a selection, clamped at both ends, and an arrow with a selection collapses it to the matching end. `Cmd+C` copies the selection, or in Vim Normal the character under the block; `Cmd+A` selects the whole text, entering Visual in Vim. The arrow keys, `Home` and `End` do nothing in Vim Normal and Visual, as in Tree. Day text is copied as displayed, in its original case. A pointer click on another row selects it with the caret at offset zero, and a click on the row that is already selected leaves its caret where it is. Every command that would insert, change, delete, put, join, indent, surround or repeat text does nothing on these rows and keeps document, caret and mode unchanged.
+* Up and Down move over visible Agenda rows and clamp at either edge.
+* In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count, caret and viewport rules as Tree.
+* Vertical movement preserves the horizontal text offset, clamped to the destination text, including when crossing day containers, gaps and contextual ancestors.
+* Normal `j`/`k` treat a direct match's attached image as Tree does: moving down from text enters the image and records the text caret, moving up from that image restores it, and arriving from below activates the image with the originating text position remembered. A counted motion applies the originating node's image transition first, then follows Tree's counted row and column rules for the remaining steps.
+* `H`/`M`/`L` land at the first nonblank character, or on a direct match's image; `G` also lands on the destination image when one exists.
+* A vertical motion that clamps at the current row preserves its caret and image return position.
+* Clicking a row selects and focuses it with the same focus dot.
+* `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda.
+* Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
+* The caret never disappears while selection moves.
+* A selected row without an editor (a day container, a gap, a contextual ancestor, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert and standard editing, and the shared selection highlight for a selection. Whole-node Visual shows its row highlight instead.
+* Explicit pointer selection of a different row without an editor places its caret at offset zero; keyboard navigation carries its offset as above.
+* An empty text shows the caret at its end.
+
+#### Moving the Caret on Rows Without an Editor
+
+* The caret moves over that text without changing it.
+* In Vim Normal and Visual, `h`, `l`, `0`, `^`, `$`, `w`, `W`, `b`, `B`, `e`, `E`, `ge`, `f`, `F`, `t`, `T`, `;` and `,` work with counts and stop at the first and last character; they never cross to another row.
+* `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the start of the selection, and `y` copies the selected text to the system clipboard and the Vim register.
+* In standard editing and Vim Insert, `Left`, `Right`, `Home`, `End`, `Option+Left`, `Option+Right`, `Cmd+Left`, `Cmd+Right` and `Shift` with any of them move or extend a selection, clamped at both ends, and an arrow with a selection collapses it to the matching end.
+* `Cmd+C` copies the selection, or in Vim Normal the character under the block; `Cmd+A` selects the whole text, entering Visual in Vim.
+* The arrow keys, `Home` and `End` do nothing in Vim Normal and Visual, as in Tree.
+* Day text is copied as displayed, in its original case.
+* A pointer click on another row selects it with the caret at offset zero, and a click on the row that is already selected leaves its caret where it is.
+* Every command that would insert, change, delete, put, join, indent, surround or repeat text does nothing on these rows and keeps document, caret and mode unchanged.
+
+#### Opening Tree and Scoped Agenda
 
 `Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today. Focused days are introduced in a subsequent Agenda task.
 
@@ -1438,7 +1516,11 @@ The caret moves over that text without changing it. In Vim Normal and Visual, `h
 
 Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles the selected day or node's projected children. Day folds hide all that day's nodes; node folds hide their projected descendants on that day. A day stays non-empty even when its only matches lie in folded branches. Empty days and projected leaves do not fold. Fold choices are keyed by occurrence, independent across days and independent of Tree expansion. If collapsing an ancestor hides the selected row, the ancestor becomes selected and focused; an unrelated collapse keeps selection and focus. Mode and document content are unchanged.
 
-On a gap, the same controls reveal up to seven days from the start. Its original header stays visible with a down chevron, followed by the revealed empty day headers and a smaller collapsed gap when at least three unrevealed days remain. A remaining one or two days use day headers. Toggling the original expanded gap collapses its revealed region again; toggling the smaller gap reveals its next chunk. Because the smaller gap is replaced by the revealed days and a new smaller gap, revealing from it moves the selection to the original expanded header. Reveal choices remain calendar-day choices as the timeline restructures. All folds and revealed gaps are runtime state, never saved to the Tree view or Undo history.
+* On a gap, the same controls reveal up to seven days from the start. Its original header stays visible with a down chevron, followed by the revealed empty day headers and a smaller collapsed gap when at least three unrevealed days remain. A remaining one or two days use day headers.
+* Toggling the original expanded gap collapses its revealed region again; toggling the smaller gap reveals its next chunk.
+* Because the smaller gap is replaced by the revealed days and a new smaller gap, revealing from it moves the selection to the original expanded header.
+* Reveal choices remain calendar-day choices as the timeline restructures.
+* All folds and revealed gaps are runtime state, never saved to the Tree view or Undo history.
 
 ### 23.6 Large Timelines
 
@@ -1492,7 +1574,12 @@ Undo removes the node and applies the history focus rule of §23.8.
 
 #### Splitting a Dated Node
 
-In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead. The new part receives the displayed day's date, so the node stays on that day. The date is inserted at the start of the new part and replaces its leading whitespace with the single space after the date, so `2026-10-14 Prepare| release` becomes `2026-10-14 Prepare` and `2026-10-14 release`. Nothing is inserted when the new part already contains that day's date as a recognized date; a date inside a hyperlink does not count. Only the displayed day's date is inherited, and hyperlinks in the new part keep their text. The caret is placed after the inserted date, or at the start when nothing was inserted, and the new node becomes the active occurrence under that day. The split and the inserted date are one undoable change.
+* In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead.
+* The new part receives the displayed day's date, so the node stays on that day. The date is inserted at the start of the new part and replaces its leading whitespace with the single space after the date, so `2026-10-14 Prepare| release` becomes `2026-10-14 Prepare` and `2026-10-14 release`.
+* Nothing is inserted when the new part already contains that day's date as a recognized date; a date inside a hyperlink does not count.
+* Only the displayed day's date is inherited, and hyperlinks in the new part keep their text.
+* The caret is placed after the inserted date, or at the start when nothing was inserted, and the new node becomes the active occurrence under that day.
+* The split and the inserted date are one undoable change.
 
 Vim Normal `Enter` follows the link/image behavior in §23.10 without creating a node. Replace and Visual `Enter` do nothing.
 
@@ -1504,7 +1591,14 @@ Vim Normal `o` creates a real sibling immediately after the selected direct matc
 
 #### Mouse Drag
 
-A direct match is moved to another day by pressing and holding it with the primary mouse button, using the hold time and movement tolerance of §11, and dropping it on any row of the target day: the day header or any node row beneath it. Contextual ancestors, day headers, and gaps cannot be dragged, nor can the disclosure chevron or the node bullet start a drag. The dragged row takes the Tree drag highlight, and the pointer shows the grabbing cursor. The target day's header is outlined with the inset drop outline of §11; the source's own day shows no outline and a drop there changes nothing. A gap is not a day: over it the pointer shows the not-allowed cursor and a drop changes nothing. `Esc`, a lost pointer, and window blur cancel the drag. Dragging near the top or bottom of the viewport scrolls it as in Tree. Dragging is unavailable while persistence is locked, and a quick click that does not hold selects and places the caret as before.
+* A direct match is moved to another day by pressing and holding it with the primary mouse button, using the hold time and movement tolerance of §11, and dropping it on any row of the target day: the day header or any node row beneath it.
+* Contextual ancestors, day headers, and gaps cannot be dragged, nor can the disclosure chevron or the node bullet start a drag.
+* The dragged row takes the Tree drag highlight, and the pointer shows the grabbing cursor.
+* The target day's header is outlined with the inset drop outline of §11; the source's own day shows no outline and a drop there changes nothing.
+* A gap is not a day: over it the pointer shows the not-allowed cursor and a drop changes nothing.
+* `Esc`, a lost pointer, and window blur cancel the drag.
+* Dragging near the top or bottom of the viewport scrolls it as in Tree.
+* Dragging is unavailable while persistence is locked, and a quick click that does not hold selects and places the caret as before.
 
 A move replaces the source day's date in the node's text and changes nothing else: the parent, the children, and the position among siblings are unchanged, and other dates in the text stay. If the text already contains the target date, no second copy is added and the source date is removed with one adjacent space, so `2026-10-14 Plan 2026-10-15` dropped on Oct 15 becomes `2026-10-15 Plan`. Links keep their text. Descendants are never changed.
 
