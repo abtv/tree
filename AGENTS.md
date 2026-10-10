@@ -153,6 +153,10 @@ By default no area is exploratory, and the rule above applies everywhere. The Pr
 
 Inside a marked section the minor-gap rule does not apply. Implement exactly what the Product Owner asked, do not fill a gap by choosing a default, and do not extend the behavior to a neighbouring case. Report what you noticed — friction, an inconsistency with adjacent behavior, or a case the section does not cover — in the handoff, as observations rather than proposals. Everything else applies unchanged, including tests, validation, and documentation.
 
+### Vim divergences
+
+The two directions are not symmetric. A divergence while editing text inside a node is a defect: fix it without asking and report it, because a Vim user must not be surprised by how ordinary text editing behaves. The behavior of commands that act on the tree, where Vim has no counterpart, is the Product Owner's choice even when one option looks obvious — this product has no precedent to copy — so propose the options and their reasons rather than choosing one. `docs/PRODUCT.md` §1.1 records where Vim fidelity sits among the product's standing commitments; `docs/VIM_CONFORMANCE.md` records each deliberate divergence.
+
 ### Open Questions
 
 `docs/OPEN_QUESTIONS.md` holds the questions the project has not answered yet, product and technical alike. It is not a backlog, specification, or source of implementation authority. An answered question leaves it: settled product behavior belongs in `docs/PRODUCT.md`, a settled technical decision in an ADR.

@@ -54,16 +54,17 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Complete |
 | PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Complete |
 | PS-10 | Same for "Interaction-state contract" and "Image and caret transitions"; queue complete; one Product Owner message sent | PS-9 | Same as PS-9; queue recorded here | Complete |
-| PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Ready; NR-1 to NR-3 complete |
+| PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Complete |
 | PS-12 | Close: lasting knowledge moved to `docs/DEVELOPMENT.md`; plan and index row removed | PS-8, PS-11, Product Owner confirmation | `npm run check:docs`; `npm run format:check:changed` | Planned |
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-11. The separately authorized runtime corrections in
-[Vim navigation and Replace corrections](vim-navigation-replace-corrections.md)
-are complete. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`;
-if PRODUCT.md changed since the last update of this plan, rerun the guard report
-before trusting the section lists here.
+**Next task:** PS-12 (close), once the Product Owner confirms that no further
+tasks remain and answers the items under "Open matrix-only rules" in
+`docs/VIM_CONFORMANCE.md` (or accepts them as they stand). Start every task with
+`git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the
+last update of this plan, rerun the guard report before trusting the section lists
+here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -224,6 +225,36 @@ character Visual selection, possibly differing from Vim), M24 (which commands
 activate a destination image), M25 (blur as a Replace-commit trigger), and the
 earlier M3 and M4. No product decision was made. PS-11 is blocked until the
 Product Owner answers the whole queue in one message (`AGENTS.md` §14).
+
+PS-11 completed (2026-10-10): the matrix-only queue was applied under D4. Written
+into PRODUCT.md as 21 new items (`npm run check:docs -- --verbatim HEAD` reports
+removed 0, added 21): M1 (§20.2.24), M2 (§20.2.5), M6, M15 to M17, M19, M23, M27
+(§20.2.9), M8 (§20.2.13), M9 and M11 without `V` (§20.2.23), M10 (§20.2.11), M12
+without "any blur" and M14 (§20.2.6), M26 and the Escape part of M25 (§20.2.4).
+Already stated after the runtime corrections and dropped: M3, M4, M5, M22, M24, and
+the clamped-motion part of M7. Mechanism statements dropped: M13, M21; M18 is
+already in `docs/ARCHITECTURE.md` (focus token, one caret authority). Left in the
+matrix as "Open matrix-only rules" for the Product Owner: M7 (caret at `0` after
+structural commands and successful Visual movement), M11 (`V` as an exit), M12
+(any other blur), M20 (thin Replace caret, no named test), M25 (blur commits), M28
+(caret at `0` on entry; §6.1 says only "keep the text cursor"), plus a cut with no
+selection during Replace (found by review; its clause was in a deleted paragraph).
+Review also moved the M12 breadcrumb and enter-control clicks to the character
+Visual clause only (no Normal-mode test) and limited M2 to quit. Observation:
+`docs/ARCHITECTURE.md:749` still says a pointer press leaves a structural Insert
+session for its node's blur, which the M3 decision changed. VIM_CONFORMANCE.md:
+purpose statement now names §23 and the `matrix-only` tag; the Agenda paragraph is
+the "Agenda" section; the history and mechanism paragraphs after the image table
+(starting "The navigation gaps closed earlier", "Edit-result, Visual-leave",
+"Historical implementation notes", "Normal motions, edit results", "Insert and
+Replace sessions are mutually exclusive", "The shutdown flush", "`Cmd+.`, `Cmd+,`,
+and `Cmd+Backspace` previously", "Blur and a same-node pointer click", "`Cmd+A`,
+`Cmd+V`, `Cmd+X`, the context-menu") are deleted (D6); two sentences of anecdote
+in the generated-guard paragraphs are trimmed. D3: "Who decides a divergence" is
+`AGENTS.md` §5 "Vim divergences" with a pointer left in the matrix;
+`docs/DEVELOPMENT.md` §8 no longer repeats the marker definition. Validation:
+`npm run check` (3,295 tests), `npm run check:opencode`, and
+`npm run format:check:changed` passed.
 
 ## Conventions
 

@@ -1041,12 +1041,15 @@ At or below 500 visible rows, the list renders every row, including inline desce
 * Pressing `i` or `a` enters Insert mode, where text entry and all existing application commands behave normally; Insert mode uses the normal thin text caret.
 * Pressing `R` enters Replace mode, where printable input overwrites existing characters and appends after the end of the node.
 * Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode.
+* On an image-only node, `i`, `a`, or `A` followed by `Escape` with no typed text leaves the Normal caret on the sole image character.
+* Replace mode started on an active image commits the replacement text before the image; `Escape` then returns to Normal mode with the caret on the final replaced character and the image caret hidden.
 
 #### 20.2.5 Pending Replace and Insert Sessions
 
 * If the user invokes an application undo or redo shortcut, selects all text, cuts or pastes, toggles a strikethrough (§2.5), enters or leaves a node (including with a navigation control), or deletes the selected node while Replace mode has a pending replacement, finish that replacement as one edit before running the command, then return to Normal mode; a select-all, cut, paste, or strikethrough toggle commits it without disturbing the visible text or selection, so the command still acts on what the user selected.
 * Quitting the application or closing the window while Replace mode has a pending replacement completes that replacement as one edit before the quit save, so the saved document includes it; a failed save leaves the replacement committed and the application open for a retry.
 * The same interruptions during Insert mode leave Insert mode active, since Insert already behaves like other application commands run normally within it.
+* After a pending Replace replacement is completed for a quit, the editor is in Normal mode.
 
 #### 20.2.6 Pointer Presses and Application Commands
 
@@ -1055,6 +1058,8 @@ At or below 500 visible rows, the list renders every row, including inline desce
 * A double-click keeps the selected word visible and Replace active until typing: the first typed character replaces the selected range once, then subsequent characters overwrite from the resulting caret. This applies to plain and rich text with or without a pending replacement.
 * A click on a navigation control, a click outside node text or an Agenda row (§23.4), a right-click, and a drag that selects text keep their existing behavior.
 * A select-all, cut, or paste drops an unfinished Normal-mode command and both character-wise Visual endpoints before it runs; character Visual mode stays active, while a cut or paste leaves whole-node Visual mode and its selected range unchanged.
+* An application undo or redo, `Cmd+.`, `Cmd+,`, and `Cmd+Backspace` likewise drop an unfinished Normal-mode command; in character-wise Visual mode they, and a click on the location breadcrumb or a node's enter control, clear both endpoints and keep the mode, so the next motion anchors at the caret of the node reached.
+* When `Cmd+A` ends whole-node Visual mode, the whole text of the node stays selected.
 
 #### 20.2.7 Mode Indicator and Status Bar
 
@@ -1079,12 +1084,19 @@ Normal mode supports:
 * `j` and `k` to move between the location's visible rows, walking through an expanded node's visible children rather than skipping them; for a node with text and an image, the text and image are separate rows, so `j` moves from text to image and `k` returns to the previous text position; when `k` moves from the first child to a current parent with an image, the image is the destination; `j` on the image moves to the next visible row, while `k` on an image-only node moves to the previous visible row.
 * When no previous visible row exists and there is no current parent, `k` on an image-only node leaves it selected with its image caret active.
 * Only one caret is visible at a time: the text caret is hidden while the image caret is active.
+* `l` or `j` from text into the image saves the text position it left; `h` from the image restores that position and applies any remaining count from there, and after an `l` count larger than the text, `h` returns to the final text character.
+* The saved text position is cleared when an in-node motion such as `0` or `$` moves to text, an edit lands on text, the caret moves to another node, or pointer input leaves the image, and the image caret is hidden unless the destination is itself an image; it belongs only to the node that saved it, and a destination image never reuses another node's saved position.
+* An image-only node has no text position to save, so its horizontal motions, and a `k` clamped at the first root, save none.
+* At the last row, repeated `j` on an image or on a childless current parent with an image, and repeated horizontal motions on an image-only node, leave the image caret active.
+* An undo, redo, or leave with nothing to do, and a whole-node Visual entry followed by an exit without movement, leave the image caret and its saved text position unchanged, so `k` still returns to the originating text character.
+* After a successful undo or redo, the image caret is active exactly when the resulting caret position (§10) reaches the node's attached image.
 * `H`, `M`, and `L` to select the top, middle, or bottom node currently visible in the viewport, without scrolling: a node clipped by the viewport edge, or lying within the edge context of §20.8, is skipped while any node lies wholly outside it, and the remaining nodes are used only when none does.
 * `{count}H` selects the count-th visible node from the top and `{count}L` the count-th from the bottom, stopping at the last or first visible node when the count exceeds them; `M` ignores a count, as in Vim.
 * `Ctrl+d` and `Ctrl+u` to move down or up by half the currently visible node rows.
 * `u` to undo and `Ctrl+r` to redo the most recent undoable change.
 * `w` and `b` to move between word starts, and `e` to move to a word end; letters, numbers, and underscores form words, while adjacent punctuation forms separate words.
 * `W` and `B` to move between whitespace-delimited WORD starts, `E` to move to a WORD end, and `ge` to move backward to a word end.
+* Word and WORD motions stop at the beginning and end of the current node and never cross to another node.
 * `f{character}` and `F{character}` to find the next or previous occurrence of a character within the current node, and `t{character}` and `T{character}` to stop immediately before or after that occurrence; a failed search leaves the caret in place.
 * `;` to repeat the most recently issued `f`, `F`, `t`, or `T` motion and `,` to repeat it in the opposite direction; repeated finds support counts and never wrap or cross a node.
 * `0`, `^`, and `$` to move to the beginning, first non-whitespace character, and final text character; `$` stops at the end of the text row even when an image occupies a second row.
@@ -1110,6 +1122,7 @@ Normal mode also supports:
 * Counts follow the underlying motion and multiply when given on both sides (`2gU3w`), while a count does not extend the whole-node forms; the caret moves to the start of the covered range, and a range that matches nothing, or whose case does not change, changes nothing.
 * A hyperlink's text is its address, so these commands, like Visual `u`, `U`, and `~`, change the case of the text around a hyperlink and leave the hyperlink's own text and link intact; children and attachments are preserved.
 * `gu` takes the `u` key after the `g` prefix as its continuation instead of discarding the prefix.
+* A case operator followed by `j` or `k` changes nothing.
 * `cc` and `S` to clear the current node's text and enter Insert mode without deleting its subtree or metadata.
 * `~` to toggle the case of the current character and advance, with a count toggling additional characters without crossing the node boundary; it advances onto an attached image when the changed text ends immediately before the image.
 
@@ -1134,6 +1147,7 @@ Normal mode also supports:
 * A plain-text put from an image caret inserts the text before that image and leaves the Normal caret on the final inserted text character, with the image caret hidden.
 * `gp` and `gP` put like `p` and `P`, with the same counts and rejections, but leave the caret immediately after the inserted content. For text, the Normal caret is on the character after the inserted text, clamped to the final text character, or to the attached image when the inserted text ends immediately before it. For a node put, the node that follows the inserted forest is selected, or the last inserted node when none follows; after a put into the children of a node, that is the node's former first child.
 * In Visual modes `gp` and `gP` are not commands.
+* `gp` and `gP` with an empty register change nothing.
 
 #### 20.2.14 Join Commands
 
@@ -1258,11 +1272,14 @@ Normal mode also supports:
 * In Normal mode a multi-node register can be put before or after the current node.
 * A node put whose target is a descendant of any source node reports an operation error and leaves the document unchanged.
 * Empty or plain-text registers cannot be put in whole-node Visual mode.
+* A whole-node Visual put that is rejected, or blocked while persistence is locked, changes neither the mode nor the selection.
+* Leaving whole-node Visual mode with `Escape`, or by a mutation command that ends it, clears an unfinished `g` prefix, so a later Normal-mode `d` starts a delete instead of running `gd`.
 
 #### 20.2.24 Tab and Shift+Tab
 
 * When a node editor has keyboard focus, plain Tab moves the focused node and its whole subtree in one level, and Shift+Tab moves it out one level. In whole-node Visual mode, these keys move the selected sibling range; in every other Vim mode and in standard editing, they move only the focused node.
 * The move keeps the editing mode, focus, caret, and text selection. In Normal mode it discards an unfinished command. In Replace mode it commits any buffered replacement as one undoable edit, performs the move as a separate command, and continues in Replace mode with a new replacement session at the same caret. In Insert mode the move ends the current text undo session and keeps Insert mode active.
+* Whole-node Visual mode keeps its range through the move, and an active image caret keeps its saved text position.
 * Each Tab press requests one level and uses the same maximum-depth behavior as `>` and `<`.
 * When the current parent is a zoomed node, Shift+Tab does not move a direct child of that node, or a selected range of its direct children, outside the current location; it is a no-op that preserves the pending edit session and editor state. A deeper descendant may move out one level when it remains inside the current parent's subtree. This location boundary applies to Tab shortcuts only; Vim `<` retains its separately specified behavior.
 * Outside a node editor, Tab and Shift+Tab retain native focus traversal, including navigation to the status-bar controls. This node-focused Tab behavior is a deliberate exception to macOS focus traversal, in service of the keyboard-first editing model (§1.1).
