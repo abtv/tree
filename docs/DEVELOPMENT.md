@@ -501,6 +501,35 @@ exemptions in `scripts/check-docs.mjs` protect the existing dense text while the
 PRODUCT.md structure initiative splits it. Fixed sections must lose their
 exemption: "stale size exemption; delete it" is an error.
 
+Before restructuring requirement text, record the starting Git ref and run
+`npm run check:docs -- --verbatim <ref>` after the edit. It compares the working
+PRODUCT.md with that revision through a shell-free Git child process. Use
+`--file docs/VIM_CONFORMANCE.md` for that document and `--allow-added <n>` for an
+explicit number of added lead-in clauses. Exit 0 requires no removed clauses and
+no additions beyond that bound; differences exit 1, invalid refs or files exit 2.
+The report lists clause counts, removed and added clauses, changed headings,
+clauses moved between headings, and clauses with antecedent phrases to inspect.
+Fenced blocks compare exactly, including their line endings. Prose comparison
+ignores formatting, whitespace, leading bold labels ending in a period or colon,
+and terminal periods, semicolons, colons, and commas. Clause multiplicity is
+preserved, so deleting or duplicating a sentence fails. A clean report proves
+only equality of normalized clause multisets: it does not verify clause or
+sentence order, and changes among periods, semicolons, and colons at internal
+clause boundaries are also invisible. Review the diff for order and punctuation
+under the stricter restructuring rules, and inspect each reported antecedent.
+
+Preserve every sentence's characters, inline code, links, numbers, and references
+when restructuring PRODUCT.md. Add Title Case headings and `*` list markers;
+allowed wording changes are added lead-ins ending in `:`, replacing a leading
+bold label with a heading, and changing a list item's final `;`, `.`, or `:`.
+Keep each rule together with sentences that only qualify it, including "It",
+"They", "That", "This", "Such", "These", and "above" or "below" references. Keep
+the original order; regroup only interleaved topics and list cross-block moves
+in the handoff. Preserve antecedents by placement or keep the pair together.
+Record ambiguities as Product Owner questions instead of editing the sentence;
+a sentence exceeding the block limit also requires a question. Keep blank lines
+around lists and run `npm run format:check:changed`.
+
 A refactoring that preserves behavior should not require unnecessary test changes.
 
 Store interaction tests use `createRealStoreHarness` from `src/renderer/test/real-store-harness.ts` by default for outcome assertions. It builds a real `EditorStore` over the shared application property-test load/save fakes, with in-memory clipboard and attachments. Assert the resulting document, location, focus, and renderer mode; use current snapshot nodes rather than supplying content that differs from the store. Tests own pending save timers with fake timers or an injected clock. Typed doubles in `src/renderer/test/` (`vim-keyboard-double.ts`, `editor-store-double.ts`) are for failure injection and calls that are themselves the contract, such as error reporting or lifecycle registration. A double supplies every member of its owner, so adding, removing, or renaming a member fails `npm run typecheck` at the double, while an unchecked literal can silently diverge and exercise a path the application never takes — the failure class [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md) removed for the interaction-state owners. When a double is needed, supply its snapshot and exercised behaviors through `createEditorStoreDouble`; do not recreate an `as unknown as EditorStore` literal.

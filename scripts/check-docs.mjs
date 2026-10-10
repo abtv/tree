@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mjs'
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -539,17 +540,228 @@ export function runChecks({
   return { issues, liveDocumentCount: liveDocuments.length }
 }
 
-function main() {
+export function parseVerbatimArguments(args) {
+  const options = { ref: undefined, file: 'docs/PRODUCT.md', allowAdded: 0 }
+  const seen = new Set()
+  for (let index = 0; index < args.length; index += 2) {
+    const option = args[index]
+    const value = args[index + 1]
+    if (!['--verbatim', '--file', '--allow-added'].includes(option) || seen.has(option) || value === undefined) {
+      throw new Error('Usage: --verbatim <git-ref> [--file <repository-relative-file>] [--allow-added <n>]')
+    }
+    seen.add(option)
+    if (option === '--verbatim') options.ref = value
+    if (option === '--file') options.file = value
+    if (option === '--allow-added') {
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
+        throw new Error('--allow-added must be a non-negative safe integer')
+      }
+      options.allowAdded = Number(value)
+    }
+  }
+  if (!options.ref || options.ref.startsWith('-') || !/^[\w./~^@{}-]+$/.test(options.ref)) {
+    throw new Error('Invalid git ref')
+  }
+  if (
+    !/^[\w./-]+$/.test(options.file) ||
+    options.file.startsWith('/') ||
+    options.file.startsWith('-') ||
+    options.file.split('/').some((part) => part === '..' || part === '' || part === '.')
+  ) {
+    throw new Error('Invalid repository-relative file')
+  }
+  return options
+}
+
+export function scanVerbatimUnits(content) {
+  const units = []
+  const headings = []
+  let heading = '(before first heading)'
+  let pending = []
+  let fence
+  let fencedText = ''
+  let comment = false
+  const flush = () => {
+    for (const block of scanProductBlocks(pending)) {
+      const text = block.text.replace(/^\*\*[^*]+[.:]\*\*\s+/, '')
+      for (const clause of text.split(/(?<=[.!?;:])\s+/)) {
+        const normalized = clause
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/[.;:,]+$/, '')
+        if (normalized) units.push({ kind: 'clause', text: normalized, heading })
+      }
+    }
+    pending = []
+  }
+  const lines = content.match(/[^\n]*(?:\n|$)/g)?.filter((line) => line !== '') ?? []
+  for (const [index, raw] of lines.entries()) {
+    const line = raw.replace(/\r?\n$/, '')
+    if (fence) {
+      fencedText += raw
+      const closing = /^\s*(`{3,}|~{3,})\s*$/.exec(line)
+      if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) {
+        units.push({ kind: 'fence', text: fencedText, heading })
+        fence = undefined
+        fencedText = ''
+      }
+      continue
+    }
+    const rawOpening = !comment && /^\s*(`{3,}|~{3,})/.exec(line)
+    if (rawOpening) {
+      flush()
+      fence = { character: rawOpening[1][0], length: rawOpening[1].length }
+      fencedText = raw
+      continue
+    }
+    // Remove comments only outside fences; code examples are compared exactly.
+    const commentAtStart = comment
+    let visible = ''
+    let cursor = 0
+    while (cursor < line.length) {
+      const delimiter = line.indexOf(comment ? '-->' : '<!--', cursor)
+      if (delimiter === -1) {
+        if (!comment) visible += line.slice(cursor)
+        break
+      }
+      if (!comment) visible += line.slice(cursor, delimiter)
+      cursor = delimiter + (comment ? 3 : 4)
+      comment = !comment
+    }
+    if (!visible.trim() && (commentAtStart || comment || line.includes('<!--'))) continue
+    const opening = /^\s*(`{3,}|~{3,})/.exec(visible)
+    if (opening) {
+      flush()
+      fence = { character: opening[1][0], length: opening[1].length }
+      fencedText = raw
+      continue
+    }
+    const title = /^(#{1,6})\s+(.+)$/.exec(visible)
+    if (title) {
+      flush()
+      heading = visible.trim()
+      headings.push(heading)
+    } else pending.push({ number: index + 1, text: visible })
+  }
+  flush()
+  if (fence) units.push({ kind: 'fence', text: fencedText, heading })
+  return { units, headings }
+}
+
+export function compareVerbatim(before, after) {
+  const oldText = scanVerbatimUnits(before)
+  const newText = scanVerbatimUnits(after)
+  const keyOf = (unit) => JSON.stringify([unit.kind, unit.text])
+  const group = (units, key = keyOf) => {
+    const result = new Map()
+    for (const unit of units) {
+      const id = key(unit)
+      if (!result.has(id)) result.set(id, [])
+      result.get(id).push(unit)
+    }
+    return result
+  }
+  const oldGroups = group(oldText.units)
+  const newGroups = group(newText.units)
+  const removed = []
+  const added = []
+  const moved = []
+  let unchanged = 0
+  for (const id of new Set([...oldGroups.keys(), ...newGroups.keys()])) {
+    const remainingOld = [...(oldGroups.get(id) ?? [])]
+    const remainingNew = []
+    // Match identical headings first so duplicates do not cause false moves.
+    for (const unit of newGroups.get(id) ?? []) {
+      const sameHeading = remainingOld.findIndex((old) => old.heading === unit.heading)
+      if (sameHeading !== -1) {
+        remainingOld.splice(sameHeading, 1)
+        unchanged += 1
+      } else remainingNew.push(unit)
+    }
+    const matches = Math.min(remainingOld.length, remainingNew.length)
+    unchanged += matches
+    for (let index = 0; index < matches; index++) {
+      moved.push({ ...remainingNew[index], from: remainingOld[index].heading })
+    }
+    removed.push(...remainingOld.slice(matches))
+    added.push(...remainingNew.slice(matches))
+  }
+  const oldHeadings = group(oldText.headings, (heading) => heading)
+  const newHeadings = group(newText.headings, (heading) => heading)
+  const difference = (left, right) => [...left].flatMap(([id, items]) => items.slice(right.get(id)?.length ?? 0))
+  return {
+    before: oldText.units.length,
+    after: newText.units.length,
+    unchanged,
+    removed,
+    added,
+    headingsRemoved: difference(oldHeadings, newHeadings),
+    headingsAdded: difference(newHeadings, oldHeadings),
+    moved,
+    antecedents: newText.units.filter(
+      (unit) =>
+        unit.kind === 'clause' &&
+        /\b(?:above|below|preceding|following|earlier|later|this section|the rule)\b/i.test(unit.text),
+    ),
+  }
+}
+
+export function runVerbatim({ ref, file, allowAdded = 0, rootDirectory = ROOT }) {
+  // Validate exported API arguments as well as the CLI. Git is invoked without a shell.
+  parseVerbatimArguments(['--verbatim', ref, '--file', file, '--allow-added', String(allowAdded)])
+  const path = realpathSync(join(rootDirectory, file))
+  const withinRoot = relative(realpathSync(rootDirectory), path)
+  if (withinRoot === '..' || withinRoot.startsWith('../')) throw new Error('File resolves outside the repository')
+  const before = execFileSync('git', ['show', `${ref}:${file}`], {
+    cwd: rootDirectory,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const after = readFileSync(path, 'utf8')
+  const comparison = compareVerbatim(before, after)
+  return { comparison, exitCode: comparison.removed.length === 0 && comparison.added.length <= allowAdded ? 0 : 1 }
+}
+
+export function formatVerbatimReport(report) {
+  const lines = [
+    `Verbatim comparison: before ${report.before}, after ${report.after}, unchanged ${report.unchanged}, removed ${report.removed.length}, added ${report.added.length}.`,
+  ]
+  for (const [label, units] of [
+    ['Removed', report.removed],
+    ['Added', report.added],
+  ]) {
+    for (const unit of units) lines.push(`${label} [${unit.heading}] ${unit.kind}: ${JSON.stringify(unit.text)}`)
+  }
+  for (const heading of report.headingsRemoved) lines.push(`Heading removed: ${heading}`)
+  for (const heading of report.headingsAdded) lines.push(`Heading added: ${heading}`)
+  for (const unit of report.moved)
+    lines.push(`Moved [${unit.from} -> ${unit.heading}] ${unit.kind}: ${JSON.stringify(unit.text)}`)
+  for (const unit of report.antecedents) lines.push(`Antecedent [${unit.heading}]: ${JSON.stringify(unit.text)}`)
+  return lines.join('\n')
+}
+
+export function main(args = process.argv.slice(2)) {
+  if (args.length > 0) {
+    try {
+      const result = runVerbatim(parseVerbatimArguments(args))
+      console.log(formatVerbatimReport(result.comparison))
+      return result.exitCode
+    } catch (error) {
+      console.error(`Verbatim comparison failed: ${error.message}`)
+      return 2
+    }
+  }
   const { issues, liveDocumentCount } = runChecks()
   if (issues.length > 0) {
     console.error(`Documentation checks failed with ${issues.length} issue(s):`)
     for (const issue of issues) console.error(`  - ${issue}`)
-    process.exitCode = 1
-    return
+    return 1
   }
   console.log(`Documentation checks passed (${liveDocumentCount} live documents).`)
+  return 0
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main()
+  process.exitCode = main()
 }

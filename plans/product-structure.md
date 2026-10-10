@@ -45,8 +45,8 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | PS-1 | Shared section scanner accepts numbered `####` headings; `check:docs` enforces block and leaf-section limits on PRODUCT.md with shrinking per-section exemptions; a marker may not cite a section that has numbered children and no text of its own | — | `npm run check`; unit tests; exact sizes and longest sentence recorded here; a trial over-limit paragraph fails the guard | Complete |
-| PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Ready |
-| PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Planned |
+| PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Complete |
+| PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Ready |
 | PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Planned |
 | PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Planned |
 | PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Planned |
@@ -59,7 +59,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-2. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-3. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -70,6 +70,19 @@ serial full-suite runs passed, supporting contention as the explanation. The
 temporary concurrency setting was restored before commit. No thresholds or
 tests were weakened. Future sessions should retain this environment caveat when
 investigating a repeated default-concurrency timing failure.
+
+PS-2 completed (2026-10-10): verbatim CLI, multiset comparison and review reports,
+50 focused documentation-tool tests, and the S3 practice documented. The npm
+command forwarded its arguments and the shell-free Git child worked in the
+sandbox: HEAD reported 1,479 unchanged units with 0 removed and 0 added; comparing
+with `e34e23d` reported the real date change, 2 removed and 6 added clauses
+(expected exit 1). Full `npm run check` passed with the same temporary single
+worker condition as PS-1 (3,220 tests, coverage, governance and build); the setting
+was restored. `npm run check:opencode` passed 284 expectations. Independent review
+reported no meaningful issues after comment/fence edge fixes and explicit
+documentation of the prescribed punctuation and order limits. PRODUCT.md stays
+unchanged; no product decisions or unresolved wording questions arose. PS-3 is
+a larger restructuring task and starts in a fresh session.
 
 ## Conventions
 
@@ -94,7 +107,7 @@ investigating a repeated default-concurrency timing failure.
 
 * CLI: `node scripts/check-docs.mjs --verbatim <git-ref> [--file docs/PRODUCT.md] [--allow-added <n>]`, run by agents as `npm run check:docs -- --verbatim HEAD`. It reads `git show <ref>:<file>` through `execFileSync('git', [...])` without a shell, validates the ref against `/^[\w./~^@{}-]+$/`, rejects a ref starting with `-`, and compares with the working-tree file. Exit 0 only when removed is 0 and added is at most `--allow-added` (default 0); exit 1 on differences; exit 2 on a bad ref or file. The default `check:docs` run is unchanged.
 * Normalization of both texts: (1) each fenced block is one unit compared exactly; (2) drop blank lines, headings, `---`, and HTML comments; (3) strip list markers and a leading bold label such as `**Context.**`; (4) split each block into clauses at `(?<=[.!?;:])\s+`; (5) trim, collapse whitespace, strip trailing `[.;:,]`, drop empty clauses; (6) compare as multisets.
-* Splitting a paragraph into items, regrouping items, moving a sentence under another heading, and changing an item's final `;` to `.` pass. A changed word, a dropped sentence, an extra copy, or a new sentence fails. Known limit: reordering clauses inside one sentence is not detected; the reviewer reads the diff.
+* Splitting a paragraph into items, regrouping items, moving a sentence under another heading, and changing an item's final `;` to `.` pass. A changed word, a dropped sentence, an extra copy, or a new sentence fails. Known limits of the prescribed normalization: clause and sentence order are not verified, and internal clause-boundary periods, semicolons, and colons normalize alike. A clean report proves only the normalized clause multiset; the reviewer checks the diff against S3's stricter wording and order rules.
 * Output: counts (before, after, unchanged, removed, added); each removed and added clause; headings added or removed; clauses that moved to a different heading; and every new-text clause containing `above`, `below`, `preceding`, `following`, `earlier`, `later`, `this section`, or `the rule`, with its heading, so the reviewer can check each antecedent.
 * Tests in `scripts/check-docs.test.mjs`: identical text; paragraph to items; items regrouped under a new heading; `;` to `.`; label to heading; one word changed; sentence dropped; sentence duplicated; lead-in added with and without `--allow-added`; fence moved and fence edited; CRLF; abbreviation splits cancelling; semicolon-joined items merged into one paragraph; a bad ref and an option-like ref exit 2.
 * A separate script with its own `package.json` entry was rejected: it would need new allow rules in `opencode.json` and `.claude/settings.json`.

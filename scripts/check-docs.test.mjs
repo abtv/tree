@@ -1,9 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   conformanceCitationMatches,
+  compareVerbatim,
+  formatVerbatimReport,
   extractTestTitles,
   findBrokenLinks,
   findBrokenReferences,
@@ -11,13 +14,192 @@ import {
   findOversizedProductText,
   findStaleConformanceCitations,
   parseConformanceCitations,
+  parseVerbatimArguments,
   runChecks,
+  runVerbatim,
+  main,
   validateAdr,
   validateAdrIndex,
   validateOpenQuestions,
   validateWorkflowOwnership,
 } from './check-docs.mjs'
 import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mjs'
+
+describe('verbatim comparison', () => {
+  const original = '## 1. Rules\nFirst rule. Second rule; Third rule: Fourth rule!\n'
+
+  it('compares identical text and counts every occurrence', () => {
+    const result = compareVerbatim(original, original)
+    expect(result).toMatchObject({ before: 4, after: 4, unchanged: 4, removed: [], added: [], moved: [] })
+  })
+
+  it('preserves clauses when paragraphs become items, final punctuation changes, and items regroup', () => {
+    const result = compareVerbatim(
+      original,
+      '## 1. Rules\n* First rule;\n* Second rule.\n\n### New Group\n- Third rule.\n1. Fourth rule!\n',
+    )
+    expect(result.removed).toEqual([])
+    expect(result.added).toEqual([])
+    expect(result.headingsAdded).toEqual(['### New Group'])
+    expect(result.moved.map(({ text, from, heading }) => [text, from, heading])).toEqual([
+      ['Third rule', '## 1. Rules', '### New Group'],
+      ['Fourth rule!', '## 1. Rules', '### New Group'],
+    ])
+    expect(compareVerbatim('* First rule;\n* Second rule.\n', 'First rule; Second rule.\n').removed).toEqual([])
+  })
+
+  it('allows a leading label to become a heading but preserves leading bold emphasis', () => {
+    expect(compareVerbatim('**Context.** Keep the rule.\n', '### Context\nKeep the rule.\n').removed).toEqual([])
+    expect(compareVerbatim('**Always** save changes.\n', 'save changes.\n').removed).toHaveLength(1)
+  })
+
+  it('detects changed words, dropped sentences, duplicate sentences, and added sentences', () => {
+    const changed = compareVerbatim('First rule. Second rule.\n', 'First rule. Another rule.\n')
+    expect(changed.removed.map(({ text }) => text)).toEqual(['Second rule'])
+    expect(changed.added.map(({ text }) => text)).toEqual(['Another rule'])
+    expect(compareVerbatim('First rule. Second rule.\n', 'First rule.\n').removed).toHaveLength(1)
+    expect(compareVerbatim('First rule.\n', 'First rule. First rule.\n').added).toHaveLength(1)
+    expect(compareVerbatim('First rule.\n', 'First rule. New rule.\n').added).toHaveLength(1)
+  })
+
+  it('normalizes CRLF prose, abbreviations, whitespace, and ignored Markdown', () => {
+    const before = '## Old Heading\r\nUse e.g. this rule.\r\n\r\n<!-- hidden\r\n## Fake\r\n-->\r\n---\r\n'
+    const result = compareVerbatim(before, '## New Heading\n* Use e.g. this   rule.\n')
+    expect(result.removed).toEqual([])
+    expect(result.added).toEqual([])
+    expect(result.headingsRemoved).toEqual(['## Old Heading'])
+    expect(result.headingsAdded).toEqual(['## New Heading'])
+  })
+
+  it('compares fenced blocks exactly while allowing them to move', () => {
+    const code = '````js\n<!-- keep -->\n## Code Heading\n```\nconst x = 1;\n````\n'
+    const before = `## One\n${code}`
+    const moved = compareVerbatim(before, `## Two\n${code}`)
+    expect(moved).toMatchObject({ before: 1, after: 1, unchanged: 1, removed: [], added: [] })
+    expect(moved.moved[0]).toMatchObject({ kind: 'fence', text: code, from: '## One', heading: '## Two' })
+    expect(compareVerbatim(before, before.replace('x = 1', 'x = 2')).removed).toHaveLength(1)
+    expect(compareVerbatim(before, before.replace('<!-- keep -->', '<!-- changed -->')).added).toHaveLength(1)
+    expect(compareVerbatim(before, before.replaceAll('\n', '\r\n')).removed).toHaveLength(1)
+    expect(compareVerbatim('~~~\ntext\n', '~~~\nchanged\n').removed).toHaveLength(1)
+  })
+
+  it('does not treat comment-contained fences and headings as Markdown structure', () => {
+    const result = compareVerbatim('<!--\n```\n## False\n-->\nReal rule.\n', 'Real rule.\n')
+    expect(result).toMatchObject({ before: 1, after: 1, removed: [], added: [], headingsRemoved: [] })
+    expect(compareVerbatim('Keep <!--\nhidden\n--> this rule.\n', 'Keep this rule.\n')).toMatchObject({
+      removed: [],
+      added: [],
+    })
+    const openingComment = '```html <!--\ncode\n```\n'
+    expect(compareVerbatim(openingComment + 'First rule.\n', openingComment + 'Changed rule.\n')).toMatchObject({
+      removed: [{ kind: 'clause', text: 'First rule', heading: '(before first heading)' }],
+      added: [{ kind: 'clause', text: 'Changed rule', heading: '(before first heading)' }],
+    })
+  })
+
+  it('documents prescribed normalization limits for internal punctuation and same-heading rule order', () => {
+    const before = 'First rule. Second rule.\n'
+    expect(compareVerbatim(before, 'First rule: Second rule.\n')).toMatchObject({ removed: [], added: [] })
+    expect(compareVerbatim(before, 'Second rule. First rule.\n')).toMatchObject({ removed: [], added: [], moved: [] })
+  })
+
+  it('matches duplicates in unchanged headings first and reports every antecedent clause', () => {
+    const result = compareVerbatim(
+      '## One\nRule above.\n## Two\nRule above.\n',
+      '## Two\nRule above.\n## Three\nRule above.\n',
+    )
+    expect(result.moved).toEqual([{ kind: 'clause', text: 'Rule above', from: '## One', heading: '## Three' }])
+    expect(result.antecedents).toHaveLength(2)
+    const all = compareVerbatim('', 'Above, below, preceding, following, earlier, later, this section, the rule.\n')
+    expect(all.antecedents).toHaveLength(1)
+    const report = formatVerbatimReport(result)
+    expect(report).toContain('removed 0, added 0')
+    expect(report).toContain('Heading removed: ## One')
+    expect(report).toContain('Moved [## One -> ## Three]')
+    expect(report).toContain('Antecedent [## Three]')
+  })
+})
+
+describe('verbatim CLI and Git loading', () => {
+  it.each(['bad:ref', '-HEAD', 'HEAD;touch', 'HEAD$(pwd)', ''])('rejects invalid or option-like refs: %s', (ref) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(main(['--verbatim', ref])).toBe(2)
+    } finally {
+      error.mockRestore()
+    }
+  })
+
+  it('validates files and addition bounds and rejects unknown, repeated, or incomplete options', () => {
+    expect(
+      parseVerbatimArguments(['--verbatim', 'HEAD~1', '--file', 'docs/VIM_CONFORMANCE.md', '--allow-added', '2']),
+    ).toEqual({ ref: 'HEAD~1', file: 'docs/VIM_CONFORMANCE.md', allowAdded: 2 })
+    for (const args of [
+      ['--verbatim'],
+      ['--file', 'docs/PRODUCT.md'],
+      ['--unknown', 'HEAD'],
+      ['--verbatim', 'HEAD', '--verbatim', 'HEAD'],
+      ...['../file', '/tmp/file', 'docs/../file', '-file', 'docs/file:other'].map((file) => [
+        '--verbatim',
+        'HEAD',
+        '--file',
+        file,
+      ]),
+      ...['-1', '1.5', 'NaN', '9007199254740992'].map((n) => ['--verbatim', 'HEAD', '--allow-added', n]),
+    ])
+      expect(() => parseVerbatimArguments(args)).toThrow()
+  })
+
+  it('reads a real Git revision and allows additions only within the explicit bound', () => {
+    const root = createTemporaryRoot()
+    const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+    git(['init', '--quiet'])
+    writeFile(root, 'docs/PRODUCT.md', '## One\nKeep this rule.\n')
+    git(['add', 'docs/PRODUCT.md'])
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'docs(fixture): add synthetic rules',
+    ])
+    expect(runVerbatim({ ref: 'HEAD', file: 'docs/PRODUCT.md', rootDirectory: root }).exitCode).toBe(0)
+    writeFile(root, 'docs/PRODUCT.md', '## One\nNormal mode also supports:\n* Keep this rule.\n')
+    const options = { ref: 'HEAD', file: 'docs/PRODUCT.md', rootDirectory: root }
+    expect(runVerbatim(options).exitCode).toBe(1)
+    expect(runVerbatim({ ...options, allowAdded: 1 }).exitCode).toBe(0)
+    writeFile(root, 'docs/PRODUCT.md', 'Normal mode also supports:\n')
+    expect(runVerbatim({ ...options, allowAdded: 10 }).exitCode).toBe(1)
+    expect(() => runVerbatim({ ...options, ref: 'missing' })).toThrow()
+    expect(() => runVerbatim({ ...options, file: 'docs/missing.md' })).toThrow()
+  })
+
+  it('returns process exit 2 for bad refs and missing files', () => {
+    const script = join(import.meta.dirname, 'check-docs.mjs')
+    for (const args of [
+      ['--verbatim', '-HEAD'],
+      ['--verbatim', 'bad:ref'],
+      ['--verbatim', 'HEAD', '--file', 'docs/missing.md'],
+    ]) {
+      const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('Verbatim comparison failed:')
+    }
+  })
+
+  it('rejects a file symlink that resolves outside the repository', () => {
+    const root = createTemporaryRoot()
+    const outside = createTemporaryRoot()
+    writeFile(outside, 'rules.md', 'External text.\n')
+    symlinkSync(join(outside, 'rules.md'), join(root, 'rules.md'))
+    expect(() => runVerbatim({ ref: 'HEAD', file: 'rules.md', rootDirectory: root })).toThrow('outside the repository')
+  })
+})
 
 describe('PRODUCT scanning and size limits', () => {
   const scan = (text) => scanProductBlocks(text.split('\n').map((text, index) => ({ number: index + 1, text })))
