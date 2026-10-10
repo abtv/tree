@@ -141,6 +141,8 @@
           "npm run test:watch *": "allow",
           "npm run test:coverage": "allow",
           "npm run test:coverage *": "allow",
+          "npm run test:performance": "allow",
+          "npm run test:performance *": "allow",
           "npm run test:property:soak": "allow",
           "npm run test:property:soak *": "allow",
           "npm run test:mutation": "allow",

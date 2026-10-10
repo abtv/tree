@@ -4,7 +4,16 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['src/test/fast-check-setup.ts'],
-    exclude: [...configDefaults.exclude, 'e2e/**', 'perf/**/*.spec.ts', 'test-results/**', '.stryker-tmp/**'],
+    exclude: [
+      ...configDefaults.exclude,
+      'e2e/**',
+      'perf/**/*.spec.ts',
+      'test-results/**',
+      '.stryker-tmp/**',
+      // Timing guards run in their own serial invocation (vitest.performance.config.ts); see
+      // docs/DEVELOPMENT.md §12.
+      'src/**/*.performance.test.ts',
+    ],
     css: { include: [/styles\.css/] },
     coverage: {
       provider: 'v8',
