@@ -496,10 +496,8 @@ comments, separators, and blank lines are excluded from block counting. Section
 text includes unnumbered headings and fenced code, but excludes comments and
 separators. Block failures report the file, line, section, size, and limit with
 "Split it into one rule per list item without rewording"; section failures say
-"Split it into numbered subsections". Temporary per-section block and section
-exemptions in `scripts/check-docs.mjs` protect the existing dense text while the
-PRODUCT.md structure initiative splits it. Fixed sections must lose their
-exemption: "stale size exemption; delete it" is an error.
+"Split it into numbered subsections". The limits apply to every section; there is
+no exemption mechanism.
 
 Before restructuring requirement text, record the starting Git ref and run
 `npm run check:docs -- --verbatim <ref>` after the edit. It compares the working

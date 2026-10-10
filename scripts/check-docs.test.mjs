@@ -203,13 +203,7 @@ describe('verbatim CLI and Git loading', () => {
 
 describe('PRODUCT scanning and size limits', () => {
   const scan = (text) => scanProductBlocks(text.split('\n').map((text, index) => ({ number: index + 1, text })))
-  const checkSize = (content, options = {}) =>
-    findOversizedProductText({
-      content,
-      blockExemptions: new Set(),
-      sectionExemptions: new Set(),
-      ...options,
-    })
+  const checkSize = (content, options = {}) => findOversizedProductText({ content, ...options })
 
   it('scans levels two through four with original line numbers and ignores comments and fenced headings', () => {
     const sections = scanProductSections(
@@ -256,31 +250,28 @@ describe('PRODUCT scanning and size limits', () => {
     expect(checkSize(content, { limits: { block: 700, section: 24 } })).toEqual([])
   })
 
-  it('suppresses current violations and rejects stale and missing-section exemptions', () => {
-    expect(
-      checkSize('## 1. One\n' + 'x'.repeat(8001), {
-        blockExemptions: new Set(['1']),
-        sectionExemptions: new Set(['1']),
-      }),
-    ).toEqual([])
-    expect(
-      checkSize('## 1. One\nshort', {
-        blockExemptions: new Set(['1']),
-        sectionExemptions: new Set(['9']),
-      }),
-    ).toEqual([
-      'docs/PRODUCT.md §1: stale size exemption; delete it.',
-      'docs/PRODUCT.md §9: stale size exemption; delete it.',
+  it('applies both limits in every section, whatever its number', () => {
+    const content = '## 20.2. Vim\n' + 'x'.repeat(8001) + '\n### 20.2.1 Leaf\n' + 'y'.repeat(701)
+    expect(checkSize(content)).toEqual([
+      'docs/PRODUCT.md:2 (§20.2): paragraph has 8001 characters; the limit is 700. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).',
+      'docs/PRODUCT.md §20.2: 8001 characters of own text; the limit is 8000. Split it into numbered subsections (docs/DEVELOPMENT.md §12).',
+      'docs/PRODUCT.md:4 (§20.2.1): paragraph has 701 characters; the limit is 700. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).',
     ])
   })
 
-  it('runs without PRODUCT and passes a title-only PRODUCT while no size exemption remains', () => {
+  it('runs without PRODUCT and passes a title-only PRODUCT', () => {
     const root = createTemporaryRoot()
     expect(runChecks({ rootDirectory: root }).issues).toEqual([])
     writeFile(root, 'docs/PRODUCT.md', '# Product\n')
     expect(runChecks({ rootDirectory: root }).issues).toEqual([])
-    const stale = runChecks({ rootDirectory: root, blockExemptions: new Set(['1']) }).issues
-    expect(stale).toEqual(['docs/PRODUCT.md §1: stale size exemption; delete it.'])
+  })
+
+  it('fails runChecks on an over-limit paragraph in PRODUCT', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'docs/PRODUCT.md', '# Product\n\n## 1. One\n\n' + 'x'.repeat(701) + '\n')
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      'docs/PRODUCT.md:5 (§1): paragraph has 701 characters; the limit is 700. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).',
+    ])
   })
 })
 
@@ -534,7 +525,7 @@ describe('runChecks', () => {
     const root = createTemporaryRoot()
     writeFile(root, 'README.md', '# Fixture\n')
     writeFile(root, 'docs/PRODUCT.md', '# Product\n')
-    const result = runChecks({ rootDirectory: root, blockExemptions: new Set(), sectionExemptions: new Set() })
+    const result = runChecks({ rootDirectory: root })
     expect(result.issues).toEqual([])
   })
 

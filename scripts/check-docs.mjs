@@ -7,45 +7,21 @@ import { productOwnText, scanProductBlocks, scanProductSections } from './produc
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 export const PRODUCT_LIMITS = { block: 700, section: 8000 }
-export const PRODUCT_BLOCK_EXEMPTIONS = new Set()
-export const PRODUCT_SECTION_EXEMPTIONS = new Set()
 
-export function findOversizedProductText({
-  content,
-  limits = PRODUCT_LIMITS,
-  blockExemptions = PRODUCT_BLOCK_EXEMPTIONS,
-  sectionExemptions = PRODUCT_SECTION_EXEMPTIONS,
-  displayPath = 'docs/PRODUCT.md',
-}) {
+export function findOversizedProductText({ content, limits = PRODUCT_LIMITS, displayPath = 'docs/PRODUCT.md' }) {
   const issues = []
-  const oversizedBlocks = new Set()
-  const oversizedSections = new Set()
   for (const section of scanProductSections(content)) {
     for (const block of scanProductBlocks(section.lines)) {
       if (block.text.length <= limits.block) continue
-      oversizedBlocks.add(section.id)
-      if (!blockExemptions.has(section.id)) {
-        issues.push(
-          `${displayPath}:${block.startLine} (§${section.id}): ${block.kind} has ${block.text.length} characters; the limit is ${limits.block}. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).`,
-        )
-      }
+      issues.push(
+        `${displayPath}:${block.startLine} (§${section.id}): ${block.kind} has ${block.text.length} characters; the limit is ${limits.block}. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).`,
+      )
     }
     const size = productOwnText(section.lines).length
     if (size <= limits.section) continue
-    oversizedSections.add(section.id)
-    if (!sectionExemptions.has(section.id)) {
-      issues.push(
-        `${displayPath} §${section.id}: ${size} characters of own text; the limit is ${limits.section}. Split it into numbered subsections (docs/DEVELOPMENT.md §12).`,
-      )
-    }
-  }
-  for (const [exemptions, oversized] of [
-    [blockExemptions, oversizedBlocks],
-    [sectionExemptions, oversizedSections],
-  ]) {
-    for (const id of exemptions) {
-      if (!oversized.has(id)) issues.push(`${displayPath} §${id}: stale size exemption; delete it.`)
-    }
+    issues.push(
+      `${displayPath} §${section.id}: ${size} characters of own text; the limit is ${limits.section}. Split it into numbered subsections (docs/DEVELOPMENT.md §12).`,
+    )
   }
   return issues
 }
@@ -460,11 +436,7 @@ function collectLiveDocuments(rootDirectory) {
   return [...documents]
 }
 
-export function runChecks({
-  rootDirectory = ROOT,
-  blockExemptions = PRODUCT_BLOCK_EXEMPTIONS,
-  sectionExemptions = PRODUCT_SECTION_EXEMPTIONS,
-} = {}) {
+export function runChecks({ rootDirectory = ROOT } = {}) {
   const issues = []
   const adrNumbers = new Set()
   const decisionsDirectory = join(rootDirectory, 'docs', 'decisions')
@@ -503,7 +475,7 @@ export function runChecks({
       issues.push(...validateOpenQuestions({ content, displayPath }))
     }
     if (displayPath === 'docs/PRODUCT.md') {
-      issues.push(...findOversizedProductText({ content, displayPath, blockExemptions, sectionExemptions }))
+      issues.push(...findOversizedProductText({ content, displayPath }))
     }
     if (displayPath === CONFORMANCE_DOCUMENT) {
       issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))

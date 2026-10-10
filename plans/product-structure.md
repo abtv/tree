@@ -51,7 +51,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 | PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Complete |
 | PS-6 | Batch A split verbatim: §2.1, §2.2, §2.4, §2.5, §10, §11, §13, §16.1 | PS-2 | Verbatim report clean; exemptions deleted; `npm run check`; independent review | Complete |
 | PS-7 | Batch B split verbatim: §20.5, §20.8, §20.9, §23.2, §23.4, §23.5, §23.11, §23.12 | PS-6 | Same as PS-6 | Complete |
-| PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Planned |
+| PS-8 | Limits made absolute; exemption mechanism removed | PS-3, PS-4, PS-6, PS-7 | `npm run check`; no exemption parameter or constant remains | Complete |
 | PS-9 | VIM_CONFORMANCE.md "Mode and command families" and "Completed Tree operation replay" cite subsections; matrix-only rules kept and queued | PS-4 | `npm run check:docs`; divergence markers kept with reasons; evidence cells unchanged; removed-clause audit; independent review | Planned |
 | PS-10 | Same for "Interaction-state contract" and "Image and caret transitions"; queue complete; one Product Owner message sent | PS-9 | Same as PS-9; queue recorded here | Planned |
 | PS-11 | Approved matrix-only rules written into PRODUCT.md; matrix purpose, Agenda paragraph, history paragraphs, and "Who decides a divergence" resolved | PS-10, Product Owner answers | `npm run check`; independent review | Planned |
@@ -59,7 +59,7 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-8. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-9. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
 
 PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
 measurements, focused tests, and primary review. PRODUCT.md is unchanged.
@@ -176,6 +176,15 @@ PRODUCT" in `scripts/check-docs.test.mjs` assumed non-empty exemption sets; it
 now asserts that a title-only PRODUCT passes and that an injected exemption is
 reported stale. `npm run check` and `npm run format:check:changed` passed (the
 first run failed only on that test). No product decision was made.
+
+PS-8 completed (2026-10-10): both exemption sets, their parameters on
+`findOversizedProductText` and `runChecks`, and the stale-exemption check are
+deleted from `scripts/check-docs.mjs`; the limits (700 and 8,000) apply to every
+section. Tests: the exemption tests are replaced by one that an over-limit block
+and section fail in a section with a former exemption number (§20.2) and in a
+subsection, and one that `runChecks` fails on an over-limit PRODUCT paragraph.
+`docs/DEVELOPMENT.md` §12 no longer mentions exemptions. PRODUCT.md is unchanged.
+No product decision was made.
 
 ## Conventions
 
