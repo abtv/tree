@@ -225,7 +225,10 @@ test('a near-fit row and oversized final row keep their readable start', async (
   expect(state.height).toBeLessThan(state.area)
   expect(state.height).toBeGreaterThan(state.area - 50)
   expect(state.top).toBe(25)
-  await expect(window).toHaveScreenshot('near-fit-start.png')
+  // Native overlay scrollbars fade independently of CSS animations. Exclude the right edge, where
+  // the scrollbar thumb may or may not be drawn during the capture.
+  const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+  await expect(window).toHaveScreenshot('near-fit-start.png', { clip })
   await window.keyboard.press('G')
   await painted(window)
   const end = await geometry(window)
