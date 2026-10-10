@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { productOwnText, scanProductSections } from './product-sections.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -48,30 +49,10 @@ export const BOUNDARY_SECTIONS = new Set([
 ])
 
 export function parseSections(content) {
-  const sections = []
-  let current
-  let fence
-  for (const line of content.split(/\r?\n/)) {
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line)
-    if (fenceMatch) {
-      if (!fence) fence = { character: fenceMatch[1][0], length: fenceMatch[1].length }
-      else if (fenceMatch[1][0] === fence.character && fenceMatch[1].length >= fence.length) fence = undefined
-      if (current) current.text.push(line)
-      continue
-    }
-    const heading = !fence && /^(#{2,3})\s+(\d+(?:\.\d+)*)\.?\s+(.+)$/.exec(line)
-    if (heading) {
-      current = { id: heading[2], title: heading[3], level: heading[1].length, text: [] }
-      sections.push(current)
-    } else if (current) current.text.push(line)
-  }
+  const sections = scanProductSections(content)
   return sections.map((section, index) => {
     const hasChildren = sections[index + 1]?.level > section.level
-    const ownText = section.text
-      .join('\n')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/^\s*---\s*$/gm, '')
-      .trim()
+    const ownText = productOwnText(section.lines)
     return { id: section.id, title: section.title, required: !hasChildren || ownText.length > 0 }
   })
 }
@@ -80,6 +61,11 @@ export function checkCoverage({ product, files, exemptions = EXEMPTIONS, boundar
   const sections = parseSections(product)
   const ids = new Set(sections.map((section) => section.id))
   const issues = []
+  for (const section of scanProductSections(product)) {
+    if (section.level !== section.id.split('.').length + 1) {
+      issues.push(`PRODUCT.md §${section.id}: heading level does not match its number depth`)
+    }
+  }
   if (sections.length === 0) issues.push('PRODUCT.md: no numbered sections found')
   if (ids.size !== sections.length) issues.push('PRODUCT.md: duplicate numbered sections')
   for (const [id, reason] of exemptions) {
@@ -114,6 +100,11 @@ export function checkCoverage({ product, files, exemptions = EXEMPTIONS, boundar
       }
       const id = marker[1]
       if (!ids.has(id)) issues.push(`${path}:${lineNumber}: unknown PRODUCT.md §${id}`)
+      else if (!sections.find((section) => section.id === id).required) {
+        issues.push(
+          `${path}:${lineNumber}: PRODUCT.md §${id} has numbered subsections and no text of its own; cite a subsection`,
+        )
+      }
       marked.add(id)
       if (path.startsWith('e2e/')) e2eMarked.add(id)
     }

@@ -1,8 +1,71 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mjs'
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+export const PRODUCT_LIMITS = { block: 700, section: 8000 }
+export const PRODUCT_BLOCK_EXEMPTIONS = new Set([
+  '2.1',
+  '2.2',
+  '2.4',
+  '2.5',
+  '10',
+  '11',
+  '13',
+  '16.1',
+  '20.2',
+  '20.5',
+  '20.8',
+  '20.9',
+  '23.2',
+  '23.4',
+  '23.5',
+  '23.11',
+  '23.12',
+])
+export const PRODUCT_SECTION_EXEMPTIONS = new Set(['20.2'])
+
+export function findOversizedProductText({
+  content,
+  limits = PRODUCT_LIMITS,
+  blockExemptions = PRODUCT_BLOCK_EXEMPTIONS,
+  sectionExemptions = PRODUCT_SECTION_EXEMPTIONS,
+  displayPath = 'docs/PRODUCT.md',
+}) {
+  const issues = []
+  const oversizedBlocks = new Set()
+  const oversizedSections = new Set()
+  for (const section of scanProductSections(content)) {
+    for (const block of scanProductBlocks(section.lines)) {
+      if (block.text.length <= limits.block) continue
+      oversizedBlocks.add(section.id)
+      if (!blockExemptions.has(section.id)) {
+        issues.push(
+          `${displayPath}:${block.startLine} (§${section.id}): ${block.kind} has ${block.text.length} characters; the limit is ${limits.block}. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).`,
+        )
+      }
+    }
+    const size = productOwnText(section.lines).length
+    if (size <= limits.section) continue
+    oversizedSections.add(section.id)
+    if (!sectionExemptions.has(section.id)) {
+      issues.push(
+        `${displayPath} §${section.id}: ${size} characters of own text; the limit is ${limits.section}. Split it into numbered subsections (docs/DEVELOPMENT.md §12).`,
+      )
+    }
+  }
+  for (const [exemptions, oversized] of [
+    [blockExemptions, oversizedBlocks],
+    [sectionExemptions, oversizedSections],
+  ]) {
+    for (const id of exemptions) {
+      if (!oversized.has(id)) issues.push(`${displayPath} §${id}: stale size exemption; delete it.`)
+    }
+  }
+  return issues
+}
 
 const ADR_FILE_PATTERN = /^(\d{4})-[a-z0-9-]+\.md$/
 
@@ -414,7 +477,11 @@ function collectLiveDocuments(rootDirectory) {
   return [...documents]
 }
 
-export function runChecks({ rootDirectory = ROOT } = {}) {
+export function runChecks({
+  rootDirectory = ROOT,
+  blockExemptions = PRODUCT_BLOCK_EXEMPTIONS,
+  sectionExemptions = PRODUCT_SECTION_EXEMPTIONS,
+} = {}) {
   const issues = []
   const adrNumbers = new Set()
   const decisionsDirectory = join(rootDirectory, 'docs', 'decisions')
@@ -451,6 +518,9 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     }
     if (displayPath === 'docs/OPEN_QUESTIONS.md') {
       issues.push(...validateOpenQuestions({ content, displayPath }))
+    }
+    if (displayPath === 'docs/PRODUCT.md') {
+      issues.push(...findOversizedProductText({ content, displayPath, blockExemptions, sectionExemptions }))
     }
     if (displayPath === CONFORMANCE_DOCUMENT) {
       issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))

@@ -14,6 +14,25 @@ function check(product, files = [], options = {}) {
 }
 
 describe('requirement section parsing', () => {
+  it('accepts four-level headings and rejects number-depth mismatches', () => {
+    expect(parseSections('## 1. Parent\n### 1.1 Child\n#### 1.1.1 Leaf\nRule')).toEqual([
+      { id: '1', title: 'Parent', required: false },
+      { id: '1.1', title: 'Child', required: false },
+      { id: '1.1.1', title: 'Leaf', required: true },
+    ])
+    expect(check('### 1. Wrong\nRule').issues).toContain('PRODUCT.md §1: heading level does not match its number depth')
+  })
+
+  it('rejects a marker on a parent without own text', () => {
+    expect(
+      check('## 1. Parent\n### 1.1 Leaf\nRule', [
+        {
+          path: 'src/x.test.ts',
+          content: '// @requirement PRODUCT.md §1\n// @requirement PRODUCT.md §1.1\n',
+        },
+      ]).issues,
+    ).toEqual(['src/x.test.ts:1: PRODUCT.md §1 has numbered subsections and no text of its own; cite a subsection'])
+  })
   it('requires leaves and parents with their own text, including unnumbered subheadings', () => {
     expect(
       parseSections('## 1. Parent\n### 1.1 Leaf\nRule\n### Example\nMore\n## 2. Parent\nOwn rule\n### 2.1 Leaf\n'),

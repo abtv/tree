@@ -8,6 +8,7 @@ import {
   findBrokenLinks,
   findBrokenReferences,
   findProductQuantityRestatements,
+  findOversizedProductText,
   findStaleConformanceCitations,
   parseConformanceCitations,
   runChecks,
@@ -16,6 +17,90 @@ import {
   validateOpenQuestions,
   validateWorkflowOwnership,
 } from './check-docs.mjs'
+import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mjs'
+
+describe('PRODUCT scanning and size limits', () => {
+  const scan = (text) => scanProductBlocks(text.split('\n').map((text, index) => ({ number: index + 1, text })))
+  const checkSize = (content, options = {}) =>
+    findOversizedProductText({
+      content,
+      blockExemptions: new Set(),
+      sectionExemptions: new Set(),
+      ...options,
+    })
+
+  it('scans levels two through four with original line numbers and ignores comments and fenced headings', () => {
+    const sections = scanProductSections(
+      '## 1. Parent\n<!--\n### 9.9 Hidden\n-->\n### 1.1 Child\n~~~~\n#### 9.9.9 Hidden\n~~~\n~~~~\n#### 1.1.1 Leaf\nRule',
+    )
+    expect(sections.map(({ id, level, startLine }) => [id, level, startLine])).toEqual([
+      ['1', 2, 1],
+      ['1.1', 3, 5],
+      ['1.1.1', 4, 10],
+    ])
+    expect(sections[2].lines).toEqual([{ number: 11, text: 'Rule' }])
+  })
+
+  it('counts paragraphs, each list item with its continuation, and table rows separately', () => {
+    expect(scan('First\nsecond\n\n* One\n  continued\n- Two\n3. Three\n\n| A | B |\n| C | D |')).toEqual([
+      { kind: 'paragraph', startLine: 1, text: 'First second' },
+      { kind: 'list item', startLine: 4, text: 'One continued' },
+      { kind: 'list item', startLine: 6, text: 'Two' },
+      { kind: 'list item', startLine: 7, text: 'Three' },
+      { kind: 'table row', startLine: 9, text: '| A | B |' },
+      { kind: 'table row', startLine: 10, text: '| C | D |' },
+    ])
+    expect(scan('# Heading\n<!-- ignored -->\n---\n```\n' + 'x'.repeat(900) + '\n```')).toEqual([])
+    expect(scan('Rule <!-- hidden -->ends')[0].text).toBe('Rule ends')
+  })
+
+  it('accepts the exact block limit and reports one character over with its section and line', () => {
+    expect(checkSize('## 1. One\n' + 'x'.repeat(700))).toEqual([])
+    expect(checkSize('## 1. One\n' + 'x'.repeat(701))).toEqual([
+      'docs/PRODUCT.md:2 (§1): paragraph has 701 characters; the limit is 700. Split it into one rule per list item without rewording (docs/DEVELOPMENT.md §12).',
+    ])
+    expect(checkSize('## 1. One\n* ' + 'x'.repeat(400) + '\n* ' + 'x'.repeat(400))).toEqual([])
+  })
+
+  it('counts only own section text, including unnumbered headings and fences', () => {
+    const content =
+      '## 1. Parent\n<!-- hidden -->\n---\n### 1.1 Child\n#### Example\n```\nabc\n```\n#### 1.1.1 Leaf\nxyz'
+    const sections = scanProductSections(content)
+    expect(productOwnText(sections[0].lines)).toBe('')
+    expect(productOwnText(sections[1].lines)).toBe('#### Example\n```\nabc\n```')
+    expect(checkSize(content, { limits: { block: 700, section: 23 } })).toEqual([
+      'docs/PRODUCT.md §1.1: 24 characters of own text; the limit is 23. Split it into numbered subsections (docs/DEVELOPMENT.md §12).',
+    ])
+    expect(checkSize(content, { limits: { block: 700, section: 24 } })).toEqual([])
+  })
+
+  it('suppresses current violations and rejects stale and missing-section exemptions', () => {
+    expect(
+      checkSize('## 1. One\n' + 'x'.repeat(8001), {
+        blockExemptions: new Set(['1']),
+        sectionExemptions: new Set(['1']),
+      }),
+    ).toEqual([])
+    expect(
+      checkSize('## 1. One\nshort', {
+        blockExemptions: new Set(['1']),
+        sectionExemptions: new Set(['9']),
+      }),
+    ).toEqual([
+      'docs/PRODUCT.md §1: stale size exemption; delete it.',
+      'docs/PRODUCT.md §9: stale size exemption; delete it.',
+    ])
+  })
+
+  it('runs without PRODUCT and reports stale exemptions for a title-only PRODUCT', () => {
+    const root = createTemporaryRoot()
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([])
+    writeFile(root, 'docs/PRODUCT.md', '# Product\n')
+    const issues = runChecks({ rootDirectory: root }).issues
+    expect(issues.length).toBeGreaterThan(0)
+    expect(issues.every((issue) => issue.includes('stale size exemption'))).toBe(true)
+  })
+})
 
 const temporaryDirectories = []
 
@@ -267,7 +352,7 @@ describe('runChecks', () => {
     const root = createTemporaryRoot()
     writeFile(root, 'README.md', '# Fixture\n')
     writeFile(root, 'docs/PRODUCT.md', '# Product\n')
-    const result = runChecks({ rootDirectory: root })
+    const result = runChecks({ rootDirectory: root, blockExemptions: new Set(), sectionExemptions: new Set() })
     expect(result.issues).toEqual([])
   })
 

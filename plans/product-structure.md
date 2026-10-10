@@ -35,8 +35,8 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 * Traceability: `parseSections` in `scripts/check-requirement-coverage.mjs` reads only `##` and `###` headings, so §20.2 (about 33 to 35 KB) is one requirement; 33 markers cite `// @requirement PRODUCT.md §20.2` in 12 files (measured).
 * Dangling references: 24 code comments in 15 files cite `§20.2.1` (most with a label `T1` to `T8`). That subsection was "Planned Tree-Specific Vim Editing", added in `9f04f4f` and removed in `7a124fa` when the `vim-org-editing` initiative moved its clauses into the §20.2 text. Its labels were: T1 subtree units and counts, T2 Visual nesting (`>`/`<`), T3 Visual register exchange and `gp`/`gP`, T4 vertical operators, T5 text commands (`Y`, case), T6 joins, T7 `gv`, T8 repeat. Once a real §20.2.1 exists these comments would point at the wrong topic.
 * Tooling constraint (read): `.claude/settings.json` denies `Bash(node *)` and `opencode.json` denies `node`, so an agent cannot run an ad hoc comparison script. The verbatim comparison must be a mode of an allowed command: `npm run check:docs -- --verbatim <ref>`.
-* Block distribution (measured; every paragraph and list item is one physical line, with no indented lines): lines of at least 600 characters: 51; 700: 37; 800: 30; 1000: 20; 1500: 5; 2000: 4. The longest line is 981 (between 2,500 and 2,800 characters). No sentence reaches 560 characters, so a 700-character block limit never forces rewording a sentence.
-* At a 700-character limit, 37 blocks in 17 sections violate: 2.1, 2.2, 2.4, 2.5, 10, 11, 13, 16.1, 20.2, 20.5, 20.8, 20.9, 23.2, 23.4, 23.5, 23.11, 23.12 (16 of the blocks are in §20.2). At an 8,000-character leaf limit only §20.2 violates (next largest by estimate: §20.9 about 6.1K, §16.1 about 5.5K, §2.1 about 5.4K).
+* PS-1 exact measurements on the unchanged PRODUCT.md at `e47b906`, using `scanProductSections`, `scanProductBlocks`, and `productOwnText`: blocks of at least 600 characters: 51; 700: 37; 800: 31; 1000: 20; 1500: 5; 2000: 4. The longest block is the paragraph at line 981 (§20.2), 2,535 characters. Splitting blocks at sentence-final punctuation followed by whitespace gives a longest sentence of 506 characters, at line 981, starting "If the user invokes an application undo or redo shortcut" and ending "the command still acts on what the user selected." No measured sentence exceeds the 700-character block limit.
+* At a 700-character limit, 37 blocks in 17 sections violate: 2.1, 2.2, 2.4, 2.5, 10, 11, 13, 16.1, 20.2, 20.5, 20.8, 20.9, 23.2, 23.4, 23.5, 23.11, 23.12 (16 of the blocks are in §20.2). The guard run with empty exemption sets confirmed these ids. Exact top five leaf own-text sizes: §20.2 33,082; §16.1 5,319; §20.9 4,709; §2.1 4,662; §20.5 3,909 characters. Only §20.2 exceeds 8,000 characters.
 * VIM_CONFORMANCE.md (87 KB, 139 lines) restates PRODUCT rules in its behavior column, and by reading it also states behavior that PRODUCT.md does not (seeds under PS-9). Its first table has a two-column header while rows at lines 21, 22, 23, 25, 41 to 45, and 49 have three cells.
 * References to `§20.2` (measured, lines): 33 test markers; 9 plain code comments or titles; 24 dangling `§20.2.1` comments; 13 in PRODUCT.md; 37 in VIM_CONFORMANCE.md; `docs/DEVELOPMENT.md:228`, `docs/ARCHITECTURE.md:547`, `plans/agenda.md:295` and `:481`; `'20.2'` in `BOUNDARY_SECTIONS`. No ADR cites §20.2. ADRs are historical and are never edited for renumbering.
 
@@ -44,8 +44,8 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| PS-1 | Shared section scanner accepts numbered `####` headings; `check:docs` enforces block and leaf-section limits on PRODUCT.md with shrinking per-section exemptions; a marker may not cite a section that has numbered children and no text of its own | — | `npm run check`; unit tests; exact sizes and longest sentence recorded here; a trial over-limit paragraph fails the guard | Ready |
-| PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Planned |
+| PS-1 | Shared section scanner accepts numbered `####` headings; `check:docs` enforces block and leaf-section limits on PRODUCT.md with shrinking per-section exemptions; a marker may not cite a section that has numbered children and no text of its own | — | `npm run check`; unit tests; exact sizes and longest sentence recorded here; a trial over-limit paragraph fails the guard | Complete |
+| PS-2 | `npm run check:docs -- --verbatim <git-ref>` compares clauses before and after an edit | PS-1 | Unit tests with adversarial cases; clean run on `HEAD`; run against a past PRODUCT.md commit; `npm run check`; `npm run check:opencode`; independent review | Ready |
 | PS-3 | §20.2 restructured under unnumbered `####` headings into one-rule items, verbatim | PS-2 | Verbatim report clean except listed lead-ins; no §20.2 block over the limit; `20.2` block exemption deleted; `npm run check`; independent review | Planned |
 | PS-4 | §20.2 subsections numbered 20.2.1 and onward; every marker re-pointed or added to the subsection its test exercises; boundary list updated | PS-3 | `npm run check` (every leaf marked, boundary leaves have E2E markers, no `§20.2` marker left); `20.2` section exemption deleted; independent review of the mapping | Planned |
 | PS-5 | Code-comment references re-pointed (24 dangling `§20.2.1`, 9 plain `§20.2`) | PS-4 | No `§20.2.1 T` left; `npm run check` | Planned |
@@ -59,7 +59,17 @@ Origin labels: measured in the planning session at HEAD `e47b906`, or read there
 
 Suggested sessions (at most four commits each, `AGENTS.md` §12): PS-1 and PS-2; PS-3; PS-4 and PS-5; PS-6 to PS-8; PS-9 and PS-10; PS-11 and PS-12.
 
-**Next task:** PS-1. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+**Next task:** PS-2. Start every task with `git status` and `git log -3 -- docs/PRODUCT.md`; if PRODUCT.md changed since the last update of this plan, rerun the guard report before trusting the section lists here.
+
+PS-1 completed (2026-10-10): shared scanner, size guard, coverage checks, exact
+measurements, focused tests, and primary review. PRODUCT.md is unchanged.
+Full validation passed with a temporary single test worker; all 3,202 tests,
+coverage floors, static/governance checks, and build passed. Default concurrency
+failed only the existing date-parser wall-clock timing guards; isolated and
+serial full-suite runs passed, supporting contention as the explanation. The
+temporary concurrency setting was restored before commit. No thresholds or
+tests were weakened. Future sessions should retain this environment caveat when
+investigating a repeated default-concurrency timing failure.
 
 ## Conventions
 

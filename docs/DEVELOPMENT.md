@@ -477,7 +477,10 @@ Requirement traceability uses a standalone comment directly above a test or suit
 `npm run check:requirements` scans `src/**/*.test.*`, `e2e/**/*.ts`, and `perf/**/*.ts`.
 It requires a marker for every numbered leaf section of `docs/PRODUCT.md` and for
 parents with their own text; unnumbered subheadings belong to the nearest numbered
-section. It rejects unknown section numbers and malformed markers. The checker
+section. Numbered headings at levels two through four are supported (for example,
+`#### 20.2.1 Title`); heading level must match number depth plus one. A marker on
+a parent with numbered children and no own text must cite a subsection instead.
+It rejects unknown section numbers and malformed markers. The checker
 owns explicit exemptions with reasons for overview and product governance prose,
 and a boundary-section list derived from `AGENTS.md` §9. Boundary sections also
 require a marker under `e2e/`; a unit or performance marker cannot replace it.
@@ -485,6 +488,18 @@ Review the boundary list when adding or changing requirements. Section-level
 traceability locates executable evidence; it does not prove that every sentence
 has an assertion. Add markers only to tests that exercise the cited behavior and
 review their assertions against the requirements when behavior changes.
+
+`npm run check:docs` limits PRODUCT.md blocks to 700 characters and each numbered
+section's own text to 8,000 characters. Paragraphs, individual list items with
+their continuation lines, and table rows are blocks; headings, fenced code,
+comments, separators, and blank lines are excluded from block counting. Section
+text includes unnumbered headings and fenced code, but excludes comments and
+separators. Block failures report the file, line, section, size, and limit with
+"Split it into one rule per list item without rewording"; section failures say
+"Split it into numbered subsections". Temporary per-section block and section
+exemptions in `scripts/check-docs.mjs` protect the existing dense text while the
+PRODUCT.md structure initiative splits it. Fixed sections must lose their
+exemption: "stale size exemption; delete it" is an error.
 
 A refactoring that preserves behavior should not require unnecessary test changes.
 
