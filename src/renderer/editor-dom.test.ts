@@ -387,6 +387,37 @@ describe('editor DOM adapters', () => {
     expect(link.classList.contains('link-selected')).toBe(true)
   })
 
+  // Every selection change runs this for every mounted input, and each Range stays attached to the
+  // document until garbage collection, which makes every later DOM removal slower (PRODUCT.md §22.2).
+  it('creates no Range for an input without links or without a ranged selection', () => {
+    const plain = document.createElement('div')
+    plain.textContent = 'plain text'
+    const linked = document.createElement('div')
+    linked.innerHTML = 'a<a href="https://example.test">link</a>z'
+    document.body.append(plain, linked)
+    const link = linked.querySelector('a')!
+    setDomSelection(linked.firstChild!, 0, linked.lastChild!, 1)
+    updateSelectedLinks(linked)
+    expect(link.classList.contains('link-selected')).toBe(true)
+    const createRange = vi.spyOn(document, 'createRange')
+    const getRangeAt = vi.spyOn(Selection.prototype, 'getRangeAt')
+    try {
+      updateSelectedLinks(plain)
+      expect(createRange).not.toHaveBeenCalled()
+      expect(getRangeAt).not.toHaveBeenCalled()
+      setDomSelection(linked.firstChild!, 0)
+      createRange.mockClear()
+      getRangeAt.mockClear()
+      updateSelectedLinks(linked)
+      expect(link.classList.contains('link-selected')).toBe(false)
+      expect(createRange).not.toHaveBeenCalled()
+      expect(getRangeAt).not.toHaveBeenCalled()
+    } finally {
+      createRange.mockRestore()
+      getRangeAt.mockRestore()
+    }
+  })
+
   it('reads text nested inside inline elements and anchors without an href attribute', () => {
     const element = document.createElement('div')
     element.innerHTML = 'before<span>inner <em>deep</em></span><a>linked</a>'

@@ -253,16 +253,22 @@ export function collapseSelectionToAnchor(element: HTMLElement): void {
 }
 
 export function updateSelectedLinks(element: HTMLElement): void {
+  const links = element.querySelectorAll('a')
+  // Every selection change runs this for every mounted input, and each Range stays attached to the
+  // document until garbage collection, slowing every later DOM removal; create one only when needed.
+  if (links.length === 0) return
   const selection = globalThis.getSelection()
-  const active = selection !== null && selection.rangeCount > 0 && !selection.isCollapsed
-  const range = active && selection !== null ? selection.getRangeAt(0) : null
+  if (selection === null || selection.rangeCount === 0 || selection.isCollapsed) {
+    for (const link of links) link.classList.remove('link-selected')
+    return
+  }
+  const range = selection.getRangeAt(0)
   const linkRange = document.createRange()
-  for (const link of element.querySelectorAll('a')) {
+  for (const link of links) {
     linkRange.selectNodeContents(link)
     link.classList.toggle(
       'link-selected',
-      range !== null &&
-        range.compareBoundaryPoints(Range.START_TO_START, linkRange) <= 0 &&
+      range.compareBoundaryPoints(Range.START_TO_START, linkRange) <= 0 &&
         range.compareBoundaryPoints(Range.END_TO_END, linkRange) >= 0,
     )
   }
