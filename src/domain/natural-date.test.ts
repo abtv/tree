@@ -38,6 +38,12 @@ describe('natural date expression table proposed in AG-22', () => {
     ['1 day ago', ['2026-10-07']],
     ['in 0 days', ['2026-10-08']],
     ['0 days ago', ['2026-10-08']],
+    ['two days ago', ['2026-10-06']],
+    ['in five days', ['2026-10-13']],
+    ['in twenty-five days', ['2026-11-02']],
+    ['twenty five days ago', ['2026-09-13']],
+    ['in one hundred days', ['2027-01-16']],
+    ['ONE   HUNDRED days ago', ['2026-06-30']],
     ['NEXT   FRIDAY', ['2026-10-16']],
     ['May 1', ['2027-05-01', '2026-05-01']],
   ])('%s gives the ordered dates', (expression, expected) => {
@@ -77,6 +83,67 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(dates('Friday', day('2026-10-06'))).toEqual(['2026-10-09', '2026-10-16'])
     expect(dates('Friday', day('2026-10-10'))).toEqual(['2026-10-16', '2026-10-09'])
     expect(dates('Friday', day('2026-10-09'))).toEqual(['2026-10-09', '2026-10-16'])
+  })
+
+  it('recognizes every English count from one through one hundred like its digits', () => {
+    const small = [
+      'one',
+      'two',
+      'three',
+      'four',
+      'five',
+      'six',
+      'seven',
+      'eight',
+      'nine',
+      'ten',
+      'eleven',
+      'twelve',
+      'thirteen',
+      'fourteen',
+      'fifteen',
+      'sixteen',
+      'seventeen',
+      'eighteen',
+      'nineteen',
+    ]
+    const tens = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+    for (let count = 1; count <= 100; count++) {
+      const word =
+        count === 100
+          ? 'one hundred'
+          : count < 20
+            ? small[count - 1]!
+            : tens[Math.floor(count / 10) - 2]! + (count % 10 ? ` ${small[(count % 10) - 1]}` : '')
+      for (const spelling of [word, word.replace(' ', '-'), word.toUpperCase().replace(' ', '   ')]) {
+        if (spelling === 'one-hundred') continue
+        expect(dates(`in ${spelling} days`)).toEqual(dates(`in ${count} days`))
+        expect(dates(`${spelling} days ago`)).toEqual(dates(`${count} days ago`))
+      }
+    }
+    expect(dates('in one day')).toEqual(dates('in 1 day'))
+    expect(dates('one day ago')).toEqual(dates('1 day ago'))
+  })
+
+  it('keeps word counts within expression boundaries and calendar bounds', () => {
+    for (const text of [
+      'in zero days',
+      'in one hundred one days',
+      'in twentyfive days',
+      'in twohundred days',
+      'in twenty--five days',
+      'in twoday',
+      'in fivedays',
+      'two days agone',
+    ]) {
+      expect(dates(text)).toBeUndefined()
+    }
+    const text = 'Plan in TWENTY   FIVE days at noon'
+    const match = suggestDates(text, 15, today)!
+    expect(text.slice(match.start, match.end)).toBe('in TWENTY   FIVE days')
+    expect(match.suggestions).toEqual([{ day: today + 25, expression: 'in twenty five days' }])
+    expect(dates('one day ago', day('0000-01-01'))).toBeUndefined()
+    expect(dates('in one day', day('9999-12-31'))).toBeUndefined()
   })
 
   it.each(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])(

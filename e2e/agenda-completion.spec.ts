@@ -17,6 +17,52 @@ import {
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
   for (const view of ['Tree', 'Agenda'] as const) {
     // @requirement PRODUCT.md §20.9
+    test(`accepts English relative day counts in ${view}`, async ({ userDataDir }, testInfo) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await setAgendaToday(window)
+      if (view === 'Agenda') {
+        await window.keyboard.press('Meta+p')
+        await window.locator('.agenda-row[data-node-id="n"]').click()
+      }
+      const input = window.getByRole('textbox', {
+        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
+        exact: true,
+      })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      for (const [expression, date] of [
+        ['two days ago', '2026-10-06'],
+        ['in five days', '2026-10-13'],
+        ['in twenty-five days', '2026-11-02'],
+        ['in one hundred days', '2027-01-16'],
+      ]) {
+        await window.keyboard.press('Meta+a')
+        await window.keyboard.type(`2026-10-08 Plan ${expression} at noon`)
+        await setCursor(input, `2026-10-08 Plan ${expression}`.length)
+        await window.keyboard.press('Backspace')
+        await window.keyboard.type(expression!.slice(-1))
+        await expect(popup.getByRole('option')).toHaveCount(1)
+        await expect(popup.getByRole('option')).toContainText(date!)
+        if (expression === 'in one hundred days') {
+          await window.screenshot({ path: testInfo.outputPath('english-relative-date.png') })
+        }
+        await window.keyboard.press('Tab')
+        await expect
+          .poll(() => input.evaluate((element) => element.textContent))
+          .toBe(`2026-10-08 Plan ${date} at noon`)
+        await expect(input).toBeFocused()
+        await expect(popup).toHaveCount(0)
+      }
+    })
+
+    // @requirement PRODUCT.md §20.9
     test(`preserves suffixes and ignores uncertain text and paste in ${view}`, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {

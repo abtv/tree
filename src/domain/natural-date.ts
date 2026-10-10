@@ -27,8 +27,32 @@ const months = [
 ]
 const weekdayPattern = weekdays.join('|')
 const monthPattern = months.map((month) => `${month}|${month.slice(0, 3)}`).join('|')
+const smallCounts = [
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+]
+const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
+const relativeExpression = new RegExp(`^(?:in (${countPattern}) days?|(${countPattern}) days? ago)$`)
 const expressions = new RegExp(
-  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +[0-9]+ +days?|[0-9]+ +days? +ago|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
+  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +days?|${countPattern} +days? +ago|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
   'gi',
 )
 // Stryker reports the module-initializer ObjectLiteral mutants as survivors.
@@ -75,9 +99,18 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
     return current >= today ? [current, current + 7] : [current + 7, current]
   }
   // The same outer-recognizer invariant makes anchor mutations equivalent.
-  const relative = /^(?:in ([0-9]+) days?|([0-9]+) days? ago)$/.exec(expression)
+  const relative = relativeExpression.exec(expression)
   if (relative) {
-    const count = Number(relative[1] ?? relative[2])
+    const value = relative[1] ?? relative[2]!
+    const [first, second] = value.split(/[ -]/)
+    const small = smallCounts.indexOf(first!) + 1
+    const tens = tensCounts.indexOf(first!)
+    const count =
+      value === 'one hundred'
+        ? 100
+        : tens >= 0
+          ? (tens + 2) * 10 + (second === undefined ? 0 : smallCounts.indexOf(second) + 1)
+          : small || Number(value)
     return [today + (relative[1] === undefined ? -count : count)]
   }
   const [month, date] = expression.split(' ')
