@@ -13,6 +13,7 @@ it('recognizes relative dates well below one millisecond, including incremental 
     ['3 weeks ago', -21],
     ['in October', dayNumberOf({ year: 2027, month: 10, day: 1 }) - today],
     ['last October', -7],
+    ['in the end of October', 23],
     ['in five days', 5],
     ['2 days ago', -2],
     ['in twenty-five days', 25],

@@ -110,6 +110,24 @@ describe('natural date expression table proposed in AG-22', () => {
     }
   })
 
+  it('offers the end of the current named month before rolling into the next year', () => {
+    for (const reference of ['2026-10-01', '2026-10-08', '2026-10-31']) {
+      expect(dates('in the end of October', day(reference))).toEqual(['2026-10-31'])
+    }
+    expect(dates('in the end of October', day('2026-11-01'))).toEqual(['2027-10-31'])
+    expect(dates('in the end of April')).toEqual(['2027-04-30'])
+    expect(dates('in the end of February', day('2028-02-10'))).toEqual(['2028-02-29'])
+    expect(dates('in the end of February', day('2027-02-10'))).toEqual(['2027-02-28'])
+    expect(dates('in the end of December', day('9999-12-31'))).toEqual(['9999-12-31'])
+    expect(dates('in the end of October', day('9999-11-01'))).toBeUndefined()
+    const text = 'Plan IN   THE END OF OCTOBER at noon'
+    const match = suggestDates(text, 27, today)!
+    expect(text.slice(match.start, match.end)).toBe('IN   THE END OF OCTOBER')
+    expect(match.suggestions).toEqual([{ day: day('2026-10-31'), expression: 'in the end of october' }])
+    expect(dates('in the end of Oct')).toBeUndefined()
+    expect(dates('in the end of Octobers')).toBeUndefined()
+  })
+
   it('recognizes every English count from one through one hundred like its digits', () => {
     const small = [
       'one',

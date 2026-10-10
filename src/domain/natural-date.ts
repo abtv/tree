@@ -52,7 +52,7 @@ const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'e
 const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
 const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
 const expressions = new RegExp(
-  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|(?:in|last) +(?:${months.join('|')})|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
+  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|in +the +end +of +(?:${months.join('|')})|(?:in|last) +(?:${months.join('|')})|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
   'gi',
 )
 // Stryker reports the module-initializer ObjectLiteral mutants as survivors.
@@ -107,6 +107,15 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
   if (expression === 'today') return [today]
   if (expression.startsWith('tomor')) return [today + 1]
   if (expression === 'yesterday') return [today - 1]
+  if (expression.startsWith('in the end of ')) {
+    const month = months.indexOf(expression.slice('in the end of '.length)) + 1
+    const reference = calendarDateOf(today)
+    const year = reference.year + (month < reference.month ? 1 : 0)
+    if (year > 9999) return []
+    let day = 31
+    while (!isValidCalendarDate({ year, month, day })) day--
+    return [dayNumberOf({ year, month, day })]
+  }
   const monday = today - weekdayOf(today)
   if (expression === 'next week') return Array.from({ length: 7 }, (_, index) => monday + 7 + index)
   const namedMonth = /^(in|last) (.+)$/.exec(expression)
