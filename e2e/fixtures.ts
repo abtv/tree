@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SAVE_IDLE_MILLISECONDS } from '../src/application/save-policy'
+import { WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS } from '../src/infrastructure/main/window-state'
 import {
   acquireSystemClipboardLock,
   releaseSystemClipboardLock,
@@ -78,6 +79,7 @@ function launchEnvironment(mode: WindowMode, shortcutMode: ShortcutMode): Record
 }
 
 const launchedApps: ElectronApplication[] = []
+const sharedApps = new WeakSet<ElectronApplication>()
 const observedSaveErrors = new Map<
   Page,
   { app: ElectronApplication; errors: string[]; timer: ReturnType<typeof setInterval>; collect: () => Promise<void> }
@@ -94,13 +96,54 @@ export const EDITING_MODES: readonly EditingMode[] = ['vim', 'standard']
 // value is safe; the `userDataDir` fixture sets it before the test body and clears it afterwards.
 let activeEditingMode: EditingMode = 'vim'
 
-export const test = base.extend<{ userDataDir: string; editingMode: EditingMode }>({
+export type SharedApplicationReset = 'off' | 'reload' | 'window'
+
+/** Only the two prototype specs opt in; an environment flag cannot affect other specs. */
+export function sharedApplicationPrototype(): SharedApplicationReset {
+  const reset = process.env['TREE_E2E_SHARED_RESET']
+  return reset === 'reload' || reset === 'window' ? reset : 'off'
+}
+
+interface SharedApplication {
+  directory: string
+  launched?: Launched | undefined
+  rendererUrl?: string
+  bounds?: PersistedWindowBounds
+}
+
+let activeSharedApplication: SharedApplication | undefined
+let activeSharedReset: SharedApplicationReset = 'off'
+
+export const test = base.extend<
+  { userDataDir: string; editingMode: EditingMode; sharedApplicationReset: SharedApplicationReset },
+  { sharedApplication: SharedApplication }
+>({
   // Specs written for Vim editing keep the default. `describeForEachEditingMode` overrides it per
   // describe block, and `launchTree` reads it when the test gives no explicit `vimPreference`.
   editingMode: ['vim', { option: true }],
-  userDataDir: async ({ editingMode }, use) => {
+  sharedApplicationReset: ['off', { option: true }],
+  sharedApplication: [
+    async ({}, use) => {
+      const shared: SharedApplication = { directory: mkdtempSync(join(tmpdir(), userDataMarker)) }
+      try {
+        await use(shared)
+      } finally {
+        if (shared.launched !== undefined) await closeApp(shared.launched.app)
+        rmSync(shared.directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+      }
+    },
+    { scope: 'worker' },
+  ],
+  userDataDir: async ({ editingMode, sharedApplicationReset, sharedApplication }, use) => {
     activeEditingMode = editingMode
-    const directory = mkdtempSync(join(tmpdir(), userDataMarker))
+    activeSharedReset = sharedApplicationReset
+    activeSharedApplication = sharedApplicationReset === 'off' ? undefined : sharedApplication
+    const directory = activeSharedApplication?.directory ?? mkdtempSync(join(tmpdir(), userDataMarker))
+    if (activeSharedApplication !== undefined) {
+      expect(existsSync(documentPath(directory)), 'The previous test document must be removed.').toBe(false)
+      expect(attachmentFiles(directory), 'The previous test attachments must be removed.').toEqual([])
+      expect(readVimPreference(directory), 'The previous editing preference must be removed.').toBeUndefined()
+    }
     await use(directory)
     const teardownStarted = performance.now()
     // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
@@ -110,7 +153,28 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
     try {
       const observations = [...observedSaveErrors.values()]
       await Promise.all(observations.map(({ collect }) => collect()))
-      await closeTrackedApps()
+      if (activeSharedApplication?.launched !== undefined && base.info().status === base.info().expectedStatus) {
+        const { app, window } = activeSharedApplication.launched
+        // Main-process navigation bypasses renderer navigation events, while the production
+        // security policy stays installed. about:blank disposes every renderer timer and store.
+        await app.evaluate(async ({ BrowserWindow }) => {
+          const main = BrowserWindow.getAllWindows()[0]
+          if (main === undefined) throw new Error('Shared application window is unavailable.')
+          await main.loadURL('about:blank')
+          if (globalThis.__treeDrainIpc === undefined) throw new Error('Shared IPC drain is unavailable.')
+          await globalThis.__treeDrainIpc()
+        })
+        await window.waitForURL('about:blank')
+        if (JSON.stringify(await readMainWindowBounds(app)) !== JSON.stringify(activeSharedApplication.bounds)) {
+          await setMainWindowBounds(app, activeSharedApplication.bounds!)
+          // A main-process debounce survives renderer disposal. Drain it before deleting data.
+          await new Promise((resolve) => setTimeout(resolve, WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS + 50))
+        }
+        forgetObservations(app)
+      } else {
+        await closeTrackedApps()
+        sharedApplication.launched = undefined
+      }
       observations.forEach(({ timer }) => clearInterval(timer))
       observedSaveErrors.clear()
       const errors = [...retainedSaveErrors, ...observations.flatMap(({ errors: values }) => values)]
@@ -122,10 +186,22 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
       if (unexpectedErrors.length > 0) {
         throw new Error(`Renderer reported save errors:\n${unexpectedErrors.join('\n')}`)
       }
+    } catch (error) {
+      // A failed reset must dispose its process before removing files it may still write.
+      await closeTrackedApps()
+      sharedApplication.launched = undefined
+      throw error
     } finally {
       activeEditingMode = 'vim'
+      activeSharedApplication = undefined
+      activeSharedReset = 'off'
       unlockSystemClipboard()
-      rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+      rmSync(sharedApplicationReset === 'off' ? directory : join(directory, 'data'), {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      })
       base.info().annotations.push({
         type: 'tree-teardown-timing',
         description: JSON.stringify({ duration: performance.now() - teardownStarted }),
@@ -407,6 +483,16 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
     await terminateProcess(electronProcess)
     return
   }
+  if (sharedApps.has(app)) {
+    // An intentionally blank renderer cannot acknowledge the production quit handshake.
+    await app
+      .evaluate(({ BrowserWindow }) => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (window.webContents.getURL() === 'about:blank') window.destroy()
+        }
+      })
+      .catch(() => undefined)
+  }
   const closePromise = app.close().catch(() => undefined)
   await Promise.race([closePromise, waitForProcessExit(electronProcess, 7_000)])
   await terminateProcess(electronProcess)
@@ -457,6 +543,7 @@ export async function launchTree(
   } = {},
 ): Promise<Launched> {
   const started = performance.now()
+  const reused = activeSharedApplication?.launched !== undefined
   const timing = { cleanup: 0, electronLaunch: 0, firstWindow: 0, assertions: 0, total: 0 }
   const measure = async <T>(
     phase: 'cleanup' | 'electronLaunch' | 'firstWindow' | 'assertions',
@@ -470,52 +557,105 @@ export async function launchTree(
     }
   }
   try {
+    const shared = activeSharedApplication
+    // Capture the test-owned seed before the application can recover or rewrite a file.
+    const initialSharedSeed =
+      shared === undefined || !existsSync(documentPath(userDataDir)) ? null : readPersisted(userDataDir)
+    if (
+      shared !== undefined &&
+      (ambientWindowMode() !== 'hidden' ||
+        options.windows !== undefined ||
+        options.shortcut !== undefined ||
+        options.expectReady === false ||
+        options.appearance !== undefined ||
+        options.initialDeviceScaleFactor !== undefined ||
+        options.vimPreference === 'saved')
+    ) {
+      throw new Error('The shared prototype supports hidden editing tests only, without custom launch options.')
+    }
+    if (shared?.launched !== undefined && shared.launched.window.url() !== 'about:blank') {
+      throw new Error('The shared prototype permits exactly one launch per test.')
+    }
     await measure('cleanup', async () => {
-      await closeTrackedApps()
-      await cleanupStaleElectronProcesses(userDataMarker)
+      if (shared?.launched === undefined) {
+        await closeTrackedApps()
+        await cleanupStaleElectronProcesses(userDataMarker)
+      }
     })
     const vimPreference = options.vimPreference ?? activeEditingMode === 'vim'
     if (vimPreference !== 'saved') writeVimPreference(userDataDir, vimPreference)
     const windowMode = options.windows ?? ambientWindowMode()
     const shortcutMode = options.shortcut ?? ambientShortcutMode()
     let app: ElectronApplication
+    let resetWindow: Page | undefined
     try {
-      app = await measure('electronLaunch', () =>
-        electron.launch({
-          args: [
-            ...(options.initialDeviceScaleFactor === undefined
-              ? []
-              : [`--force-device-scale-factor=${options.initialDeviceScaleFactor}`]),
-            // Set the backing scale before Electron initializes Chromium. CSS-sized screenshots still
-            // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
-            '--force-device-scale-factor=1',
-            `--user-data-dir=${userDataDir}`,
-            join(process.cwd(), 'e2e', 'electron-entry.cjs'),
-            // Overlay scrollbars reserve no width, while classic ones narrow the centered outline. macOS
-            // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
-            // through the user-defaults argument domain. It follows the entry, or Electron would take the
-            // value for the application path.
-            '-AppleShowScrollBars',
-            'WhenScrolling',
-            ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
-          ],
-          cwd: process.cwd(),
-          env: launchEnvironment(windowMode, shortcutMode),
-        }),
-      )
+      if (shared?.launched !== undefined) {
+        app = shared.launched.app
+        const resetStarted = performance.now()
+        await app.evaluate(({ BrowserWindow, nativeTheme }, bounds) => {
+          nativeTheme.themeSource = 'system'
+          const main = BrowserWindow.getAllWindows()[0]
+          if (main === undefined) throw new Error('Shared application window is unavailable.')
+          main.setAlwaysOnTop(false)
+          main.setBounds(bounds)
+        }, shared.bounds!)
+        if (activeSharedReset === 'window') {
+          const newWindow = app.waitForEvent('window')
+          await app.evaluate(({ app, BrowserWindow }) => {
+            BrowserWindow.getAllWindows()[0]!.destroy()
+            app.emit('activate')
+          })
+          resetWindow = await newWindow
+        } else {
+          resetWindow = shared.launched.window
+          await app.evaluate(async ({ BrowserWindow }, url) => {
+            await BrowserWindow.getAllWindows()[0]!.loadURL(url)
+          }, shared.rendererUrl!)
+        }
+        await resetWindow.waitForURL(shared.rendererUrl!)
+        timing.firstWindow += performance.now() - resetStarted
+      } else {
+        app = await measure('electronLaunch', () =>
+          electron.launch({
+            args: [
+              ...(options.initialDeviceScaleFactor === undefined
+                ? []
+                : [`--force-device-scale-factor=${options.initialDeviceScaleFactor}`]),
+              // Set the backing scale before Electron initializes Chromium. CSS-sized screenshots still
+              // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
+              '--force-device-scale-factor=1',
+              `--user-data-dir=${userDataDir}`,
+              join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+              ...(shared === undefined ? [] : ['--tree-test-shared-application']),
+              // Overlay scrollbars reserve no width, while classic ones narrow the centered outline. macOS
+              // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
+              // through the user-defaults argument domain. It follows the entry, or Electron would take the
+              // value for the application path.
+              '-AppleShowScrollBars',
+              'WhenScrolling',
+              ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
+            ],
+            cwd: process.cwd(),
+            env: launchEnvironment(windowMode, shortcutMode),
+          }),
+        )
+      }
     } catch (error) {
       await cleanupStaleElectronProcesses(userDataMarker)
       throw new Error(`Electron failed to launch for E2E test: ${formatLaunchError(error)}`, { cause: error })
     }
-    launchedApps.push(app)
-    app.once('close', () => {
-      closedApps.add(app)
-      const trackedIndex = launchedApps.indexOf(app)
-      if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
-      forgetObservations(app)
-    })
+    if (!launchedApps.includes(app)) {
+      if (shared !== undefined) sharedApps.add(app)
+      launchedApps.push(app)
+      app.once('close', () => {
+        closedApps.add(app)
+        const trackedIndex = launchedApps.indexOf(app)
+        if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+        forgetObservations(app)
+      })
+    }
     try {
-      const window = await measure('firstWindow', () => app.firstWindow())
+      const window = resetWindow ?? (await measure('firstWindow', () => app.firstWindow()))
       await measure('assertions', async () => {
         await observeSaveErrors(window)
         await Promise.all([assertWindowMode(app, windowMode), assertShortcutMode(app, shortcutMode)])
@@ -536,6 +676,61 @@ export async function launchTree(
         if (scrollbarWidth !== 0) {
           throw new Error(`Expected E2E overlay scrollbars, got a ${scrollbarWidth}px classic scrollbar.`)
         }
+        if (shared !== undefined) {
+          if (shared.bounds === undefined) shared.bounds = await readMainWindowBounds(app)
+          if (shared.rendererUrl === undefined) shared.rendererUrl = window.url()
+          const initial = initialSharedSeed
+          const blankId =
+            initial === null ? await window.locator('.node-row').first().getAttribute('data-node-id') : null
+          const expectedLoaded = {
+            document: initial?.document ?? { roots: [{ id: blankId, text: '', children: [] }] },
+            location: initial?.location ?? { currentParentId: null, selectedNodeId: blankId },
+            expandedIds: initial?.view?.expandedIds ?? [],
+          }
+          await expect
+            .poll(() =>
+              window.evaluate(async () => {
+                const loaded = await (
+                  globalThis as typeof globalThis & { treeApi: { load(): Promise<PersistedState | null> } }
+                ).treeApi.load()
+                return loaded === null
+                  ? null
+                  : {
+                      document: loaded.document,
+                      location: loaded.location,
+                      expandedIds: loaded.view?.expandedIds ?? [],
+                    }
+              }),
+            )
+            .toEqual(expectedLoaded)
+          const beforeUndo = await nodeTexts(window)
+          expect(initial?.location.currentParentId ?? null).toBeNull()
+          expect(initial?.view?.expandedIds ?? []).toEqual([])
+          expect(beforeUndo).toEqual(initial?.document.roots.map((root) => root.text) ?? [''])
+          const selected =
+            initial === null
+              ? node(window, 1)
+              : window.locator(`.node-row[data-node-id="${initial.location.selectedNodeId}"] .node-input`)
+          await expect(selected).toBeFocused()
+          if (vimPreference === true) await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+          else await expect(window.getByLabel('Vim mode')).toHaveCount(0)
+          await window.keyboard.press('Meta+z')
+          expect(await nodeTexts(window)).toEqual(beforeUndo)
+          await window.keyboard.press('Meta+Shift+z')
+          expect(await nodeTexts(window)).toEqual(beforeUndo)
+          // Synchronize the retained application menu through the existing production command.
+          await window.evaluate(
+            (enabled) =>
+              (
+                globalThis as typeof globalThis & { treeApi: { setVimEnabled(value: boolean): Promise<void> } }
+              ).treeApi.setVimEnabled(enabled),
+            vimPreference === true,
+          )
+          await expect(window.getByRole('button', { name: 'Unpin window from top' })).toHaveCount(0)
+          expect(await readMainWindowBounds(app)).toEqual(shared.bounds)
+          expect(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe('system')
+          shared.launched = { app, window }
+        }
         // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
         // Vim tests opt into the real Normal-mode startup state. Standard editing has no modes.
         if (
@@ -550,11 +745,15 @@ export async function launchTree(
       return { app, window }
     } catch (error) {
       await closeApp(app)
+      if (shared !== undefined) shared.launched = undefined
       throw error
     }
   } finally {
     timing.total = performance.now() - started
-    base.info().annotations.push({ type: 'tree-launch-timing', description: JSON.stringify(timing) })
+    base.info().annotations.push({
+      type: reused ? 'tree-reset-timing' : 'tree-launch-timing',
+      description: JSON.stringify({ ...timing, ...(reused ? { mechanism: activeSharedReset } : {}) }),
+    })
   }
 }
 

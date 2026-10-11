@@ -2,7 +2,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describeForEachEditingMode, expect, launchTree, node, parent, seedDocument, test } from './fixtures'
-import { attachmentPath } from './fixtures'
+import { attachmentPath, sharedApplicationPrototype } from './fixtures'
+
+test.use({ sharedApplicationReset: sharedApplicationPrototype() })
 
 function seedSiblings(userDataDir: string): void {
   seedDocument(userDataDir, {

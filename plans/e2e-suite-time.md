@@ -43,7 +43,7 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | --- | --- | --- | --- |
 | E2E-1 | Repeatable timing report and launch-time breakdown | — | Done |
 | E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Done |
-| E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Ready |
+| E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Done |
 | E2E-4 | Editing-mode audit and proposal | — | Ready |
 | E2E-5 | Apply the approved editing-mode reclassification | E2E-4, D2 | Planned |
 | E2E-6 | Local affected-spec validation policy | D3 | Blocked |
@@ -187,12 +187,43 @@ Full validation reproduced the documented atomic-save polling race in `e2e/agend
 
 Independent review found no meaningful issues, including preservation of launch assertions and isolation and the ENOENT-only polling retry. Final `npm run format:check:changed` and `npm run check:docs` passed. The polling correction landed separately in `227b352`. The Product Owner explicitly requested continuing in the same session after the initial failed validation, overriding the default session-stop rule. E2E-2 is complete with no new product decisions; the causal speedup remains unquantified.
 
+### E2E-3 prototype measurements (2026-10-11)
+
+The Product Owner authorized E2E-3 followed by E2E-4 in this session. The retained experiment is off by default and only `navigation.spec.ts` and `tab-structure.spec.ts` opt in through `TREE_E2E_SHARED_RESET=reload` or `window`. Both files actually use both editing modes; their existing coverage is preserved. No production bundle, IPC channel, product requirement or default isolation model changes.
+
+Both mechanisms first navigate the owned window to a blank document through the main process, await Playwright's navigation acknowledgment, drain test-entry-tracked production IPC operations, and remove the worker profile's data directory. This discards renderer state, timers, undo/redo, registers, location, view and preference files before the next test seeds its state. The next launch restores native appearance, pinning and bounds, then loads the production renderer into the same window or destroys/recreates the window through production activation. Existing readiness, visibility, shortcut, scale, scrollbar and save-error guards remain. Each prototype launch checks the expected document, collapsed top-level view, selected editor focus, startup editing mode, empty undo/redo, unpinned state, default bounds and automatic appearance. A deliberately poisoned-state test leaves edits, zoom, Visual mode, pinning, different bounds and dark appearance for the next case to reset. Clipboard locking and release remain per test; the global clipboard is not cleared outside its ownership lock.
+
+The first six-worker reload trial failed 67/225 cases: the main-process navigation promise could resolve before Playwright received the page's navigation events. Waiting for the expected URL in Playwright on both reset directions fixed the reproduced race. Blank-renderer worker shutdown also needed destruction before the normal quit handshake, since a blank renderer cannot acknowledge it. Final measurements below exclude preliminary runs.
+
+All runs used HEAD `6d79ee8`, local macOS GUI session, hidden windows, sequential invocations, and five repeats of both selected specs. Final hardened prototype inputs are identified by snapshot `sha256:a98eed461ea338be6d8acc6ad8b7c5fbb26d0ed020679bb7d7907616033e2540`; the reload/six run preceded only an equivalent formatting change. Fresh controls used the earlier opt-in implementation with its sharing option off; the later hardening changes only the opt-in branch and its conditional probe. Each command rebuilt `out/`. Fresh controls passed 220/220; final prototype runs passed 225/225 including five poison cases, with no flaky or skipped cases. The common-case totals exclude poison cases; wall time includes them, so wall comparisons conservatively include the extra reset stress.
+
+| Workers / mechanism | Wall time | Common summed time (220 cases) | Common mean | Median launch or reset |
+| --- | --- | --- | --- | --- |
+| 1 / fresh process | 84.59 s | 82.531 s | 375 ms | 274 ms launch |
+| 1 / same window | 28.83 s | 22.508 s | 102 ms | 61 ms reset |
+| 1 / new window | 52.23 s | 45.835 s | 208 ms | 162 ms reset |
+| 6 / fresh process | 40.53 s | 203.573 s | 925 ms | 719 ms launch |
+| 6 / same window | 12.56 s | 50.784 s | 231 ms | 119 ms reset |
+| 6 / new window | 20.71 s | 92.822 s | 422 ms | 308 ms reset |
+
+Same-window reuse saved 273 ms per common case at one worker and 694 ms at six (72.7% and 75.1% of summed time). Window recreation saved 167 ms and 503 ms (44.5% and 54.4%). At six workers, wall time fell 69.0% with same-window reuse and 48.9% with recreation. These are matched observations for two editing files, not a causal whole-suite prediction or stable variance estimate. Prototype runs launched five actual applications at one worker and ten at six; the remaining `launchTree` calls are separately annotated resets, not launches. Median reset timing includes native restoration, renderer loading and initial-state assertions; per-test teardown is also included in test totals.
+
+Commands: `TREE_E2E_SHARED_RESET=<reload|window> PLAYWRIGHT_JSON_OUTPUT_NAME=/private/tmp/tree-e2e3-<mechanism>-<one|six>.json npm run test:e2e -- e2e/navigation.spec.ts e2e/tab-structure.spec.ts --repeat-each=5 --workers=<1|6> --reporter=dot,json`. Fresh controls omit `TREE_E2E_SHARED_RESET` and use `/private/tmp/tree-e2e3-fresh-<one|six>.json`. Reports are temporary measurement artifacts, summarized here for resumption. The existing `scripts/e2e-timing.mjs` reconciles actual-launch phases; a temporary read-only report extractor computes common-case and reset statistics.
+
+**D1 recommendation:** prefer same-window reuse for a bounded rollout of suitable editing specs after an ADR, while keeping real-boundary/lifecycle tests on fresh processes. The stronger saving does not make this equivalent to process isolation: Chromium session caches, main-process listeners and the file-service generation counter survive resets; resets deliberately discard pending renderer edits rather than verify saving them. The two selected files cover seeded/unseeded documents, mode switching, attachments and clipboard operations, but do not establish long-run memory bounds or coverage of every possible retained native state. Memory growth and suite-wide savings remain unmeasured. Tests with custom launch options, relaunches or persisted recovery must stay excluded; a new opt-in owner must explicitly prove its state-reset contract. Adoption and the scope of rollout remain the Product Owner's decision. No product disk-write, interactive CPU or memory path changed.
+
+Primary review hardened the initial-state oracle to capture the test seed before renderer loading and assert that prior document, attachments and editing-preference files are absent before each test body. The poison case explicitly saves a different synthetic document through production IPC. Probe-only failures showed that first-launch initialization saves the empty document immediately and can add a measured `selectedRowTop`; the corrected oracle compares the expected document, location and expansion rather than treating format migration or runtime viewport measurements as leaks. Preliminary failed or interrupted probe runs are excluded from timing evidence.
+
+Playwright page-clock and custom initialization scripts are browser-context state, which survives both reset mechanisms. The retained probe installs neither. Specs using those scripts, handler replacement, or other retained instrumentation must also keep fresh processes until they prove a supported reset; this is an additional D1 isolation limit.
+
+High Risk validation is complete: `npm run check:full` passed before the opt-in oracle hardening (3,296 unit tests, 746 E2E cases, 60 performance cases, static/governance checks, build and zero audit vulnerabilities). Unchanged unit, production, performance and audit inputs retain that evidence. After hardening, `npm run typecheck:e2e`, `npm run lint`, `npm run format:check:changed`, `npm run check:docs` and the complete `npm run test:e2e -- --reporter=dot` passed. The final E2E console session was lost during context compaction; its completed runner and Playwright `.last-run.json` report `passed` with no failed tests. These affected reruns and unchanged full-command stages compose validation rather than imply a second full-command pass. Screenshot guards passed 20 serial and 48 parallel cases; the prototype's indented selection screenshot was inspected. Independent review found no meaningful issues in reset isolation, IPC draining, failure cleanup, seed oracles or retained-state limits. E2E-3 is complete.
+
 ## Next Task
 
-E2E-3 (opt-in shared-application prototype) and E2E-4 (editing-mode audit) are ready and independent. The Product Owner selects the next task. Adoption of a shared application remains reserved under D1; E2E-3 authorizes only the bounded prototype and measurement.
+Perform the already-authorized E2E-4 editing-mode audit in a separate commit. Adoption of a shared application remains reserved under D1; E2E-3 authorizes only the bounded prototype and measurement.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-3, the opt-in shared-application prototype.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-4, the editing-mode audit and proposal.
 ```

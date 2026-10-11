@@ -23,10 +23,29 @@ if (appearance === 'dark' || appearance === 'light') {
 const handlers = new Map()
 const originalHandle = ipcMain.handle.bind(ipcMain)
 const originalRemoveHandler = ipcMain.removeHandler.bind(ipcMain)
+const sharedReset = process.argv.includes('--tree-test-shared-application')
+const pending = new Set()
+const operationErrors = []
 
 ipcMain.handle = (channel, listener) => {
   handlers.set(channel, listener)
-  return originalHandle(channel, listener)
+  return originalHandle(
+    channel,
+    sharedReset
+      ? (...args) => {
+          const operation = Promise.resolve().then(() => listener(...args))
+          pending.add(operation)
+          void operation.then(
+            () => pending.delete(operation),
+            (error) => {
+              operationErrors.push(String(error))
+              pending.delete(operation)
+            },
+          )
+          return operation
+        }
+      : listener,
+  )
 }
 
 ipcMain.removeHandler = (channel) => {
@@ -44,6 +63,15 @@ globalThis.__treeIpc = {
     ipcMain.removeHandler(channel)
     ipcMain.handle(channel, (...args) => wrapper(original, ...args))
   },
+}
+
+// The renderer is disposed before this drain: no old timer can enqueue another save.
+// Keep all production handlers and their validation, errors and filesystem work intact.
+if (sharedReset) {
+  globalThis.__treeDrainIpc = async () => {
+    while (pending.size > 0) await Promise.allSettled([...pending])
+    if (operationErrors.length > 0) throw new Error(`Shared application IPC failed: ${operationErrors.join('\n')}`)
+  }
 }
 
 // Hidden windows are opt-in at the entry level: the e2e fixtures always pass the selected

@@ -9,4 +9,5 @@ declare global {
   }
 
   var __treeIpc: TreeIpcTestControl
+  var __treeDrainIpc: (() => Promise<void>) | undefined
 }
