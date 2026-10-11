@@ -469,20 +469,28 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
       const { window } = await launchTree(userDataDir)
       await expect(window.getByRole('textbox', { name: 'Node 61', exact: true })).toBeFocused()
+      const viewport = window.locator('.scroll-viewport')
+      await viewport.evaluate((element) => {
+        element.setAttribute('data-wheel-scroll-ended', 'false')
+        element.addEventListener(
+          'wheel',
+          () => {
+            const start = element.scrollTop
+            const onScrollEnd = () => {
+              if (element.scrollTop - start <= 100) return
+              element.setAttribute('data-wheel-scroll-ended', 'true')
+              element.removeEventListener('scrollend', onScrollEnd)
+            }
+            element.addEventListener('scrollend', onScrollEnd)
+          },
+          { once: true },
+        )
+      })
       await window.mouse.move(400, 300)
       await window.mouse.wheel(0, 3000)
-      // Wait for wheel momentum to stop, so it cannot move the content after gg. A single stable
-      // sample can land between native scroll updates on a loaded CI runner.
-      let lastChange = Date.now()
-      let previous = -1
-      await expect
-        .poll(async () => {
-          const top = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
-          if (top !== previous) lastChange = Date.now()
-          previous = top
-          return top > 1000 && Date.now() - lastChange >= 300
-        })
-        .toBe(true)
+      // Native wheel scrolling must finish before gg starts a new navigation reveal.
+      await expect(viewport).toHaveAttribute('data-wheel-scroll-ended', 'true')
+      await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(1000)
 
       await window.keyboard.press('g')
       await window.keyboard.press('g')

@@ -298,7 +298,11 @@ test.describe('image-only blank row click in standard editing', () => {
     await expect(editor).toBeFocused()
     await expect(editor).toHaveCSS('height', '20px')
     await expect(editor).toHaveCSS('caret-color', 'rgb(59, 56, 51)')
+    // Keep the native insertion line visible without depending on its blink phase.
+    await editor.evaluate((element) => element.style.setProperty('caret-animation', 'manual'))
+    await expect(editor).toHaveCSS('caret-animation', 'manual')
     await expect(row).toHaveScreenshot('image-only-standard-blank-row.png', { caret: 'initial' })
+    await editor.evaluate((element) => element.style.removeProperty('caret-animation'))
     await window.keyboard.type('typed after row click')
     await expect(editor).toHaveValue('typed after row click')
   })

@@ -92,9 +92,28 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await selected.evaluate((element) => {
       ;(globalThis as unknown as { selectedAgendaElement: Element }).selectedAgendaElement = element
     })
-    await window.evaluate(() => {
-      document.querySelector<HTMLElement>('.scroll-viewport')!.scrollTop = 8000
+    const viewport = window.locator('.scroll-viewport')
+    const wheelDelta = await viewport.evaluate((element) => {
+      element.setAttribute('data-wheel-scroll-ended', 'false')
+      element.addEventListener(
+        'wheel',
+        () => {
+          const start = element.scrollTop
+          const onScrollEnd = () => {
+            if (Math.abs(element.scrollTop - start) <= 1000) return
+            element.setAttribute('data-wheel-scroll-ended', 'true')
+            element.removeEventListener('scrollend', onScrollEnd)
+          }
+          element.addEventListener('scrollend', onScrollEnd)
+        },
+        { once: true },
+      )
+      return element.scrollTop > 8000 ? -8000 : 8000
     })
+    // Real wheel input relinquishes navigation reveal even while row measurements settle.
+    await window.mouse.move(400, 300)
+    await window.mouse.wheel(0, wheelDelta)
+    await expect(viewport).toHaveAttribute('data-wheel-scroll-ended', 'true')
     await expect(selected).toHaveClass(/agenda-row-pinned/u)
     await expectFocused(selected)
     await expect
