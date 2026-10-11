@@ -16,12 +16,14 @@ Sources of truth: `AGENTS.md` §§9-10, [Development Guide](../docs/DEVELOPMENT.
 
 The Product Owner authorized creating this initiative on 2026-10-11 and will start it in a new session. A continuation request authorizes the next `Ready` task within this scope.
 
-Decisions reserved for the Product Owner:
+Product Owner decisions (2026-10-11):
 
-* **D1.** Whether to adopt a shared application per worker (E2E-3 result). Adoption changes the E2E isolation model and needs an ADR.
-* **D2.** Which `both` spec files or tests move to a single editing mode (E2E-4 proposal).
-* **D3.** Whether local validation runs only affected E2E specs and leaves the complete suite to CI (E2E-6). This changes `AGENTS.md` §10 and the validation matrix.
-* **D4.** Whether a suite-duration budget is a report or a failing gate, and its value (E2E-7).
+* **D1 — approved.** Adopt a shared application per worker through bounded same-window reuse for eligible specs. Record the isolation model in an ADR and split rollout into ordered tasks before adoption. Fresh-process boundary exclusions remain.
+* **D2 — declined.** Keep existing editing-mode coverage. Do not implement the three proposed reductions.
+* **D3 — approved.** Use affected E2E specs for contained local changes and retain the complete suite in CI. E2E-6 keeps the planned complete-local exceptions for High Risk changes.
+* **D4 — deferred.** Ignore duration reporting and budgets for now; E2E-7 does not proceed.
+
+The Product Owner's message was: "D1 - yes, D2 - no, D3 - yes, D4 - for now let's ignore it". D1 and D3 authorize their recorded initiative tasks; D2 and D4 do not authorize changes. This session already completed E2E-3 and E2E-4; E2E-6 and D1 rollout preparation are the remaining two tasks before the four-task session limit in `AGENTS.md` §12.
 
 ## Baseline (2026-10-11, commit 701e9e6)
 
@@ -45,10 +47,11 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Done |
 | E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Done |
 | E2E-4 | Editing-mode audit and proposal | — | Done |
-| E2E-5 | Apply the approved editing-mode reclassification | E2E-4, D2 | Planned |
-| E2E-6 | Local affected-spec validation policy | D3 | Blocked |
-| E2E-7 | Suite-duration report or budget | E2E-1, D4 | Planned |
+| E2E-5 | No reclassification: D2 declined | E2E-4, D2 | Done |
+| E2E-6 | Local affected-spec validation policy | D3 | Done |
+| E2E-7 | Suite-duration report or budget (D4 deferred) | E2E-1, D4 | Blocked |
 | E2E-8 | Roll out the shared application | E2E-3, D1 | Planned |
+| E2E-8a | ADR and ordered rollout preparation | E2E-3, D1 | Ready |
 
 ### E2E-1 — Timing report and launch breakdown
 
@@ -100,9 +103,9 @@ Tier: Low Risk with full E2E run. `npm run check` and `npm run test:e2e`.
 
 ### E2E-6 — Local affected-spec validation
 
-Blocked on D3. If approved: add `test:e2e:changed` using Playwright `--only-changed=HEAD`, define in `docs/DEVELOPMENT.md` §9 which changes still require the complete suite locally (shared fixtures, startup, shutdown, persistence, toolchain), and update `AGENTS.md` §10 accordingly. Record the trade-off: a regression in an unrun spec appears in CI after the commit lands on `main`.
+D3 approved. Add `test:e2e:changed` using Playwright `--only-changed=HEAD`, define in `docs/DEVELOPMENT.md` §9 which changes still require the complete suite locally (shared fixtures, startup, shutdown, persistence, toolchain), and update `AGENTS.md` §10 accordingly. Record the trade-off: a regression in an unrun spec appears in CI after the commit lands on `main` or in a pull request. The selector does not infer requirements or dependencies through the Electron build; explicit owning-spec selection remains required.
 
-Files: `package.json`, `docs/DEVELOPMENT.md` §9, `AGENTS.md` §10, `opencode.json` if needed, this plan.
+Files: `package.json`, `docs/DEVELOPMENT.md` §9, `AGENTS.md` §10, `opencode.json`, `scripts/check-opencode-permissions.mjs`, this plan and its index.
 Tier: Low Risk (agent policy and tooling). `npm run check`, `npm run check:opencode`.
 
 ### E2E-7 — Duration report
@@ -114,7 +117,13 @@ Tier: Low Risk. `npm run check`.
 
 ### E2E-8 — Shared application rollout
 
-Planned only if D1 approves adoption. Write the ADR, then split the rollout into per-area tasks in this plan before starting.
+D1 approved. Write the ADR and split adoption into per-area tasks before changing default execution. The parent task remains incomplete until the bounded rollout lands; preparing its ADR and plan is not runtime adoption.
+
+### E2E-8a — ADR and rollout preparation
+
+Record same-window reuse through explicit eligible-spec opt-in, fresh-process exclusions and surviving caches/instrumentation. Refine rather than supersede ADR 0012. Split fixture hardening, first-area adoption, subsequent text/navigation areas and final measurements into executable tasks with file ownership, state-contract acceptance and validation. Do not change runtime execution in preparation.
+
+Files: new ADR under `docs/decisions/`, its index, this plan and its index; Development §8 only if needed. Tier: Minimal Risk, `npm run format:check:changed`, `npm run check:docs` and `npm run check:opencode` if workflow documentation changes.
 
 ## Findings
 
@@ -757,12 +766,18 @@ Several existing single-mode blocks called “mode-independent” contain points
 
 D2 must approve any subset of the three I entries before E2E-5 changes specs or categories. If screenshot-stability is approved, preserve its serial/parallel infrastructure guards and update any mode-count wording in Development §9 to describe the retained guard accurately. No change to product requirements, renderer code, persistence, launch isolation or performance budgets is proposed. E2E-4 is complete; its Minimal Risk documentation checks passed. No specs or screenshot baselines changed in this task.
 
+### E2E-6 implementation and validation (2026-10-11)
+
+Added `npm run test:e2e:changed` (build then Playwright `--only-changed=HEAD`), scoped OpenCode allowances and checker expectations, and local-selection guidance in AGENTS §10 and Development §9. The complete CI workflow and High Risk complete-local requirement remain unchanged. Installed Playwright inspection confirmed the selector includes staged/unstaged tracked and nonignored untracked files, follows imported test dependencies, and may succeed with zero cases. Production code through Electron and non-imported snapshots/resources still require explicit affected-spec coverage. These limits and the post-commit starting-reference option are documented.
+
+Low Risk validation passed on HEAD `dc4c01f` plus these changes: `npm run check` (all static/governance checks, 3,296 unit cases, serial unit-performance guard and build), `npm run check:opencode` (292 expectations), final documentation and changed-format checks. Snapshot before the command smoke was `sha256:7b60704e2f712bbc4dc3cc5f660a1a2b9cf632c61fcaa198dcf16b3e1626f057`; subsequent edits only update initiative documentation. `npm run test:e2e:changed -- --list` selected zero cases, correctly recorded as no E2E coverage. `npm run test:e2e:changed -- e2e/navigation.spec.ts --only-changed=6d79ee8 --workers=1 --reporter=dot` passed all 25 selected cases in real Electron (10.0 s, macOS GUI, one worker, no concurrent Playwright invocation), proving the earlier-reference override and focused execution. Primary diff review found no issue. No runtime, test categories, baseline images or product behavior changed. The former D2 proposal remains historical evidence and was declined; no estimated duplicate-removal saving is implemented.
+
 ## Next Task
 
-No task is ready without a Product Owner decision. D1 selects whether and where shared-application reuse proceeds; D2 selects any of the three proposed mode reclassifications. D3 still reserves local validation policy and D4 reserves the duration report/budget. E2E-5 and E2E-8 must wait for D2 and D1 respectively; do not interpret completion of the audit or prototype as adoption authority.
+E2E-8a: record the approved D1 isolation model in an ADR and finalize ordered rollout tasks. No runtime adoption has landed yet. D2 is declined and D4 deferred; neither requires another decision to complete the currently authorized work.
 
 ## Resume Prompt
 
 ```text
-Review the E2E suite time findings in plans/e2e-suite-time.md and decide D1 (shared-application adoption), D2 (the three proposed mode reclassifications), D3 (local validation policy), or D4 (duration reporting/budget). No implementation task is ready until its reserved decision is made.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): complete E2E-8a, the approved shared-application ADR and rollout preparation. D2 was declined, D3 implemented, and D4 deferred.
 ```

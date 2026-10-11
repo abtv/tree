@@ -329,6 +329,8 @@ Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` �
 
 Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. Keep this record in `WORKING_PLAN.md` when one is required under §8; otherwise include it in the final handoff.
 
+For contained changes below High Risk, run the affected E2E specs locally; the complete suite remains required in CI. `npm run test:e2e:changed` selects uncommitted changed specs and their imported dependencies, but does not infer coverage for production code loaded through Electron. Inventory affected product requirements and explicitly run their specs when the selector misses them. An empty selection is not boundary validation. High Risk changes, including shared fixtures, startup, shutdown, persistence, security and toolchain, retain complete local validation under the matrix; broaden a focused run whenever its impact cannot be bounded. Selection and full-suite exceptions are documented in `docs/DEVELOPMENT.md` §9.
+
 For a visual-regression workflow, record the inspected states, command, screenshot artifact, and outcome as visual evidence; a passing DOM, CSS, or computed-style assertion does not substitute for this record.
 
 Validation records are temporary task evidence, not permanent repository artifacts. Do not create a committed validation-log or plan archive unless the Product Owner explicitly approves a new audit requirement.

@@ -45,6 +45,7 @@
     "test:property:soak": "TREE_PROPERTY_RUNS=20 NODE_OPTIONS=--max-old-space-size=4096 vitest run --testTimeout=600000 .property.test.ts",
     "test:mutation": "stryker run",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:changed": "npm run build && playwright test --only-changed=HEAD",
     "test:e2e:timing": "npm run build && PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e-timing.json playwright test --reporter=list,json && node scripts/e2e-timing.mjs",
     "test:e2e:visible": "TREE_E2E_VISIBLE=1 npm run test:e2e --",
     "test:perf": "npm run build && playwright test -c perf.config.ts",

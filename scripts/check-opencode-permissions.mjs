@@ -92,6 +92,8 @@ const developCases = {
     'npm run test:watch',
     'npm run check:full',
     'npm run test:e2e:timing',
+    'npm run test:e2e:changed',
+    'npm run test:e2e:changed -- --list',
     'npm run typecheck 2>&1',
     'npm run typecheck:node 2>&1',
     'npm run test -- src/domain/document.test.ts',

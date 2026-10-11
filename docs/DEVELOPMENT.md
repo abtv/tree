@@ -306,6 +306,14 @@ Use the highest applicable tier. Focused checks may be run during implementation
 
 When categories overlap or the tier is uncertain, use the higher tier. A suite that cannot execute its real boundary is blocked, not passed.
 
+### Local affected-spec E2E validation
+
+For contained changes below High Risk, run affected E2E specs locally and leave the complete suite to the existing macOS CI shards. `npm run test:e2e:changed` builds the application and runs Playwright with `--only-changed=HEAD`; it includes staged, unstaged and untracked nonignored changes before commit, then follows test imports. Preview its selection with `npm run test:e2e:changed -- --list`. After committing, compare with the task's starting commit using `npm run test:e2e:changed -- --only-changed=<starting-commit>`; the referenced commit must exist locally. Additional spec arguments restrict the selected set rather than adding missing specs.
+
+The selector does not infer test coverage through the Electron production build, preload/IPC or product-requirement mapping. For each affected behavior, explicitly select its owning specs with `npm run test:e2e -- <specs>` when they are absent from the changed selection. Record the actual specs/cases exercised. Playwright can exit successfully with no selected cases; this is a selection result, not a passing boundary test. Documentation-only tasks do not acquire an E2E requirement merely because this command exists.
+
+The High Risk row is unchanged: shared fixture or interaction infrastructure, startup/shutdown, process/IPC, filesystem/persistence, clipboard/attachments, native shortcuts, security, dependencies/toolchain and scale-sensitive changes still require complete local validation. Unbounded impact also requires broader coverage. CI continues to run every E2E spec in its existing shards; this command does not filter CI or the serial visible performance suite. Regressions outside the locally exercised scope may first appear in CI after a commit on `main` or in a pull request.
+
 For a contained change, use a concise conversation plan, a focused development loop, the tier's required validation, and a primary-agent diff review. Add a working plan, independent reviewer, or separate product verifier only under the triggers in `AGENTS.md` §§8 and 13. A user-visible change still needs product verification by the primary agent when no separate verifier is required. Keep defect-first regressions, boundary tests, and visual evidence whenever their specific triggers in `AGENTS.md` §9 apply.
 
 Classify the complete change, not only its purpose. For example, a workflow-documentation change that also modifies a validation script or its tests is Low Risk because executable validation tooling changed.

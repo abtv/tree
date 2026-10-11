@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [E2E suite time](e2e-suite-time.md) | Awaiting Product Owner decisions | D1 adoption, D2 mode reclassification, D3 validation policy or D4 duration reporting |
+| [E2E suite time](e2e-suite-time.md) | Active: D1 and D3 approved | E2E-8a shared-application ADR and rollout preparation |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
