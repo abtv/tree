@@ -2,6 +2,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { SAVE_IDLE_MILLISECONDS } from '../src/application/save-policy'
 import {
   acquireSystemClipboardLock,
   releaseSystemClipboardLock,
@@ -130,10 +131,27 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
 
 export { expect }
 
-/** Fix only Date; browser timers and animation frames keep running normally. */
+/**
+ * Fix Date. This also installs the page clock, whose timers and animation frames keep running in real
+ * time until a test fast-forwards them.
+ */
 export async function setAgendaToday(window: Page): Promise<void> {
   await window.clock.setFixedTime(new Date(2026, 9, 8, 12))
 }
+
+/**
+ * Fires a pending idle save (PRODUCT.md §16.1) without spending its wall-clock interval.
+ * The first `window.clock` call (for example `setAgendaToday` or `clock.install()`) replaces the page
+ * timers, and it must precede the edit that armed the idle timer: a timer armed earlier keeps real time.
+ * Poll the persisted file with `idleSavePoll` afterwards, so a misplaced call fails instead of silently
+ * waiting for the real interval.
+ */
+export async function fireIdleSave(window: Page): Promise<void> {
+  await window.clock.fastForward(SAVE_IDLE_MILLISECONDS)
+}
+
+/** Shorter than the idle interval, so only a fast-forwarded idle save can satisfy the poll. */
+export const idleSavePoll = { timeout: SAVE_IDLE_MILLISECONDS / 2 } as const
 
 export interface EditingModeContext {
   mode: EditingMode

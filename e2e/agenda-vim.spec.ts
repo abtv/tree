@@ -5,6 +5,8 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   expect,
+  fireIdleSave,
+  idleSavePoll,
   launchTree,
   readPersisted,
   screenshotContentSize,
@@ -425,12 +427,14 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('p')
     const texts = () =>
       readPersisted(userDataDir).document.roots.flatMap((root) => root.children.map((child) => child.text))
-    await expect.poll(texts, { timeout: 20000 }).toEqual(['2026-10-16 A 2026-10-20', '2026-10-16 B', '2026-10-16 C'])
+    await fireIdleSave(window)
+    await expect.poll(texts, idleSavePoll).toEqual(['2026-10-16 A 2026-10-20', '2026-10-16 B', '2026-10-16 C'])
     expect(readPersisted(userDataDir).document.roots[0]!.children[0]!.children[0]!.text).toBe('2026-10-14 Child')
     await expect(row(window, nodeKey(10, 16, 'a'))).toHaveAttribute('aria-selected', 'true')
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
-    await expect.poll(texts, { timeout: 20000 }).toEqual(['2026-10-14 A 2026-10-20', '2026-10-14 B', '2026-10-14 C'])
+    await fireIdleSave(window)
+    await expect.poll(texts, idleSavePoll).toEqual(['2026-10-14 A 2026-10-20', '2026-10-14 B', '2026-10-14 C'])
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('clipboard before')
   })
 
@@ -510,10 +514,9 @@ test.describe('Agenda Vim commands', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     await window.keyboard.type('After')
     await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(4)
+    await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), {
-        timeout: 20000,
-      })
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 After', '2026-10-14 Other'])
     // The sibling follows the node and its subtree; the node keeps its child.
     expect(readPersisted(userDataDir).document.roots[0]!.children[0]!.children.map((entry) => entry.id)).toEqual([
@@ -526,17 +529,15 @@ test.describe('Agenda Vim commands', () => {
     await expect(created).toBeFocused()
     await expect(created).toHaveText('2026-10-14 ')
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), {
-        timeout: 20000,
-      })
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 After', '2026-10-14 ', '2026-10-14 Other'])
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
+    await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), {
-        timeout: 20000,
-      })
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 After', '2026-10-14 Other'])
   })
 
@@ -602,8 +603,9 @@ test.describe('Agenda Vim commands', () => {
     await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveCount(0)
     await expect(window.locator('.agenda-row-pending')).toHaveCount(0)
     await expect(message(window)).toHaveCount(0)
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-16 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
     // The node keeps its parent and children.
     expect(readPersisted(userDataDir).document.roots[0]!.children[0]!.children.map((entry) => entry.id)).toEqual([
@@ -612,8 +614,9 @@ test.describe('Agenda Vim commands', () => {
 
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('clipboard before')
   })
@@ -637,13 +640,15 @@ test.describe('Agenda Vim commands', () => {
     await expect(message(window)).toHaveText('Moving 2 items · p to put · Esc to cancel')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await window.keyboard.press('P')
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-16 Prepare', '2026-10-16 Other', '2026-10-16 Later'])
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
   })
 
@@ -671,14 +676,16 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.type('!')
     await expect(message(window)).toHaveCount(0)
     await window.keyboard.press('Escape')
-    await expect.poll(() => persistedTexts(userDataDir), { timeout: 20000 }).toContain('2026-10-14 Prepare!')
+    await fireIdleSave(window)
+    await expect.poll(() => persistedTexts(userDataDir), idleSavePoll).toContain('2026-10-14 Prepare!')
 
     // Undo cancels a move and reverts only the earlier edit.
     await mark()
     await window.keyboard.press('u')
     await expect(message(window)).toHaveCount(0)
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
 
     // Leaving Agenda discards the move.

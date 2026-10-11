@@ -6,6 +6,8 @@ import type { TreeNode } from '../src/domain/document'
 import {
   describeForEachEditingMode,
   expect,
+  fireIdleSave,
+  idleSavePoll,
   launchTree,
   readPersisted,
   screenshotContentSize,
@@ -154,10 +156,12 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
     await setMainWindowContentSize(app, screenshotContentSize)
-    await window.getByRole('button', { name: 'Expand node 1', exact: true }).click()
-    await expect.poll(() => readPersisted(userDataDir).view?.expandedIds, { timeout: 20_000 }).toContain('work')
-    const persisted = readPersisted(userDataDir)
+    // Fixing the date first also replaces the page timers, so the idle save below can be fired.
     await setAgendaToday(window)
+    await window.getByRole('button', { name: 'Expand node 1', exact: true }).click()
+    await fireIdleSave(window)
+    await expect.poll(() => readPersisted(userDataDir).view?.expandedIds, idleSavePoll).toContain('work')
+    const persisted = readPersisted(userDataDir)
     await window.keyboard.press('Meta+p')
     const work = window.locator('.agenda-row[data-node-id="work"]').first()
     const prepare = window.locator('.agenda-row[data-node-id="prepare"]').first()

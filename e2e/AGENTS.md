@@ -19,6 +19,7 @@ Rules for the Playwright Electron suite in `e2e/`. The root `AGENTS.md` still ap
 * Inject IPC delays, failures, and probes only through the test-owned entry `e2e/electron-entry.cjs` and its `globalThis.__treeIpc` registry; never read Electron-private internals such as `ipcMain._invokeHandlers`.
 * For editing-command shortcuts, suppress the native browser behavior so the test proves the application handles the command (`docs/decisions/0003-renderer-owns-standard-editing-commands.md`).
 * Every spec file declares its editing-mode category on its first line (`// @editing-modes: both | vim | independent | explicit`); `npm run check:e2e-modes` enforces it. A test whose behavior can differ between standard and Vim editing belongs in a `both` file and runs through `describeForEachEditingMode`; take screenshot names from its `screenshotName`. Do not set `vimPreference` in such a test. See `docs/DEVELOPMENT.md` §8.
+* To assert an idle-saved change, call `fireIdleSave(window)` and poll with `idleSavePoll`; never wait for the real idle interval of `docs/PRODUCT.md` §16.1. See `docs/DEVELOPMENT.md` §8.
 * Observe visible save and operation errors; a test that intentionally induces one must declare the exact expected message.
 * Temporary diagnostic specs are named `_*.spec.ts` in this directory. When the investigation finishes, move them to `test-results/` instead of deleting them: that directory is gitignored and Playwright clears it at the start of every run.
 

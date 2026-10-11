@@ -4,6 +4,8 @@ import type { TreeNode } from '../src/domain/document'
 import {
   describeForEachEditingMode,
   expect,
+  fireIdleSave,
+  idleSavePoll,
   launchTree,
   readPersisted,
   screenshotContentSize,
@@ -68,14 +70,16 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
     await expect(row(window, nodeKey(10, 15, 'first'))).toHaveAttribute('aria-selected', 'true')
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(0)
     // Parent, siblings, and order are unchanged; only the moved date differs.
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-15 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-14 Plan 2026-10-15'])
 
     await window.keyboard.press('Meta+z')
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(1)
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-14 Plan 2026-10-15'])
   })
 
@@ -95,8 +99,9 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
     await window.mouse.up()
 
     await expect(row(window, nodeKey(10, 15, 'third'))).toHaveAttribute('aria-selected', 'true')
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-15 Plan'])
   })
 
@@ -118,8 +123,9 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
     await window.mouse.up()
     await expect(input).toHaveText('2026-10-13 Plan 2026-10-15')
     await expect(input).toBeFocused()
+    await fireIdleSave(window)
     await expect
-      .poll(() => persistedTexts(userDataDir), { timeout: 20000 })
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-13 Plan 2026-10-15'])
   })
 
