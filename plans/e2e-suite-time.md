@@ -57,8 +57,8 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-8b | Harden reset, recovery and memory evidence | E2E-8a | Done |
 | E2E-8c | Adopt navigation and Tab structure | E2E-8b | Done |
 | E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Done |
-| E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Ready |
-| E2E-8f | Measure and close the bounded rollout | E2E-8e | Planned |
+| E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Done |
+| E2E-8f | Measure and close the bounded rollout | E2E-8e | Ready |
 
 ### E2E-1 — Timing report and launch breakdown
 
@@ -995,14 +995,149 @@ poison/successor and mixed ownership paths and found no meaningful issues.
 E2E-8d is complete, with no unresolved validation failure or product decision.
 No production or fixture code, editing category or screenshot baseline changed.
 
+### E2E-8e body-level eligibility inventory (2026-10-11)
+
+Inventory covers every original declaration and expansion, in registration order:
+79 cases, 54 adopted and 25 fresh. All launches use supported Normal-mode options;
+no adopted case installs a clock, initialization script or replacement handler,
+or relaunches. The deliberate Normal-selection fresh case installs a page clock
+through the pointer-drag helper as well as media emulation. Root
+seeds may contain collapsed descendants. Renderer-owned wheel/paste listeners
+are discarded on reload. Sixteen nested/expanded cases, eight retained media
+emulation cases and one startup assertion remain fresh. Unnamed groups preserve
+titles, order, assertions, conformance references and Vim-only coverage.
+
+The ordinal ranges below enumerate expanded cases, including parameter loops.
+`Shared` means eligible hidden reload; visible and explicit fresh controls still
+launch fresh applications. Clipboard users retain the fixture-owned lock.
+
+| Cases | Exact existing title or family | Execution / state covered |
+| --- | --- | --- |
+| 1 | leaves character Visual at its active endpoint | Shared: character selection/caret |
+| 2 | replays counted dd with complete subtrees and one undo per successful iteration | Shared: structural repeat/history |
+| 3 | replays shifts and joins with exact sibling spans and stops counted dot on failure | Shared: shift/join/repeat |
+| 4 | replays counted gp and gP with captured incoming subtrees and their destination | Shared: registers/structural put |
+| 5 | puts a subtree as the first child of a node with children, like o, and repeats it | Shared: collapsed subtree/put/repeat |
+| 6 | replays Visual puts and case after register exchanges, then repeats vertical changes | Shared: Visual/register/repeat |
+| 7–8 | uses o to create and focus a child node; uses o to create a sibling below a selected child node | Fresh: nested locations |
+| 9–11 | applies a counted Normal-mode node motion before the next command; applies counts to node motions and subtree puts; deletes a counted forward sibling range with dd | Shared: counts/motion/register/delete |
+| 12–13 | does nothing when O is pressed on the current-parent heading; focuses the current parent with gg from a nested level | Fresh: nested locations |
+| 14–15 | scrolls to the first row with gg after wheel scrolling away (top level)/(nested) | Shared top level; fresh nested |
+| 16–18 | selects an inner text object in character Visual mode; repeats dd and subtree puts with fresh IDs; selects complete sibling subtrees with V and repeats their deletion | Shared: text objects/Visual/subtree repeat |
+| 19 | uses the whole-node yellow highlight for character-wise Visual mode | Fresh: retained media emulation |
+| 20 | yanks reverse V ranges, puts node forests, and replaces a V range with fresh IDs | Shared: reverse selection/register/forest put |
+| 21 | changes whole selected subtrees and keeps the current-parent heading out of V | Fresh: nested location |
+| 22–23 | repeats open-sibling text and rejects a subtree put into its descendant; discards structural dot recording when a pointer click lands elsewhere | Shared: collapsed descendants/repeat/pointer focus |
+| 24–27 | keeps the prior dot change after {Meta+a,Meta+x,Meta+v,native-paste} interrupts structural Insert | Shared: four interruptions/clipboard/repeat |
+| 28–31 | preserves the previous dot change after a pointer interrupts structural {o,O,c,s} | Shared: four pointer interruptions |
+| 32 | starts in Normal mode | Fresh: startup requirement |
+| 33 | shows the Normal-mode block caret on individual hyperlink characters | Shared: linked caret |
+| 34 | uses the highlight pair for a deliberate Normal-mode text selection | Fresh: retained media emulation and page clock |
+| 35–36 | crosses a hyperlink one character at a time; keeps the Normal caret on the selected linked node while h and l traverse it | Shared: linked caret/motion |
+| 37 | keeps the Normal-mode linked character visible in dark appearance | Fresh: retained media emulation |
+| 38 | matches the Visual-mode selection color across a selected hyperlink | Shared: rich Visual selection |
+| 39–40 | keeps a character Visual selection inside a hyperlink on the highlight pair; keeps a spanning character Visual selection on the highlight pair | Fresh: retained media emulation |
+| 41 | keeps the Normal-mode linked selection on the focused node | Shared: peer focus/caret |
+| 42 | keeps the Normal-mode linked character on one line through wrapping and resize | Fresh: retained media emulation/resize |
+| 43 | leaves the current node with Ctrl+o | Fresh: nested location |
+| 44–46 | supports line and viewport motions; H and L select fully visible rows without scrolling the clipped ones into view; j and k at the window edge scroll by about one row instead of centering the row | Shared: viewport/caret/navigation |
+| 47–50 | keeps one row of context on every keyboard step through nested and wrapped nodes, in both directions; reaches the same scroll position at the document edges by walking, gg, and G; H and L choose rows clear of the edge context and do not scroll; a click on a fully visible row near the edge does not move the content | Fresh: expanded nested helper seed |
+| 51–55 | o and O open empty siblings below and above; yanks a Visual selection and puts it from the local register; Visual p exchanges the register with the replaced text and P keeps the incoming text; applies a count to a Visual put and leaves the selection when the register is empty; whole-node Visual p exchanges the node register, P keeps it, and both accept a count | Shared: insertion/Visual/local registers/clipboard |
+| 56–57 | yanks and puts a node subtree with yy, p, and P; does nothing when p or P puts a subtree on the current-parent heading | Fresh: nested locations |
+| 58 | keeps backward Visual selections inclusive and $ on the final character | Shared: backward selection/end caret |
+| 59 | changes, replaces, swaps, and cases a Visual selection | Fresh: retained media emulation |
+| 60–67 | keeps a hyperlink intact when a surround wraps it; clears stale Visual state on a focus-changing shortcut and a whole-node Visual exit; drops a pending Normal-mode command before Cmd+A and undo; nests and un-nests a whole-node Visual range with > and <, keeping the range and undoing each step; applies a count to whole-node Visual > and refuses an impossible count without a change; joins siblings with J and gJ, keeps every child, and undoes each join as one step; joins a whole-node Visual range with J and gJ and returns to Normal mode; restores the latest whole-node Visual selection with gv and ignores one that was invalidated | Shared: surround/focus/pending commands/shift/join/history/Visual memory |
+| 68 | restores a character-wise Visual selection with gv in another node, keeping its direction | Shared: peer focus/Visual memory |
+| 69 | preserves backward rich-text Visual direction through idle observation and gv | Fresh: retained media emulation |
+| 70–73 | selects the incoming nodes after a Visual put and the moved range after a shift; deletes, yanks, and changes sibling subtrees with dj, d2j, dk, yj, and cj, each as one undo; extends whole-node Visual by a count with j and k; moves the current node with a character Visual > and < and keeps its character selection | Shared: range/register/history/shift/count |
+| 74 | shows the displayed location one level up when whole-node Visual < leaves it | Fresh: nested location |
+| 75 | exits whole-node Visual on a focus-changing shortcut | Shared: focus/Visual exit |
+| 76–77 | exits whole-node Visual on a breadcrumb click and an enter-control click; re-anchors character Visual after a breadcrumb click and an enter-control click | Fresh: nested locations |
+| 78–79 | re-anchors character Visual after a paste at the resulting caret; keeps whole-node Visual mode and its range across a paste | Shared: clipboard/Visual/caret |
+
+Four new ordered character/whole-node poison and successor cases exercise
+registers, repeat/history, remembered Visual selections, sibling ranges and
+focused Normal caret restoration. Successors rewrite the locked clipboard,
+check put/repeat/undo/restore are inert and preserve both clean nodes. Existing
+registration order also exercises shared/fresh/shared transitions at exclusions.
+No product, fixture-contract or editing-category change is authorized or made.
+
+### E2E-8e matched controls (2026-10-11)
+
+Four sequential controls on HEAD `78d4341` plus adopted spec blob
+`c1e55ac6bdeb95897d6bde8525de1db5445ff719`, identical production/fixture/build
+inputs, same macOS GUI host and no overlapping Playwright runs. Each diagnostic
+run uses five repeats, `--reporter=dot,json`, fresh/reload selector and one/six
+worker limits. All four passed 415 identical cases with no failures, flakes,
+skips or errors. Temporary exact commands and reports remain under
+`.scratch/e2e-8e/`.
+
+| Execution | Worker limit | Launches | Resets | Summed time | Wall time |
+| --- | --- | --- | --- | --- | --- |
+| Adopted reload | 1 | 210 | 205 | 114.26 s | 117.35 s |
+| Fresh control | 1 | 415 | 0 | 170.53 s | 173.35 s |
+| Adopted reload | 6 | 210 | 205 | 265.62 s | 54.80 s |
+| Fresh control | 6 | 415 | 0 | 426.35 s | 88.32 s |
+
+Fresh islands dispose the shared application: 125 fresh launches plus 85 adopted
+segment cold starts account for 210 launches; the other 205 eligible executions
+reset. Playwright scheduled five workers under the six-worker limit because
+the file has five repeat groups. Observed wall reductions are 32.3% and 38.0%;
+single matched pairs do not establish whole-suite savings or run-to-run spread.
+
+Initial development failed a new whole-node poison label assertion (VISUAL
+versus existing VISUAL NODE), which was corrected. An initial adopted control
+then passed 415, but source inspection found that yy followed by x leaves a
+text register. Whole-node poison was reordered to x then yy to retain the node
+register while preserving poisoned repeat/history. The initial fresh control
+was deliberately interrupted after 267 passed and 148 not run. Those attempts
+are retained separately and do not count as the final matched controls above.
+
+### E2E-8e validation (2026-10-11)
+
+Real renderer Visual active-endpoint and post-Escape Normal screenshots from
+the existing synthetic abcdef case were inspected; selection and caret matched
+the expected states. No baseline changed. Serial/parallel screenshot infrastructure
+guards passed ten/24 cases, and typed-input punctuation guards passed ten/24.
+
+The full visible fallback attempt passed 82 cases and failed one unchanged
+join screenshot with 180 pixels differing at the caret highlight. Text, focus
+and caret-position assertions passed. Actual/expected/diff pixels were inspected:
+the actual lacked the B caret highlight. Five unchanged focused visible repeats
+of that body passed, completing successful visible coverage of all 83 cases.
+The original visible attempt remains recorded as failed; no cause is claimed.
+
+`npm run check:full` passed static/governance checks, 3,308 unit cases, the unit
+performance guard, build and all 773 real E2E cases (3.6 min), including shared
+reset/recovery and memory controls. Performance passed 57 of 60, failing dense
+Agenda open paint at 151.1/154.6/165.4 ms against strict <150 ms and mixed-dense
+motion p95 at 61.1 ms against strict <50 ms. Performance uses independent fresh
+visible applications; no source dependency path from this adopted spec was found.
+No cause is claimed. The complete unchanged `npm run test:perf` supplement passed
+all 60 (2.0 min), with dense open paint 123.7/118.3/116.2 ms and mixed-dense motion
+p95 33.1 ms. Audit found zero vulnerabilities. No performance guard changed.
+Development §9 permits composing the valid successful initial stages with the
+passing complete performance/audit supplements; the failed aggregate is not
+relabeled. Exact commands, snapshot blobs and temporary evidence are retained in
+`.scratch/e2e-8e/evidence.md`.
+
+Independent review traced every eligibility group, preserved assertions/order,
+reset lifecycle, clipboard/register poisoning and mixed ownership against the
+inventory and found no meaningful runtime issues. Its documentation correction
+was applied: the fresh deliberate Normal-selection case installs a page clock
+through its drag helper, so the no-clock claim applies to adopted cases only.
+Final formatting, documentation and workflow governance checks passed. E2E-8e
+is complete, with no unresolved validation failure or Product Owner decision.
+No production/fixture code, editing category or screenshot baseline changed.
+
 ## Next Task
 
-E2E-8e: inventory every body/launch of `e2e/vim-navigation-and-visual.spec.ts` under ADR 0021, adopt only supported hidden top-level/collapsed cases and keep nested/expanded seeds and retained instrumentation explicitly fresh. Preserve conformance references, all assertions and editing-mode coverage. Complete matched one/six-worker five-repeat controls, state-poisoning/mixed transitions, screenshot inspection, High Risk validation and independent review as specified in the task above. No other source spec is eligible by proximity.
+E2E-8f: measure and close the bounded rollout. Run two sequential matched full-suite timing pairs for adopted and fresh-control execution on the same host and worker count, without overlapping suites or runtime-input changes. Report launches/resets, summed/wall time, observed spread, failures and final memory evidence. Preserve every case, editing category and boundary exclusion. Extend reset reporting only if necessary, then move durable findings to Development §8 and ADR 0021 and remove this completed plan/index entry when no authorized work remains. D4 remains deferred; do not implement budgets or CI reporting.
 
-Start a new session for E2E-8e after E2E-8d's media-emulation discovery and performance validation follow-up. Playwright media emulation survives renderer reload and remains excluded; do not infer renderer ownership from a page API alone. D2 remains declined and D4 deferred; do not change editing-mode composition or introduce budgets.
+Start a new session for E2E-8f after E2E-8e's register-poison correction and unchanged screenshot/performance failures that passed supplemental runs. E2E-8e is committed with valid composed High Risk evidence; preserve the failed attempts in its findings rather than claiming the aggregate passed. Retained Playwright media emulation/page clocks and nested/expanded seeds remain excluded; do not widen the reset contract. D2 remains declined and D4 deferred.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8e, inventory and adopt eligible Vim navigation/selection cases under ADR 0021. E2E-8d is complete. D1 approved, D2 declined, D3 implemented, D4 deferred. Preserve assertions, editing modes and fresh-process exclusions, including retained Playwright media emulation; do not broaden the reset contract.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8f, measure and close the bounded shared-application rollout. E2E-8e is complete. Run two sequential matched full-suite timing pairs for adopted/fresh controls and record final memory evidence; preserve all cases, modes and fresh-process exclusions. D1 approved, D2 declined, D3 implemented, D4 deferred. Do not broaden the reset contract or introduce budgets.
 ```
