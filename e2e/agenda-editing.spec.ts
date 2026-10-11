@@ -10,6 +10,7 @@ import {
   setAgendaToday,
   setCursor,
   readPersisted,
+  tryReadPersisted,
   writeClipboardText,
   writeClipboardImageSized,
   firePaste,
@@ -179,7 +180,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(input).toBeFocused()
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((child) => child.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((child) => child.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20 alpha', 'beta', '2026-10-14 Review'])
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(input)
@@ -189,7 +190,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(image).toBeVisible()
     expect(await image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children[0]!.attachment, {
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children[0]!.attachment, {
         timeout: 20000,
       })
       .toBeDefined()
@@ -362,7 +363,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(input).toHaveText('2026-10-14 READY Prepare 2026-10-20')
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children[0]!.text, idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children[0]!.text, idleSavePoll)
       .toBe('2026-10-14 READY Prepare 2026-10-20')
     await app.close()
     const restarted = await launchTree(userDataDir)
@@ -391,7 +392,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 8)}:"]`)).toHaveCount(1)
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots.map((entry) => entry.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots.map((entry) => entry.text), idleSavePoll)
       .toEqual(['Context', '2026-10-08 Plan'])
     expect(readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.id)).toEqual(['first', 'second'])
   })
@@ -416,13 +417,13 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(window.locator(`[data-agenda-key="${dayKey(10, day)}"]`)).toHaveCount(1)
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots.map((entry) => entry.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots.map((entry) => entry.text), idleSavePoll)
       .toEqual(['Context', `2026-10-${day} `])
     await window.keyboard.press('Meta+z')
     await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, day)}:"]`)).toHaveCount(rowsBefore)
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots.map((entry) => entry.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots.map((entry) => entry.text), idleSavePoll)
       .toEqual(['Context'])
     const gap = window.locator('[data-agenda-key^="gap:"]').first()
     await gap.click()
@@ -457,7 +458,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(3)
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 release'])
     await window.keyboard.press('Meta+z')
     await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(2)
@@ -466,7 +467,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     )
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare release'])
   })
 
@@ -495,7 +496,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await expect(created).toHaveText('2026-10-14 Xrelease')
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Xrelease'])
     const context = window.locator('.agenda-row[data-node-id="context"]').first()
     await context.click()
