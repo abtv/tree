@@ -31,6 +31,8 @@ The runner is a deterministic coordinator, not another product decision-maker. I
 | AW-3L | Bounded development launcher and reusable permission rule | AW-2 | Implementation, composed full validation, independent review and no-prompt runtime launch verified | Done |
 | AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter/host regressions, composed High Risk validation and independent reviewer/verifier passes complete | Done |
 | AW-4 | Bounded fresh-run pilot and closure | AW-3; numeric pilot budget | Actual capability evidence, automatic task transition, recovery evidence and no outstanding required checks | Ready |
+| AW-41 | Synthetic recovery and first commit boundary | AW-3 | Failed documentation check, fresh repair, independent review and reconciled commit | Ready |
+| AW-42 | Automatic fresh-task transition and Electron evidence | AW-41 | Fresh primary, real Electron checks, independent roles and reconciled commit | Planned |
 
 ### AW-1 — Shared Workflow Contract
 
@@ -74,6 +76,64 @@ Measure total usage including repeated context, reviews and retries, elapsed tim
 
 Validation tier: Minimal Risk for final documentation, plus outstanding High Risk implementation checks and explicit live pilot acceptance. Independent review of cumulative completion evidence. No repository-wide approval or capability claim from a single successful command.
 
+### AW-41 — Synthetic recovery and first commit boundary
+
+This is the first bounded synthetic subtask of AW-4, authorized by the Product Owner's 2026-10-12 continuation. Edit only this plan's permitted task status transitions and `docs/DEVELOPMENT.md`. Add one paragraph after the runner operational guidance explaining that a synthetic documentation failure exercises recovery without changing application behavior. The lasting paragraph must link to the active plan index at `../plans/README.md` and say that seeded failures must be reported separately from naturally occurring quality findings.
+
+For the initial fresh attempt ONLY, deliberately use `../plans/aw4-recovery-check.md` as that paragraph's link target. Do not create that file. This is an explicitly seeded broken relative link: the host's real documentation check must reject it before review or commit. On a fresh same-task recovery carrying the failed command evidence, replace that link with `../plans/README.md`; do not seed another failure. Preserve every other paragraph and all unrelated work. The host runs checks, review, acceptance and commit, then advances AW-42 automatically. Remove any temporary WORKING_PLAN.md before returning the candidate, as the host requires.
+
+Validation tier: Minimal Risk documentation; scoped formatting, documentation governance and OpenCode governance. Independent reviewer required by this pilot. No product requirement gap, runtime implementation change or owner check.
+
+### AW-42 — Automatic fresh-task transition and Electron evidence
+
+This is the second synthetic subtask of AW-4. Edit only this plan's AW-42 status and `docs/WORKING_WITH_AGENT.md`. Add a concise operational paragraph explaining that a pilot must count fresh primaries, acceptance resumes, independent roles and retries in usage, retain its original elapsed deadline, and distinguish observed permissions from configured permissions. Do not claim savings or quality equivalence from a single pilot. Preserve other content and unrelated initiatives; remove any temporary WORKING_PLAN.md before returning.
+
+Validation tier: Minimal Risk documentation plus explicit live pilot acceptance. The host runs formatting, documentation and OpenCode checks, then the existing `e2e/window-appearance.spec.ts` workflow serially with retained output under the pilot ledger directory. This exercises real Electron launch, both appearances and teardown with isolated application data. Inspect its generated dark/light PNG artifacts in the outer session before AW-4 closure; passing automation alone does not establish artifact inspection or native manual input. Independent reviewer and workflow verifier required. No manual native keyboard/menu checks are required by this scope.
+
+## AW-4 Execution Projection
+
+The pilot remains unstarted: no live budget ledger, authorization record or runner lock was found by `rg --files --hidden .scratch` on 2026-10-12 at clean HEAD `a3bd0fd5bddceaa61c57f606bafece064ea337cc`. Retained AW-3 completion evidence also records an unstarted budget. Preserve those historical files. Because the runner refuses to create a budget in a nonempty evidence directory, this same AW-4 pilot uses the distinct ledger namespace `.scratch/autonomous-initiatives-pilot/`; outer coordination notes stay in `.scratch/autonomous-initiatives/aw4/`. This is a scratch-path implementation exception, not a different initiative or renewed budget. Never change this namespace or approval reference to evade retained state. Coordinator construction starts the single cumulative allowance; its budget.json deadline governs both tasks, retries and restarts.
+
+The existing fixed launcher authorizes AW-3 only. Invoke the documented generic host through its supported permission flow with approval reference `AW4-owner-2026-10-12-60min`. No new permission rule, model override or unrestricted launch is authorized. An unrelated default Electron process observed at PID 11208 blocks the host's required quiescence check; the owner has been asked to close it normally. Never terminate it or replace the check. Expected owner verification remains zero rounds/checks; closing that unrelated app and any host approval are setup interventions, counted separately.
+
+```initiative-runner
+{
+  "version": 1,
+  "tool": "codex",
+  "initiative": "autonomous-initiatives-pilot",
+  "budgetMs": 3600000,
+  "tasks": {
+    "AW-41": {
+      "files": ["plans/autonomous-initiatives.md", "docs/DEVELOPMENT.md"],
+      "commands": [
+        { "id": "format", "argv": ["npm", "run", "format:check:changed"] },
+        { "id": "docs", "argv": ["npm", "run", "check:docs"] },
+        { "id": "opencode", "argv": ["npm", "run", "check:opencode"] }
+      ],
+      "roles": ["reviewer"],
+      "ownerChecks": [],
+      "nextTask": "AW-42"
+    },
+    "AW-42": {
+      "files": ["plans/autonomous-initiatives.md", "docs/WORKING_WITH_AGENT.md"],
+      "commands": [
+        { "id": "format", "argv": ["npm", "run", "format:check:changed"] },
+        { "id": "docs", "argv": ["npm", "run", "check:docs"] },
+        { "id": "opencode", "argv": ["npm", "run", "check:opencode"] },
+        {
+          "id": "electron",
+          "argv": ["npm", "run", "test:e2e", "--", "e2e/window-appearance.spec.ts", "--workers=1", "--output=.scratch/autonomous-initiatives-pilot/electron-artifacts"]
+        }
+      ],
+      "roles": ["reviewer", "product_verifier"],
+      "ownerChecks": []
+    }
+  }
+}
+```
+
+After both committed subtask gates, outer AW-4 closure must inspect Electron artifacts and retained recovery/deadline records, aggregate native usage including acceptance and role launches (unknown totals remain unknown), count prompts/interventions and genuine versus seeded failures, obtain independent cumulative review, and run the final documentation tier before retiring this plan and only its index row. Earlier AW-3 High Risk evidence remains valid while runtime inputs are unchanged. If execution blocks, retain this projection unchanged and record the exact original starting commit, ledger deadline and supported resume invocation outside its bound task scopes.
+
 ## Owner Involvement
 
 Separate setup involvement: **one confirmed Codex restart**, completed. At commit `3654b987`, the outer coordinator invoked the reviewed `develop-aw3` operation without a new approval prompt. Native session `01a12ce8-d98a-7422-ac99-5bfe4b25fcea` completed repository inspection, native edits and focused synthetic tests, then returned successfully. A second fixed development launch also started without a prompt. These observations establish the bounded development path, not automatic controller advancement or AW-4 pilot acceptance.
@@ -91,6 +151,14 @@ Do not bundle checks across a task's required pre-commit boundary. Report any ne
 
 ## Next Task
 
-AW-4: define and review the bounded synthetic pilot projection, then exercise at least two fresh task runs, real validation/commit boundaries, independent roles and recovery. AW-3 provides the executable host, configured-role adapter, owner-evidence resolution, exact pre-commit checks and bounded recovery. Host-observed receipts follow the existing trusted-repository model; no external signing-key custody or stronger same-user isolation is claimed. AW-3L's three fixed operations have all run without new approval prompts. Generic host invocation and automatic live advancement remain to be verified through the supported permission flow; the bounded launcher rule does not authorize arbitrary host invocations. The approved cumulative live pilot limit is 60 minutes and has not started. Retain its original deadline across retries and restarts. Do not select the separate E2E Coverage Efficiency initiative.
+AW-4 preparation is complete; live execution is blocked before clock start by the unrelated default Electron application (PID 11208 observed on 2026-10-12). The configured independent reviewer found **No meaningful issues found** in the two-task projection. Scoped formatting, documentation governance and OpenCode governance passed. Historical AW-3 High Risk results remain valid because no runtime, fixture, role, build or performance inputs changed. Temporary details are in `.scratch/autonomous-initiatives/aw4/preflight.md`; AW-3 records were preserved. No live run, retry, native role receipt, Electron check or pilot commit boundary has yet executed. One owner setup request was made to close that unrelated app normally; zero required manual verification rounds/checks and zero host permission prompts so far. Total coordinator/planner/reviewer usage is unavailable through the exposed tools, not zero. No savings or quality-equivalence claim is supported.
 
-Resume with: “Continue Autonomous Initiative Execution AW-4 from plans/autonomous-initiatives.md. Define and verify the synthetic pilot within the approved cumulative 60-minute limit; do not reset the budget on restart or change unrelated work.”
+Exact next action: after the owner closes the unrelated Electron app, inspect the standalone process table again. Do not kill unrelated processes or weaken quiescence. Verify that the projection commit is the current clean HEAD, inspect any retained `.scratch/autonomous-initiatives-pilot/budget.json` and original starting commit before proceeding, and launch:
+
+```text
+node /Users/andrew/work/tree/scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tree plans/autonomous-initiatives.md AW-41 <full-projection-commit> AW4-owner-2026-10-12-60min
+```
+
+Use the supported host permission flow with the exact command and no broader prefix rule. The fixed AW-3 launcher does not authorize this operation. Construction starts the approved cumulative 60-minute clock only if no ledger exists; an existing ledger always governs, including time between runs. AW-41 repairs the seeded failure then automatically transitions to AW-42. If interrupted, resume the same host invocation with its original full starting commit, namespace and approval reference. Preserve all records and unfinished work. Read actual budget/run/blocker evidence before any recovery; never renew the deadline. After both tasks, inspect dark/light Electron PNGs before another suite replaces them, aggregate all available primary/acceptance/role usage and elapsed/retry/intervention/correction counts, and independently review cumulative completion before final documentation validation and closure. Do not select the E2E Coverage Efficiency initiative.
+
+Resume with: “Continue Autonomous Initiative Execution AW-4 from plans/autonomous-initiatives.md. Resolve the recorded unrelated-Electron preflight blocker, then execute the reviewed AW-41/AW-42 pilot projection through the supported host flow. Preserve the original cumulative 60-minute budget and retained evidence; do not reset it or change unrelated work.”
