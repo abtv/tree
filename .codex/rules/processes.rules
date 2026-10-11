@@ -1,0 +1,13 @@
+prefix_rule(
+    pattern = ["kill", "-INT"],
+    decision = "allow",
+    match = ["kill -INT 12345"],
+    not_match = ["kill -KILL 12345", "killall Electron"],
+)
+
+prefix_rule(
+    pattern = ["kill", "-TERM"],
+    decision = "allow",
+    match = ["kill -TERM 12345"],
+    not_match = ["kill -9 12345", "pkill Electron"],
+)
