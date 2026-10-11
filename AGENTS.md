@@ -105,6 +105,7 @@ The Product Owner may communicate with the agent in any language, and the agent 
 ## 4. General Working Rules
 
 * Keep changes focused on the requested task.
+* In Codex, run Electron E2E tests outside the sandbox from the first invocation, using `sandbox_permissions: "require_escalated"` and the named npm workflows allowed by `.codex/rules/tests.rules` and `.codex/rules/e2e.rules`. Use `npm run test:e2e -- <spec>` for focused runs and `npm run test:e2e:visible -- <spec>` for visible runs. Project rules require trusted `.codex/` configuration and are loaded at session startup; restart Codex after changing them. If a rule is unavailable, follow the platform approval flow rather than bypassing it.
 * Do not introduce unnecessary abstractions or complexity.
 * Prefer simple, maintainable solutions.
 * Preserve existing behavior unless the task explicitly changes it.
