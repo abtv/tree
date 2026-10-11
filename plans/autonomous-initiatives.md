@@ -31,8 +31,8 @@ The runner is a deterministic coordinator, not another product decision-maker. I
 | AW-3L | Bounded development launcher and reusable permission rule | AW-2 | Implementation, composed full validation, independent review and no-prompt runtime launch verified | Done |
 | AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter/host regressions, composed High Risk validation and independent reviewer/verifier passes complete | Done |
 | AW-4 | Bounded fresh-run pilot and closure | AW-3; numeric pilot budget | Actual capability evidence, automatic task transition, recovery evidence and no outstanding required checks | Ready |
-| AW-41 | Synthetic recovery and first commit boundary | AW-3 | Failed documentation check, fresh repair, independent review and reconciled commit | Ready |
-| AW-42 | Automatic fresh-task transition and Electron evidence | AW-41 | Fresh primary, real Electron checks, independent roles and reconciled commit | Planned |
+| AW-41 | Synthetic recovery and first commit boundary | AW-3 | Failed documentation check, fresh repair, independent review and reconciled commit | Done |
+| AW-42 | Automatic fresh-task transition and Electron evidence | AW-41 | Fresh primary, real Electron checks, independent roles and reconciled commit | Ready |
 
 ### AW-1 — Shared Workflow Contract
 

@@ -576,6 +576,8 @@ Fresh same-task repair prompts include the retained blocker, concrete role findi
 
 Focused sandbox-compatible checks: `npm test -- scripts/initiative-runner-state.test.mjs scripts/initiative-runner-adapter.test.mjs` plus runner lint and formatting. Fixtures own synthetic subprocesses and repositories under `.scratch/autonomous-initiatives/tests/`; they never launch Codex or Electron. High Risk host validation and independent workflow review remain separate acceptance evidence.
 
+A synthetic documentation failure exercises runner recovery without changing application behavior. Follow the approved scope in the [active plan index](../plans/README.md), and report seeded failures separately from naturally occurring quality findings.
+
 ## 12. Testing Strategy
 
 Tests should be placed as close as practical to the code they validate.
