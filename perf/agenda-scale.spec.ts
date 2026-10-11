@@ -186,8 +186,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       expect.soft(metrics.scrollPaintMs).toBeLessThan(100)
       expect.soft(metrics.motionP95Ms).toBeLessThan(50)
       expect.soft(metrics.motionMaxMs).toBeLessThan(100)
-      // The Product Owner accepted a 75 ms edit p95 ceiling for the dense mixed extreme case.
-      const editP95LimitMs = shape === 'mixed' && dense ? 75 : 50
+      const editP95LimitMs = 75
       expect.soft(metrics.typingP95Ms).toBeLessThan(editP95LimitMs)
       expect.soft(metrics.typingMaxMs).toBeLessThan(100)
       expect.soft(metrics.dateEditP95Ms).toBeLessThan(editP95LimitMs)

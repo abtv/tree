@@ -23,6 +23,8 @@ Product Owner decisions (2026-10-11):
 * **D3 — approved.** Use affected E2E specs for contained local changes and retain the complete suite in CI. E2E-6 keeps the planned complete-local exceptions for High Risk changes.
 * **D4 — deferred.** Ignore duration reporting and budgets for now; E2E-7 does not proceed.
 
+E2E-8c follow-up authorization (2026-10-11): after repeated unchanged Agenda scale performance failures, the Product Owner requested "Let's raise the limit to 75 ms and commit". This separately authorizes raising the Agenda scale typing/date-edit p95 guard to 75 ms for all six document-scale scenarios; other guard limits remain unchanged. It is a narrow exception to the performance-suite scope exclusion, not authorization for additional performance changes or duration budgets.
+
 The Product Owner's message was: "D1 - yes, D2 - no, D3 - yes, D4 - for now let's ignore it". D1 and D3 authorize their recorded initiative tasks; D2 and D4 do not authorize changes. This session already completed E2E-3 and E2E-4; E2E-6 and D1 rollout preparation are the remaining two tasks before the four-task session limit in `AGENTS.md` §12.
 
 ## Baseline (2026-10-11, commit 701e9e6)
@@ -53,8 +55,8 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-8 | Roll out the shared application | E2E-3, D1 | In progress |
 | E2E-8a | ADR and ordered rollout preparation | E2E-3, D1 | Done |
 | E2E-8b | Harden reset, recovery and memory evidence | E2E-8a | Done |
-| E2E-8c | Adopt navigation and Tab structure | E2E-8b | Ready |
-| E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Planned |
+| E2E-8c | Adopt navigation and Tab structure | E2E-8b | Done |
+| E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Ready |
 | E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Planned |
 | E2E-8f | Measure and close the bounded rollout | E2E-8e | Planned |
 
@@ -819,14 +821,66 @@ Final one/six-worker prototype stress passed 225 cases each (28.1 s / 12.2 s). S
 
 Final hidden infrastructure coverage passed 18 cases; visible and explicit fresh-control coverage passed three each. The last hidden probes left a blank shared process for actual worker teardown; its recorded process and profile were absent after runner exit. Shared fault/memory probes are deliberately declared only for hidden execution, so the complete visible suite retains fresh launches. The independent completed-diff review traced the lifecycle/state/error/clipboard paths and found no meaningful issues. E2E-8b is complete. E2E-8c remains unimplemented; D2 is declined and D4 deferred.
 
+### E2E-8c eligibility inventory (2026-10-11)
+
+All bodies launch once. Navigation has no pre-seeded document; its twelve ordinary cases remain in both editing modes. Options are defaults except the Vim-only `gd` case's supported `vimPreference: true`. Clipboard operations use fixture-owned locked helpers. Hidden cases adopt reload; visible and explicit fresh controls stay fresh. The poison is transient native/renderer mutation, not retained instrumentation, and remains immediately before its navigation successor in file order. Fresh controls now include it too, so comparison case sets are identical.
+
+| Exact navigation title | State mutations / clipboard | Hidden eligibility |
+| --- | --- | --- |
+| shared prototype poisons state before the following navigation case | Creates parent/child, changes location, pins/resizes window, sets native theme dark, enters Visual mode, production save of different state | Adopted; existing reset regression |
+| arrow keys move selection between siblings | Types A/B, creates sibling, moves focus | Adopted |
+| moves the first root caret to the beginning on ArrowUp | Types Root; changes caret | Adopted |
+| moves the last root caret to the end on ArrowDown | Types First/Last, creates sibling, changes caret | Adopted |
+| moves the last linked root caret to the end on ArrowDown | Locked clipboard writes/pastes URL; rich-text caret | Adopted |
+| moves a childless linked parent caret to the end on ArrowDown | Locked clipboard writes/pastes URL; parent entry/caret | Adopted |
+| moves from the first child up to the current parent | Types Projects/Work, creates child, changes location/focus/caret | Adopted |
+| focuses a linked first child with a visible caret after moving down from the parent | Parent/child creation, locked clipboard long URL paste, rich-text focus/caret | Adopted |
+| moves left and right across sibling and parent boundaries | Creates Projects/Work/Personal; focus/caret across boundaries | Adopted |
+| entering a childless node keeps the cursor in the current parent and Enter creates a first child | Enters Projects, creates/types Work child, focus/location | Adopted |
+| leaving a node restores the parent level and selects the node that was entered | Creates Projects/Work; entry/exit and selection | Adopted |
+| the location path navigates to ancestors and the root | Projects/Work/Task hierarchy; ancestor/root breadcrumb clicks | Adopted |
+| clicks the circular indicator to enter a node with children and a childless node | Parent/Child creation; entry indicators, location/focus/style reads | Adopted |
+| gd enters the selected node like Cmd+. | Types Parent, Normal mode, `gd`, location/focus | Adopted; explicit Vim preference |
+
+Tab bodies use supported `initialMode: 'normal'`, except native status-bar traversal (default options). None uses the clipboard. Attachments are seeded under reset-owned data; selection changes retain no instrumentation. No body installs clocks/init scripts/handlers, relaunches or retains instrumentation.
+
+| Exact Tab title/family | Seed and state mutations | Hidden eligibility |
+| --- | --- | --- |
+| indents and outdents the focused `${state}` node while preserving its mode | Collapsed Alpha/Bravo/Charlie roots, Bravo selected; selection, five Vim states/standard, indent/outdent, typing/undo | Adopted; six cases |
+| consumes impossible root Tab and Shift+Tab moves while retaining the focused editor | Collapsed Alpha/Bravo roots, Alpha selected; blocked commands/focus/mode | Adopted; both modes |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in `${state}` | Alpha with Bravo/Charlie children; zoom, selection/mode, blocked outdent, typing/undo | Fresh; six nested-seed cases |
+| outdents a deeper descendant while keeping the zoomed current parent | Alpha with Bravo/Bravo child and Charlie; zoom/expansion/focus/outdent | Fresh; both modes |
+| keeps an image caret on a direct child when Shift+Tab is blocked by the zoom boundary | Alpha with attached Bravo and Charlie; zoom/image caret/blocked outdent | Fresh; nested seed, Vim |
+| keeps native Tab traversal from status-bar focus outside the editor | Blank; status focus/Tab/Shift+Tab | Adopted; Vim |
+| moves an active image caret with Tab and restores its saved text position | Collapsed Alpha/attached Bravo roots; text/image caret, indent/outdent/restoration | Adopted; Vim |
+
+The explicit fresh group contains exactly nine nested cases. Ten Tab and 26 navigation cases use the adopted selector. No product behavior, fixture implementation, editing category or baseline changed.
+
+### E2E-8c implementation and validation (2026-10-11)
+
+Implemented adoption and fresh exclusions without production/fixture changes. Four sequential matched runs on the same macOS host/build/source, five repeats each and 225 identical cases, all passed without failures/flakes/skips/errors:
+
+| Execution | Workers | Launches | Resets | Summed test time | Wall time |
+| --- | --- | --- | --- | --- | --- |
+| Adopted reload | 1 | 55 | 170 | 40.978 s | 43.118 s |
+| Fresh control | 1 | 225 | 0 | 85.862 s | 87.943 s |
+| Adopted reload | 6 | 60 | 165 | 95.236 s | 20.196 s |
+| Fresh control | 6 | 225 | 0 | 214.053 s | 42.513 s |
+
+Observed two-spec wall reduction is 51.0%/52.5% at one/six workers; these single pairs do not establish whole-suite savings or variance. Temporary commands/reports/snapshot evidence is retained under `.scratch/e2e-8c/`. Visible fallback passed 45 cases. Actual synthetic indented-selection image embedded in the adopted-one JSON was inspected against Alpha/Bravo/Charlie with selected indented Bravo; no baseline changes. Independent review found no meaningful implementation/evidence issues.
+
+The initial `npm run check:full` passed static/governance checks, 3,308 unit cases, unit-performance guard, build and all 765 E2E cases, then failed one of 60 performance cases. Deep-sparse Agenda typing p95 was 50.5 ms against strict <50 ms. Two unchanged complete `npm run test:perf` repeats each passed 59 cases and failed one: wide-dense date-edit p95 54.9 ms, then deep-sparse typing p95 50.9 ms. These attempts remain recorded as failures; no cause is claimed. The performance suite uses its own fresh visible launches and no changed-spec/selector causal path was found in read-only inspection.
+
+The Product Owner then explicitly authorized the 75 ms Agenda edit-p95 limit and commit. Only that guard changed; motion p95, maximum latency and all other assertions remain. The subsequent complete `npm run test:perf` passed all 60 cases. Affected E2E/performance type checking, focused lint and final formatting/documentation checks passed; audit found zero vulnerabilities. Under Development §9, the required High Risk tier is satisfied by the initial successful unchanged stages plus the complete passing supplemental performance/audit stages; the aggregate attempt itself is not relabeled as passing. Independent review of the budget change found no meaningful issues. E2E-8c is complete; no production behavior, editing category or screenshot baseline changed.
+
 ## Next Task
 
-E2E-8c: inventory every launch/seed/option/state mutation in navigation and Tab structure, then adopt the hardened selector only for eligible hidden cases under ADR 0021. Preserve both editing modes, every existing oracle and the poison regression; visible and fresh-control runs stay isolated. Repeat one/six-worker five-repeat runs with matched fresh controls, record launches/resets and timings, inspect the indented-selection image, and complete High Risk validation and independent review. No other source spec is eligible by proximity.
+E2E-8d: inventory every body/launch of `e2e/vim-text-editing.spec.ts` under ADR 0021, adopt only supported hidden top-level/collapsed cases and keep nested/unsupported cases explicitly fresh. Preserve conformance references, all assertions and editing-mode coverage. Complete matched one/six-worker five-repeat controls, state-poisoning/mixed transitions, screenshot inspection, High Risk validation and independent review as specified in the task above. No other source spec is eligible by proximity.
 
-Start a new session for this adoption task. E2E-8b required extensive lifecycle and memory evidence, so a fresh context keeps the area inventory and validation review manageable. D2 remains declined and D4 deferred; do not change editing-mode composition or introduce budgets.
+Start a new session for E2E-8d: its body-level inventory benefits from fresh context after E2E-8c's performance validation follow-up. D2 remains declined and D4 deferred; do not change editing-mode composition or introduce budgets.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8c, inventory and adopt eligible navigation/Tab structure cases through the hardened selector under ADR 0021. E2E-8b is complete. D1 is approved, D2 declined, D3 implemented, D4 deferred. Preserve both editing modes, existing oracles and fresh-process boundary exclusions.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8d, inventory and adopt eligible Vim text-editing cases under ADR 0021. E2E-8c is complete. D1 approved, D2 declined, D3 implemented, D4 deferred. Preserve assertions, editing modes and fresh-process exclusions; do not broaden the reset contract.
 ```

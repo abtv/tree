@@ -7,41 +7,39 @@ import {
   node,
   parent,
   setMainWindowBounds,
-  sharedApplicationPrototype,
+  sharedApplicationAdopted,
   test,
   typeInto,
   writeClipboardText,
 } from './fixtures'
 
-test.use({ sharedApplicationReset: sharedApplicationPrototype() })
+test.use({ sharedApplicationReset: sharedApplicationAdopted() })
 
 // Deliberately leave native and renderer state behind; the next launch's fixture checks
 // must reject it unless the shared reset restored the initial state.
-if (sharedApplicationPrototype() !== 'off') {
-  test('shared prototype poisons state before the following navigation case', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
-    await typeInto(node(window, 1), 'Previous test')
-    await window.keyboard.press('Meta+.')
-    await window.keyboard.press('Enter')
-    await typeInto(node(window, 1), 'Previous child')
-    await window.getByRole('button', { name: 'Pin window on top' }).click()
-    await setMainWindowBounds(app, { width: 800, height: 550 })
-    await app.evaluate(({ nativeTheme }) => {
-      nativeTheme.themeSource = 'dark'
-    })
-    await window.keyboard.press('Escape')
-    await window.keyboard.press('v')
-    await window.evaluate(async () => {
-      const api = (globalThis as typeof globalThis & { treeApi: { save(state: unknown): Promise<void> } }).treeApi
-      await api.save({
-        version: 4,
-        document: { roots: [{ id: 'previous-test', text: 'Previous persisted test', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'previous-test' },
-        view: { expandedIds: [] },
-      })
+test('shared prototype poisons state before the following navigation case', async ({ userDataDir }) => {
+  const { app, window } = await launchTree(userDataDir)
+  await typeInto(node(window, 1), 'Previous test')
+  await window.keyboard.press('Meta+.')
+  await window.keyboard.press('Enter')
+  await typeInto(node(window, 1), 'Previous child')
+  await window.getByRole('button', { name: 'Pin window on top' }).click()
+  await setMainWindowBounds(app, { width: 800, height: 550 })
+  await app.evaluate(({ nativeTheme }) => {
+    nativeTheme.themeSource = 'dark'
+  })
+  await window.keyboard.press('Escape')
+  await window.keyboard.press('v')
+  await window.evaluate(async () => {
+    const api = (globalThis as typeof globalThis & { treeApi: { save(state: unknown): Promise<void> } }).treeApi
+    await api.save({
+      version: 4,
+      document: { roots: [{ id: 'previous-test', text: 'Previous persisted test', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'previous-test' },
+      view: { expandedIds: [] },
     })
   })
-}
+})
 
 describeForEachEditingMode('navigation', () => {
   // @requirement PRODUCT.md §4.1

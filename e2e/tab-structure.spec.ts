@@ -2,9 +2,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describeForEachEditingMode, expect, launchTree, node, parent, seedDocument, test } from './fixtures'
-import { attachmentPath, sharedApplicationPrototype } from './fixtures'
+import { attachmentPath, sharedApplicationAdopted } from './fixtures'
 
-test.use({ sharedApplicationReset: sharedApplicationPrototype() })
+test.use({ sharedApplicationReset: sharedApplicationAdopted() })
 
 function seedSiblings(userDataDir: string): void {
   seedDocument(userDataDir, {
@@ -184,135 +184,102 @@ describeForEachEditingMode('node editor Tab structure commands', ({ mode }) => {
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
-  for (const state of states) {
-    test(`keeps a direct child inside the zoomed current parent with Shift+Tab in ${state}`, async ({
-      userDataDir,
-    }) => {
-      seedDocument(userDataDir, {
-        document: {
-          roots: [
-            {
-              id: 'a',
-              text: 'Alpha',
-              children: [
-                { id: 'b', text: 'Bravo', children: [] },
-                { id: 'c', text: 'Charlie', children: [] },
-              ],
-            },
-          ],
-        },
-        location: { currentParentId: null, selectedNodeId: 'a' },
-      })
-      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-      await window.keyboard.press('Meta+.')
-      await expect(parent(window)).toHaveValue('Alpha')
-      const input = node(window, 1)
-      await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 0))
-      if (state === 'insert') await window.keyboard.press('i')
-      if (state === 'replace') {
-        await window.keyboard.press('R')
-        await window.keyboard.type('x')
-        await expect(input).toHaveValue('xravo')
-      }
-      if (state === 'visual') await window.keyboard.press('v')
-      if (state === 'visual-node') {
-        await window.keyboard.press('V')
-        await window.keyboard.press('j')
-      }
-      const focusedInput = state === 'visual-node' ? node(window, 2) : input
-      await expect(focusedInput).toBeFocused()
-      const selectionBefore = await input.evaluate((element) => {
-        const textarea = element as HTMLTextAreaElement
-        return [textarea.selectionStart, textarea.selectionEnd]
-      })
+  test.describe('nested seeds retain fresh applications', () => {
+    test.use({ sharedApplicationReset: 'off' })
 
-      await window.keyboard.press('Shift+Tab')
-
-      await expect(parent(window)).toHaveValue('Alpha')
-      await expect(input).toHaveValue(state === 'replace' ? 'xravo' : 'Bravo')
-      await expect(node(window, 2)).toHaveValue('Charlie')
-      await expect(focusedInput).toBeFocused()
-      if (state === 'standard') {
-        const screenshot = await window.locator('.editor-shell').screenshot()
-        await test.info().attach('tab-zoom-boundary.png', { body: screenshot, contentType: 'image/png' })
-      }
-      if (state === 'standard' || state === 'visual' || state === 'replace')
-        await expect
-          .poll(() =>
-            input.evaluate((element) => {
-              const textarea = element as HTMLTextAreaElement
-              return [textarea.selectionStart, textarea.selectionEnd]
-            }),
-          )
-          .toEqual(selectionBefore)
-      if (state !== 'standard')
-        await expect(window.getByLabel('Vim mode')).toHaveText(
-          state === 'visual-node'
-            ? 'VISUAL NODE'
-            : state === 'visual'
-              ? 'VISUAL'
-              : state === 'replace'
-                ? 'REPLACE'
-                : state === 'insert'
-                  ? 'INSERT'
-                  : 'NORMAL',
-        )
-
-      if (state === 'replace') {
-        await window.keyboard.type('y')
-        await expect(input).toHaveValue('xyavo')
-        await window.keyboard.press('Escape')
-        await window.keyboard.press('Meta+z')
-        await expect(input).toHaveValue('Bravo')
-        await expect(parent(window)).toHaveValue('Alpha')
-      } else if (state === 'insert') {
-        await window.keyboard.type('!')
-        await expect(input).toHaveValue('!Bravo')
-        await window.keyboard.press('Escape')
-        await window.keyboard.press('Meta+z')
-        await expect(input).toHaveValue('Bravo')
-        await expect(parent(window)).toHaveValue('Alpha')
-      }
-    })
-  }
-
-  test('outdents a deeper descendant while keeping the zoomed current parent', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: {
-        roots: [
-          {
-            id: 'a',
-            text: 'Alpha',
-            children: [
-              { id: 'b', text: 'Bravo', children: [{ id: 'b1', text: 'Bravo child', children: [] }] },
-              { id: 'c', text: 'Charlie', children: [] },
+    for (const state of states) {
+      test(`keeps a direct child inside the zoomed current parent with Shift+Tab in ${state}`, async ({
+        userDataDir,
+      }) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              {
+                id: 'a',
+                text: 'Alpha',
+                children: [
+                  { id: 'b', text: 'Bravo', children: [] },
+                  { id: 'c', text: 'Charlie', children: [] },
+                ],
+              },
             ],
           },
-        ],
-      },
-      location: { currentParentId: null, selectedNodeId: 'a' },
-    })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    await window.keyboard.press('Meta+.')
-    await expect(parent(window)).toHaveValue('Alpha')
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    const descendant = node(window, 2)
-    await expect(descendant).toHaveValue('Bravo child')
-    await descendant.focus()
+          location: { currentParentId: null, selectedNodeId: 'a' },
+        })
+        const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+        await window.keyboard.press('Meta+.')
+        await expect(parent(window)).toHaveValue('Alpha')
+        const input = node(window, 1)
+        await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 0))
+        if (state === 'insert') await window.keyboard.press('i')
+        if (state === 'replace') {
+          await window.keyboard.press('R')
+          await window.keyboard.type('x')
+          await expect(input).toHaveValue('xravo')
+        }
+        if (state === 'visual') await window.keyboard.press('v')
+        if (state === 'visual-node') {
+          await window.keyboard.press('V')
+          await window.keyboard.press('j')
+        }
+        const focusedInput = state === 'visual-node' ? node(window, 2) : input
+        await expect(focusedInput).toBeFocused()
+        const selectionBefore = await input.evaluate((element) => {
+          const textarea = element as HTMLTextAreaElement
+          return [textarea.selectionStart, textarea.selectionEnd]
+        })
 
-    await window.keyboard.press('Shift+Tab')
+        await window.keyboard.press('Shift+Tab')
 
-    await expect(parent(window)).toHaveValue('Alpha')
-    await expect(node(window, 1)).toHaveValue('Bravo')
-    await expect(node(window, 2)).toHaveValue('Bravo child')
-    await expect(node(window, 3)).toHaveValue('Charlie')
-    await expect(descendant).toBeFocused()
-  })
+        await expect(parent(window)).toHaveValue('Alpha')
+        await expect(input).toHaveValue(state === 'replace' ? 'xravo' : 'Bravo')
+        await expect(node(window, 2)).toHaveValue('Charlie')
+        await expect(focusedInput).toBeFocused()
+        if (state === 'standard') {
+          const screenshot = await window.locator('.editor-shell').screenshot()
+          await test.info().attach('tab-zoom-boundary.png', { body: screenshot, contentType: 'image/png' })
+        }
+        if (state === 'standard' || state === 'visual' || state === 'replace')
+          await expect
+            .poll(() =>
+              input.evaluate((element) => {
+                const textarea = element as HTMLTextAreaElement
+                return [textarea.selectionStart, textarea.selectionEnd]
+              }),
+            )
+            .toEqual(selectionBefore)
+        if (state !== 'standard')
+          await expect(window.getByLabel('Vim mode')).toHaveText(
+            state === 'visual-node'
+              ? 'VISUAL NODE'
+              : state === 'visual'
+                ? 'VISUAL'
+                : state === 'replace'
+                  ? 'REPLACE'
+                  : state === 'insert'
+                    ? 'INSERT'
+                    : 'NORMAL',
+          )
 
-  if (mode === 'vim') {
-    test('keeps an image caret on a direct child when Shift+Tab is blocked by the zoom boundary', async ({
-      userDataDir,
-    }) => {
+        if (state === 'replace') {
+          await window.keyboard.type('y')
+          await expect(input).toHaveValue('xyavo')
+          await window.keyboard.press('Escape')
+          await window.keyboard.press('Meta+z')
+          await expect(input).toHaveValue('Bravo')
+          await expect(parent(window)).toHaveValue('Alpha')
+        } else if (state === 'insert') {
+          await window.keyboard.type('!')
+          await expect(input).toHaveValue('!Bravo')
+          await window.keyboard.press('Escape')
+          await window.keyboard.press('Meta+z')
+          await expect(input).toHaveValue('Bravo')
+          await expect(parent(window)).toHaveValue('Alpha')
+        }
+      })
+    }
+
+    test('outdents a deeper descendant while keeping the zoomed current parent', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -320,7 +287,7 @@ describeForEachEditingMode('node editor Tab structure commands', ({ mode }) => {
               id: 'a',
               text: 'Alpha',
               children: [
-                { id: 'b', text: 'Bravo', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+                { id: 'b', text: 'Bravo', children: [{ id: 'b1', text: 'Bravo child', children: [] }] },
                 { id: 'c', text: 'Charlie', children: [] },
               ],
             },
@@ -328,23 +295,60 @@ describeForEachEditingMode('node editor Tab structure commands', ({ mode }) => {
         },
         location: { currentParentId: null, selectedNodeId: 'a' },
       })
-      mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
-      writeFileSync(attachmentPath(userDataDir, 'image'), imageBytes)
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       await window.keyboard.press('Meta+.')
-      const input = node(window, 1)
       await expect(parent(window)).toHaveValue('Alpha')
-      await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(5, 5))
-      await window.keyboard.press('l')
-      await expect(input).toHaveClass(/node-input-image-caret/)
+      await window.getByRole('button', { name: 'Expand node 1' }).click()
+      const descendant = node(window, 2)
+      await expect(descendant).toHaveValue('Bravo child')
+      await descendant.focus()
 
       await window.keyboard.press('Shift+Tab')
 
       await expect(parent(window)).toHaveValue('Alpha')
-      await expect(input).toHaveClass(/node-input-image-caret/)
-      await expect(input).toHaveJSProperty('selectionStart', 5)
+      await expect(node(window, 1)).toHaveValue('Bravo')
+      await expect(node(window, 2)).toHaveValue('Bravo child')
+      await expect(node(window, 3)).toHaveValue('Charlie')
+      await expect(descendant).toBeFocused()
     })
-  }
+
+    if (mode === 'vim') {
+      test('keeps an image caret on a direct child when Shift+Tab is blocked by the zoom boundary', async ({
+        userDataDir,
+      }) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              {
+                id: 'a',
+                text: 'Alpha',
+                children: [
+                  { id: 'b', text: 'Bravo', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
+                  { id: 'c', text: 'Charlie', children: [] },
+                ],
+              },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'a' },
+        })
+        mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+        writeFileSync(attachmentPath(userDataDir, 'image'), imageBytes)
+        const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+        await window.keyboard.press('Meta+.')
+        const input = node(window, 1)
+        await expect(parent(window)).toHaveValue('Alpha')
+        await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(5, 5))
+        await window.keyboard.press('l')
+        await expect(input).toHaveClass(/node-input-image-caret/)
+
+        await window.keyboard.press('Shift+Tab')
+
+        await expect(parent(window)).toHaveValue('Alpha')
+        await expect(input).toHaveClass(/node-input-image-caret/)
+        await expect(input).toHaveJSProperty('selectionStart', 5)
+      })
+    }
+  })
 
   if (mode === 'vim') {
     test('keeps native Tab traversal from status-bar focus outside the editor', async ({ userDataDir }) => {
