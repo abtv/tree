@@ -50,8 +50,13 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-5 | No reclassification: D2 declined | E2E-4, D2 | Done |
 | E2E-6 | Local affected-spec validation policy | D3 | Done |
 | E2E-7 | Suite-duration report or budget (D4 deferred) | E2E-1, D4 | Blocked |
-| E2E-8 | Roll out the shared application | E2E-3, D1 | Planned |
-| E2E-8a | ADR and ordered rollout preparation | E2E-3, D1 | Ready |
+| E2E-8 | Roll out the shared application | E2E-3, D1 | In progress |
+| E2E-8a | ADR and ordered rollout preparation | E2E-3, D1 | Done |
+| E2E-8b | Harden reset, recovery and memory evidence | E2E-8a | Ready |
+| E2E-8c | Adopt navigation and Tab structure | E2E-8b | Planned |
+| E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Planned |
+| E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Planned |
+| E2E-8f | Measure and close the bounded rollout | E2E-8e | Planned |
 
 ### E2E-1 — Timing report and launch breakdown
 
@@ -124,6 +129,38 @@ D1 approved. Write the ADR and split adoption into per-area tasks before changin
 Record same-window reuse through explicit eligible-spec opt-in, fresh-process exclusions and surviving caches/instrumentation. Refine rather than supersede ADR 0012. Split fixture hardening, first-area adoption, subsequent text/navigation areas and final measurements into executable tasks with file ownership, state-contract acceptance and validation. Do not change runtime execution in preparation.
 
 Files: new ADR under `docs/decisions/`, its index, this plan and its index; Development §8 only if needed. Tier: Minimal Risk, `npm run format:check:changed`, `npm run check:docs` and `npm run check:opencode` if workflow documentation changes.
+
+### E2E-8b — Reset hardening and evidence
+
+Make the existing test-owned same-window reset suitable for adopted opt-ins before broadening eligibility. Introduce an adopted selector with explicit fresh-control and visible-run fallbacks, keeping the global default fresh. Review worker transitions between shared and fresh cases, failures before/after loading, disposal before data deletion, renderer/IPC errors and bounded worker shutdown. Reset all worker metadata after process loss so a clean relaunch cannot reuse stale URL/bounds state. Preserve every existing launch and seed oracle, IPC drain and clipboard/error observation. Do not adopt another source spec in this task.
+
+Files: `e2e/fixtures.ts`, `e2e/electron-entry.cjs`, `e2e/ipc-test-control.d.ts` if needed, new `e2e/shared-application.spec.ts`, `e2e/AGENTS.md`, Development §8, this plan. Real Electron regressions must verify successful reset, rejected/failed reset, owned-process exit before deletion, clean subsequent launch, mixed fresh/shared ownership and final worker teardown. Add test-owned controls or extracted fixture helpers only where needed; no production channel or handler replacement in adopted tests.
+
+After warm-up, measure repeated edit/reset bursts in the same worker with renderer heap and Electron process memory samples; compare successive bursts and fresh controls, record actual growth and investigate sustained retention before expansion. Confirm live renderer/window counts and pending-operation tracking are bounded. This is measurement evidence, not a new duration or memory budget. Reuse the two existing specs for one/six-worker five-repeat reset stress without changing their default opt-in. Acceptance: no leaks or state mismatches in these runs, proven failure cleanup, unchanged default behavior and retained-state limits documented. Tier: High Risk, `npm run check:full`, required screenshot infrastructure guards, primary visual inspection and independent review. No Product Owner decision remains unless inspection reveals a material expansion beyond ADR 0021.
+
+### E2E-8c — Navigation and Tab structure adoption
+
+Use the hardened adopted same-window selector for hidden navigation and Tab structure runs. Preserve all cases, both editing modes and the poison/reset regression; keep visible/fresh-control runs on isolated applications. Inventory every seed, launch option, clipboard use and state mutation before changing opt-in. Verify each body starts after the expected document/focus/history/native-state oracle. Do not add eligibility to other files.
+
+Files: `e2e/navigation.spec.ts`, `e2e/tab-structure.spec.ts`, fixture selector only if necessary, Development §8, this plan. Acceptance: both specs pass five repeats at one and six workers, sequentially; matched fresh controls use identical tests/build/worker counts. Record actual launches versus resets, common-case summed/wall times and failure counts; inspect the existing indented-selection screenshot. Tier: High Risk, complete validation and independent review; repeat screenshot infrastructure guards if launch/rendering inputs changed. Update current supported commands in Development §8.
+
+### E2E-8d — Vim text-editing area
+
+Inventory every body/launch in `e2e/vim-text-editing.spec.ts` against ADR 0021 before opting in. Adopt only hidden top-level/collapsed seeds with supported options and no clocks, initialization scripts, relaunches or retained instrumentation. Keep incompatible cases explicitly fresh; the current file includes nested locations, so whole-file opt-in is prohibited. Group eligibility without losing assertions or changing editing-mode coverage. If group/title changes affect conformance references, update them in the same task.
+
+Files: `e2e/vim-text-editing.spec.ts`, `e2e/fixtures.ts` only for a required group selector, `docs/VIM_CONFORMANCE.md` if references change, Development §8, this plan. Acceptance: committed body-level eligibility inventory in the task findings; five-repeat one/six-worker runs and matched fresh controls; Visual/Replace/register and clipboard state poisoning across successive eligible cases; mixed fresh/shared transitions; existing relevant screenshots inspected. Tier: High Risk, `npm run check:full`, applicable screenshot guards and independent review. Extending the top-level/collapsed oracle is outside this task; exclusions are acceptable and must be explicit.
+
+### E2E-8e — Vim navigation and selection area
+
+Inventory `e2e/vim-navigation-and-visual.spec.ts` by body/launch and adopt only cases meeting the same established contract. Keep nested/expanded seeds, unsupported launch options and retained instrumentation fresh. Cover Visual selection, registers, focus/caret restoration and transitions between fresh and shared cases; preserve conformance references when restructuring groups.
+
+Files: `e2e/vim-navigation-and-visual.spec.ts`, `docs/VIM_CONFORMANCE.md` if references change, fixture group selector only if necessary, Development §8, this plan. Acceptance and High Risk validation match E2E-8d, including one/six-worker five repeats, fresh controls, inspected existing screenshots and independent review against the complete eligibility inventory. Do not silently widen the reset contract or select neighboring files.
+
+### E2E-8f — Bounded rollout closure
+
+Run two sequential matched full-suite timing runs for adopted and fresh-control configurations on the same host/worker count, with no overlapping suites or source changes. Preserve every case and editing category. Report whole-suite launches/resets, summed/wall time, observed spread, reset failures and final memory evidence; keep excluded boundary areas explicit. Do not require the prototype's two-file percentage as a suite-wide target.
+
+Files: Development §8 and this plan/index; `scripts/e2e-timing.mjs` only if reset reporting needs a focused extension. Acceptance: complete passing timing pairs, no state-leak or lifecycle failures, all areas and exclusions documented. Tier: High Risk if reporting code changes, otherwise documentation checks plus the full real-E2E measurements. Resolve all authorized rollout tasks before marking the parent done. D2 remains declined and D4 deferred; do not implement them during closure. Move durable current commands/isolation/evidence limits to Development and ADR 0021, then remove the completed initiative/index when no authorized task remains.
 
 ## Findings
 
@@ -774,10 +811,12 @@ Low Risk validation passed on HEAD `dc4c01f` plus these changes: `npm run check`
 
 ## Next Task
 
-E2E-8a: record the approved D1 isolation model in an ADR and finalize ordered rollout tasks. No runtime adoption has landed yet. D2 is declined and D4 deferred; neither requires another decision to complete the currently authorized work.
+E2E-8a preparation passed `npm run format:check:changed`, `npm run check:docs` (43 live documents) and `npm run check:opencode` (292 expectations) on HEAD `94479f7` plus its documentation-only diff. Independent review of the full diff and new ADR found no meaningful issues. Runtime inputs and previous validation remain unchanged; no implementation or memory-measurement result is claimed by this preparation.
+
+E2E-8b: harden reset/recovery and establish repeated-cycle memory evidence before adopting default reuse in the selected specs. ADR 0021 and the ordered rollout are prepared; runtime adoption has not landed. Start a new session: E2E-3, E2E-4, E2E-6 and E2E-8a exhaust the four-task session limit. D2 is declined and D4 deferred.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): complete E2E-8a, the approved shared-application ADR and rollout preparation. D2 was declined, D3 implemented, and D4 deferred.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8b, harden shared-application reset/recovery and establish memory evidence under ADR 0021. D1 is approved, D2 declined, D3 implemented, D4 deferred. Preserve both editing modes and fresh-process boundary exclusions.
 ```

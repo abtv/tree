@@ -24,5 +24,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0018](0018-struck-through-nodes-in-schema-version-4.md) | Struck-Through Nodes in Schema Version 4 | Accepted | 2026-10-05 |
 | [0019](0019-canonical-e2e-rendering-scale.md) | Canonical E2E Rendering Scale | Accepted | 2026-10-05 |
 | [0020](0020-agenda-derived-projection-and-runtime-view-state.md) | Agenda Derived Projection and Runtime View State | Accepted | 2026-10-09 |
+| [0021](0021-worker-owned-e2e-application-reuse.md) | Worker-Owned E2E Application Reuse | Accepted | 2026-10-11 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.
