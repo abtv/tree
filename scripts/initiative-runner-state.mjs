@@ -16,6 +16,14 @@ function unique(values) {
   return new Set(values).size === values.length
 }
 
+function artifacts(values) {
+  if (!Array.isArray(values) || values.length === 0) return false
+  if (strings(values)) return true // Pure AW-2 gate fixtures; runtime verifies observed artifact descriptors.
+  return values.every(
+    (value) => value && strings([value.path, value.identity]) && /^sha256:[a-f0-9]{64}$/.test(value.identity),
+  )
+}
+
 function validObservation(observation) {
   requireCondition(observation && typeof observation.root === 'string', 'Missing repository observation')
   for (const key of ['head', 'startingCommit', 'planPath', 'taskId', 'indexIdentity', 'headIdentity', 'snapshot']) {
@@ -46,6 +54,11 @@ export function authorizeTask(input) {
     requireCondition(typeof input[key] === 'string' && input[key].trim().length > 0, `Missing ${key}`)
   }
   requireCondition(/^[A-Z][A-Z0-9]*-[0-9]+$/.test(input.taskId), 'Invalid task ID')
+  if (input.nextTask !== undefined)
+    requireCondition(
+      /^[A-Z][A-Z0-9]*-[0-9]+$/.test(input.nextTask) && input.nextTask !== input.taskId,
+      'Invalid next task',
+    )
   repositoryPath(input.planPath)
   requireCondition(
     strings(input.files) && input.files.length > 0 && unique(input.files),
@@ -68,6 +81,18 @@ export function authorizeTask(input) {
     Number.isSafeInteger(input.budgetMs) && input.budgetMs > 0,
     'A finite elapsed-time budget is required',
   )
+  if (input.closure !== undefined) {
+    requireCondition(input.closure?.approved === true, 'Explicit final-closure authorization required')
+    repositoryPath(input.closure.indexPath)
+    requireCondition(input.files.includes(input.closure.indexPath), 'Closure scope must include the plan index')
+    requireCondition(
+      strings(input.closure.requiredTasks) &&
+        input.closure.requiredTasks.length > 0 &&
+        unique(input.closure.requiredTasks) &&
+        input.closure.requiredTasks.includes(input.taskId),
+      'Explicit completed closure prerequisites required',
+    )
+  }
   const contract = structuredClone(input)
   return { contract, identity: digest(contract) }
 }
@@ -135,7 +160,12 @@ export function startTask({ authorization, observation, runId, sessionId, now, d
     'Observation belongs to another or missing plan/task',
   )
   requireCondition(clean(observation), 'Initial worktree must be clean; reconcile unfinished work first')
-  requireCondition(observation.planStatus === 'Ready', 'Committed task must be Ready')
+  if (authorization.contract.closure)
+    requireCondition(
+      observation.planStatus === 'Done' && observation.closureReady === true,
+      'Closure requires all committed tasks Done',
+    )
+  else requireCondition(observation.planStatus === 'Ready', 'Committed task must be Ready')
   requireCondition(strings([runId, sessionId]), 'Run and primary session identities required')
   requireCondition(Number.isSafeInteger(now) && now >= 0, 'Invalid start time')
   requireCondition(
@@ -201,6 +231,36 @@ export function resumeTask({ run, authorization, observation, now, sessionId }) 
   }
 }
 
+// External owner evidence resolves this checkpoint without consuming a repair
+// attempt or replacing the already validated primary session.
+export function resolveOwnerEvidence({ run, authorization, observation, receipts, now }) {
+  bound(run, authorization, observation, now)
+  requireCondition(run.phase === 'blocked' && run.blocker.kind === 'owner', 'No owner checkpoint to resolve')
+  requireCondition(now < run.deadlineAt, 'Initiative budget exhausted')
+  requireCondition(
+    observation.head === run.startingCommit && observation.snapshot === run.blocker.snapshot,
+    'Worktree changed since owner checkpoint',
+  )
+  requireCondition(
+    authorization.contract.ownerChecks.every((checkId) =>
+      receipts.some(
+        (receipt) =>
+          receipt.kind === 'owner' &&
+          receipt.checkId === checkId &&
+          receipt.status === 'passed' &&
+          receipt.runId === run.runId &&
+          receipt.taskId === authorization.contract.taskId &&
+          receipt.snapshot === observation.snapshot &&
+          receipt.candidate === observation.indexIdentity &&
+          strings([receipt.ownerReference]) &&
+          artifacts(receipt.artifacts),
+      ),
+    ),
+    'Missing owner verification',
+  )
+  return { ...run, phase: 'executing', blocker: null, observedAt: now }
+}
+
 function evidenceProblems(run, authorization, observation, receipts, now) {
   const problems = []
   const contract = authorization.contract
@@ -211,8 +271,13 @@ function evidenceProblems(run, authorization, observation, receipts, now) {
   if (observation.unstaged.length || observation.untracked.length || observation.workingPlanPresent)
     problems.push('Candidate must be fully staged with no temporary working plan')
   if (observation.indexIdentity === observation.headIdentity) problems.push('No task change to commit')
-  if (observation.planStatus !== 'Done' || observation.planBlob === run.startingPlanBlob)
+  if (contract.closure) {
+    if (observation.closureValid !== true || observation.planBlob !== null)
+      problems.push('Candidate lacks the explicitly authorized final closure')
+  } else if (observation.planStatus !== 'Done' || observation.planBlob === run.startingPlanBlob)
     problems.push('Candidate lacks the task completion plan update')
+  if (!contract.closure && observation.planTransitionsValid === false)
+    problems.push('Candidate changes unrelated task statuses or scope')
   if (!observation.changed.includes(contract.planPath)) problems.push('Plan update missing from candidate')
   if (observation.changed.some((path) => !contract.files.includes(path)))
     problems.push('Changed paths need scope reconciliation')
@@ -232,7 +297,7 @@ function evidenceProblems(run, authorization, observation, receipts, now) {
     }
     if (!Number.isSafeInteger(receipt.finishedAt) || receipt.finishedAt < run.startedAt || receipt.finishedAt > now)
       problems.push('Invalid evidence time')
-    if (receipt.status !== 'passed' || !strings(receipt.artifacts) || receipt.artifacts.length === 0)
+    if (receipt.status !== 'passed' || !artifacts(receipt.artifacts))
       problems.push('Failed, incomplete or unsupported evidence')
     if (!['command', 'role', 'owner', 'acceptance'].includes(receipt.kind)) problems.push('Unknown evidence kind')
   }
@@ -311,7 +376,9 @@ export function reconcileCommit({ run, authorization, observation, now }) {
   )
     problems.push('Expected exactly one append-only task commit')
   if (observation.headIdentity !== run.candidate?.identity) problems.push('Commit differs from the validated candidate')
-  if (observation.planStatus !== 'Done') problems.push('Committed plan does not mark the task Done')
+  if (authorization.contract.closure) {
+    if (observation.closureValid !== true) problems.push('Committed closure does not match the authorized projection')
+  } else if (observation.planStatus !== 'Done') problems.push('Committed plan does not mark the task Done')
   // Reconciliation may record a commit that already landed before a timeout;
   // it never authorizes the next launch or renews the initiative deadline.
   if (problems.length) return { advance: false, problems, run }

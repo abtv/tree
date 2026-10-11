@@ -28,9 +28,9 @@ The runner is a deterministic coordinator, not another product decision-maker. I
 | --- | --- | --- | --- | --- |
 | AW-1 | Shared approval, autonomy, planning and handoff contract | None | Consistent documentation, owner-involvement template, policy review and documentation checks | Done |
 | AW-2 | Deterministic runner state and completion gates | AW-1 | Tests reject unauthorized/stale/incomplete results and preserve interrupted work | Done |
-| AW-3L | Bounded development launcher and reusable permission rule | AW-2 | Implementation, composed full validation and independent review complete; runtime probe after restart | Awaiting restart |
-| AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter contract tests, process/budget tests, required validation and independent review | Ready |
-| AW-4 | Bounded fresh-run pilot and closure | AW-3; numeric pilot budget | Actual capability evidence, automatic task transition, recovery evidence and no outstanding required checks | Planned |
+| AW-3L | Bounded development launcher and reusable permission rule | AW-2 | Implementation, composed full validation, independent review and no-prompt runtime launch verified | Done |
+| AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter/host regressions, composed High Risk validation and independent reviewer/verifier passes complete | Done |
+| AW-4 | Bounded fresh-run pilot and closure | AW-3; numeric pilot budget | Actual capability evidence, automatic task transition, recovery evidence and no outstanding required checks | Ready |
 
 ### AW-1 — Shared Workflow Contract
 
@@ -76,7 +76,7 @@ Validation tier: Minimal Risk for final documentation, plus outstanding High Ris
 
 ## Owner Involvement
 
-Separate setup involvement: **one confirmed Codex restart** to activate the reviewed launcher rule. The agent performs the subsequent runtime check; another prompt or denial is a capability finding to resolve explicitly, not a reason to weaken permissions.
+Separate setup involvement: **one confirmed Codex restart**, completed. At commit `3654b987`, the outer coordinator invoked the reviewed `develop-aw3` operation without a new approval prompt. Native session `01a12ce8-d98a-7422-ac99-5bfe4b25fcea` completed repository inspection, native edits and focused synthetic tests, then returned successfully. A second fixed development launch also started without a prompt. These observations establish the bounded development path, not automatic controller advancement or AW-4 pilot acceptance.
 
 Expected application manual verification: **zero confirmed rounds, zero confirmed checks** for the documentation and runner itself. The live pilot has unresolved runtime capabilities, so this is not a promise of unattended completion. Do not count a missing native capability as passed.
 
@@ -91,6 +91,6 @@ Do not bundle checks across a task's required pre-commit boundary. Report any ne
 
 ## Next Task
 
-AW-3L: after the owner's Codex restart, verify the named launcher without a new prompt, then continue AW-3. The launcher implementation, permission matching, composed full validation and independent passes are complete. AW-3 still has unfinished uncommitted modules; retain them and `WORKING_PLAN.md`. No additional implementation approval is required within this initiative's scope. The live pilot limit is 60 minutes and has not started. Automatic task advancement is not implemented yet.
+AW-4: define and review the bounded synthetic pilot projection, then exercise at least two fresh task runs, real validation/commit boundaries, independent roles and recovery. AW-3 provides the executable host, configured-role adapter, owner-evidence resolution, exact pre-commit checks and bounded recovery. Host-observed receipts follow the existing trusted-repository model; no external signing-key custody or stronger same-user isolation is claimed. AW-3L's three fixed operations have all run without new approval prompts. Generic host invocation and automatic live advancement remain to be verified through the supported permission flow; the bounded launcher rule does not authorize arbitrary host invocations. The approved cumulative live pilot limit is 60 minutes and has not started. Retain its original deadline across retries and restarts. Do not select the separate E2E Coverage Efficiency initiative.
 
-Resume with: “Continue Autonomous Initiative Execution after the restart. Verify the bounded launcher rule, then resume AW-3 from WORKING_PLAN.md. Preserve the unfinished files and the 60-minute pilot limit.”
+Resume with: “Continue Autonomous Initiative Execution AW-4 from plans/autonomous-initiatives.md. Define and verify the synthetic pilot within the approved cumulative 60-minute limit; do not reset the budget on restart or change unrelated work.”
