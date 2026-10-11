@@ -522,6 +522,24 @@ For these gates, stage the complete candidate (including the task's Done status)
 
 If blocked, record the concrete blocker and the safe next action in the active plan when that update can be committed independently; otherwise preserve the uncommitted work and `WORKING_PLAN.md` and give the same information in the handoff. A plan's status must never imply a task passed validation or was committed when it did not. At completion of an initiative, or of a review follow-up batch whose last task has landed and for which the Product Owner confirmed no further tasks remain, move lasting product, architecture, or development knowledge to its owner, then remove the plan and index entry in the commit that records completion. Git history provides the completed plan's record; do not keep an archive or permanent validation log.
 
+### Bounded AW-3 development launcher
+
+`scripts/initiative-launch.mjs` is a temporary prerequisite for finishing the autonomous-initiative controller. It has no dependency on unfinished controller modules and does not advance tasks, stage files, commit, certify validation or change permissions. It accepts exactly one of `develop-aw3`, `review-aw3` and `verify-aw3`; additional arguments, arbitrary prompts, paths, session IDs and Codex flags are rejected. It requires AW-3 to be Ready in the committed Autonomous Initiative Execution plan.
+
+After reviewing launcher changes and restarting Codex with the project configuration trusted, invoke the appropriate command outside the parent sandbox using the normal execution tool. The tracked `.codex/rules/initiative-launch.rules` permits only these operations at this checkout path:
+
+```text
+node /Users/andrew/work/tree/scripts/initiative-launch.mjs develop-aw3
+node /Users/andrew/work/tree/scripts/initiative-launch.mjs review-aw3
+node /Users/andrew/work/tree/scripts/initiative-launch.mjs verify-aw3
+```
+
+The launcher fixes the repository directory and child sandbox. Independent role launches project the committed `.codex/agents/` model, instructions and sandbox settings, disable web access and further role delegation, and reject unsupported role configuration fields. Existing Codex rules and authentication stay in effect. The development child implements and runs sandbox-compatible focused checks; the outer coordinating Codex session supplies required host validation, independent passes and the final commit. Reviewer command restrictions and verifier no-edits/command restrictions remain instruction-enforced as described in `docs/AGENT_ROLES.md`; this launcher does not claim stronger enforcement.
+
+Each invocation has a 20-minute and 16 MiB output bound, separate from the unstarted 60-minute pilot allowance. Temporary raw logs, native session identity and exit summary are retained under `.scratch/autonomous-initiatives/launch-<id>/`. A successful native return is a handoff only. A repository-local exclusive lock prevents competing launcher invocations. After an abnormal stop the lock remains: inspect the recorded session and owned processes, establish that work has stopped, then remove only that reconciled lock through the file-editing tool before another launch. Never kill the shared Codex daemon, signal a PID merely because it appears in an old record, or delete another task's evidence. Required validation and review still gate the commit.
+
+The permission rule grants host execution to this reviewed repository script. As with existing named test workflows, it trusts the script's contents; it is not a content signature. Review changes to this security boundary before using its allowance. The rule is checkout-path-specific and needs a reviewed update after moving the repository. `codex execpolicy check --rules .codex/rules/initiative-launch.rules -- node /Users/andrew/work/tree/scripts/initiative-launch.mjs develop-aw3` checks matching only. Actual rule discovery, trust, child capabilities and absence of approval prompts must be verified after restart. See the [official Codex rules documentation](https://learn.chatgpt.com/docs/agent-configuration/rules).
+
 ---
 
 ## 12. Testing Strategy

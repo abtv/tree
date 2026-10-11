@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Autonomous Initiative Execution](autonomous-initiatives.md) | Approved; workflow contract and completion gates complete | AW-3: implement Codex adapter and bounded recovery |
+| [Autonomous Initiative Execution](autonomous-initiatives.md) | Approved; launcher reviewed, awaiting restart; controller draft preserved | AW-3L: verify launcher after restart, then continue AW-3 |
 | [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Proposed; planning recorded, execution awaits continuation | EC-1: audit coverage ownership and establish comparable costs |
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.

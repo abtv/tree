@@ -28,6 +28,7 @@ The runner is a deterministic coordinator, not another product decision-maker. I
 | --- | --- | --- | --- | --- |
 | AW-1 | Shared approval, autonomy, planning and handoff contract | None | Consistent documentation, owner-involvement template, policy review and documentation checks | Done |
 | AW-2 | Deterministic runner state and completion gates | AW-1 | Tests reject unauthorized/stale/incomplete results and preserve interrupted work | Done |
+| AW-3L | Bounded development launcher and reusable permission rule | AW-2 | Implementation, composed full validation and independent review complete; runtime probe after restart | Awaiting restart |
 | AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter contract tests, process/budget tests, required validation and independent review | Ready |
 | AW-4 | Bounded fresh-run pilot and closure | AW-3; numeric pilot budget | Actual capability evidence, automatic task transition, recovery evidence and no outstanding required checks | Planned |
 
@@ -51,6 +52,8 @@ Validation tier: High Risk for orchestration of processes, filesystem state and 
 
 ### AW-3 — Codex Adapter and Recovery
 
+Prerequisite AW-3L was authorized after three ad-hoc native launch approvals interrupted implementation. It owns `scripts/initiative-launch.mjs`, its test, `.codex/rules/initiative-launch.rules`, development instructions and this plan/index. Complete and review the fixed-operation launcher, then restart Codex once to load its rule and probe actual no-prompt behavior. It is a launch prerequisite, not a complete controller. Preserve unfinished AW-3 modules and `WORKING_PLAN.md` across that restart. Validation tier: High Risk, including synthetic real-process tests, full validation, independent reviewer and workflow verifier. No live AW-4 pilot is authorized by this prerequisite.
+
 Expected files: runner modules/tests from AW-2; `docs/DEVELOPMENT.md` operational instructions; `docs/WORKING_WITH_AGENT.md`; `.codex/rules/` only for a demonstrated and separately reviewed narrow gap; this plan.
 
 Launch fresh Codex primary runs through supported native interfaces, with explicit repository working directory and existing sandbox/rules, capturing structured events and usage. Preserve native subagent role restrictions. Reject unsupported tooling or missing permissions rather than selecting unrestricted access. Pass only the task context and source links needed; use native resume only when it helps recover the same unfinished task.
@@ -73,6 +76,8 @@ Validation tier: Minimal Risk for final documentation, plus outstanding High Ris
 
 ## Owner Involvement
 
+Separate setup involvement: **one confirmed Codex restart** to activate the reviewed launcher rule. The agent performs the subsequent runtime check; another prompt or denial is a capability finding to resolve explicitly, not a reason to weaken permissions.
+
 Expected application manual verification: **zero confirmed rounds, zero confirmed checks** for the documentation and runner itself. The live pilot has unresolved runtime capabilities, so this is not a promise of unattended completion. Do not count a missing native capability as passed.
 
 | Check or decision | Classification | When | Owner action |
@@ -86,6 +91,6 @@ Do not bundle checks across a task's required pre-commit boundary. Report any ne
 
 ## Next Task
 
-AW-3: implement the native Codex adapter, durable receipts, exclusive process ownership and bounded recovery. AW-2 completed the gate library after independent review corrected malformed attribution and blocker handling; scoped reviewer and workflow-verifier rechecks found no meaningful issues. This initiative is approved; no additional implementation approval is required for its stated scope. The live pilot limit is 60 minutes. Automatic launching is not implemented yet.
+AW-3L: after the owner's Codex restart, verify the named launcher without a new prompt, then continue AW-3. The launcher implementation, permission matching, composed full validation and independent passes are complete. AW-3 still has unfinished uncommitted modules; retain them and `WORKING_PLAN.md`. No additional implementation approval is required within this initiative's scope. The live pilot limit is 60 minutes and has not started. Automatic task advancement is not implemented yet.
 
-Resume with: “Continue the approved Autonomous Initiative Execution plan at its next ready task. Preserve the 60-minute pilot limit and all validation, role, scope and permission boundaries.”
+Resume with: “Continue Autonomous Initiative Execution after the restart. Verify the bounded launcher rule, then resume AW-3 from WORKING_PLAN.md. Preserve the unfinished files and the 60-minute pilot limit.”
