@@ -85,6 +85,8 @@ const developCases = {
   allow: [
     'git status --short',
     'git diff --check',
+    'git check-ignore .scratch/opencode-check/report.json',
+    'git check-ignore --verbose -- .scratch/task/report.json',
     'git add opencode.json docs/DEVELOPMENT.md',
     'git commit -m "chore(agents): refine permissions"',
     'npm run dev',
@@ -259,6 +261,7 @@ const developCases = {
     'rm WORKING_PLAN.md.bak',
     'git push origin main',
     'git reset --hard HEAD~1',
+    'git check-ignore-extra .scratch/task/report.json',
     'git commit --amend -m "rewrite"',
     'git commit --no-verify',
     'git commit -n -m "skip hooks"',

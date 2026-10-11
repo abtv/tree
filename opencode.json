@@ -72,6 +72,8 @@
           "git status *": "allow",
           "git diff": "allow",
           "git diff *": "allow",
+          "git check-ignore": "allow",
+          "git check-ignore *": "allow",
           "git log": "allow",
           "git log *": "allow",
           "git show": "allow",
