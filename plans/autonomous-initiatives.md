@@ -12,7 +12,7 @@ Approved decisions:
 * Agents may choose reversible UX details inside explicitly delegated areas using recorded principles. New capabilities outside scope, unspecified destructive or migration behavior, major architecture changes, and weakening standing commitments remain reserved.
 * Required manual checks block the affected task. Planning must estimate the number of owner verification rounds and checks before implementation and expose unresolved capabilities separately.
 * Start with Codex, one fresh primary run per task, independent roles under the existing role contract, and two unsuccessful recovery attempts at the same blocker without new evidence before escalation. Quality takes priority over token savings.
-* Numeric elapsed-time budget for the live pilot is pending the Product Owner's answer. Planning, documentation and deterministic tests may proceed; do not launch the unattended pilot before that answer.
+* The Product Owner approved a 60-minute elapsed-time limit for the live pilot on 2026-10-11. The allowance applies across fresh task runs and retries; restarting does not renew it. This does not start the pilot clock during implementation.
 
 ## Sources and Constraints
 
@@ -27,8 +27,8 @@ The runner is a deterministic coordinator, not another product decision-maker. I
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | AW-1 | Shared approval, autonomy, planning and handoff contract | None | Consistent documentation, owner-involvement template, policy review and documentation checks | Done |
-| AW-2 | Deterministic runner state and completion gates | AW-1 | Tests reject unauthorized/stale/incomplete results and preserve interrupted work | Ready |
-| AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter contract tests, process/budget tests, required validation and independent review | Planned |
+| AW-2 | Deterministic runner state and completion gates | AW-1 | Tests reject unauthorized/stale/incomplete results and preserve interrupted work | Done |
+| AW-3 | Codex adapter, bounded recovery and operational documentation | AW-2 | Adapter contract tests, process/budget tests, required validation and independent review | Ready |
 | AW-4 | Bounded fresh-run pilot and closure | AW-3; numeric pilot budget | Actual capability evidence, automatic task transition, recovery evidence and no outstanding required checks | Planned |
 
 ### AW-1 — Shared Workflow Contract
@@ -57,6 +57,8 @@ Launch fresh Codex primary runs through supported native interfaces, with explic
 
 Enforce an initiative-wide elapsed-time allowance across restarts, bounded recovery, exclusive ownership, graceful interruption and owned-process cleanup. Preserve logs/evidence and worktree on failure. Serialize native test execution. Report blockers with the next supported action. Test timeout, signal, malformed output, approval denial, authentication failure and budget exhaustion using synthetic processes before a live run.
 
+AW-2 provides conservative exact-snapshot gates and read-only Git observations, with 77 regression cases and successful complete validation. The adapter must establish authentic receipt provenance and exclusive launch ownership; the gate library alone does not provide either. Add an explicit final-closure contract for retiring the plan and its index entry: ordinary task gates require a retained Done row and intentionally reject implicit plan deletion. Preserve newly discovered blockers even when their task commit has already landed.
+
 Validation tier: High Risk; full validation, independent reviewer and separate workflow verifier. Reuse valid AW-2 results only when their inputs remain unchanged. No automatic changes to user configuration, trust or permissions.
 
 ### AW-4 — Pilot and Closure
@@ -75,7 +77,7 @@ Expected application manual verification: **zero confirmed rounds, zero confirme
 
 | Check or decision | Classification | When | Owner action |
 | --- | --- | --- | --- |
-| Numeric elapsed-time budget | Owner required | Before AW-4 live execution | Choose the pilot limit; 60 minutes proposed |
+| Numeric elapsed-time budget | Resolved | AW-4 live execution | 60 minutes approved; no further answer needed |
 | Fresh Codex authentication/trust and narrow command permissions | Capability unresolved | AW-3/AW-4 preflight | Only if the supported permission flow requires it; present exact action and reason |
 | Required role launch and artifact inspection | Capability unresolved | First authorized use | None if verified; otherwise report the missing capability before dependent work |
 | Native keyboard/menu/transient lifecycle observation | Capability unresolved; not required by current runtime scope | Only if pilot/task scope actually requires it | Add explicit steps and revised round count before reaching the affected completion gate |
@@ -84,6 +86,6 @@ Do not bundle checks across a task's required pre-commit boundary. Report any ne
 
 ## Next Task
 
-AW-2: implement the deterministic runner state and completion gates. AW-1 recorded the shared workflow contract; its independent review found a review-batch authorization contradiction, now corrected so whole-batch approval and task-only approval remain distinct. This initiative is approved; no additional implementation approval is required for its stated scope. The live pilot budget remains unresolved. Automatic launching is not implemented yet.
+AW-3: implement the native Codex adapter, durable receipts, exclusive process ownership and bounded recovery. AW-2 completed the gate library after independent review corrected malformed attribution and blocker handling; scoped reviewer and workflow-verifier rechecks found no meaningful issues. This initiative is approved; no additional implementation approval is required for its stated scope. The live pilot limit is 60 minutes. Automatic launching is not implemented yet.
 
-Resume with: “Continue the approved Autonomous Initiative Execution plan at its next ready task. Preserve the pending pilot budget and all validation, role, scope and permission boundaries.”
+Resume with: “Continue the approved Autonomous Initiative Execution plan at its next ready task. Preserve the 60-minute pilot limit and all validation, role, scope and permission boundaries.”
