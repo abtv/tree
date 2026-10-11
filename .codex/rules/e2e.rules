@@ -1,0 +1,6 @@
+prefix_rule(
+    pattern = ["npm", "run", "test:e2e:timing"],
+    decision = "allow",
+    match = ["npm run test:e2e:timing"],
+    not_match = ["npm run test:e2e", "npm run check:full"],
+)
