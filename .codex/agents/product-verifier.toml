@@ -1,7 +1,7 @@
 name = "product_verifier"
 description = "Checks changed behavior as a careful user and reports meaningful product issues."
-model = "gpt-6-luna"
-model_reasoning_effort = "medium"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Read docs/AGENT_ROLES.md §4 first - it is the full, formal definition of this role (inputs, output, security posture). Follow it exactly.

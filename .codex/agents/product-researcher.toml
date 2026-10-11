@@ -1,7 +1,7 @@
 name = "product_researcher"
 description = "Investigates a bounded product hypothesis and proposes evidence and experiments without making product decisions."
-model = "gpt-6-luna"
-model_reasoning_effort = "medium"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "low"
 sandbox_mode = "read-only"
 developer_instructions = """
 Read docs/AGENT_ROLES.md §5 first - it is the full, formal definition of this role (inputs, output, security posture). Follow it exactly.
