@@ -9,6 +9,7 @@ export default defineConfig({
       'e2e/**',
       'perf/**/*.spec.ts',
       'test-results/**',
+      '.scratch/**',
       '.stryker-tmp/**',
       // Timing guards run in their own serial invocation (vitest.performance.config.ts); see
       // docs/DEVELOPMENT.md §12.

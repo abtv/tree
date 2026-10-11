@@ -22,7 +22,7 @@ const platformImportRestrictions = {
 
 export default tseslint.config(
   {
-    ignores: ['coverage/**', 'node_modules/**', 'out/**', 'reports/**', '.stryker-tmp/**'],
+    ignores: ['coverage/**', 'node_modules/**', 'out/**', 'reports/**', '.stryker-tmp/**', '.scratch/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

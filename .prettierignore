@@ -6,6 +6,7 @@ playwright-report/
 blob-report/
 reports/
 .stryker-tmp/
+.scratch/
 package-lock.json
 docs/
 *.md

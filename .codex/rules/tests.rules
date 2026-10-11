@@ -4,7 +4,7 @@ prefix_rule(
     decision = "allow",
     match = [
         "npm run test:e2e:changed -- --list",
-        "npm run test:e2e:diagnose -- --shared-reset=reload --json-output=/private/tmp/report.json e2e/navigation.spec.ts --workers=6 --repeat-each=5 --reporter=dot,json",
+        "npm run test:e2e:diagnose -- --shared-reset=reload --json-output=.scratch/diagnostics/report.json e2e/navigation.spec.ts --workers=6 --repeat-each=5 --reporter=dot,json",
         "npm run test:e2e:visible -- e2e/drag-and-drop-hierarchy.spec.ts --workers=1 --update-snapshots",
         "npm run test:perf:profile -- perf/agenda-scale.spec.ts --grep deep-100000-dense",
     ],
