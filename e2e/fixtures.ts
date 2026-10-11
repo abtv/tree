@@ -102,6 +102,7 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
     activeEditingMode = editingMode
     const directory = mkdtempSync(join(tmpdir(), userDataMarker))
     await use(directory)
+    const teardownStarted = performance.now()
     // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
     // Playwright caches imported helper modules for the lifetime of the worker process, so a hook
     // declared here would attach only to the first test file's suite and silently stop running for
@@ -125,6 +126,10 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
       activeEditingMode = 'vim'
       unlockSystemClipboard()
       rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+      base.info().annotations.push({
+        type: 'tree-teardown-timing',
+        description: JSON.stringify({ duration: performance.now() - teardownStarted }),
+      })
     }
   },
 })
@@ -451,81 +456,107 @@ export async function launchTree(
     vimPreference?: boolean | 'saved'
   } = {},
 ): Promise<Launched> {
-  await closeTrackedApps()
-  await cleanupStaleElectronProcesses(userDataMarker)
-  const vimPreference = options.vimPreference ?? activeEditingMode === 'vim'
-  if (vimPreference !== 'saved') writeVimPreference(userDataDir, vimPreference)
-  const windowMode = options.windows ?? ambientWindowMode()
-  const shortcutMode = options.shortcut ?? ambientShortcutMode()
-  let app: ElectronApplication
-  try {
-    app = await electron.launch({
-      args: [
-        ...(options.initialDeviceScaleFactor === undefined
-          ? []
-          : [`--force-device-scale-factor=${options.initialDeviceScaleFactor}`]),
-        // Set the backing scale before Electron initializes Chromium. CSS-sized screenshots still
-        // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
-        '--force-device-scale-factor=1',
-        `--user-data-dir=${userDataDir}`,
-        join(process.cwd(), 'e2e', 'electron-entry.cjs'),
-        // Overlay scrollbars reserve no width, while classic ones narrow the centered outline. macOS
-        // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
-        // through the user-defaults argument domain. It follows the entry, or Electron would take the
-        // value for the application path.
-        '-AppleShowScrollBars',
-        'WhenScrolling',
-        ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
-      ],
-      cwd: process.cwd(),
-      env: launchEnvironment(windowMode, shortcutMode),
-    })
-  } catch (error) {
-    await cleanupStaleElectronProcesses(userDataMarker)
-    throw new Error(`Electron failed to launch for E2E test: ${formatLaunchError(error)}`, { cause: error })
+  const started = performance.now()
+  const timing = { cleanup: 0, electronLaunch: 0, firstWindow: 0, assertions: 0, total: 0 }
+  const measure = async <T>(
+    phase: 'cleanup' | 'electronLaunch' | 'firstWindow' | 'assertions',
+    action: () => Promise<T>,
+  ): Promise<T> => {
+    const phaseStarted = performance.now()
+    try {
+      return await action()
+    } finally {
+      timing[phase] += performance.now() - phaseStarted
+    }
   }
-  launchedApps.push(app)
-  app.once('close', () => {
-    closedApps.add(app)
-    const trackedIndex = launchedApps.indexOf(app)
-    if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
-    forgetObservations(app)
-  })
   try {
-    const window = await app.firstWindow()
-    await observeSaveErrors(window)
-    await assertWindowMode(app, windowMode)
-    await assertShortcutMode(app, shortcutMode)
-    if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
-    const scale = await window.evaluate(() => devicePixelRatio)
-    if (scale !== 1) {
-      throw new Error(`Expected E2E devicePixelRatio 1, got ${scale}. The launch-time rendering scale did not apply.`)
-    }
-    const scrollbarWidth = await window.evaluate(() => {
-      const probe = document.createElement('div')
-      probe.style.cssText = 'position:absolute;visibility:hidden;width:100px;height:100px;overflow:scroll'
-      document.body.append(probe)
-      const width = probe.offsetWidth - probe.clientWidth
-      probe.remove()
-      return width
+    await measure('cleanup', async () => {
+      await closeTrackedApps()
+      await cleanupStaleElectronProcesses(userDataMarker)
     })
-    if (scrollbarWidth !== 0) {
-      throw new Error(`Expected E2E overlay scrollbars, got a ${scrollbarWidth}px classic scrollbar.`)
+    const vimPreference = options.vimPreference ?? activeEditingMode === 'vim'
+    if (vimPreference !== 'saved') writeVimPreference(userDataDir, vimPreference)
+    const windowMode = options.windows ?? ambientWindowMode()
+    const shortcutMode = options.shortcut ?? ambientShortcutMode()
+    let app: ElectronApplication
+    try {
+      app = await measure('electronLaunch', () =>
+        electron.launch({
+          args: [
+            ...(options.initialDeviceScaleFactor === undefined
+              ? []
+              : [`--force-device-scale-factor=${options.initialDeviceScaleFactor}`]),
+            // Set the backing scale before Electron initializes Chromium. CSS-sized screenshots still
+            // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
+            '--force-device-scale-factor=1',
+            `--user-data-dir=${userDataDir}`,
+            join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+            // Overlay scrollbars reserve no width, while classic ones narrow the centered outline. macOS
+            // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
+            // through the user-defaults argument domain. It follows the entry, or Electron would take the
+            // value for the application path.
+            '-AppleShowScrollBars',
+            'WhenScrolling',
+            ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
+          ],
+          cwd: process.cwd(),
+          env: launchEnvironment(windowMode, shortcutMode),
+        }),
+      )
+    } catch (error) {
+      await cleanupStaleElectronProcesses(userDataMarker)
+      throw new Error(`Electron failed to launch for E2E test: ${formatLaunchError(error)}`, { cause: error })
     }
-    // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
-    // Vim tests opt into the real Normal-mode startup state. Standard editing has no modes.
-    if (
-      options.expectReady !== false &&
-      options.initialMode !== 'normal' &&
-      (await window.getByLabel('Vim mode').count()) > 0
-    ) {
-      await window.keyboard.press('i')
-      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    launchedApps.push(app)
+    app.once('close', () => {
+      closedApps.add(app)
+      const trackedIndex = launchedApps.indexOf(app)
+      if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+      forgetObservations(app)
+    })
+    try {
+      const window = await measure('firstWindow', () => app.firstWindow())
+      await measure('assertions', async () => {
+        await observeSaveErrors(window)
+        await assertWindowMode(app, windowMode)
+        await assertShortcutMode(app, shortcutMode)
+        if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
+        const scale = await window.evaluate(() => devicePixelRatio)
+        if (scale !== 1) {
+          throw new Error(
+            `Expected E2E devicePixelRatio 1, got ${scale}. The launch-time rendering scale did not apply.`,
+          )
+        }
+        const scrollbarWidth = await window.evaluate(() => {
+          const probe = document.createElement('div')
+          probe.style.cssText = 'position:absolute;visibility:hidden;width:100px;height:100px;overflow:scroll'
+          document.body.append(probe)
+          const width = probe.offsetWidth - probe.clientWidth
+          probe.remove()
+          return width
+        })
+        if (scrollbarWidth !== 0) {
+          throw new Error(`Expected E2E overlay scrollbars, got a ${scrollbarWidth}px classic scrollbar.`)
+        }
+        // Most non-Vim E2E tests exercise editing commands and explicitly start an Insert session.
+        // Vim tests opt into the real Normal-mode startup state. Standard editing has no modes.
+        if (
+          options.expectReady !== false &&
+          options.initialMode !== 'normal' &&
+          (await window.getByLabel('Vim mode').count()) > 0
+        ) {
+          await window.keyboard.press('i')
+          await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+        }
+      })
+      return { app, window }
+    } catch (error) {
+      await closeApp(app)
+      throw error
     }
-    return { app, window }
-  } catch (error) {
-    await closeApp(app)
-    throw error
+  } finally {
+    timing.total = performance.now() - started
+    base.info().annotations.push({ type: 'tree-launch-timing', description: JSON.stringify(timing) })
   }
 }
 

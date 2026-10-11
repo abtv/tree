@@ -41,8 +41,8 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| E2E-1 | Repeatable timing report and launch-time breakdown | — | In progress |
-| E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Planned |
+| E2E-1 | Repeatable timing report and launch-time breakdown | — | Done |
+| E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Ready |
 | E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Planned |
 | E2E-4 | Editing-mode audit and proposal | — | Ready |
 | E2E-5 | Apply the approved editing-mode reclassification | E2E-4, D2 | Planned |
@@ -148,11 +148,23 @@ The workflow prints all file totals and the 20 slowest tests. Run 1's three lead
 
 ### Validation support: Agenda persistence polling
 
-Two existing tests reproduced ENOENT while polling during the documented atomic-save rename window. The correction uses existing `tryReadPersisted` for all 11 persistence polls across five tests in `e2e/agenda-vim.spec.ts`. The multi-root and first-root projections, expected arrays, and direct post-save assertions are preserved. The complete spec passed three repeats (69 cases); affected TypeScript, lint, format, requirement coverage, and editing-mode checks passed. This contained correction needs no new product decision or structural initiative: the safe reader already exists and the observed test failures share one documented cause in one owner. E2E-1 still requires successful High Risk validation before its timing implementation is complete.
+Two existing tests reproduced ENOENT while polling during the documented atomic-save rename window. The correction uses existing `tryReadPersisted` for all 11 persistence polls across five tests in `e2e/agenda-vim.spec.ts`. The multi-root and first-root projections, expected arrays, and direct post-save assertions are preserved. The complete spec passed three repeats (69 cases); affected TypeScript, lint, format, requirement coverage, and editing-mode checks passed. This contained correction needs no new product decision or structural initiative: the safe reader already exists and the observed test failures share one documented cause in one owner. At that point, E2E-1 still required successful High Risk validation before its timing implementation could be marked complete.
+
+### E2E-1 final validation and Agenda investigation (2026-10-11)
+
+The Product Owner authorized investigating the recurring Agenda performance failures and completing E2E-1 while preserving the timing changes and all performance thresholds. Investigation and validation used HEAD `12f7f97` plus the existing timing implementation, on the same local macOS GUI machine. No application or performance-suite source changed.
+
+The earlier full run breached three unchanged 100,000-node budgets: wide dense date-edit P95 54.4 ms (below 50 required), deep dense undo 100.8 ms (below 100), and mixed dense open 170.1 ms (below 150). `npm run test:perf -- perf/agenda-scale.spec.ts --grep 'agenda-wide-100000-dense|agenda-deep-100000|agenda-mixed-100000-dense' --repeat-each=3 --workers=1` passed 12/12 in 39.7 s outside the sandbox. Across those repeats, open was 107.1–128.9 ms, undo 44.3–68.9 ms, and date-edit P95 36–44 ms.
+
+Source inspection established that the performance suite uses its own fixture and never executes the new E2E timing instrumentation. `perf/agenda-scale.spec.ts` records key-event latency through two animation frames; open and undo each use one sample, while date-edit P95 uses 15 samples. These measurements include renderer and display scheduling. A process probe during the focused run observed high UI-service CPU use (WindowServer 86.3%, WindowManager 47.9%, CursorUIViewService 32.6%); a later full-run probe observed lower values and no remaining `tree-e2e-*` Electron processes. `pmset -g therm` reported no thermal or performance warning. These observations support transient host or display scheduling variability as the leading explanation, but do not prove the process-specific cause of the earlier failures. No persistent runtime regression or E2E process leak was reproduced. The mixed dense open check retains little margin, so intermittent failures remain a risk; thresholds and measurement semantics remain unchanged.
+
+`npm run check:full` passed outside the sandbox on this snapshot: type checks, lint, formatting, documentation and requirement coverage, editing-mode and permission checks, all 3,296 unit tests, unit performance, build, all 746 E2E cases (3.1 minutes), all 60 serial visible Electron performance cases (2.0 minutes), and audit with zero vulnerabilities. In that full sequence the previously failing metrics were wide dense date-edit P95 47.5 ms, deep dense undo 50.2 ms, and mixed dense open 145 ms. Independent review of the full timing diff and untracked report script found no meaningful issues. The existing timing pair above remains evidence for its explicitly identified snapshot; the subsequent polling correction preserved command flow and expected data, and the current full suite passed. `npm run fix:history` listed one earlier OpenCode workflow fix and no package or permission-checker fixes in its 14-day window; no shared structural defect was identified. Temporary investigation evidence is `/private/tmp/tree-e2e1-agenda-investigation.txt`.
+
+The current validation blocker is cleared by the successful full run. E2E-1 introduces no product decisions or architecture changes. This investigation does not authorize performance-suite or product changes outside the initiative.
 
 ## Next Task
 
-E2E-1: complete High Risk validation and commit the timing implementation. Its code and working context remain in the worktree. E2E-4 is independent and may be taken instead if the Product Owner asks for it.
+E2E-2: inspect the measured launch phases for avoidable overhead while retaining every launch assertion and existing isolation. E2E-4 is also ready and independent. The Product Owner must select the next task because both are ready; completion of E2E-1 does not select either.
 
 ## Resume Prompt
 
