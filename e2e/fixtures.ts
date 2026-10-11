@@ -79,7 +79,8 @@ function launchEnvironment(mode: WindowMode, shortcutMode: ShortcutMode): Record
 }
 
 const launchedApps: ElectronApplication[] = []
-const sharedApps = new WeakSet<ElectronApplication>()
+const ownedProcesses = new WeakMap<ElectronApplication, ReturnType<ElectronApplication['process']>>()
+const sharedApps = new WeakMap<ElectronApplication, SharedApplication>()
 const observedSaveErrors = new Map<
   Page,
   { app: ElectronApplication; errors: string[]; timer: ReturnType<typeof setInterval>; collect: () => Promise<void> }
@@ -104,11 +105,91 @@ export function sharedApplicationPrototype(): SharedApplicationReset {
   return reset === 'reload' || reset === 'window' ? reset : 'off'
 }
 
-interface SharedApplication {
+/** Explicit eligible owners opt in; fresh controls and visible runs always retain isolation. */
+export function sharedApplicationAdopted(): SharedApplicationReset {
+  return ambientWindowMode() === 'visible' || process.env['TREE_E2E_SHARED_RESET'] === 'off' ? 'off' : 'reload'
+}
+
+export interface SharedApplication {
   directory: string
   launched?: Launched | undefined
   rendererUrl?: string
   bounds?: PersistedWindowBounds
+}
+
+function invalidateSharedApplication(shared: SharedApplication): void {
+  shared.launched = undefined
+  delete shared.rendererUrl
+  delete shared.bounds
+}
+
+const SHARED_OPERATION_TIMEOUT_MS = 10_000
+
+async function bounded<T>(
+  operation: Promise<T>,
+  label: string,
+  milliseconds = SHARED_OPERATION_TIMEOUT_MS,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out.`)), milliseconds)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Infrastructure regression tests exercise the same reset/disposal path as fixture teardown. */
+export async function resetSharedApplication(
+  shared: SharedApplication,
+  timeoutMilliseconds = SHARED_OPERATION_TIMEOUT_MS,
+): Promise<void> {
+  try {
+    const launched = shared.launched
+    if (launched === undefined) throw new Error('Shared application is unavailable.')
+    const { app, window } = launched
+    await bounded(
+      app.evaluate(async ({ BrowserWindow }) => {
+        const main = BrowserWindow.getAllWindows()[0]
+        if (main === undefined) throw new Error('Shared application window is unavailable.')
+        await main.loadURL('about:blank')
+        if (globalThis.__treeDrainIpc === undefined) throw new Error('Shared IPC drain is unavailable.')
+        await globalThis.__treeDrainIpc()
+      }),
+      'Shared renderer disposal and IPC drain',
+      timeoutMilliseconds,
+    )
+    await bounded(window.waitForURL('about:blank'), 'Shared blank renderer acknowledgement')
+    if (
+      JSON.stringify(await bounded(readMainWindowBounds(app), 'Shared bounds read')) !== JSON.stringify(shared.bounds)
+    ) {
+      await bounded(setMainWindowBounds(app, shared.bounds!), 'Shared bounds restoration')
+    }
+    // Any earlier move/resize can leave a main-process timer even when bounds already match.
+    const elapsed = await bounded(
+      app.evaluate(() => {
+        if (globalThis.__treeSharedTest === undefined) throw new Error('Shared bounds observation is unavailable.')
+        return Date.now() - globalThis.__treeSharedTest.boundsChangedAt
+      }),
+      'Shared bounds debounce observation',
+    )
+    const remaining = WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS + 50 - elapsed
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
+    forgetObservations(app)
+  } catch (error) {
+    await disposeSharedApplication(shared)
+    throw error
+  }
+}
+
+export async function disposeSharedApplication(shared: SharedApplication): Promise<void> {
+  const app = shared.launched?.app
+  if (app !== undefined) await closeApp(app)
+  invalidateSharedApplication(shared)
 }
 
 let activeSharedApplication: SharedApplication | undefined
@@ -128,7 +209,8 @@ export const test = base.extend<
       try {
         await use(shared)
       } finally {
-        if (shared.launched !== undefined) await closeApp(shared.launched.app)
+        await closeTrackedApps()
+        await disposeSharedApplication(shared)
         rmSync(shared.directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
       }
     },
@@ -139,41 +221,27 @@ export const test = base.extend<
     activeSharedReset = sharedApplicationReset
     activeSharedApplication = sharedApplicationReset === 'off' ? undefined : sharedApplication
     const directory = activeSharedApplication?.directory ?? mkdtempSync(join(tmpdir(), userDataMarker))
-    if (activeSharedApplication !== undefined) {
-      expect(existsSync(documentPath(directory)), 'The previous test document must be removed.').toBe(false)
-      expect(attachmentFiles(directory), 'The previous test attachments must be removed.').toEqual([])
-      expect(readVimPreference(directory), 'The previous editing preference must be removed.').toBeUndefined()
-    }
-    await use(directory)
-    const teardownStarted = performance.now()
-    // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
-    // Playwright caches imported helper modules for the lifetime of the worker process, so a hook
-    // declared here would attach only to the first test file's suite and silently stop running for
-    // later files. Fixture teardown runs for every test in every file.
+    let safeToRemove = false
+    let teardownStarted = performance.now()
     try {
+      if (activeSharedApplication !== undefined) {
+        expect(existsSync(documentPath(directory)), 'The previous test document must be removed.').toBe(false)
+        expect(attachmentFiles(directory), 'The previous test attachments must be removed.').toEqual([])
+        expect(readVimPreference(directory), 'The previous editing preference must be removed.').toBeUndefined()
+      }
+      await use(directory)
+      teardownStarted = performance.now()
+      // Per-test teardown lives in this fixture rather than a module-level `test.afterEach`.
+      // Playwright caches imported helper modules for the lifetime of the worker process, so a hook
+      // declared here would attach only to the first test file's suite and silently stop running for
+      // later files. Fixture teardown runs for every test in every file.
       const observations = [...observedSaveErrors.values()]
-      await Promise.all(observations.map(({ collect }) => collect()))
+      await bounded(Promise.all(observations.map(({ collect }) => collect())), 'Renderer error collection')
       if (activeSharedApplication?.launched !== undefined && base.info().status === base.info().expectedStatus) {
-        const { app, window } = activeSharedApplication.launched
-        // Main-process navigation bypasses renderer navigation events, while the production
-        // security policy stays installed. about:blank disposes every renderer timer and store.
-        await app.evaluate(async ({ BrowserWindow }) => {
-          const main = BrowserWindow.getAllWindows()[0]
-          if (main === undefined) throw new Error('Shared application window is unavailable.')
-          await main.loadURL('about:blank')
-          if (globalThis.__treeDrainIpc === undefined) throw new Error('Shared IPC drain is unavailable.')
-          await globalThis.__treeDrainIpc()
-        })
-        await window.waitForURL('about:blank')
-        if (JSON.stringify(await readMainWindowBounds(app)) !== JSON.stringify(activeSharedApplication.bounds)) {
-          await setMainWindowBounds(app, activeSharedApplication.bounds!)
-          // A main-process debounce survives renderer disposal. Drain it before deleting data.
-          await new Promise((resolve) => setTimeout(resolve, WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS + 50))
-        }
-        forgetObservations(app)
+        await resetSharedApplication(activeSharedApplication)
       } else {
         await closeTrackedApps()
-        sharedApplication.launched = undefined
+        invalidateSharedApplication(sharedApplication)
       }
       observations.forEach(({ timer }) => clearInterval(timer))
       observedSaveErrors.clear()
@@ -186,22 +254,29 @@ export const test = base.extend<
       if (unexpectedErrors.length > 0) {
         throw new Error(`Renderer reported save errors:\n${unexpectedErrors.join('\n')}`)
       }
+      safeToRemove = true
     } catch (error) {
       // A failed reset must dispose its process before removing files it may still write.
       await closeTrackedApps()
-      sharedApplication.launched = undefined
+      invalidateSharedApplication(sharedApplication)
+      safeToRemove = true
       throw error
     } finally {
+      for (const { timer } of observedSaveErrors.values()) clearInterval(timer)
+      observedSaveErrors.clear()
+      retainedSaveErrors.length = 0
+      allowedRendererErrors.length = 0
       activeEditingMode = 'vim'
       activeSharedApplication = undefined
       activeSharedReset = 'off'
       unlockSystemClipboard()
-      rmSync(sharedApplicationReset === 'off' ? directory : join(directory, 'data'), {
-        recursive: true,
-        force: true,
-        maxRetries: 5,
-        retryDelay: 100,
-      })
+      if (safeToRemove)
+        rmSync(sharedApplicationReset === 'off' ? directory : join(directory, 'data'), {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 100,
+        })
       base.info().annotations.push({
         type: 'tree-teardown-timing',
         description: JSON.stringify({ duration: performance.now() - teardownStarted }),
@@ -464,19 +539,21 @@ export async function forceRenderFailure(window: Page, message = 'forced rendere
 }
 
 async function closeTrackedApps(): Promise<void> {
-  await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
+  await Promise.all([...launchedApps].map((app) => closeApp(app)))
 }
 
 export async function closeApp(app: ElectronApplication): Promise<void> {
+  const shared = sharedApps.get(app)
   forgetObservations(app)
-  const trackedIndex = launchedApps.indexOf(app)
-  if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+
+  // Drop every process-owned value, even when close is requested by a fresh test.
+  if (shared !== undefined) invalidateSharedApplication(shared)
 
   let electronProcess: ReturnType<ElectronApplication['process']>
   try {
-    electronProcess = app.process()
+    electronProcess = ownedProcesses.get(app) ?? app.process()
   } catch {
-    await app.close().catch(() => undefined)
+    await bounded(app.close(), 'Electron close', 1_000).catch(() => undefined)
     return
   }
   if (closedApps.has(app) || electronProcess.exitCode !== null || electronProcess.signalCode !== null) {
@@ -485,18 +562,22 @@ export async function closeApp(app: ElectronApplication): Promise<void> {
   }
   if (sharedApps.has(app)) {
     // An intentionally blank renderer cannot acknowledge the production quit handshake.
-    await app
-      .evaluate(({ BrowserWindow }) => {
+    await bounded(
+      app.evaluate(({ BrowserWindow }) => {
         for (const window of BrowserWindow.getAllWindows()) {
           if (window.webContents.getURL() === 'about:blank') window.destroy()
         }
-      })
-      .catch(() => undefined)
+      }),
+      'Blank window destruction',
+      1_000,
+    ).catch(() => undefined)
   }
   const closePromise = app.close().catch(() => undefined)
   await Promise.race([closePromise, waitForProcessExit(electronProcess, 7_000)])
   await terminateProcess(electronProcess)
-  await closePromise
+  await bounded(closePromise, 'Electron driver close', 1_000)
+  const trackedIndex = launchedApps.indexOf(app)
+  if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
 }
 
 async function terminateProcess(electronProcess: ReturnType<ElectronApplication['process']>): Promise<void> {
@@ -516,11 +597,13 @@ async function waitForProcessExit(
 ): Promise<void> {
   if (electronProcess.exitCode !== null || electronProcess.signalCode !== null) return
   await new Promise<void>((resolve) => {
-    const timeout = setTimeout(resolve, timeoutMilliseconds)
-    electronProcess.once('exit', () => {
+    const onExit = (): void => {
       clearTimeout(timeout)
+      electronProcess.removeListener('exit', onExit)
       resolve()
-    })
+    }
+    const timeout = setTimeout(onExit, timeoutMilliseconds)
+    electronProcess.once('exit', onExit)
   })
 }
 
@@ -558,6 +641,10 @@ export async function launchTree(
   }
   try {
     const shared = activeSharedApplication
+    if (shared?.launched !== undefined) {
+      const child = shared.launched.app.process()
+      if (child.exitCode !== null || child.signalCode !== null) await disposeSharedApplication(shared)
+    }
     // Capture the test-owned seed before the application can recover or rewrite a file.
     const initialSharedSeed =
       shared === undefined || !existsSync(documentPath(userDataDir)) ? null : readPersisted(userDataDir)
@@ -592,13 +679,16 @@ export async function launchTree(
       if (shared?.launched !== undefined) {
         app = shared.launched.app
         const resetStarted = performance.now()
-        await app.evaluate(({ BrowserWindow, nativeTheme }, bounds) => {
-          nativeTheme.themeSource = 'system'
-          const main = BrowserWindow.getAllWindows()[0]
-          if (main === undefined) throw new Error('Shared application window is unavailable.')
-          main.setAlwaysOnTop(false)
-          main.setBounds(bounds)
-        }, shared.bounds!)
+        await bounded(
+          app.evaluate(({ BrowserWindow, nativeTheme }, bounds) => {
+            nativeTheme.themeSource = 'system'
+            const main = BrowserWindow.getAllWindows()[0]
+            if (main === undefined) throw new Error('Shared application window is unavailable.')
+            main.setAlwaysOnTop(false)
+            main.setBounds(bounds)
+          }, shared.bounds!),
+          'Shared native state restoration',
+        )
         if (activeSharedReset === 'window') {
           const newWindow = app.waitForEvent('window')
           await app.evaluate(({ app, BrowserWindow }) => {
@@ -608,11 +698,14 @@ export async function launchTree(
           resetWindow = await newWindow
         } else {
           resetWindow = shared.launched.window
-          await app.evaluate(async ({ BrowserWindow }, url) => {
-            await BrowserWindow.getAllWindows()[0]!.loadURL(url)
-          }, shared.rendererUrl!)
+          await bounded(
+            app.evaluate(async ({ BrowserWindow }, url) => {
+              await BrowserWindow.getAllWindows()[0]!.loadURL(url)
+            }, shared.rendererUrl!),
+            'Shared renderer loading',
+          )
         }
-        await resetWindow.waitForURL(shared.rendererUrl!)
+        await bounded(resetWindow.waitForURL(shared.rendererUrl!), 'Shared renderer acknowledgement')
         timing.firstWindow += performance.now() - resetStarted
       } else {
         app = await measure('electronLaunch', () =>
@@ -641,16 +734,25 @@ export async function launchTree(
         )
       }
     } catch (error) {
+      await closeTrackedApps()
+      if (shared !== undefined) invalidateSharedApplication(shared)
       await cleanupStaleElectronProcesses(userDataMarker)
       throw new Error(`Electron failed to launch for E2E test: ${formatLaunchError(error)}`, { cause: error })
     }
     if (!launchedApps.includes(app)) {
-      if (shared !== undefined) sharedApps.add(app)
+      const child = app.process()
+      ownedProcesses.set(app, child)
+      if (shared !== undefined) sharedApps.set(app, shared)
       launchedApps.push(app)
       app.once('close', () => {
+        if (shared !== undefined) invalidateSharedApplication(shared)
         closedApps.add(app)
-        const trackedIndex = launchedApps.indexOf(app)
-        if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+        const forgetProcess = (): void => {
+          const trackedIndex = launchedApps.indexOf(app)
+          if (trackedIndex >= 0) launchedApps.splice(trackedIndex, 1)
+        }
+        if (child.exitCode !== null || child.signalCode !== null) forgetProcess()
+        else child.once('exit', forgetProcess)
         forgetObservations(app)
       })
     }
@@ -745,9 +847,13 @@ export async function launchTree(
       return { app, window }
     } catch (error) {
       await closeApp(app)
-      if (shared !== undefined) shared.launched = undefined
+      if (shared !== undefined) invalidateSharedApplication(shared)
       throw error
     }
+  } catch (error) {
+    await closeTrackedApps()
+    if (activeSharedApplication !== undefined) invalidateSharedApplication(activeSharedApplication)
+    throw error
   } finally {
     timing.total = performance.now() - started
     base.info().annotations.push({

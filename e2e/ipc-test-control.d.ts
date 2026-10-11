@@ -10,4 +10,13 @@ declare global {
 
   var __treeIpc: TreeIpcTestControl
   var __treeDrainIpc: (() => Promise<void>) | undefined
+  var __treeSharedTest:
+    | {
+        rejectDrain: boolean
+        stallDrain: boolean
+        boundsChangedAt: number
+        pending: () => number
+        errors: () => number
+      }
+    | undefined
 }

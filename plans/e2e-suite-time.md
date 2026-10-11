@@ -52,8 +52,8 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-7 | Suite-duration report or budget (D4 deferred) | E2E-1, D4 | Blocked |
 | E2E-8 | Roll out the shared application | E2E-3, D1 | In progress |
 | E2E-8a | ADR and ordered rollout preparation | E2E-3, D1 | Done |
-| E2E-8b | Harden reset, recovery and memory evidence | E2E-8a | Ready |
-| E2E-8c | Adopt navigation and Tab structure | E2E-8b | Planned |
+| E2E-8b | Harden reset, recovery and memory evidence | E2E-8a | Done |
+| E2E-8c | Adopt navigation and Tab structure | E2E-8b | Ready |
 | E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Planned |
 | E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Planned |
 | E2E-8f | Measure and close the bounded rollout | E2E-8e | Planned |
@@ -809,14 +809,24 @@ Added `npm run test:e2e:changed` (build then Playwright `--only-changed=HEAD`), 
 
 Low Risk validation passed on HEAD `dc4c01f` plus these changes: `npm run check` (all static/governance checks, 3,296 unit cases, serial unit-performance guard and build), `npm run check:opencode` (292 expectations), final documentation and changed-format checks. Snapshot before the command smoke was `sha256:7b60704e2f712bbc4dc3cc5f660a1a2b9cf632c61fcaa198dcf16b3e1626f057`; subsequent edits only update initiative documentation. `npm run test:e2e:changed -- --list` selected zero cases, correctly recorded as no E2E coverage. `npm run test:e2e:changed -- e2e/navigation.spec.ts --only-changed=6d79ee8 --workers=1 --reporter=dot` passed all 25 selected cases in real Electron (10.0 s, macOS GUI, one worker, no concurrent Playwright invocation), proving the earlier-reference override and focused execution. Primary diff review found no issue. No runtime, test categories, baseline images or product behavior changed. The former D2 proposal remains historical evidence and was declined; no estimated duplicate-removal saving is implemented.
 
+### E2E-8b reset/recovery and memory evidence (2026-10-11)
+
+The fixture exposes a reviewed-owner selector for hidden reload, explicit fresh controls and visible fresh execution without changing the global fresh default or adopting another editing spec. Process loss, disposal and transitions to fresh execution invalidate the application, renderer URL and bounds together. Reset/loading and error collection have deadlines; retained child-process ownership proves exit before file removal even after Playwright disconnects. Move/resize observation drains the native debounce after bounds move away and back. Setup failures, original production IPC rejection, drain rejection/stall, renderer load/readiness errors, clean recovery, mixed ownership and worker disposal have real-Electron regressions. Production handlers, seed/focus/mode/history/native-state oracles, error observation, clipboard release, scale and scrollbar guards remain.
+
+Repeated-cycle evidence used the same host/build and sequential runs. The final matched-state comparison sampled both modes after identical two-row edits, with twelve bursts of eight cycles and the first as warm-up. Retained renderer heap stayed near the fresh control, every sample had one window/renderer/Tab process and zero pending/error IPC, and listener counts stayed fixed. An extended 384-cycle exploratory run investigated native growth: main heap and Browser working set demonstrated reclamation, while renderer/GPU working sets remained above fresh controls. No per-load document/queue/listener retention owner was found in read-only production inspection. These are finite-run measurements and retained native-cache limits, not proof of an indefinite memory bound or a new budget. Detailed local evidence is in `/private/tmp/tree-e2e8b-evidence.txt` and JSON reports under `/private/tmp/tree-e2e8b*.json`; durable execution and isolation limits are in Development §8 and ADR 0021.
+
+Final one/six-worker prototype stress passed 225 cases each (28.1 s / 12.2 s). Serial/parallel screenshot guards plus typed punctuation passed 20 / 48 cases; actual synthetic Tab indentation/selection and zoom-boundary PNGs were inspected, with no text/selection defect and no baseline changes. High Risk static/unit/build stages and all 764 E2E cases passed. The initial performance stage had three existing Agenda timing failures; its focused six-case repeat and complete 60-case repeat passed unchanged inputs/budgets. Audit found zero vulnerabilities. The original complete-command failure remains recorded; passing stages were reused under Development §9 rather than rerunning unrelated suites. No production file, product behavior, editing category or source-spec default changed.
+
+Final hidden infrastructure coverage passed 18 cases; visible and explicit fresh-control coverage passed three each. The last hidden probes left a blank shared process for actual worker teardown; its recorded process and profile were absent after runner exit. Shared fault/memory probes are deliberately declared only for hidden execution, so the complete visible suite retains fresh launches. The independent completed-diff review traced the lifecycle/state/error/clipboard paths and found no meaningful issues. E2E-8b is complete. E2E-8c remains unimplemented; D2 is declined and D4 deferred.
+
 ## Next Task
 
-E2E-8a preparation passed `npm run format:check:changed`, `npm run check:docs` (43 live documents) and `npm run check:opencode` (292 expectations) on HEAD `94479f7` plus its documentation-only diff. Independent review of the full diff and new ADR found no meaningful issues. Runtime inputs and previous validation remain unchanged; no implementation or memory-measurement result is claimed by this preparation.
+E2E-8c: inventory every launch/seed/option/state mutation in navigation and Tab structure, then adopt the hardened selector only for eligible hidden cases under ADR 0021. Preserve both editing modes, every existing oracle and the poison regression; visible and fresh-control runs stay isolated. Repeat one/six-worker five-repeat runs with matched fresh controls, record launches/resets and timings, inspect the indented-selection image, and complete High Risk validation and independent review. No other source spec is eligible by proximity.
 
-E2E-8b: harden reset/recovery and establish repeated-cycle memory evidence before adopting default reuse in the selected specs. ADR 0021 and the ordered rollout are prepared; runtime adoption has not landed. Start a new session: E2E-3, E2E-4, E2E-6 and E2E-8a exhaust the four-task session limit. D2 is declined and D4 deferred.
+Start a new session for this adoption task. E2E-8b required extensive lifecycle and memory evidence, so a fresh context keeps the area inventory and validation review manageable. D2 remains declined and D4 deferred; do not change editing-mode composition or introduce budgets.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8b, harden shared-application reset/recovery and establish memory evidence under ADR 0021. D1 is approved, D2 declined, D3 implemented, D4 deferred. Preserve both editing modes and fresh-process boundary exclusions.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8c, inventory and adopt eligible navigation/Tab structure cases through the hardened selector under ADR 0021. E2E-8b is complete. D1 is approved, D2 declined, D3 implemented, D4 deferred. Preserve both editing modes, existing oracles and fresh-process boundary exclusions.
 ```

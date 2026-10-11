@@ -68,7 +68,24 @@ globalThis.__treeIpc = {
 // The renderer is disposed before this drain: no old timer can enqueue another save.
 // Keep all production handlers and their validation, errors and filesystem work intact.
 if (sharedReset) {
+  // Infrastructure regressions may fail the drain without replacing a production handler.
+  globalThis.__treeSharedTest = {
+    rejectDrain: false,
+    stallDrain: false,
+    boundsChangedAt: 0,
+    pending: () => pending.size,
+    errors: () => operationErrors.length,
+  }
+  app.on('browser-window-created', (_event, window) => {
+    const changed = () => {
+      globalThis.__treeSharedTest.boundsChangedAt = Date.now()
+    }
+    window.on('resize', changed)
+    window.on('move', changed)
+  })
   globalThis.__treeDrainIpc = async () => {
+    if (globalThis.__treeSharedTest.rejectDrain) throw new Error('Injected shared drain rejection.')
+    if (globalThis.__treeSharedTest.stallDrain) await new Promise(() => {})
     while (pending.size > 0) await Promise.allSettled([...pending])
     if (operationErrors.length > 0) throw new Error(`Shared application IPC failed: ${operationErrors.join('\n')}`)
   }
