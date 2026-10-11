@@ -9,7 +9,7 @@ import {
   screenshotContentSize,
   setMainWindowContentSize,
   test,
-  lockSystemClipboard,
+  unlockSystemClipboard,
   writeClipboardText,
   firePaste,
 } from './fixtures'
@@ -84,7 +84,6 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         },
         location: { currentParentId: null, selectedNodeId: 'n' },
       })
-      await lockSystemClipboard()
       const { window, app } = await launchTree(userDataDir)
       await setAgendaToday(window)
       if (view === 'Agenda') {
@@ -132,6 +131,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await writeClipboardText(app, ' tomorrow')
       await firePaste(input)
       await expect.poll(text).toContain(' tomorrow')
+      unlockSystemClipboard()
       await expect(popup).toHaveCount(0)
       await window.keyboard.press('Meta+a')
       await window.keyboard.type('2026-10-08 Friday')

@@ -191,7 +191,6 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
   test('moves, selects and copies over the text of a day without editing', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
-    await lockSystemClipboard()
     await setMainWindowContentSize(app, screenshotContentSize)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
@@ -219,6 +218,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await window.emulateMedia({ colorScheme: 'dark' })
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-dark.png'))
       await window.emulateMedia({ colorScheme: 'light' })
+      await lockSystemClipboard()
       await window.keyboard.press('y')
       await expect.poll(clipboard).toBe('Thu Oct')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -253,6 +253,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await window.emulateMedia({ colorScheme: 'dark' })
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-dark.png'))
       await window.emulateMedia({ colorScheme: 'light' })
+      await lockSystemClipboard()
       await window.keyboard.press('Meta+c')
       await expect.poll(clipboard).toBe('u O')
       await window.keyboard.press('ArrowLeft')

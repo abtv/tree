@@ -20,7 +20,7 @@ const OWNER_FILE = 'owner.json'
 // as stale once the directory has outlived this grace period, so a concurrent acquisition is not
 // mistaken for a crash.
 const OWNER_FILE_GRACE_MS = 2_000
-// A clipboard test holds the lock for its whole body (docs/decisions/0012), and under hidden
+// A clipboard test can hold the lock until teardown, and under hidden
 // parallelism several clipboard tests queue behind one holder, whose own body can stretch
 // well past the 30 s the bound used to allow on a loaded machine. The bound is raised so a waiter
 // outlasts any realistic holder; `fixtures.ts` raises the waiting test's own Playwright timeout to

@@ -13,7 +13,7 @@ import {
   writeClipboardText,
   writeClipboardImageSized,
   firePaste,
-  lockSystemClipboard,
+  unlockSystemClipboard,
   screenshotContentSize,
   setMainWindowContentSize,
   test,
@@ -166,7 +166,6 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.9
   test('pastes multiline text and a real image through the shared clipboard boundary', async ({ userDataDir }) => {
     seed(userDataDir)
-    await lockSystemClipboard()
     const { window, app } = await launchTree(userDataDir)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
@@ -176,6 +175,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await writeClipboardText(app, ' alpha\nbeta')
     await firePaste(input)
     await expect(input).toHaveText('2026-10-14 Prepare 2026-10-20 alpha')
+    unlockSystemClipboard()
     await expect(input).toBeFocused()
     await fireIdleSave(window)
     await expect
@@ -184,6 +184,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(input)
     await expect(window.locator('.agenda-row[data-node-id="first"] img')).toHaveCount(2)
+    unlockSystemClipboard()
     const image = window.locator('.agenda-row[data-node-id="first"] img').first()
     await expect(image).toBeVisible()
     expect(await image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
@@ -332,7 +333,6 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.8
   test('uses ordinary Cut and Paste and history, and persists edits across restart', async ({ userDataDir }) => {
     seed(userDataDir)
-    await lockSystemClipboard()
     const { window, app } = await launchTree(userDataDir)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
@@ -357,6 +357,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+x')
     await expect(input).toHaveText('2026-10-14 EADY Prepare 2026-10-20')
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('R')
+    unlockSystemClipboard()
     await window.keyboard.press('Meta+z')
     await expect(input).toHaveText('2026-10-14 READY Prepare 2026-10-20')
     await fireIdleSave(window)

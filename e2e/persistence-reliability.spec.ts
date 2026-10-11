@@ -18,6 +18,7 @@ import {
   test,
   tryReadPersisted,
   typeInto,
+  unlockSystemClipboard,
   writeClipboardImage,
 } from './fixtures'
 
@@ -241,6 +242,7 @@ test.describe('persistence reliability regressions', () => {
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
     await expect(window.getByText(/Operation failed:.*image blocked/)).toBeVisible()
+    unlockSystemClipboard()
     expect(
       await app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0),
     ).toBe(0)
@@ -316,6 +318,9 @@ test.describe('persistence reliability regressions', () => {
         app.evaluate(() => (globalThis as typeof globalThis & { attachmentStarted?: boolean }).attachmentStarted),
       )
       .toBe(true)
+    // The attachment handler has received the image bytes; the delayed write no longer reads
+    // the clipboard. Let other workers use it while this test exercises quit failure.
+    unlockSystemClipboard()
     await window.evaluate(() => {
       const control = globalThis as typeof globalThis & {
         quitRequested?: boolean
@@ -337,8 +342,10 @@ test.describe('persistence reliability regressions', () => {
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
+    await writeClipboardImage(app)
     await firePaste(node(window, 1))
     await expect(window.getByAltText('Attached image')).toBeVisible()
+    unlockSystemClipboard()
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await clickApplicationMenuQuit(app)
     await closed

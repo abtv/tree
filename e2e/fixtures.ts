@@ -123,7 +123,7 @@ export const test = base.extend<{ userDataDir: string; editingMode: EditingMode 
       }
     } finally {
       activeEditingMode = 'vim'
-      releaseSystemClipboardLock()
+      unlockSystemClipboard()
       rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   },
@@ -782,8 +782,8 @@ const CLIPBOARD_WAIT_TEST_TIMEOUT_MS = SYSTEM_CLIPBOARD_LOCK_TIMEOUT_MS + 30_000
 
 /**
  * Acquire the system clipboard lock for the current test. The test holds the lock until its
- * fixture teardown releases it, so under hidden parallelism a waiter can sit behind several
- * holders; its Playwright timeout is raised to cover that wait.
+ * fixture teardown releases it unless the test releases it earlier with `unlockSystemClipboard`.
+ * Its Playwright timeout is raised to cover waits behind other holders.
  */
 async function acquireClipboardLockForTest(): Promise<void> {
   if (test.info().timeout < CLIPBOARD_WAIT_TEST_TIMEOUT_MS) test.setTimeout(CLIPBOARD_WAIT_TEST_TIMEOUT_MS)
@@ -792,10 +792,18 @@ async function acquireClipboardLockForTest(): Promise<void> {
 
 // Tests that make the application read or write the system clipboard outside these helpers (for
 // example by pressing Cmd+C, Cmd+X, or a context-menu Copy item) must hold the clipboard lock for
-// the whole test. The helpers below acquire it automatically, and the fixture teardown releases it
-// after every test.
+// those interactions. The helpers below acquire it automatically, and fixture teardown releases
+// it as a fallback after every test.
 export async function lockSystemClipboard(): Promise<void> {
   await acquireClipboardLockForTest()
+}
+
+/**
+ * Release only after assertions confirm every pending clipboard read/write has finished and no
+ * later interaction needs its contents. Reacquire and rewrite before a later independent paste.
+ */
+export function unlockSystemClipboard(): void {
+  releaseSystemClipboardLock()
 }
 
 export async function writeClipboardText(app: ElectronApplication, text: string): Promise<void> {
