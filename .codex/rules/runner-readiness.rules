@@ -1,0 +1,22 @@
+# Relative command from a trusted repository root and fixed plan only.
+# Rules match argv, not cwd; the owner accepted this portability tradeoff.
+# The existing host validates argument count,
+# committed plan authority, task scope and ownership before execution.
+# This allowance grants host execution, not approval of the initiative.
+# Review host changes before use; trusted repository scripts are mutable.
+prefix_rule(
+    pattern = ["node", "scripts/initiative-runner-host.mjs", "--authorized-plan", ".", "plans/runner-readiness.md"],
+    decision = "allow",
+    justification = "Run only the separately approved Runner Readiness plan through its reviewed host",
+    match = [
+        "node scripts/initiative-runner-host.mjs --authorized-plan . plans/runner-readiness.md RR-1 starting-commit owner-approval",
+    ],
+    not_match = [
+        "node scripts/initiative-runner-host.mjs --authorized-plan . plans/e2e-coverage-efficiency.md EC-1 starting-commit owner-approval",
+        "node scripts/initiative-runner-host.mjs --authorized-plan /another/checkout plans/runner-readiness.md RR-1 starting-commit owner-approval",
+        "node another/initiative-runner-host.mjs --authorized-plan . plans/runner-readiness.md RR-1 starting-commit owner-approval",
+        "node .scratch/runner-readiness/preflight/probe.mjs",
+        "node arbitrary-script.mjs",
+        "codex exec arbitrary-prompt",
+    ],
+)
