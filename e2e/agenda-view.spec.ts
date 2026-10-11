@@ -251,6 +251,11 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     }
     await window.keyboard.press('Meta+p')
     await expect(window.locator('.node-row[data-node-id="team"]')).toHaveCount(1)
+    await fireIdleSave(window)
+    // Queue a read behind the idle save so the comparison cannot race its asynchronous disk write.
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
     expect(readPersisted(userDataDir)).toEqual(persisted)
   })
   // @requirement PRODUCT.md §23.1
@@ -302,6 +307,11 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+p')
     await expectFocused(input)
     expect(await input.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(2)
+    await fireIdleSave(window)
+    // Queue a read behind the idle save so the comparison cannot race its asynchronous disk write.
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
     expect(readPersisted(userDataDir)).toEqual(before)
     expect(readdirSync(join(userDataDir, 'data')).sort()).toEqual(files)
     await app.close()
