@@ -37,16 +37,16 @@ Use existing measurement commands and save raw task evidence under `.scratch/e2e
 
 ## Ordered Tasks
 
-| ID | Outcome | Depends on | Status | Acceptance evidence |
+| ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| EC-1 | Audit coverage ownership and establish comparable costs | None | Ready | All spec families classified; concrete migration list and protected boundaries; baseline and candidate costs |
-| EC-2 | Make validation scope follow changed mechanisms | EC-1 | Planned | Consistent policy with worked examples, preserving full-local exceptions and complete regression CI |
-| EC-3 | Give long memory investigations a dedicated workflow | EC-2 | Planned | Both controls executable; normal reset/failure guards retained; explicit CI and local triggers verified |
-| EC-4 | Migrate redundant Vim text scenarios | EC-1, EC-2 | Planned | Assertion mapping, faithful replacement tests, retained real dispatch/caret coverage and measured reduction |
-| EC-5 | Reduce exhaustive Agenda E2E command matrices | EC-1, EC-2, EC-4 | Planned | Complete lower-layer matrix plus distinct real renderer/boundary paths in both modes |
-| EC-6 | Verify overall reduction and finish or enumerate remaining migrations | EC-3, EC-4, EC-5 | Planned | Comparable complete results, coverage audit, honest remaining gaps and durable guidance |
+| EC-1 | Audit coverage ownership and establish comparable costs | None | All spec families classified; concrete migration list and protected boundaries; baseline and candidate costs | Ready |
+| EC-2 | Make validation scope follow changed mechanisms | EC-1 | Consistent policy with worked examples, preserving full-local exceptions and complete regression CI | Planned |
+| EC-3 | Give long memory investigations a dedicated workflow | EC-2 | Both controls executable; normal reset/failure guards retained; explicit CI and local triggers verified | Planned |
+| EC-4 | Migrate redundant Vim text scenarios | EC-1, EC-2 | Assertion mapping, faithful replacement tests, retained real dispatch/caret coverage and measured reduction | Planned |
+| EC-5 | Reduce exhaustive Agenda E2E command matrices | EC-1, EC-2, EC-4 | Complete lower-layer matrix plus distinct real renderer/boundary paths in both modes | Planned |
+| EC-6 | Verify overall reduction and finish or enumerate remaining migrations | EC-3, EC-4, EC-5 | Comparable complete results, coverage audit, honest remaining gaps and durable guidance | Planned |
 
-Tasks execute in listed order. EC-1 may add bounded migration tasks for other justified families before EC-6; each must name concrete files, assertion-transfer evidence, dependencies and validation tier before becoming ready. It must not authorize an unspecified bulk deletion pass. Preserve cases when equivalence is uncertain. This is a complete proposed initiative, not a review batch with an unknown external task list.
+Tasks execute in listed order. The runner projection fixes these six tasks. EC-1 records additional candidates in execution findings; it cannot add task rows or alter later task scopes during this run. Additional migrations require a separately reviewed plan and authorization. Preserve cases when equivalence is uncertain. If confirmed redundant families remain outside the fixed projection, report the unfinished objective rather than claiming closure. This is a complete proposed initiative, not a review batch with an unknown external task list.
 
 ### EC-1 — Audit and Baseline
 
@@ -54,7 +54,7 @@ Expected changes: this plan only, with temporary inventory/results in `.scratch/
 
 Inventory each spec family by assertions and reason for Electron: native/process boundary, actual browser semantics, visual/geometry, integrated user flow, or rule-only candidate. Expand test titles/modes using the existing Playwright listing; text searches alone miss parameterized cases. Prioritize by measured cost and faithful replacement opportunity. Specifically inspect Vim insert-entry/motion/surround cases, Agenda forbidden-command matrices and long memory probes. For other families, either name concrete candidates or record why Electron remains necessary. Do not infer duplication from similar test titles.
 
-Run the existing timing workflow on the current baseline and summarize it with `scripts/e2e-timing.mjs`; obtain focused timings for candidate families. Reuse valid same-input results when available. Record build time and test time separately and the cost of a representative contained-change validation command. No new timing tooling is needed. Update later tasks with exact candidate assertions and files so the next session can proceed without reconstructing the audit.
+The primary inventories assertions without launching validation. After staging, the host runs the projected listings, baseline and candidate timings and summarizes them with `scripts/e2e-timing.mjs`. Its retained command logs establish build/check wall time separately from the JSON test duration. EC-2 consumes those observed costs. Record candidate assertion mappings in execution findings, without changing later task scopes or the projection. No new timing tooling is needed.
 
 Validation tier: Minimal Risk for the committed plan edits (`npm run format:check:changed`, `npm run check:docs`, `npm run check:opencode`); measurements are explicit task acceptance work, not a reason to run unrelated performance suites. No test or runtime edits. No product requirement gaps are resolved here.
 
@@ -76,7 +76,7 @@ Validation tier: Minimal Risk while documentation only. Run formatting, docs and
 
 ### EC-3 — Separate Long Memory Investigations
 
-Expected files: `e2e/shared-application.spec.ts`, a dedicated diagnostic spec/config under `e2e/`, `package.json`, a dedicated `.github/workflows/` workflow, `docs/DEVELOPMENT.md` §8, and the execution guidance in ADR 0021 if needed. Keep existing `e2e/fixtures.ts` behavior unchanged. Any named workflow permission adapters and their tests must be updated together if a new command needs them; inspect `.codex/rules/`, `.claude/settings.json`, `opencode.json` and `scripts/check-opencode-permissions.mjs` before choosing the command.
+Expected files: `e2e/shared-application.spec.ts`, `e2e/shared-application-memory.ts`, `e2e/shared-application-memory.config.ts`, `.github/workflows/e2e-memory.yml`, `docs/DEVELOPMENT.md` §8, and the execution guidance in ADR 0021 if needed. The dedicated test filename avoids ordinary `*.spec.ts` discovery; its configuration imports the ordinary configuration and replaces projects with one matching that file. Explicitly rebase inherited `testDir`, `globalSetup`, and any relative output/snapshot paths against the dedicated configuration's directory; otherwise inherited `./e2e` paths resolve to `e2e/e2e`. Reuse `test:e2e:diagnose` with the dedicated configuration instead of adding an npm command or permission rule. Keep fixtures and ordinary Playwright configuration unchanged. Inspect permission adapters and their governance checks to confirm the existing workflow covers the arguments; a denial blocks the stage rather than authorizing permission edits.
 
 Move only the paired repeated-cycle memory investigations out of ordinary discovery. Retain reset/recovery, IPC drain, seed validation, ownership/disposal, poison/successor and visible/fresh-control regressions in ordinary E2E. Preserve both memory experiments and their raw artifacts, warm-up handling and fresh/shared comparability; do not invent a memory threshold.
 
@@ -86,7 +86,7 @@ Validation tier: High Risk under current shared-fixture coverage policy. Run `np
 
 ### EC-4 — Vim Text Migration
 
-Expected files: `e2e/vim-text-editing.spec.ts`, `src/renderer/vim-text-commands.test.ts`, `src/renderer/vim-editing.test.ts`, relevant existing Vim session/handler/property tests identified by EC-1, and `docs/VIM_CONFORMANCE.md`. Keep snapshots unless their only scenario is validly retired and no visual obligation remains.
+Expected files: `e2e/vim-text-editing.spec.ts`, `src/renderer/vim-text-commands.test.ts`, `src/renderer/vim-editing.test.ts`, `src/renderer/vim-edit-session.test.ts`, `src/renderer/vim-surround.test.ts`, `src/renderer/vim-editing.property.test.ts`, `src/renderer/vim-edit-session.property.test.ts`, and `docs/VIM_CONFORMANCE.md`. EC-1 selects candidates within these owners. Retain scenarios whose replacement requires another owner or changes a snapshot; report the limitation instead of expanding scope.
 
 Start with EC-1's insert-entry (`A`/`I`), count/motion/range and surround candidates. Establish faithful lower-layer assertions first, then remove only redundant variants. Keep every distinct keyboard-dispatch route, physical shifted sequence, caret projection and pending-session transition unless another named Electron case proves it. Do not replace rendered image/decorated-text or clipboard checks with calculation-only tests. Update conformance references and requirement markers with the transfer; markers alone are not proof.
 
@@ -94,7 +94,7 @@ Validation tier: Low Risk for tests/docs only with unchanged fixtures and runtim
 
 ### EC-5 — Agenda Matrix Migration
 
-Expected files: `e2e/agenda-editing.spec.ts`, `src/renderer/agenda-command-matrix.test.ts`, `src/renderer/agenda-row-keyboard.test.ts`, related existing policy/property/hook tests identified by EC-1. Do not modify production command policy.
+Expected files: `e2e/agenda-editing.spec.ts`, `src/renderer/agenda-command-matrix.test.ts`, `src/renderer/agenda-row-keyboard.test.ts`, `src/renderer/agenda-row-keyboard.property.test.ts`, `src/renderer/agenda-key-policy.test.ts`, and `src/renderer/agenda-editing-handlers.test.ts`. Do not modify production command policy. Retain candidates needing other owners and report them.
 
 Cover exhaustive forbidden-command × row-role combinations below Electron using real store/state where the rule depends on them. Retain Electron representatives for distinct handler routes, both editing modes, actual focus/caret continuity, command-prefix sequences and browser behavior. Treat doubles in the existing handler matrix as an equivalence limitation to resolve, not evidence that real wiring is covered. Retain clipboard and restart/save tests.
 
@@ -106,24 +106,644 @@ Validation tier: Low Risk for isolated test transfers with unchanged fixtures/ru
 
 Expected files: this plan, `plans/README.md`, and concise durable testing guidance in `docs/DEVELOPMENT.md` if not already recorded by EC-2/EC-3. No permanent audit ledger or new reporting automation.
 
-Reconcile every removed assertion with its replacement and remaining Electron boundary. Complete any concrete migration tasks added by EC-1 before closure. Run complete ordinary E2E twice sequentially on the baseline host/workers to expose gross variability, plus required dedicated probes once unless valid final-input evidence exists. Run the final applicable static/unit/governance checks; reuse still-valid stage results. Compare full-suite and representative focused validation costs, separating build, tests, diagnostic relocation and actual removal. Report failures/retries, case/launch counts and all unsupported combinations; never call relocation alone a reduction in total coverage cost.
+Reconcile every removed assertion with its replacement and remaining Electron boundary. Report additional migrations identified by EC-1 without adding them to this execution. Run complete ordinary E2E twice sequentially on the baseline host/workers to expose gross variability, plus required dedicated probes once unless valid final-input evidence exists. Run the final applicable static/unit/governance checks; reuse still-valid stage results. Compare full-suite and representative focused validation costs, separating build, tests, diagnostic relocation and actual removal. Report failures/retries, case/launch counts and all unsupported combinations; never call relocation alone a reduction in total coverage cost.
 
 Validation tier: Minimal Risk for closure documentation, with the explicit runtime acceptance runs above and any outstanding checks from implementation tasks. Seek an independent final coverage review of cumulative migrations and retained boundaries. If useful reductions cannot be demonstrated, report that finding rather than deleting necessary coverage to meet a target. Remaining confirmed redundant families need explicit follow-up tasks before claiming the objective complete; justified retained coverage does not need a count cap.
 
-Move enduring guidance to its existing owner, then remove this plan and its index row in the closure commit. Git retains the analysis and completed task record.
+Move enduring guidance to its existing owner and commit EC-6 as Done while retaining the plan and index. The host validation and independent review retain the final timing and coverage comparison; the outer coordinator presents those observed results to the owner. Retirement is reserved pending the closure decision described below. Git retains the analysis and completed task record.
+
+## Sources and Constraints
+
+Preparation snapshot: clean HEAD `645aa79`, authored by `abtv` on 2026-10-12. This preparation authorizes planning only. The execution projection below is proposed, not approved. Approval must cover the six-task initiative, the finite host allowance and host execution explicitly, and settle final retirement separately; do not interpret this preparation request as that approval.
+
+The objective, this section, task headings/scopes, task-table descriptions and execution projection are immutable for a run. Only the selected task's status, its projected next task's Planned-to-Ready status, and progress/evidence outside those scopes may change. Preserve assertions when faithful migration needs an unlisted owner. Additional migration or executable policy-enforcement tasks require separate authorization; report them and leave coverage intact. Do not silently claim the overall objective complete while confirmed redundant families remain unaddressed.
+
+Use the existing runner described in [Development §11](../docs/DEVELOPMENT.md#11-multi-session-initiatives), with a fresh primary per task, host-observed serial commands, independent configured roles, acceptance and one append-only commit per task. Primary sessions inspect/edit only; they must not run validation, nested roles or commits. Host baseline measurements therefore occur after the EC-1 inventory candidate; EC-2 consumes those results. Final measured comparisons belong to retained command/reviewer evidence and the outer-host handoff, not invented pre-measurement plan numbers. Independent reviewers inspect raw assertions, launch/timing annotations, memory attachments and CI trigger/import ownership. A passing requirement marker alone does not establish equivalence.
+
+The fixed EC-3 layout uses a non-spec test filename and a dedicated configuration through the existing diagnostic workflow. No new npm command, permission rule, package dependency, ordinary discovery configuration or fixture change is authorized. Preserve ADR 0021 isolation and both editing modes, all existing thresholds and complete ordinary CI regression. Inspect dedicated configuration inheritance and discovery: only the two long memory controls move. Verify the scheduled/manual/path-triggered workflow definition locally; a successful hosted CI execution remains unverified until a permitted push/dispatch, which this plan does not authorize.
+
+All Playwright invocations are serialized and comparisons use six hidden workers on this host. Timing output paths are unique per task/run; preserve baseline artifacts outside tool-cleared `test-results/`. Build and complete command elapsed time are available in host process records; test-only wall/summed times and launches are in JSON and timing summaries. Diagnostics, failures and relocation are reported separately from actual coverage-work reduction. Fault experiments are optional bounded evidence, not authorization to mutate production code or launch unprojected commands.
+
+Proposed allowance: **8 hours elapsed (28,800,000 ms)** from first coordinator construction, including pauses, retries, independent roles, commits and closure. Suggested allocation: EC-1 90 minutes, EC-2 45, EC-3 90, EC-4 90, EC-5 75, EC-6/closure 30, contingency 60. These are planning estimates, not measurements or E2E duration gates. The original deadline survives restart; maximum two recoveries per task. Never renew it by deleting a ledger. Permission/authentication/capability blocks require supported external resolution immediately. Budget exhaustion preserves unfinished work and evidence.
+
+Owner involvement: **zero mandatory manual product-verification checks, zero required verification rounds**, hence empty `ownerChecks`. No runtime UI or native input behavior changes. One approval round covers scope and allowance before execution. Possible setup interventions include host command approval, authentication/trust, quiescence of unrelated Electron/Codex exec processes, and supported outer-host closure invocation. A new visual/native obligation or scope-changing discovery requires a revised estimate and decision before crossing it. Review roles cover workflow behavior and coverage transfer; they do not replace unavailable native interaction.
+
+Capabilities checked in this preparation session:
+* `git status --short`: clean before edits; repository inspection and process inspection succeeded.
+* `npm run doctor`: passed on macOS arm64; Node/npm/Git, Electron/Playwright, display, registry and existing build reported ready.
+* `codex --version`: CLI 0.162.1 available; sandbox reported it could not create PATH aliases. This proves executable presence, not authenticated child-session access.
+* `npm run test:e2e -- e2e/navigation.spec.ts --grep 'arrow keys move selection between siblings' --workers=1`: build succeeded and two real Electron cases passed, one per editing mode. This is bounded preflight only, not EC-1 baseline or initiative execution.
+* Independent native Planner inspection succeeded. Reviewer/Product Verifier are configured, but their new-host launch and runtime access remain to be established on first invocation.
+* Native image inspection is exposed; no rendering/snapshot change is authorized and no screenshot preflight is required.
+* No coordinator was constructed and no budget ledger was started. Host launch permissions, authentication, fresh/resumed primary execution and quiescence must be checked at authorized launch; historical pilot success is not current proof.
+* Existing `.scratch/autonomous-initiatives-pilot/` records are unrelated and must be preserved. The proposed execution namespace is `.scratch/e2e-coverage-efficiency/`; confirm it remains unstarted before construction.
+
+Launch only after the prepared plan is committed, approval is attributable, the worktree is clean and host permission is established. Substitute the full resulting commit and actual approval reference; never use the pre-preparation HEAD as the approved source:
+
+```text
+node scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tree plans/e2e-coverage-efficiency.md EC-1 <full-approved-starting-commit> <owner-approval-reference>
+```
+
+The CLI advances EC-1 through EC-6 only. **Current host closure is blocked:** `executeInitiative` in `scripts/initiative-runner-host.mjs:98` replaces a supplied completed EC-6 starting commit with that task's persisted original starting commit. That original plan marks EC-6 Ready, whereas closure projection requires Done. The independently inspected code therefore does not support the proposed same-namespace closure replay; the CLI also has no closure flag. No closure contract is projected and no runner correction is authorized here.
+
+Recommended owner decision: authorize the outer coordinating agent, after observed EC-6 success and confirmation that the objective is met, to retire only this plan and its index row in one separate documentation commit using native edits and the Minimal Risk checks (formatting, docs, permission governance). Count that work within the eight-hour allowance; it requires no additional product-verification round. This final commit is outside the initiative host. If every commit must be handled by the runner, a separately planned and authorized runner correction is required before launch. Until the owner chooses, retain the plan/index and do not claim fully autonomous closure.
+
+## Proposed Runner Projection
+
+Adding this block does not authorize execution. Exact argv arrays are host validation contracts; all commands run sequentially after staging. Role passes consume observed results and report uncovered/stale evidence. The host stages only the listed files, checks unknown dirty work, and commits; preserve other changes and stop instead of stashing, resetting or including them.
+
+```initiative-runner
+{
+  "version": 1,
+  "tool": "codex",
+  "initiative": "e2e-coverage-efficiency",
+  "budgetMs": 28800000,
+  "tasks": {
+    "EC-1": {
+      "files": [
+        "plans/e2e-coverage-efficiency.md"
+      ],
+      "commands": [
+        {
+          "id": "format",
+          "argv": [
+            "npm",
+            "run",
+            "format:check:changed"
+          ]
+        },
+        {
+          "id": "docs",
+          "argv": [
+            "npm",
+            "run",
+            "check:docs"
+          ]
+        },
+        {
+          "id": "permissions",
+          "argv": [
+            "npm",
+            "run",
+            "check:opencode"
+          ]
+        },
+        {
+          "id": "ordinary-list",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e",
+            "--",
+            "--list",
+            "--workers=6"
+          ]
+        },
+        {
+          "id": "baseline",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-1/baseline.json",
+            "--reporter=list,json",
+            "--workers=6"
+          ]
+        },
+        {
+          "id": "baseline-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-1/baseline.json"
+          ]
+        },
+        {
+          "id": "candidates",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-1/candidates.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "e2e/vim-text-editing.spec.ts",
+            "e2e/agenda-editing.spec.ts",
+            "e2e/shared-application.spec.ts"
+          ]
+        },
+        {
+          "id": "candidate-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-1/candidates.json"
+          ]
+        }
+      ],
+      "roles": [
+        "reviewer"
+      ],
+      "ownerChecks": [],
+      "nextTask": "EC-2"
+    },
+    "EC-2": {
+      "files": [
+        "plans/e2e-coverage-efficiency.md",
+        "AGENTS.md",
+        "docs/DEVELOPMENT.md",
+        "e2e/AGENTS.md"
+      ],
+      "commands": [
+        {
+          "id": "format",
+          "argv": [
+            "npm",
+            "run",
+            "format:check:changed"
+          ]
+        },
+        {
+          "id": "docs",
+          "argv": [
+            "npm",
+            "run",
+            "check:docs"
+          ]
+        },
+        {
+          "id": "permissions",
+          "argv": [
+            "npm",
+            "run",
+            "check:opencode"
+          ]
+        }
+      ],
+      "roles": [
+        "reviewer",
+        "product_verifier"
+      ],
+      "ownerChecks": [],
+      "nextTask": "EC-3"
+    },
+    "EC-3": {
+      "files": [
+        "plans/e2e-coverage-efficiency.md",
+        "e2e/shared-application.spec.ts",
+        "e2e/shared-application-memory.ts",
+        "e2e/shared-application-memory.config.ts",
+        ".github/workflows/e2e-memory.yml",
+        "docs/DEVELOPMENT.md",
+        "docs/decisions/0021-worker-owned-e2e-application-reuse.md"
+      ],
+      "commands": [
+        {
+          "id": "full",
+          "argv": [
+            "npm",
+            "run",
+            "check:full"
+          ]
+        },
+        {
+          "id": "ordinary-list",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e",
+            "--",
+            "--list",
+            "--workers=6"
+          ]
+        },
+        {
+          "id": "memory-list",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-3/memory-list.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "--config=e2e/shared-application-memory.config.ts",
+            "--list"
+          ]
+        },
+        {
+          "id": "memory",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-3/memory.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "--config=e2e/shared-application-memory.config.ts"
+          ]
+        },
+        {
+          "id": "memory-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-3/memory.json"
+          ]
+        },
+        {
+          "id": "reset-guards",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-3/guards.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "e2e/shared-application.spec.ts"
+          ]
+        },
+        {
+          "id": "guard-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-3/guards.json"
+          ]
+        }
+      ],
+      "roles": [
+        "reviewer",
+        "product_verifier"
+      ],
+      "ownerChecks": [],
+      "nextTask": "EC-4"
+    },
+    "EC-4": {
+      "files": [
+        "plans/e2e-coverage-efficiency.md",
+        "e2e/vim-text-editing.spec.ts",
+        "src/renderer/vim-text-commands.test.ts",
+        "src/renderer/vim-editing.test.ts",
+        "src/renderer/vim-edit-session.test.ts",
+        "src/renderer/vim-surround.test.ts",
+        "src/renderer/vim-editing.property.test.ts",
+        "src/renderer/vim-edit-session.property.test.ts",
+        "docs/VIM_CONFORMANCE.md"
+      ],
+      "commands": [
+        {
+          "id": "typecheck",
+          "argv": [
+            "npm",
+            "run",
+            "typecheck"
+          ]
+        },
+        {
+          "id": "lint",
+          "argv": [
+            "npm",
+            "run",
+            "lint"
+          ]
+        },
+        {
+          "id": "format",
+          "argv": [
+            "npm",
+            "run",
+            "format:check:changed"
+          ]
+        },
+        {
+          "id": "docs",
+          "argv": [
+            "npm",
+            "run",
+            "check:docs"
+          ]
+        },
+        {
+          "id": "permissions",
+          "argv": [
+            "npm",
+            "run",
+            "check:opencode"
+          ]
+        },
+        {
+          "id": "requirements",
+          "argv": [
+            "npm",
+            "run",
+            "check:requirements"
+          ]
+        },
+        {
+          "id": "modes",
+          "argv": [
+            "npm",
+            "run",
+            "check:e2e-modes"
+          ]
+        },
+        {
+          "id": "unit",
+          "argv": [
+            "npm",
+            "test",
+            "--",
+            "src/renderer/vim-text-commands.test.ts",
+            "src/renderer/vim-editing.test.ts",
+            "src/renderer/vim-edit-session.test.ts",
+            "src/renderer/vim-surround.test.ts",
+            "src/renderer/vim-editing.property.test.ts",
+            "src/renderer/vim-edit-session.property.test.ts"
+          ]
+        },
+        {
+          "id": "vim",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-4/vim.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "e2e/vim-text-editing.spec.ts",
+            "e2e/vim-navigation-and-visual.spec.ts",
+            "e2e/vim-image-caret.spec.ts"
+          ]
+        },
+        {
+          "id": "vim-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-4/vim.json"
+          ]
+        }
+      ],
+      "roles": [
+        "reviewer"
+      ],
+      "ownerChecks": [],
+      "nextTask": "EC-5"
+    },
+    "EC-5": {
+      "files": [
+        "plans/e2e-coverage-efficiency.md",
+        "e2e/agenda-editing.spec.ts",
+        "src/renderer/agenda-command-matrix.test.ts",
+        "src/renderer/agenda-row-keyboard.test.ts",
+        "src/renderer/agenda-row-keyboard.property.test.ts",
+        "src/renderer/agenda-key-policy.test.ts",
+        "src/renderer/agenda-editing-handlers.test.ts"
+      ],
+      "commands": [
+        {
+          "id": "typecheck",
+          "argv": [
+            "npm",
+            "run",
+            "typecheck"
+          ]
+        },
+        {
+          "id": "lint",
+          "argv": [
+            "npm",
+            "run",
+            "lint"
+          ]
+        },
+        {
+          "id": "format",
+          "argv": [
+            "npm",
+            "run",
+            "format:check:changed"
+          ]
+        },
+        {
+          "id": "docs",
+          "argv": [
+            "npm",
+            "run",
+            "check:docs"
+          ]
+        },
+        {
+          "id": "permissions",
+          "argv": [
+            "npm",
+            "run",
+            "check:opencode"
+          ]
+        },
+        {
+          "id": "requirements",
+          "argv": [
+            "npm",
+            "run",
+            "check:requirements"
+          ]
+        },
+        {
+          "id": "modes",
+          "argv": [
+            "npm",
+            "run",
+            "check:e2e-modes"
+          ]
+        },
+        {
+          "id": "unit",
+          "argv": [
+            "npm",
+            "test",
+            "--",
+            "src/renderer/agenda-command-matrix.test.ts",
+            "src/renderer/agenda-row-keyboard.test.ts",
+            "src/renderer/agenda-row-keyboard.property.test.ts",
+            "src/renderer/agenda-key-policy.test.ts",
+            "src/renderer/agenda-editing-handlers.test.ts"
+          ]
+        },
+        {
+          "id": "agenda",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-5/agenda.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "e2e/agenda-editing.spec.ts",
+            "e2e/agenda-vim.spec.ts",
+            "e2e/agenda-caret.spec.ts"
+          ]
+        },
+        {
+          "id": "agenda-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-5/agenda.json"
+          ]
+        }
+      ],
+      "roles": [
+        "reviewer"
+      ],
+      "ownerChecks": [],
+      "nextTask": "EC-6"
+    },
+    "EC-6": {
+      "files": [
+        "plans/e2e-coverage-efficiency.md",
+        "plans/README.md",
+        "docs/DEVELOPMENT.md"
+      ],
+      "commands": [
+        {
+          "id": "final-check",
+          "argv": [
+            "npm",
+            "run",
+            "check"
+          ]
+        },
+        {
+          "id": "final-1",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-6/final-1.json",
+            "--reporter=list,json",
+            "--workers=6"
+          ]
+        },
+        {
+          "id": "final-1-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-6/final-1.json"
+          ]
+        },
+        {
+          "id": "final-2",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-6/final-2.json",
+            "--reporter=list,json",
+            "--workers=6"
+          ]
+        },
+        {
+          "id": "final-2-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-6/final-2.json"
+          ]
+        },
+        {
+          "id": "final-memory",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-6/memory.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "--config=e2e/shared-application-memory.config.ts"
+          ]
+        },
+        {
+          "id": "final-memory-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-6/memory.json"
+          ]
+        },
+        {
+          "id": "final-focused",
+          "argv": [
+            "npm",
+            "run",
+            "test:e2e:diagnose",
+            "--",
+            "--shared-reset=reload",
+            "--json-output=.scratch/e2e-coverage-efficiency/ec-6/focused.json",
+            "--reporter=list,json",
+            "--workers=6",
+            "e2e/vim-text-editing.spec.ts",
+            "e2e/agenda-editing.spec.ts"
+          ]
+        },
+        {
+          "id": "focused-summary",
+          "argv": [
+            "node",
+            "scripts/e2e-timing.mjs",
+            ".scratch/e2e-coverage-efficiency/ec-6/focused.json"
+          ]
+        }
+      ],
+      "roles": [
+        "reviewer"
+      ],
+      "ownerChecks": []
+    }
+  }
+}
+```
+
+## Execution Findings
+
+Preparation only. EC-1 remains the next task and no initiative task has executed. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and allowance await owner approval.
 
 ## Next Task and Resume Prompt
 
-Next task: EC-1. No implementation or policy change has started. No product requirement gaps have been identified for this test/workflow-only scope. Runtime access for future Electron measurements must be verified in that execution session; repository read access and planner inspection succeeded in the planning session.
+Next task: EC-1, after explicit approval of the prepared initiative scope, runner host and eight-hour elapsed allowance. No implementation or policy change has started. No product requirement gaps have been identified for this test/workflow-only scope. Recheck future host capabilities at authorized launch; the preparation evidence above is limited to its stated commands and scope.
 
 ```text
-Continue plans/e2e-coverage-efficiency.md, starting with EC-1. I authorize the
-test-coverage and development-workflow initiative described there. Preserve
+Execute plans/e2e-coverage-efficiency.md through the proposed Codex runner,
+starting with EC-1. I authorize all six fixed tasks, host execution, the
+eight-hour original elapsed allowance. I also authorize the outer coordinator
+to retire the plan/index in a separate validated documentation commit after
+all six tasks are committed Done and the objective is met. Preserve
 product behavior, real-boundary coverage, existing editing-mode obligations,
 and ADR 0021 isolation constraints. Do not introduce duration budgets or new
 reporting infrastructure. Audit assertions and measure costs before removing
 tests; move redundant rule coverage to faithful lower-layer tests and retain
-distinct Electron integration paths. Execute the next ready task, validate and
-commit it with the plan status update. Resolve ordinary engineering choices
+distinct Electron integration paths. Advance within the fixed projection,
+validate and commit each task with its plan status update. Resolve ordinary engineering choices
 autonomously; do not expand into production refactoring or product changes.
 ```
