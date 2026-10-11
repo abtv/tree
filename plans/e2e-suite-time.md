@@ -41,7 +41,7 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| E2E-1 | Repeatable timing report and launch-time breakdown | — | Ready |
+| E2E-1 | Repeatable timing report and launch-time breakdown | — | In progress |
 | E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Planned |
 | E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Planned |
 | E2E-4 | Editing-mode audit and proposal | — | Ready |
@@ -60,7 +60,7 @@ Add a repeatable timing workflow so later tasks measure with one approved comman
 * Add `test:e2e:timing` to the approval configuration only if `npm run check:opencode` requires it; `.claude/settings.json` already allows `npm run test:e2e*`.
 * Record in this plan: the summary of two runs at the same commit, the launch phase breakdown, launches per test, and run-to-run variance.
 
-Files: `package.json`, `scripts/e2e-timing.mjs`, `e2e/fixtures.ts`, `docs/DEVELOPMENT.md` §8 (one paragraph on the timing command), `opencode.json` if needed, this plan.
+Files: `package.json`, `scripts/e2e-timing.mjs`, `e2e/fixtures.ts`, `docs/DEVELOPMENT.md` §8 (one paragraph on the timing command), `opencode.json` and its permission checker if needed, this plan. Validation also exposed unsafe persistence polling in `e2e/agenda-vim.spec.ts`; its contained correction is a separate test-only change preserving all expected results.
 Acceptance: the command prints the summary from a fresh run; phase durations add up to the measured launch time within 10%; annotations do not change test results.
 Tier: High Risk (shared fixture). `npm run check:full`.
 
@@ -118,11 +118,41 @@ Planned only if D1 approves adoption. Write the ADR, then split the rollout into
 
 ## Findings
 
-None yet beyond the baseline.
+### E2E-1 measurements (2026-10-11)
+
+Two sequential `npm run test:e2e:timing` runs on the local macOS GUI session, hidden windows, six workers. Both used the same uncommitted implementation snapshot based on commit `805922e`. Measured Git blob IDs: `e2e/fixtures.ts` `16bbf6784c4268bbd41c782dcbb34f644b8d0016`, `scripts/e2e-timing.mjs` `53ebaefe48ac9e3d6699d5e7bd98a6c362651af5`, `package.json` `c54e7a5c199a88d67261e7dc78c938cb830c0e01`, `e2e/agenda-vim.spec.ts` `eccaee62f5e6e56efe9016b16431803ce39f06f6`. No source edits or other test suites ran between or during these measurements. An initial sandbox invocation failed to launch Electron (`SIGABRT`, cleanup `kill EPERM`) and was interrupted; it is excluded. Measurements ran with approved access outside the sandbox. The first full-validation run reproduced an unsafe persistence poll in the existing dated-node creation test: an atomic save briefly removes `document.json`, and a throwing poll callback aborts instead of retrying. Its three callbacks were corrected before the recorded measurements; preliminary runs are excluded. A later full-validation run exposed the same race in a cancellation test. The subsequent test-only correction protects all 11 persistence polls in this spec; the table remains measurement evidence for the explicitly identified earlier snapshot, with final validation required after that correction.
+
+| Measure | Run 1 | Run 2 |
+| --- | --- | --- |
+| Tests | 746 passed, no flaky or skipped tests | 746 passed, no flaky or skipped tests |
+| Playwright wall time (build excluded) | 205.86 s | 255.28 s |
+| Summed test time | 1047.59 s | 1253.23 s |
+| Mean test time | 1.40 s | 1.68 s |
+| Duration buckets: <1 / 1–2 / 2–5 / 5–10 / ≥10 s | 305 / 347 / 79 / 11 / 4 | 159 / 412 / 156 / 14 / 5 |
+| Vim / standard duplicated blocks | 290.77 / 257.43 s | 333.04 / 303.94 s |
+| Single-mode tests | 499.38 s | 616.25 s |
+| Launch calls | 795 (1.066 per test) | 795 (1.066 per test) |
+| Cleanup: summed / mean / median | 46.18 / 0.06 / 0.05 s | 51.60 / 0.06 / 0.06 s |
+| Electron launch: summed / mean / median | 219.22 / 0.28 / 0.27 s | 266.71 / 0.34 / 0.33 s |
+| First window: summed / mean / median | 226.98 / 0.29 / 0.27 s | 284.73 / 0.36 / 0.33 s |
+| Post-launch assertions: summed / mean / median | 95.64 / 0.12 / 0.11 s | 119.16 / 0.15 / 0.13 s |
+| Total launch: summed / mean / median | 588.54 / 0.74 / 0.72 s | 722.71 / 0.91 / 0.87 s |
+| Fixture teardown: summed / median | 69.83 / 0.09 s | 83.46 / 0.10 s |
+| Maximum phase discrepancy | 1.13% | 0.96% |
+
+Each run had 704 tests with one launch, 35 with two, and seven with three; 746 teardown samples. All launch phase sums were within 10% of measured total launch duration. The wall-time spread was 49.42 s, or 24.0% of run 1 (mean 230.57 s). Summed time rose 19.6%, and the rounded median launch time rose 20.8%. Two samples establish an observed spread, not a stable variance estimate or its cause; later comparisons should repeat the workflow on the same machine and worker count.
+
+Measured launch plus fixture teardown accounted for 62.8% and 64.3% of summed test time. This replaces the earlier rough launch-cost estimate for this snapshot. Electron launch and first-window loading together took approximately 76% of launch time, cleanup 7–8%, and post-launch assertions 16–17%. E2E-2 must inspect whether assertion overhead can be reduced while retaining every assertion; the cleanup phase alone is below its 10% criterion. This is measurement evidence, not an authorization to weaken isolation or assertions.
+
+The workflow prints all file totals and the 20 slowest tests. Run 1's three leading files were `drag-and-drop-hierarchy.spec.ts` (118.95 s), `vim-navigation-and-visual.spec.ts` (59.10 s), and `shutdown-failures.spec.ts` (53.47 s). Run 2's were `drag-and-drop-hierarchy.spec.ts` (131.97 s), `vim-navigation-and-visual.spec.ts` (89.16 s), and `vim-text-editing.spec.ts` (70.58 s). Raw reports are temporary local artifacts at `/private/tmp/tree-e2e1-final-run1.json` and `/private/tmp/tree-e2e1-final-run2.json`; the committed summary supports resumption without those artifacts.
+
+### Validation support: Agenda persistence polling
+
+Two existing tests reproduced ENOENT while polling during the documented atomic-save rename window. The correction uses existing `tryReadPersisted` for all 11 persistence polls across five tests in `e2e/agenda-vim.spec.ts`. The multi-root and first-root projections, expected arrays, and direct post-save assertions are preserved. The complete spec passed three repeats (69 cases); affected TypeScript, lint, format, requirement coverage, and editing-mode checks passed. This contained correction needs no new product decision or structural initiative: the safe reader already exists and the observed test failures share one documented cause in one owner. E2E-1 still requires successful High Risk validation before its timing implementation is complete.
 
 ## Next Task
 
-E2E-1. E2E-4 is independent and may be taken instead if the Product Owner asks for it.
+E2E-1: complete High Risk validation and commit the timing implementation. Its code and working context remain in the worktree. E2E-4 is independent and may be taken instead if the Product Owner asks for it.
 
 ## Resume Prompt
 
