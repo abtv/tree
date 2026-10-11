@@ -56,6 +56,8 @@ With initiative-wide approval and a verified runner, fresh task runs can start a
 
 The initiative runner includes an executable host, configured native role adapters, process inspection and synthetic tests. Implementation validation and independent review are complete; automatic live advancement still requires the bounded pilot. Missing capabilities stop the affected stage with a concrete next action. A completed local commit does not hide a newly discovered blocker or renew the elapsed allowance. Operational details are in [Development Guide §11](DEVELOPMENT.md#initiative-runner). The approved pilot allowance starts with live pilot execution and is preserved across restarts.
 
+Pilot usage must count fresh primaries, acceptance resumes, independent roles, and retries; unavailable usage totals remain unknown. The pilot retains its original elapsed deadline across all runs and restarts. Report permissions observed during actual operations separately from configured permissions, including whether an operation prompted and whether it passed. A single pilot does not establish usage savings or quality equivalence.
+
 ### What to Expect During Delivery
 
 Before substantial work, the agent checks the current session's capabilities needed for your task. If a required tool, validation environment, or independent role is unavailable, it explains the effect and next action early, and continues authorized work that can proceed. Settings alone do not prove access. You do not need to select tools or supervise this check.
