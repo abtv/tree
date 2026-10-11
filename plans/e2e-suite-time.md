@@ -56,8 +56,8 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-8a | ADR and ordered rollout preparation | E2E-3, D1 | Done |
 | E2E-8b | Harden reset, recovery and memory evidence | E2E-8a | Done |
 | E2E-8c | Adopt navigation and Tab structure | E2E-8b | Done |
-| E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Ready |
-| E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Planned |
+| E2E-8d | Adopt eligible Vim text-editing cases | E2E-8c | Done |
+| E2E-8e | Adopt eligible Vim navigation/selection cases | E2E-8d | Ready |
 | E2E-8f | Measure and close the bounded rollout | E2E-8e | Planned |
 
 ### E2E-1 — Timing report and launch breakdown
@@ -873,14 +873,136 @@ The initial `npm run check:full` passed static/governance checks, 3,308 unit cas
 
 The Product Owner then explicitly authorized the 75 ms Agenda edit-p95 limit and commit. Only that guard changed; motion p95, maximum latency and all other assertions remain. The subsequent complete `npm run test:perf` passed all 60 cases. Affected E2E/performance type checking, focused lint and final formatting/documentation checks passed; audit found zero vulnerabilities. Under Development §9, the required High Risk tier is satisfied by the initial successful unchanged stages plus the complete passing supplemental performance/audit stages; the aggregate attempt itself is not relabeled as passing. Independent review of the budget change found no meaningful issues. E2E-8c is complete; no production behavior, editing category or screenshot baseline changed.
 
+### E2E-8d body-level eligibility inventory (2026-10-11)
+
+All original bodies launch once with supported `initialMode: 'normal'`; no clocks,
+initialization scripts, relaunches or replaced handlers occur. Collapsed root
+seeds may contain descendants, links and attachments. Renderer paste/cut
+prevention listeners are discarded on reload. The two nested initial locations
+and two Playwright media-emulation bodies remain fresh. The other 50 of 54
+existing cases adopt hidden reload through unnamed groups, preserving all titles,
+assertions, registration order, conformance references and Vim-only coverage.
+Visible and explicit fresh controls remain fresh for every body.
+
+| Exact existing title / parameter family | State mutations and clipboard | Hidden execution |
+| --- | --- | --- |
+| uses word, quote, and bracket text objects in Normal mode | Text objects, deletion/change, Insert | Shared |
+| switches modes and applies Normal-mode motions and edits | Insert/Normal, motion, deletion | Shared |
+| undoes with u and redoes with Ctrl+r in Normal mode | Text history, undo/redo | Shared |
+| keeps the caret on the change that u and Ctrl+r apply | Text history, caret, undo/redo | Shared |
+| returns to the level of the change when u applies it elsewhere | Initial location alpha, ancestor navigation, undo | Fresh: nested seed |
+| blocks an unhandled Ctrl-modified key from reaching native text editing in Normal mode | Insert/Normal, native command suppression | Shared |
+| drops an unfinished command before u and Ctrl+r instead of undoing or redoing | Counts, pending operator, undo/redo | Shared |
+| undoes two separate Vim character replacements without an empty history step | Replacement, history | Shared |
+| A enters Insert mode at the end of the node | Append, Insert, caret | Shared |
+| I enters Insert mode at the first non-whitespace character | Insert, caret | Shared |
+| puts the local register after the current character with p | Visual yank/put, locked clipboard | Shared |
+| uses counted text operators while preserving the node and its subtree | Collapsed subtree, counted deletion, enter child | Shared |
+| changes words, finds characters, and repeats the completed change | Find/change/Insert, repeat register | Shared |
+| replaces, substitutes, and changes through the end of node text | Character replace, substitute/change, deletion | Shared |
+| repeats inserted text and honors a count before dot | Insert, delete/repeat registers | Shared |
+| repeats a deletion-only Insert edit at the same relative caret | Insert deletion, repeat, caret | Shared |
+| repeats a completed Insert session in another node | Root peers, Insert, focus, repeat | Shared |
+| repeats a completed change and substitute in another node | Root peers, change/substitute, repeat | Shared |
+| does not repeat an Insert session interrupted by pointer focus | Root peers, pending Insert, pointer focus | Shared |
+| changes whole-node text, deletes backward, and repeats counted text puts | Collapsed subtree, enter/leave, Visual yank, locked clipboard | Shared |
+| uses WORD, ge, and repeated character-find motions | WORD/find motions, find register | Shared |
+| replaces text in Replace mode and repeats the completed session | Replace, repeat, caret | Shared |
+| continues Replace after double-click word selection (plain/rich, pending false/true) | Four cases; Replace, pointer selection, undo, rich screenshot | Shared |
+| continues Replace after double-clicking another node's word (plain/rich) | Two cases; root peers, Replace, pointer focus/selection, undo | Shared |
+| leaves an image caret on replacement text after Escape | Attachment, image/text caret, Replace | Shared |
+| continues Replace at the clicked caret of the same node and undoes each click-separated edit | Replace, pointer caret, undo | Shared |
+| continues Replace in another node after committing the pending replacement | Root peers, Replace, pointer focus | Shared |
+| continues Replace in another node when nothing was typed yet | Root peers, empty Replace, pointer focus | Shared |
+| ends Replace when a press in another node drags a text selection | Root peers, Replace, pointer drag | Shared |
+| clears the image caret when a pending Replace session commits on blur | Attachment, peers, image caret, blur; leaves Replace active | Shared |
+| activates the image caret when a same-node pointer click commits a Replace session | Attachment, Replace, image caret, light/dark screenshots | Fresh: retained media emulation |
+| undoes a pending Replace-mode edit and focuses the restored text | Attachment, peers, Replace, undo, light/dark screenshots | Fresh: retained media emulation |
+| ends a pending Replace session on Cmd+Shift+Z with a valid Normal caret | Attachment, Replace, redo, image/text caret | Shared |
+| commits a pending Replace session before entering the node with its enter control | Collapsed subtree, Replace, navigation | Shared |
+| commits a pending Replace session before Cmd+Backspace deletes the node | Root peers, Replace, structural deletion, undo | Shared |
+| commits a pending Replace session before Cmd+V pastes at the typed end | Replace, locked clipboard, discarded paste listener | Shared |
+| commits a pending Replace session before the native paste fallback | Replace, locked clipboard, native paste | Shared |
+| commits a pending Replace session before Cmd+A selects all | Replace, text selection | Shared |
+| commits a pending Replace session before Cmd+A and Cmd+X cut the visible selection | Replace, selection, discarded cut listener, locked clipboard | Shared |
+| repeats a deletion made inside an Insert session | Insert deletion, repeat | Shared |
+| does not record an Insert session interrupted by Enter as repeatable | Insert, structural split, repeat | Shared |
+| does not record a plain Insert session as repeatable after entering the node with its enter control | Collapsed subtree, Insert, navigation, repeat | Shared |
+| does not record a plain Insert session as repeatable after a breadcrumb navigates to an ancestor | Initial location root, Insert, ancestor navigation | Fresh: nested seed |
+| adds, changes, and deletes surrounding pairs in Normal mode | Surround commands, locked clipboard | Shared |
+| surrounds the whole node with yss and repeats a surround with dot | Surround, repeat, undo, locked clipboard | Shared |
+| surrounds a Visual selection with S | Visual selection, surround | Shared |
+| changes case with gu, gU, g~, and Visual ~ around a hyperlink | Collapsed subtree, rich link, case, Visual, undo | Shared |
+| puts with gp and gP and leaves the caret on the character after the inserted text | Local register, put/delete, undo, caret | Shared |
+| selects the node after a gp subtree put, or the last copy when none follows | Collapsed subtree, root peers, structural put/undo, locked clipboard | Shared |
+| yanks to the end of the node with Y without disturbing the repeatable change | Local yank/put, repeat, undo | Shared |
+
+Four new ordered poison/successor cases cover Visual and pending Replace state,
+register/repeat disposal and locked clipboard rewriting; successors check clean
+Normal focus/caret/history and no mutation after each put/repeat command. Existing
+order also crosses shared/fresh/shared at each fresh exclusion. No fixture or
+production reset contract is extended.
+
+The initial five-repeat one-worker adopted run passed 285 cases and failed the
+same undo-light screenshot in all five repeats. Inspected actual pixels were
+dark because the preceding Playwright media override survived reload. Both
+media-emulation cases were then excluded; screenshot expectations are unchanged.
+The failed attempt remains in `.scratch/e2e-8d/adopted-one.json`.
+
+### E2E-8d matched controls (2026-10-11)
+
+Four sequential runs on HEAD `8835c1a` plus the adopted text spec, identical
+production/fixture/build inputs, same macOS GUI host and no overlapping suites.
+Each used `npm run test:e2e:diagnose`, the text-editing spec, five repeats and
+`--reporter=dot,json`, with fresh/reload selection and one/six-worker limits.
+All four passed 290 identical cases with zero failures, flakes, skips or errors.
+Reports are retained under `.scratch/e2e-8d/`.
+
+| Execution | Worker limit | Launches | Resets | Summed time | Wall time |
+| --- | --- | --- | --- | --- | --- |
+| Adopted reload | 1 | 40 | 250 | 40.130 s | 42.650 s |
+| Fresh control | 1 | 290 | 0 | 106.632 s | 108.944 s |
+| Adopted reload | 6 | 40 | 250 | 93.623 s | 20.025 s |
+| Fresh control | 6 | 290 | 0 | 287.230 s | 59.969 s |
+
+Playwright scheduled five workers under the six-worker limit because this file
+has five repeat groups; each group preserves poison/successor order. Observed
+wall reductions are 60.9% and 66.6%; these single matched pairs do not establish
+whole-suite savings or run-to-run variance.
+
+### E2E-8d validation and review (2026-10-11)
+
+Visible fresh fallback passed all 58 cases. Existing actual Replace word-selection,
+click image-caret light/dark and undo image-caret light/dark screenshots were
+inspected after six focused cases passed; no baseline or conformance-reference
+changes. Capture-only attachments were removed before final validation. Serial
+and parallel screenshot infrastructure guards passed ten and 24 cases.
+
+The complete `npm run check:full` passed static/governance checks, 3,308 unit cases,
+the unit-performance guard, build and all 769 E2E cases (4.2 min). Performance
+passed 59 of 60 cases, failing unchanged Vim date-completion maximum popup paint
+at 147.2 ms against strict <100 ms; p95 was 32.0 ms and insertion max 4.3 ms.
+Five unchanged repeats of both date-completion modes passed ten cases with maxima
+31.5–32.4 ms. The complete supplemental `npm run test:perf` then passed all 60
+cases (2.0 min), and audit found zero vulnerabilities. No cause is claimed and
+no performance guard changed. Under Development §9, valid initial stages plus
+passing complete performance/audit supplements satisfy High Risk validation;
+the original failed aggregate attempt is not relabeled. Detailed temporary
+commands, runtime blobs and artifacts are retained in `.scratch/e2e-8d/evidence.md`.
+
+Independent review traced eligibility, assertion/title preservation, clipboard,
+poison/successor and mixed ownership paths and found no meaningful issues.
+E2E-8d is complete, with no unresolved validation failure or product decision.
+No production or fixture code, editing category or screenshot baseline changed.
+
 ## Next Task
 
-E2E-8d: inventory every body/launch of `e2e/vim-text-editing.spec.ts` under ADR 0021, adopt only supported hidden top-level/collapsed cases and keep nested/unsupported cases explicitly fresh. Preserve conformance references, all assertions and editing-mode coverage. Complete matched one/six-worker five-repeat controls, state-poisoning/mixed transitions, screenshot inspection, High Risk validation and independent review as specified in the task above. No other source spec is eligible by proximity.
+E2E-8e: inventory every body/launch of `e2e/vim-navigation-and-visual.spec.ts` under ADR 0021, adopt only supported hidden top-level/collapsed cases and keep nested/expanded seeds and retained instrumentation explicitly fresh. Preserve conformance references, all assertions and editing-mode coverage. Complete matched one/six-worker five-repeat controls, state-poisoning/mixed transitions, screenshot inspection, High Risk validation and independent review as specified in the task above. No other source spec is eligible by proximity.
 
-Start a new session for E2E-8d: its body-level inventory benefits from fresh context after E2E-8c's performance validation follow-up. D2 remains declined and D4 deferred; do not change editing-mode composition or introduce budgets.
+Start a new session for E2E-8e after E2E-8d's media-emulation discovery and performance validation follow-up. Playwright media emulation survives renderer reload and remains excluded; do not infer renderer ownership from a page API alone. D2 remains declined and D4 deferred; do not change editing-mode composition or introduce budgets.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8d, inventory and adopt eligible Vim text-editing cases under ADR 0021. E2E-8c is complete. D1 approved, D2 declined, D3 implemented, D4 deferred. Preserve assertions, editing modes and fresh-process exclusions; do not broaden the reset contract.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-8e, inventory and adopt eligible Vim navigation/selection cases under ADR 0021. E2E-8d is complete. D1 approved, D2 declined, D3 implemented, D4 deferred. Preserve assertions, editing modes and fresh-process exclusions, including retained Playwright media emulation; do not broaden the reset contract.
 ```
