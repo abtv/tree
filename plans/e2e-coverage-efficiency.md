@@ -114,7 +114,7 @@ Move enduring guidance to its existing owner and commit EC-6 as Done while retai
 
 ## Sources and Constraints
 
-Preparation snapshot: clean HEAD `645aa79`, authored by `abtv` on 2026-10-12. This preparation authorizes planning only. The execution projection below is proposed, not approved. Approval must cover the six-task initiative, the finite host allowance and host execution explicitly, and settle final retirement separately; do not interpret this preparation request as that approval.
+Preparation snapshot: clean HEAD `645aa79`, authored by `abtv` on 2026-10-12. This preparation authorizes planning only. The execution projection below is proposed, not approved. Approval must cover the six-task initiative, the finite host allowance and host execution explicitly. This initiative has six working tasks and requires final owner acceptance under `AGENTS.md` §8. The later request to add those rules authorizes policy documentation only; it does not approve this initiative or runner implementation.
 
 The objective, this section, task headings/scopes, task-table descriptions and execution projection are immutable for a run. Only the selected task's status, its projected next task's Planned-to-Ready status, and progress/evidence outside those scopes may change. Preserve assertions when faithful migration needs an unlisted owner. Additional migration or executable policy-enforcement tasks require separate authorization; report them and leave coverage intact. Do not silently claim the overall objective complete while confirmed redundant families remain unaddressed.
 
@@ -124,9 +124,11 @@ The fixed EC-3 layout uses a non-spec test filename and a dedicated configuratio
 
 All Playwright invocations are serialized and comparisons use six hidden workers on this host. Timing output paths are unique per task/run; preserve baseline artifacts outside tool-cleared `test-results/`. Build and complete command elapsed time are available in host process records; test-only wall/summed times and launches are in JSON and timing summaries. Diagnostics, failures and relocation are reported separately from actual coverage-work reduction. Fault experiments are optional bounded evidence, not authorization to mutate production code or launch unprojected commands.
 
-Proposed allowance: **8 hours elapsed (28,800,000 ms)** from first coordinator construction, including pauses, retries, independent roles, commits and closure. Suggested allocation: EC-1 90 minutes, EC-2 45, EC-3 90, EC-4 90, EC-5 75, EC-6/closure 30, contingency 60. These are planning estimates, not measurements or E2E duration gates. The original deadline survives restart; maximum two recoveries per task. Never renew it by deleting a ledger. Permission/authentication/capability blocks require supported external resolution immediately. Budget exhaustion preserves unfinished work and evidence.
+Proposed implementation allowance: **8 hours elapsed (28,800,000 ms)** from first coordinator construction, including implementation pauses, retries, independent roles and task commits. Suggested allocation: EC-1 90 minutes, EC-2 45, EC-3 90, EC-4 90, EC-5 75, EC-6 30, contingency 60. Final owner waiting is excluded and preserves the remaining implementation allowance and recovery counters for any authorized repairs. A separate small closure allowance must be proposed and approved after runner readiness is established. These are planning estimates, not measurements or E2E duration gates. Maximum two recoveries per task; never renew an allowance by deleting a ledger. The current host cannot suspend its original deadline for final owner waiting, so the proposed projection is not launch-ready under the new policy. Permission/authentication/capability blocks require supported external resolution immediately. Budget exhaustion preserves unfinished work and evidence.
 
-Owner involvement: **zero mandatory manual product-verification checks, zero required verification rounds**, hence empty `ownerChecks`. No runtime UI or native input behavior changes. One approval round covers scope and allowance before execution. Possible setup interventions include host command approval, authentication/trust, quiescence of unrelated Electron/Codex exec processes, and supported outer-host closure invocation. A new visual/native obligation or scope-changing discovery requires a revised estimate and decision before crossing it. Review roles cover workflow behavior and coverage transfer; they do not replace unavailable native interaction.
+### Owner Involvement
+
+There are **zero mandatory manual product-verification checks and one required final owner acceptance round** for the six working tasks. No runtime UI or native input behavior changes. The initial execution approval is separate: it covers scope and allowances only after unattended preflight passes. Existing task `ownerChecks` remain empty because they are pre-commit gates, not final initiative acceptance. After EC-6, retain this plan/index as `Awaiting owner acceptance` and present the audited assertion transfers, actual before/after costs, retained boundaries, validation/review evidence and remaining limitations against the delivered commit. Explicit owner acceptance permits closure; rejection records issues and requires repair and renewed acceptance. Possible additional rounds arise from rejected results, scope-changing discoveries or new native-verification obligations. Setup interventions for permissions, authentication/trust and unrelated process quiescence must be resolved and rechecked without intervention before launch.
 
 Capabilities checked in this preparation session:
 * `git status --short`: clean before edits; repository inspection and process inspection succeeded.
@@ -138,7 +140,7 @@ Capabilities checked in this preparation session:
 * No coordinator was constructed and no budget ledger was started. Host launch permissions, authentication, fresh/resumed primary execution and quiescence must be checked at authorized launch; historical pilot success is not current proof.
 * Existing `.scratch/autonomous-initiatives-pilot/` records are unrelated and must be preserved. The proposed execution namespace is `.scratch/e2e-coverage-efficiency/`; confirm it remains unstarted before construction.
 
-Launch only after the prepared plan is committed, approval is attributable, the worktree is clean and host permission is established. Substitute the full resulting commit and actual approval reference; never use the pre-preparation HEAD as the approved source:
+Launch is currently blocked. A separately authorized runner task must implement and verify the missing preflight, final acceptance, waiting-budget and closure behavior described in Development §11. No such implementation is authorized by this policy edit. Then complete the unattended preflight of Development §10, revise this projection to the supported contract, obtain attributable execution approval, and launch only from a clean committed plan. The invocation below is a future template, not a readiness claim; never use the pre-preparation HEAD as the approved source:
 
 ```text
 node scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tree plans/e2e-coverage-efficiency.md EC-1 <full-approved-starting-commit> <owner-approval-reference>
@@ -146,7 +148,7 @@ node scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tre
 
 The CLI advances EC-1 through EC-6 only. **Current host closure is blocked:** `executeInitiative` in `scripts/initiative-runner-host.mjs:98` replaces a supplied completed EC-6 starting commit with that task's persisted original starting commit. That original plan marks EC-6 Ready, whereas closure projection requires Done. The independently inspected code therefore does not support the proposed same-namespace closure replay; the CLI also has no closure flag. No closure contract is projected and no runner correction is authorized here.
 
-Recommended owner decision: authorize the outer coordinating agent, after observed EC-6 success and confirmation that the objective is met, to retire only this plan and its index row in one separate documentation commit using native edits and the Minimal Risk checks (formatting, docs, permission governance). Count that work within the eight-hour allowance; it requires no additional product-verification round. This final commit is outside the initiative host. If every commit must be handled by the runner, a separately planned and authorized runner correction is required before launch. Until the owner chooses, retain the plan/index and do not claim fully autonomous closure.
+Final owner acceptance is mandatory after EC-6 and cannot be granted in the initial execution approval. Retire only this plan and its index row after explicit acceptance of the unchanged delivered result, within the separately approved closure allowance and through a verified supported closure path. Until runner readiness and owner acceptance are satisfied, retain the plan/index and do not claim fully autonomous closure.
 
 ## Proposed Runner Projection
 
@@ -727,23 +729,16 @@ Adding this block does not authorize execution. Exact argv arrays are host valid
 
 ## Execution Findings
 
-Preparation only. EC-1 remains the next task and no initiative task has executed. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and allowance await owner approval.
+Preparation only. No initiative task has executed. EC-1 remains the first implementation task, but unattended launch is blocked by missing runner preflight/final-acceptance/budget/closure support. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
 
 ## Next Task and Resume Prompt
 
-Next task: EC-1, after explicit approval of the prepared initiative scope, runner host and eight-hour elapsed allowance. No implementation or policy change has started. No product requirement gaps have been identified for this test/workflow-only scope. Recheck future host capabilities at authorized launch; the preparation evidence above is limited to its stated commands and scope.
+Next required action: separately authorize runner readiness work and complete unattended preflight. EC-1 can start only afterward, under explicit execution approval and the revised supported projection. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. The preparation evidence above is limited to its stated commands and scope.
 
 ```text
-Execute plans/e2e-coverage-efficiency.md through the proposed Codex runner,
-starting with EC-1. I authorize all six fixed tasks, host execution, the
-eight-hour original elapsed allowance. I also authorize the outer coordinator
-to retire the plan/index in a separate validated documentation commit after
-all six tasks are committed Done and the objective is met. Preserve
-product behavior, real-boundary coverage, existing editing-mode obligations,
-and ADR 0021 isolation constraints. Do not introduce duration budgets or new
-reporting infrastructure. Audit assertions and measure costs before removing
-tests; move redundant rule coverage to faithful lower-layer tests and retain
-distinct Electron integration paths. Advance within the fixed projection,
-validate and commit each task with its plan status update. Resolve ordinary engineering choices
-autonomously; do not expand into production refactoring or product changes.
+Prepare the separately scoped runner readiness work needed by AGENTS.md §8
+and Development §§10–11. Keep E2E Coverage Efficiency unstarted. Identify
+the implementation tasks, preflight evidence, owner involvement and budget
+needed for prompt-free execution and post-implementation owner acceptance.
+Do not treat this preparation prompt as implementation authorization.
 ```

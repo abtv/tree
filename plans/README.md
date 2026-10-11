@@ -4,6 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Proposed; runner contract prepared, scope and eight-hour allowance await approval | EC-1: audit coverage ownership and establish comparable costs |
+| [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Proposed; unattended launch blocked by runner readiness; execution allowance and final acceptance pending | Complete runner readiness and preflight before approving EC-1 |
 
-An empty index means no multi-session or review-batch work is known to be outstanding. Remove a plan and its row when the work is complete — for a review batch, after the Product Owner confirms no further tasks remain. Git history retains the completed record.
+An empty index means no multi-session or review-batch work is known to be outstanding. Retain initiatives with three or more working tasks as `Awaiting owner acceptance` after implementation; remove their plan and row only after explicit acceptance under `AGENTS.md` §8. Review batches also require confirmation that no further tasks remain. Git history retains the completed record.
