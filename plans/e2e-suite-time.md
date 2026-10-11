@@ -42,8 +42,8 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | E2E-1 | Repeatable timing report and launch-time breakdown | — | Done |
-| E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Ready |
-| E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Planned |
+| E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Done |
+| E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Ready |
 | E2E-4 | Editing-mode audit and proposal | — | Ready |
 | E2E-5 | Apply the approved editing-mode reclassification | E2E-4, D2 | Planned |
 | E2E-6 | Local affected-spec validation policy | D3 | Blocked |
@@ -162,12 +162,37 @@ Source inspection established that the performance suite uses its own fixture an
 
 The current validation blocker is cleared by the successful full run. E2E-1 introduces no product decisions or architecture changes. This investigation does not authorize performance-suite or product changes outside the initiative.
 
+### E2E-2 measurements and validation (2026-10-11)
+
+The Product Owner selected E2E-2. Inspection of the E2E-1 phases found cleanup below the 10% criterion and post-launch checks at 16–17%. The optimization runs the independent visibility and shortcut evaluations together and combines device-scale and overlay-scrollbar measurements in one renderer evaluation. Every assertion, save-error observer, readiness check, initial editing-mode transition, per-worker process scan, tracked-app teardown, and failure cleanup remains. No product, persistence, architecture, or performance-suite change was made.
+
+Two sequential `npm run test:e2e:timing` runs used HEAD `1449695` plus fixture blob `dd83555afef19abde5735fbf66ffe644af3c0bb8`, on the local macOS GUI, hidden windows, six workers, no overlapping suites or source edits. Both passed 746/746 with zero flaky or skipped cases and 795 launches (1.066 per test).
+
+| Measure | Run 1 | Run 2 |
+| --- | --- | --- |
+| Wall time, build excluded | 183.37 s | 226.10 s |
+| Summed test time | 926.01 s | 1171.71 s |
+| Cleanup median | 0.05 s | 0.06 s |
+| Electron launch median | 0.24 s | 0.32 s |
+| First-window median | 0.22 s | 0.32 s |
+| Assertion median | 0.09 s | 0.12 s |
+| Total launch median | 0.62 s | 0.87 s |
+| Maximum phase discrepancy | 2.69% | 2.26% |
+
+All phase sums were within 10%. Compared with E2E-1's rounded launch medians of 0.72/0.87 s and assertion medians of 0.11/0.13 s, the mean of the two run medians decreased by approximately 6% and 13%, respectively. The 42.73 s wall-time spread is 23.3% of run 1. Other launch phases also improved, so these two samples do not establish the causal saving of this small optimization. Raw reports are temporary artifacts at `/private/tmp/tree-e2e2-run1.json` and `/private/tmp/tree-e2e2-run2.json`.
+
+Full validation reproduced the documented atomic-save polling race in `e2e/agenda-moves.spec.ts`: its throwing reader aborted `expect.poll` on ENOENT. A separate contained test correction reuses `tryReadPersisted` for its text projection, preserving all expected arrays and propagating malformed-file errors. The corrected spec (blob `0b3d224dfbc6fc576d1545ed166fd00c87cb505d`) passed `npm run test:e2e -- e2e/agenda-moves.spec.ts --repeat-each=3` (42/42). `npm run fix:history -- e2e/agenda-moves.spec.ts` found no fix commits in its 14-day window. The safe reader already owns this solution; no structural initiative is needed for this focused reuse.
+
+`npm run check:full` passed static checks, governance, all 3,296 unit tests, unit performance, and build before the polling failure (745 E2E cases passed). After the correction, affected `npm run typecheck:e2e`, `npm run lint`, and `npm run format:check:changed` passed, and `npm run test:e2e` passed 746/746 (2.8 min). `npm run audit` reported zero vulnerabilities. `npm run test:perf` passed 59/60 cases; deep dense Agenda typing P95 failed at 55.4 ms against the unchanged 50 ms ceiling. `npm run test:perf -- perf/agenda-scale.spec.ts --grep agenda-deep-100000-dense --repeat-each=3 --workers=1` then passed 3/3, with typing P95 43.2/32.2/33.0 ms. Performance uses its own unchanged fixture. These repeats support intermittent timing variation, without proving its cause; the intermittent extreme-scale performance risk already noted in E2E-1 remains. Valid unaffected stages and the affected/remainder reruns together satisfy the full validation tier; neither earlier failure is represented as a passing full command.
+
+Independent review found no meaningful issues, including preservation of launch assertions and isolation and the ENOENT-only polling retry. Final `npm run format:check:changed` and `npm run check:docs` passed. The polling correction landed separately in `227b352`. The Product Owner explicitly requested continuing in the same session after the initial failed validation, overriding the default session-stop rule. E2E-2 is complete with no new product decisions; the causal speedup remains unquantified.
+
 ## Next Task
 
-E2E-2: inspect the measured launch phases for avoidable overhead while retaining every launch assertion and existing isolation. E2E-4 is also ready and independent. The Product Owner must select the next task because both are ready; completion of E2E-1 does not select either.
+E2E-3 (opt-in shared-application prototype) and E2E-4 (editing-mode audit) are ready and independent. The Product Owner selects the next task. Adoption of a shared application remains reserved under D1; E2E-3 authorizes only the bounded prototype and measurement.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take the next Ready task.
+Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-3, the opt-in shared-application prototype.
 ```

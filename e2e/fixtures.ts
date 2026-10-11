@@ -518,23 +518,21 @@ export async function launchTree(
       const window = await measure('firstWindow', () => app.firstWindow())
       await measure('assertions', async () => {
         await observeSaveErrors(window)
-        await assertWindowMode(app, windowMode)
-        await assertShortcutMode(app, shortcutMode)
+        await Promise.all([assertWindowMode(app, windowMode), assertShortcutMode(app, shortcutMode)])
         if (options.expectReady !== false) await expect(window.locator('main.tree-app')).toBeVisible()
-        const scale = await window.evaluate(() => devicePixelRatio)
+        const { scale, scrollbarWidth } = await window.evaluate(() => {
+          const probe = document.createElement('div')
+          probe.style.cssText = 'position:absolute;visibility:hidden;width:100px;height:100px;overflow:scroll'
+          document.body.append(probe)
+          const scrollbarWidth = probe.offsetWidth - probe.clientWidth
+          probe.remove()
+          return { scale: devicePixelRatio, scrollbarWidth }
+        })
         if (scale !== 1) {
           throw new Error(
             `Expected E2E devicePixelRatio 1, got ${scale}. The launch-time rendering scale did not apply.`,
           )
         }
-        const scrollbarWidth = await window.evaluate(() => {
-          const probe = document.createElement('div')
-          probe.style.cssText = 'position:absolute;visibility:hidden;width:100px;height:100px;overflow:scroll'
-          document.body.append(probe)
-          const width = probe.offsetWidth - probe.clientWidth
-          probe.remove()
-          return width
-        })
         if (scrollbarWidth !== 0) {
           throw new Error(`Expected E2E overlay scrollbars, got a ${scrollbarWidth}px classic scrollbar.`)
         }
