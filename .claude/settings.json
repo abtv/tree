@@ -38,6 +38,7 @@
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
     "excludedCommands": [
+      "ps -axo pid=,ppid=,command=",
       "npm run test:e2e*",
       "npm run test:perf*",
       "TREE_E2E_VISIBLE=1 npm run test:e2e*",
@@ -82,6 +83,7 @@
       "Bash(tail*)",
       "Bash(wc*)",
       "Bash(rg *)",
+      "Bash(ps -axo pid=,ppid=,command=)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
