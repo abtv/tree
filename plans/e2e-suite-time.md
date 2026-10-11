@@ -44,7 +44,7 @@ Unmeasured: launches per test, the split of launch time between Electron startup
 | E2E-1 | Repeatable timing report and launch-time breakdown | — | Done |
 | E2E-2 | Remove avoidable per-launch fixture overhead | E2E-1 | Done |
 | E2E-3 | Prototype and measure a shared application per worker | E2E-1 | Done |
-| E2E-4 | Editing-mode audit and proposal | — | Ready |
+| E2E-4 | Editing-mode audit and proposal | — | Done |
 | E2E-5 | Apply the approved editing-mode reclassification | E2E-4, D2 | Planned |
 | E2E-6 | Local affected-spec validation policy | D3 | Blocked |
 | E2E-7 | Suite-duration report or budget | E2E-1, D4 | Planned |
@@ -218,12 +218,551 @@ Playwright page-clock and custom initialization scripts are browser-context stat
 
 High Risk validation is complete: `npm run check:full` passed before the opt-in oracle hardening (3,296 unit tests, 746 E2E cases, 60 performance cases, static/governance checks, build and zero audit vulnerabilities). Unchanged unit, production, performance and audit inputs retain that evidence. After hardening, `npm run typecheck:e2e`, `npm run lint`, `npm run format:check:changed`, `npm run check:docs` and the complete `npm run test:e2e -- --reporter=dot` passed. The final E2E console session was lost during context compaction; its completed runner and Playwright `.last-run.json` report `passed` with no failed tests. These affected reruns and unchanged full-command stages compose validation rather than imply a second full-command pass. Screenshot guards passed 20 serial and 48 parallel cases; the prototype's indented selection screenshot was inspected. Independent review found no meaningful issues in reset isolation, IPC draining, failure cleanup, seed oracles or retained-state limits. E2E-3 is complete.
 
+### E2E-4 editing-mode audit (2026-10-11)
+
+Source: all 35 `both` files at commit `4bb0897` (authored by abtv on 2026-10-11), inspected in this session against Development §8. Two configured planners inspected bounded groups of 12 files each; the primary inspected the remaining 11 and integrated the body-level findings. This is a proposal for D2, not a change to execution categories or coverage. Common fixture startup alone is not treated as a reason to duplicate every test.
+
+**Recommendation:** retain 32 files as they are; split the two pure control-style checks below into existing independent coverage, and propose running screenshot-stability once. Preserve every mode-dependent interaction and generated mode-specific matrix. Only three executions can be removed under the recorded conservative policy. Prefer D1 as the larger measured opportunity; broad mode removal would discard protected caret, pointer or editing-command coverage.
+
+The original `701e9e6` baseline retains only aggregate timings, so its 904.9 s cannot support exact per-test savings. Estimates instead use the latest recorded E2E-2 timing pair: HEAD `1449695` plus fixture blob `dd83555afef19abde5735fbf66ffe644af3c0bb8`, hidden macOS, six workers, 746 passing cases per run, 926.01/1171.71 s summed. The available raw reports were checked in this session at `/private/tmp/tree-e2e2-run1.json` and `/private/tmp/tree-e2e2-run2.json`. Savings equal the standard-mode durations of the three proposed removals, retaining Vim as Development §8 prescribes for independent coverage. This preserves timing provenance instead of allocating aggregate seconds to titles. No new timing run or product execution is needed for this documentation audit.
+
+| Proposed change | Body evidence for independence | Run 1 saving | Run 2 saving | Orphan committed baselines |
+| --- | --- | --- | --- | --- |
+| Split inline-expansion contrast test | Reads only disclosure-control colors and document-surface contrast; no editor interaction, caret, selection or status assertion. | 0.640 s | 1.149 s | None; no screenshot capture. |
+| Split node-gutter selected-bullet color/geometry test | Reads marker/control colors and coincident centers on the initially selected row; no caret/selection rendering assertion, editor interaction or screenshot. Keep the separate pointer/focus alignment test in both modes. | 0.739 s | 1.006 s | None; its sibling owns the unchanged alignment baselines. |
+| Move screenshot-stability to independent | Seeded `.node-list` images hide the caret, omit the status bar and compare repeated captures within each run; no typing, editor pointer or pre-resolved command. Retain both appearances, all three startup-scale variants, nine captures per appearance and one-pixel sensitivity. | 3.949 s | 5.527 s | None; comparisons use in-memory buffers and temporary attachments, not committed baselines. |
+| **Total: three fewer executions (746 → 743)** | Conditional prototype poison remains separate. | **5.328 s** | **7.682 s** | **None** |
+
+The pair mean is 6.505 s summed, approximately 0.62% of the pair mean suite total. The observed range is 0.58–0.66% of the respective suite totals. It is not a wall-time estimate: worker scheduling and the recorded host spread prevent a reliable conversion. No saving is claimed for already-single-mode cases, mode-specific matrices or retained pairs. All other proposal-table rows below have zero saving and no newly orphaned baselines.
+
+| File | Proposal | Difference points supporting retained coverage | Paired titles | Mode-specific titles in helper | Existing single titles |
+| --- | --- | --- | ---: | ---: | ---: |
+| `agenda-caret.spec.ts` | Keep existing coverage | Caret transfer, stand-in caret/selection pixels, Escape and Cmd+C. | 4 | 0 | 0 |
+| `agenda-completion.spec.ts` | Keep existing coverage | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. | 8 | 0 | 0 |
+| `agenda-editing.spec.ts` | Keep existing coverage | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. | 12 | 0 | 0 |
+| `agenda-focused-day.spec.ts` | Keep existing coverage | Cmd+./,/E, explicit Vim versus arrow motions, editor focus/caret and full-window status/caret screenshots. | 4 | 0 | 0 |
+| `agenda-live.spec.ts` | Keep existing coverage | Editor pointer and caret, Escape/Insert, typing, Cmd+Z and full-window status/caret screenshots. | 2 | 0 | 0 |
+| `agenda-moves.spec.ts` | Keep existing coverage | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. | 7 | 0 | 0 |
+| `agenda-view.spec.ts` | Keep existing coverage | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. | 6 | 0 | 0 |
+| `always-on-top.spec.ts` | Keep existing coverage | Explicit mode indicator/status-bar differences and preservation of focused editor/Normal mode. | 3 | 0 | 0 |
+| `attachment-validation.spec.ts` | Keep existing coverage | Duplicated image-only presentation tests caret-sensitive layout and subsequent caption typing. | 1 | 0 | 9 |
+| `clipboard.spec.ts` | Keep existing coverage | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. | 7 | 0 | 9 |
+| `context-menu.spec.ts` | Keep existing coverage | Editor right-click/selection and context-menu Paste; Cmd+A and pointer selection clearing. | 3 | 0 | 4 |
+| `date-like-indicator.spec.ts` | Keep existing coverage | Caret-dependent underline rendering, editor pointer, typing, Cmd+A and full-window screenshots. | 3 | 1 | 0 |
+| `deletion.spec.ts` | Keep existing coverage | Typing and caret/focus projection through Cmd+Backspace and Cmd+.. | 3 | 0 | 0 |
+| `drag-and-drop-hierarchy.spec.ts` | Keep existing coverage | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. | 23 | 8 | 1 |
+| `drag-and-drop.spec.ts` | Keep existing coverage | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. | 7 | 0 | 6 |
+| `editing.spec.ts` | Keep existing coverage | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. | 14 | 0 | 0 |
+| `empty-node.spec.ts` | Keep existing coverage | Caret/focus projection on Backspace boundaries; typing, Cmd+. and Cmd+Z. | 5 | 0 | 0 |
+| `history.spec.ts` | Keep existing coverage | Typing, caret/split transitions and Cmd+Z/history grouping. | 3 | 0 | 5 |
+| `hyperlink.spec.ts` | Keep existing coverage | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. | 7 | 0 | 3 |
+| `initial-state.spec.ts` | Keep existing coverage | Explicit first-run preference, mode indicator and focused startup root. | 1 | 0 | 0 |
+| `inline-expansion.spec.ts` | Split one I title; retain other modes | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. | 12 | 0 | 12 |
+| `navigation.spec.ts` | Keep existing coverage | Editor caret/focus boundary matrix, typing and Cmd+./,. | 12 | 0 | 1 |
+| `node-gutter-alignment.spec.ts` | Split one I title; retain other modes | Retained alignment case moves selection through row clicks and captures the focused editor/caret. | 2 | 0 | 1 |
+| `persistence.spec.ts` | Keep existing coverage | Duplicated restart case types, uses Cmd+. and verifies selected-editor startup focus. | 1 | 0 | 15 |
+| `pointer-cursor.spec.ts` | Keep existing coverage | Explicit mode-indicator presence/absence and pointer presentation over its different status content. | 1 | 0 | 0 |
+| `preview.spec.ts` | Keep existing coverage | Opening/closing preview, Escape, editor focus return and Cmd+Enter; retained mode-specific return cases. | 5 | 0 | 8 |
+| `screenshot-stability.spec.ts` | Propose independent | No difference point: seeded list only, hidden caret, no status bar or editing interaction. | 1 | 0 | 0 |
+| `sticky-location-bar.spec.ts` | Keep existing coverage | Duplicated case explicitly checks status-bar geometry and Vim indicator placement/presence. | 1 | 0 | 1 |
+| `strikethrough.spec.ts` | Keep existing coverage | Cmd+Enter/Z, caret/typing retention and focused Normal/standard screenshots. | 4 | 0 | 5 |
+| `tab-structure.spec.ts` | Keep existing coverage | Mode-specific Tab/Shift+Tab caret/selection/history matrix; Cmd+. and explicit Vim image-caret/status traversal cases. | 2 | 15 | 0 |
+| `tree-date-visualization.spec.ts` | Keep existing coverage | Block versus insertion caret, selected date colors, editor pointer/typing and Cmd+A/Z. | 2 | 0 | 0 |
+| `typed-input.spec.ts` | Keep existing coverage | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. | 6 | 0 | 0 |
+| `typography.spec.ts` | Keep existing coverage | Typed and linked focused-editor glyph screenshots include caret-sensitive rendering. | 2 | 0 | 0 |
+| `undo-sessions.spec.ts` | Keep existing coverage | Typing, cursor/focus transitions and Cmd+Z undo grouping; standard-only Escape case. | 3 | 0 | 1 |
+| `windowed-list.spec.ts` | Keep existing coverage | Editor focus/typing, Cmd+Z and caret restoration; drag/Escape and full-window status pixels. | 3 | 0 | 7 |
+
+#### Complete test inventory
+
+Every default-run execution in these files is accounted for: 180 paired titles (360 executions), 24 mode-specific titles inside helpers, and 88 existing single titles, totaling 472 executions. The table expands generated title families explicitly and adds the one conditional infrastructure poison test from E2E-3. Product quantities in two titles use `$depthLimit` and `$inlineImageBound` placeholders so their numerical requirements remain owned by Product §2.3 and §17.1; the corresponding source titles are unambiguous in their named spec files. Body inspection covers every entry; timing reports supply title enumeration and durations, not independence judgments. Source changes since the timing snapshot preserve all existing titles; E2E-3 adds only the opt-in poison and option declarations.
+
+* **B:** retain the Vim and standard pair; its body passes through the difference points named in its file row.
+* **I:** paired title proposed to run once; exact body rationale and saving are above.
+* **M:** retain the existing named mode-specific matrix/conditional case; it has no identical-title pair to remove. Its mode is stated explicitly.
+* **S:** already executes once outside the helper; preserve its current execution and claim no removal saving. This label does not certify that its body is independent.
+* **P:** opt-in-only prototype poison, already once; preserve it and claim no default-suite saving.
+
+##### agenda-caret.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| carries the caret through a day and contextual ancestor into another editor | B | Caret transfer, stand-in caret/selection pixels, Escape and Cmd+C. |
+| shows the caret on days, gaps and contextual ancestors but not on unselected rows | B | Caret transfer, stand-in caret/selection pixels, Escape and Cmd+C. |
+| leaves no second caret in the editor that selection moved away from | B | Caret transfer, stand-in caret/selection pixels, Escape and Cmd+C. |
+| moves, selects and copies over the text of a day without editing | B | Caret transfer, stand-in caret/selection pixels, Escape and Cmd+C. |
+
+##### agenda-completion.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| accepts relative dates and named months in Tree | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| preserves suffixes and ignores uncertain text and paste in Tree | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| keeps the popup inside the window at the bottom and right edges | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| accepts, cycles, cancels and undoes completion in Tree | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| accepts relative dates and named months in Agenda | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| preserves suffixes and ignores uncertain text and paste in Agenda | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| does not offer completion inside hyperlink text | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+| accepts, cycles, cancels and undoes completion in Agenda | B | Typing and caret placement, Escape, editor pointer, Cmd+A/V/Z and undo grouping. |
+
+##### agenda-editing.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| Command Matrix no-ops preserve each selected non-editable row and direct-match caret | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| retains hyperlinks on inactive direct matches and opens them with Cmd-click | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| pastes multiline text and a real image through the shared clipboard boundary | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| keeps Chromium composition and repeated key input continuous in decorated text | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| edits emphasized text and preserves the editor and caret when its active day changes | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| blocks structural commands and contextual editing while retaining direct text editing | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| uses ordinary Cut and Paste and history, and persists edits across restart | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| creates a dated last root from a day container in Insert and persists it | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| creates for the preceding day from a gap, one Undo removes it, and gaps ignore creation keys | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| splits a dated node at the caret with the displayed date and one Undo restores it | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| places the caret after the inherited date and ignores Enter on a contextual ancestor | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+| deletes an empty childless match but preserves an empty match with children | B | Explicit mode-specific command matrix, editor pointer/caret, typing, Cmd+A/X/V/Z/Enter and session grouping. |
+
+##### agenda-focused-day.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| keeps a selected heading outside the virtualized window at its original position | B | Cmd+./,/E, explicit Vim versus arrow motions, editor focus/caret and full-window status/caret screenshots. |
+| bounds navigation and restores timeline selection, scroll and folds | B | Cmd+./,/E, explicit Vim versus arrow motions, editor focus/caret and full-window status/caret screenshots. |
+| follows a live date edit and creates from the focused heading | B | Cmd+./,/E, explicit Vim versus arrow motions, editor focus/caret and full-window status/caret screenshots. |
+| places its heading at the current-parent position in both appearances | B | Cmd+./,/E, explicit Vim versus arrow motions, editor focus/caret and full-window status/caret screenshots. |
+
+##### agenda-live.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| mirrors edits without taking focus or scrolling, and the active occurrence follows a removed date | B | Editor pointer and caret, Escape/Insert, typing, Cmd+Z and full-window status/caret screenshots. |
+| keeps an item whose last date was removed until selection leaves it, and Undo restores it | B | Editor pointer and caret, Escape/Insert, typing, Cmd+Z and full-window status/caret screenshots. |
+
+##### agenda-moves.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| drags an inactive occurrence onto another day, changing only that date, and Undo restores it | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+| drops on a node row of the target day and removes a duplicate date, activating that occurrence | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+| drags the focused editor and restores its focus and caret after the drop | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+| restores the same caret after a drop as after a cancelled drag from the same point | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+| does not drag contextual ancestors, and drops on a gap or the same day change nothing | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+| cancels a drag with Escape | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+| shows the drop outline on the target day header in light and dark appearances | B | Editor pointer activation and caret restoration, Escape and Cmd+Z; full-window status pixels. |
+
+##### agenda-view.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| windows occurrences while keeping distant selection focused through scrolling, resizing and folding | B | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. |
+| folds occurrences and reveals gaps through pointer and keyboard without changing Tree folds | B | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. |
+| finishes an editing session before opening and preserves its single Undo step | B | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. |
+| opens at Today and restores the origin cursor without persisting Agenda | B | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. |
+| projects full hierarchy, emphasizes dates, compresses empty days, and navigates to scoped Tree | B | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. |
+| arrows and Vim counts navigate rows while edit commands leave the document intact | B | Mode-specific motions, restored caret, Escape, undo grouping, Cmd+./E/Z and full-window status pixels. |
+
+##### always-on-top.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| toggles the native window flag and restores it after restart | B | Explicit mode indicator/status-bar differences and preservation of focused editor/Normal mode. |
+| keeps the editor focused when the pin is clicked | B | Explicit mode indicator/status-bar differences and preservation of focused editor/Normal mode. |
+| switches Always on Top from the Window menu and keeps the menu and status bar in step | B | Explicit mode indicator/status-bar differences and preservation of focused editor/Normal mode. |
+
+##### attachment-validation.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| rejects invalid attachment bytes at the preload boundary without writing a file | S | None: direct preload attachment validation and file-absence assertions. |
+| rejects an oversized PNG at the preload boundary before writing a file | S | None: direct preload attachment validation and file-absence assertions. |
+| pastes a real image, decodes it in the browser, and restores it after restart | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+| opens a document whose stored attachment file is missing | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+| reports a read failure without disabling the editor | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+| reports corrupt stored bytes after restart and preserves preview keyboard behavior | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+| shows an image-only node without a blank text row and keeps it editable | B | Duplicated image-only presentation tests caret-sensitive layout and subsequent caption typing. |
+| keeps an image-only text cursor reachable from a blank row click in Normal mode | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+| moves the Normal-mode caret onto an image with l and opens it with Enter | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+| focuses the editor, shows the insertion line, and accepts typing | S | Caret-dependent paste, editor typing or image-caret/preview return. |
+
+##### clipboard.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| pastes plain text at the cursor | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| pastes plain text when the HTML clipboard representation is oversized | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| pastes an HTTP URL as a clickable hyperlink | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| keeps adjacent pasted URLs as separate links | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| creates links for valid URLs in multiline paste | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| cuts a hyperlink and pastes it into another node with its link preserved | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| copies a hyperlink and pastes it into another node with its link preserved | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| keeps the editor writable after a hyperlink is pasted | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| selects linked characters with the mouse | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| removes one linked character with Backspace at its end | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| keeps the caret within a hyperlink while editing before following text | B | Caret-dependent paste/editing, editor pointer selection, typing and Cmd+A/C/X. |
+| pastes multiline text as separate nodes | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| pastes an image as an attachment | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| prefers the image representation over text | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| pasting an image onto a node that already has one creates a sibling | S | Caret-dependent clipboard insertion or editor input; no duplicate currently exists. |
+| cancels a cut when the node changes during the clipboard write | S | Pre-resolved Cmd+X, selection and concurrent typing. |
+
+##### context-menu.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| routes Copy and Paste through the editor store path | B | Editor right-click/selection and context-menu Paste; Cmd+A and pointer selection clearing. |
+| does not extend a text selection when the next node is right-clicked | B | Editor right-click/selection and context-menu Paste; Cmd+A and pointer selection clearing. |
+| clears document selection when the disclosure circle is right-clicked | B | Editor right-click/selection and context-menu Paste; Cmd+A and pointer selection clearing. |
+| keeps the prior dot change after menu Select All interrupts Insert | S | Vim Insert/dot-repeat interruption by native menu commands. |
+| keeps the prior dot change after menu Cut interrupts Insert | S | Vim Insert/dot-repeat interruption by native menu commands. |
+| keeps the prior dot change after menu Paste interrupts Insert | S | Vim Insert/dot-repeat interruption by native menu commands. |
+| bounds long selections in the native Look Up menu label | S | Typing, Cmd+A and editor right-click selection. |
+
+##### date-like-indicator.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| flags the current parent heading like a child row | B | Caret-dependent underline rendering, editor pointer, typing, Cmd+A and full-window screenshots. |
+| treats the Normal block caret as the caret before its character | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| flags impossible dates only away from the caret in Tree | B | Caret-dependent underline rendering, editor pointer, typing, Cmd+A and full-window screenshots. |
+| flags impossible dates only away from the caret in Agenda | B | Caret-dependent underline rendering, editor pointer, typing, Cmd+A and full-window screenshots. |
+
+##### deletion.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| deleting a middle sibling selects the next sibling | B | Typing and caret/focus projection through Cmd+Backspace and Cmd+.. |
+| deleting the only root creates a new empty root | B | Typing and caret/focus projection through Cmd+Backspace and Cmd+.. |
+| does not delete the current parent when its heading is focused | B | Typing and caret/focus projection through Cmd+Backspace and Cmd+.. |
+
+##### drag-and-drop-hierarchy.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| moves an image-only subtree from a unfocused row onto a breadcrumb | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| moves an image-only subtree from a focused row onto a breadcrumb | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| finds the moved node after unrelated navigation, including Vim undo keys | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| appends to ancestor and undo navigates to the hidden node | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| appends to ancestor and undo keeps the visible level | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| appends to root and undo navigates to the hidden node | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| appends to root and undo keeps the visible level | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| rejects the current parent and toolbar whitespace, and clears cancelled breadcrumb highlights | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| highlights the full ancestor hit region in both appearances without shifting layout | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| resolves normal mode and its caret after a breadcrumb drop | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| resolves insert mode and its caret after a breadcrumb drop | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| resolves replace mode and its caret after a breadcrumb drop | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| resolves visual mode and its caret after a breadcrumb drop | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| resolves visual-node mode and its caret after a breadcrumb drop | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps the caret and resolves normal editing when dropping onto a row | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps the caret and resolves insert editing when dropping onto a row | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| keeps the caret and resolves replace editing when dropping onto a row | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps the caret and resolves visual editing when dropping onto a row | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps the caret and resolves visual-node editing when dropping onto a row | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| selects a source dragged from its unfocused gutter and starts its caret | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| appends onto a collapsed node, opens its fold, and supports undo and redo | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| appends onto an expanded node, opens its fold, and supports undo and redo | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| outlines only the receiving row in both appearances and keeps the edge band as a gap | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| prohibits the source and its descendant row middles and cancels an accepting row with Escape | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| offers an over-depth row target and reports the operation error without moving | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| nests at the selected gap level, supports undo and redo, and survives restart | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| outdents a visible child to the root at the selected gap level | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| moves a distant root node into the expanded branch after its hidden sibling block | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| shows a prohibiting cursor over a gap inside the dragged subtree and changes nothing | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| Escape cancels a gap move without changing hierarchy | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| preserves whole-node Visual mode for a same-parent reorder | B | Editor-origin pointer handling, caret/mode resolution, Escape, Cmd+Z and restored focus. Even geometry/invalid-target cases begin on the editor. |
+| reports an over-depth gap drop and preserves the document | S | Editor-origin pointer drag; depth-limit rejection. |
+
+##### drag-and-drop.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| places the caret on a quick click without reordering | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| reorders a focused sibling after holding the pointer and moving across a target | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| keeps the caret and mode when a drag is cancelled | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| keeps the mode and restores the caret when a drag starts on an unfocused row | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| cancels an active drag with Escape without moving | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| keeps a pressed drag as a text selection instead of starting a node drag | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| keeps the selection collapsed while dragging a node across the text | B | Editor pointer/caret and text selection; Escape, startup Normal and focus/caret restoration. |
+| does not start a drag when the pointer moves before the hold threshold | S | Editor pointer/selection, Escape or explicit Normal-mode preservation. |
+| keeps dragging when the pointer moves within the hold tolerance | S | Editor pointer/selection, Escape or explicit Normal-mode preservation. |
+| releases in place without reordering | S | Editor pointer/selection, Escape or explicit Normal-mode preservation. |
+| keeps a pending hold through a browser hover reset | S | Editor pointer/selection, Escape or explicit Normal-mode preservation. |
+| keeps Normal mode after clicking or moving a node with the mouse | S | Editor pointer/selection, Escape or explicit Normal-mode preservation. |
+| renders a multi-character text selection with the shared highlight pair in both appearances | S | Standard-only selected-text pixels. |
+
+##### editing.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| Cmd+A selects all text in a link-free node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Cmd+A and Cmd+C copy all text from a link-free node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Cmd+A and Cmd+C copy all text without the browser copy command | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Cmd+A and Cmd+X cut all text without the browser cut command | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| keeps plain text selected after Cmd+C | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Cmd+V pastes clipboard text without the browser paste command | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| pastes copied plain text with Cmd+V after typing in the target node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| pastes copied plain text after typing a space in the copied node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Enter at the end creates an empty sibling after the node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| pressing Enter twice creates successive siblings after the current node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Enter at the end of a linked node focuses the new sibling | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Enter at the beginning creates an empty sibling before the node | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Enter at the beginning preserves the selected node subtree | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+| Enter in the middle splits the text at the cursor | B | Typing/caret/splits and pre-resolved Cmd+A/C/X/V or Cmd+./,. |
+
+##### empty-node.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| deletes an empty node and focuses the previous sibling at the end | B | Caret/focus projection on Backspace boundaries; typing, Cmd+. and Cmd+Z. |
+| focuses the current parent when the empty first child is deleted | B | Caret/focus projection on Backspace boundaries; typing, Cmd+. and Cmd+Z. |
+| keeps the only root when Backspace is pressed | B | Caret/focus projection on Backspace boundaries; typing, Cmd+. and Cmd+Z. |
+| selects the next root when the empty first root is deleted | B | Caret/focus projection on Backspace boundaries; typing, Cmd+. and Cmd+Z. |
+| undoes a Backspace deletion | B | Caret/focus projection on Backspace boundaries; typing, Cmd+. and Cmd+Z. |
+
+##### history.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| undoes and redoes a text edit | B | Typing, caret/split transitions and Cmd+Z/history grouping. |
+| undoes a structural node creation | B | Typing, caret/split transitions and Cmd+Z/history grouping. |
+| undoes and redoes a split | B | Typing, caret/split transitions and Cmd+Z/history grouping. |
+| keeps node IDs stable across undo and redo | S | Typing/caret, editor drag/paste or pre-resolved Cmd+Z/Backspace. |
+| undoes and redoes node and subtree deletion with stable IDs | S | Typing/caret, editor drag/paste or pre-resolved Cmd+Z/Backspace. |
+| undoes and redoes sibling reordering | S | Typing/caret, editor drag/paste or pre-resolved Cmd+Z/Backspace. |
+| undoes and redoes text and multiline paste | S | Typing/caret, editor drag/paste or pre-resolved Cmd+Z/Backspace. |
+| undoes and redoes image paste and image-bearing deletion | S | Typing/caret, editor drag/paste or pre-resolved Cmd+Z/Backspace. |
+
+##### hyperlink.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| edits linked characters with immediate styling and destination updates | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| restores a corrected link beside plain text without linking its neighbors | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| turns a typed URL into a link while typing and follows later edits | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| keeps the link of a URL typed in front of an existing word once a space follows | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| keeps typing in the next node after a URL is typed and Enter creates a sibling | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| keeps every character when a URL typed at speed becomes a link | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| edits on plain click and opens on Cmd+click through the main process | B | Rich-editor typing/caret and plain-click handling; focused-editor screenshots. |
+| drops a link when pasted text makes its covered text invalid | S | Caret-dependent paste through linked text. |
+| recomputes the destination when pasted text keeps the covered text a valid URL | S | Caret-dependent paste through linked text. |
+| opens the hyperlink under the Normal-mode caret with Enter | S | Vim Normal text-caret command Enter. |
+
+##### initial-state.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| first launch creates one empty focused root that is persisted | B | Explicit first-run preference, mode indicator and focused startup root. |
+
+##### inline-expansion.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| expands and collapses a node’s children inline without entering it or moving the caret | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| moves through expanded rows on ArrowDown, including entering a branch | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| selects the collapsing node with the caret at the start when collapse hides the caret | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| toggles the selected node fold with Cmd+E without moving the caret and keeps typing | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| leaves the caret unchanged when collapsing a branch that does not contain it | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| keeps each node’s expansion when entering and leaving a node | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| keeps the location when deleting and undoing a visible descendant | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| restores expansion and the selected descendant after relaunch with no other change | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| opens an older document collapsed, moving a hidden selection to its displayed ancestor | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| crosses an expanded branch boundary with ArrowLeft and ArrowRight | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| matches the collapsed, expanded, nested, and focused disclosure appearance | B | Caret restoration on folding/relaunch, editor pointer, Cmd+./,/E/Backspace/Z and caret-bearing screenshots. |
+| keeps the outer ring and disclosure triangle distinguishable from the light document surface | I | No mode difference; exact independence rationale in the proposal above. |
+| restores nested expansion choices when re-expanding | S | None: disclosure controls and visible-node texts only. |
+| keeps expansion when navigating via the location breadcrumb | S | Editor pointer and Cmd+. before breadcrumb return. |
+| restores the remembered expansion of a location entered before relaunch | S | Editor pointer, Cmd+. and startup selected-editor focus restoration. |
+| windows on the flattened visible row count once inline descendants push past the threshold | S | None: programmatic disclosure clicks and virtualization counts. |
+| moves through expanded rows on j and k, including entering and leaving branches | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| folds inline expansion with the Vim fold keys, moving the caret to the displayed ancestor it hides | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| opens an empty first child with o on a collapsed node that has children, keeping the location | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| keeps the location when deleting with dd and undoing with u a visible descendant | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| keeps gg on the first displayed root while G reaches the last visible row | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| ends whole-node Visual mode when an ancestor collapses and hides its anchor and focus | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| keeps whole-node Visual, dd, and yy scoped to actual siblings across an expanded branch | S | Vim-only tree/fold/Visual/clipboard command and caret semantics. |
+| colors node text by depth in the dark appearance only | S | None: disclosure controls and computed depth text colors. |
+
+##### navigation.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| arrow keys move selection between siblings | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| moves the first root caret to the beginning on ArrowUp | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| moves the last root caret to the end on ArrowDown | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| moves the last linked root caret to the end on ArrowDown | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| moves a childless linked parent caret to the end on ArrowDown | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| moves from the first child up to the current parent | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| focuses a linked first child with a visible caret after moving down from the parent | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| moves left and right across sibling and parent boundaries | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| entering a childless node keeps the cursor in the current parent and Enter creates a first child | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| leaving a node restores the parent level and selects the node that was entered | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| the location path navigates to ancestors and the root | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| clicks the circular indicator to enter a node with children and a childless node | B | Editor caret/focus boundary matrix, typing and Cmd+./,. |
+| gd enters the selected node like Cmd+. | S | Vim-only gd navigation command. |
+| shared prototype poisons state before the following navigation case | P (Vim/native reset stress) | Vim Visual and native-state poisoning for opt-in reset validation. |
+
+##### node-gutter-alignment.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| centers the bullet and disclosure triangle on the first line of node text | B | Retained alignment case moves selection through row clicks and captures the focused editor/caret. |
+| draws the selected-node bullet in the text color on top of the muted bullet | I | No mode difference; exact independence rationale in the proposal above. |
+| keeps the gutter of an image-only row at the single-line text position | S | Vim-only Normal image caret and its different collapsed empty-editor geometry. |
+
+##### persistence.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| rejects a child below level $depthLimit without changing the editor or persisted bytes | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| shows the document error and leaves an over-depth file byte-for-byte unchanged | S | None: document load-error reporting and byte preservation. |
+| rejects unsafe persisted attachment ids and link destinations before writing | S | None: direct save IPC validation and file-absence assertions. |
+| does not surface a save error during rapid edits | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| restores where the selected row sat in the window after two relaunches in a short list | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| restores where the selected row sat in the window after two relaunches in a windowed list | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| restores where the selected row sat in the window after two relaunches in a windowed list of wrapped rows | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| shows the selected row at the window edge when scrolling had moved it off-screen | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| restores the main window size and position after restart | S | None: native bounds resize and restoration. |
+| restores an image attachment after restart | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| restores a pasted hyperlink after restart | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| retains an attachment referenced only by a generation across restart | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| recovers a generation document including its image after the primary is damaged | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| enters a level-20 leaf through its indicator and still rejects creating a child | S | Editor typing, pointer, caret/startup restoration or clipboard/edit-command path. |
+| rejects an over-depth paste without changing the persisted bytes or showing a save error | S | Vim-only yy/paste at a depth boundary. |
+| restores the document, current parent, and selected node after restart | B | Duplicated restart case types, uses Cmd+. and verifies selected-editor startup focus. |
+
+##### pointer-cursor.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| shows the default arrow rather than the text-editing cursor over text the user cannot edit | B | Explicit mode-indicator presence/absence and pointer presentation over its different status content. |
+
+##### preview.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| scales a large inline image down to fit $inlineImageBound while preserving aspect ratio | S | Caret-dependent clipboard paste into the inline editor; inline image sizing assertion. |
+| does not enlarge a small inline image | S | Caret-dependent clipboard paste into the inline editor; inline image sizing assertion. |
+| opens the preview by clicking the image and closes it with the button | B | Opening/closing preview, Escape, editor focus return and Cmd+Enter; retained mode-specific return cases. |
+| closes the preview on Escape | B | Opening/closing preview, Escape, editor focus return and Cmd+Enter; retained mode-specific return cases. |
+| closes the preview on a mouse click in the window | B | Opening/closing preview, Escape, editor focus return and Cmd+Enter; retained mode-specific return cases. |
+| opens the preview with Cmd+Y, while Cmd+Enter strikes the node through instead | B | Opening/closing preview, Escape, editor focus return and Cmd+Enter; retained mode-specific return cases. |
+| shows the same focus ring on the close button however the preview was opened | B | Opening/closing preview, Escape, editor focus return and Cmd+Enter; retained mode-specific return cases. |
+| keeps keyboard focus inside the preview | S | Image preview opening/focus handling (including geometry-only preview assertions). |
+| does not upscale a small image in the preview | S | Image preview opening/focus handling (including geometry-only preview assertions). |
+| returns Normal-mode keys to the editor after a mouse click closes the preview | S | Vim Normal keyboard focus return after preview closure. |
+| returns focus and the caret to the editor after closing with button | S | Standard-only caret/focus return and continued typing after preview closure. |
+| returns focus and the caret to the editor after closing with Escape | S | Standard-only caret/focus return and continued typing after preview closure. |
+| returns focus and the caret to the editor after closing with click | S | Standard-only caret/focus return and continued typing after preview closure. |
+
+##### screenshot-stability.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| keeps repeated screenshots identical across startup display scales | I | No mode difference; exact independence rationale in the proposal above. |
+
+##### sticky-location-bar.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| stays at the top while only the content below it scrolls and owns the scrollbar | S | None: toolbar/viewport/scrollbar geometry outside the editor. |
+| keeps the status bar below the scrolling content | B | Duplicated case explicitly checks status-bar geometry and Vim indicator placement/presence. |
+
+##### strikethrough.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| toggles the selected node with Cmd+Enter, keeps the caret and typing, and keeps it after relaunch | B | Cmd+Enter/Z, caret/typing retention and focused Normal/standard screenshots. |
+| undoes and redoes a Cmd+Enter toggle as one change | B | Cmd+Enter/Z, caret/typing retention and focused Normal/standard screenshots. |
+| strikes the editable current-parent heading and leaves its children normal | B | Cmd+Enter/Z, caret/typing retention and focused Normal/standard screenshots. |
+| draws the line through muted text in the light and dark appearance | B | Cmd+Enter/Z, caret/typing retention and focused Normal/standard screenshots. |
+| toggles in Normal mode and keeps Normal mode | S | Vim-only Normal/Replace/Visual caret, selection and history resolution. |
+| draws a struck row inside the whole-node Visual highlight with the highlight colors | S | Vim-only Normal/Replace/Visual caret, selection and history resolution. |
+| keeps a Normal-mode select-all highlighted across a toggle | S | Vim-only Normal/Replace/Visual caret, selection and history resolution. |
+| commits a pending Replace edit before toggling and returns to Normal mode | S | Vim-only Normal/Replace/Visual caret, selection and history resolution. |
+| toggles the whole-node Visual range and the current node in character Visual mode | S | Vim-only Normal/Replace/Visual caret, selection and history resolution. |
+
+##### tab-structure.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| indents and outdents the focused normal node while preserving its mode | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| indents and outdents the focused insert node while preserving its mode | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| indents and outdents the focused replace node while preserving its mode | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| indents and outdents the focused visual node while preserving its mode | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| indents and outdents the focused visual-node node while preserving its mode | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| consumes impossible root Tab and Shift+Tab moves while retaining the focused editor | B | Mode-specific Tab/Shift+Tab caret/selection/history matrix; Cmd+. and explicit Vim image-caret/status traversal cases. |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in normal | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in insert | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in replace | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in visual | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in visual-node | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| outdents a deeper descendant while keeping the zoomed current parent | B | Mode-specific Tab/Shift+Tab caret/selection/history matrix; Cmd+. and explicit Vim image-caret/status traversal cases. |
+| keeps an image caret on a direct child when Shift+Tab is blocked by the zoom boundary | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps native Tab traversal from status-bar focus outside the editor | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| moves an active image caret with Tab and restores its saved text position | M (Vim) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| indents and outdents the focused standard node while preserving its mode | M (standard) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+| keeps a direct child inside the zoomed current parent with Shift+Tab in standard | M (standard) | Explicit mode-specific caret/selection or command matrix; preserve the named mode. |
+
+##### tree-date-visualization.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| styles heading and row dates like Agenda and preserves selection colors | B | Block versus insertion caret, selected date colors, editor pointer/typing and Cmd+A/Z. |
+| updates date styling while typing and keeps focus through undo and date removal | B | Block versus insertion caret, selected date colors, editor pointer/typing and Cmd+A/Z. |
+
+##### typed-input.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| types a URL with a path, query, and fragment between words exactly as typed | B | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. |
+| types operator-like punctuation exactly as typed | B | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. |
+| types brackets, quotes, and symbols exactly as typed | B | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. |
+| types repeated slashes and dots exactly as typed | B | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. |
+| types a URL typed in front of an existing word and then a space exactly as typed | B | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. |
+| types two URLs and trailing text exactly as typed | B | Typing and exact caret assertions, rich-editor conversion and focused-editor screenshot. |
+
+##### typography.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| typed URL characters render as typed, without font ligatures | B | Typed and linked focused-editor glyph screenshots include caret-sensitive rendering. |
+| linked text renders without font ligatures | B | Typed and linked focused-editor glyph screenshots include caret-sensitive rendering. |
+
+##### undo-sessions.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| starts a new undo entry after five seconds without a text change | B | Typing, cursor/focus transitions and Cmd+Z undo grouping; standard-only Escape case. |
+| ends the edit session on cursor movement, paste, and structural commands | B | Typing, cursor/focus transitions and Cmd+Z undo grouping; standard-only Escape case. |
+| ends the edit session when focus switches to another node | B | Typing, cursor/focus transitions and Cmd+Z undo grouping; standard-only Escape case. |
+| leaves the text, caret, selection, and undo grouping unchanged | S | Standard-only Escape and preservation of caret, selection and undo grouping. |
+
+##### windowed-list.spec.ts
+
+| Exact expanded title | Classification | Body audit |
+| --- | --- | --- |
+| keeps an unfocused drag source mounted while the viewport scrolls away | B | Editor focus/typing, Cmd+Z and caret restoration; drag/Escape and full-window status pixels. |
+| keyboard navigation reaches and types into an off-screen row | B | Editor focus/typing, Cmd+Z and caret restoration; drag/Escape and full-window status pixels. |
+| undo and redo while scrolled restore the edited row | B | Editor focus/typing, Cmd+Z and caret restoration; drag/Escape and full-window status pixels. |
+| dragging near the window edge auto-scrolls to an off-screen position | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+| dragging near the window edge auto-scrolls a list below the windowing threshold | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+| dragging over the location toolbar does not auto-scroll the list | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+| dragging at the window edge does not scroll a list that fits the window | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+| resizing the window re-wraps rows and keeps navigation and focus correct | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+| editing a row to wrapped text grows the row and the list height | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+| loading an attachment image grows its row and shifts later rows | S | Editor-origin drag/pointer, Escape or editor typing/caret/focus after resize/loading. |
+
+#### Coverage observations and next decision
+
+Several existing single-mode blocks called “mode-independent” contain points protected by the current conservative policy: persistence startup/caret recovery, history Cmd+Z, context-menu editor right-click/Cmd+A, clipboard typing/caret/edit commands, drag editor pointer/Escape, windowed-list editor input/focus, attachment preview/input, hyperlink caret/paste and inline-expansion Cmd+./caret restoration. Their exact titles remain S above; several other S entries are intentionally Vim-only or standard-only. These are coverage observations, not removal candidates or authorization to expand tests. The three proposed reductions do not fix or worsen those pre-existing gaps. A subsequent coverage decision should distinguish genuinely single-rule boundary tests from missing mode counterparts rather than trust block names.
+
+D2 must approve any subset of the three I entries before E2E-5 changes specs or categories. If screenshot-stability is approved, preserve its serial/parallel infrastructure guards and update any mode-count wording in Development §9 to describe the retained guard accurately. No change to product requirements, renderer code, persistence, launch isolation or performance budgets is proposed. E2E-4 is complete; its Minimal Risk documentation checks passed. No specs or screenshot baselines changed in this task.
+
 ## Next Task
 
-Perform the already-authorized E2E-4 editing-mode audit in a separate commit. Adoption of a shared application remains reserved under D1; E2E-3 authorizes only the bounded prototype and measurement.
+No task is ready without a Product Owner decision. D1 selects whether and where shared-application reuse proceeds; D2 selects any of the three proposed mode reclassifications. D3 still reserves local validation policy and D4 reserves the duration report/budget. E2E-5 and E2E-8 must wait for D2 and D1 respectively; do not interpret completion of the audit or prototype as adoption authority.
 
 ## Resume Prompt
 
 ```text
-Continue the E2E suite time initiative (plans/e2e-suite-time.md): take E2E-4, the editing-mode audit and proposal.
+Review the E2E suite time findings in plans/e2e-suite-time.md and decide D1 (shared-application adoption), D2 (the three proposed mode reclassifications), D3 (local validation policy), or D4 (duration reporting/budget). No implementation task is ready until its reserved decision is made.
 ```
