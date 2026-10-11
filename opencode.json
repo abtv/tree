@@ -152,6 +152,8 @@
           "npm run test:e2e:timing": "allow",
           "npm run test:e2e:changed": "allow",
           "npm run test:e2e:changed *": "allow",
+          "npm run test:e2e:diagnose": "allow",
+          "npm run test:e2e:diagnose *": "allow",
           "npm run test:e2e:visible": "allow",
           "npm run test:e2e:visible *": "allow",
           "npm run test:perf": "allow",

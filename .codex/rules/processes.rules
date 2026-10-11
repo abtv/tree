@@ -1,3 +1,11 @@
+# Run this inspection by itself; filtering a pipeline requires separate allowances.
+prefix_rule(
+    pattern = ["ps", "-axo", "pid=,ppid=,command="],
+    decision = "allow",
+    match = ["ps -axo pid=,ppid=,command="],
+    not_match = ["ps eww", "pkill Electron"],
+)
+
 prefix_rule(
     pattern = ["kill", "-INT"],
     decision = "allow",

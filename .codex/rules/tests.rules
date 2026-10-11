@@ -1,10 +1,12 @@
 # Named Electron workflows accept spec paths and Playwright flags without shell env prefixes.
 prefix_rule(
-    pattern = ["npm", "run", ["test:e2e", "test:e2e:visible", "test:perf", "test:perf:profile"]],
+    pattern = ["npm", "run", ["test:e2e", "test:e2e:changed", "test:e2e:diagnose", "test:e2e:visible", "test:perf", "test:perf:profile"]],
     decision = "allow",
     match = [
+        "npm run test:e2e:changed -- --list",
+        "npm run test:e2e:diagnose -- --shared-reset=reload --json-output=/private/tmp/report.json e2e/navigation.spec.ts --workers=6 --repeat-each=5 --reporter=dot,json",
         "npm run test:e2e:visible -- e2e/drag-and-drop-hierarchy.spec.ts --workers=1 --update-snapshots",
         "npm run test:perf:profile -- perf/agenda-scale.spec.ts --grep deep-100000-dense",
     ],
-    not_match = ["npm run unknown", "npm install", "npm run test:e2e:visible-extra"],
+    not_match = ["npm run unknown", "npm install", "npm run test:e2e:visible-extra", "npm run test:e2e:diagnose-extra"],
 )
