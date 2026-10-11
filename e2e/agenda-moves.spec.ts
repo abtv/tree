@@ -7,13 +7,13 @@ import {
   fireIdleSave,
   idleSavePoll,
   launchTree,
-  readPersisted,
   screenshotContentSize,
   seedDocument,
   setAgendaToday,
   setMainWindowContentSize,
   startRowDrag,
   test,
+  tryReadPersisted,
 } from './fixtures'
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
@@ -37,8 +37,8 @@ function seed(userDataDir: string): void {
 }
 
 const row = (window: Page, key: string) => window.locator(`.agenda-row[data-agenda-key="${key}"]`)
-const persistedTexts = (userDataDir: string): string[] =>
-  readPersisted(userDataDir).document.roots[0]!.children.map((child) => child.text)
+const persistedTexts = (userDataDir: string): string[] | undefined =>
+  tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((child) => child.text)
 
 async function centerOf(window: Page, key: string): Promise<{ x: number; y: number }> {
   const box = await row(window, key).boundingBox()
