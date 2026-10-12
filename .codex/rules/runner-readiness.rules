@@ -5,6 +5,24 @@
 # This allowance grants host execution, not approval of the initiative.
 # Review host changes before use; trusted repository scripts are mutable.
 prefix_rule(
+    pattern = ["node", "scripts/initiative-runner-host.mjs", "--authorized-preflight", ".", ".scratch/runner-readiness/preflight/approved-manifest.json"],
+    decision = "allow",
+    justification = "Run separately approved bounded Runner Readiness preflight through the reviewed host and fixed scratch manifest",
+    match = [
+        "node scripts/initiative-runner-host.mjs --authorized-preflight . .scratch/runner-readiness/preflight/approved-manifest.json sha256:manifest-identity owner-approval",
+    ],
+    not_match = [
+        "node scripts/initiative-runner-host.mjs --authorized-preflight . .scratch/another/preflight/approved-manifest.json sha256:manifest-identity owner-approval",
+        "node scripts/initiative-runner-host.mjs --authorized-preflight . .scratch/runner-readiness/preflight/other.json sha256:manifest-identity owner-approval",
+        "node scripts/initiative-runner-host.mjs --authorized-preflight /another/checkout .scratch/runner-readiness/preflight/approved-manifest.json sha256:manifest-identity owner-approval",
+        "node another/initiative-runner-host.mjs --authorized-preflight . .scratch/runner-readiness/preflight/approved-manifest.json sha256:manifest-identity owner-approval",
+        "node .scratch/runner-readiness/preflight/probe.mjs",
+        "node arbitrary-script.mjs",
+        "codex exec arbitrary-prompt",
+    ],
+)
+
+prefix_rule(
     pattern = ["node", "scripts/initiative-runner-host.mjs", "--authorized-plan", ".", "plans/runner-readiness.md"],
     decision = "allow",
     justification = "Run only the separately approved Runner Readiness plan through its reviewed host",

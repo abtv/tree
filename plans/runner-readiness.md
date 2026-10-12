@@ -82,11 +82,17 @@ RR-1 bootstrap exception: the owner approved its initial 45 minutes and explicit
 
 Four substantive tasks require one final owner acceptance round. Owner involvement comprises initial implementation/budget authorization, any actual setup approvals during preflight, final acceptance and further acceptance rounds after rejection. Automated validation and independent workflow verification need no owner intervention once their launch paths are verified. Closure of an unchanged explicitly accepted result needs no second approval. Zero mandatory manual application UI checks are currently identified; the number of setup interventions remains unknown until live preflight.
 
+## Live Preflight Permission Setup — 2026-10-12
+
+RR-1 implementation is committed as `817a95db50a0c31035ee777b30d0221fb432b183`. The owner approved the proposed live-preflight scope with a separate 30-minute allowance in this session; the recorded window is 19:35–20:05 UTC. The first exact host invocation requested platform approval and the owner pressed Esc. The tool reported it aborted; authenticated live proof remains pending. Preserve the prepared invocation manifest and artifact under `.scratch/runner-readiness/preflight/live-20261012-a/`. No initiative execution was launched.
+
+The owner subsequently authorized a narrow persistent preflight permission rule. It covers the reviewed host, relative root `.` and the fixed entry `.scratch/runner-readiness/preflight/approved-manifest.json`; each invocation still requires a separately authorized scope, unique id, pinned manifest identity and attributable approval reference. Existing validation/process rules remain sufficient configuration for the proposed probes; live child permissions, authentication and cleanup remain unverified. No arbitrary Node, Git, native-agent or other-initiative allowance is added. Rule changes require a fresh trusted Codex session before runtime testing. This setup does not renew the original allowance. RR-2–RR-4 and E2E Coverage Efficiency remain unstarted and unauthorized.
+
 ## Exact Next Action
 
-### Proposed RR-1 live preflight (not authorized or started)
+### Approved RR-1 live preflight (runtime proof not started)
 
-Proposed separate allowance: **30 minutes**, with the owner available for supported permission/trust/authentication approvals. Stop at expiration or a denied capability, retain evidence and confirm owned-process cleanup; never renew an allowance or clear an ownership lock automatically. RR-2–RR-4 and E2E Coverage Efficiency remain outside this scope.
+Approved separate allowance: **30 minutes**, 19:35–20:05 UTC on 2026-10-12, with the owner available for supported permission/trust/authentication approvals. Stop at expiration or a denied capability, retain evidence and confirm owned-process cleanup; never renew an allowance or clear an ownership lock automatically. RR-2–RR-4 and E2E Coverage Efficiency remain outside this scope.
 
 After explicit approval, prepare a native-edited, identity-pinned manifest under `.scratch/runner-readiness/preflight/` for the dedicated `--authorized-preflight` path. Use invocation-specific ids and fixtures; retain the exact command, source snapshot, approval reference and interventions for each attempt. Do not create an execution projection or coordinator.
 
@@ -97,10 +103,10 @@ After explicit approval, prepare a native-edited, identity-pinned manifest under
 5. Prepare an isolated synthetic Git repository within the invocation's `fixtures/` directory, inspect its local hook setup, stage only synthetic files, run hooks and create an append-only commit through the approved Git command probes. Inspect actual HEAD/parent and clean status for reconciliation; preserve application Git state.
 6. Review raw command/native logs, snapshots, hashes, intervention counts, cleanup and limitations. After supported setup, repeat affected operations with separately approved ids without intervention. Report configured, verified and unresolved capabilities, explicitly confirming no application/task mutation or execution-budget ledger. Missing proof blocks unattended launch.
 
-The existing permission rule covers `--authorized-plan`, not this new preflight argument. Exact preflight invocation approvals may be needed. Any proposed persistent rule must be narrowly reviewed separately and followed by a fresh trusted session before testing it; this scope does not authorize weaker permissions. If setup or full suites exhaust the proposed allowance, retain the report and request an explicit continuation allowance rather than running beyond it.
+The newly owner-approved persistent rule covers the fixed preflight entry manifest described above. A fresh trusted session must load it before testing actual prompt-free access. Other command shapes still require supported approval; this scope does not authorize weaker permissions. If setup or full suites exhaust the approved allowance, retain the report and request an explicit continuation allowance rather than running beyond it.
 
 ### Remaining action
 
-Obtain explicit approval for the proposed 30-minute RR-1 live-preflight scope above before any live probe. The implementation is validated; the authenticated acceptance proof is pending. RR-2–RR-4 and E2E Coverage Efficiency remain unstarted and unauthorized. No automatic continuation is authorized.
+Restart Codex with trusted project configuration to load the preflight rule. Verify the prepared rule and live host path only within the remaining approved window; if that window has expired, obtain an explicit continuation allowance first. The implementation is validated; authenticated acceptance proof is pending. RR-2–RR-4 and E2E Coverage Efficiency remain unstarted and unauthorized. No automatic continuation is authorized.
 
-Resume prompt: “Read `plans/runner-readiness.md`; RR-1 implementation is validated but live proof is pending. Review the proposed 30-minute live-preflight scope and obtain explicit approval before running it. Keep RR-2–RR-4 and E2E Coverage Efficiency unstarted.”
+Resume prompt: “Read `plans/runner-readiness.md`; RR-1 implementation is committed as `817a95d`, and its narrow persistent preflight rule has been prepared. Verify the fresh trusted session loaded it. Live scope was approved for 19:35–20:05 UTC on 2026-10-12; obtain a new explicit allowance if expired. Keep RR-2–RR-4 and E2E Coverage Efficiency unstarted.”
