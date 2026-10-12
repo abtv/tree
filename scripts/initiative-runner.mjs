@@ -7,6 +7,12 @@ import { checkPlanAuthority, projectApprovedPlan } from './initiative-runner-pla
 import { observeProcess, StageBlocker } from './initiative-runner-process.mjs'
 import { RunRecords } from './initiative-runner-records.mjs'
 import {
+  awaitingPlan,
+  checkpointInitiative,
+  checkInitiativeRepair,
+  requireInitiativeAcceptance,
+} from './initiative-runner-owner.mjs'
+import {
   checkpointTask,
   prepareCommit,
   reconcileCommit,
@@ -61,6 +67,7 @@ export class InitiativeCoordinator {
     this.busy = false
     this.run = null
     try {
+      if (this.authorization.contract.closure) requireInitiativeAcceptance(this.records, this.authorization)
       this.budget = this.records.budget({
         now: this.now(),
         budgetMs: this.authorization.contract.budgetMs,
@@ -81,6 +88,9 @@ export class InitiativeCoordinator {
             if (!blocker.resolvedAt) fail(blocker.kind, blocker.reason, blocker.nextAction)
           }
           const previous = this.records.load('authorization.json')
+          const repairing =
+            !this.authorization.contract.closure && existsSync(this.records.file('initiative-owner.json'))
+          if (repairing) checkInitiativeRepair(this.records, this.authorization)
           const observed = observeRepository({
             root: this.records.root,
             startingCommit: persisted.startingCommit,
@@ -89,15 +99,22 @@ export class InitiativeCoordinator {
             closure: previous.contract.closure,
           })
           if (
-            observed.head !== persisted.commit ||
+            (!repairing && observed.head !== persisted.commit) ||
             observed.indexIdentity !== observed.headIdentity ||
             observed.unstaged.length ||
             observed.untracked.length ||
             observed.workingPlanPresent
           )
             throw new Error('Previous completed task no longer matches clean Git state')
-          if (this.startingCommit !== persisted.commit) throw new Error('Next task must start at the reconciled commit')
+          if (this.startingCommit !== (repairing ? observed.head : persisted.commit))
+            throw new Error('Next task must start at the reconciled commit')
+          if (
+            repairing &&
+            this.records.load('initiative-owner.json').response.repair.startingCommit !== this.startingCommit
+          )
+            throw new Error('Repair starting commit changed')
           this.records.save(`${persisted.runId}-completed.json`, persisted)
+          this.priorRecoveryAttempts = repairing ? persisted.recoveryAttempts : 0
         } else {
           if (persisted.phase === 'completed' && input.hostResume !== true)
             throw new Error('Completed task replay refused')
@@ -141,6 +158,7 @@ export class InitiativeCoordinator {
       this.authorization,
     )
     if (closure && this.run) {
+      requireInitiativeAcceptance(this.records, this.authorization, true)
       const observed = this.observation()
       if (!observed.closureReady) throw new Error('Closure prerequisites changed')
       if (!existsSync(join(this.records.root, this.authorization.contract.planPath))) {
@@ -294,6 +312,7 @@ export class InitiativeCoordinator {
   primary(signal) {
     return this.exclusive(async () => {
       this.checkAuthority()
+      checkInitiativeRepair(this.records, this.authorization)
       const observed = this.observation()
       const recovery =
         this.run && existsSync(this.records.file('blocker.json'))
@@ -383,6 +402,7 @@ export class InitiativeCoordinator {
                 now: launchStartedAt,
                 deadlineAt: this.budget.deadlineAt,
               })
+          if (!recovering && this.priorRecoveryAttempts) this.run.recoveryAttempts = this.priorRecoveryAttempts
           this.records.save('run.json', this.run)
           if (recovering && existsSync(this.records.file('blocker.json'))) {
             const blocker = this.records.load('blocker.json')
@@ -709,6 +729,14 @@ export class InitiativeCoordinator {
     if (this.busy) throw new Error('Owned process is still running')
     const observed = this.observation()
     this.checkAuthority()
+    const ownerContract = this.authorization.contract.initiativeAcceptance
+    if (ownerContract && !this.authorization.contract.closure) {
+      const complete = awaitingPlan(this.records.root, ':', this.authorization.contract.planPath, ownerContract)
+      if ((!this.authorization.contract.nextTask || this.authorization.contract.initiativeRepair) && !complete)
+        throw new Error('Final substantive task requires all initiative prerequisites Done')
+      if (complete && this.authorization.contract.nextTask && !this.authorization.contract.initiativeRepair)
+        throw new Error('Final substantive result cannot advance to another task')
+    }
     const primary = this.records.load('primary.json')
     if (
       primary.runId !== this.run?.runId ||
@@ -760,12 +788,16 @@ export class InitiativeCoordinator {
     })
     this.run = result.run
     this.records.save('run.json', this.run)
+    const owner =
+      result.run.phase === 'completed'
+        ? checkpointInitiative(this.records, this.authorization, result.run.commit, this.now())
+        : null
     if (existsSync(this.records.file('blocker.json'))) {
       const blocker = this.records.load('blocker.json')
       if (!blocker.resolvedAt)
         return { ...result, advance: false, problems: [...result.problems, blocker.reason], blocker }
     }
-    return result
+    return owner ? { ...result, advance: false, initiativeOwner: owner } : result
   }
 
   async close() {

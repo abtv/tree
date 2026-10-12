@@ -89,6 +89,7 @@ export class CodexEvents {
 }
 
 export function primaryPrompt({ authorization, resumeSession, evidence, recovery }) {
+  const contract = authorization.contract
   return [
     `You are the fresh primary for ${authorization.contract.initiative} ${authorization.contract.taskId} only.`,
     'Read AGENTS.md, WORKING_PLAN.md if present, the selected approved plan and relevant development instructions.',
@@ -104,6 +105,16 @@ export function primaryPrompt({ authorization, resumeSession, evidence, recovery
         ]
       : [
           'Leave a reviewable candidate. When complete, update only the selected task to Done and the projected nextTask from Planned to Ready. Remove WORKING_PLAN.md after preserving useful context in durable owners; the host gates these provisional labels before committing. Do not execute another task.',
+          ...(contract.initiativeAcceptance && (!contract.nextTask || contract.initiativeRepair)
+            ? [
+                'After all initiativeAcceptance.requiredTasks are Done, retain the plan with the exact line Status: **Awaiting owner acceptance** and its index row with status Awaiting owner acceptance. Final owner acceptance is a separate post-commit outer-host decision; do not claim it or retire the plan.',
+              ]
+            : []),
+          ...(contract.initiativeRepair
+            ? [
+                'This is only the exact owner-authorized repair task. Preserve completed neighbouring tasks; do not advance to nextTask. Its delivered result requires renewed final owner acceptance.',
+              ]
+            : []),
         ]),
     'Return only JSON: {"allRequirementsCovered":true,"unresolvedFindings":[]}, listing actual findings or false coverage when incomplete. This assessment is not validation evidence.',
     ...(recovery

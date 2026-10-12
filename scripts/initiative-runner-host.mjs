@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { launchConfiguredRole } from './initiative-runner-codex.mjs'
-import { readRecord } from './initiative-runner-records.mjs'
+import { readRecord, RunRecords } from './initiative-runner-records.mjs'
+import { checkpointInitiative, recordInitiativeRepair, recordInitiativeResponse } from './initiative-runner-owner.mjs'
 import { projectApprovedPlan } from './initiative-runner-plan.mjs'
 import { StageBlocker } from './initiative-runner-process.mjs'
 import { InitiativeCoordinator } from './initiative-runner.mjs'
@@ -85,7 +86,18 @@ function completed(coordinator) {
     const blocker = coordinator.records.load('blocker.json')
     if (!blocker.resolvedAt) blocked(blocker.reason, blocker.kind)
   }
-  return { run: coordinator.run, advance: coordinator.now() < coordinator.budget.deadlineAt, problems: [] }
+  const owner = checkpointInitiative(
+    coordinator.records,
+    coordinator.authorization,
+    coordinator.run.commit,
+    coordinator.now(),
+  )
+  return {
+    run: coordinator.run,
+    advance: !owner && coordinator.now() < coordinator.budget.deadlineAt,
+    problems: [],
+    ...(owner ? { initiativeOwner: owner } : {}),
+  }
 }
 
 // No execution on import. Tests inject primary/role adapters only; production
@@ -100,7 +112,11 @@ export async function executeInitiative(input) {
     if (existsSync(join(directory, 'authorization.json')) && existsSync(join(directory, 'run.json'))) {
       const previous = readRecord(join(directory, 'authorization.json'))
       const run = readRecord(join(directory, 'run.json'))
-      if (previous.contract.taskId === selected.taskId) selected.startingCommit = run.startingCommit
+      if (
+        previous.contract.taskId === selected.taskId &&
+        (!selected.repairAuthorized || previous.identity === auth.identity)
+      )
+        selected.startingCommit = run.startingCommit
     }
     const coordinator = new InitiativeCoordinator({
       ...selected,
@@ -211,6 +227,41 @@ export async function resolveOwnerCheck(input, evidence) {
     return await coordinator.resolveOwnerCheck(evidence)
   } finally {
     await coordinator.close()
+  }
+}
+
+// Post-commit owner decisions are deliberately independent of task receipts and
+// budget construction. The authorized outer host supplies the owner's words.
+export async function resolveInitiativeOwner(input, evidence) {
+  if (input.hostAuthorized !== true) blocked('Explicit host execution authorization required')
+  const records = new RunRecords(input)
+  const inspect = input.confirmQuiescence ?? confirmQuiescence
+  try {
+    if ((await inspect({ records, root: records.root, stage: 'owner-response' })) !== true)
+      blocked('Owner response requires confirmed process cleanup')
+    if (evidence.outcome === 'repair-authorized') {
+      const repair = projectApprovedPlan({
+        ...input,
+        ...input.repairInput,
+        hostAuthorized: true,
+        repairAuthorized: true,
+        repairOwnerReference: evidence.ownerReference,
+        sourceCommit: input.repairInput?.startingCommit,
+      })
+      return recordInitiativeRepair(
+        records,
+        repair,
+        evidence,
+        (input.now ?? Date.now)(),
+        input.repairInput?.startingCommit,
+      )
+    }
+    if (evidence.repair) blocked('Use separate repair-authorized response with committed repair scope', 'scope')
+    return recordInitiativeResponse(records, evidence, (input.now ?? Date.now)())
+  } finally {
+    if ((await inspect({ records, root: records.root, stage: 'release' })) !== true)
+      blocked('Owner response cleanup remains unconfirmed; ownership retained')
+    records.release()
   }
 }
 
