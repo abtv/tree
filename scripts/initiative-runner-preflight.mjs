@@ -7,8 +7,95 @@ import { observeProcess, StageBlocker } from './initiative-runner-process.mjs'
 import { RunRecords } from './initiative-runner-records.mjs'
 import { createValidationSnapshot } from './validation-snapshot.mjs'
 
-const scripts = new Set(['check:full', 'check', 'test:e2e', 'test:perf', 'test:performance', 'build', 'audit'])
+const scripts = new Set([
+  'check:full',
+  'check',
+  'test:e2e',
+  'test:perf',
+  'test:performance',
+  'build',
+  'audit',
+  'format:check:changed',
+  'check:docs',
+  'check:opencode',
+  'check:requirements',
+  'check:e2e-modes',
+  'typecheck',
+  'lint',
+])
 const identifier = /^[a-z][a-z0-9-]{0,63}$/
+
+function scratchPath(path, prefix) {
+  repositoryPath(path)
+  return path.startsWith(`${prefix}/`)
+}
+
+function testPath(path, directory, extension) {
+  repositoryPath(path)
+  return path.startsWith(`${directory}/`) && path.endsWith(extension)
+}
+
+function validationCommand(argv, prefix) {
+  if (argv[0] === 'node')
+    return argv.length === 3 && argv[1] === 'scripts/e2e-timing.mjs' && scratchPath(argv[2], prefix)
+  if (argv[0] !== 'npm') return false
+  if (argv[1] === 'test')
+    return (
+      argv.length === 2 ||
+      (argv[2] === '--' &&
+        argv.length > 3 &&
+        argv.slice(3).every((path) => testPath(path, 'src', '.test.ts') || testPath(path, 'scripts', '.test.mjs')))
+    )
+  if (argv[1] !== 'run') return false
+  if (argv.length === 3 && scripts.has(argv[2])) return true
+  if (!['test:e2e', 'test:e2e:diagnose'].includes(argv[2]) || argv[3] !== '--' || argv.length < 5) return false
+  const seen = new Set()
+  return argv.slice(4).every((arg) => {
+    if (!arg.startsWith('-')) return testPath(arg, 'e2e', '.spec.ts')
+    const key = arg.split('=')[0]
+    if (seen.has(key)) return false
+    seen.add(key)
+    if (arg === '--list' || arg === '--reporter=list,json' || /^--workers=[1-6]$/.test(arg)) return true
+    if (/^--shared-reset=(fresh|reload|window)$/.test(arg)) return argv[2] === 'test:e2e:diagnose'
+    if (arg.startsWith('--json-output='))
+      return argv[2] === 'test:e2e:diagnose' && scratchPath(arg.slice('--json-output='.length), prefix)
+    if (arg.startsWith('--config=')) {
+      const path = arg.slice('--config='.length)
+      return scratchPath(path, `${prefix}/fixtures`) && path.endsWith('.config.ts')
+    }
+    return false
+  })
+}
+
+// Validate every existing path ancestor too: a normalized path alone cannot
+// prevent a reviewed scratch path from escaping through a symlink at launch.
+function inspectCommandPaths(root, argv) {
+  const inputs = []
+  const paths = argv.flatMap((arg) => {
+    if (arg.startsWith('--json-output=') || arg.startsWith('--config=')) return [arg.slice(arg.indexOf('=') + 1)]
+    if (arg.startsWith('src/') || arg.startsWith('scripts/') || arg.startsWith('e2e/') || arg.startsWith('.scratch/'))
+      return [arg]
+    return []
+  })
+  for (const path of paths) {
+    repositoryPath(path)
+    let current = root
+    for (const part of path.split('/')) {
+      current = join(current, part)
+      try {
+        if (lstatSync(current).isSymbolicLink() || realpathSync(current) !== current)
+          fail('Preflight command path escapes its reviewed scope')
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error
+      }
+    }
+    if ((argv[0] === 'node' && path === argv[2]) || argv.includes(`--config=${path}`)) {
+      if (!existsSync(current) || !lstatSync(current).isFile()) fail('Preflight input fixture must be a regular file')
+      inputs.push(current)
+    }
+  }
+  return inputs
+}
 
 function fail(reason, kind = 'capability') {
   throw new StageBlocker(kind, reason, 'Retain preflight evidence; resolve through the supported approval flow')
@@ -91,9 +178,7 @@ export function validatePreflight(manifest) {
         argv.some((arg) => typeof arg !== 'string' || !arg || arg.includes('\0') || arg.length > 4096)
       )
         fail('Explicit bounded command argv required')
-      const npm =
-        argv[0] === 'npm' &&
-        ((argv.length === 3 && argv[1] === 'run' && scripts.has(argv[2])) || (argv.length === 2 && argv[1] === 'test'))
+      const validation = validationCommand(argv, prefix)
       const ps = JSON.stringify(argv) === JSON.stringify(['ps', '-axo', 'pid=,ppid=,command='])
       // Git writes are confined to an isolated fixture, never the application
       // repository. No config, rewrite, shell, helper override or bypass flags.
@@ -109,7 +194,7 @@ export function validatePreflight(manifest) {
           (argv.length === 3 && argv[1] === 'rev-parse' && argv[2] === 'HEAD') ||
           (argv.length === 3 && argv[1] === 'status' && argv[2] === '--short') ||
           (argv.length === 3 && argv[1] === 'log' && argv[2] === '--oneline'))
-      if (!npm && !ps && !git) fail('Command is outside supported preflight launch paths')
+      if (!validation && !ps && !git) fail('Command is outside supported preflight launch paths')
       if (probe.cwd !== undefined) {
         repositoryPath(probe.cwd)
         if (!git) fail('Only isolated synthetic Git probes may change cwd')
@@ -130,6 +215,7 @@ function prompt(manifest, probe) {
   return [
     `This is separately authorized capability preflight ${manifest.id}, probe ${probe.id}, not initiative execution.`,
     'Read AGENTS.md and docs/AGENT_ROLES.md. Preserve application data and all existing work.',
+    'When native text-reading tools are absent, use the authorized read-only cat/rg/sed inspection fallback through exec_command. Synthetic edits still require native file-edit tools.',
     `Approved scope: ${manifest.scope}`,
     `Scratch scope: .scratch/${manifest.initiative}/preflight/${manifest.id}/.`,
     'Never execute initiative tasks, create an execution ledger, modify plans, change permissions/trust/authentication or use bypass flags.',
@@ -195,11 +281,13 @@ export async function executePreflight(input) {
       const before = snapshot(records.root)
       const common = { records, deadlineAt: report.deadlineAt, signal: input.signal, now }
       let result
+      let inputArtifacts = []
       if (probe.kind === 'command') {
         const cwd = probe.cwd
           ? ownedPath(records.root, probe.cwd, `.scratch/${manifest.initiative}/preflight/${manifest.id}/fixtures`)
           : records.root
         if (probe.argv[0] === 'git') isolatedGit(cwd, probe.argv)
+        else inputArtifacts = inspectCommandPaths(records.root, probe.argv).map((path) => records.artifact(path))
         result = await (input.observeProcess ?? observeProcess)({ ...common, argv: probe.argv, cwd })
       } else if (probe.kind === 'role') {
         const committed = (path) =>
@@ -228,10 +316,11 @@ export async function executePreflight(input) {
       const processResult = result.process ?? result
       cleanupConfirmed = (await input.confirmQuiescence({ records, process: processResult })) === true
       const after = snapshot(records.root)
-      const evidence = { id: probe.id, kind: probe.kind, before, after, result, cleanupConfirmed }
+      const evidence = { id: probe.id, kind: probe.kind, before, after, result, cleanupConfirmed, inputArtifacts }
       report.probes.push(evidence)
       records.save('preflight.json', report)
       if (!cleanupConfirmed) fail('Independent owned-process cleanup remains unconfirmed')
+      if (inputArtifacts.length) records.verifyArtifacts(inputArtifacts)
       if (result.blocker || processResult.blocker) {
         const blocker = result.blocker ?? processResult.blocker
         fail(blocker.reason ?? blocker.message ?? 'Preflight probe blocked', blocker.kind)

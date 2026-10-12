@@ -436,6 +436,130 @@ describe('bounded preflight host operation', () => {
 })
 
 describe('reviewable manifest and bounded retention', () => {
+  const prefix = '.scratch/example/preflight/attempt-one'
+  it('rejects a dangling report symlink instead of following it to a new external file', async () => {
+    const root = fixture()
+    mkdirSync(join(root, prefix), { recursive: true })
+    symlinkSync(join(root, 'new-external-report.json'), join(root, prefix, 'report.json'))
+    const selected = manifest([
+      {
+        id: 'diagnostic',
+        kind: 'command',
+        argv: ['npm', 'run', 'test:e2e:diagnose', '--', `--json-output=${prefix}/report.json`],
+      },
+    ])
+    let launched = false
+    await expect(
+      executePreflight(
+        input(root, selected, {
+          observeProcess: async () => {
+            launched = true
+            return { exitCode: 0 }
+          },
+        }),
+      ),
+    ).rejects.toThrow('escapes')
+    expect(launched).toBe(false)
+    expect(existsSync(join(root, 'new-external-report.json'))).toBe(false)
+  })
+  it('blocks a scratch output symlink before launching any command', async () => {
+    const root = fixture()
+    mkdirSync(join(root, prefix, 'fixtures'), { recursive: true })
+    symlinkSync(root, join(root, prefix, 'fixtures/escape'))
+    let launched = false
+    const selected = manifest([
+      {
+        id: 'diagnostic',
+        kind: 'command',
+        argv: ['npm', 'run', 'test:e2e:diagnose', '--', `--json-output=${prefix}/fixtures/escape/report.json`],
+      },
+    ])
+    await expect(
+      executePreflight(
+        input(root, selected, {
+          observeProcess: async () => {
+            launched = true
+            return { exitCode: 0 }
+          },
+        }),
+      ),
+    ).rejects.toThrow('escapes')
+    expect(launched).toBe(false)
+    expect(readRecord(reportPath(root)).cleanupConfirmed).toBe(true)
+  })
+  it('retains and verifies the actual timing fixture identity', async () => {
+    const root = fixture()
+    mkdirSync(join(root, prefix), { recursive: true })
+    const path = `${prefix}/timing.json`
+    writeFileSync(join(root, path), '{}\n')
+    const selected = manifest([{ id: 'summary', kind: 'command', argv: ['node', 'scripts/e2e-timing.mjs', path] }])
+    await expect(
+      executePreflight(
+        input(root, selected, {
+          observeProcess: async () => {
+            writeFileSync(join(root, path), '{"changed":true}\n')
+            return { exitCode: 0 }
+          },
+        }),
+      ),
+    ).rejects.toThrow()
+    const report = readRecord(reportPath(root))
+    expect(report.phase).toBe('blocked')
+    expect(report.probes[0].inputArtifacts[0].path).toBe(path)
+    expect(report.cleanupConfirmed).toBe(true)
+  })
+  it.each([
+    ['npm', 'run', 'format:check:changed'],
+    ['npm', 'run', 'check:docs'],
+    ['npm', 'run', 'check:opencode'],
+    ['npm', 'run', 'check:requirements'],
+    ['npm', 'run', 'check:e2e-modes'],
+    ['npm', 'run', 'typecheck'],
+    ['npm', 'run', 'lint'],
+    ['npm', 'test', '--', 'src/renderer/vim-text-commands.test.ts'],
+    ['npm', 'run', 'test:e2e', '--', '--list', '--workers=6'],
+    [
+      'npm',
+      'run',
+      'test:e2e:diagnose',
+      '--',
+      '--shared-reset=reload',
+      `--json-output=${prefix}/timing.json`,
+      '--reporter=list,json',
+      '--workers=6',
+      'e2e/vim-text-editing.spec.ts',
+    ],
+    [
+      'npm',
+      'run',
+      'test:e2e:diagnose',
+      '--',
+      '--shared-reset=reload',
+      `--json-output=${prefix}/future.json`,
+      '--reporter=list,json',
+      '--workers=6',
+      `--config=${prefix}/fixtures/memory.config.ts`,
+      '--list',
+    ],
+    ['node', 'scripts/e2e-timing.mjs', `${prefix}/timing.json`],
+  ])('supports bounded projected command %j', (...argv) => {
+    expect(validatePreflight(manifest([{ id: 'command', kind: 'command', argv }])).probes[0].argv).toEqual(argv)
+  })
+  it.each([
+    ['npm', 'run', 'postinstall'],
+    ['npm', 'run', 'check:docs', '--', '--prefix=/elsewhere'],
+    ['npm', 'test', '--', '--config=malicious.ts'],
+    ['npm', 'run', 'test:e2e', '--', '--workers=100'],
+    ['npm', 'run', 'test:e2e', '--', '--global-setup=elsewhere.ts'],
+    ['npm', 'run', 'test:e2e:diagnose', '--', '--json-output=/tmp/report.json'],
+    ['npm', 'run', 'test:e2e:diagnose', '--', `--json-output=${prefix}/../escape.json`],
+    ['npm', 'run', 'test:e2e:diagnose', '--', '--config=elsewhere.ts'],
+    ['npm', 'run', 'test:e2e', '--', 'e2e/../outside.spec.ts'],
+    ['node', '-e', 'process.exit(0)'],
+    ['node', 'scripts/e2e-timing.mjs', 'test-results/report.json'],
+  ])('rejects widened command %j', (...argv) => {
+    expect(() => validatePreflight(manifest([{ id: 'command', kind: 'command', argv }]))).toThrow()
+  })
   it.each([
     { budgetMs: 0 },
     { budgetMs: 3600001 },

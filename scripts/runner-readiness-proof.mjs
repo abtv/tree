@@ -33,6 +33,16 @@ async function releaseProof(records) {
 }
 
 export function proofArguments(args, manifest, now = Date.now()) {
+  const scoped = args[0] === '--authorized-fixture-proof'
+  let selectedDirectory = fixtureDirectory
+  if (scoped) {
+    const match = /^\.scratch\/([a-z][a-z0-9-]{0,63})\/preflight\/([a-z][a-z0-9-]{0,63})\/proof\.json$/.exec(
+      args[1] ?? '',
+    )
+    if (!match) throw new Error('Exact identity-pinned synthetic proof manifest required')
+    selectedDirectory = `.scratch/${match[1]}/preflight/${match[2]}/fixtures/live`
+    args = ['--authorized-proof', ...args.slice(2)]
+  }
   if (
     ![4, 5].includes(args.length) ||
     args[0] !== '--authorized-proof' ||
@@ -44,7 +54,7 @@ export function proofArguments(args, manifest, now = Date.now()) {
     throw new Error('Exact identity-pinned RR-4 proof arguments required')
   if (
     manifest?.version !== 1 ||
-    manifest.fixtureDirectory !== fixtureDirectory ||
+    manifest.fixtureDirectory !== selectedDirectory ||
     !Number.isSafeInteger(manifest.startedAt) ||
     manifest.startedAt < 0 ||
     !Number.isSafeInteger(manifest.deadlineAt) ||
@@ -82,14 +92,22 @@ export async function withinProofWindow(deadlineAt, operation, signal) {
 
 export async function executeReadinessProof(repositoryRoot, args, signal) {
   repositoryRoot = realpathSync(repositoryRoot)
-  const manifestPath = join(repositoryRoot, '.scratch/runner-readiness/rr4/approved-proof.json')
+  const scoped = args[0] === '--authorized-fixture-proof'
+  if (scoped && !/^\.scratch\/[a-z][a-z0-9-]{0,63}\/preflight\/[a-z][a-z0-9-]{0,63}\/proof\.json$/.test(args[1] ?? ''))
+    throw new Error('Exact identity-pinned synthetic proof manifest required')
+  const manifestPath = join(repositoryRoot, scoped ? args[1] : '.scratch/runner-readiness/rr4/approved-proof.json')
   const manifestStat = lstatSync(manifestPath)
-  if (!manifestStat.isFile() || manifestStat.isSymbolicLink() || manifestStat.size > 65536)
+  if (
+    !manifestStat.isFile() ||
+    manifestStat.isSymbolicLink() ||
+    realpathSync(manifestPath) !== manifestPath ||
+    manifestStat.size > 65536
+  )
     throw new Error('Bounded regular proof manifest required')
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
   const { scenario, operation, source, deadlineAt } = proofArguments(args, manifest)
   return withHostDeadline(deadlineAt, async () => {
-    const root = join(repositoryRoot, fixtureDirectory, scenario)
+    const root = join(repositoryRoot, manifest.fixtureDirectory, scenario)
     // No alternate cwd, linked worktree, external Git metadata or fixture symlink.
     if (realpathSync(root) !== root || realpathSync(join(root, '.git')) !== join(root, '.git'))
       throw new Error('Proof fixture must own its isolated repository')

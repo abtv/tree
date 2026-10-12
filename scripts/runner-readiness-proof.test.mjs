@@ -18,6 +18,33 @@ const manifest = {
 const args = ['--authorized-proof', digest(manifest), 'accepted', 'finish']
 
 describe('bounded Runner Readiness proof entry', () => {
+  it('supports an identity-pinned initiative-specific synthetic namespace', () => {
+    const selected = {
+      ...manifest,
+      fixtureDirectory: '.scratch/e2e-coverage-efficiency/preflight/lifecycle-one/fixtures/live',
+    }
+    const invocation = [
+      '--authorized-fixture-proof',
+      '.scratch/e2e-coverage-efficiency/preflight/lifecycle-one/proof.json',
+      digest(selected),
+      'accepted',
+      'finish',
+    ]
+    expect(proofArguments(invocation, selected, 2000)).toMatchObject({ scenario: 'accepted', operation: 'finish' })
+    for (const fixtureDirectory of [
+      '.scratch/e2e-coverage-efficiency/live',
+      '.scratch/e2e-coverage-efficiency/preflight/lifecycle-one/fixtures/../live',
+      '.scratch/runner-readiness/rr4/live',
+    ]) {
+      const changed = { ...selected, fixtureDirectory }
+      expect(() =>
+        proofArguments([invocation[0], invocation[1], digest(changed), ...invocation.slice(3)], changed, 2000),
+      ).toThrow()
+    }
+    expect(() =>
+      proofArguments([invocation[0], '.scratch/other/preflight/id/proof.json', ...invocation.slice(2)], selected, 2000),
+    ).toThrow()
+  })
   it('bounds synchronous subprocesses while the event loop cannot deliver an abort timer', () => {
     const startedAt = Date.now()
     expect(() =>

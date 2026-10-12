@@ -769,16 +769,20 @@ Adding this block does not authorize execution. Exact argv arrays are host valid
 
 ## Execution Findings
 
-Preparation only. No initiative task has executed. EC-1 remains the first implementation task; unattended launch is blocked by initiative-specific full-path preflight and explicit execution/allowance approval. Runner Readiness acceptance and closure do not authorize this initiative or its preflight. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
+No initiative task has executed. EC-1 remains the first implementation task; unattended launch is blocked by incomplete initiative-specific readiness and explicit execution/allowance approval. Runner Readiness acceptance and closure do not authorize this initiative. Record audit mappings, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
+
+The owner separately authorized readiness preparation and a focused runner correction on 2026-10-13. The correction supports bounded diagnostic/listing arguments, governance checks, owned timing reports and synthetic future configurations, plus initiative-specific isolated lifecycle proof fixtures. Required source validation and independent review/verification passed. Routine command paths and an ordinary native synthetic task-to-commit loop were exercised; this is not complete readiness. The owner canceled terminal-input permission for Ctrl+C and a repeated-command approval. Do not retry or bypass those actions without renewed authorization. Live interruption, prompt-free replay, owner-response, repair and closure evidence remain incomplete. Retain the temporary permission/evidence records under `.scratch/e2e-coverage-efficiency/preflight/`; no EC execution ledger or implementation allowance has started. Original proof windows and failed-fixture recovery history must remain preserved.
 
 ## Next Task and Resume Prompt
 
-Next required action: await separate owner authorization for this initiative's unattended preflight. EC-1 can start only after that preflight, under explicit execution approval and the revised supported projection. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. The preparation evidence above is limited to its stated commands and scope.
+Next required action: resolve the canceled preflight permissions and finish the missing readiness paths under a separately bounded, explicitly authorized window. EC-1 can start only after readiness, explicit execution approval and approved implementation/closure allowances. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. Existing evidence proves only its observed paths and inputs; neither one-time approval nor a completed ordinary run proves stored, prompt-free access.
 
 ```text
-Under a separate owner authorization, prepare
-E2E Coverage Efficiency's exact host/child permission preflight under
-AGENTS.md §8 and Development §§10–11. Keep its implementation unstarted.
-Resolve scope, execution and closure allowances before execution approval;
-verify affected paths without intervention. This prompt authorizes no tasks.
+After renewed owner authorization for the canceled permission paths,
+finish E2E Coverage Efficiency readiness under AGENTS.md §8 and
+Development §§10–11. Explain each expected platform request before it
+appears. Preserve prior evidence, deadlines and recovery history; approve
+any new bounded proof window separately rather than renewing old ledgers.
+Keep EC-1–EC-6 unstarted. Resolve execution and closure allowances before
+execution approval. This prompt authorizes no initiative implementation.
 ```
