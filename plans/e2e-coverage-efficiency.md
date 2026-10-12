@@ -1,6 +1,6 @@
 # E2E Coverage Efficiency
 
-Prerequisite: [Runner Readiness](runner-readiness.md) supplies the supported execution contract and bounded readiness evidence. Its authorization does not authorize this initiative's execution.
+Prerequisite: Runner Readiness supplies the supported execution contract and bounded readiness evidence. The Product Owner accepted its delivered commit `25e779d` on 2026-10-13; acceptance and the separate closure allowance are recorded in `95fe80b`, whose `plans/runner-readiness.md` retains the complete plan and recovery history before retirement. Its authorization does not authorize this initiative's execution. The owner explicitly prohibited starting E2E Coverage Efficiency during Runner Readiness closure.
 
 ## Objective and Authorization
 
@@ -142,7 +142,7 @@ Capabilities checked in this preparation session:
 * No coordinator was constructed and no budget ledger was started. Host launch permissions, authentication, fresh/resumed primary execution and quiescence must be checked at authorized launch; historical pilot success is not current proof.
 * Existing `.scratch/autonomous-initiatives-pilot/` records are unrelated and must be preserved. The proposed execution namespace is `.scratch/e2e-coverage-efficiency/`; confirm it remains unstarted before construction.
 
-Launch remains unauthorized. Complete Runner Readiness acceptance and the initiative-specific unattended preflight of Development §10, approve implementation and closure allowances, obtain attributable execution approval, and launch only from a clean committed plan. Permission setup must cover the actual full host and child paths before execution; RR-4 synthetic permission does not cover this initiative. The invocation below is a future template, not a readiness claim; never use the pre-preparation HEAD as the approved source:
+Launch remains unauthorized. Runner Readiness is accepted; complete the initiative-specific unattended preflight of Development §10, approve implementation and closure allowances, obtain attributable execution approval, and launch only from a clean committed plan. Permission setup must cover the actual full host and child paths before execution; RR-4 synthetic permission does not cover this initiative. The invocation below is a future template, not a readiness claim; never use the pre-preparation HEAD as the approved source:
 
 ```text
 node scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tree plans/e2e-coverage-efficiency.md EC-1 <full-approved-starting-commit> <owner-approval-reference>
@@ -769,14 +769,14 @@ Adding this block does not authorize execution. Exact argv arrays are host valid
 
 ## Execution Findings
 
-Preparation only. No initiative task has executed. EC-1 remains the first implementation task; unattended launch is blocked by pending Runner Readiness acceptance, initiative-specific full-path preflight and explicit execution/allowance approval. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
+Preparation only. No initiative task has executed. EC-1 remains the first implementation task; unattended launch is blocked by initiative-specific full-path preflight and explicit execution/allowance approval. Runner Readiness acceptance and closure do not authorize this initiative or its preflight. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
 
 ## Next Task and Resume Prompt
 
-Next required action: finish and accept Runner Readiness, then complete this initiative's unattended preflight. EC-1 can start only afterward, under explicit execution approval and the revised supported projection. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. The preparation evidence above is limited to its stated commands and scope.
+Next required action: await separate owner authorization for this initiative's unattended preflight. EC-1 can start only after that preflight, under explicit execution approval and the revised supported projection. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. The preparation evidence above is limited to its stated commands and scope.
 
 ```text
-After explicitly accepting the completed Runner Readiness result, prepare
+Under a separate owner authorization, prepare
 E2E Coverage Efficiency's exact host/child permission preflight under
 AGENTS.md §8 and Development §§10–11. Keep its implementation unstarted.
 Resolve scope, execution and closure allowances before execution approval;
