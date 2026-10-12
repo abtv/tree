@@ -1,3 +1,35 @@
+# Owner-approved standard validation commands from a trusted repository.
+# These prefixes permit the named npm scripts and their ordinary test arguments
+# outside the sandbox. Rules match argv, not cwd, and trust mutable repository
+# scripts; this extends the existing named Electron workflow permission model.
+# Restart Codex with the project's .codex layer trusted after changing rules,
+# then verify an actual test launch without a prompt. Rule matching alone is
+# configuration evidence, not proof of runtime access or task authorization.
+prefix_rule(
+    pattern = ["npm", "test"],
+    decision = "allow",
+    justification = "Run the trusted repository's unit and runner tests outside the sandbox without repeated approval",
+    match = [
+        "npm test",
+        "npm test -- scripts/initiative-runner-state.test.mjs scripts/initiative-runner-adapter.test.mjs scripts/initiative-runner-preflight.test.mjs",
+        "npm test -- scripts/initiative-runner-owner.test.mjs",
+    ],
+    not_match = ["npm install", "npm exec node", "node arbitrary-script.mjs", "npm testing"],
+)
+prefix_rule(
+    pattern = ["npm", "run", ["test", "test:coverage", "test:performance", "check", "check:full"]],
+    decision = "allow",
+    justification = "Run the trusted repository's named validation workflows outside the sandbox without repeated approval",
+    match = [
+        "npm run test -- scripts/initiative-runner-preflight.test.mjs",
+        "npm run test:coverage",
+        "npm run test:performance",
+        "npm run check",
+        "npm run check:full",
+    ],
+    not_match = ["npm run unknown", "npm install", "npm run check:full-extra", "npm exec node"],
+)
+
 # Named Electron workflows accept spec paths and Playwright flags without shell env prefixes.
 prefix_rule(
     pattern = ["npm", "run", ["test:e2e", "test:e2e:changed", "test:e2e:diagnose", "test:e2e:visible", "test:perf", "test:perf:profile"]],
