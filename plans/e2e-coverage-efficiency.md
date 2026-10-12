@@ -1,5 +1,7 @@
 # E2E Coverage Efficiency
 
+Prerequisite: [Runner Readiness](runner-readiness.md) is proposed separately. Its preparation does not authorize runner implementation, runtime probes or this initiative's execution.
+
 ## Objective and Authorization
 
 Reduce redundant Electron test execution and the cost of validating ordinary changes as the application grows. Keep exhaustive rule coverage at the lowest faithful layer, with real Electron coverage for integration and behavior that lower layers cannot reproduce. A smaller E2E suite is an intended result, not a quota that permits deleting useful coverage.
