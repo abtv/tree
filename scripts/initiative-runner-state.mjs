@@ -83,6 +83,13 @@ export function authorizeTask(input) {
   )
   if (input.closure !== undefined) {
     requireCondition(input.closure?.approved === true, 'Explicit final-closure authorization required')
+    requireCondition(
+      Number.isSafeInteger(input.closure.budgetMs) &&
+        input.closure.budgetMs > 0 &&
+        typeof input.closure.approvalReference === 'string' &&
+        input.closure.approvalReference.trim().length > 0,
+      'Separate approved closure allowance required',
+    )
     repositoryPath(input.closure.indexPath)
     requireCondition(input.files.includes(input.closure.indexPath), 'Closure scope must include the plan index')
     requireCondition(
@@ -118,7 +125,7 @@ function bound(run, authorization, observation, now) {
   requireCondition(
     Number.isSafeInteger(run.deadlineAt) &&
       run.deadlineAt > run.startedAt &&
-      run.deadlineAt - run.startedAt <= authorization.contract.budgetMs,
+      run.deadlineAt - run.startedAt <= (authorization.contract.closure?.budgetMs ?? authorization.contract.budgetMs),
     'Invalid persisted deadline',
   )
   requireCondition(
@@ -169,7 +176,9 @@ export function startTask({ authorization, observation, runId, sessionId, now, d
   requireCondition(strings([runId, sessionId]), 'Run and primary session identities required')
   requireCondition(Number.isSafeInteger(now) && now >= 0, 'Invalid start time')
   requireCondition(
-    Number.isSafeInteger(deadlineAt) && deadlineAt > now && deadlineAt - now <= authorization.contract.budgetMs,
+    Number.isSafeInteger(deadlineAt) &&
+      deadlineAt > now &&
+      deadlineAt - now <= (authorization.contract.closure?.budgetMs ?? authorization.contract.budgetMs),
     'Invalid initiative deadline',
   )
   return {

@@ -45,7 +45,12 @@ function fixture({ awaiting = true, contract = true } = {}) {
     budgetMs: 60000,
     substantiveTaskCount: 3,
     tasks: { 'EX-1': { ...task, nextTask: 'EX-2' }, 'EX-2': { ...task, nextTask: 'EX-3' }, 'EX-3': task },
-    closure: { indexPath: 'plans/README.md', requiredTasks: ['EX-1', 'EX-2', 'EX-3'] },
+    closure: {
+      indexPath: 'plans/README.md',
+      requiredTasks: ['EX-1', 'EX-2', 'EX-3'],
+      budgetMs: 60000,
+      approvalReference: 'separate synthetic closure allowance',
+    },
     ...(contract
       ? {
           initiativeAcceptance: {
@@ -196,7 +201,18 @@ describe('post-commit initiative owner checkpoint', () => {
     const { records, state, evidence } = checkpoint(f)
     recordInitiativeResponse(records, { ...evidence, outcome: 'rejected', issues: ['Fix the delivered value'] }, 110)
     expect(() => checkInitiativeRepair(records, f.authorization())).toThrow('explicitly authorized')
-    records.save('budget.json', { retained: 'original allowance and recovery history' })
+    records.save('budget.json', {
+      initiative: 'example',
+      budgetMs: 60000,
+      approvalReference: f.input.approvalReference,
+      startedAt: 0,
+      observedAt: 100,
+      deadlineAt: 60000,
+      accountingVersion: 2,
+      suspendedMs: 0,
+      waiting: null,
+    })
+    const preserved = records.suspendBudget(state, 110)
     records.release()
     writeFileSync(
       join(f.root, f.input.planPath),
@@ -235,7 +251,11 @@ describe('post-commit initiative owner checkpoint', () => {
     recordInitiativeResponse(reopened, { ...evidence, commit: next.commit, inputIdentity: next.inputIdentity }, 140)
     requireInitiativeAcceptance(reopened, auth)
     expect(reopened.load('owner-response-1.json').response.issues).toEqual(['Fix the delivered value'])
-    expect(reopened.load('budget.json')).toEqual({ retained: 'original allowance and recovery history' })
+    expect(reopened.load('budget.json')).toMatchObject({
+      startedAt: preserved.startedAt,
+      deadlineAt: preserved.deadlineAt,
+      waiting: preserved.waiting,
+    })
     reopened.release()
   })
 
@@ -297,6 +317,91 @@ describe('post-commit initiative owner checkpoint', () => {
     expect(readRecord(join(f.root, '.scratch/example/owner-response-1.json'))).toEqual(accepted)
   })
 
+  it.each(['accepted', 'rejected'])(
+    'preserves the remainder on attributable %s after long waiting',
+    async (outcome) => {
+      const f = fixture()
+      const { records, state, evidence } = checkpoint(f)
+      records.save('budget.json', {
+        initiative: 'example',
+        budgetMs: 1000,
+        approvalReference: f.input.approvalReference,
+        startedAt: 0,
+        observedAt: 100,
+        deadlineAt: 1000,
+        accountingVersion: 2,
+        suspendedMs: 0,
+        waiting: null,
+      })
+      const saved = records.suspendBudget(state, 200)
+      records.release()
+      await resolveInitiativeOwner(
+        { ...f.input, initiative: 'example', now: () => 100000 },
+        {
+          ...evidence,
+          outcome,
+          issues: outcome === 'rejected' ? ['Repair delivered value'] : [],
+        },
+      )
+      const budget = readRecord(join(f.root, '.scratch/example/budget.json'))
+      expect(budget).toMatchObject({
+        startedAt: saved.startedAt,
+        budgetMs: saved.budgetMs,
+        deadlineAt: saved.deadlineAt,
+        suspendedMs: 0,
+        waiting: saved.waiting,
+      })
+      expect(budget.observedAt).toBe(100000)
+      if (outcome === 'accepted') {
+        const coordinator = new InitiativeCoordinator({ ...f.input, closureAuthorized: true, now: () => 200000 })
+        expect(coordinator.budget).toMatchObject({
+          startedAt: 200000,
+          budgetMs: 60000,
+          deadlineAt: 260000,
+          approvalReference: 'separate synthetic closure allowance',
+        })
+        await coordinator.close()
+        expect(readRecord(join(f.root, '.scratch/example/budget.json')).waiting).toEqual(saved.waiting)
+      }
+    },
+  )
+
+  it('blocks owner response when interrupted persistence lost the waiting half', async () => {
+    const f = fixture()
+    const { records, evidence } = checkpoint(f)
+    records.save('budget.json', {
+      initiative: 'example',
+      budgetMs: 1000,
+      approvalReference: f.input.approvalReference,
+      startedAt: 0,
+      observedAt: 100,
+      deadlineAt: 1000,
+      accountingVersion: 2,
+      suspendedMs: 0,
+      waiting: null,
+    })
+    records.release()
+    await expect(
+      resolveInitiativeOwner({ ...f.input, initiative: 'example', now: () => 110 }, evidence),
+    ).rejects.toThrow('checkpoint disagree')
+    expect(readRecord(join(f.root, '.scratch/example/initiative-owner.json')).status).toBe('awaiting')
+    expect(existsSync(join(f.root, '.scratch/example/owner-response-1.json'))).toBe(false)
+  })
+
+  it('requires a separately approved closure allowance in the committed projection', () => {
+    const f = fixture()
+    writeFileSync(
+      join(f.root, f.input.planPath),
+      readFileSync(join(f.root, f.input.planPath), 'utf8').replace(
+        '"approvalReference":"separate synthetic closure allowance"',
+        '"approvalReference":""',
+      ),
+    )
+    expect(() => projectApprovedPlan({ ...f.input, closureAuthorized: true })).toThrow(
+      'Separate approved closure allowance',
+    )
+  })
+
   it('retains ownership and leaves approval pending when cleanup is unconfirmed', async () => {
     const f = fixture()
     const { records, evidence } = checkpoint(f)
@@ -318,6 +423,8 @@ describe('post-commit initiative owner checkpoint', () => {
 
   it('final task commits awaiting status and restarts without inferring owner approval', async () => {
     const f = fixture({ awaiting: false })
+    let clock = Date.now()
+    f.input.now = () => clock
     let launches = 0
     f.input.launchPrimary = async ({ records, authorization, onSession, resumeSession, deadlineAt }) => {
       onSession?.('synthetic-primary')
@@ -357,6 +464,7 @@ describe('post-commit initiative owner checkpoint', () => {
       initiativeOwner: { status: 'awaiting' },
       run: { phase: 'completed' },
     })
+    clock += 86400000
     const resumed = await executeInitiative(f.input)
     expect(resumed[0].initiativeOwner).toEqual(result[0].initiativeOwner)
     expect(launches).toBe(1)
@@ -364,6 +472,7 @@ describe('post-commit initiative owner checkpoint', () => {
     expect(git(f.root, ['show', 'HEAD:plans/example.md'])).toContain('Status: **Awaiting owner acceptance**')
     const directory = join(f.root, '.scratch/example')
     const before = readRecord(join(directory, 'budget.json'))
+    expect(before.waiting.remainingMs).toBe(60000)
     const owned = new RunRecords({ root: f.root, initiative: 'example', hostAuthorized: true })
     writeFileSync(join(owned.path, 'owner.log'), 'Explicit owner rejection and scoped repair\n')
     const artifacts = [owned.artifact(join(owned.path, 'owner.log'))]
@@ -377,6 +486,7 @@ describe('post-commit initiative owner checkpoint', () => {
       artifacts,
     }
     await resolveInitiativeOwner({ ...f.input, initiative: 'example' }, evidence)
+    expect(readRecord(join(directory, 'budget.json')).waiting).toEqual(before.waiting)
     const runPath = join(directory, 'run.json')
     const retainedRun = readRecord(runPath)
     // Seed a prior recovery to prove authorization does not clear its history.
@@ -393,6 +503,7 @@ describe('post-commit initiative owner checkpoint', () => {
       { ...f.input, initiative: 'example', repairInput: { startingCommit: repairCommit } },
       { ...evidence, outcome: 'repair-authorized', ownerReference },
     )
+    clock += 86400000
     const repaired = await executeInitiative({
       ...f.input,
       startingCommit: repairCommit,
@@ -407,7 +518,7 @@ describe('post-commit initiative owner checkpoint', () => {
     expect(repaired[0].initiativeOwner.commit).not.toBe(result[0].initiativeOwner.commit)
     expect(readRecord(join(directory, 'budget.json'))).toMatchObject({
       startedAt: before.startedAt,
-      deadlineAt: before.deadlineAt,
+      deadlineAt: clock + before.waiting.remainingMs,
     })
     expect(readRecord(join(directory, `${retainedRun.runId}-completed.json`)).recoveryAttempts).toBe(1)
     const secondEvidence = {
@@ -441,6 +552,16 @@ describe('post-commit initiative owner checkpoint', () => {
       run: { recoveryAttempts: 1 },
       initiativeOwner: { status: 'awaiting' },
     })
-    expect(readRecord(join(directory, 'budget.json')).deadlineAt).toBe(before.deadlineAt)
+    expect(readRecord(join(directory, 'budget.json')).waiting.remainingMs).toBe(before.waiting.remainingMs)
+    rmSync(join(directory, 'initiative-owner.json'))
+    await expect(
+      executeInitiative({
+        ...f.input,
+        taskId: 'EX-1',
+        startingCommit: earlierCommit,
+        repairAuthorized: true,
+        repairOwnerReference: earlierReference,
+      }),
+    ).rejects.toThrow('lost its owner checkpoint')
   }, 30000)
 })

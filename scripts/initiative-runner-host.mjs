@@ -4,7 +4,12 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { launchConfiguredRole } from './initiative-runner-codex.mjs'
 import { readRecord, RunRecords } from './initiative-runner-records.mjs'
-import { checkpointInitiative, recordInitiativeRepair, recordInitiativeResponse } from './initiative-runner-owner.mjs'
+import {
+  checkpointInitiative,
+  loadInitiativeOwner,
+  recordInitiativeRepair,
+  recordInitiativeResponse,
+} from './initiative-runner-owner.mjs'
 import { projectApprovedPlan } from './initiative-runner-plan.mjs'
 import { StageBlocker } from './initiative-runner-process.mjs'
 import { InitiativeCoordinator } from './initiative-runner.mjs'
@@ -239,6 +244,7 @@ export async function resolveInitiativeOwner(input, evidence) {
   try {
     if ((await inspect({ records, root: records.root, stage: 'owner-response' })) !== true)
       blocked('Owner response requires confirmed process cleanup')
+    records.waitingBudget(loadInitiativeOwner(records), (input.now ?? Date.now)())
     if (evidence.outcome === 'repair-authorized') {
       const repair = projectApprovedPlan({
         ...input,

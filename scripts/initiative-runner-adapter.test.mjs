@@ -53,7 +53,12 @@ function repository({ done = false, roles = [], argv = ['npm', 'test'] } = {}) {
         ownerChecks: [],
       },
     },
-    closure: { indexPath: 'plans/README.md', requiredTasks: ['EX-1'] },
+    closure: {
+      indexPath: 'plans/README.md',
+      requiredTasks: ['EX-1'],
+      budgetMs: 60000,
+      approvalReference: 'separate synthetic closure allowance',
+    },
   }
   const plan = `# Example\n\n## Objective and Authorization\n\nApproved synthetic test scope only.\n\n## Sources and Constraints\n\nPreserve test data.\n\n## Tasks\n\n| ID | Outcome | Status |\n| --- | --- | --- |\n| EX-1 | Synthetic change | ${done ? 'Done' : 'Ready'} |\n\n### EX-1 — Synthetic change\n\nChange value.txt.\n\n### EX-2 — Excluded task\n\nNever select this task.\n\n## Execution Projection\n\n\`\`\`initiative-runner\n${JSON.stringify(execution)}\n\`\`\`\n`
   writeFileSync(join(path, 'plans/example.md'), plan)

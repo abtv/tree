@@ -4,7 +4,7 @@
 
 Provide the runner capabilities required by [AGENTS §8](../AGENTS.md#8-plans-and-architecture-decisions) and [Development §§10–11](../docs/DEVELOPMENT.md) before unattended [E2E Coverage Efficiency](e2e-coverage-efficiency.md) execution.
 
-Status: **RR-1 and RR-2 complete; RR-3–RR-4 unauthorized.** On 2026-10-12 the Product Owner authorized RR-1 only with a 45-minute implementation, validation and recovery allowance. The initial allowance expired during a canceled sandbox-approval wait; the owner approved a renewed 45-minute allowance at 06:25 UTC, retaining prior failure/recovery history. That renewed window remained fixed through 07:10 UTC and did not authorize later work. The separately authorized live-preflight attempts and allowances are recorded below; none renews implementation accounting or authorizes initiative execution. The separately authorized RR-2 continuation and its preserved recovery history are recorded below. E2E Coverage Efficiency remains unstarted. No executable projection or execution ledger was created for this owner-assisted bootstrap.
+Status: **RR-1–RR-3 complete; RR-4 unauthorized.** On 2026-10-12 the Product Owner authorized RR-1 only with a 45-minute implementation, validation and recovery allowance. The initial allowance expired during a canceled sandbox-approval wait; the owner approved a renewed 45-minute allowance at 06:25 UTC, retaining prior failure/recovery history. That renewed window remained fixed through 07:10 UTC and did not authorize later work. The separately authorized live-preflight attempts and allowances are recorded below; none renews implementation accounting or authorizes initiative execution. The separately authorized RR-2 and RR-3 work and preserved recovery history are recorded below. E2E Coverage Efficiency remains unstarted. No executable projection or execution ledger was created for this owner-assisted bootstrap.
 
 Selected tool: Codex. Four substantive working tasks are proposed, so explicit final owner acceptance is mandatory. Follow the configured roles and security postures in [Agent Roles](../docs/AGENT_ROLES.md). Preserve application behavior, data, architectural boundaries and permission restrictions.
 
@@ -25,7 +25,7 @@ Preliminary evidence remains in `.scratch/runner-readiness/preflight/REPORT.md` 
 | --- | --- | --- | --- |
 | RR-1 | Dedicated bounded preflight host operation | Implementation and bounded live proof separately authorized | Complete |
 | RR-2 | Post-implementation owner acceptance and rejection | RR-1 | Complete |
-| RR-3 | Suspend waiting consumption and preserve repair allowance | RR-2 | Planned |
+| RR-3 | Suspend waiting consumption and preserve repair allowance | RR-2 | Complete |
 | RR-4 | Closure, restart and integrated readiness proof | RR-2, RR-3 | Planned |
 
 ### RR-1 — Dedicated Bounded Preflight
@@ -53,6 +53,8 @@ Delivered: qualifying projections explicitly bind the acceptance contract; final
 Exclude final owner waiting from implementation consumption while preserving remaining allowance and recovery history. Provide a separate approved closure allowance. Expected owners: record/state/coordinator modules, host/projection integration, related tests and workflow documentation.
 
 Use deterministic clock tests for waiting, restart, acceptance and rejection. Waiting consumes no implementation allowance; rejection resumes the remainder without renewing the budget or recovery counters. Exhaustion retains evidence and unfinished work. Contradictory or corrupt ledgers block advancement. Closure uses its distinct allowance. Do not implement destructive migration or silently reset legacy records.
+
+Delivered: version-2 accounting suspends the implementation remainder against the final owner checkpoint after confirmed process cleanup. Waiting, acceptance, rejection and repair-scope preparation preserve that remainder; explicitly authorized repair construction resumes it without changing the original allowance or recovery history. Historical completed runs retain their deadlines. Closure requires its separately approved projected allowance/reference and independent restart-stable ledger. Missing, contradictory, unsafe or unsupported suspension records fail closed; legacy active ledgers are not migrated or reset. Deterministic and synthetic supported-host tests cover long waiting/restart, owner responses, repeated scoped repairs, retained recovery counts, exhausted remainder, interrupted checkpoint persistence, missing closure ledgers and arithmetic limits. High Risk validation, independent review and workflow verification passed. Supported integrated live closure/restart proof remains RR-4.
 
 ### RR-4 — Closure, Restart and Integrated Proof
 
@@ -141,4 +143,10 @@ In the fresh trusted session, the owner explicitly authorized completing RR-2 wi
 
 ## Exact Next Action
 
-RR-1 and RR-2 are complete. The next proposed task is RR-3, requiring explicit owner authorization and a separate allowance. RR-3–RR-4 and E2E Coverage Efficiency remain unstarted and unauthorized; no automatic continuation is authorized. Retain this plan and index for the remaining initiative and eventual final owner acceptance of the finished result.
+RR-1–RR-3 are complete. The next proposed task is RR-4, requiring explicit owner authorization and a separate allowance. RR-4 and E2E Coverage Efficiency remain unstarted and unauthorized; no automatic continuation is authorized. Retain this plan and index for the remaining initiative and eventual final owner acceptance of the finished result.
+
+## RR-3 Authorization and Result — 2026-10-12
+
+The owner authorized RR-3 only with a separate 35-minute implementation, validation and necessary-repairs allowance, starting with the request. First clock observation 20:58:57 UTC; conservative stop 21:33 UTC. Prior allowances, evidence, canceled approvals and recovery history remain preserved. This owner-assisted task created no actual initiative execution projection or ledger and did not approve a closure allowance or RR-4/E2E Coverage Efficiency work.
+
+High Risk validation passed through `npm run check:full` (3,549 coverage tests, 773 real Electron cases, 60 Electron performance cases, build, unit performance and audit with zero vulnerabilities), composed with final runner-only static and five-suite regression checks (217 tests) after bounded accounting guards were added during the aggregate pass. Independent configured reviewer and workflow verifier found no meaningful issues and reused valid evidence. An obsolete placeholder-ledger fixture was corrected after the first focused run rejected it; no unresolved failures or permission blockers remain. Detailed transient snapshots, commands, invalidation boundaries and recovery evidence are retained in `.scratch/runner-readiness/rr3/EVIDENCE.md`. The temporary working plan is retired before commit. No application product decisions, data changes or permission expansion occurred.

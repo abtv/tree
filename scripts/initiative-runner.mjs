@@ -10,6 +10,7 @@ import {
   awaitingPlan,
   checkpointInitiative,
   checkInitiativeRepair,
+  loadInitiativeOwner,
   requireInitiativeAcceptance,
 } from './initiative-runner-owner.mjs'
 import {
@@ -67,16 +68,11 @@ export class InitiativeCoordinator {
     this.busy = false
     this.run = null
     try {
-      if (this.authorization.contract.closure) requireInitiativeAcceptance(this.records, this.authorization)
-      this.budget = this.records.budget({
-        now: this.now(),
-        budgetMs: this.authorization.contract.budgetMs,
-        approvalReference: input.approvalReference,
-        allowExpired:
-          input.hostResume === true &&
-          existsSync(this.records.file('run.json')) &&
-          Boolean(this.records.load('run.json').candidate),
-      })
+      if (this.authorization.contract.closure) {
+        requireInitiativeAcceptance(this.records, this.authorization)
+        if (existsSync(this.records.file('initiative-owner.json')))
+          this.records.waitingBudget(loadInitiativeOwner(this.records), this.now())
+      }
       this.startingCommit = input.startingCommit
       if (existsSync(this.records.file('run.json'))) {
         const persisted = this.records.load('run.json')
@@ -122,6 +118,22 @@ export class InitiativeCoordinator {
           this.startingCommit = persisted.startingCommit
         }
       }
+      if (
+        this.priorRecoveryAttempts !== undefined &&
+        !this.authorization.contract.closure &&
+        existsSync(this.records.file('initiative-owner.json'))
+      ) {
+        const owner = checkInitiativeRepair(this.records, this.authorization)
+        this.records.resumeBudget(owner, this.now())
+      }
+      this.budget = this.readBudget({
+        allowExpired: input.hostResume === true && Boolean(this.run?.candidate),
+        allowWaiting: this.run?.phase === 'completed',
+      })
+      if (this.budget.waiting && !existsSync(this.records.file('initiative-owner.json')))
+        throw new Error('Suspended allowance lost its owner checkpoint')
+      if (this.run?.phase === 'completed' && existsSync(this.records.file('initiative-owner.json')))
+        this.records.waitingBudget(loadInitiativeOwner(this.records), this.now())
       this.records.save('authorization.json', this.authorization)
       this.receipts =
         this.run && existsSync(this.records.file('receipts.json')) ? this.records.load('receipts.json') : []
@@ -138,6 +150,17 @@ export class InitiativeCoordinator {
       this.records.release()
       throw error
     }
+  }
+
+  readBudget(options = {}) {
+    const closure = this.authorization.contract.closure
+    return this.records.budget({
+      now: this.now(),
+      budgetMs: closure ? closure.budgetMs : this.authorization.contract.budgetMs,
+      approvalReference: closure ? closure.approvalReference : this.input.approvalReference,
+      closure: Boolean(closure),
+      ...options,
+    })
   }
 
   observation() {
@@ -227,11 +250,7 @@ export class InitiativeCoordinator {
     this.busy = true
     try {
       this.records.assertOwned()
-      this.budget = this.records.budget({
-        now: this.now(),
-        budgetMs: this.authorization.contract.budgetMs,
-        approvalReference: this.input.approvalReference,
-      })
+      this.budget = this.readBudget()
       if (
         (await this.input.confirmQuiescence({ root: this.records.root, records: this.records, stage: 'before' })) !==
         true
@@ -811,6 +830,10 @@ export class InitiativeCoordinator {
         'Process cleanup remains unconfirmed',
         'Retain the lock; inspect only owned processes through the supported host flow',
       )
+    if (this.run?.phase === 'completed' && !this.authorization.contract.closure) {
+      const owner = checkpointInitiative(this.records, this.authorization, this.run.commit, this.now())
+      if (owner) this.budget = this.records.suspendBudget(owner, this.now())
+    }
     this.records.release()
   }
 }

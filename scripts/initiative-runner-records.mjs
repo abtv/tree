@@ -139,29 +139,75 @@ export class RunRecords {
     }
   }
 
-  budget({ now, budgetMs, approvalReference, allowExpired = false }) {
+  budget({ now, budgetMs, approvalReference, allowExpired = false, closure = false, allowWaiting = false }) {
     this.assertOwned()
     if (this.preflight) fail('Preflight cannot create an execution budget')
-    if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(budgetMs) || budgetMs <= 0)
+    if (
+      !Number.isSafeInteger(now) ||
+      now < 0 ||
+      !Number.isSafeInteger(budgetMs) ||
+      budgetMs <= 0 ||
+      typeof approvalReference !== 'string' ||
+      !approvalReference.trim()
+    )
       fail('Invalid elapsed-time allowance')
-    const path = this.file('budget.json')
+    const name = closure ? 'closure-budget.json' : 'budget.json'
+    const path = this.file(name)
     let value
     if (existsSync(path)) {
-      value = this.load('budget.json')
+      value = this.load(name)
       if (
         value.initiative !== this.initiative ||
         value.budgetMs !== budgetMs ||
         value.approvalReference !== approvalReference ||
         !Number.isSafeInteger(value.startedAt) ||
+        value.startedAt < 0 ||
         !Number.isSafeInteger(value.observedAt) ||
         value.observedAt < value.startedAt ||
-        value.deadlineAt !== value.startedAt + budgetMs ||
+        value.deadlineAt !== value.startedAt + budgetMs + (value.suspendedMs ?? 0) ||
         now < value.observedAt
       )
         fail('Invalid budget identity or clock moved backwards')
+      if (value.accountingVersion !== undefined) {
+        const waiting = value.waiting
+        if (
+          value.accountingVersion !== 2 ||
+          !Number.isSafeInteger(value.suspendedMs) ||
+          value.suspendedMs < 0 ||
+          (waiting !== null &&
+            (!/^[a-f0-9]{40,64}$/.test(waiting?.commit) ||
+              !/^sha256:[a-f0-9]{64}$/.test(waiting?.inputIdentity) ||
+              !Number.isSafeInteger(waiting.startedAt) ||
+              waiting.startedAt < value.startedAt ||
+              waiting.startedAt > value.observedAt ||
+              !Number.isSafeInteger(waiting.remainingMs) ||
+              waiting.remainingMs < 0 ||
+              waiting.remainingMs > budgetMs ||
+              waiting.remainingMs !== Math.max(0, value.deadlineAt - waiting.startedAt))) ||
+          (closure && (waiting !== null || value.suspendedMs !== 0))
+        )
+          fail('Contradictory allowance ledger')
+      } else if (closure || value.suspendedMs !== undefined || value.waiting !== undefined) {
+        fail('Unsupported legacy allowance ledger')
+      }
     } else {
       // Existing execution records without their budget cannot renew an allowance.
-      if (readdirSync(this.path).some((name) => name !== 'preflight')) fail('Missing original budget ledger')
+      if (closure) {
+        if (existsSync(this.file('authorization.json')) && this.load('authorization.json').contract?.closure)
+          fail('Missing original closure allowance ledger')
+        // Owner-assisted initiatives may have no implementation execution ledger.
+        // Starting closure never creates or renews that ledger.
+        if (existsSync(this.file('budget.json'))) {
+          const implementation = this.load('budget.json')
+          this.budget({
+            now,
+            budgetMs: implementation.budgetMs,
+            approvalReference: implementation.approvalReference,
+            allowExpired: true,
+            allowWaiting: true,
+          })
+        }
+      } else if (readdirSync(this.path).some((name) => name !== 'preflight')) fail('Missing original budget ledger')
       const preflightPath = join(this.path, 'preflight')
       if (
         existsSync(preflightPath) &&
@@ -175,13 +221,94 @@ export class RunRecords {
         startedAt: now,
         observedAt: now,
         deadlineAt: now + budgetMs,
+        accountingVersion: 2,
+        suspendedMs: 0,
+        waiting: null,
       }
     }
     if (!Number.isSafeInteger(value.deadlineAt)) fail('Invalid budget deadline')
     value.observedAt = now
-    this.save('budget.json', value)
-    if (now >= value.deadlineAt && !allowExpired)
+    this.save(name, value)
+    if (value.waiting && !allowWaiting) fail('Implementation allowance is suspended for final owner waiting')
+    if (!value.waiting && now >= value.deadlineAt && !allowExpired)
       fail('Initiative budget exhausted; retain ledger and request supported resolution')
+    return value
+  }
+
+  suspendBudget(state, now) {
+    if (!existsSync(this.file('budget.json'))) return null
+    const original = this.load('budget.json')
+    const value = this.budget({
+      now,
+      budgetMs: original.budgetMs,
+      approvalReference: original.approvalReference,
+      allowExpired: true,
+      allowWaiting: true,
+    })
+    if (value.accountingVersion !== 2) fail('Legacy allowance cannot infer suspended time; retain evidence')
+    if (value.waiting) {
+      if (value.waiting.commit !== state.commit || value.waiting.inputIdentity !== state.inputIdentity)
+        fail('Waiting allowance and owner checkpoint disagree')
+      return value
+    }
+    value.waiting = {
+      commit: state.commit,
+      inputIdentity: state.inputIdentity,
+      startedAt: now,
+      remainingMs: Math.max(0, value.deadlineAt - now),
+    }
+    this.save('budget.json', value)
+    return value
+  }
+
+  resumeBudget(state, now) {
+    const original = this.load('budget.json')
+    const value = this.budget({
+      now,
+      budgetMs: original.budgetMs,
+      approvalReference: original.approvalReference,
+      allowExpired: true,
+      allowWaiting: true,
+    })
+    if (
+      value.accountingVersion !== 2 ||
+      !value.waiting ||
+      value.waiting.commit !== state.commit ||
+      value.waiting.inputIdentity !== state.inputIdentity
+    )
+      fail('Missing or contradictory preserved repair allowance')
+    value.suspendedMs += now - value.waiting.startedAt
+    value.deadlineAt = now + value.waiting.remainingMs
+    if (!Number.isSafeInteger(value.deadlineAt) || !Number.isSafeInteger(value.suspendedMs))
+      fail('Allowance arithmetic overflow')
+    // An exhausted result cannot recover time lost before waiting began.
+    if (!value.waiting.remainingMs) fail('Initiative budget exhausted; retain ledger and unfinished work')
+    value.waiting = null
+    this.save('budget.json', value)
+    return value
+  }
+
+  waitingBudget(state, now) {
+    if (!existsSync(this.file('budget.json'))) {
+      if (existsSync(this.file('authorization.json')) && !this.load('authorization.json').contract?.closure)
+        fail('Missing original budget ledger')
+      return null
+    }
+    const original = this.load('budget.json')
+    const value = this.budget({
+      now,
+      budgetMs: original.budgetMs,
+      approvalReference: original.approvalReference,
+      allowExpired: true,
+      allowWaiting: true,
+    })
+    if (
+      value.accountingVersion !== 2 ||
+      !value.waiting ||
+      value.waiting.commit !== state.commit ||
+      value.waiting.inputIdentity !== state.inputIdentity
+    )
+      fail('Waiting allowance and owner checkpoint disagree')
     return value
   }
 

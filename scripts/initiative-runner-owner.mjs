@@ -51,7 +51,7 @@ function valid(value) {
   return value
 }
 
-function loadState(records) {
+export function loadInitiativeOwner(records) {
   const state = valid(records.load('initiative-owner.json'))
   if (
     state.status === 'awaiting' &&
@@ -70,6 +70,8 @@ function loadState(records) {
 
 // Compare only explicitly reviewed paths. Unrelated owner changes are neither
 // included in acceptance nor modified by this read-only operation.
+const loadState = loadInitiativeOwner
+
 export function reviewedInputs(root, commit, paths) {
   if (!/^[a-f0-9]{40,64}$/.test(commit)) throw new Error('Full delivered commit required')
   git(root, ['cat-file', '-e', `${commit}^{commit}`])
@@ -207,6 +209,7 @@ export function checkInitiativeRepair(records, authorization) {
     state.response.repair?.taskId !== authorization.contract.taskId
   )
     throw new Error('Only explicitly authorized initiative repairs may execute')
+  return state
 }
 
 export function recordInitiativeRepair(records, authorization, evidence, now, startingCommit) {
