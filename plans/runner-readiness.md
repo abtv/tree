@@ -4,7 +4,13 @@
 
 Provide the runner capabilities required by [AGENTS §8](../AGENTS.md#8-plans-and-architecture-decisions) and [Development §§10–11](../docs/DEVELOPMENT.md) before unattended [E2E Coverage Efficiency](e2e-coverage-efficiency.md) execution.
 
-Status: **Awaiting owner acceptance**
+Status: **Accepted; closure authorized**
+
+## Final Owner Acceptance and Closure Authorization — 2026-10-13
+
+The Product Owner explicitly accepted Runner Readiness at commit `25e779da40de27382d9ea27b91a05215622f29ce` and authorized a separate 15-minute allowance from that message solely for initiative closure. First observed clock: 2026-10-12 22:04:18 UTC; conservative closure stop: 22:19 UTC. The accepted commit is the current HEAD, authored and committed by `abtv` at 2026-10-12 22:01:15 UTC. `git status --short` and `git diff 25e779d --stat` were empty, confirming unchanged reviewed inputs and no unrelated work at closure bootstrap.
+
+Closure records acceptance before retiring this plan and its active-index row. Preserve the append-only Git history, all earlier allowances, interventions, failed attempts, recovery history and retained scratch evidence. Do not create or reset an implementation ledger. E2E Coverage Efficiency must not start; only its prerequisite reference/status may be reconciled with this retirement. No additional implementation or live preflight is authorized.
 
 On 2026-10-12 the Product Owner authorized RR-1 only with a 45-minute implementation, validation and recovery allowance. The initial allowance expired during a canceled sandbox-approval wait; the owner approved a renewed 45-minute allowance at 06:25 UTC, retaining prior failure/recovery history. That renewed window remained fixed through 07:10 UTC and did not authorize later work. The separately authorized live-preflight attempts and allowances are recorded below; none renews implementation accounting or authorizes initiative execution. The separately authorized RR-2 and RR-3 work and preserved recovery history are recorded below. E2E Coverage Efficiency remains unstarted. No executable projection or execution ledger was created for this owner-assisted bootstrap.
 
@@ -145,7 +151,7 @@ In the fresh trusted session, the owner explicitly authorized completing RR-2 wi
 
 ## Exact Next Action
 
-RR-1–RR-4 are complete. Await explicit owner acceptance of the delivered RR-4 result before retiring this four-task initiative. E2E Coverage Efficiency remains unstarted and unauthorized; no automatic continuation or initiative closure allowance is approved. Retain this plan and index until that owner decision and the applicable closure allowance are recorded.
+RR-1–RR-4 are complete and the delivered result at `25e779d` is explicitly accepted. Retire this plan and its index entry within the separately authorized 15-minute closure allowance, preserving all history. E2E Coverage Efficiency remains unstarted and must not be launched in this session.
 
 ## RR-3 Authorization and Result — 2026-10-12
 
