@@ -13,7 +13,12 @@ import {
   requireInitiativeAcceptance,
   reviewedInputs,
 } from './initiative-runner-owner.mjs'
-import { executeInitiative, resolveInitiativeOwner } from './initiative-runner-host.mjs'
+import {
+  executeInitiative,
+  hostArguments,
+  reconcileClosureWork,
+  resolveInitiativeOwner,
+} from './initiative-runner-host.mjs'
 import { InitiativeCoordinator } from './initiative-runner.mjs'
 import { observeProcess } from './initiative-runner-process.mjs'
 
@@ -110,6 +115,231 @@ afterEach(() => {
 })
 
 describe('post-commit initiative owner checkpoint', () => {
+  function completingPrimary(f) {
+    let launches = 0
+    const launchPrimary = async ({ records, authorization, onSession, resumeSession, deadlineAt }) => {
+      const sessionId = resumeSession ?? `synthetic-lifecycle-${++launches}`
+      onSession?.(sessionId)
+      if (!resumeSession) {
+        if (authorization.contract.closure) {
+          rmSync(join(f.root, f.input.planPath), { force: true })
+          writeFileSync(
+            join(f.root, 'plans/README.md'),
+            readFileSync(join(f.root, 'plans/README.md'), 'utf8')
+              .split('\n')
+              .filter((line) => !line.includes('[Example](example.md)'))
+              .join('\n'),
+          )
+        } else {
+          writeFileSync(join(f.root, 'value.txt'), `delivered result ${launches}\n`)
+          writeFileSync(
+            join(f.root, f.input.planPath),
+            readFileSync(join(f.root, f.input.planPath), 'utf8')
+              .replace('| Final | Ready |', '| Final | Done |')
+              .replace('Status: **In progress**', 'Status: **Awaiting owner acceptance**'),
+          )
+          writeFileSync(
+            join(f.root, 'plans/README.md'),
+            readFileSync(join(f.root, 'plans/README.md'), 'utf8').replace(
+              '| In progress |',
+              '| Awaiting owner acceptance |',
+            ),
+          )
+        }
+      }
+      const process = await observeProcess({
+        records,
+        deadlineAt,
+        argv: [globalThis.process.execPath, '-e', 'console.log("synthetic lifecycle")'],
+      })
+      return {
+        process,
+        native: { sessionId, finalMessage: '{"allRequirementsCovered":true,"unresolvedFindings":[]}' },
+      }
+    }
+    return { launchPrimary, launches: () => launches }
+  }
+
+  it('closes the accepted actual final task and preserves unrelated dirty and committed work across restart', async () => {
+    const f = fixture({ awaiting: false })
+    const native = completingPrimary(f)
+    f.input.launchPrimary = native.launchPrimary
+    const final = (await executeInitiative(f.input))[0]
+    const directory = join(f.root, '.scratch/example')
+    const implementationBudget = readRecord(join(directory, 'budget.json'))
+    const ownerRecords = new RunRecords({ root: f.root, initiative: 'example', hostAuthorized: true })
+    writeFileSync(join(ownerRecords.path, 'explicit-owner.log'), 'Explicit synthetic acceptance\n')
+    const artifacts = [ownerRecords.artifact(join(ownerRecords.path, 'explicit-owner.log'))]
+    ownerRecords.release()
+    await resolveInitiativeOwner(
+      { ...f.input, initiative: 'example' },
+      {
+        outcome: 'accepted',
+        commit: final.initiativeOwner.commit,
+        inputIdentity: final.initiativeOwner.inputIdentity,
+        ownerReference: 'explicit synthetic acceptance',
+        issues: [],
+        artifacts,
+      },
+    )
+    writeFileSync(join(f.root, 'unrelated.txt'), 'unrelated committed owner work\n')
+    git(f.root, ['add', 'unrelated.txt'])
+    git(f.root, ['commit', '--quiet', '-m', 'test(runner): preserve unrelated descendant'])
+    const source = git(f.root, ['rev-parse', 'HEAD'])
+    writeFileSync(join(f.root, 'unrelated.txt'), 'unrelated staged owner work\n')
+    git(f.root, ['add', 'unrelated.txt'])
+    const unrelatedIndex = git(f.root, ['rev-parse', ':unrelated.txt'])
+    writeFileSync(join(f.root, 'unrelated.txt'), 'unrelated unstaged owner work\n')
+    writeFileSync(join(f.root, 'untracked.txt'), 'unrelated untracked owner work\n')
+    const closureInput = { ...f.input, startingCommit: source, closureAuthorized: true }
+    const closed = (await executeInitiative(closureInput))[0]
+    expect(closed.run.phase).toBe('completed')
+    expect(git(f.root, ['rev-parse', 'HEAD^'])).toBe(source)
+    expect(git(f.root, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']).split('\n')).toEqual([
+      'plans/README.md',
+      'plans/example.md',
+    ])
+    expect(git(f.root, ['rev-parse', ':unrelated.txt'])).toBe(unrelatedIndex)
+    expect(readFileSync(join(f.root, 'unrelated.txt'), 'utf8')).toBe('unrelated unstaged owner work\n')
+    expect(readFileSync(join(f.root, 'untracked.txt'), 'utf8')).toBe('unrelated untracked owner work\n')
+    expect(readRecord(join(directory, 'budget.json'))).toMatchObject({
+      startedAt: implementationBudget.startedAt,
+      deadlineAt: implementationBudget.deadlineAt,
+      budgetMs: implementationBudget.budgetMs,
+      suspendedMs: implementationBudget.suspendedMs,
+      waiting: implementationBudget.waiting,
+    })
+    const closureBudget = readRecord(join(directory, 'closure-budget.json'))
+    const sessions = native.launches()
+    expect((await executeInitiative(closureInput))[0].run).toEqual(closed.run)
+    // Crash after commit, before run completion persistence: ancestry must reconcile.
+    atomicRecord(join(directory, 'run.json'), { ...closed.run, phase: 'executing', commit: undefined })
+    expect((await executeInitiative(closureInput))[0].run.commit).toBe(closed.run.commit)
+    expect(native.launches()).toBe(sessions)
+    expect(readRecord(join(directory, 'closure-budget.json'))).toMatchObject({
+      startedAt: closureBudget.startedAt,
+      deadlineAt: closureBudget.deadlineAt,
+      budgetMs: closureBudget.budgetMs,
+      approvalReference: closureBudget.approvalReference,
+    })
+  }, 30000)
+
+  it('exposes explicit closure authorization without granting ordinary plan invocations deletion', () => {
+    const args = ['.', 'plans/example.md', 'EX-3', 'a'.repeat(40), 'owner closure approval']
+    expect(hostArguments(['--authorized-closure', ...args])).toMatchObject({
+      closureAuthorized: true,
+      singleTask: true,
+    })
+    expect(hostArguments(['--authorized-plan', ...args]).closureAuthorized).toBeUndefined()
+  })
+
+  it('resumes a prepared accepted closure before commit without another primary or renewed allowance', async () => {
+    const f = fixture()
+    const owner = checkpoint(f)
+    recordInitiativeResponse(owner.records, owner.evidence, 110)
+    owner.records.release()
+    const native = completingPrimary(f)
+    const input = { ...f.input, closureAuthorized: true, launchPrimary: native.launchPrimary }
+    const coordinator = new InitiativeCoordinator(input)
+    await coordinator.primary()
+    git(f.root, ['add', '-A', '--', ...coordinator.authorization.contract.files])
+    await coordinator.validation('unit')
+    await coordinator.acceptance()
+    expect(coordinator.prepare().ready).toBe(true)
+    const deadline = coordinator.budget.deadlineAt
+    await coordinator.close()
+    const result = (await executeInitiative(input))[0]
+    expect(result.run).toMatchObject({ phase: 'completed', recoveryAttempts: 0, deadlineAt: deadline })
+    expect(native.launches()).toBe(1)
+    expect(git(f.root, ['rev-parse', 'HEAD^'])).toBe(f.commit)
+  }, 15000)
+
+  it.each(['missing acceptance', 'rejected', 'changed relevant input', 'stale owner record'])(
+    'blocks supported closure with %s before a native launch',
+    async (kind) => {
+      const f = fixture()
+      if (kind !== 'missing acceptance') {
+        const owner = checkpoint(f)
+        recordInitiativeResponse(
+          owner.records,
+          {
+            ...owner.evidence,
+            ...(kind === 'rejected' ? { outcome: 'rejected', issues: ['Repair required'] } : {}),
+          },
+          110,
+        )
+        owner.records.release()
+      }
+      if (kind === 'changed relevant input') writeFileSync(join(f.root, 'value.txt'), 'unreviewed\n')
+      if (kind === 'stale owner record') {
+        const path = join(f.root, '.scratch/example/initiative-owner.json')
+        atomicRecord(path, { ...readRecord(path), commit: 'f'.repeat(40) })
+      }
+      const native = completingPrimary(f)
+      await expect(
+        executeInitiative({ ...f.input, closureAuthorized: true, launchPrimary: native.launchPrimary }),
+      ).rejects.toThrow()
+      expect(native.launches()).toBe(0)
+      expect(git(f.root, ['rev-parse', 'HEAD'])).toBe(f.commit)
+      expect(existsSync(join(f.root, 'plans/example.md'))).toBe(true)
+    },
+  )
+
+  it('retains closure ownership and forbids launch when cleanup cannot be confirmed', async () => {
+    const f = fixture()
+    const owner = checkpoint(f)
+    recordInitiativeResponse(owner.records, owner.evidence, 110)
+    owner.records.release()
+    const native = completingPrimary(f)
+    await expect(
+      executeInitiative({
+        ...f.input,
+        closureAuthorized: true,
+        launchPrimary: native.launchPrimary,
+        confirmQuiescence: async () => false,
+      }),
+    ).rejects.toThrow('cleanup remains unconfirmed')
+    expect(native.launches()).toBe(0)
+    expect(existsSync(join(f.root, '.scratch/initiative-runner.lock'))).toBe(true)
+    expect(git(f.root, ['rev-parse', 'HEAD'])).toBe(f.commit)
+  })
+
+  it('detects a primary changing unrelated owner work during closure and preserves the evidence', async () => {
+    const f = fixture()
+    const owner = checkpoint(f)
+    recordInitiativeResponse(owner.records, owner.evidence, 110)
+    owner.records.release()
+    const native = completingPrimary(f)
+    await expect(
+      executeInitiative({
+        ...f.input,
+        closureAuthorized: true,
+        launchPrimary: async (request) => {
+          const output = await native.launchPrimary(request)
+          writeFileSync(join(f.root, 'unrelated.txt'), 'unexpected primary edit\n')
+          return output
+        },
+      }),
+    ).rejects.toThrow('Unrelated work changed')
+    expect(native.launches()).toBe(1)
+    expect(git(f.root, ['rev-parse', 'HEAD'])).toBe(f.commit)
+    expect(readFileSync(join(f.root, 'unrelated.txt'), 'utf8')).toBe('unexpected primary edit\n')
+    const input = {
+      ...f.input,
+      closureAuthorized: true,
+      launchPrimary: native.launchPrimary,
+      reconciliationReference: 'Explicit exact baseline restoration',
+    }
+    await expect(reconcileClosureWork(input)).rejects.toThrow('baseline')
+    writeFileSync(join(f.root, 'unrelated.txt'), 'owner\n')
+    const reconciled = await reconcileClosureWork(input)
+    expect(reconciled.recoveryAttempts).toBe(0)
+    const deadline = reconciled.deadlineAt
+    const result = (await executeInitiative(input))[0]
+    expect(result.run).toMatchObject({ phase: 'completed', recoveryAttempts: 1, deadlineAt: deadline })
+    expect(native.launches()).toBe(2)
+  }, 30000)
+
   it('fails closed on qualifying legacy projections without acceptance, including corrupt counts', () => {
     const f = fixture({ contract: false })
     expect(f.authorization).toThrow('requires explicit final owner acceptance')

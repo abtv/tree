@@ -69,7 +69,11 @@ export class InitiativeCoordinator {
     this.run = null
     try {
       if (this.authorization.contract.closure) {
-        requireInitiativeAcceptance(this.records, this.authorization)
+        const prior = existsSync(this.records.file('run.json')) ? this.records.load('run.json') : null
+        const resuming = prior?.authorization === this.authorization.identity
+        requireInitiativeAcceptance(this.records, this.authorization, resuming)
+        if (resuming && prior.candidate && !this.observationFor(input.startingCommit).closureValid)
+          throw new Error('Retained closure no longer matches the permitted retirement')
         if (existsSync(this.records.file('initiative-owner.json')))
           this.records.waitingBudget(loadInitiativeOwner(this.records), this.now())
       }
@@ -87,22 +91,23 @@ export class InitiativeCoordinator {
           const repairing =
             !this.authorization.contract.closure && existsSync(this.records.file('initiative-owner.json'))
           if (repairing) checkInitiativeRepair(this.records, this.authorization)
+          const closing = Boolean(this.authorization.contract.closure)
           const observed = observeRepository({
             root: this.records.root,
-            startingCommit: persisted.startingCommit,
+            startingCommit: closing ? this.startingCommit : persisted.startingCommit,
             planPath: previous.contract.planPath,
             taskId: previous.contract.taskId,
-            closure: previous.contract.closure,
+            closure: closing ? this.authorization.contract.closure : previous.contract.closure,
           })
           if (
-            (!repairing && observed.head !== persisted.commit) ||
+            (!repairing && !closing && observed.head !== persisted.commit) ||
             observed.indexIdentity !== observed.headIdentity ||
             observed.unstaged.length ||
             observed.untracked.length ||
             observed.workingPlanPresent
           )
             throw new Error('Previous completed task no longer matches clean Git state')
-          if (this.startingCommit !== (repairing ? observed.head : persisted.commit))
+          if (this.startingCommit !== (repairing || closing ? observed.head : persisted.commit))
             throw new Error('Next task must start at the reconciled commit')
           if (
             repairing &&
@@ -164,9 +169,13 @@ export class InitiativeCoordinator {
   }
 
   observation() {
+    return this.observationFor(this.startingCommit)
+  }
+
+  observationFor(startingCommit) {
     return observeRepository({
       root: this.records.root,
-      startingCommit: this.startingCommit,
+      startingCommit,
       planPath: this.authorization.contract.planPath,
       taskId: this.authorization.contract.taskId,
       closure: this.authorization.contract.closure,
@@ -176,6 +185,8 @@ export class InitiativeCoordinator {
 
   checkAuthority() {
     const closure = this.authorization.contract.closure
+    if (closure && this.run && this.run.closureUnrelatedIdentity !== this.observation().unrelatedIdentity)
+      throw new Error('Unrelated work changed during closure; preserve work and reconcile')
     checkPlanAuthority(
       { ...this.input, sourceCommit: closure ? this.startingCommit : undefined, candidate: Boolean(this.run) },
       this.authorization,
@@ -331,7 +342,9 @@ export class InitiativeCoordinator {
   primary(signal) {
     return this.exclusive(async () => {
       this.checkAuthority()
-      checkInitiativeRepair(this.records, this.authorization)
+      if (this.authorization.contract.closure)
+        requireInitiativeAcceptance(this.records, this.authorization, Boolean(this.run))
+      else checkInitiativeRepair(this.records, this.authorization)
       const observed = this.observation()
       const recovery =
         this.run && existsSync(this.records.file('blocker.json'))
@@ -422,6 +435,8 @@ export class InitiativeCoordinator {
                 deadlineAt: this.budget.deadlineAt,
               })
           if (!recovering && this.priorRecoveryAttempts) this.run.recoveryAttempts = this.priorRecoveryAttempts
+          if (!recovering && this.authorization.contract.closure)
+            this.run.closureUnrelatedIdentity = observed.unrelatedIdentity
           this.records.save('run.json', this.run)
           if (recovering && existsSync(this.records.file('blocker.json'))) {
             const blocker = this.records.load('blocker.json')
@@ -437,6 +452,7 @@ export class InitiativeCoordinator {
           at: this.now(),
         }),
       )
+      if (this.authorization.contract.closure) this.checkAuthority()
       if (output.blocker)
         fail(
           output.blocker.kind,
@@ -799,6 +815,7 @@ export class InitiativeCoordinator {
   reconcile() {
     this.records.assertOwned()
     if (this.busy || !this.run) throw new Error('No quiescent task to reconcile')
+    if (this.authorization.contract.closure) this.checkAuthority()
     const result = reconcileCommit({
       run: this.run,
       authorization: this.authorization,

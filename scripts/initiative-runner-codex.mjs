@@ -1,5 +1,5 @@
 import { StringDecoder } from 'node:string_decoder'
-import { execFileSync } from 'node:child_process'
+import { boundedExecFileSync as execFileSync } from './initiative-runner-deadline.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { roleSettings } from './initiative-launch.mjs'
@@ -94,7 +94,9 @@ export function primaryPrompt({ authorization, resumeSession, evidence, recovery
     `You are the fresh primary for ${authorization.contract.initiative} ${authorization.contract.taskId} only.`,
     'Read AGENTS.md, WORKING_PLAN.md if present, the selected approved plan and relevant development instructions.',
     `Plan: ${authorization.contract.planPath}. Approval: ${authorization.contract.approvalReference}.`,
-    `Authorized scope:\n${authorization.contract.scope}`,
+    contract.closure
+      ? `Authorized closure only: retire ${contract.planPath} and exactly its row in ${contract.closure.indexPath}. Owned paths: ${contract.files.join(', ')}. Do not repeat the completed implementation task or edit any other file.`
+      : `Authorized scope:\n${authorization.contract.scope}`,
     'Own source/test/doc edits only. Use native file-edit tools. Preserve existing work and permission boundaries.',
     'The separately authorized host coordinator owns validation, configured independent role launches and commit gates.',
     'Do not launch validation, Electron/performance tests, nested roles, another primary, or Git commits.',

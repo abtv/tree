@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { boundedExecFileSync as execFileSync } from './initiative-runner-deadline.mjs'
 import { join } from 'node:path'
 import { digest, repositoryPath, taskStatus } from './initiative-runner-git.mjs'
 import { authorizeTask } from './initiative-runner-state.mjs'
@@ -111,6 +111,8 @@ export function projectApprovedPlan({
   const taskHeading = plan.split('\n').filter((line) => line.startsWith(`### ${taskId} — `))
   if (taskHeading.length !== 1) throw new Error('Ambiguous task scope')
   const scope = section(plan, taskHeading[0])
+  if (closureAuthorized && (!execution.closure || !task.files.includes(execution.closure.indexPath)))
+    throw new Error('Explicit final-closure scope must include the plan index')
   const authority = {
     objective: acceptance
       ? section(plan, '## Objective and Authorization').replace(
@@ -130,7 +132,7 @@ export function projectApprovedPlan({
     approvalReference,
     scope,
     planPath,
-    files: task.files,
+    files: closureAuthorized ? [planPath, execution.closure?.indexPath] : task.files,
     commands: task.commands,
     roles: task.roles,
     ownerChecks: task.ownerChecks,

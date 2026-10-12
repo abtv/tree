@@ -1,6 +1,6 @@
 # E2E Coverage Efficiency
 
-Prerequisite: [Runner Readiness](runner-readiness.md) is proposed separately. Its preparation does not authorize runner implementation, runtime probes or this initiative's execution.
+Prerequisite: [Runner Readiness](runner-readiness.md) supplies the supported execution contract and bounded readiness evidence. Its authorization does not authorize this initiative's execution.
 
 ## Objective and Authorization
 
@@ -126,7 +126,7 @@ The fixed EC-3 layout uses a non-spec test filename and a dedicated configuratio
 
 All Playwright invocations are serialized and comparisons use six hidden workers on this host. Timing output paths are unique per task/run; preserve baseline artifacts outside tool-cleared `test-results/`. Build and complete command elapsed time are available in host process records; test-only wall/summed times and launches are in JSON and timing summaries. Diagnostics, failures and relocation are reported separately from actual coverage-work reduction. Fault experiments are optional bounded evidence, not authorization to mutate production code or launch unprojected commands.
 
-Proposed implementation allowance: **8 hours elapsed (28,800,000 ms)** from first coordinator construction, including implementation pauses, retries, independent roles and task commits. Suggested allocation: EC-1 90 minutes, EC-2 45, EC-3 90, EC-4 90, EC-5 75, EC-6 30, contingency 60. Final owner waiting is excluded and preserves the remaining implementation allowance and recovery counters for any authorized repairs. A separate small closure allowance must be proposed and approved after runner readiness is established. These are planning estimates, not measurements or E2E duration gates. Maximum two recoveries per task; never renew an allowance by deleting a ledger. The current host cannot suspend its original deadline for final owner waiting, so the proposed projection is not launch-ready under the new policy. Permission/authentication/capability blocks require supported external resolution immediately. Budget exhaustion preserves unfinished work and evidence.
+Proposed implementation allowance: **8 hours elapsed (28,800,000 ms)** from first coordinator construction, including implementation pauses, retries, independent roles and task commits. Suggested allocation: EC-1 90 minutes, EC-2 45, EC-3 90, EC-4 90, EC-5 75, EC-6 30, contingency 60. Final owner waiting is excluded and preserves the remaining implementation allowance and recovery counters for any authorized repairs. A separate small closure allowance must be proposed and approved after runner readiness is established. These are planning estimates, not measurements or E2E duration gates. Maximum two recoveries per task; never renew an allowance by deleting a ledger. The supported host preserves implementation time during final owner waiting; this proposal still requires its own approved allowances and complete unattended preflight. Permission/authentication/capability blocks require supported external resolution immediately. Budget exhaustion preserves unfinished work and evidence.
 
 ### Owner Involvement
 
@@ -142,13 +142,13 @@ Capabilities checked in this preparation session:
 * No coordinator was constructed and no budget ledger was started. Host launch permissions, authentication, fresh/resumed primary execution and quiescence must be checked at authorized launch; historical pilot success is not current proof.
 * Existing `.scratch/autonomous-initiatives-pilot/` records are unrelated and must be preserved. The proposed execution namespace is `.scratch/e2e-coverage-efficiency/`; confirm it remains unstarted before construction.
 
-Launch is currently blocked. A separately authorized runner task must implement and verify the missing preflight, final acceptance, waiting-budget and closure behavior described in Development §11. No such implementation is authorized by this policy edit. Then complete the unattended preflight of Development §10, revise this projection to the supported contract, obtain attributable execution approval, and launch only from a clean committed plan. The invocation below is a future template, not a readiness claim; never use the pre-preparation HEAD as the approved source:
+Launch remains unauthorized. Complete Runner Readiness acceptance and the initiative-specific unattended preflight of Development §10, approve implementation and closure allowances, obtain attributable execution approval, and launch only from a clean committed plan. Permission setup must cover the actual full host and child paths before execution; RR-4 synthetic permission does not cover this initiative. The invocation below is a future template, not a readiness claim; never use the pre-preparation HEAD as the approved source:
 
 ```text
 node scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tree plans/e2e-coverage-efficiency.md EC-1 <full-approved-starting-commit> <owner-approval-reference>
 ```
 
-The CLI advances EC-1 through EC-6 only. **Current host closure is blocked:** `executeInitiative` in `scripts/initiative-runner-host.mjs:98` replaces a supplied completed EC-6 starting commit with that task's persisted original starting commit. That original plan marks EC-6 Ready, whereas closure projection requires Done. The independently inspected code therefore does not support the proposed same-namespace closure replay; the CLI also has no closure flag. No closure contract is projected and no runner correction is authorized here.
+The execution CLI advances EC-1 through EC-6 only. The proposed projection includes the supported initiativeAcceptance contract with exact reviewed paths and retained substantive task count. Closure uses the separate supported `--authorized-closure` invocation and a committed Done source; same-authorization restarts retain their original authority. No closure contract is projected yet because its separate allowance and approval reference remain unresolved. Add those only after owner approval; this preparation authorizes no execution or plan retirement.
 
 Final owner acceptance is mandatory after EC-6 and cannot be granted in the initial execution approval. Retire only this plan and its index row after explicit acceptance of the unchanged delivered result, within the separately approved closure allowance and through a verified supported closure path. Until runner readiness and owner acceptance are satisfied, retain the plan/index and do not claim fully autonomous closure.
 
@@ -725,22 +725,60 @@ Adding this block does not authorize execution. Exact argv arrays are host valid
       ],
       "ownerChecks": []
     }
+  },
+  "substantiveTaskCount": 6,
+  "initiativeAcceptance": {
+    "indexPath": "plans/README.md",
+    "requiredTasks": [
+      "EC-1",
+      "EC-2",
+      "EC-3",
+      "EC-4",
+      "EC-5",
+      "EC-6"
+    ],
+    "reviewPaths": [
+      "plans/e2e-coverage-efficiency.md",
+      "plans/README.md",
+      "AGENTS.md",
+      "docs/DEVELOPMENT.md",
+      "e2e/AGENTS.md",
+      "e2e/shared-application.spec.ts",
+      "e2e/shared-application-memory.ts",
+      "e2e/shared-application-memory.config.ts",
+      ".github/workflows/e2e-memory.yml",
+      "docs/decisions/0021-worker-owned-e2e-application-reuse.md",
+      "e2e/vim-text-editing.spec.ts",
+      "src/renderer/vim-text-commands.test.ts",
+      "src/renderer/vim-editing.test.ts",
+      "src/renderer/vim-edit-session.test.ts",
+      "src/renderer/vim-surround.test.ts",
+      "src/renderer/vim-editing.property.test.ts",
+      "src/renderer/vim-edit-session.property.test.ts",
+      "docs/VIM_CONFORMANCE.md",
+      "e2e/agenda-editing.spec.ts",
+      "src/renderer/agenda-command-matrix.test.ts",
+      "src/renderer/agenda-row-keyboard.test.ts",
+      "src/renderer/agenda-row-keyboard.property.test.ts",
+      "src/renderer/agenda-key-policy.test.ts",
+      "src/renderer/agenda-editing-handlers.test.ts"
+    ]
   }
 }
 ```
 
 ## Execution Findings
 
-Preparation only. No initiative task has executed. EC-1 remains the first implementation task, but unattended launch is blocked by missing runner preflight/final-acceptance/budget/closure support. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
+Preparation only. No initiative task has executed. EC-1 remains the first implementation task; unattended launch is blocked by pending Runner Readiness acceptance, initiative-specific full-path preflight and explicit execution/allowance approval. Record audit mappings, measured evidence links, retained candidates, blockers and next-task notes here, outside immutable task scopes. The prepared scope and implementation allowance await owner approval after readiness; closure allowance is unresolved.
 
 ## Next Task and Resume Prompt
 
-Next required action: separately authorize runner readiness work and complete unattended preflight. EC-1 can start only afterward, under explicit execution approval and the revised supported projection. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. The preparation evidence above is limited to its stated commands and scope.
+Next required action: finish and accept Runner Readiness, then complete this initiative's unattended preflight. EC-1 can start only afterward, under explicit execution approval and the revised supported projection. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. The preparation evidence above is limited to its stated commands and scope.
 
 ```text
-Prepare the separately scoped runner readiness work needed by AGENTS.md §8
-and Development §§10–11. Keep E2E Coverage Efficiency unstarted. Identify
-the implementation tasks, preflight evidence, owner involvement and budget
-needed for prompt-free execution and post-implementation owner acceptance.
-Do not treat this preparation prompt as implementation authorization.
+After explicitly accepting the completed Runner Readiness result, prepare
+E2E Coverage Efficiency's exact host/child permission preflight under
+AGENTS.md §8 and Development §§10–11. Keep its implementation unstarted.
+Resolve scope, execution and closure allowances before execution approval;
+verify affected paths without intervention. This prompt authorizes no tasks.
 ```

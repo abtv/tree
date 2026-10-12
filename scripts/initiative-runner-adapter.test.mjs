@@ -552,6 +552,8 @@ describe('executable host with synthetic native adapters', () => {
     expect(processTableQuiescent(`${base}30 1 node vitest worker\n`, 20)).toBe(false)
     expect(processTableQuiescent(`${base}30 1 npm test\n`, 20)).toBe(false)
     expect(processTableQuiescent(`${base}30 1 npm run build\n`, 20)).toBe(false)
+    expect(processTableQuiescent(`${base}30 1 node /fixture/.git/hooks/commit-msg\n`, 20)).toBe(false)
+    expect(processTableQuiescent(`${base}30 1 node scripts/runner-readiness-proof.mjs\n`, 20)).toBe(false)
     expect(processTableQuiescent('', 20)).toBe(false)
   })
   it('retains ownership after unconfirmed native cancellation even if the CLI exited', async () => {
@@ -904,6 +906,24 @@ describe('executable host with synthetic native adapters', () => {
 })
 
 describe('authoritative plan projection and explicit closure', () => {
+  it('gives closure primaries only retirement instructions, excluding completed implementation scope', () => {
+    const authorization = {
+      contract: {
+        initiative: 'example',
+        taskId: 'EX-1',
+        planPath: 'plans/example.md',
+        approvalReference: 'closure',
+        files: ['plans/example.md', 'plans/README.md'],
+        scope: 'Append another Delivered line to result.txt',
+        closure: { indexPath: 'plans/README.md' },
+      },
+    }
+    const prompt = primaryPrompt({ authorization })
+    expect(prompt).toContain('Authorized closure only')
+    expect(prompt).toContain('plans/README.md')
+    expect(prompt).not.toContain('Append another Delivered')
+    expect(prompt).toContain('Do not repeat the completed implementation task')
+  })
   it('derives exact command/file/role inputs from the selected approved plan', () => {
     const f = repository()
     const authorization = projectApprovedPlan({

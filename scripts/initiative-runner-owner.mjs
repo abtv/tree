@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { boundedExecFileSync as execFileSync } from './initiative-runner-deadline.mjs'
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { join, posix } from 'node:path'
 import { digest, repositoryPath, taskStatus } from './initiative-runner-git.mjs'

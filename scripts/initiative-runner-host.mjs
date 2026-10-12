@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { boundedExecFileSync as execFileSync } from './initiative-runner-deadline.mjs'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,9 +11,10 @@ import {
   recordInitiativeResponse,
 } from './initiative-runner-owner.mjs'
 import { projectApprovedPlan } from './initiative-runner-plan.mjs'
-import { StageBlocker } from './initiative-runner-process.mjs'
+import { observeProcess, StageBlocker } from './initiative-runner-process.mjs'
 import { InitiativeCoordinator } from './initiative-runner.mjs'
 import { executePreflight, readPreflightManifest } from './initiative-runner-preflight.mjs'
+import { randomUUID } from 'node:crypto'
 
 export { executePreflight } from './initiative-runner-preflight.mjs'
 
@@ -54,7 +55,7 @@ export function processTableQuiescent(output, ownerPid) {
   return !rows.some(
     (row) =>
       !ancestors.has(Number(row[1])) &&
-      /codex\s+exec|Electron|playwright|vitest|initiative-runner-host|npm\s+(?:test|run\s+(?:build|check))|test:e2e|test:perf|check:full/.test(
+      /codex\s+exec|Electron|playwright|vitest|initiative-runner-host|runner-readiness-proof|\.git\/hooks\/|\.githooks\/|npm\s+(?:test|run\s+(?:build|check))|test:e2e|test:perf|check:full/.test(
         row[3],
       ),
   )
@@ -65,6 +66,7 @@ function blocked(reason, kind = 'capability') {
 }
 
 function stage(coordinator) {
+  if (coordinator.authorization.contract.closure) coordinator.checkAuthority()
   const observed = coordinator.observation()
   const { files } = coordinator.authorization.contract
   if (observed.head !== coordinator.run.startingCommit || observed.conflicts.length || observed.unsupported.length)
@@ -78,6 +80,7 @@ function stage(coordinator) {
 }
 
 function completed(coordinator) {
+  if (coordinator.authorization.contract.closure) coordinator.checkAuthority()
   const observed = coordinator.observation()
   if (
     observed.head !== coordinator.run.commit ||
@@ -112,15 +115,16 @@ export async function executeInitiative(input) {
   let selected = { ...input }
   const results = []
   for (;;) {
-    const auth = projectApprovedPlan({ ...selected, sourceCommit: selected.startingCommit })
+    const auth = projectApprovedPlan({
+      ...selected,
+      sourceCommit: selected.startingCommit,
+      candidate: !selected.closureAuthorized,
+    })
     const directory = join(selected.root, '.scratch', auth.contract.initiative)
     if (existsSync(join(directory, 'authorization.json')) && existsSync(join(directory, 'run.json'))) {
       const previous = readRecord(join(directory, 'authorization.json'))
       const run = readRecord(join(directory, 'run.json'))
-      if (
-        previous.contract.taskId === selected.taskId &&
-        (!selected.repairAuthorized || previous.identity === auth.identity)
-      )
+      if (previous.identity === auth.identity && previous.contract.taskId === selected.taskId)
         selected.startingCommit = run.startingCommit
     }
     const coordinator = new InitiativeCoordinator({
@@ -144,7 +148,21 @@ export async function executeInitiative(input) {
               if (coordinator.now() >= coordinator.budget.deadlineAt || input.signal?.aborted)
                 blocked('Stopped before commit', 'budget')
               await coordinator.beforeCommit(input.signal)
-              git(selected.root, ['commit', '-m', `chore(initiative): complete ${selected.taskId}`])
+              const closure = coordinator.authorization.contract.closure
+              const commit = await observeProcess({
+                records: coordinator.records,
+                argv: [
+                  'git',
+                  '--literal-pathspecs',
+                  'commit',
+                  ...(closure ? ['--only', ...coordinator.authorization.contract.files] : []),
+                  '-m',
+                  `chore(initiative): ${closure ? 'close' : 'complete'} ${selected.taskId}`,
+                ],
+                deadlineAt: coordinator.budget.deadlineAt,
+                signal: input.signal,
+              })
+              await coordinator.confirmed(commit)
             }
             result = coordinator.reconcile()
           } else {
@@ -235,6 +253,50 @@ export async function resolveOwnerCheck(input, evidence) {
   }
 }
 
+// An outer host may reconcile a restored failed closure only after the exact
+// accepted inputs and unrelated index/worktree baseline match again. Retain the
+// old checkpoint before rebinding its snapshot; never reset time or recoveries.
+export async function reconcileClosureWork(input) {
+  if (input.hostAuthorized !== true || !input.closureAuthorized || !input.reconciliationReference?.trim())
+    blocked('Explicit restored-closure reconciliation authorization required')
+  const coordinator = new InitiativeCoordinator({
+    ...input,
+    hostResume: true,
+    confirmQuiescence: input.confirmQuiescence ?? confirmQuiescence,
+    launchConfiguredRole: input.launchConfiguredRole ?? launchConfiguredRole,
+  })
+  try {
+    const run = coordinator.run
+    const observed = coordinator.observation()
+    if (
+      run?.phase !== 'blocked' ||
+      run.candidate ||
+      run.blocker?.kind !== 'failure' ||
+      run.blocker.reason !== 'Unrelated work changed during closure; preserve work and reconcile' ||
+      observed.head !== run.startingCommit ||
+      !observed.closureReady ||
+      observed.unrelatedIdentity !== run.closureUnrelatedIdentity ||
+      coordinator.now() >= coordinator.budget.deadlineAt
+    )
+      blocked('Restored closure does not match its retained baseline')
+    coordinator.checkAuthority()
+    if (!(await coordinator.input.confirmQuiescence({ records: coordinator.records, stage: 'closure-reconciliation' })))
+      blocked('Restored closure cleanup remains unconfirmed')
+    coordinator.records.save(`closure-reconciliation-${randomUUID()}.json`, {
+      run,
+      blocker: coordinator.records.load('blocker.json'),
+      observation: observed,
+      reference: input.reconciliationReference,
+      observedAt: coordinator.now(),
+    })
+    coordinator.run = { ...run, blocker: { ...run.blocker, snapshot: observed.snapshot, head: observed.head } }
+    coordinator.records.save('run.json', coordinator.run)
+    return coordinator.run
+  } finally {
+    await coordinator.close()
+  }
+}
+
 // Post-commit owner decisions are deliberately independent of task receipts and
 // budget construction. The authorized outer host supplies the owner's words.
 export async function resolveInitiativeOwner(input, evidence) {
@@ -281,8 +343,10 @@ export function hostArguments(args) {
       preflightAuthorized: true,
     }
   }
-  if (args.length !== 6 || args[0] !== '--authorized-plan')
-    throw new Error('Expected --authorized-plan <root> <planPath> <taskId> <startingCommit> <approvalReference>')
+  if (args.length !== 6 || !['--authorized-plan', '--authorized-closure'].includes(args[0]))
+    throw new Error(
+      'Expected --authorized-plan or --authorized-closure <root> <planPath> <taskId> <startingCommit> <approvalReference>',
+    )
   return {
     root: resolve(args[1]),
     planPath: args[2],
@@ -290,6 +354,7 @@ export function hostArguments(args) {
     startingCommit: args[4],
     approvalReference: args[5],
     hostAuthorized: true,
+    ...(args[0] === '--authorized-closure' ? { closureAuthorized: true, singleTask: true } : {}),
   }
 }
 

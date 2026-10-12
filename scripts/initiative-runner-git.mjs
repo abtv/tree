@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { boundedExecFileSync as execFileSync } from './initiative-runner-deadline.mjs'
 import { createHash } from 'node:crypto'
 import { existsSync, realpathSync } from 'node:fs'
 import { join, posix } from 'node:path'
@@ -133,6 +133,35 @@ export function observeRepository({ root, startingCommit, planPath, taskId, clos
   })
   let closureReady = false
   let closureValid = false
+  const closurePaths = closure ? [planPath, closure.indexPath] : null
+  const unrelatedIdentity = closurePaths
+    ? digest([
+        identity(index.filter((entry) => !closurePaths.includes(entry.path))),
+        createValidationSnapshot({
+          rootDirectory: root,
+          runGit: (args, directory, encoding) => {
+            if (args[0] === 'rev-parse') return `${startingCommit}\n`
+            if (args[0] === 'diff')
+              return command(
+                directory,
+                [
+                  ...args,
+                  '--no-ext-diff',
+                  '--no-textconv',
+                  '--',
+                  '.',
+                  ...closurePaths.map((path) => `:(exclude,literal)${path}`),
+                ],
+                encoding,
+              )
+            return command(directory, args, encoding)
+              .split('\0')
+              .filter((path) => !closurePaths.includes(path))
+              .join('\0')
+          },
+        }).digest,
+      ])
+    : null
   if (closure) {
     repositoryPath(closure.indexPath)
     if (!Array.isArray(closure.requiredTasks) || closure.requiredTasks.length === 0)
@@ -155,7 +184,21 @@ export function observeRepository({ root, startingCommit, planPath, taskId, clos
       !planEntry &&
       candidateIndex === expected &&
       changed.includes(planPath) &&
-      changed.includes(closure.indexPath)
+      changed.includes(closure.indexPath) &&
+      (head === startingCommit ||
+        command(root, [
+          'diff',
+          '--no-ext-diff',
+          '--no-textconv',
+          '--no-renames',
+          '--name-only',
+          '-z',
+          startingCommit,
+          head,
+        ])
+          .split('\0')
+          .filter(Boolean)
+          .every((path) => closurePaths.includes(path)))
   }
   return {
     root,
@@ -164,19 +207,20 @@ export function observeRepository({ root, startingCommit, planPath, taskId, clos
     taskId,
     head,
     parents,
-    indexIdentity: identity(index),
-    headIdentity: identity(tree),
+    indexIdentity: identity(closurePaths ? index.filter((entry) => closurePaths.includes(entry.path)) : index),
+    headIdentity: identity(closurePaths ? tree.filter((entry) => closurePaths.includes(entry.path)) : tree),
     snapshot: snapshot.digest,
     conflicts,
     unsupported,
-    unstaged,
-    untracked,
-    changed,
+    unstaged: closurePaths ? unstaged.filter((path) => closurePaths.includes(path)) : unstaged,
+    untracked: closurePaths ? untracked.filter((path) => closurePaths.includes(path)) : untracked,
+    changed: closurePaths ? changed.filter((path) => closurePaths.includes(path)) : changed,
     planBlob: planEntry?.blob ?? null,
     planStatus: taskStatus(plan, taskId),
     workingPlanPresent: existsSync(join(root, 'WORKING_PLAN.md')),
     closureReady,
     closureValid,
+    unrelatedIdentity,
     planTransitionsValid: closure
       ? true
       : planTransitionsValid(command(root, ['show', `${startingCommit}:${planPath}`]), plan, taskId, nextTask),
