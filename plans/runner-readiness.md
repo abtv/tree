@@ -4,7 +4,7 @@
 
 Provide the runner capabilities required by [AGENTS §8](../AGENTS.md#8-plans-and-architecture-decisions) and [Development §§10–11](../docs/DEVELOPMENT.md) before unattended [E2E Coverage Efficiency](e2e-coverage-efficiency.md) execution.
 
-Status: **Proposed; preparation authorized; implementation and new runtime probes not authorized.** The Product Owner requested continued preparation without implementation on 2026-10-12. Prior approval of the portable host permission rule does not authorize initiative execution or preflight fixtures. E2E Coverage Efficiency remains unstarted. No executable projection or execution ledger is created during preparation.
+Status: **RR-1 implementation validated; live acceptance proof pending; RR-2–RR-4 unauthorized.** On 2026-10-12 the Product Owner authorized RR-1 only with a 45-minute implementation, validation and recovery allowance. The initial allowance expired during a canceled sandbox-approval wait; the owner approved a renewed 45-minute allowance at 06:25 UTC, retaining prior failure/recovery history. That renewed window remains fixed through 07:10 UTC and does not authorize later work. Live preflight requires a separately proposed scope and allowance before execution. Prior approval of the portable host permission rule does not authorize initiative execution or preflight fixtures. E2E Coverage Efficiency remains unstarted. No executable projection or execution ledger is created for this owner-assisted bootstrap.
 
 Selected tool: Codex. Four substantive working tasks are proposed, so explicit final owner acceptance is mandatory. Follow the configured roles and security postures in [Agent Roles](../docs/AGENT_ROLES.md). Preserve application behavior, data, architectural boundaries and permission restrictions.
 
@@ -23,7 +23,7 @@ Preliminary evidence remains in `.scratch/runner-readiness/preflight/REPORT.md` 
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| RR-1 | Dedicated bounded preflight host operation | Implementation and probe authorization | Planned |
+| RR-1 | Dedicated bounded preflight host operation | Implementation authorized; live proof requires separate approval | Implemented; live proof pending |
 | RR-2 | Post-implementation owner acceptance and rejection | RR-1 | Planned |
 | RR-3 | Suspend waiting consumption and preserve repair allowance | RR-2 | Planned |
 | RR-4 | Closure, restart and integrated readiness proof | RR-2, RR-3 | Planned |
@@ -35,6 +35,10 @@ Implement a supported capability-probe path separate from coordinator constructi
 Acceptance requires fresh authenticated native primary execution and same-session resume; configured reviewer/product-verifier launch and permitted inspection; native scratch editing and artifact reading; process inspection, exclusive ownership, bounded interruption and independently confirmed cleanup; required validation launch paths including Electron and performance; staging, hooks, append-only commit and reconciliation in an isolated synthetic repository. Record commands, snapshots, native identities, interventions, cleanup and limitations. Confirm no coordinator, initiative-task mutation or execution-budget ledger was created. Repeat affected operations without intervention after supported setup.
 
 A new preflight or closure argument may require narrowly reviewed permission configuration and a fresh session. Do not broaden permissions or use an initiative coordinator as a probe. Live probes need a separately approved scope and time allowance.
+
+Implementation contract: the supported `--authorized-preflight` operation pins a bounded native-edited scratch manifest and records independent preflight evidence without constructing the coordinator or creating an execution budget. It reuses production process, native primary/resume and committed configured-role adapters; commands are restricted to existing validation/process inspection and isolated synthetic Git paths. It retains the shared exclusive lock when cleanup is unconfirmed. See [Development Guide §11](../docs/DEVELOPMENT.md#initiative-runner) for the manifest and supported CLI/API. Synthetic tests and implementation validation do not fulfill the fresh authenticated acceptance proof above. Live proof remains pending, so RR-1 must not be reported as fully accepted or as enabling unattended RR-2.
+
+The implementation commit includes its regression coverage and workflow documentation. High Risk validation passed using the composed-stage evidence allowed by Development §9; independent reviewer and workflow product verifier found no meaningful issues. No application behavior, permission rules or later task implementation changed. Detailed transient validation and recovery evidence is retained in the task's ignored scratch handoff; live readiness remains unverified.
 
 ### RR-2 — Final Owner Acceptance and Rejection
 
@@ -68,16 +72,35 @@ No application product requirement gaps were identified. Ordinary internal modul
 
 The runner cannot promise unattended execution before RR-1 supplies its missing preflight. Proposed bootstrap: implement RR-1 with the owner available for supported approvals, then perform separately authorized bounded preflight. RR-2–RR-4 may run unattended only with explicit authorization and verified capabilities. Preparation does not grant either authorization.
 
-Before implementation, the Product Owner must decide scope authorization (whole initiative or named tasks), bootstrap execution mode, whether later tasks may run unattended, bounded preflight scope/allowance, and implementation/closure allowances. Resolve actual permission, trust or authentication requests through supported approval mechanisms. Final acceptance remains a separate decision tied to the finished commit.
+The owner has selected RR-1 only, owner-assisted bootstrap and its implementation allowance. Later tasks, unattended execution, bounded live-preflight scope/allowance and closure allowance remain unapproved. Resolve actual permission, trust or authentication requests through supported approval mechanisms. Final acceptance remains a separate decision tied to the finished commit.
 
 ## Proposed Budget and Owner Involvement
 
 Implementation, validation and recovery: **180 minutes**, proposed allocation RR-1 45, RR-2 35, RR-3 35, RR-4 45, contingency 20. Separate post-acceptance closure: **15 minutes**. These are estimates, not approved allowances. A bounded live-preflight allowance remains to be agreed separately. Approval must define bootstrap and later host accounting without renewing consumed allowance; preserve recovery history across execution-mode transitions.
 
+RR-1 bootstrap exception: the owner approved its initial 45 minutes and explicitly renewed a 45-minute allowance after expiration/canceled approval. This does not approve the remaining initiative estimate or reset recovery evidence, and does not start an initiative execution ledger.
+
 Four substantive tasks require one final owner acceptance round. Owner involvement comprises initial implementation/budget authorization, any actual setup approvals during preflight, final acceptance and further acceptance rounds after rejection. Automated validation and independent workflow verification need no owner intervention once their launch paths are verified. Closure of an unchanged explicitly accepted result needs no second approval. Zero mandatory manual application UI checks are currently identified; the number of setup interventions remains unknown until live preflight.
 
 ## Exact Next Action
 
-Review the proposal and settle the reserved execution decisions before authorizing the bootstrap. Implementation, runtime probes and E2E Coverage Efficiency remain unauthorized. This plan's existence is not authorization to begin RR-1.
+### Proposed RR-1 live preflight (not authorized or started)
 
-Resume prompt: “Continue Runner Readiness preparation from `plans/runner-readiness.md`; keep implementation, runtime probes and E2E Coverage Efficiency unstarted unless their recorded authorization has changed.”
+Proposed separate allowance: **30 minutes**, with the owner available for supported permission/trust/authentication approvals. Stop at expiration or a denied capability, retain evidence and confirm owned-process cleanup; never renew an allowance or clear an ownership lock automatically. RR-2–RR-4 and E2E Coverage Efficiency remain outside this scope.
+
+After explicit approval, prepare a native-edited, identity-pinned manifest under `.scratch/runner-readiness/preflight/` for the dedicated `--authorized-preflight` path. Use invocation-specific ids and fixtures; retain the exact command, source snapshot, approval reference and interventions for each attempt. Do not create an execution projection or coordinator.
+
+1. Authenticate and launch one fresh native primary against the actual trusted checkout. Have it use native tools to create/read a synthetic fixture and inspect an artifact within its owned preflight directory. Resume that exact native session and check its identity and fixture/artifact observations.
+2. Launch the committed configured reviewer and product verifier through the production adapter for permitted fixture/artifact inspection. Record native identities, effective launch settings and any limitations; do not infer OS-enforced role restrictions from configuration.
+3. Exercise the exact process-inspection command, shared ownership exclusion and bounded host interruption. Independently inspect the returned process table and cleanup markers before releasing ownership; retain the lock and stop if native cancellation cannot be confirmed. A second host may test lock rejection but must not launch concurrent work.
+4. Exercise existing `npm run check:full` through the dedicated host, including real Electron, performance and audit launch paths. Reuse the implementation results for correctness where valid, but distinguish them from proof of this host launch mechanism. Do not launch suites concurrently or label future acceptance/closure paths as implemented.
+5. Prepare an isolated synthetic Git repository within the invocation's `fixtures/` directory, inspect its local hook setup, stage only synthetic files, run hooks and create an append-only commit through the approved Git command probes. Inspect actual HEAD/parent and clean status for reconciliation; preserve application Git state.
+6. Review raw command/native logs, snapshots, hashes, intervention counts, cleanup and limitations. After supported setup, repeat affected operations with separately approved ids without intervention. Report configured, verified and unresolved capabilities, explicitly confirming no application/task mutation or execution-budget ledger. Missing proof blocks unattended launch.
+
+The existing permission rule covers `--authorized-plan`, not this new preflight argument. Exact preflight invocation approvals may be needed. Any proposed persistent rule must be narrowly reviewed separately and followed by a fresh trusted session before testing it; this scope does not authorize weaker permissions. If setup or full suites exhaust the proposed allowance, retain the report and request an explicit continuation allowance rather than running beyond it.
+
+### Remaining action
+
+Obtain explicit approval for the proposed 30-minute RR-1 live-preflight scope above before any live probe. The implementation is validated; the authenticated acceptance proof is pending. RR-2–RR-4 and E2E Coverage Efficiency remain unstarted and unauthorized. No automatic continuation is authorized.
+
+Resume prompt: “Read `plans/runner-readiness.md`; RR-1 implementation is validated but live proof is pending. Review the proposed 30-minute live-preflight scope and obtain explicit approval before running it. Keep RR-2–RR-4 and E2E Coverage Efficiency unstarted.”

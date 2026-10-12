@@ -23,6 +23,7 @@ export function classifyFailure(text) {
 export async function observeProcess({
   records,
   argv,
+  cwd = records.root,
   deadlineAt,
   signal,
   input,
@@ -55,7 +56,7 @@ export async function observeProcess({
   let hardTimer
   let budgetTimer
   let closed = false
-  const launch = { id, argv, cwd: records.root, startedAt, token: records.token, pid: null, phase: 'starting' }
+  const launch = { id, argv, cwd, startedAt, token: records.token, pid: null, phase: 'starting' }
   const stop = (kind, reason) => {
     if (closed || interrupted) return
     interrupted = { kind, reason }
@@ -70,7 +71,7 @@ export async function observeProcess({
   let cleanupDeadline
   try {
     records.save(`${id}-launch.json`, launch)
-    child = spawn(argv[0], argv.slice(1), { cwd: records.root, shell: false, stdio: ['pipe', 'pipe', 'pipe'] })
+    child = spawn(argv[0], argv.slice(1), { cwd, shell: false, stdio: ['pipe', 'pipe', 'pipe'] })
     child.on('error', (cause) => {
       error = cause
     })

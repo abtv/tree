@@ -544,6 +544,9 @@ describe('executable host with synthetic native adapters', () => {
     expect(processTableQuiescent(base, 20)).toBe(true)
     expect(processTableQuiescent(`${base}30 1 Electron fixture\n`, 20)).toBe(false)
     expect(processTableQuiescent(`${base}30 1 codex exec other-task\n`, 20)).toBe(false)
+    expect(processTableQuiescent(`${base}30 1 node vitest worker\n`, 20)).toBe(false)
+    expect(processTableQuiescent(`${base}30 1 npm test\n`, 20)).toBe(false)
+    expect(processTableQuiescent(`${base}30 1 npm run build\n`, 20)).toBe(false)
     expect(processTableQuiescent('', 20)).toBe(false)
   })
   it('retains ownership after unconfirmed native cancellation even if the CLI exited', async () => {

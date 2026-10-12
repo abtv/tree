@@ -7,6 +7,9 @@ import { readRecord } from './initiative-runner-records.mjs'
 import { projectApprovedPlan } from './initiative-runner-plan.mjs'
 import { StageBlocker } from './initiative-runner-process.mjs'
 import { InitiativeCoordinator } from './initiative-runner.mjs'
+import { executePreflight, readPreflightManifest } from './initiative-runner-preflight.mjs'
+
+export { executePreflight } from './initiative-runner-preflight.mjs'
 
 function git(root, args) {
   return execFileSync('git', ['--no-pager', ...args], {
@@ -45,7 +48,9 @@ export function processTableQuiescent(output, ownerPid) {
   return !rows.some(
     (row) =>
       !ancestors.has(Number(row[1])) &&
-      /codex\s+exec|Electron|playwright|initiative-runner-host|test:e2e|test:perf|check:full/.test(row[3]),
+      /codex\s+exec|Electron|playwright|vitest|initiative-runner-host|npm\s+(?:test|run\s+(?:build|check))|test:e2e|test:perf|check:full/.test(
+        row[3],
+      ),
   )
 }
 
@@ -210,6 +215,15 @@ export async function resolveOwnerCheck(input, evidence) {
 }
 
 export function hostArguments(args) {
+  if (args.length === 5 && args[0] === '--authorized-preflight') {
+    return {
+      root: resolve(args[1]),
+      manifestPath: args[2],
+      manifestIdentity: args[3],
+      approvalReference: args[4],
+      preflightAuthorized: true,
+    }
+  }
   if (args.length !== 6 || args[0] !== '--authorized-plan')
     throw new Error('Expected --authorized-plan <root> <planPath> <taskId> <startingCommit> <approvalReference>')
   return {
@@ -227,9 +241,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   process.once('SIGINT', () => controller.abort())
   process.once('SIGTERM', () => controller.abort())
   try {
-    console.log(
-      JSON.stringify(await executeInitiative({ ...hostArguments(process.argv.slice(2)), signal: controller.signal })),
-    )
+    const input = { ...hostArguments(process.argv.slice(2)), signal: controller.signal }
+    const result = input.preflightAuthorized
+      ? await executePreflight({
+          ...input,
+          manifest: readPreflightManifest(input.root, input.manifestPath),
+          confirmQuiescence,
+        })
+      : await executeInitiative(input)
+    console.log(JSON.stringify(result))
   } catch (error) {
     console.error(
       JSON.stringify({

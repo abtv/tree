@@ -65,7 +65,7 @@ export function readRecord(path) {
 // Lock ownership is never reclaimed by guessing whether a persisted PID is
 // alive. A crashed owner requires explicit host reconciliation of its children.
 export class RunRecords {
-  constructor({ root, initiative, hostAuthorized }) {
+  constructor({ root, initiative, hostAuthorized, preflightId }) {
     if (hostAuthorized !== true) fail('Separately authorized host launch required')
     if (!/^[a-z][a-z0-9-]*$/.test(initiative)) fail('Invalid initiative identity')
     this.root = realpathSync(root)
@@ -76,6 +76,16 @@ export class RunRecords {
     this.path = join(scratch, initiative)
     directory(this.path)
     if (realpathSync(this.path) !== this.path) fail('Evidence path escapes repository')
+    if (preflightId !== undefined) {
+      if (!/^[a-z][a-z0-9-]*$/.test(preflightId)) fail('Invalid preflight identity')
+      this.path = join(this.path, 'preflight')
+      directory(this.path)
+      if (realpathSync(this.path) !== this.path) fail('Preflight path escapes repository')
+      this.path = join(this.path, preflightId)
+      directory(this.path)
+      if (realpathSync(this.path) !== this.path) fail('Preflight path escapes repository')
+      this.preflight = true
+    }
     this.lockPath = join(scratch, 'initiative-runner.lock')
     this.token = randomUUID()
     const fd = openSync(this.lockPath, 'wx', 0o600)
@@ -131,6 +141,7 @@ export class RunRecords {
 
   budget({ now, budgetMs, approvalReference, allowExpired = false }) {
     this.assertOwned()
+    if (this.preflight) fail('Preflight cannot create an execution budget')
     if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(budgetMs) || budgetMs <= 0)
       fail('Invalid elapsed-time allowance')
     const path = this.file('budget.json')
@@ -150,7 +161,13 @@ export class RunRecords {
         fail('Invalid budget identity or clock moved backwards')
     } else {
       // Existing execution records without their budget cannot renew an allowance.
-      if (readdirSync(this.path).length) fail('Missing original budget ledger')
+      if (readdirSync(this.path).some((name) => name !== 'preflight')) fail('Missing original budget ledger')
+      const preflightPath = join(this.path, 'preflight')
+      if (
+        existsSync(preflightPath) &&
+        (!lstatSync(preflightPath).isDirectory() || realpathSync(preflightPath) !== preflightPath)
+      )
+        fail('Unsafe preflight evidence directory')
       value = {
         initiative: this.initiative,
         budgetMs,

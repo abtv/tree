@@ -128,10 +128,11 @@ export async function launchPrimary({
   resumeSession,
   evidence,
   recovery,
+  preflightPrompt,
 }) {
   const events = new CodexEvents()
   records.save('native-cleanup.json', { confirmed: false, stage: resumeSession ? 'acceptance' : 'primary' })
-  const input = primaryPrompt({ authorization, resumeSession, evidence, recovery })
+  const input = preflightPrompt ?? primaryPrompt({ authorization, resumeSession, evidence, recovery })
   const process = await observeProcess({
     records,
     argv: resumeSession ? codexResumeArgv(records.root, resumeSession) : codexPrimaryArgv(records.root),
@@ -197,7 +198,9 @@ export async function launchConfiguredRole(input) {
     argv,
     deadlineAt,
     signal,
-    input: `Act only as configured ${role}. Read docs/AGENT_ROLES.md and AGENTS.md. Inspect the full staged diff and relevant untracked files for ${authorization.contract.taskId} in ${authorization.contract.planPath}. Preserve all work; no edits, commits, nested launches, permission/configuration changes or web access. Reuse valid validation evidence. Report findings or the role's exact no-findings output.\nObserved candidate: ${JSON.stringify(observation)}\nObserved receipts: ${JSON.stringify(receipts)}`,
+    input:
+      input.preflightPrompt ??
+      `Act only as configured ${role}. Read docs/AGENT_ROLES.md and AGENTS.md. Inspect the full staged diff and relevant untracked files for ${authorization.contract.taskId} in ${authorization.contract.planPath}. Preserve all work; no edits, commits, nested launches, permission/configuration changes or web access. Reuse valid validation evidence. Report findings or the role's exact no-findings output.\nObserved candidate: ${JSON.stringify(observation)}\nObserved receipts: ${JSON.stringify(receipts)}`,
     onStdout: (chunk) => parser.push(chunk),
   })
   if (process.blocker) return process
