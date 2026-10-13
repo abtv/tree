@@ -294,6 +294,8 @@ The native window surface is the exception to renderer color ownership: `src/mai
 
 ---
 
+Emoji completion shares the existing `DateAssist` owner, input adapter and popup rather than adding a second input lifecycle. `emoji-completion.ts` recognizes shortcode fragments independently of UI and reads the bundled, attributed `emoji-catalog.json`. The popup discriminates calendar and emoji suggestions for presentation; acceptance sends either canonical date text or the full emoji sequence through the same range command. Search checks the active node fragment against the fixed catalog and retains at most eight suggestions. Catalog storage is fixed, recognition does not traverse the document, and transient state remains one active node-sized text value. Suggestions cause no writes or syncs; acceptance schedules the existing ordinary range edit. Existing editing performance guards cover the shared path.
+
 ## 9. UI State vs Document State
 
 Insert interruption consumes renderer-local plain and structural repeat

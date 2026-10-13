@@ -167,33 +167,6 @@ Support requires at least one important scenario that current persistence and sy
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies automatic persistence and retained generations but no user-facing data-portability workflow.
 - 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
 
-## PD-005: Optional emoji completion while typing
-
-Kind: product
-Status: Exploring
-
-### Question
-
-How can typing an emoji name fragment such as `:roc` offer completion to 🚀 while letting the user ignore the suggestion and continue typing literal text without automatic replacement?
-
-### What we are watching
-
-Whether suggestions make frequent emoji entry easier without interrupting ordinary text, URLs, time expressions, or Tree and Agenda commands. Search names, matching, trigger boundaries, and editing of compound emoji still need evaluation.
-
-### What would settle it
-
-A separately authorized prototype could compare accepting `:roc`, ignoring it, and continuing to type in standard editing and Vim Insert. Support would mean predictable explicit acceptance, unchanged literal text when ignored, and reliable caret, deletion, and Undo behavior. Frequent unwanted popups or difficult name discovery would call for revising the trigger or search behavior.
-
-### Product Owner perspective
-
-On 2026-10-14, the Product Owner endorsed typing `:roc` and either completing it to an emoji or ignoring it and continuing to type. They then requested saving the idea, not implementing it.
-
-### Evidence
-
-- 2026-10-14 — Agent proposal discussed with the Product Owner: use Tab to accept and Ctrl+N / Ctrl+P to select; keep Enter's ordinary action and existing Escape behavior, including leaving Vim Insert. Continued typing refines suggestions; a space or no matches closes them without replacing text. Offer completion in standard editing and Vim Insert in Tree and Agenda, after a colon and at least two letters at the start of text or after whitespace. One Undo restores the accepted fragment. These details remain a proposed interaction, not product requirements.
-- 2026-10-14 — Repository fact: [date completion](PRODUCT.md#209-natural-language-date-completion) already provides explicit acceptance with these selection keys and preserves unaccepted text.
-- 2026-10-14 — Agent inference from `src/renderer/vim-text-commands.ts`: character edits and motions use UTF-16 offset arithmetic, so emoji editing needs focused verification. No runtime emoji defect or prototype was reproduced during the discussion.
-
 ## TD-001: Whether a written rule is the right response to a recurring defect
 
 Kind: technical

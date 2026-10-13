@@ -1,8 +1,9 @@
 import { suggestDates, type NaturalDateMatch } from '../domain/natural-date'
 import type { DayNumber } from '../domain/calendar-date'
 import type { DateTextRange } from '../domain/date-recognition'
+import { suggestEmoji, type EmojiMatch } from '../domain/emoji-completion'
 
-export interface DateAssistPopup extends NaturalDateMatch {
+export type DateAssistPopup = (NaturalDateMatch | EmojiMatch) & {
   readonly nodeId: string
   readonly text: string
   readonly selected: number
@@ -17,7 +18,7 @@ export class DateAssist {
   }
 
   public edit(nodeId: string, text: string, caret: number, today: DayNumber, excluded: readonly DateTextRange[]): void {
-    const match = suggestDates(text, caret, today)
+    const match = suggestEmoji(text, caret) ?? suggestDates(text, caret, today)
     if (match === undefined || excluded.some((range) => range.start < match.end && range.end > match.start)) {
       this.close()
       return

@@ -269,6 +269,62 @@ describe('useNodeInputBindings', () => {
     expect(getCaret(input)).toBe(3)
   })
 
+  // @requirement PRODUCT.md §20.12
+  it.each([false, true])(
+    'accepts a full emoji sequence and restores literal text with Undo (Vim %s)',
+    async (vimEnabled) => {
+      const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
+      f.input().focus()
+      f.type(':woman_techn')
+      expect(f.result.current.datePopup?.popup.suggestions).toContainEqual({
+        shortcode: 'woman_technologist',
+        emoji: '👩‍💻',
+      })
+      f.press('Tab')
+      expect(f.node().text).toBe('👩‍💻')
+      expect(getCaret(f.input())).toBe('👩‍💻'.length)
+      expect(f.result.current.vimMode).toBe('insert')
+      act(() => f.store.undo())
+      f.sync()
+      expect(f.node().text).toBe(':woman_techn')
+      expect(f.result.current.datePopup).toBeUndefined()
+      f.type(':roc')
+      f.type(':roc ')
+      expect(f.node().text).toBe(':roc ')
+      expect(f.result.current.datePopup).toBeUndefined()
+    },
+  )
+
+  // @requirement PRODUCT.md §20.12
+  it('dismisses emoji on paste, composition, focus loss, selection and external changes', async () => {
+    const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
+    const input = f.input()
+    input.focus()
+    f.type(':roc')
+    act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type(':rocke')
+    expect(f.result.current.datePopup).toBeUndefined()
+    act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
+    expect(f.result.current.datePopup).toBeDefined()
+    input.setSelectionRange(0, 3)
+    act(() => f.bindings().onSelect({ currentTarget: input } as never))
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type(':roc')
+    act(() => f.bindings().onBlur())
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type(':roc')
+    input.value = ':rocke'
+    input.setSelectionRange(6, 6)
+    act(() =>
+      f.bindings().onTextChange({ currentTarget: input, nativeEvent: { inputType: 'insertFromPaste' } } as never),
+    )
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type(':roc')
+    act(() => f.store.editText('node', 'external'))
+    expect(f.result.current.datePopup).toBeUndefined()
+  })
+
   // @requirement PRODUCT.md §20.9
   it('suspends date completion throughout native composition and recognizes the committed expression', async () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })

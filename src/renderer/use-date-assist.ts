@@ -102,7 +102,7 @@ export function useDateAssist(
       if (popup === undefined) return
       const suggestion = popup.suggestions[index]
       if (suggestion === undefined) return
-      const canonical = formatCanonicalDate(calendarDateOf(suggestion.day))
+      const canonical = 'emoji' in suggestion ? suggestion.emoji : formatCanonicalDate(calendarDateOf(suggestion.day))
       close()
       scheduleCaret(popup.nodeId, popup.start + canonical.length)
       store.replaceTextRange(popup.nodeId, popup.start, popup.end, canonical)

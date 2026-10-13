@@ -36,4 +36,57 @@ For later product work, the agent records the outcome when an already necessary 
 
 ## Entries
 
-No requests have been recorded yet.
+## OI-001 — Emoji completion interaction and search scope
+
+- Requested: 2026-10-13 23:29 UTC; Codex primary; optional emoji completion implementation.
+- Action and purpose: Resolve interaction and search scope before implementing PD-005.
+- Context/evidence: The owner requested implementation of emoji completion. PD-005 records explicit acceptance and literal-text preservation, but labels the detailed interaction as proposed and leaves search names and matching unresolved.
+- Trigger: Material main-flow gaps under AGENTS.md §5 and Agent Workflow Procedures §§5 and 14.
+- Earlier occurrence: None found.
+- Outcome: Approved in the conversation; implement the recommended interaction and English shortcode prefix matching with a bundled Unicode emoji catalog.
+- Persistence: Not applicable; product decision.
+- Follow-up: Unanalyzed. Recommend the recorded keyboard interaction with English shortcode prefix matching and a bundled Unicode emoji catalog; retain literal text until explicit acceptance.
+
+## OI-002 — Real Electron emoji completion validation
+
+- Requested: 2026-10-13 approximately 23:34 UTC; Codex primary; optional emoji completion.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-completion.spec.ts e2e/agenda-completion.spec.ts --workers=1` outside the sandbox to verify real editor behavior and capture screenshots.
+- Context/evidence: Unit and input-binding checks passed. Native renderer behavior and visual evidence remain required.
+- Trigger: AGENTS.md §4 and Agent Workflow Procedures §4 require Codex Electron E2E to use `sandbox_permissions: require_escalated` from the first invocation.
+- Earlier occurrence: None recorded in this log; historical configuration is not proof of current access.
+- Outcome: Execution succeeded; all 20 selected tests passed, including native emoji insertion and deletion. Approval UI clicks are unknown.
+- Persistence: The supported escalated workflow executed in this session; new-session persistence is unverified.
+- Follow-up: Unanalyzed; use the supported named workflow without changing permission configuration.
+
+## OI-003 — Verify added plain-textarea completion case
+
+- Requested: 2026-10-13 approximately 23:35 UTC; Codex primary; optional emoji completion.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-completion.spec.ts --workers=1` outside the sandbox after adding plain textarea and preserved-suffix coverage.
+- Context/evidence: OI-002 passed all existing scenarios; the additional case exercises a different input element. Production sources are unchanged since that pass.
+- Trigger: Codex Electron escalation requirement in AGENTS.md §4; necessary new test inputs invalidate their own validation.
+- Earlier occurrence: OI-002 established this session's supported workflow execution.
+- Outcome: Execution succeeded; all six emoji tests passed, including the additional plain-textarea case in both modes.
+- Persistence: Supported workflow executed again in this session; new-session access and UI clicks remain unknown.
+- Follow-up: Unanalyzed; reuse the named workflow and keep existing date results.
+
+## OI-004 — Reproduce overflowing emoji keyboard selection
+
+- Requested: 2026-10-13 23:39 UTC; Codex primary; optional emoji completion.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-completion.spec.ts --grep "all keyboard-selected" --workers=1` outside the sandbox to reproduce the product verifier's eight-option overflow finding.
+- Context/evidence: Product verifier identified that keyboard selection never scrolls and eight options exceed the existing popup height. Add a failing real-renderer regression before correction.
+- Trigger: Electron escalation under AGENTS.md §4 and defect-first testing under §9.
+- Earlier occurrence: OI-002 and OI-003 verified named workflow access in this session.
+- Outcome: Both editing-mode regressions failed because the selected suggestion extended below the popup's visible box, confirming the finding.
+- Persistence: New-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; focused reproduction, then repair and rerun invalidated checks.
+
+## OI-005 — Validate visible selection and constrained popup height
+
+- Requested: 2026-10-13 approximately 23:40 UTC; Codex primary; optional emoji completion.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-completion.spec.ts e2e/agenda-completion.spec.ts --workers=1` outside the sandbox after correcting scroll-to-selection and popup height.
+- Context/evidence: OI-004 confirmed the overflowing selection defect. Shared popup presentation changed; both completion families and inspected screenshots require fresh evidence.
+- Trigger: Codex Electron escalation under AGENTS.md §4 and validation reuse/invalidation policy under §10.
+- Earlier occurrence: OI-002 through OI-004 executed the supported workflow in this session.
+- Outcome: Execution succeeded; all 24 tests passed, including visible selection in both modes and unchanged date screenshot baselines.
+- Persistence: New-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; rerun affected presentation checks and independent finding verification.

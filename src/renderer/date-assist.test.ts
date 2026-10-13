@@ -3,6 +3,20 @@ import { dayNumberOf } from '../domain/calendar-date'
 import { DateAssist } from './date-assist'
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
+// @requirement PRODUCT.md §20.12
+it('shares dismissal, selection and hyperlink exclusion with emoji completion', () => {
+  const assist = new DateAssist()
+  assist.edit('n', ':roc', 4, today, [])
+  expect(assist.popup?.suggestions).toContainEqual({ shortcode: 'rocket', emoji: '🚀' })
+  assist.move(-1)
+  expect(assist.popup?.selected).toBe(1)
+  assist.observe('n', ':roc', 0, 4, true)
+  expect(assist.popup).toBeUndefined()
+  assist.edit('n', ':roc', 4, today, [{ start: 0, end: 4 }])
+  expect(assist.popup).toBeUndefined()
+  assist.edit('n', ':roc ', 5, today, [])
+  expect(assist.popup).toBeUndefined()
+})
 // @requirement PRODUCT.md §20.9
 it('opens only from an edit, updates suggestions, and closes rather than reopening on observation', () => {
   const assist = new DateAssist()

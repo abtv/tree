@@ -1445,6 +1445,18 @@ Every recognized canonical date (§23.2) in Tree node text, including the curren
 
 ---
 
+### 20.12 Optional Emoji Completion
+
+Tree and Agenda editors offer optional emoji completion in standard editing and Vim Insert. Typing a colon followed by at least two English letters, at the start of text or after whitespace, opens suggestions for English shortcode prefixes. Matching ignores case; subsequent letters, digits, underscores and hyphens refine the shortcode. The caret must be at the end of the fragment. A space, punctuation or no matches closes suggestions without changing literal text. URLs, time expressions and hyperlink text do not trigger suggestions.
+
+The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. Search runs locally without network access. Up to eight suggestions appear in shortcode order; each shows the emoji and its full `:shortcode:`. For example, `:roc` offers `:rock:` and `:rocket:`; `:rocke` offers 🚀. A closing colon is not required for acceptance.
+
+The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9). Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row. `Ctrl+N` and `Ctrl+P` cycle suggestions; `Tab` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit. The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged. These shortcuts override ordinary commands only while suggestions are open, following the approved keyboard-first completion interaction.
+
+Enter retains its ordinary action. Escape dismisses suggestions and retains its ordinary action, including leaving Vim Insert. Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
+
+---
+
 ## 21. Unexpected Renderer Errors
 
 If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.
