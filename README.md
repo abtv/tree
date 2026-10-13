@@ -63,7 +63,9 @@ The build produces unpackaged output, not an installable `.app` or `.dmg`. See t
 
 ## Development Workflow
 
-For the project’s agent development workflow, see [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md).
+Describe a task or defect to the coding agent. The agent handles implementation, required checks, and commits; the Product Owner controls material product and technical decisions.
+
+Write `menu` to see the [main requests](docs/WORKING_WITH_AGENT.md#command-menu), including continuing authorized work, viewing or saving ideas, discussing a solution, fixing a defect, and reviewing permission interruptions. The menu marks which requests can change files. Ordinary language works too. See [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md) for the complete workflow.
 
 ## Project Structure
 

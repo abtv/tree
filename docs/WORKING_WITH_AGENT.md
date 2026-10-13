@@ -2,6 +2,26 @@
 
 As Product Owner, describe the problem, desired result, or question in ordinary language. You do not need to choose a work type, name files, split the work into tasks, or select validation commands. The agent identifies the appropriate approach, explains its interpretation, and carries authorized work to completion. You decide product behavior and material tradeoffs; the agent owns implementation, testing, documentation, and commits.
 
+### Command Menu
+
+Write `menu` to see these calls in your conversation language. Use them as ordinary messages in Codex, Claude Code, or OpenCode; they require no installation or terminal command. Natural-language requests work too. The text after `:` describes the target; you do not need to choose files, record IDs, tools, or validation commands. An unambiguous reference to the current discussion is sufficient.
+
+| Call | Result | File changes |
+| --- | --- | --- |
+| `menu` | Show this menu and its read/write labels without starting any listed action. | Read only |
+| `status` | Inspect current task evidence and Git state; report what is done, what remains, blockers, and any necessary owner action. Do not resume work or rerun validation. | Read only |
+| `continue` | Resume identifiable unfinished authorized work under [continuation rules](#continuing-in-a-new-session). Exclude deferred work and preserve review/no-commit conditions. If nothing is ready, report that. | Within existing authorization |
+| `ideas` | Read [Open Questions](OPEN_QUESTIONS.md) and show each saved question's ID, title, product/technical kind, and current status. Do not select, investigate, or change an idea. | Read only |
+| `save-idea: …` | Save the supplied idea in Open Questions. The agent chooses the kind and an unused ID, uses the existing template, and checks for an existing matching entry before adding another. Preserve the owner's meaning and uncertainty; record an uninvestigated new idea as `Idea`. This authorizes recording only. | Documentation; validate and commit |
+| `discuss: …` | Inspect relevant evidence and give a recommendation with material tradeoffs. Do not implement or record the discussion in repository files. | Read only |
+| `implement: …` | Deliver the stated outcome with required documentation, checks, review, and commit. Resolve material gaps before implementation; follow initiative planning/authorization rules if the outcome needs one. | Implementation within stated scope |
+| `fix: …` | Reproduce and correct the reported defect within recorded requirements, following the defect-first workflow and required validation. Apply the uncommitted owner-verification gate for a failed latest fix. | Implementation within stated scope |
+| `improve-permissions` | Analyze relevant interventions and prior corrections, then recommend concrete changes under the [shared procedure](OWNER_INTERVENTIONS.md#improve-permissions-procedure). | Read only; application needs authorization |
+
+Read-only calls do not authorize file edits or settings changes. Mandatory intervention logging under `AGENTS.md` §4 remains the sole recording exception when owner action is required. Calls that authorize edits retain all scope, review, validation, and platform-permission requirements; existing instructions to withhold a commit still apply. `save-idea` does not authorize experiments, product changes, or resolution of an existing question. If the evidence needed by its template is not yet known, record that uncertainty rather than invent observations or an owner decision. The agent handles formatting, record selection, and required checks itself.
+
+For example, `save-idea: make notes easier to find` records an idea; `discuss: ways to find notes` requests analysis; `implement: the search behavior we just specified` requests delivery within that agreed scope. A bare `fix` or `implement` with no identifiable target needs clarification. Showing or quoting a call is not an instruction to execute it. No call implicitly resumes deferred infrastructure or permits bypassing a denial; resumption still requires an explicit request naming that work.
+
 ### Technical Decisions and Communication
 
 You control architecture, data and persistence models, process boundaries, compatibility, and security commitments. The agent also brings you choices with substantial reversal cost or future constraints, new dependencies/services/tools with significant maintenance obligations, and material tradeoffs among performance, complexity, reliability, and operating cost. You can explicitly reserve a particular choice. The exact boundary is in [Agent Instructions §§6 and 14](../AGENTS.md#6-architecture-changes).

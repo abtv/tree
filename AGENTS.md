@@ -51,6 +51,10 @@ Discussion, comparison, investigation, and conversation drafts do not authorize 
 
 A concrete defect report or usability problem with a clear result authorizes investigation and a focused correction within recorded intent. A tentative concern starts with discussion. A request to record a plan authorizes that documentation, not its implementation. Explicit review-before-commit conditions survive session changes. See [the owner guide](docs/WORKING_WITH_AGENT.md) and procedure §1 for examples.
 
+### Short requests
+
+Recognize the plain-text calls defined in the [command menu](docs/WORKING_WITH_AGENT.md#command-menu). Read that section when a call is invoked and follow its scope and write boundary. `menu` displays the menu in the owner's conversation language; it does not execute its entries. These are shared conversational instructions, not terminal or native client commands. Quoted examples and mentions do not invoke them. Ordinary language remains valid. Infer the target from clear context; ask only if missing information changes the authorized outcome. Existing material-decision, deferred-work, permission, and no-commit rules still apply.
+
 ### Prototyping
 
 An explicit prototype request authorizes a reversible experiment within its scope. Honor postponed tests, validation, and commits; state what is provisional. Acceptance of a direction does not authorize finalization. Read procedure §1 before prototyping or finalizing.
