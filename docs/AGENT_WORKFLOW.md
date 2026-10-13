@@ -28,7 +28,7 @@ Not every message asks for a change. The Product Owner also thinks out loud: ask
 
 In a discussion, change nothing. Read what is needed to answer well, then answer: say which parts are already covered and where, name what would add noise, and give a recommendation instead of a survey. Leave the working tree and Git history untouched, including documentation.
 
-Lead with the conclusion. The first lines carry the answer and the recommendation, the evidence that matters follows in descending order, and everything else is offered in one line and written only when the Product Owner asks for it. Researching deeply does not mean reporting at length: investigate as far as the question needs and report the result, not the material.
+Lead with the conclusion. The first lines carry the answer and the recommendation, followed by the evidence needed to assess or use the result. Be concise by removing repetition and unrelated detail; do not withhold necessary context until the Product Owner asks for it. Researching deeply does not mean reporting at length: investigate as far as the question needs and report the result, not the material.
 
 Write so the Product Owner does not have to reconstruct the meaning, in any answer and not only in a discussion. Use plain declarative sentences and no aphorisms or figures of speech: a sentence that is false when read literally has to be rewritten, however well it reads. Mark a factual claim with its origin — read in this session, with its commit, `file:line`, or command; the agent's own inference; or unverified recall — and treat a claim as checked only when its source's date, author, and status were checked too, not just its content. When the Product Owner stops at a sentence, rewrite that sentence rather than the message around it.
 
@@ -386,13 +386,15 @@ An automatic runner must reconcile the task, actual Git changes, required valida
 
 For a multi-session initiative, commit the updated task status and next task with the completed change. A later session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 
-Before ending a session or authorized outcome, provide an explicit handoff.
+### Delivery reports
+
+For completed or interrupted repository work, provide an explicit delivery report. The checklist below applies to that report; a requested prompt for another session uses the separate procedure below.
 
 Start with a short Product Owner summary, in this order: what was delivered and its completion status; how to try or inspect the result; what remains unverified or blocked; and whether a Product Owner decision or action is needed. For a completed task requiring no action, say so rather than requesting confirmation. For documentation or internal changes, link the relevant result instead of inventing a manual application check. For interface changes, link representative inspected screenshots or recordings from the required visual evidence when available, using synthetic data. Reuse those artifacts rather than producing an extra demonstration solely for the handoff.
 
 Put the technical evidence below this summary, or link to an accessible temporary evidence artifact. Keep failures, blockers, and the next action visible in the summary even when details are linked. A link must remain usable at handoff; never link to a deleted working plan. Detailed evidence remains required under §10 and the list below. Do not create a permanent validation archive.
 
-The complete handoff states:
+The complete delivery report states:
 
 * what was completed;
 * for a defect fix, the output of `npm run fix:history`, and, when it reports a possible shared cause, a proposed structural initiative under §8 or a stated reason why none is needed;
@@ -406,6 +408,14 @@ The complete handoff states:
 Never leave unresolved validation failures without identifying the next action needed to investigate them.
 
 The direct follow-up rule above still applies when the Product Owner reports that the most recently committed fix does not work. Context grows with every message and tool call; use a new session when continuing would make the work harder to verify.
+
+### New-session prompts
+
+When the Product Owner asks for a prompt to start another session, provide one complete, concise, pasteable prompt on the first attempt. Include the new objective and the relevant context the receiving agent cannot recover from the repository: the owner's motivation, concrete observations and their verification status, decisions or rejected suggestions, unresolved alternatives, and task-specific authorization or review conditions. Include only what this conversation establishes and the new task needs; do not invent missing evidence or promote an agent suggestion into an owner decision.
+
+The receiving agent owns bootstrap and repository inspection. Omit copied permanent rules, reminders to read instructions, Git state, and repository-recoverable task history. Keep a conversation-only constraint when it changes the new task's scope, even if it resembles a standing rule. A request to discuss a new objective remains a discussion; it is not a continuation of an unrelated initiative or a delivery report for the preceding task.
+
+Before sending, check the prompt against the relevant conversation: can the next agent start the requested work without asking the owner to repeat known context? If the owner challenges an omission or redundant policy, reassess the whole handoff and return a complete corrected prompt, not just the explanation or the latest missing fragment. Drafting a prompt in conversation does not authorize repository edits.
 
 ---
 

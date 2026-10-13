@@ -185,7 +185,9 @@ If the owner says the latest committed fix still fails, reproduce and make the n
 
 Continue authorized work while context permits. Preserve exact remaining work and valid evidence for a new session; ordinary “continue” must be sufficient to resume an identifiable authorized task. Do not require the owner to reconstruct context. Resolve multiple ready initiatives under procedure §8, excluding deferred work. Procedure §12 governs bounded recovery, budgets, no more than four initiative task commits per primary session, and verified automatic continuation.
 
-Before ending, report delivery/status, how to inspect it, anything unverified or blocked, and any required owner action. Supply the technical evidence required by procedure §12 below that summary or in an accessible linked artifact. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
+For a requested new-session prompt, follow [procedure §12, New-session prompts](docs/AGENT_WORKFLOW.md#new-session-prompts). Include the new objective and necessary conversation-only context; the receiving agent recovers permanent rules and repository state itself.
+
+For a delivery report, state delivery/status, how to inspect it, anything unverified or blocked, and any required owner action. Supply the technical evidence required by procedure §12 below that summary or in an accessible linked artifact. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
 
 ## 13. Completion Criteria
 
