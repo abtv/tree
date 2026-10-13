@@ -2,6 +2,20 @@
 
 As Product Owner, describe the problem, desired result, or question in ordinary language. You do not need to choose a work type, name files, split the work into tasks, or select validation commands. The agent identifies the appropriate approach, explains its interpretation, and carries authorized work to completion. You decide product behavior and material tradeoffs; the agent owns implementation, testing, documentation, and commits.
 
+### Technical Decisions and Communication
+
+You control architecture, data and persistence models, process boundaries, compatibility, and security commitments. The agent also brings you choices with substantial reversal cost or future constraints, new dependencies/services/tools with significant maintenance obligations, and material tradeoffs among performance, complexity, reliability, and operating cost. You can explicitly reserve a particular choice. The exact boundary is in [Agent Instructions §§6 and 14](../AGENTS.md#6-architecture-changes).
+
+For those decisions, the agent recommends a solution before implementation and explains its consequences, a meaningful alternative, and the cost of changing course. It does not ask you to design the solution. Local reversible implementation choices within the agreed requirements and architecture belong to the agent; significant ones are explained in the result. Already authorized choices do not need another approval unless new evidence changes their consequences.
+
+Answers start with the conclusion, recommendation, result, or blocker, followed by the evidence needed to assess it. The agent uses plain, literal language and consistent technical terms while keeping the technical depth needed for your decision. It checks clarity before sending; you do not need to request BLUF or repeat writing instructions. These are clear-writing principles inspired by ASD-STE100, not formal conformance to its English vocabulary and rules.
+
+### Permission Review
+
+Start a separate session in your chosen coding tool and write `improve-permissions`. The agent selects the relevant journal entries, assesses recurring causes and previous corrections, and proposes concrete changes. You do not need to supply entry IDs, assemble evidence, or request a metrics report. If there is no actionable evidence, it says so and stops.
+
+That call is analysis only. You can then say “apply” to authorize the concrete proposal. The agent handles edits, required checks, recording, and commits; mandatory platform permissions remain separate. Later necessary operations supply evidence of effectiveness without a special probe or an owner reminder. The [shared procedure](OWNER_INTERVENTIONS.md#improve-permissions-procedure) applies to Codex, Claude Code, and OpenCode; each tool's actual permission scope is assessed separately.
+
 ### Vocabulary
 
 | Term | Meaning |
@@ -36,7 +50,7 @@ A possible route is: idea → open question → investigation or prototype → p
 
 Use [Open Questions](OPEN_QUESTIONS.md) to retain unresolved questions, observations, evidence, and your decisions. It is not an implementation backlog. Do not create an entry for every clear request or fix. Accepting an idea does not itself authorize implementation; ask for the behavior you want delivered.
 
-Decided product behavior belongs in [Product Requirements](PRODUCT.md). An initiative plan belongs under [Active Plans](plans/README.md): it records the objective, authorized scope, ordered tasks, completion evidence, unresolved decisions, and exact next task. The agent proposes and creates this plan when the authorized outcome needs coordination across sessions. A contained task normally uses a short conversation plan; the temporary `WORKING_PLAN.md` is used when working context needs to survive a handoff or independent review. Detailed rules are in [Agent Instructions §8](../AGENTS.md#8-plans-and-architecture-decisions).
+Decided product behavior belongs in [Product Requirements](PRODUCT.md). An initiative plan belongs under [Active Plans](../plans/README.md): it records the objective, authorized scope, ordered tasks, completion evidence, unresolved decisions, and exact next task. The agent proposes and creates this plan when the authorized outcome needs coordination across sessions. A contained task normally uses a short conversation plan; the temporary `WORKING_PLAN.md` is used when working context needs to survive a handoff or independent review. Detailed rules are in [Agent Instructions §8](../AGENTS.md#8-plans-and-architecture-decisions).
 
 For an initiative, the agent investigates, asks a consolidated batch of necessary questions, and presents the scope, priorities, decision principles, tasks, validation, expected manual-verification rounds and execution budget. You then explicitly approve implementation. That approval can cover all in-scope tasks, review corrections and closure commits; you do not have to approve each task again. Asking for investigation or a plan alone does not authorize implementation. You can retain task-by-task approval or a no-commit condition when you want it.
 
@@ -50,7 +64,9 @@ Prototyping is a separate stage from completing an implementation. A request to 
 
 You can say “continue” or “let's continue the work.” The agent checks Git state, any `WORKING_PLAN.md`, and Active Plans to recover unfinished authorized work before starting another task. A temporary plan or uncommitted change is checked against actual repository state; it is not proof that a task was completed, and unrelated user changes are preserved.
 
-When exactly one active initiative has a ready next task, the agent names it and continues. When several do, it asks which to select. When none does, it reports what prevents progress or that no implementation work is ready. It never selects an open product idea for implementation just because the work queue is empty. A remaining “show me before committing” condition survives a session change.
+When exactly one active initiative has a ready, authorized next task, the agent names it and continues. When several do, it asks which to select. Deferred initiatives are excluded. When none does, it reports what prevents progress or that no implementation work is ready. It never selects an open product idea for implementation just because the work queue is empty. A remaining “show me before committing” condition survives a session change.
+
+Harness/readiness preparation and E2E Coverage Efficiency are deferred until you explicitly request the named work. The agent preserves existing code, plans, evidence, and history; it does not ask about resumption on each task. Ordinary product work continues with its required checks. You may start a new session every 30–40 minutes; this is a context handoff interval, not a task-completion promise. The agent saves remaining work and reusable validation evidence so “continue” is sufficient for an identifiable unfinished task.
 
 With initiative-wide approval and a verified runner, fresh task runs can start automatically within the agreed budget. They use the committed plan and Git state, preserve unfinished work, and continue only after required validation, reviews and owner checks pass. Failed checks trigger bounded repair of the same task; they do not permit skipping ahead. Missing permissions, mandatory verification, reserved decisions or exhausted recovery/budget produce a concrete blocker for you. The runner must remain in the coding tool selected for the initiative. The Codex host has exercised automatic advancement across two synthetic documentation tasks, independent roles, real validation and local commits, fresh repair of a seeded failure, and completed-task reconciliation after a host restart. These observations establish that bounded workflow, not permissions or capabilities for every future task.
 

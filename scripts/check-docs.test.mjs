@@ -22,6 +22,8 @@ import {
   validateAdrIndex,
   validateOpenQuestions,
   validateWorkflowOwnership,
+  validateAgentCore,
+  AGENT_CORE_MAX_BYTES,
 } from './check-docs.mjs'
 import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mjs'
 
@@ -508,6 +510,63 @@ describe('validateWorkflowOwnership', () => {
         expect.stringContaining('reference to the validation mechanics owner'),
       ]),
     )
+  })
+})
+
+describe('agent instruction routing', () => {
+  const titles = [
+    '1. Project Role',
+    '4. General Working Rules',
+    '5. Product Changes',
+    '8. Plans and Architecture Decisions',
+    '9. Tests',
+    '10. Validation',
+    '11. Documentation',
+    '12. Git',
+    '13. Completion Criteria',
+    '14. When to Ask the Product Owner',
+  ]
+  const procedureContent = titles.map((title) => `## ${title}`).join('\n')
+  const routes = titles
+    .map((title) => `[Read](docs/AGENT_WORKFLOW.md#${title.toLowerCase().replaceAll('.', '').replaceAll(' ', '-')})`)
+    .join('\n')
+
+  it('accepts a routed core at the byte limit, including multibyte text', () => {
+    const agentContent = routes + 'é'.repeat(Math.floor((AGENT_CORE_MAX_BYTES - Buffer.byteLength(routes)) / 2))
+    expect(validateAgentCore({ agentContent, procedureContent })).toEqual([])
+    expect(validateAgentCore({ agentContent: agentContent + 'é', procedureContent })).toEqual([
+      expect.stringContaining('UTF-8 bytes exceeds'),
+    ])
+  })
+
+  it('detects missing procedures, dropped routes, and renamed destination headings', () => {
+    expect(validateAgentCore({ agentContent: routes })).toEqual([
+      expect.stringContaining('binding workflow procedures are missing'),
+    ])
+    expect(validateAgentCore({ agentContent: routes.replace('#9-tests', '#9-removed'), procedureContent })).toEqual([
+      expect.stringContaining('missing required procedure route'),
+    ])
+    expect(
+      validateAgentCore({
+        agentContent: routes,
+        procedureContent: procedureContent.replace('## 9. Tests', '## Tests'),
+      }),
+    ).toEqual([expect.stringContaining('missing routed heading 9. Tests')])
+  })
+
+  it('checks the core and all shared workflow documents in the normal repository check', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'AGENTS.md', routes)
+    writeFile(root, 'docs/AGENT_WORKFLOW.md', procedureContent + '\n[Missing](MISSING.md)')
+    writeFile(root, 'docs/OWNER_INTERVENTIONS.md', '[Missing](MISSING.md)')
+    writeFile(root, 'docs/WORKING_WITH_AGENT.md', '[Missing](MISSING.md)')
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      expect.stringContaining('docs/AGENT_WORKFLOW.md: link target not found'),
+      expect.stringContaining('docs/OWNER_INTERVENTIONS.md: link target not found'),
+      expect.stringContaining('docs/WORKING_WITH_AGENT.md: link target not found'),
+    ])
+    writeFile(root, 'AGENTS.md', routes + 'a'.repeat(AGENT_CORE_MAX_BYTES))
+    expect(runChecks({ rootDirectory: root }).issues).toContainEqual(expect.stringContaining('UTF-8 bytes exceeds'))
   })
 })
 

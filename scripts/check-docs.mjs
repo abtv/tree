@@ -44,6 +44,42 @@ const VALIDATION_MECHANICS_MARKER = '<!-- validation-mechanics-owner -->'
 const WORKFLOW_POLICY_REFERENCE = '<!-- workflow-policy-reference: AGENTS.md -->'
 const VALIDATION_MECHANICS_REFERENCE = '<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->'
 const OPEN_QUESTIONS_DECLARATION = '> This document is non-normative.'
+export const AGENT_CORE_MAX_BYTES = 24 * 1024
+const WORKFLOW_PROCEDURES = 'docs/AGENT_WORKFLOW.md'
+const REQUIRED_WORKFLOW_ROUTES = [
+  '1. Project Role',
+  '4. General Working Rules',
+  '5. Product Changes',
+  '8. Plans and Architecture Decisions',
+  '9. Tests',
+  '10. Validation',
+  '11. Documentation',
+  '12. Git',
+  '13. Completion Criteria',
+  '14. When to Ask the Product Owner',
+]
+
+export function validateAgentCore({ agentContent, procedureContent }) {
+  const issues = []
+  const bytes = Buffer.byteLength(agentContent, 'utf8')
+  if (bytes > AGENT_CORE_MAX_BYTES) {
+    issues.push(`AGENTS.md: ${bytes} UTF-8 bytes exceeds the ${AGENT_CORE_MAX_BYTES}-byte core limit`)
+  }
+  if (procedureContent === undefined) {
+    issues.push(`${WORKFLOW_PROCEDURES}: binding workflow procedures are missing`)
+    return issues
+  }
+  for (const title of REQUIRED_WORKFLOW_ROUTES) {
+    const anchor = title.toLowerCase().replaceAll('.', '').replaceAll(' ', '-')
+    if (!agentContent.includes(`](${WORKFLOW_PROCEDURES}#${anchor})`)) {
+      issues.push(`AGENTS.md: missing required procedure route to ${WORKFLOW_PROCEDURES}#${anchor}`)
+    }
+    if (!procedureContent.split(/\r?\n/u).includes(`## ${title}`)) {
+      issues.push(`${WORKFLOW_PROCEDURES}: missing routed heading ${title}`)
+    }
+  }
+  return issues
+}
 
 export function validateAdr({ fileName, content, adrNumbers }) {
   const issues = []
@@ -407,6 +443,9 @@ function collectLiveDocuments(rootDirectory) {
     'DEVELOPMENT.md',
     'SECURITY.md',
     'VIM_CONFORMANCE.md',
+    'AGENT_WORKFLOW.md',
+    'OWNER_INTERVENTIONS.md',
+    'WORKING_WITH_AGENT.md',
   ]) {
     addIfPresent(join(rootDirectory, 'docs', name))
   }
@@ -483,6 +522,15 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
   }
   const agentPath = join(rootDirectory, 'AGENTS.md')
   const developmentPath = join(rootDirectory, 'docs', 'DEVELOPMENT.md')
+  if (existsSync(agentPath)) {
+    const procedurePath = join(rootDirectory, WORKFLOW_PROCEDURES)
+    issues.push(
+      ...validateAgentCore({
+        agentContent: readFileSync(agentPath, 'utf8'),
+        procedureContent: existsSync(procedurePath) ? readFileSync(procedurePath, 'utf8') : undefined,
+      }),
+    )
+  }
   if (existsSync(agentPath) && existsSync(developmentPath)) {
     issues.push(
       ...validateWorkflowOwnership({

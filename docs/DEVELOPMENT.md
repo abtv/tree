@@ -452,6 +452,16 @@ File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttach
 
 ## 10. Development Workflow
 
+### Shared agent instructions
+
+`AGENTS.md` is the compact workflow core and policy owner. Its action table requires relevant sections of [Agent Workflow Procedures](AGENT_WORKFLOW.md) before those actions; a link does not load a section automatically. The supplement retains the matching section numbers. This guide owns validation mechanics, while `docs/AGENT_ROLES.md` owns role contracts. Keep shared behavior in these sources rather than copying it into three tool adapters. `npm run check:docs` checks the core size (at most 24 KiB), routing links, and the supplement as a live document. These checks establish document structure, not model compliance or actual client loading.
+
+For the owner-directed infrastructure pause, apply `AGENTS.md` §8 and the retained plan status. Task capability checks below still apply to ordinary product work; unattended initiative preflight does not become a prerequisite for it. Do not restart deferred preparation as a side effect of a product task or permission analysis.
+
+### Requested permission analysis
+
+The shared plain-text alias `improve-permissions` is defined in `AGENTS.md` §4. Follow the [single analysis procedure](OWNER_INTERVENTIONS.md#improve-permissions-procedure), including automatic record selection, evidence assessment, the analysis/application boundary, and later effectiveness observations. It requires no installed skill, shell command, or per-tool procedure. Tool-specific proposals must use current official documentation and the actual client's supported controls; configuration inspection is not proof of runtime access. Do not use another tool to bypass a denial.
+
 ### Task capability check
 
 At bootstrap, apply the capability policy in `AGENTS.md` to the selected task. Identify the needed file inspection and editing tools, validation commands and environment, artifact inspection or native interaction tools, external evidence access, and any required independent roles. Omit capabilities the task does not use. `npm run doctor` checks development-environment prerequisites when relevant; it does not establish the agent's runtime permissions or ability to inspect a native interface.
@@ -506,7 +516,7 @@ Allowed npm scripts and Git hooks execute mutable repository code with the host 
 
 Before fixing a reported defect, run `npm run fix:history` — with no arguments it inspects the fix at `HEAD` or the working-tree diff, and it takes repository-relative paths otherwise — to see the earlier `fix` commits in the same production files, and when it reports a possible shared design cause include the proposed structural initiative or the reason none is needed in the handoff.
 
-When an authorized outcome or session ends, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Include a suggested prompt when another session is needed to resume the work. A commit followed by another authorized task in the same session needs only a brief progress update. An incomplete validation result must never be presented without a follow-up action.
+When an authorized outcome or session ends, provide a handoff recording what was completed, validation that passed, validation that failed or was blocked, unresolved issues, and the exact next task. Save enough context for ordinary “continue” to resume identifiable authorized work; supply a short task selector only when needed to distinguish multiple unfinished outcomes. A commit followed by another authorized task in the same session needs only a brief progress update. An incomplete validation result must never be presented without a follow-up action.
 
 ---
 

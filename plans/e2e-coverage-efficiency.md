@@ -1,5 +1,7 @@
 # E2E Coverage Efficiency
 
+**Status: Deferred by owner on 2026-10-14.** Harness development, readiness preparation, and this initiative remain paused until the owner explicitly requests the named work. The scope, proposed projection, historical evidence, canceled actions, and recovery records below are retained, not current launch instructions. Generic continuation or `improve-permissions` grants no resumption authority. Ordinary separately authorized product work is independent of this pause and retains its required validation.
+
 Prerequisite: Runner Readiness supplies the supported execution contract and bounded readiness evidence. The Product Owner accepted its delivered commit `25e779d` on 2026-10-13; acceptance and the separate closure allowance are recorded in `95fe80b`, whose `plans/runner-readiness.md` retains the complete plan and recovery history before retirement. Its authorization does not authorize this initiative's execution. The owner explicitly prohibited starting E2E Coverage Efficiency during Runner Readiness closure.
 
 ## Objective and Authorization
@@ -41,7 +43,7 @@ Use existing measurement commands and save raw task evidence under `.scratch/e2e
 
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| EC-1 | Audit coverage ownership and establish comparable costs | None | All spec families classified; concrete migration list and protected boundaries; baseline and candidate costs | Ready |
+| EC-1 | Audit coverage ownership and establish comparable costs | None | All spec families classified; concrete migration list and protected boundaries; baseline and candidate costs | Deferred |
 | EC-2 | Make validation scope follow changed mechanisms | EC-1 | Consistent policy with worked examples, preserving full-local exceptions and complete regression CI | Planned |
 | EC-3 | Give long memory investigations a dedicated workflow | EC-2 | Both controls executable; normal reset/failure guards retained; explicit CI and local triggers verified | Planned |
 | EC-4 | Migrate redundant Vim text scenarios | EC-1, EC-2 | Assertion mapping, faithful replacement tests, retained real dispatch/caret coverage and measured reduction | Planned |
@@ -142,7 +144,7 @@ Capabilities checked in this preparation session:
 * No coordinator was constructed and no budget ledger was started. Host launch permissions, authentication, fresh/resumed primary execution and quiescence must be checked at authorized launch; historical pilot success is not current proof.
 * Existing `.scratch/autonomous-initiatives-pilot/` records are unrelated and must be preserved. The proposed execution namespace is `.scratch/e2e-coverage-efficiency/`; confirm it remains unstarted before construction.
 
-Launch remains unauthorized. Runner Readiness is accepted; complete the initiative-specific unattended preflight of Development §10, approve implementation and closure allowances, obtain attributable execution approval, and launch only from a clean committed plan. Permission setup must cover the actual full host and child paths before execution; RR-4 synthetic permission does not cover this initiative. The invocation below is a future template, not a readiness claim; never use the pre-preparation HEAD as the approved source:
+Launch remains unauthorized and preparation is deferred. Only after an explicit resumption request, reassess the initiative-specific unattended preflight of Development §10, implementation and closure allowances, and attributable execution approval. Launch requires a clean committed approved plan. Permission setup must cover the actual full host and child paths before execution; RR-4 synthetic permission does not cover this initiative. The invocation below is a retained future template, not a current instruction or readiness claim; never use the pre-preparation HEAD as the approved source:
 
 ```text
 node scripts/initiative-runner-host.mjs --authorized-plan /Users/andrew/work/tree plans/e2e-coverage-efficiency.md EC-1 <full-approved-starting-commit> <owner-approval-reference>
@@ -775,14 +777,13 @@ The owner separately authorized readiness preparation and a focused runner corre
 
 ## Next Task and Resume Prompt
 
-Next required action: resolve the canceled preflight permissions and finish the missing readiness paths under a separately bounded, explicitly authorized window. EC-1 can start only after readiness, explicit execution approval and approved implementation/closure allowances. No initiative implementation has started. No product requirement gaps have been identified for this test/workflow-only scope. Existing evidence proves only its observed paths and inputs; neither one-time approval nor a completed ordinary run proves stored, prompt-free access.
+No next task is ready while deferred. Keep all existing code, committed history, `.scratch/e2e-coverage-efficiency/preflight/` evidence, and original proof windows/recovery counters. Runner Readiness remains accepted and closed; do not recreate its retired plan. The owner will separately decide when to resume this work.
+
+After an explicit request to resume, inspect current Git state and this retained plan, identify which evidence remains applicable, and recommend the next bounded step. That request does not implicitly authorize retrying canceled actions, resetting budgets/counters, or beginning EC implementation. Unattended execution still requires the applicable readiness, explicit execution approval, and implementation/closure allowances. No EC task or main allowance has started. Existing evidence proves only its observed paths and inputs.
 
 ```text
-After renewed owner authorization for the canceled permission paths,
-finish E2E Coverage Efficiency readiness under AGENTS.md §8 and
-Development §§10–11. Explain each expected platform request before it
-appears. Preserve prior evidence, deadlines and recovery history; approve
-any new bounded proof window separately rather than renewing old ledgers.
-Keep EC-1–EC-6 unstarted. Resolve execution and closure allowances before
-execution approval. This prompt authorizes no initiative implementation.
+Resume discussion of E2E Coverage Efficiency. Read the retained plan and
+current repository state, assess existing evidence, and recommend the next
+bounded step. Preserve all prior records. This request authorizes analysis,
+not readiness probes, canceled actions, or initiative implementation.
 ```
