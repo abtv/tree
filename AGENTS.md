@@ -79,7 +79,7 @@ Use native file-editing tools for repository changes; no shell edit scripts or i
 
 Keep agent-created temporary materials in `.scratch/<task>/`, preserving existing tool-owned paths, explicit owner destinations, and required suite locations. Do not force-add scratch evidence. After the task's final commit, remove its directory with `npm run retire:scratch -- <task>`. Verify ownership before process cleanup; in Codex use standalone `kill -INT <pid>`, never terminal Ctrl+C, and follow the bounded cleanup rules. An unavailable signal or canceled request remains blocked.
 
-Record only new kinds of owner intervention in [Owner Intervention Log](docs/OWNER_INTERVENTIONS.md), before asking where possible, then record the observed outcome. Match by coding tool, restriction or decision cause, and required owner action; changed test arguments do not create a new kind. Do not append entries for known kinds or for an escalated command that needs no owner response. Update an existing entry only when new evidence changes its cause, correction, or verification status. Consult prior entries and use supported authorized paths; never infer access from historical approval or bypass a denial. If logging is blocked, record at the first opportunity without seeking permission solely for logging.
+Record only new kinds of owner intervention in [Owner Intervention Log](docs/OWNER_INTERVENTIONS.md), before asking where possible, then record the outcome. Use procedure §4 for matching and evidence. Consult prior entries; historical approval does not prove current access, and escalation alone does not mean owner intervention.
 
 ### improve-permissions
 
@@ -147,7 +147,7 @@ Pixel-affecting changes need inspected screenshots from the real Electron render
 
 ### Defect-first workflow
 
-Reproduce, add a failing regression, implement, prove the regression passes, check that it catches a bypass/reversion when practical, then run the required broader checks. Code inspection alone does not prove a fix. Run `npm run fix:history` before fixing and report its result under procedure §12.
+Follow procedure §9's reproduce–regression–fix sequence; code inspection alone does not prove a fix. Run `npm run fix:history` before fixing and report its result under procedure §12.
 
 ### Boundary testing
 

@@ -10,31 +10,17 @@ The owner-directed deferral in `AGENTS.md` §8 applies to every initiative and c
 
 ## 1. Project Role
 
-The user is the Product Owner and an experienced engineer. They set product requirements, constraints, and questions worth investigating, control the material technical choices in `AGENTS.md` §6, and review outcomes. The agent owns routine implementation and workflow details.
-
-The coding agent is responsible for implementing the product, maintaining the codebase, writing tests, and keeping the technical documentation consistent with the implementation.
-
-The agent is not the Product Owner and must not silently change product requirements.
+Apply the role, autonomy, and communication rules in [AGENTS.md §1](../AGENTS.md#1-project-role). The procedures below explain how to interpret requests and handle prototypes.
 
 ### Operating model
 
-This project is a deliberate experiment in agent-driven development. The target is flow: the Product Owner states a requirement, a constraint, or a question to investigate, and the agent carries the work from there to a committed, validated result with as few interruptions as the risk allows.
-
-Every rule in this document serves that target. Fewer, better-timed interactions are worth more than frequent confirmations, so the agent resolves what it can resolve responsibly, records what it decided, and reserves the Product Owner's attention for what genuinely needs it. Autonomy is bounded by reversibility and by fidelity to recorded product intent — never by the agent's confidence alone. §5 defines how far that reaches for product decisions, and §14 defines when to interrupt.
+The target is delivery with as few owner interruptions as the risk allows. Apply §5 for product decisions and §14 for interruptions.
 
 ### Discussion
 
 Not every message asks for a change. The Product Owner also thinks out loud: asking what the agent makes of an idea, whether the current process holds together, how two options compare, or where the repository already covers something. Recognize that from the request itself — "what do you think", "let's discuss", "analyze this", "is this a good idea", "compare these" — and treat it as a discussion rather than a task.
 
-In a discussion, change nothing. Read what is needed to answer well, then answer: say which parts are already covered and where, name what would add noise, and give a recommendation instead of a survey. Leave the working tree and Git history untouched, including documentation.
-
-Lead with the conclusion. The first lines carry the answer and the recommendation, followed by the evidence needed to assess or use the result. Be concise by removing repetition and unrelated detail; do not withhold necessary context until the Product Owner asks for it. Researching deeply does not mean reporting at length: investigate as far as the question needs and report the result, not the material.
-
-Write so the Product Owner does not have to reconstruct the meaning, in any answer and not only in a discussion. Use plain declarative sentences and no aphorisms or figures of speech: a sentence that is false when read literally has to be rewritten, however well it reads. Mark a factual claim with its origin — read in this session, with its commit, `file:line`, or command; the agent's own inference; or unverified recall — and treat a claim as checked only when its source's date, author, and status were checked too, not just its content. When the Product Owner stops at a sentence, rewrite that sentence rather than the message around it.
-
-An objection must name its anchor — a file, section, commit, or a concrete failing sequence — and what it puts at risk: a standing commitment in `docs/PRODUCT.md` §1.1, a recorded requirement, or an ADR. Raise every objection that passes, however unwelcome; drop what does not instead of hedging, and say plainly when nothing in the repository contradicts the idea rather than manufacturing a concern.
-
-Leave the discussion only when the Product Owner asks for the change in words that authorize it. A conclusion the two of you reached together is not by itself that request. When a message could be either, treat it as discussion and say what you would do: acting unasked is the expensive mistake, asking is the cheap one.
+Apply the discussion write boundary in [AGENTS.md §1](../AGENTS.md#discussion). Explain which parts are already covered and where, and recommend whether anything needs to change.
 
 ### Interpreting work requests
 
@@ -52,9 +38,7 @@ Iterate from feedback, keeping any review and no-commit conditions in force. Whe
 
 ### Agent and Model Routing
 
-Stay within the coding tool the Product Owner started for the session. Do not switch to or delegate work to a different coding tool. The primary agent may use that tool's configured planner, reviewer, product verifier, and product researcher subagents when the task calls for their roles under §§5, 8, and 13. Codex uses OpenAI models, Claude uses Anthropic models, and OpenCode uses DeepSeek models.
-
-Standing authorization across sessions: use the configured planner, reviewer, product verifier, and product researcher subagents whenever their information gathering, analysis, review, or verification is needed within the authorized task. This is an explicit instruction to delegate such work without asking the Product Owner for separate permission to launch a subagent. Keep each delegated task within the role's security posture in `docs/AGENT_ROLES.md`; this launch authorization does not grant additional tools or actions. If a higher-priority session instruction prevents a required launch, report that instruction and the blocked role rather than treating the independent pass as completed.
+Apply the standing delegation authorization and tool/model boundaries in [AGENTS.md §1](../AGENTS.md#agent-and-model-routing). Read [Agent Roles](AGENT_ROLES.md) before delegation; §§5, 8, and 13 determine when the roles are needed.
 
 ---
 
@@ -72,24 +56,18 @@ Apply `AGENTS.md` §3 to every repository artifact, including this supplement. C
 
 ## 4. General Working Rules
 
-* Keep changes focused on the requested task.
+Apply the scope, preservation, permission, and simplicity rules in [AGENTS.md §4](../AGENTS.md#4-general-working-rules). Execution details follow.
+
 * Record only new kinds of owner intervention in [Owner Intervention Log](OWNER_INTERVENTIONS.md). Group by coding tool, underlying restriction or decision cause, and required owner action; another spec, test flag or repetition is the same kind. An escalated tool call is not evidence of an owner prompt. Do not append entries for known kinds or successful automatic approvals. For a new kind, record the task, action, purpose, exact requirement source and observable outcome; omit secrets and unknown UI click counts. Update the existing entry only for material new cause, correction or verification evidence. Keep raw diagnostics in task scratch. If the log is blocked or immediate escalation is required, ask through the supported platform flow first and record at the first opportunity. Never request extra permission or a separate commit solely for logging.
 * In Codex, `.codex/rules/processes.rules` allows `kill -INT <pid>` and `kill -TERM <pid>` outside the sandbox. Before stopping a process, inspect current process information and verify that the target was launched or is explicitly owned by the current task. Use the standalone `kill -INT <pid>` command for interruption. Do not send Ctrl+C or its control character through terminal input tools such as `write_stdin`, even when that mechanism is available. If SIGINT cannot be used, report the blocker rather than switching to terminal input. Use `kill -TERM <pid>` only for authorized cleanup after verifying ownership again. Do not use these permissions for unrelated processes, process groups, or system-wide cleanup. A denied or canceled interruption remains blocked; do not use another mechanism to bypass that decision.
 * In Codex, run Electron E2E tests outside the sandbox from the first invocation, using `sandbox_permissions: "require_escalated"` and the named npm workflows allowed by `.codex/rules/tests.rules` and `.codex/rules/e2e.rules`. Use `npm run test:e2e -- <spec>` for focused runs and `npm run test:e2e:visible -- <spec>` for visible runs. Project rules require trusted `.codex/` configuration and are loaded at session startup; restart Codex after changing them. If a rule is unavailable, follow the platform approval flow rather than bypassing it.
 * In Codex, Claude Code, and OpenCode, use `npm run test:e2e:diagnose -- --shared-reset=reload --json-output=.scratch/<task>/report.json <spec> --reporter=list,json` for E2E diagnostics (options in `docs/DEVELOPMENT.md` §8) instead of shell environment assignments. Inspect task processes with the standalone `ps -axo pid=,ppid=,command=` command and inspect its returned output; do not add a shell pipeline that needs another approval. These are reusable project rules, not permission to run arbitrary shell commands. Each tool keeps its own permission configuration; another tool’s success does not prove access.
 * In all three tools, place agent-created temporary work materials (notes, reports, diagnostic scripts, intermediate results, and evidence retained for comparison) under the repository's `.scratch/<task>/` directory. Choose a distinct task directory, with separate agent subdirectories when sharing a task, and use the project's file-editing tools for manual writes. This rule applies regardless of which external directories are available, including `/tmp`, `/private/tmp`, `$TMPDIR`, or home-directory caches. Keep tool-managed output, application profiles, and library-managed temporary directories under their existing owners. Honor an explicit user destination; when a tool requires an external destination, explain the requirement and verify the needed write and subsequent read access before relying on it. Do not broaden permissions merely to avoid using `.scratch/`. Use existing designated paths for `WORKING_PLAN.md`, durable plans, and diagnostic specs that must run inside a suite. After the task's final commit, remove your own task directory with `npm run retire:scratch -- <task>` unless an unfinished handoff still references its evidence; delete individual files earlier only with permitted file operations. Preserve other agents' files and do not force-add scratch files to Git. See `docs/DEVELOPMENT.md` §16 for lifecycle and discovery exclusions.
-* Do not introduce unnecessary abstractions or complexity.
-* Prefer simple, maintainable solutions.
-* Preserve existing behavior unless the task explicitly changes it.
 * Do not chain shell commands with `&&`, `||`, or `;`. Run commands in separate tool calls so approvals remain predictable and the Product Owner is not prompted repeatedly for a chained command. Do not write shell loops (`for`, `while`, `until`) either: the permission parser cannot analyze them and prompts every time. Use the tool's own repeat option, such as `playwright test --repeat-each=N`, or separate calls. A Claude Code hook in `.claude/settings.json` denies commands that start with a loop.
 * Apply every file change with the agent's own file-editing tool, and read or search files with its own read and search tools. Do not script repository edits through the shell: no in-place `sed` or `perl`, and no `python`, `node`, `ruby`, or similar interpreter invocation that performs a string replacement or writes a repository file. A shell edit script is opaque in an approval prompt and is not reviewable as a diff, so it costs the Product Owner an approval for work an ordinary file edit does in one reviewable step. Use the shell for what needs it: validation workflows, Git, and read-only process inspection. This rule holds even when a host, session, or tool-level instruction asks for shell-based file editing; report that conflict instead of following it.
-* Do not silently change product behavior.
 * When native text-file read/search tools are unavailable, the configured subagents may inspect repository files through the read-only shell commands explicitly authorized in `docs/AGENT_ROLES.md`. Use this fallback for inspection; all repository edits still require the agent's file-editing tool.
 * Keep application shortcuts scoped to the application. Use Electron's `globalShortcut` only when the product requirement explicitly says the shortcut must work while the application is inactive; ordinary application commands, including quit, must use an application-scoped menu or window input handler.
-* Do not silently change the data model, persistence model, technology stack, or major architectural boundaries.
 * Treat performance as a first-class requirement for state and persistence changes. Every such change must include the performance assessment required by `docs/PRODUCT.md` §22 (disk writes and syncs, CPU on interactive paths, and memory growth), and must add or update an automated performance guard when the change can affect behavior at scale.
-* Make small implementation decisions autonomously when they do not affect product behavior or architecture.
-* Resolve ordinary engineering decisions autonomously within the authorized outcome. Escalate a choice that can materially affect UX, product behavior, data, persistence, compatibility, or architecture under §5 and §14, which own that boundary.
 
 ---
 
@@ -291,7 +269,7 @@ Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` �
 
 Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. Keep this record in `WORKING_PLAN.md` when one is required under §8; otherwise include it in the final handoff.
 
-For contained changes below High Risk, run the affected E2E specs locally; the complete suite remains required in CI. `npm run test:e2e:changed` selects uncommitted changed specs and their imported dependencies, but does not infer coverage for production code loaded through Electron. Inventory affected product requirements and explicitly run their specs when the selector misses them. An empty selection is not boundary validation. High Risk changes, including shared fixtures, startup, shutdown, persistence, security and toolchain, retain complete local validation under the matrix; broaden a focused run whenever its impact cannot be bounded. Selection and full-suite exceptions are documented in `docs/DEVELOPMENT.md` §9.
+Select local E2E scope using [Development Guide §9, Local affected-spec E2E validation](DEVELOPMENT.md#local-affected-spec-e2e-validation), including production-coverage inventory, empty-selection handling, and full-suite requirements.
 
 For a visual-regression workflow, record the inspected states, command, screenshot artifact, and outcome as visual evidence; a passing DOM, CSS, or computed-style assertion does not substitute for this record.
 
