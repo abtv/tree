@@ -9,6 +9,8 @@ import {
   documentPath,
   exactMessage,
   expect,
+  fireIdleSave,
+  idleSavePoll,
   launchTree,
   node,
   readPersisted,
@@ -36,7 +38,23 @@ test.describe('save failure lock', () => {
     const text = 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
     await typeInto(node(window, 1), text)
 
-    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
+    await expect(window.getByRole('status')).toContainText('Changes could not be saved:', idleSavePoll)
+    // Typing can queue more than one volume-triggered save. Drain their replies before advancing
+    // each remaining retry, so the renderer has armed its next idle timer.
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
+    const initialAttempts = await readSaveAttempts(app)
+    expect(initialAttempts).toBeGreaterThan(0)
+    expect(initialAttempts).toBeLessThanOrEqual(3)
+    for (let expectedAttempts = initialAttempts + 1; expectedAttempts <= 3; expectedAttempts += 1) {
+      await fireIdleSave(window)
+      await expect.poll(() => readSaveAttempts(app), idleSavePoll).toBe(expectedAttempts)
+      await window.evaluate(() =>
+        (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+      )
+    }
+    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible(idleSavePoll)
     await expect(node(window, 1)).not.toBeEditable()
     const frozen = await node(window, 1).inputValue()
     const attempts = await readSaveAttempts(app)
