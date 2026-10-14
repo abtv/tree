@@ -9,7 +9,9 @@ import {
   documentPath,
   exactMessage,
   expect,
+  fireIdleSave,
   firePaste,
+  idleSavePoll,
   lockSystemClipboard,
   launchTree,
   node,
@@ -198,10 +200,12 @@ test.describe('persistence', () => {
 
   test('does not surface a save error during rapid edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    await window.clock.install()
     const text = 'rapid '.repeat(100)
 
     await typeInto(node(window, 1), text)
-    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, { timeout: 15_000 }).toBe(text)
+    await fireIdleSave(window)
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, idleSavePoll).toBe(text)
   })
 
   for (const { name, seed, distance } of [
