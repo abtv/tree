@@ -5,7 +5,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 | Initiative | Status | Next task |
 | --- | --- | --- |
 | [Fold/Expand Test Pilot](fold-expand-test-pilot.md) | Preparation complete; implementation awaits explicit continuation | FP-2: one bounded test-layer transfer and focused comparison; at most 75 minutes remain |
-| [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Deferred by owner on 2026-10-14; initiative-specific readiness incomplete; execution unapproved | None while deferred. Resume only on an explicit request naming this work; no EC task has started |
+| [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Deferred; concise evidence and unresolved directions retained; implementation unapproved | None while deferred. Explicit resumption starts with a bounded proposal; former runner task sequence is historical |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation and `improve-permissions` do not resume them. Independently authorized product tasks proceed under the ordinary workflow; unfinished runner readiness is not their prerequisite.
 
