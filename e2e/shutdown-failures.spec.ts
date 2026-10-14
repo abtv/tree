@@ -12,6 +12,8 @@ import {
   documentPath,
   exactMessage,
   expect,
+  fireIdleSave,
+  idleSavePoll,
   launchTree,
   node,
   readPersisted,
@@ -41,6 +43,8 @@ test.describe('shutdown failure handling', () => {
     const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
     mkdirSync(temporaryDocumentPath)
 
+    // Control renderer save timers while retaining the real main-process quit timeout.
+    await window.clock.install()
     const initialText = 'unsaved one two three four five six seven eight nine'
     const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
     await typeInto(node(window, 1), initialText)
@@ -57,10 +61,9 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), recoveryText)
 
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
+    await fireIdleSave(window)
     await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text ?? '', {
-        timeout: 15_000,
-      })
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text ?? '', idleSavePoll)
       .toBe(`${initialText}${recoveryText}`)
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
