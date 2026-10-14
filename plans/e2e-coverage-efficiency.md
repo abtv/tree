@@ -1,8 +1,14 @@
 # E2E Coverage Efficiency
 
-**Status: Deferred by owner on 2026-10-14; implementation unapproved.** No EC task, execution ledger or implementation allowance has started. No next task is ready. Generic continuation, `improve-permissions`, and the separate Fold/Expand pilot do not resume this work.
+**Status: Broader initiative remains deferred.** On 2026-10-15 the owner authorized only separating the two long memory measurements, measuring their cost, validating both sets and committing the result. This single bounded task does not resume runner/readiness, reuse changes, other test families or the remaining directions below. No other next task is ready.
 
-The owner authorized shortening this record on 2026-10-14. This preserves the unresolved objective and evidence; it does not authorize tests, policy changes, readiness preparation or implementation. The former six-task runner proposal is historical, not the current execution plan.
+## Bounded memory separation
+
+**Completed.** The ordinary and memory configurations select disjoint sets of 785 and 2 cases with the same combined coverage as the original 787. All 16 ordinary shared-application infrastructure cases remain. The standalone controls retain their original sample helper, loops, assertions, timeouts and attachments; both execute successfully. Development §8 owns the commands and CI ownership. The remaining initiative directions stay deferred; this one working task does not close the broader initiative.
+
+The authorized task preserves both twelve-burst controls and every ordinary reset/recovery test. Its files are the shared-application specs, ordinary and memory Playwright configurations, npm entry, E2E typecheck inclusion, dedicated CI workflow and development instructions. Acceptance requires disjoint ordinary/memory discovery with unchanged combined coverage, both controls executing with their sample artifacts, required Low Risk checks, a same-host six-worker ordinary before/after comparison and primary diff review. No product decision or owner verification is required. All other initiative work remains deferred after this task.
+
+The owner authorized shortening this record on 2026-10-14. That preserved the unresolved objective and evidence without authorizing implementation. The later bounded memory request above is the only implementation authority. The former six-task runner proposal is historical, not the current execution plan.
 
 ## Objective
 
@@ -15,7 +21,7 @@ The completed Fold/Expand Test Pilot transferred one nested expansion round trip
 - Historical measurements recorded by `abtv` on 2026-10-11 in `95e8b7f:plans/e2e-suite-time.md`: 746 cases, 795 launches; launch plus teardown accounted for 62.8% and 64.3% of summed test time. These are historical cost shares, not current wall-time savings.
 - The completed bounded reuse rollout at runtime commit `3dff3bf` passed 773 cases in 254.01/257.30 seconds versus 280.51/280.37-second fresh controls: an 8.2–9.4% wall-time reduction, excluding builds. [Development §8](../docs/DEVELOPMENT.md#8-tests) owns the measurements; [ADR 0021](../docs/decisions/0021-worker-owned-e2e-application-reuse.md) owns the isolation decision.
 - [Development §9](../docs/DEVELOPMENT.md#9-full-validation) already permits focused local E2E below High Risk. Whether its remaining full-local triggers impose disproportionate cost needs assessment; actual agent rerun frequency has not been measured.
-- The earlier inspection identified two long memory investigations in [shared-application.spec.ts](../e2e/shared-application.spec.ts); their fresh control contributed 96 launches per full run. Their individual wall-time contribution and savings from different scheduling were not established.
+- The bounded separation on 2026-10-15 measured the original shared and fresh memory controls at 32.12 s and 74.55 s, respectively (106.67 s summed test time). One sequential same-host hidden six-worker comparison passed 787 original cases in 219.31 s and 785 ordinary cases in 195.45 s: 23.86 s / 10.9% less wall time, excluding builds (0.61 s and 0.70 s). Ordinary launches fell from 802 to 705. This is one local pair with host variance, not a portable saving. Both controls remain in [shared-application-memory.spec.ts](../e2e/shared-application-memory.spec.ts); moving their schedule reduces ordinary-run cost rather than eliminating their work.
 - Vim text-command and Agenda command-matrix overlap was identified as a candidate, not proven redundant coverage. A similar title, requirement marker or mocked handler test does not establish equivalence.
 
 General launch cost has already been investigated. Reuse this evidence rather than restarting a full audit; obtain fresh focused measurements only where a new decision needs them.
@@ -27,7 +33,7 @@ These are questions for a future bounded proposal, not ready implementation task
 | Direction | What must be established before a change |
 | --- | --- |
 | Local validation scope (former EC-2) | Which concrete changes can safely use focused checks, which still need complete local validation, and how agents select the affected tests. Keep changed-boundary coverage and report untested scope. |
-| Long diagnostics (former EC-3) | Whether moving repeated memory investigations out of ordinary regression runs gives useful savings; retain both controls with explicit local and CI ownership. Relocation alone does not reduce total work. |
+| Long diagnostics (former EC-3) | The two shared/fresh controls now have separate local and scheduled/manual/infrastructure CI ownership. Any further diagnostic relocation needs separate authorization. Relocation alone does not reduce total work. |
 | Larger test transfers (former EC-4/EC-5) | Find a bounded, worthwhile group in Vim or Agenda; map actual assertions to faithful fast replacements and retained Electron paths. Keyboard, focus, caret, prefixes and persistence can invalidate apparent overlap. |
 | Evidence and outcome (former EC-1/EC-6) | Use candidate-level inspection and matched measurements, including build and required-check costs. Decide the next step from measured benefit and protection retained, not removed-case counts. |
 
@@ -39,7 +45,7 @@ Do not restore the former exhaustive audit, fixed task order, eight-hour estimat
 - Editing-mode reductions were declined; duration gates/reporting and broader reuse were not authorized by this initiative. Preserve ADR 0021 eligibility and isolation.
 - Retain real keyboard routes, native focus/pointer timing, browser behavior, caret/selection, visual states and process/persistence boundaries. Verify replacement assertions and historical regressions; do not use mocks that bypass the protected mechanism.
 - Production refactoring, a new browser/component runner, dependencies, product changes or broader architecture need a separate proposal. Do not merge unrelated scenarios merely to lower the count.
-- No implementation or closure budget is approved here. Scope, execution authority and applicable final acceptance must be settled before implementation; the former six-task proposal never executed.
+- No broader implementation or closure budget is approved here. The single memory separation is authorized above; the former six-task proposal never executed.
 
 ## Historical record and resumption
 

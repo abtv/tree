@@ -1,0 +1,77 @@
+name: Electron E2E memory
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'e2e/shared-application*.spec.ts'
+      - 'e2e/fixtures.ts'
+      - 'e2e/global-setup.ts'
+      - 'e2e/*.cjs'
+      - 'e2e/electron-process.ts'
+      - 'e2e/clipboard-lock.ts'
+      - 'playwright*.config.ts'
+      - 'tsconfig.e2e.json'
+      - 'scripts/e2e-diagnose.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.nvmrc'
+      - '.github/workflows/e2e*.yml'
+  pull_request:
+    paths:
+      - 'e2e/shared-application*.spec.ts'
+      - 'e2e/fixtures.ts'
+      - 'e2e/global-setup.ts'
+      - 'e2e/*.cjs'
+      - 'e2e/electron-process.ts'
+      - 'e2e/clipboard-lock.ts'
+      - 'playwright*.config.ts'
+      - 'tsconfig.e2e.json'
+      - 'scripts/e2e-diagnose.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.nvmrc'
+      - '.github/workflows/e2e*.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-memory-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory:
+    name: Electron E2E memory
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run shared and fresh memory measurements
+        run: npm run test:e2e:memory -- --reporter=list,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: reports/e2e-memory.json
+
+      - name: Upload memory evidence and failure traces
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-memory
+          path: |
+            reports/e2e-memory.json
+            test-results/
+          if-no-files-found: warn

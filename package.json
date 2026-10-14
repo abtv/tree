@@ -47,6 +47,7 @@
     "test:mutation": "stryker run",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:diagnose": "node scripts/e2e-diagnose.mjs",
+    "test:e2e:memory": "npm run test:e2e -- --config=playwright.memory.config.ts",
     "test:e2e:changed": "npm run build && playwright test --only-changed=HEAD",
     "test:e2e:timing": "npm run build && PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e-timing.json playwright test --reporter=list,json && node scripts/e2e-timing.mjs",
     "test:e2e:visible": "TREE_E2E_VISIBLE=1 npm run test:e2e --",

@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Deferred; concise evidence and unresolved directions retained; implementation unapproved | None while deferred. Explicit resumption starts with a bounded proposal; former runner task sequence is historical |
+| [E2E Coverage Efficiency](e2e-coverage-efficiency.md) | Bounded memory separation completed; broader work deferred | None. No runner/readiness or other test-family work authorized |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation and `improve-permissions` do not resume them. Independently authorized product tasks proceed under the ordinary workflow; unfinished runner readiness is not their prerequisite.
 

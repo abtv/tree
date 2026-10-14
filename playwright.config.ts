@@ -24,7 +24,7 @@ export default defineConfig({
   projects: [
     {
       // Every other spec keeps the default per-file snapshot directory.
-      testIgnore: vimSpecFile,
+      testIgnore: [vimSpecFile, /shared-application-memory\.spec\.ts$/],
     },
     {
       name: 'vim',
