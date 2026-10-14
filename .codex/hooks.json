@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/codex-permission-log.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Recording minimal permission metadata"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -25,7 +25,7 @@ Use one entry per new intervention kind, with a stable identifier such as `OI-00
 
 The alias and authorization boundary are defined in [AGENTS.md §4](../AGENTS.md#improve-permissions). The agent performs the following procedure without asking the owner to select records or repeat instructions.
 
-1. Select unanalysed entries and applied corrections whose effectiveness is unresolved or contradicted by a recurrence. Include matching earlier entries and existing evidence when needed; do not reconstruct old readiness history as a new project. If no actionable records exist, say so and stop.
+1. Select unanalysed entries and applied corrections whose effectiveness is unresolved or contradicted by a recurrence. Also inspect `.scratch/permission-requests/events.jsonl` when present: it supplies minimal Codex permission-request metadata independently of agent-written entries. A hook event does not prove a visible owner prompt, response, or execution outcome. Unknown operations remain unknown; do not reconstruct commands or secrets from other session files. Include matching earlier entries and existing evidence when needed; do not reconstruct old readiness history as a new project. If no actionable records exist, say so and stop.
 2. Inspect the relevant evidence, current repository rules, and effective settings that can be read through authorized tools. Check current official documentation before proposing a tool-specific mechanism. Separate an observed restriction from an agent inference, command misuse, instruction-discovery failure, test/fixture defect, owner decision, or genuinely missing capability. Unknown causes stay unknown.
 3. Group matching causes within each tool and scope. Count observed requests, recurrences, and stops requiring owner response from those records. Identify required owner actions and whether subsequent relevant operations exercised a correction. Do not equate command escalations with UI clicks, silence with success, or one tool's access with another's.
 4. Recommend the smallest correction. First use existing authorized workflows and correct agent mistakes. Where access really is missing, present the exact proposed settings diff, scope, allowed and excluded examples, expected effect, verification, and rollback. Explain gates that should remain. Do not propose broad interpreter/shell permissions, bypass a denial, or weaken role restrictions.
@@ -35,6 +35,17 @@ The alias and authorization boundary are defined in [AGENTS.md §4](../AGENTS.md
 For later product work, the agent records the outcome when an already necessary operation exercises a prior correction. Until then its effectiveness is “not yet exercised.” Use the next requested analysis to assess benefit; do not append a metrics report to every product handoff or require reminders. Fresh-session verification is needed before claiming persistence across sessions, and must identify the observed tool and scope. If only configuration matching was checked, report that narrower fact. This procedure grants no authority to resume deferred infrastructure, run unrelated validation, or build an execution system.
 
 ## Entries
+
+## OI-015 — Trust the minimal Codex permission logger
+
+- Requested: Prepared 2026-10-14 22:30 UTC; Codex primary; automatic minimal permission-request recording. Activation instruction will be delivered after implementation checks.
+- Action and purpose: Restart Codex in this repository, open `/hooks`, review and trust the project `PermissionRequest` logging handler so future supported approval requests leave local metadata independently of agent-written entries.
+- Context/evidence: The owner authorized implementation after accepting a privacy boundary of timestamp, tool category and known operation only. Installed `codex-cli 0.162.1` reports the hooks feature enabled. Unit and actual stdin/subprocess tests verify the handler, but do not establish activation in the owner's client.
+- Trigger: Official Codex hook trust requires review of the exact definition before a non-managed hook runs; `.codex/` project trust and enabling hooks do not replace that review. Source: https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks.
+- Earlier occurrence: None found for hook trust. OI-014 established a missed owner prompt, not a hook activation request.
+- Outcome: Pending owner activation; no trust action or live request capture observed.
+- Persistence: Not yet exercised in a fresh trusted session. Hook events do not establish visible prompts, owner clicks or execution outcomes.
+- Follow-up: Implemented `.codex/hooks.json` and `scripts/codex-permission-log.mjs` with privacy and real-process tests in this change; automatic approval policy is unchanged. Activation and effectiveness remain unverified. Verify at the next already necessary permission request after activation by inspecting `.scratch/permission-requests/events.jsonl`. Do not use an unrelated probe or infer success from missing requests. Keep this distinction in later permission analysis.
 
 ## OI-014 — Timed E2E command requires separate approval
 
