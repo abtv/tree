@@ -558,11 +558,9 @@ describe('agent instruction routing', () => {
     const root = createTemporaryRoot()
     writeFile(root, 'AGENTS.md', routes)
     writeFile(root, 'docs/AGENT_WORKFLOW.md', procedureContent + '\n[Missing](MISSING.md)')
-    writeFile(root, 'docs/OWNER_INTERVENTIONS.md', '[Missing](MISSING.md)')
     writeFile(root, 'docs/WORKING_WITH_AGENT.md', '[Missing](MISSING.md)')
     expect(runChecks({ rootDirectory: root }).issues).toEqual([
       expect.stringContaining('docs/AGENT_WORKFLOW.md: link target not found'),
-      expect.stringContaining('docs/OWNER_INTERVENTIONS.md: link target not found'),
       expect.stringContaining('docs/WORKING_WITH_AGENT.md: link target not found'),
     ])
     writeFile(root, 'AGENTS.md', routes + 'a'.repeat(AGENT_CORE_MAX_BYTES))

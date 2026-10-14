@@ -45,7 +45,7 @@ Before sending, check that the first lines explain the conclusion and whether ow
 
 ### Discussion
 
-Discussion, comparison, investigation, and conversation drafts do not authorize repository edits. Read what is needed and answer with a recommendation. Change nothing, including Git history and documentation. Agreement on a direction alone does not authorize implementation. If authorization is ambiguous, treat the request as discussion and state what you would do. Log any required owner intervention under §4; the log is not permission to edit other files.
+Discussion, comparison, investigation, and conversation drafts do not authorize repository edits. Read what is needed and answer with a recommendation. Change nothing, including Git history and documentation. Agreement on a direction alone does not authorize implementation. If authorization is ambiguous, treat the request as discussion and state what you would do.
 
 ### Interpreting work requests
 
@@ -79,13 +79,6 @@ Use native file-editing tools for repository changes; no shell edit scripts or i
 
 Keep agent-created temporary materials in `.scratch/<task>/`, preserving existing tool-owned paths, explicit owner destinations, and required suite locations. Do not force-add scratch evidence. After the task's final commit, remove its directory with `npm run retire:scratch -- <task>`. Verify ownership before process cleanup; in Codex use standalone `kill -INT <pid>`, never terminal Ctrl+C, and follow the bounded cleanup rules. An unavailable signal or canceled request remains blocked.
 
-Record only new kinds of owner intervention in [Owner Intervention Log](docs/OWNER_INTERVENTIONS.md), before asking where possible, then record the outcome. Use procedure §4 for matching and evidence. Consult prior entries; historical approval does not prove current access, and escalation alone does not mean owner intervention.
-
-### improve-permissions
-
-The plain-text request `improve-permissions` invokes the [shared analysis procedure](docs/OWNER_INTERVENTIONS.md#improve-permissions-procedure). This is the same instruction in all three tools, not a shell command or installed skill. Select unanalysed records and prior corrections yourself; the owner need not supply IDs or wording. The invocation authorizes analysis and concrete proposals only, with no file/settings edits except any mandatory intervention entry. Applying a presented proposal requires explicit authorization; platform permission remains separate. Do not launch readiness, unrelated checks, or new automation to perform the analysis.
-
-During an already necessary authorized operation, record evidence of whether a relevant previous correction worked. Do not run a probe merely to prove persistence. Distinguish applied from verified, session access from new-session access, and observed outcomes from unknown UI clicks. No recurrence without a relevant operation is not success evidence.
 
 Keep ordinary shortcuts application-scoped; use `globalShortcut` only for an explicit inactive-application requirement. State/persistence changes require the assessment in `docs/PRODUCT.md` §22 (writes/syncs, interactive CPU, memory growth) and automated scale guards when relevant.
 
@@ -125,7 +118,7 @@ Read procedure §8 before initiatives, review batches, and ADRs. Plans do not au
 
 ### Deferred infrastructure work
 
-At the owner's direction on 2026-10-14, harness development, readiness preparation, and E2E Coverage Efficiency are deferred until an explicit request to resume the named work. Preserve code, plans, durable findings, and history; the owner authorized deletion of four old scratch directories on 2026-10-14. Do not reopen the completed Runner Readiness initiative. Do not ask routinely whether to resume, select deferred work on “continue,” or treat `improve-permissions` as resumption. This pause does not block independently authorized product tasks in ordinary sessions. Check their actual required capabilities and validation, not unattended-runner readiness. Concrete missing task capabilities still block their dependent work.
+At the owner's direction on 2026-10-14, harness development, readiness preparation, and E2E Coverage Efficiency are deferred until an explicit request to resume the named work. Preserve code, plans, durable findings, and history; the owner authorized deletion of four old scratch directories on 2026-10-14. Do not reopen the completed Runner Readiness initiative. Do not ask routinely whether to resume or select deferred work on “continue.” This pause does not block independently authorized product tasks in ordinary sessions. Check their actual required capabilities and validation, not unattended-runner readiness. Concrete missing task capabilities still block their dependent work.
 
 Deferred runner and unattended-preflight procedures are in [Deferred Runner](docs/DEFERRED_RUNNER.md). Load them only after an explicit request to resume that work.
 

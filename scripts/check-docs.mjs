@@ -444,7 +444,6 @@ function collectLiveDocuments(rootDirectory) {
     'SECURITY.md',
     'VIM_CONFORMANCE.md',
     'AGENT_WORKFLOW.md',
-    'OWNER_INTERVENTIONS.md',
     'WORKING_WITH_AGENT.md',
   ]) {
     addIfPresent(join(rootDirectory, 'docs', name))

@@ -16,9 +16,8 @@ Write `menu` to see these calls in your conversation language. Use them as ordin
 | `discuss: …` | Inspect relevant evidence and give a recommendation with material tradeoffs. Do not implement or record the discussion in repository files. | Read only |
 | `implement: …` | Deliver the stated outcome with required documentation, checks, review, and commit. Resolve material gaps before implementation; follow initiative planning/authorization rules if the outcome needs one. | Implementation within stated scope |
 | `fix: …` | Reproduce and correct the reported defect within recorded requirements, following the defect-first workflow and required validation. Apply the uncommitted owner-verification gate for a failed latest fix. | Implementation within stated scope |
-| `improve-permissions` | Analyze relevant interventions and prior corrections, then recommend concrete changes under the [shared procedure](OWNER_INTERVENTIONS.md#improve-permissions-procedure). | Read only; application needs authorization |
 
-Read-only calls do not authorize file edits or settings changes. Mandatory intervention logging under `AGENTS.md` §4 remains the sole recording exception when owner action is required. Calls that authorize edits retain all scope, review, validation, and platform-permission requirements; existing instructions to withhold a commit still apply. `save-idea` does not authorize experiments, product changes, or resolution of an existing question. If the evidence needed by its template is not yet known, record that uncertainty rather than invent observations or an owner decision. The agent handles formatting, record selection, and required checks itself.
+Read-only calls do not authorize file edits or settings changes. Calls that authorize edits retain all scope, review, validation, and platform-permission requirements; existing instructions to withhold a commit still apply. `save-idea` does not authorize experiments, product changes, or resolution of an existing question. If the evidence needed by its template is not yet known, record that uncertainty rather than invent observations or an owner decision. The agent handles formatting, record selection, and required checks itself.
 
 For example, `save-idea: make notes easier to find` records an idea; `discuss: ways to find notes` requests analysis; `implement: the search behavior we just specified` requests delivery within that agreed scope. A bare `fix` or `implement` with no identifiable target needs clarification. Showing or quoting a call is not an instruction to execute it. No call implicitly resumes deferred infrastructure or permits bypassing a denial; resumption still requires an explicit request naming that work.
 
@@ -30,11 +29,6 @@ For those decisions, the agent recommends a solution before implementation and e
 
 Answers start with the conclusion, recommendation, result, or blocker, followed by the evidence needed to assess it. The agent uses plain, literal language and consistent technical terms while keeping the technical depth needed for your decision. It checks clarity before sending; you do not need to request BLUF or repeat writing instructions. These are clear-writing principles inspired by ASD-STE100, not formal conformance to its English vocabulary and rules.
 
-### Permission Review
-
-Start a separate session in your chosen coding tool and write `improve-permissions`. The agent selects the relevant journal entries, assesses recurring causes and previous corrections, and proposes concrete changes. You do not need to supply entry IDs, assemble evidence, or request a metrics report. If there is no actionable evidence, it says so and stops.
-
-That call is analysis only. You can then say “apply” to authorize the concrete proposal. The agent handles edits, required checks, recording, and commits; mandatory platform permissions remain separate. Later necessary operations supply evidence of effectiveness without a special probe or an owner reminder. The [shared procedure](OWNER_INTERVENTIONS.md#improve-permissions-procedure) applies to Codex, Claude Code, and OpenCode; each tool's actual permission scope is assessed separately.
 
 ### Vocabulary
 
