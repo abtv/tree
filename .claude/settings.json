@@ -43,6 +43,7 @@
       "npm run test:perf*",
       "TREE_E2E_VISIBLE=1 npm run test:e2e*",
       "npm run check:full*",
+      "npm run check",
       "npx playwright*"
     ],
     "network": {

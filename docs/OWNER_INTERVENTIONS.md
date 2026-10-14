@@ -6,7 +6,7 @@ The Product Owner authorized this log on 2026-10-13 to reduce repeated interrupt
 
 ## Entry Format
 
-Use one entry per request, with a stable identifier such as `OI-001`. Update the same entry after the response and any later confirmed correction. Use a UTC timestamp and name the coding tool and task. Keep entries factual and short; omit secrets and personal data from command arguments and paths. Include the client/version, mode, and primary/child context when relevant and known; do not run unrelated diagnostics to populate fields. Link retained evidence in `.scratch/<task>/` when a sanitized error or exact command is needed to explain the cause. Do not infer owner click counts from escalated tool calls.
+Use one entry per new intervention kind, with a stable identifier such as `OI-001`. Match by coding tool, underlying restriction or decision cause, and required owner action; differing test arguments or repetitions are not new kinds. Existing per-request entries are historical and need not be rewritten. Do not add an entry merely because a tool call requests escalation. Update an existing entry only when evidence materially changes its cause, correction, or verification status. Use a UTC timestamp and name the coding tool and task. Keep entries factual and short; omit secrets and personal data. Include client/version, mode and primary/child context when relevant and known, without unrelated diagnostics. Do not infer owner click counts from escalated tool calls.
 
 ```md
 ## OI-NNN — Short description
@@ -35,6 +35,32 @@ The alias and authorization boundary are defined in [AGENTS.md §4](../AGENTS.md
 For later product work, the agent records the outcome when an already necessary operation exercises a prior correction. Until then its effectiveness is “not yet exercised.” Use the next requested analysis to assess benefit; do not append a metrics report to every product handoff or require reminders. Fresh-session verification is needed before claiming persistence across sessions, and must identify the observed tool and scope. If only configuration matching was checked, report that narrower fact. This procedure grants no authority to resume deferred infrastructure, run unrelated validation, or build an execution system.
 
 ## Entries
+
+## OI-012 — Writable workspace excludes authorized source files
+
+- Requested: 2026-10-14; Codex primary; workflow simplification.
+- Action and purpose: Reopen the repository root as writable to apply the five authorized workflow changes.
+- Context/evidence: The preceding session could write only scratch files; its handoff retained a prepared patch without applying it to source or settings. Logging in this file was also blocked.
+- Trigger: Runtime workspace restriction; repository workflow requires supported access rather than bypassing that restriction.
+- Earlier occurrence: None recorded for this cause.
+- Outcome: The owner resumed with the repository root writable; native edits to source documentation and Claude settings succeeded in this session.
+- Persistence: Verified for this session only; no inference about the owner's UI actions or future sessions.
+- Follow-up: Use the repository root as the writable workspace for repository tasks. No permission-rule expansion was needed.
+
+## OI-013 — Retire deferred evidence and relocate live documentation
+
+- Requested: 2026-10-14; Codex primary; workflow simplification.
+- Action and purpose: Delete four retained infrastructure scratch directories and move deferred runner/preflight procedures with their dependent links.
+- Context/evidence: The preceding handoff recorded both confirmations as pending. Durable scratch conclusions were already recorded in the deferred plan and Git history.
+- Trigger: Explicit confirmation for destructive cleanup and the requested change to documentation with live dependents.
+- Earlier occurrence: None recorded for this cause.
+- Outcome: Explicitly authorized in the continuation request on 2026-10-14, with general planning and acceptance preserved and no push to origin.
+- Persistence: Task-specific authorization; it does not resume deferred work, renew budgets, or authorize retrying canceled actions.
+- Follow-up: Apply the scoped cleanup and relocation in this task; no further confirmation is needed.
+
+### Codex E2E evidence shared by OI-002 through OI-010
+
+On 2026-10-14, the preceding workflow-simplification session checked the combined existing tests.rules and e2e.rules: the named E2E command matched allow. Its necessary navigation sibling-arrow test execution built successfully and passed both cases without an observed owner interruption. This establishes that session and command scope only. Escalation itself is not an owner prompt; no Codex permission expansion was needed. Future-session persistence remains unknown.
 
 ## OI-001 — Emoji completion interaction and search scope
 
@@ -155,4 +181,4 @@ For later product work, the agent records the outcome when an already necessary 
 - Earlier occurrence: None recorded for Claude Code.
 - Outcome: Approved without an observed owner prompt; 171 test files and 3624 tests passed, and the full check passed.
 - Persistence: Per-command; new-session access unknown.
-- Follow-up: Unanalyzed; the same suite will hit this sandbox boundary in every Claude Code session.
+- Follow-up: Applied the owner-approved exact `npm run check` entry in Claude `sandbox.excludedCommands` on 2026-10-14; existing command permissions still apply. No wildcard or broader shell exclusion was added. Actual fresh-session Claude verification remains unexercised; this Codex session cannot establish it.

@@ -79,7 +79,7 @@ Use native file-editing tools for repository changes; no shell edit scripts or i
 
 Keep agent-created temporary materials in `.scratch/<task>/`, preserving existing tool-owned paths, explicit owner destinations, and required suite locations. Do not force-add scratch evidence. After the task's final commit, remove its directory with `npm run retire:scratch -- <task>`. Verify ownership before process cleanup; in Codex use standalone `kill -INT <pid>`, never terminal Ctrl+C, and follow the bounded cleanup rules. An unavailable signal or canceled request remains blocked.
 
-Record every platform permission request and interruption requiring an owner response in [Owner Intervention Log](docs/OWNER_INTERVENTIONS.md), before asking where possible, then record the observed outcome. Consult prior entries, use already authorized supported paths, and never infer access from historical approval. If logging is blocked or immediate escalation is required, request first and record at the first opportunity. Do not seek an extra permission or separate commit solely for logging. The agent owns this work without reminders. During product work, report necessary actions or blockers, not a routine permission-score report.
+Record only new kinds of owner intervention in [Owner Intervention Log](docs/OWNER_INTERVENTIONS.md), before asking where possible, then record the observed outcome. Match by coding tool, restriction or decision cause, and required owner action; changed test arguments do not create a new kind. Do not append entries for known kinds or for an escalated command that needs no owner response. Update an existing entry only when new evidence changes its cause, correction, or verification status. Consult prior entries and use supported authorized paths; never infer access from historical approval or bypass a denial. If logging is blocked, record at the first opportunity without seeking permission solely for logging.
 
 ### improve-permissions
 
@@ -125,11 +125,9 @@ Read procedure §8 before initiatives, review batches, and ADRs. Plans do not au
 
 ### Deferred infrastructure work
 
-At the owner's direction on 2026-10-14, harness development, readiness preparation, and E2E Coverage Efficiency are deferred until an explicit request to resume the named work. Preserve code, plans, evidence, and history; do not reopen the completed Runner Readiness initiative. Do not ask routinely whether to resume, select deferred work on “continue,” or treat `improve-permissions` as resumption. This pause does not block independently authorized product tasks in ordinary sessions. Check their actual required capabilities and validation, not unattended-runner readiness. Concrete missing task capabilities still block their dependent work.
+At the owner's direction on 2026-10-14, harness development, readiness preparation, and E2E Coverage Efficiency are deferred until an explicit request to resume the named work. Preserve code, plans, durable findings, and history; the owner authorized deletion of four old scratch directories on 2026-10-14. Do not reopen the completed Runner Readiness initiative. Do not ask routinely whether to resume, select deferred work on “continue,” or treat `improve-permissions` as resumption. This pause does not block independently authorized product tasks in ordinary sessions. Check their actual required capabilities and validation, not unattended-runner readiness. Concrete missing task capabilities still block their dependent work.
 
-### Unattended execution preflight
-
-Before explicitly authorized unattended initiative execution, read procedure §8 and `docs/DEVELOPMENT.md` §10. Verify actual required host/child paths; configuration and old evidence are insufficient. Preserve bounds and stop safely on unexpected permission/authentication requests. This requirement is not a prerequisite for ordinary product sessions.
+Deferred runner and unattended-preflight procedures are in [Deferred Runner](docs/DEFERRED_RUNNER.md). Load them only after an explicit request to resume that work.
 
 ### Final owner acceptance
 
@@ -183,7 +181,7 @@ If the owner says the latest committed fix still fails, reproduce and make the n
 
 ### Session boundaries
 
-Continue authorized work while context permits. Preserve exact remaining work and valid evidence for a new session; ordinary “continue” must be sufficient to resume an identifiable authorized task. Do not require the owner to reconstruct context. Resolve multiple ready initiatives under procedure §8, excluding deferred work. Procedure §12 governs bounded recovery, budgets, no more than four initiative task commits per primary session, and verified automatic continuation.
+Continue authorized work while context permits. Preserve exact remaining work and valid evidence for a new session; ordinary “continue” must be sufficient to resume an identifiable authorized task. Do not require the owner to reconstruct context. Resolve multiple ready initiatives under procedure §8, excluding deferred work. Procedure §12 governs bounded recovery, budgets, no more than four initiative task commits per primary session, and ordinary continuation.
 
 For a requested new-session prompt, follow [procedure §12, New-session prompts](docs/AGENT_WORKFLOW.md#new-session-prompts). Include the new objective and necessary conversation-only context; the receiving agent recovers permanent rules and repository state itself.
 

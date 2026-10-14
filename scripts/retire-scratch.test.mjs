@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { RETAINED_TASKS, resolveScratchRetirement, retireScratch } from './retire-scratch.mjs'
+import { resolveScratchRetirement, retireScratch } from './retire-scratch.mjs'
 
 const temporaryDirectories = []
 
@@ -49,13 +49,20 @@ describe('resolveScratchRetirement', () => {
     }
   })
 
-  it('refuses retained initiative evidence', () => {
-    const root = createRepository()
-    for (const taskName of RETAINED_TASKS) {
+  it.each(['autonomous-initiatives', 'autonomous-initiatives-pilot', 'e2e-coverage-efficiency', 'runner-readiness'])(
+    'retires the owner-released namespace %s without removing another task',
+    (taskName) => {
+      const root = createRepository()
       mkdirSync(join(root, '.scratch', taskName))
-      expect(resolveScratchRetirement({ rootDirectory: root, taskName })).toMatchObject({ ok: false })
-    }
-  })
+      writeFileSync(join(root, '.scratch', taskName, 'evidence.txt'), 'synthetic evidence')
+      expect(retireScratch({ rootDirectory: root, taskName })).toEqual({
+        ok: true,
+        relativePath: join('.scratch', taskName),
+      })
+      expect(existsSync(join(root, '.scratch', taskName))).toBe(false)
+      expect(existsSync(join(root, '.scratch', 'task', 'nested', 'report.json'))).toBe(true)
+    },
+  )
 
   it('refuses a missing directory and a regular file', () => {
     const root = createRepository()

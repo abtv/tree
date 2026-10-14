@@ -4,15 +4,9 @@ import { fileURLToPath } from 'node:url'
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-// Evidence namespaces that documented initiative workflows and the deferred E2E Coverage
-// Efficiency plan require to survive across sessions. They are removed only by an explicit owner
-// request, never by routine task cleanup.
-export const RETAINED_TASKS = Object.freeze([
-  'autonomous-initiatives',
-  'autonomous-initiatives-pilot',
-  'e2e-coverage-efficiency',
-  'runner-readiness',
-])
+// The owner released the four former infrastructure namespaces on 2026-10-14 after their
+// durable conclusions were checked. Future retained evidence can be listed here explicitly.
+export const RETAINED_TASKS = Object.freeze([])
 
 // Decide whether one task scratch directory may be removed, without changing anything. The guards
 // keep the workflow to a single real directory directly under `.scratch/`: no nested or option-like
