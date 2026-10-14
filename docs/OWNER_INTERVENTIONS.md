@@ -25,7 +25,7 @@ Use one entry per new intervention kind, with a stable identifier such as `OI-00
 
 The alias and authorization boundary are defined in [AGENTS.md §4](../AGENTS.md#improve-permissions). The agent performs the following procedure without asking the owner to select records or repeat instructions.
 
-1. Select unanalysed entries and applied corrections whose effectiveness is unresolved or contradicted by a recurrence. Also inspect `.scratch/permission-requests/events.jsonl` when present: it supplies minimal Codex permission-request metadata independently of agent-written entries. A hook event does not prove a visible owner prompt, response, or execution outcome. Unknown operations remain unknown; do not reconstruct commands or secrets from other session files. Include matching earlier entries and existing evidence when needed; do not reconstruct old readiness history as a new project. If no actionable records exist, say so and stop.
+1. Select unanalysed entries and applied corrections whose effectiveness is unresolved or contradicted by a recurrence. Unknown operations remain unknown; do not reconstruct commands or secrets from other session files. Include matching earlier entries and existing evidence when needed; do not reconstruct old readiness history as a new project. If no actionable records exist, say so and stop.
 2. Inspect the relevant evidence, current repository rules, and effective settings that can be read through authorized tools. Check current official documentation before proposing a tool-specific mechanism. Separate an observed restriction from an agent inference, command misuse, instruction-discovery failure, test/fixture defect, owner decision, or genuinely missing capability. Unknown causes stay unknown.
 3. Group matching causes within each tool and scope. Count observed requests, recurrences, and stops requiring owner response from those records. Identify required owner actions and whether subsequent relevant operations exercised a correction. Do not equate command escalations with UI clicks, silence with success, or one tool's access with another's.
 4. Recommend the smallest correction. First use existing authorized workflows and correct agent mistakes. Where access really is missing, present the exact proposed settings diff, scope, allowed and excluded examples, expected effect, verification, and rollback. Explain gates that should remain. Do not propose broad interpreter/shell permissions, bypass a denial, or weaken role restrictions.
@@ -36,7 +36,20 @@ For later product work, the agent records the outcome when an already necessary 
 
 ## Entries
 
+## OI-016 — New memory workflow requires approval
+
+- Requested: 2026-10-15; exact UTC prompt time unknown; Codex primary; bounded E2E memory separation.
+- Action and purpose: Run `npm run test:e2e:memory -- --list` to verify the new memory-only npm entry.
+- Context/evidence: The owner supplied a screenshot of an explicit approval prompt after task completion. The agent omitted the request from this journal and did not inspect the hook metadata before completion.
+- Trigger: The new npm name is absent from the tracked Codex named-workflow allow rules. The same configuration can be selected through the existing allowed `npm run test:e2e -- --config=playwright.memory.config.ts` workflow.
+- Earlier occurrence: OI-002 through OI-010 cover existing E2E commands; OI-014 covers a timer wrapper. This request concerns a new npm command prefix.
+- Outcome: Prompt observed; selected approval option unknown. The command subsequently succeeded and listed exactly two cases.
+- Persistence: No persistent approval selection is established by the screenshot. No repository permission rule was added.
+- Follow-up: Use the existing named E2E workflow for agent invocations. The owner requested removal of the supplemental hook; OI-015 records its retirement. No permission expansion is authorized.
+
 ## OI-015 — Trust the minimal Codex permission logger
+
+**Retired at the owner's request on 2026-10-15.** The project hook, logger and dedicated tests were removed. The retained local JSONL contains one event at 2026-10-14 22:54:40 UTC with operation `unknown`; its relationship to the later owner-supplied memory-command approval screenshot is unverified. The agent did not inspect the hook log before completing that task. Existing metadata is preserved, but automatic logging and its activation instructions are no longer part of the workflow. The entries below describe historical activation evidence, not a current instruction to activate or verify this hook.
 
 - Requested: Prepared 2026-10-14 22:30 UTC; Codex primary; automatic minimal permission-request recording. Activation instruction will be delivered after implementation checks.
 - Action and purpose: Restart Codex in this repository, open `/hooks`, review and trust the project `PermissionRequest` logging handler so future supported approval requests leave local metadata independently of agent-written entries.
