@@ -36,6 +36,17 @@ For later product work, the agent records the outcome when an already necessary 
 
 ## Entries
 
+## OI-014 — Timed E2E command requires separate approval
+
+- Requested: Previous session; exact request date and UTC time unknown. Recorded 2026-10-14 22:20 UTC; Codex primary; fold expansion test pilot baseline.
+- Action and purpose: Run `/usr/bin/time -p npm run test:e2e:diagnose -- --json-output=.scratch/fold-expand-test-pilot/before.json e2e/inline-expansion.spec.ts --workers=6 --reporter=dot,json` to measure the complete baseline command.
+- Context/evidence: The owner supplied a screenshot in this conversation showing the command and an explicit approval prompt. The preceding agent message states that the first baseline omitted the complete command timer and overlapped fast tests with E2E execution. No response selection or command result is visible. This request was missing from the log when the owner invoked permission analysis.
+- Trigger: The tracked Codex rules allow the named npm workflow, but do not contain the `/usr/bin/time -p` prefix. The wrapper changes the command prefix; this explains the prompt, although the previous session's complete effective configuration is unknown.
+- Earlier occurrence: OI-002 through OI-010 cover direct npm E2E executions, not the timer wrapper; no matching wrapper entry found.
+- Outcome: Owner approval prompt observed; response and execution outcome unknown.
+- Persistence: Unknown; no repository rule for this wrapper exists, and the screenshot does not establish that a persistent client rule was selected.
+- Follow-up: Proposed a narrowly scoped prefix for `/usr/bin/time -p npm run test:e2e:diagnose`; not authorized or applied. This change records the missed case and requires complete-prefix checks and session request reconciliation in Agent Workflow Procedures §4. Effectiveness of that workflow correction is not yet exercised by a subsequent permission request.
+
 ## OI-012 — Writable workspace excludes authorized source files
 
 - Requested: 2026-10-14; Codex primary; workflow simplification.
