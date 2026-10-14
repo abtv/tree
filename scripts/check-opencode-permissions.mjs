@@ -112,6 +112,9 @@ const developCases = {
     // Guardrailed deletion of one tracked file; the script enforces the path checks.
     'npm run retire:file -- e2e/vim-editing.spec.ts',
     'npm run retire:file -- src/renderer/editor-dom.ts 2>&1',
+    // Guardrailed removal of one finished task's scratch directory; the script enforces the checks.
+    'npm run retire:scratch -- emoji-caret',
+    'npm run retire:scratch -- emoji-caret 2>&1',
     // Fix-history signal for a defect fix; see AGENTS.md §12 and docs/DEVELOPMENT.md §10.
     'npm run fix:history',
     'npm run fix:history 2>&1',
@@ -218,6 +221,7 @@ const developCases = {
     'npm run format:check:changed-extra',
     'npm run validation:snapshot-extra',
     'npm run retire:file-extra',
+    'npm run retire:scratch-extra',
     'npm run fix:history-extra',
     'FOO=1 npm run validation:snapshot',
     'TREE_E2E_VISIBLE=1 npm run format:check:changed',

@@ -128,6 +128,8 @@
           "npm run demo:video": "allow",
           "npm run retire:file": "allow",
           "npm run retire:file *": "allow",
+          "npm run retire:scratch": "allow",
+          "npm run retire:scratch *": "allow",
           "npm run fix:history": "allow",
           "npm run fix:history *": "allow",
           "npm run changelog": "allow",

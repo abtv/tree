@@ -145,3 +145,14 @@ For later product work, the agent records the outcome when an already necessary 
 - Outcome: All 90 selected Electron cases passed, including restored compound-emoji deletion/Undo and native arrows after a.
 - Persistence: New-session access and UI clicks unknown.
 - Follow-up: Unanalyzed; validate corrected paths and reuse unchanged image/Agenda/completion evidence.
+
+## OI-011 — Run unit coverage with nested Git fixtures outside the sandbox
+
+- Requested: 2026-10-14; Claude Code primary in auto mode; scratch cleanup workflow.
+- Action and purpose: Rerun `npm run check` with the sandbox disabled so unit fixtures can initialize nested Git repositories under `.scratch/`.
+- Context/evidence: The sandboxed run failed in initiative-runner and readiness tests with `fatal: cannot copy .../templates/hooks/commit-msg.sample to .../.scratch/<namespace>/.../.git/hooks/commit-msg.sample: Operation not permitted`; the sandbox denies writes to nested `.git/hooks` paths. Static checks had already passed.
+- Trigger: Sandbox-caused failure of required Low Risk validation under AGENTS.md §10.
+- Earlier occurrence: None recorded for Claude Code.
+- Outcome: Approved without an observed owner prompt; 171 test files and 3624 tests passed, and the full check passed.
+- Persistence: Per-command; new-session access unknown.
+- Follow-up: Unanalyzed; the same suite will hit this sandbox boundary in every Claude Code session.
