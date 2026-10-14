@@ -29,6 +29,8 @@ test.describe('save failure lock', () => {
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
     allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+    // Install before editing so any incorrectly retained retry uses the controlled clock too.
+    await window.clock.install()
     await blockSaves(app, { countAttempts: true })
 
     const text = 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
@@ -40,7 +42,11 @@ test.describe('save failure lock', () => {
     const attempts = await readSaveAttempts(app)
     expect(attempts).toBe(3)
 
-    await new Promise((resolve) => setTimeout(resolve, 12_000))
+    await window.clock.runFor(12_000)
+    // Drain renderer-to-main work before checking that no extra save was attempted.
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
     expect(await readSaveAttempts(app)).toBe(attempts)
     expect(await node(window, 1).inputValue()).toBe(frozen)
 
