@@ -320,33 +320,6 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
 // @requirement PRODUCT.md §2.4
 test.describe('inline node expansion (mode-independent)', () => {
-  test('restores nested expansion choices when re-expanding', async ({ userDataDir }) => {
-    seedDocument(userDataDir, nestedSeed())
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    await window.getByRole('button', { name: 'Expand node 2' }).click()
-    expect(await nodeTexts(window)).toEqual([
-      'Alpha',
-      'Alpha child one',
-      'Alpha grandchild',
-      'Alpha child two',
-      'Bravo',
-    ])
-
-    await window.getByRole('button', { name: 'Collapse node 1' }).click()
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
-
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    expect(await nodeTexts(window)).toEqual([
-      'Alpha',
-      'Alpha child one',
-      'Alpha grandchild',
-      'Alpha child two',
-      'Bravo',
-    ])
-  })
-
   test('keeps expansion when navigating via the location breadcrumb', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })

@@ -752,6 +752,52 @@ describe('App', () => {
       expect(readySnapshot(store).location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
     })
 
+    // @requirement PRODUCT.md §2.4
+    it('restores nested expansion choices when re-expanding', async () => {
+      const store = await createSeededStore(
+        {
+          roots: [
+            {
+              id: 'a',
+              text: 'Alpha',
+              children: [
+                {
+                  id: 'a1',
+                  text: 'Alpha child one',
+                  children: [{ id: 'a1a', text: 'Alpha grandchild', children: [] }],
+                },
+                { id: 'a2', text: 'Alpha child two', children: [] },
+              ],
+            },
+            { id: 'b', text: 'Bravo', children: [] },
+          ],
+        },
+        { currentParentId: null, selectedNodeId: 'a' },
+      )
+      renderReact(<App initialVimEnabled store={store} />)
+      const texts = (): string[] =>
+        screen.getAllByRole('textbox', { name: /^Node \d+$/u }).map((input) => (input as HTMLTextAreaElement).value)
+      const expandedTexts = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
+
+      expect(screen.getByText('NORMAL')).toBeInTheDocument()
+      expect(texts()).toEqual(['Alpha', 'Bravo'])
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 2' }))
+      expect(texts()).toEqual(expandedTexts)
+      expect(readySnapshot(store).location.currentParentId).toBeNull()
+      expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+      expect(texts()).toEqual(['Alpha', 'Bravo'])
+      expect(readySnapshot(store).location.currentParentId).toBeNull()
+      expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+      expect(texts()).toEqual(expandedTexts)
+      expect(readySnapshot(store).location.currentParentId).toBeNull()
+      expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
+    })
+
     it('collapses a node’s children again from the same disclosure control', async () => {
       await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))

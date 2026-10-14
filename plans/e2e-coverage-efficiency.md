@@ -8,7 +8,7 @@ The owner authorized shortening this record on 2026-10-14. This preserves the un
 
 Reduce the cost of validating ordinary changes as the editor grows. Keep exhaustive rules and state combinations at the lowest faithful test layer, and retain real Electron coverage for behavior that cheaper tests cannot reproduce. The owner's desired direction is approximately one minute of relevant local feedback and lower macOS CI cost, not a numerical test-count quota.
 
-The [Fold/Expand Test Pilot](fold-expand-test-pilot.md) investigates one concrete transfer. Its result can inform this initiative; it cannot establish that the broader objective is complete. Its separate 90-minute budget does not fund this initiative.
+The completed Fold/Expand Test Pilot transferred one nested expansion round trip to an App composition test and retained the remaining Electron coverage. Its result can inform this initiative; it cannot establish that the broader objective is complete. Its separate budget did not fund this initiative; Git history retains the pilot plan and result.
 
 ## Established evidence
 
