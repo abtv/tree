@@ -261,7 +261,7 @@ For visible-row movements, cursor-position behavior is the same as for `↑`.
 
 `←` and `→` move between adjacent nodes when the caret is at the corresponding text boundary.
 
-In Normal mode, `h` and `l` move across the node's text characters and its optional image character, which follows the text. An image-only node has the image as its sole character.
+In Normal mode, `h` and `l` move across the node's visible text characters and its optional image character, which follows the text. One visible character is one Unicode grapheme cluster: an emoji, including its skin tone, flag pair or joined sequence, takes one movement step and one block-caret position. Counts and character-wise Visual endpoints use those same boundaries. This explicitly requested visible-character rule takes precedence over component-level Vim movement for compound emoji. Standard editing and Vim Insert keep native Left/Right movement and selection over complete visible characters. An image-only node has the image as its sole character.
 
 When the caret is at the beginning of a node and the user presses `←`:
 

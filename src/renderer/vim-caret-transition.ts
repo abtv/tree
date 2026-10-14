@@ -1,5 +1,6 @@
 import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
 import { normalEditCursor } from './vim-text-commands'
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 export interface VimCaretState {
   cursor: number
@@ -11,6 +12,18 @@ export interface VimVerticalStep {
   caret: VimCaretState
   crossNode: boolean
   focusCursor: number
+}
+
+/** Normalize every published Normal caret against the current text, including saved image returns. */
+export function characterCaretTransition(state: VimCaretState, text: string): VimCaretState {
+  const cursor = state.imageActive ? text.length : moveCharacterOffset(text, state.cursor, 1, 0)
+  const imageTextReturnCursor =
+    state.imageTextReturnCursor === undefined || text.length === 0
+      ? undefined
+      : characterStart(text, state.imageTextReturnCursor)
+  return cursor === state.cursor && imageTextReturnCursor === state.imageTextReturnCursor
+    ? state
+    : { ...state, cursor, imageTextReturnCursor }
 }
 
 /** Resolve one vertical key step before asking the store for a different node. */
@@ -114,19 +127,20 @@ export function horizontalCaretTransition(
   state: VimCaretState,
   direction: 'left' | 'right',
   count: number,
-  textLength: number,
+  text: string,
   hasAttachment: boolean,
 ): VimCaretState {
+  const textLength = text.length
   if (direction === 'left' && state.imageActive && hasAttachment && textLength > 0) {
     // Mutation triage: any action other than `'enter'` is the exit form, so replacing `'exit'` is a no-op.
     const exited = sameNodeImageTransition(state, 'exit', textLength)
     return {
-      cursor: Math.max(0, exited.cursor - (count - 1)),
+      cursor: moveCharacterCursor(exited.cursor, 'left', text, false, count - 1),
       imageActive: false,
     }
   }
 
-  const cursor = moveCharacterCursor(state.cursor, direction, textLength, hasAttachment, count)
+  const cursor = moveCharacterCursor(state.cursor, direction, text, hasAttachment, count)
   const imageActive = hasAttachment && cursor === textLength
   if (!imageActive) return { cursor, imageActive: false }
   if (state.imageActive) return { cursor, imageActive: true, imageTextReturnCursor: state.imageTextReturnCursor }
@@ -136,6 +150,6 @@ export function horizontalCaretTransition(
     state,
     'enter',
     textLength,
-    direction === 'right' ? imageTextReturnCursor(state.cursor, count, textLength) : undefined,
+    direction === 'right' ? imageTextReturnCursor(state.cursor, count, text) : undefined,
   )
 }

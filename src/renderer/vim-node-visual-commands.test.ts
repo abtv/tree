@@ -36,6 +36,18 @@ async function setup(roots: TreeNode[] = [node('a', [node('child')]), node('b'),
 }
 
 describe('whole-node Visual restoration and movement', () => {
+  // @requirement PRODUCT.md §4.3
+  it('restores a whole compound emoji as the remembered Visual character', async () => {
+    const deps = await setup([{ ...node('c'), text: 'A👩‍💻Z' }])
+    deps.commandState.lastVisual = { kind: 'text', nodeId: 'c', anchor: 1, focus: 1, hadText: true }
+    restoreVisual(deps)
+    expect(deps.schedulePendingVisualSelection).toHaveBeenCalledWith({
+      nodeId: 'c',
+      start: 1,
+      end: 6,
+      endpoints: { anchor: 1, focus: 1, hadText: true },
+    })
+  })
   // @requirement PRODUCT.md §23.14
   it('routes Agenda selection motions and d through pending moves and blocks other range commands', async () => {
     const deps = await setup([

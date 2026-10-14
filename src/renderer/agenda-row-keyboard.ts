@@ -70,7 +70,7 @@ export function createAgendaKeyDownHandler({
               anchor: state.agenda!.selectionCursor ?? 0,
               focus: state.agenda!.selectionCursor ?? 0,
             },
-            textOf(row).length,
+            textOf(row),
             rowCaretMode(vim),
           ).focus
     const select = (target: number, preserveViewport = false, cursor = sourceCursor(), explicit = false): void => {
@@ -78,11 +78,7 @@ export function createAgendaKeyDownHandler({
       if (destination.key === row.key && !explicit) return
       if (destination.key === row.key && rowText !== undefined && !rowText.hasEditor(destination)) {
         rowText.setCaret(
-          clampCaret(
-            { key: destination.key, anchor: cursor, focus: cursor },
-            textOf(destination).length,
-            rowCaretMode(vim),
-          ),
+          clampCaret({ key: destination.key, anchor: cursor, focus: cursor }, textOf(destination), rowCaretMode(vim)),
         )
         return
       }

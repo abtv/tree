@@ -351,7 +351,7 @@ describe('Agenda row text keys', () => {
     f.press('ArrowRight', { shiftKey: true })
     f.press('ArrowRight', { shiftKey: true })
     expect(f.caret()).toMatchObject({ anchor: 0, focus: 2 })
-    expect(clampCaret(f.caret(), 4, 'normal')).toMatchObject({ anchor: 2, focus: 2 })
+    expect(clampCaret(f.caret(), 'x'.repeat(4), 'normal')).toMatchObject({ anchor: 2, focus: 2 })
   })
 
   // @requirement PRODUCT.md §23.4

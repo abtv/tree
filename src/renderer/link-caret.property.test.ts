@@ -9,7 +9,7 @@ it('keeps every Normal caret target on exactly one character or the terminal pos
       fc.integer({ min: -5, max: 205 }),
       fc.boolean(),
       (textLength, position, hasAttachment) => {
-        const target = normalCaretTarget(textLength, position, hasAttachment)
+        const target = normalCaretTarget('x'.repeat(textLength), position, hasAttachment)
         if (target.kind === 'block') {
           expect(target.start).toBeGreaterThanOrEqual(0)
           expect(target.end).toBe(target.start + 1)
@@ -35,7 +35,7 @@ it('never selects a character outside the link under the caret', () => {
         const linkLength = 1 + (linkLengthSeed % (textLength - linkStart))
         const link = { start: linkStart, end: linkStart + linkLength }
         const caret = link.start + (linkStartSeed % linkLength)
-        const target = normalCaretTarget(textLength, caret, hasAttachment)
+        const target = normalCaretTarget('x'.repeat(textLength), caret, hasAttachment)
         expect(target.kind).toBe('block')
         if (target.kind !== 'block') return
         expect(target.start).toBe(caret)

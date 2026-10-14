@@ -118,7 +118,7 @@ export function AgendaView({
     if (row.key !== agenda.selectedKey) return undefined
     const text = textOfRow(row)
     const mode = rowCaretMode(vim)
-    return caretMarks(clampCaret(caret, text.length, mode), text.length, mode)
+    return caretMarks(clampCaret(caret, text, mode), text, mode)
   }
   const listRef = useRef<HTMLDivElement | null>(null)
   const heights = useRef(new Map<string, number>())

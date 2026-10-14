@@ -1,20 +1,22 @@
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
+
 export type VimMode = 'insert' | 'normal' | 'replace' | 'visual' | 'visual-node'
 
 export function moveCharacterCursor(
   cursor: number,
   direction: 'left' | 'right',
-  textLength: number,
+  text: string,
   hasAttachment: boolean,
   count = 1,
 ): number {
-  const lastCharacter = hasAttachment ? textLength : Math.max(0, textLength - 1)
-  return Math.max(0, Math.min(lastCharacter, cursor + (direction === 'left' ? -count : count)))
+  const lastCharacter = hasAttachment ? text.length : characterStart(text, text.length)
+  return Math.min(lastCharacter, moveCharacterOffset(text, cursor, direction === 'left' ? -1 : 1, count))
 }
 
 /** The final text character reached before a counted right motion clamps on the image. */
-export function imageTextReturnCursor(cursor: number, count: number, textLength: number): number | undefined {
-  if (textLength === 0) return undefined
-  return Math.min(textLength - 1, cursor + count - 1)
+export function imageTextReturnCursor(cursor: number, count: number, text: string): number | undefined {
+  if (text.length === 0) return undefined
+  return moveCharacterCursor(cursor, 'right', text, false, count - 1)
 }
 
 type CharacterClass = 'space' | 'word' | 'punctuation'

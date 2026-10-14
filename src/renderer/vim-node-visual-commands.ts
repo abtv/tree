@@ -1,6 +1,7 @@
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
 import { agendaVisualTarget } from '../application/agenda-visual-selection'
-import { locateNode } from '../domain/document'
+import { locateNode, requireNode } from '../domain/document'
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 import { isNodeExpanded } from '../application/expansion-state'
 import type { NodeVisualSelection, PendingVisualSelection } from './node-input-types'
 import {
@@ -45,13 +46,16 @@ export function restoreVisual(deps: RestoreVisualDeps): void {
     syncImageCaretToFocus()
     return
   }
-  const start = Math.min(restore.anchor, restore.focus)
+  const text = requireNode(state.document, restore.nodeId).node.text
+  const anchor = characterStart(text, restore.anchor)
+  const focus = characterStart(text, restore.focus)
+  const start = Math.min(anchor, focus)
   store.selectNode(restore.nodeId, start)
   schedulePendingVisualSelection({
     nodeId: restore.nodeId,
     start,
-    end: Math.max(restore.anchor, restore.focus) + 1,
-    endpoints: { anchor: restore.anchor, focus: restore.focus, hadText: restore.hadText },
+    end: moveCharacterOffset(text, Math.max(anchor, focus), 1),
+    endpoints: { anchor, focus, hadText: restore.hadText },
   })
   changeVimMode('visual')
 }

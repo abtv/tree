@@ -5,7 +5,7 @@ import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from '
 import {
   collapseSelectionToAnchor,
   hasMultiCharacterSelection,
-  nodeTextLength,
+  nodeText,
   getCaret,
   readEditableContent,
   hasAttachmentCharacter,
@@ -18,6 +18,7 @@ import {
 import { createEditorKeyDownHandler, type VimTextCommandState } from './editor-input-handlers'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { normalCaretTarget } from './link-caret'
+import { characterCaretTransition } from './vim-caret-transition'
 import { revealInViewport } from './scroll-viewport'
 import { createViewportReveal } from './viewport-reveal'
 import { moveViewportSelection } from './vim-viewport-motion'
@@ -234,8 +235,10 @@ export function useNodeInputBindings({
     ): void => {
       const revision = ++caretRevision.current
       pendingCaret.current = undefined
-      caretAuthority.current = { nodeId, caret }
       const state = store.getSnapshot()
+      if (state.status === 'ready')
+        caret = characterCaretTransition(caret, requireNode(state.document, nodeId).node.text)
+      caretAuthority.current = { nodeId, caret }
       if (fromFocus) {
         if (state.status === 'ready') syncedImageFocusToken.current = state.focus?.token
       }
@@ -575,7 +578,7 @@ export function useNodeInputBindings({
         // the originating text column. Project the resolved caret, including on the deferred pass.
         const authority = caretAuthority.current
         const cursor = authority.nodeId === focus.nodeId ? authority.caret.cursor : focus.cursor
-        const target = normalCaretTarget(nodeTextLength(input), cursor, hasAttachmentCharacter(input))
+        const target = normalCaretTarget(nodeText(input), cursor, hasAttachmentCharacter(input))
         const matches = normalCaretIsDrawn(input, target)
         if (!matches) setNormalCaret(input, cursor)
       } else if (input instanceof HTMLTextAreaElement) input.setSelectionRange(focus.cursor, focus.cursor)

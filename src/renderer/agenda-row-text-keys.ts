@@ -2,8 +2,9 @@ import type { VimTextCommandState } from './editor-input-handlers'
 import { clearPending } from './vim-command-state'
 import { moveWordBackward, moveWordEnd } from './vim-editing'
 import type { VimFindCommand } from './vim-keyboard-types'
-import { copyRange, clampCaret, maxOffset, selectionRange, type RowCaret, type RowCaretMode } from './agenda-row-caret'
+import { copyRange, clampCaret, selectionRange, type RowCaret, type RowCaretMode } from './agenda-row-caret'
 import { isTextMotion, parseCount, repeatedFindMotion, textMotion } from './vim-text-commands'
+import { moveCharacterOffset } from '../domain/text-characters'
 
 export interface RowTextKeyContext {
   event: { key: string; shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }
@@ -32,22 +33,27 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
   const mode = rowCaretMode(vim)
   if (mode === 'hidden' || event.ctrlKey) return false
   const length = text.length
-  const caret = clampCaret(context.caret, length, mode)
+  const caret = clampCaret(context.caret, text, mode)
   const key = event.key
   const place = (anchor: number, focus: number): void => {
-    const maximum = maxOffset(length, mode)
-    setCaret({
-      key: caret.key,
-      anchor: Math.max(0, Math.min(anchor, maximum)),
-      focus: Math.max(0, Math.min(focus, maximum)),
-    })
+    setCaret(
+      clampCaret(
+        {
+          key: caret.key,
+          anchor,
+          focus,
+        },
+        text,
+        mode === 'normal' && anchor !== focus ? 'visual' : mode,
+      ),
+    )
   }
   const vimText = mode === 'normal' || mode === 'visual'
   if (event.metaKey) {
     if (event.altKey) return false
     const lower = key.toLowerCase()
     if (lower === 'c' && !event.shiftKey) {
-      const range = copyRange(caret, length, mode)
+      const range = copyRange(caret, text, mode)
       if (range.end > range.start) copy(text.slice(range.start, range.end))
       return true
     }
@@ -134,7 +140,7 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
   }
   if (visual && key === 'y') {
     clearPending(commandState)
-    const range = selectionRange(caret, length, mode)
+    const range = selectionRange(caret, text, mode)
     if (range.end > range.start) {
       const yanked = text.slice(range.start, range.end)
       if (vim!.register !== undefined) vim!.register.current = { kind: 'text', value: yanked }
@@ -178,9 +184,5 @@ function handleThinKey(
 
 /** The next caret position by user-perceived character, so an emoji or a combined letter is one step. */
 export function adjacentBoundary(text: string, offset: number, direction: -1 | 1): number {
-  const boundaries = [0]
-  for (const { index, segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text))
-    boundaries.push(index + segment.length)
-  if (direction === 1) return boundaries.find((boundary) => boundary > offset) ?? text.length
-  return boundaries.findLast((boundary) => boundary < offset) ?? 0
+  return moveCharacterOffset(text, offset, direction)
 }

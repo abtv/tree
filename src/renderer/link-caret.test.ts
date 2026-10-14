@@ -2,26 +2,31 @@ import { describe, expect, it } from 'vitest'
 import { currentLinkDraft, normalCaretTarget } from './link-caret'
 
 describe('normalCaretTarget', () => {
+  // @requirement PRODUCT.md §4.3
+  it('draws one block over the entire emoji even when a restored offset is inside it', () => {
+    expect(normalCaretTarget('A👩‍💻Z', 3, false)).toEqual({ kind: 'block', start: 1, end: 6 })
+    expect(normalCaretTarget('🚀', 2, false)).toEqual({ kind: 'block', start: 0, end: 2 })
+  })
   it('selects exactly one character for a text position', () => {
-    expect(normalCaretTarget(5, 2, false)).toEqual({ kind: 'block', start: 2, end: 3 })
+    expect(normalCaretTarget('x'.repeat(5), 2, false)).toEqual({ kind: 'block', start: 2, end: 3 })
   })
 
   it('clamps a text position to the character range', () => {
-    expect(normalCaretTarget(5, -3, false)).toEqual({ kind: 'block', start: 0, end: 1 })
-    expect(normalCaretTarget(5, 99, false)).toEqual({ kind: 'block', start: 4, end: 5 })
+    expect(normalCaretTarget('x'.repeat(5), -3, false)).toEqual({ kind: 'block', start: 0, end: 1 })
+    expect(normalCaretTarget('x'.repeat(5), 99, false)).toEqual({ kind: 'block', start: 4, end: 5 })
   })
 
   it('collapses on an empty node', () => {
-    expect(normalCaretTarget(0, 0, false)).toEqual({ kind: 'collapsed', position: 0 })
+    expect(normalCaretTarget('x'.repeat(0), 0, false)).toEqual({ kind: 'collapsed', position: 0 })
   })
 
   it('collapses on the terminal image character of an attached node', () => {
-    expect(normalCaretTarget(5, 5, true)).toEqual({ kind: 'collapsed', position: 5 })
-    expect(normalCaretTarget(0, 0, true)).toEqual({ kind: 'collapsed', position: 0 })
+    expect(normalCaretTarget('x'.repeat(5), 5, true)).toEqual({ kind: 'collapsed', position: 5 })
+    expect(normalCaretTarget('x'.repeat(0), 0, true)).toEqual({ kind: 'collapsed', position: 0 })
   })
 
   it('keeps a text character block before an attached image', () => {
-    expect(normalCaretTarget(5, 4, true)).toEqual({ kind: 'block', start: 4, end: 5 })
+    expect(normalCaretTarget('x'.repeat(5), 4, true)).toEqual({ kind: 'block', start: 4, end: 5 })
   })
 })
 

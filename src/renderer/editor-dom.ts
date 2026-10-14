@@ -1,6 +1,7 @@
 import type { LinkRange, TreeNode } from '../domain/document'
 import { findDateLikeTokens } from '../domain/date-recognition'
 import { markedPieces, type CaretMark } from './agenda-row-caret'
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 /** Measure a UTF-16 text offset without disturbing the live selection. */
 export function expressionPosition(
@@ -65,7 +66,11 @@ export function expressionPosition(
 import { normalCaretTarget } from './link-caret'
 
 export function nodeTextLength(input: HTMLElement): number {
-  return input instanceof HTMLTextAreaElement ? input.value.length : (input.textContent?.length ?? 0)
+  return nodeText(input).length
+}
+
+export function nodeText(input: HTMLElement): string {
+  return input instanceof HTMLTextAreaElement ? input.value : (input.textContent ?? '')
 }
 
 /**
@@ -74,7 +79,12 @@ export function nodeTextLength(input: HTMLElement): number {
  */
 export function hasMultiCharacterSelection(input: HTMLElement): boolean {
   const selection = getSelectionRange(input)
-  return selection.end - selection.start > 1
+  if (selection.start === selection.end) return false
+  const text = nodeText(input)
+  return (
+    selection.start !== characterStart(text, selection.start) ||
+    selection.end !== moveCharacterOffset(text, selection.start, 1)
+  )
 }
 
 export function setEditableText(input: HTMLElement, text: string): void {
@@ -304,8 +314,7 @@ export function setCaret(element: HTMLElement, position: number): void {
 }
 
 export function setNormalCaret(element: HTMLElement, position: number): void {
-  const length = element instanceof HTMLTextAreaElement ? element.value.length : (element.textContent?.length ?? 0)
-  const target = normalCaretTarget(length, position, hasAttachmentCharacter(element))
+  const target = normalCaretTarget(nodeText(element), position, hasAttachmentCharacter(element))
   if (target.kind === 'collapsed') {
     setCaret(element, target.position)
     return

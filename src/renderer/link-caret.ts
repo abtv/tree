@@ -1,4 +1,5 @@
 import type { LinkRange } from '../domain/document'
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 /**
  * The selection a Normal-mode caret draws: a block over exactly one text character, or a collapsed
@@ -10,11 +11,12 @@ export type NormalCaretTarget = { kind: 'block'; start: number; end: number } | 
  * Resolve the Normal-mode caret target from a text position. A block is always one character, so a
  * caret on a hyperlink character can never select past the character or the link boundary.
  */
-export function normalCaretTarget(textLength: number, position: number, hasAttachment: boolean): NormalCaretTarget {
+export function normalCaretTarget(text: string, position: number, hasAttachment: boolean): NormalCaretTarget {
+  const textLength = text.length
   if (hasAttachment && position === textLength) return { kind: 'collapsed', position: textLength }
   if (textLength === 0) return { kind: 'collapsed', position: 0 }
-  const cursor = Math.min(Math.max(position, 0), textLength - 1)
-  return { kind: 'block', start: cursor, end: cursor + 1 }
+  const cursor = characterStart(text, position)
+  return { kind: 'block', start: cursor, end: moveCharacterOffset(text, cursor, 1) }
 }
 
 /**

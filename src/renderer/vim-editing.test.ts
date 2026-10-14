@@ -102,7 +102,7 @@ describe('Vim image character positions (PRODUCT §4.3 and §20.2.9)', () => {
       expected: 0,
     },
   ])('$name', ({ cursor, direction, length, image, count, expected }) => {
-    expect(moveCharacterCursor(cursor, direction, length, image, count)).toBe(expected)
+    expect(moveCharacterCursor(cursor, direction, 'x'.repeat(length), image, count)).toBe(expected)
   })
 })
 
@@ -217,13 +217,13 @@ describe('Vim image caret cursor rule', () => {
 
 describe('Vim image text return cursor', () => {
   it('has no return position for an image-only node', () => {
-    expect(imageTextReturnCursor(0, 3, 0)).toBeUndefined()
+    expect(imageTextReturnCursor(0, 3, 'x'.repeat(0))).toBeUndefined()
   })
 
   it('records the final text character reached by a counted motion', () => {
-    expect(imageTextReturnCursor(0, 1, 5)).toBe(0)
-    expect(imageTextReturnCursor(2, 3, 10)).toBe(4)
-    expect(imageTextReturnCursor(8, 5, 10)).toBe(9)
+    expect(imageTextReturnCursor(0, 1, 'x'.repeat(5))).toBe(0)
+    expect(imageTextReturnCursor(2, 3, 'x'.repeat(10))).toBe(4)
+    expect(imageTextReturnCursor(8, 5, 'x'.repeat(10))).toBe(9)
   })
 })
 

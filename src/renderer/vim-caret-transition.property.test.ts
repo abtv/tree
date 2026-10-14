@@ -15,7 +15,7 @@ it('keeps counted horizontal caret transitions inside the active node', () => {
         const imageActive = hasAttachment && cursor === textLength
         const state = { cursor, imageActive }
         for (const direction of ['left', 'right'] as const) {
-          const next = horizontalCaretTransition(state, direction, count, textLength, hasAttachment)
+          const next = horizontalCaretTransition(state, direction, count, 'x'.repeat(textLength), hasAttachment)
           expect(next.cursor).toBeGreaterThanOrEqual(0)
           expect(next.cursor).toBeLessThanOrEqual(maximum)
           expect(next.imageActive).toBe(hasAttachment && next.cursor === textLength)

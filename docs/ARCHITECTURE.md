@@ -298,6 +298,8 @@ Emoji completion shares the existing `DateAssist` owner, input adapter and popup
 
 ## 9. UI State vs Document State
 
+`text-characters.ts` resolves visible-character boundaries with the platform's Unicode grapheme segmenter. Document, link, store and DOM offsets remain UTF-16. Normal horizontal movement, block-caret projection and Agenda stand-in carets share these boundaries; the existing caret authority normalizes published character positions without changing native Insert editing or tree navigation. Segmentation retains only the latest text and boundary array, so repeated motions on unchanged text reuse work and memory cannot accumulate with edit count. A new text costs O(node text); ordinary motion reads the cached boundaries. No document writes, syncs or history entries are added. A serial long-node motion guard covers the shared path under PRODUCT.md §22.1.
+
 Insert interruption consumes renderer-local plain and structural repeat
 bookkeeping through `vim-session-finish.ts`. Text commands share that rule across
 keyboard, context-menu, and native-paste adapters. Escape alone captures the

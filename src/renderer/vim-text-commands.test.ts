@@ -15,6 +15,16 @@ import {
 } from './vim-text-commands'
 
 describe('Vim text command calculations', () => {
+  // @requirement PRODUCT.md §4.3
+  it('keeps horizontal motion and operator ranges on whole emoji boundaries', () => {
+    expect(textMotion('A👩‍💻Z', 1, 'l', 1)).toEqual({ target: 6, start: 1, end: 6 })
+    expect(textMotion('A👩‍💻Z', 6, 'h', 1)).toEqual({ target: 1, start: 1, end: 6 })
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('enters Insert after the complete emoji with a', () => {
+    expect(insertPosition('A👩‍💻Z', 1, 'a')).toBe(6)
+  })
   it('bounds counts and returns inclusive word-end ranges', () => {
     expect(parseCount('')).toBe(1)
     expect(parseCount('0')).toBe(1)

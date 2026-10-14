@@ -37,6 +37,7 @@ import { editCaretTransition, horizontalCaretTransition } from './vim-caret-tran
 import { navigateVertically } from './vim-vertical-navigation'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 /** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2.15). */
 const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
@@ -168,14 +169,12 @@ export function handleVimKey(
     const maximum =
       allowAttachment && !visual && node.attachment !== undefined
         ? node.text.length
-        : node.text.length > 0
-          ? node.text.length - 1
-          : 0
-    const clamped = Math.max(0, Math.min(target, maximum))
+        : characterStart(node.text, node.text.length)
+    const clamped = moveCharacterOffset(node.text, Math.max(0, Math.min(target, maximum)), 1, 0)
     if (visual) {
       const anchor = commandState.visualAnchor ?? cursor
       setVisualRange(commandState, node.id, anchor, clamped, node.text.length > 0)
-      setSelectionRange(input, Math.min(anchor, clamped), Math.max(anchor, clamped) + 1)
+      setSelectionRange(input, Math.min(anchor, clamped), moveCharacterOffset(node.text, Math.max(anchor, clamped), 1))
     } else {
       syncImageCaretAtCursor(vim, node, input, clamped)
     }
@@ -615,7 +614,7 @@ export function handleVimKey(
       vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
       event.key === 'h' ? 'left' : 'right',
       count,
-      node.text.length,
+      node.text,
       node.attachment !== undefined,
     )
     vim.applyCaretState(node.id, next)
@@ -666,7 +665,7 @@ export function handleVimKey(
   } else if (!visual && event.key === 'v') {
     setVisualRange(commandState, node.id, cursor, cursor, node.text.length > 0)
     vim.setMode('visual')
-    setSelectionRange(input, cursor, Math.min(cursor + 1, node.text.length))
+    setSelectionRange(input, cursor, moveCharacterOffset(node.text, cursor, 1))
   } else if (!visual && event.key === 'V') {
     if (vim.nodeVisual.enter(node.id)) {
       setSelectionRange(input, cursor, cursor)
@@ -687,7 +686,7 @@ export function handleVimKey(
     const anchor = commandState.visualAnchor ?? selection.start
     const focus = commandState.visualFocus ?? selection.end - 1
     setVisualRange(commandState, node.id, focus, anchor, node.text.length > 0)
-    setSelectionRange(input, Math.min(anchor, focus), Math.max(anchor, focus) + 1)
+    setSelectionRange(input, Math.min(anchor, focus), moveCharacterOffset(node.text, Math.max(anchor, focus), 1))
   } else if (visual && (event.key === 'd' || event.key === 'y' || event.key === 'x')) {
     if (selection.start !== selection.end) {
       vim.register.current = { kind: 'text', value: node.text.slice(selection.start, selection.end) }

@@ -4,6 +4,8 @@
  * kept here and drawn as markup (`docs/PRODUCT.md` §23.4). Pure: no DOM, React or store.
  */
 
+import { characterStart, moveCharacterOffset } from '../domain/text-characters'
+
 /** `anchor` and `focus` are UTF-16 offsets into the row's text; both equal means a collapsed caret. */
 export interface RowCaret {
   key: string
@@ -33,43 +35,47 @@ export function arrivalCaret(key: string): RowCaret {
   return { key, anchor: 0, focus: 0 }
 }
 
-/** Normal and Visual rest on a character, so their last offset is `length - 1`; the others reach `length`. */
-export function maxOffset(length: number, mode: RowCaretMode): number {
-  return mode === 'normal' || mode === 'visual' ? Math.max(0, length - 1) : length
+/** Normal and Visual rest on the final visible character; the others reach the insertion point after it. */
+export function maxOffset(text: string, mode: RowCaretMode): number {
+  return mode === 'normal' || mode === 'visual' ? characterStart(text, text.length) : text.length
 }
 
-export function clampCaret(caret: RowCaret, length: number, mode: RowCaretMode): RowCaret {
-  const maximum = maxOffset(length, mode)
-  const focus = Math.max(0, Math.min(caret.focus, maximum))
+export function clampCaret(caret: RowCaret, text: string, mode: RowCaretMode): RowCaret {
+  const maximum = maxOffset(text, mode)
+  const clamp = (offset: number): number => {
+    const clamped = Math.max(0, Math.min(offset, maximum))
+    return mode === 'normal' || mode === 'visual' ? characterStart(text, clamped) : clamped
+  }
+  const focus = clamp(caret.focus)
   // Normal has no range: whatever selection existed before a mode change collapses to the caret.
-  const anchor = mode === 'normal' ? focus : Math.max(0, Math.min(caret.anchor, maximum))
+  const anchor = mode === 'normal' ? focus : clamp(caret.anchor)
   return anchor === caret.anchor && focus === caret.focus ? caret : { ...caret, anchor, focus }
 }
 
 /** The selected span `[start, end)`; a Vim Visual selection includes both of its end characters. */
-export function selectionRange(caret: RowCaret, length: number, mode: RowCaretMode): { start: number; end: number } {
-  const clamped = clampCaret(caret, length, mode)
+export function selectionRange(caret: RowCaret, text: string, mode: RowCaretMode): { start: number; end: number } {
+  const clamped = clampCaret(caret, text, mode)
   const start = Math.min(clamped.anchor, clamped.focus)
   const end = Math.max(clamped.anchor, clamped.focus)
-  if (mode === 'visual') return { start, end: Math.min(length, end + 1) }
+  if (mode === 'visual') return { start, end: moveCharacterOffset(text, end, 1) }
   return { start, end }
 }
 
 /** What a copy command takes: the selection, or in Vim Normal the character under the block caret. */
-export function copyRange(caret: RowCaret, length: number, mode: RowCaretMode): { start: number; end: number } {
-  const range = selectionRange(caret, length, mode)
+export function copyRange(caret: RowCaret, text: string, mode: RowCaretMode): { start: number; end: number } {
+  const range = selectionRange(caret, text, mode)
   if (range.end > range.start || mode !== 'normal') return range
-  return { start: range.start, end: Math.min(length, range.start + 1) }
+  return { start: range.start, end: moveCharacterOffset(text, range.start, 1) }
 }
 
-export function caretMarks(caret: RowCaret, length: number, mode: RowCaretMode): CaretMark[] {
+export function caretMarks(caret: RowCaret, text: string, mode: RowCaretMode): CaretMark[] {
   if (mode === 'hidden') return []
-  const clamped = clampCaret(caret, length, mode)
-  const range = selectionRange(clamped, length, mode)
+  const clamped = clampCaret(caret, text, mode)
+  const range = selectionRange(clamped, text, mode)
   if (range.end > range.start) return [{ ...range, className: 'agenda-selection' }]
   if (mode === 'normal' || mode === 'visual') {
-    const at = Math.min(clamped.focus, Math.max(0, length - 1))
-    return [{ start: at, end: length === 0 ? at : at + 1, className: 'agenda-caret' }]
+    const at = characterStart(text, clamped.focus)
+    return [{ start: at, end: moveCharacterOffset(text, at, 1), className: 'agenda-caret' }]
   }
   return [{ start: clamped.focus, end: clamped.focus, className: 'agenda-caret' }]
 }

@@ -90,3 +90,58 @@ For later product work, the agent records the outcome when an already necessary 
 - Outcome: Execution succeeded; all 24 tests passed, including visible selection in both modes and unchanged date screenshot baselines.
 - Persistence: New-session access and UI clicks unknown.
 - Follow-up: Unanalyzed; rerun affected presentation checks and independent finding verification.
+
+## OI-006 — Reproduce emoji caret movement
+
+- Requested: 2026-10-13 23:46 UTC; Codex primary; single-step emoji caret defect.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-caret.spec.ts --workers=1` outside the sandbox to compare native arrows and Vim h/l across whole Unicode emoji.
+- Context/evidence: Owner reports needing two steps. Clean starting commit 5cc1d50. No production changes; regression covers plain/rich Tree and Agenda in both editing modes.
+- Trigger: Codex Electron escalation under AGENTS.md §4; defect-first workflow under §9.
+- Earlier occurrence: OI-002 through OI-005 verified supported workflow execution in this session.
+- Outcome: All standard/Insert arrow assertions passed. Vim Normal's plain-input block selected one UTF-16 unit instead of the complete rocket; rich/Agenda Normal cases initially stopped on an invalid multi-digit test key, corrected to a typed count before revalidation.
+- Persistence: Same-session workflow established; new-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; reproduce before selecting the focused correction.
+
+## OI-007 — Validate grapheme-aware Normal movement
+
+- Requested: 2026-10-13 approximately 23:51 UTC; Codex primary; single-step emoji caret defect.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-caret.spec.ts --workers=1` outside the sandbox after correcting character stepping and full-emoji block projection.
+- Context/evidence: OI-006 established the Normal-mode defect; standard/Insert native arrows already passed. New pure character boundaries preserve existing UTF-16 storage offsets.
+- Trigger: Codex Electron escalation under AGENTS.md §4 and defect validation under §9.
+- Earlier occurrence: OI-006 verified this session's supported workflow.
+- Outcome: All six Electron cases passed with full-emoji Normal blocks, one-step movement and unchanged native arrows.
+- Persistence: New-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; validate the reproduced route and nearby state transitions.
+
+## OI-008 — Broaden emoji caret regression validation
+
+- Requested: 2026-10-13 approximately 23:55 UTC; Codex primary; single-step emoji caret defect.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-caret.spec.ts e2e/emoji-completion.spec.ts e2e/vim-navigation-and-visual.spec.ts e2e/vim-image-caret.spec.ts e2e/agenda-caret.spec.ts --workers=6` outside the sandbox after shared character-boundary changes.
+- Context/evidence: Initial focused caret cases passed; Visual ranges, stand-in row carets and image returns now share grapheme boundaries. Existing native fixtures and isolated synthetic data are used.
+- Trigger: Codex Electron escalation under AGENTS.md §4; broadened shared-interaction validation under §§9–10.
+- Earlier occurrence: OI-006 and OI-007 verified supported execution in this session.
+- Outcome: All 145 affected Electron cases passed, including the new image/emoji and Visual checks. No permission interruption was observed.
+- Persistence: New-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; validate affected existing paths without reopening infrastructure work.
+
+## OI-009 — Inspect full-emoji blocks in dark appearance
+
+- Requested: 2026-10-13 23:59 UTC; Codex primary; single-step emoji caret defect.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-caret.spec.ts --workers=1` outside the sandbox after adding dark joined-emoji caret captures for plain/rich Tree and Agenda.
+- Context/evidence: All 145 affected tests already passed on unchanged production sources. Light screenshots inspected; dark compound-emoji captures require new evidence.
+- Trigger: Electron escalation under AGENTS.md §4; inspected appearance-specific visual evidence under §9.
+- Earlier occurrence: OI-008 established broadened passing execution in this session.
+- Outcome: All seven focused cases passed, with dark joined-emoji captures produced for all three input contexts.
+- Persistence: New-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; retain existing broad validation and check only the additional visual inputs.
+
+## OI-010 — Verify Visual restoration and Insert entry boundaries
+
+- Requested: 2026-10-14 approximately 00:02 UTC; Codex primary; single-step emoji caret defect.
+- Action and purpose: Run `npm run test:e2e -- e2e/emoji-caret.spec.ts e2e/vim-navigation-and-visual.spec.ts --workers=6` outside the sandbox after correcting `gv` and `a` caret boundaries.
+- Context/evidence: Independent reviewer found gv still used a one-code-unit endpoint. New failing unit regressions confirmed gv and a stop inside a compound emoji; shared boundary helper now resolves both.
+- Trigger: Electron escalation under AGENTS.md §4 and required finding resolution under §13.
+- Earlier occurrence: OI-008 and OI-009 established passing native checks in this session.
+- Outcome: All 90 selected Electron cases passed, including restored compound-emoji deletion/Undo and native arrows after a.
+- Persistence: New-session access and UI clicks unknown.
+- Follow-up: Unanalyzed; validate corrected paths and reuse unchanged image/Agenda/completion evidence.

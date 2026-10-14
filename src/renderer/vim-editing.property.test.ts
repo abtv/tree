@@ -17,7 +17,7 @@ describe('Vim character-cursor invariants with attachments', () => {
   it('never records a text return position for an image-only node', () => {
     fc.assert(
       fc.property(fc.nat(1000), (count) => {
-        expect(imageTextReturnCursor(0, count + 1, 0)).toBeUndefined()
+        expect(imageTextReturnCursor(0, count + 1, 'x'.repeat(0))).toBeUndefined()
       }),
     )
   })
@@ -30,8 +30,8 @@ describe('Vim character-cursor invariants with attachments', () => {
         fc.integer({ min: 1, max: 1000 }),
         (length, arbitraryCursor, count) => {
           const cursor = arbitraryCursor % length
-          if (moveCharacterCursor(cursor, 'right', length, true, count) !== length) return
-          const restored = imageTextReturnCursor(cursor, count, length)
+          if (moveCharacterCursor(cursor, 'right', 'x'.repeat(length), true, count) !== length) return
+          const restored = imageTextReturnCursor(cursor, count, 'x'.repeat(length))
           expect(restored).toBeGreaterThanOrEqual(cursor)
           expect(restored).toBeLessThan(length)
           expect(restored).toBe(length - 1)
@@ -50,17 +50,17 @@ describe('Vim character-cursor invariants with attachments', () => {
         (length, cursor, hasImage, count) => {
           const maximum = hasImage ? length : Math.max(0, length - 1)
           const start = Math.min(cursor, maximum)
-          const right = moveCharacterCursor(start, 'right', length, hasImage, count)
-          const left = moveCharacterCursor(start, 'left', length, hasImage, count)
+          const right = moveCharacterCursor(start, 'right', 'x'.repeat(length), hasImage, count)
+          const left = moveCharacterCursor(start, 'left', 'x'.repeat(length), hasImage, count)
           expect(right).toBeGreaterThanOrEqual(0)
           expect(right).toBeLessThanOrEqual(maximum)
           expect(left).toBeGreaterThanOrEqual(0)
           expect(left).toBeLessThanOrEqual(maximum)
-          expect(moveCharacterCursor(maximum, 'right', length, hasImage)).toBe(maximum)
-          expect(moveCharacterCursor(0, 'left', length, hasImage)).toBe(0)
+          expect(moveCharacterCursor(maximum, 'right', 'x'.repeat(length), hasImage)).toBe(maximum)
+          expect(moveCharacterCursor(0, 'left', 'x'.repeat(length), hasImage)).toBe(0)
           if (hasImage && length > 0) {
-            expect(moveCharacterCursor(length - 1, 'right', length, true)).toBe(length)
-            expect(moveCharacterCursor(length, 'left', length, true)).toBe(length - 1)
+            expect(moveCharacterCursor(length - 1, 'right', 'x'.repeat(length), true)).toBe(length)
+            expect(moveCharacterCursor(length, 'left', 'x'.repeat(length), true)).toBe(length - 1)
           }
         },
       ),

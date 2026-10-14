@@ -23,6 +23,7 @@ import type { LinkedTextEdit, LinkRange } from '../domain/document'
 import type { VimFindCommand } from './vim-keyboard-types'
 import type { VimSurroundChange, VimTextChange } from './vim-keyboard-types'
 import { vimPastePosition } from './vim-editing'
+import { moveCharacterOffset } from '../domain/text-characters'
 
 // Mutation triage: `Number('')` is `0`, which the surrounding `Math.max(1, ...)` raises to `1`, so
 // both the empty-string test and its forced-false branch are equivalent to the literal `1`.
@@ -41,7 +42,7 @@ export function isTextObjectKey(key: string): boolean {
 export function insertPosition(text: string, cursor: number, entry: 'i' | 'a' | 'I' | 'A'): number {
   if (entry === 'I') return firstNonWhitespace(text)
   if (entry === 'A') return text.length
-  if (entry === 'a') return Math.min(cursor + 1, text.length)
+  if (entry === 'a') return moveCharacterOffset(text, cursor, 1)
   return cursor
 }
 
@@ -89,7 +90,7 @@ export function textMotion(
     target = Math.max(0, length - 1)
     end = length
   } else if (motion === 'h' || motion === 'l') {
-    target = Math.max(0, Math.min(length, cursor + (motion === 'h' ? -count : count)))
+    target = moveCharacterOffset(text, cursor, motion === 'h' ? -1 : 1, count)
     start = Math.min(cursor, target)
     end = Math.max(cursor, target)
   } else if (
