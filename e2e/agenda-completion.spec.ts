@@ -15,6 +15,50 @@ import {
 } from './fixtures'
 
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.9
+  test('keeps plain-editor arrows in the popup until dismissal, then resumes node navigation', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'n', text: 'Plan ', children: [] },
+          { id: 'other', text: 'Other', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'n' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('i')
+    }
+    await setCursor(input, 5)
+    await window.keyboard.type('next wee')
+    const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+    await expect(popup.getByRole('option')).toHaveCount(7)
+    await window.keyboard.down('Meta')
+    await expect(popup).toBeVisible()
+    await window.keyboard.up('Meta')
+    await window.keyboard.press('ArrowDown')
+    await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue('Plan next wee')
+    await expect(input).toHaveJSProperty('selectionStart', 13)
+    await expect(input).toHaveJSProperty('selectionEnd', 13)
+    await window.keyboard.press('Escape')
+    await expect(popup).toHaveCount(0)
+    if (mode === 'vim') {
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await window.keyboard.press('ArrowDown')
+      await expect(input).toBeFocused()
+      await window.keyboard.press('i')
+    }
+    await window.keyboard.press('ArrowDown')
+    await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toBeFocused()
+  })
+
   for (const view of ['Tree', 'Agenda'] as const) {
     // @requirement PRODUCT.md §20.9
     test(`completes distinctive prefixes and retains the selected date in ${view}`, async ({
@@ -79,6 +123,30 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         await replace(prefix)
         await expect(popup.getByRole('option')).toHaveCount(7)
         await expect(popup.getByRole('option').first()).toContainText(first)
+        const selection = await input.evaluate(() => {
+          const range = getSelection()?.getRangeAt(0)
+          return { start: range?.startOffset, end: range?.endOffset }
+        })
+        await window.keyboard.down('Meta')
+        await expect(popup).toBeVisible()
+        await window.keyboard.up('Meta')
+        // Remappers may expose the initial Command keydown before sending a
+        // plain arrow. Exercise those delivered events without a host remap.
+        await window.keyboard.press('ArrowDown')
+        await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+        await window.keyboard.press('ArrowUp')
+        await expect(popup.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+        await window.keyboard.press('ArrowUp')
+        await expect(popup.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
+        await window.keyboard.press('ArrowDown')
+        await expect(popup.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+        await expect(input).toBeFocused()
+        expect(
+          await input.evaluate(() => {
+            const range = getSelection()?.getRangeAt(0)
+            return { start: range?.startOffset, end: range?.endOffset }
+          }),
+        ).toEqual(selection)
         await window.keyboard.press('Control+n')
         await window.keyboard.type('k')
         await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')

@@ -205,6 +205,24 @@ export function useDateAssist(
           bindings.onKeyDown(event)
           return
         }
+        // Consume popup navigation before caret reconciliation can dismiss the
+        // popup and let the same key fall through to node navigation.
+        if (
+          owner.current.popup?.nodeId === node.id &&
+          mode === 'insert' &&
+          !locked &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          !event.ctrlKey &&
+          (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+        ) {
+          event.preventDefault()
+          event.stopPropagation()
+          owner.current.move(event.key === 'ArrowDown' ? 1 : -1)
+          project()
+          return
+        }
         observe()
         const popup = owner.current.popup
         if (popup !== undefined && !event.metaKey && !event.altKey && !event.shiftKey) {
@@ -220,11 +238,17 @@ export function useDateAssist(
             return
           }
         }
-        if (event.key === 'Escape' || event.metaKey || event.key === 'Enter' || event.key === 'Tab') close()
+        if (
+          event.key === 'Escape' ||
+          (event.metaKey && event.key !== 'Meta') ||
+          event.key === 'Enter' ||
+          event.key === 'Tab'
+        )
+          close()
         bindings.onKeyDown(event)
       },
     }),
-    [edit, close, observe, accept, project],
+    [edit, close, observe, accept, project, mode, locked],
   )
   return { presentation, accept, decorate, reconcile: observe }
 }

@@ -105,6 +105,7 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
         ctrlKey: false,
         altKey: false,
         preventDefault: () => undefined,
+        stopPropagation: () => undefined,
         ...modifiers,
       } as never),
     )
@@ -120,6 +121,76 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
 }
 
 describe('useNodeInputBindings', () => {
+  // @requirement PRODUCT.md §20.9
+  // @requirement PRODUCT.md §20.12
+  it.each([
+    [false, 'next wee'],
+    [true, 'next wee'],
+    [false, ':roc'],
+    [true, ':roc'],
+  ] as const)(
+    'keeps modifier-only keys and popup arrows inside the editor (Vim: %s, %s)',
+    async (vimEnabled, fragment) => {
+      const f = await fixture({
+        mode: 'insert',
+        vimEnabled,
+        document: { roots: [node('node', ''), node('peer', 'Other')] },
+      })
+      const input = f.input()
+      input.focus()
+      f.type(fragment)
+      const count = f.result.current.datePopup!.popup.suggestions.length
+      for (const key of ['Meta', 'Control', 'Alt', 'Shift']) {
+        f.press(key, {
+          metaKey: key === 'Meta',
+          ctrlKey: key === 'Control',
+          altKey: key === 'Alt',
+          shiftKey: key === 'Shift',
+        })
+        expect(f.result.current.datePopup?.popup.selected).toBe(0)
+      }
+      f.press('ArrowDown')
+      expect(f.result.current.datePopup?.popup.selected).toBe(1)
+      f.press('ArrowUp')
+      expect(f.result.current.datePopup?.popup.selected).toBe(0)
+      f.press('ArrowUp')
+      expect(f.result.current.datePopup?.popup.selected).toBe(count - 1)
+      f.press('ArrowDown')
+      expect(f.result.current.datePopup?.popup.selected).toBe(0)
+      expect(f.snapshot().location.selectedNodeId).toBe('node')
+      expect(getCaret(input)).toBe(fragment.length)
+      expect(f.node().text).toBe(fragment)
+      expect(f.result.current.vimMode).toBe('insert')
+      f.press('Escape')
+      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.vimMode).toBe(vimEnabled ? 'normal' : 'insert')
+    },
+  )
+
+  // @requirement PRODUCT.md §20.9
+  it('consumes an open popup arrow before caret reconciliation and still dismisses actual Command shortcuts', async () => {
+    const f = await fixture({ mode: 'insert', document: { roots: [node('node', 'Plan '), node('peer', 'Other')] } })
+    const input = f.input()
+    input.focus()
+    f.type('Plan next wee')
+    // A pending native selection observation must not turn popup navigation
+    // into a node command in the same keydown.
+    input.setSelectionRange(0, 0)
+    const preventDefault = vi.fn()
+    const stopPropagation = vi.fn()
+    act(() =>
+      f.bindings().onKeyDown({ currentTarget: input, key: 'ArrowDown', preventDefault, stopPropagation } as never),
+    )
+    expect(preventDefault).toHaveBeenCalledOnce()
+    expect(stopPropagation).toHaveBeenCalledOnce()
+    expect(f.snapshot().location.selectedNodeId).toBe('node')
+    f.type('Plan next wee')
+    expect(f.result.current.datePopup).toBeDefined()
+    f.press('a', { metaKey: true })
+    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.node().text).toBe('Plan next wee')
+  })
+
   it.each(['outside', 'window'])('ends Replace when a read-only Agenda row loses focus to %s', async (path) => {
     const f = await fixture({ mode: 'replace' })
     const row = document.createElement('div')

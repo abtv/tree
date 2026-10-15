@@ -67,7 +67,7 @@ export function DatePopup({
           </div>
         ))}
       </div>
-      <div className="date-popup-footer">Tab accept · ⌃N ⌃P</div>
+      <div className="date-popup-footer">↑ ↓ select · Tab accept · Esc dismiss</div>
     </div>
   )
 }

@@ -30,7 +30,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
     await expect(popup.getByRole('option')).toHaveCount(8)
     for (let index = 1; index <= 8; index++) {
-      await window.keyboard.press('Control+n')
+      await window.keyboard.press('ArrowDown')
       const geometry = await window.evaluate(() => {
         const box = document.querySelector('.date-popup')!.getBoundingClientRect()
         const selected = document.querySelector('.date-popup [aria-selected="true"]')!.getBoundingClientRect()
@@ -112,6 +112,14 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await window.keyboard.type(':roc')
       await expect(popup.getByRole('option')).toHaveCount(2)
       await expect(popup.getByRole('option').nth(1)).toContainText('🚀')
+      await window.keyboard.down('Meta')
+      await expect(popup).toBeVisible()
+      await window.keyboard.up('Meta')
+      await window.keyboard.press('ArrowDown')
+      await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+      await window.keyboard.press('ArrowUp')
+      await expect(popup.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+      await expect(input).toBeFocused()
       await window.keyboard.press('Control+n')
       await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
       await window.keyboard.press('Control+p')
