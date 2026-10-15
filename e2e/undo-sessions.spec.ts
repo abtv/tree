@@ -16,9 +16,10 @@ describeForEachEditingMode('text edit sessions', () => {
 
   test('starts a new undo entry after five seconds without a text change', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    await window.clock.install()
 
     await typeInto(node(window, 1), 'first')
-    await window.waitForTimeout(5_200)
+    await window.clock.fastForward(5_200)
     await typeInto(node(window, 1), ' second')
     await expect(node(window, 1)).toHaveValue('first second')
 
