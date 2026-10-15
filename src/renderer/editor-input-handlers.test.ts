@@ -1114,27 +1114,40 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(2)
   })
 
-  it('opens a sibling below with o and above with O', async () => {
-    const { store, snapshot, input, dispatch, vim } = await textFixture({ id: 'node', text: 'text', children: [] })
+  it.each([false, true])('opens a sibling below with o and above with O (nested: %s)', async (nested) => {
+    const node: TreeNode = { id: 'node', text: 'text', children: [] }
+    const { store, snapshot, input, dispatch, vim } = await textFixture(
+      node,
+      'normal',
+      nested
+        ? {
+            document: { roots: [{ id: 'parent', text: 'Parent', children: [node] }] },
+            location: { currentParentId: 'parent', selectedNodeId: 'node' },
+          }
+        : {},
+    )
+    const siblings = () => (nested ? snapshot().document.roots[0]!.children : snapshot().document.roots)
     input.setSelectionRange(2, 2)
     const below = dispatch('o')
-    expect(snapshot().document.roots.map(({ text }) => text)).toEqual(['text', ''])
+    expect(siblings().map(({ text }) => text)).toEqual(['text', ''])
     const belowId = snapshot().location.selectedNodeId
     expect(belowId).not.toBe('node')
+    expect(snapshot().location.currentParentId).toBe(nested ? 'parent' : null)
+    expect(snapshot().focus).toMatchObject({ nodeId: belowId, cursor: 0 })
     expect(vim.mode).toBe('insert')
     expect(below.preventDefault).toHaveBeenCalledOnce()
 
     vim.mode = 'normal'
     const above = dispatch('O')
-    expect(snapshot().document.roots.map(({ text }) => text)).toEqual(['text', '', ''])
-    expect(snapshot().document.roots[1]!.id).toBe(snapshot().location.selectedNodeId)
-    expect(snapshot().document.roots[2]!.id).toBe(belowId)
+    expect(siblings().map(({ text }) => text)).toEqual(['text', '', ''])
+    expect(siblings()[1]!.id).toBe(snapshot().location.selectedNodeId)
+    expect(siblings()[2]!.id).toBe(belowId)
     expect(vim.mode).toBe('insert')
     expect(above.preventDefault).toHaveBeenCalledOnce()
     store.undo()
-    expect(snapshot().document.roots.map(({ id }) => id)).toEqual(['node', belowId])
+    expect(siblings().map(({ id }) => id)).toEqual(['node', belowId])
     store.undo()
-    expect(snapshot().document.roots.map(({ id }) => id)).toEqual(['node'])
+    expect(siblings().map(({ id }) => id)).toEqual(['node'])
   })
 
   it('does nothing when O is pressed on the current-parent heading', async () => {

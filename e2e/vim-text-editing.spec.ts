@@ -88,22 +88,6 @@ test.describe('Vim editing: text editing', () => {
     })
 
     // @requirement PRODUCT.md §20.2.9
-    test('undoes with u and redoes with Ctrl+r in Normal mode', async ({ userDataDir }) => {
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
-
-      await editor.press('i')
-      await typeInto(editor, 'abc')
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('x')
-      await expect(editor).toHaveValue('ab')
-
-      await window.keyboard.press('u')
-      await expect(editor).toHaveValue('abc')
-      await window.keyboard.press('Control+r')
-      await expect(editor).toHaveValue('ab')
-    })
-
     test('keeps the caret on the change that u and Ctrl+r apply', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'root', text: 'abcde', children: [] }] },

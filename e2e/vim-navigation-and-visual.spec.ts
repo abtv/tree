@@ -101,6 +101,11 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await node(window, 1).focus()
     for (const key of ['2', 'd', 'd']) await window.keyboard.press(key)
     await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
+    // The original counted deletion is one undo step, independently of its later dot replay.
+    await window.keyboard.press('u')
+    await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'C', 'D', 'E'])
+    await window.keyboard.press('Control+r')
+    await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
     await window.keyboard.press('3')
     await window.keyboard.press('.')
     await expect.poll(() => nodeTexts(window)).toEqual(['E'])
@@ -314,44 +319,6 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Parent')
       await expect(node(window, 1)).toHaveValue('Child')
     })
-
-    test('uses o to create a sibling below a selected child node', async ({ userDataDir }) => {
-      seedDocument(userDataDir, {
-        document: {
-          roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'first', text: 'First', children: [] }] }],
-        },
-        location: { currentParentId: 'parent', selectedNodeId: 'first' },
-      })
-      const { window } = await launchTree(userDataDir)
-      await node(window, 1).focus()
-      await window.keyboard.press('o')
-      await typeInto(node(window, 2), 'Second')
-      await window.keyboard.press('Escape')
-
-      await expect(node(window, 1)).toHaveValue('First')
-      await expect(node(window, 2)).toHaveValue('Second')
-    })
-  })
-
-  test('applies a counted Normal-mode node motion before the next command', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: {
-        roots: [
-          { id: 'first', text: 'First', children: [] },
-          { id: 'second', text: 'Second', children: [] },
-        ],
-      },
-      location: { currentParentId: null, selectedNodeId: 'first' },
-    })
-    const { window } = await launchTree(userDataDir)
-    const editor = node(window, 1)
-    await editor.focus()
-    await window.keyboard.press('2')
-    await window.keyboard.press('j')
-    await expect(node(window, 2)).toBeFocused()
-    await window.keyboard.press('l')
-
-    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 1)
   })
 
   // @requirement PRODUCT.md §20.2.16
@@ -373,6 +340,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('3')
     await window.keyboard.press('j')
     await expect(countedNode(4)).toBeFocused()
+    await window.keyboard.press('l')
+    await expect(countedNode(4)).toHaveJSProperty('selectionStart', 1)
     await window.keyboard.press('5')
     await window.keyboard.press('k')
     await expect(countedNode(1)).toBeFocused()
@@ -390,33 +359,6 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('3')
     await window.keyboard.press('p')
     await expect(window.locator('.node-row')).toHaveCount(18)
-  })
-
-  test('deletes a counted forward sibling range with dd', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: {
-        roots: [
-          { id: 'first', text: 'First', children: [] },
-          { id: 'second', text: 'Second', children: [] },
-          { id: 'third', text: 'Third', children: [] },
-          { id: 'fourth', text: 'Fourth', children: [] },
-        ],
-      },
-      location: { currentParentId: null, selectedNodeId: 'first' },
-    })
-    const { window } = await launchTree(userDataDir)
-    await node(window, 1).focus()
-    await window.keyboard.press('3')
-    await window.keyboard.press('d')
-    await window.keyboard.press('d')
-
-    await expect(window.locator('.node-row')).toHaveCount(1)
-    await expect(node(window, 1)).toHaveValue('Fourth')
-
-    // One counted deletion is one undoable command (PRODUCT §20.2.16).
-    await window.keyboard.press('u')
-    await expect(window.locator('.node-row')).toHaveCount(4)
-    await expect(node(window, 3)).toHaveValue('Third')
   })
 
   test.describe(() => {
