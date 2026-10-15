@@ -116,12 +116,6 @@ Contained work uses a concise conversation plan. Use a fresh configured planner 
 
 Read procedure §8 before initiatives, review batches, and ADRs. Plans do not authorize implementation. Record approved scope, decisions, validation, owner checks, budget, and exact next task. Preserve in-scope continuation authority and all explicit review/no-commit conditions. A single logical task may continue across sessions; a session boundary does not create another task.
 
-### Deferred infrastructure work
-
-At the owner's direction on 2026-10-14, harness development, readiness preparation, and E2E Coverage Efficiency are deferred until an explicit request to resume the named work. Preserve code, plans, durable findings, and history; the owner authorized deletion of four old scratch directories on 2026-10-14. Do not reopen the completed Runner Readiness initiative. Do not ask routinely whether to resume or select deferred work on “continue.” This pause does not block independently authorized product tasks in ordinary sessions. Check their actual required capabilities and validation, not unattended-runner readiness. Concrete missing task capabilities still block their dependent work.
-
-Deferred runner and unattended-preflight procedures are in [Deferred Runner](docs/DEFERRED_RUNNER.md). Load them only after an explicit request to resume that work.
-
 ### Final owner acceptance
 
 An initiative reaching three substantive working tasks requires explicit acceptance of the delivered result before closure. Read procedure §8 for counting, waiting, rejection, allowances, and retirement. Commit authorized completed tasks autonomously; keep the plan/index `Awaiting owner acceptance` at that gate. Review batches require confirmation that no tasks remain.

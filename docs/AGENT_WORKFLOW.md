@@ -4,8 +4,6 @@
 
 These are the binding detailed procedures of [AGENTS.md](../AGENTS.md), which remains the workflow policy owner. Read only the sections that the core requires for the current action. Section numbers match the core; paths in code spans are relative to the repository root. This document is live policy, not a historical archive. Keep detailed rules here and concise obligations and routing in the core. Validation commands and execution mechanics belong to `docs/DEVELOPMENT.md`.
 
-The owner-directed deferral in `AGENTS.md` §8 applies to every initiative and continuation procedure below. It does not waive validation of an independently authorized product task.
-
 ---
 
 ## 1. Project Role
@@ -145,13 +143,11 @@ The complete separation and domain-testability rule is in `AGENTS.md` §7. It ap
 
 ## 8. Plans and Architecture Decisions
 
-Exclude owner-deferred work from all ready-task selection and continuation below. The current infrastructure pause is defined in `AGENTS.md` §8. An ordinary product session uses task capability checks, not unattended preflight; required validation and missing task capabilities still apply.
+Exclude owner-deferred work from ready-task selection and continuation below.
 
 For a contained change with a clear outcome and one existing owner, make a concise plan in the conversation and proceed without a planner subagent or temporary plan file. Use the configured planner subagent in a fresh context when the outcome requires a multi-session initiative, changes major architecture, or has several interacting owners or material design choices that benefit from independent planning. Review its plan against the Product Owner's request and repository requirements, resolve ordinary engineering details, and share a concise plan or progress update. Continue without a separate approval pause within the authorized outcome. Ask for a decision before implementing a material unresolved choice or expanding product behavior or major architecture.
 
 For a new initiative, investigate first, collect the necessary questions in one batch, and present the resulting scope, priorities, delegated decisions, reserved decisions, task sequence, validation, expected owner-verification rounds and checks, unresolved capabilities, and execution budget. Obtain explicit authorization to implement that initiative before starting implementation. A request to investigate or record a plan is not implementation authorization. When the Product Owner has already explicitly authorized the presented outcome and boundaries, record that approval rather than asking again. Initiative-wide approval covers its in-scope tasks and required review corrections; closure is subject to the owner acceptance rule below. It does not authorize a different initiative, publishing, or scope expansion. Task-by-task authorization and explicit prototype or no-commit conditions remain valid when the Product Owner chooses them.
-
-Deferred unattended execution procedures are in [Deferred Runner](DEFERRED_RUNNER.md). Read them only when the owner explicitly resumes that work.
 
 ### Final owner acceptance
 

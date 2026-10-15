@@ -82,9 +82,7 @@ You can say “continue” or “let's continue the work.” The agent checks Gi
 
 When exactly one active initiative has a ready, authorized next task, the agent names it and continues. When several do, it asks which to select. Deferred initiatives are excluded. When none does, it reports what prevents progress or that no implementation work is ready. It never selects an open product idea for implementation just because the work queue is empty. A remaining “show me before committing” condition survives a session change.
 
-Harness/readiness preparation and E2E Coverage Efficiency are deferred until you explicitly request the named work. The agent preserves existing code, plans, durable findings, and history; it does not ask about resumption on each task. Ordinary product work continues with its required checks. You may start a new session every 30–40 minutes; this is a context handoff interval, not a task-completion promise. The agent saves remaining work and reusable validation evidence so “continue” is sufficient for an identifiable unfinished task.
-
-Runner development and unattended preflight are deferred. Their retained procedures are in [Deferred Runner](DEFERRED_RUNNER.md); they apply only after an explicit request to resume the named work. Ordinary planning, continuation and final owner acceptance remain in [Development Guide §11](DEVELOPMENT.md#11-multi-session-initiatives).
+You may start a new session every 30–40 minutes; this is a context handoff interval, not a task-completion promise. The agent saves remaining work and reusable validation evidence so “continue” is sufficient for an identifiable unfinished task. Planning, continuation and final owner acceptance follow [Development Guide §11](DEVELOPMENT.md#11-multi-session-initiatives).
 
 ### What to Expect During Delivery
 

@@ -4,8 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-// The owner released the four former infrastructure namespaces on 2026-10-14 after their
-// durable conclusions were checked. Future retained evidence can be listed here explicitly.
+// List task directories here when their evidence must survive ordinary scratch cleanup.
 export const RETAINED_TASKS = Object.freeze([])
 
 // Decide whether one task scratch directory may be removed, without changing anything. The guards

@@ -49,26 +49,23 @@ describe('resolveScratchRetirement', () => {
     }
   })
 
-  it.each(['autonomous-initiatives', 'autonomous-initiatives-pilot', 'e2e-coverage-efficiency', 'runner-readiness'])(
-    'retires the owner-released namespace %s without removing another task',
-    (taskName) => {
-      const root = createRepository()
-      mkdirSync(join(root, '.scratch', taskName))
-      writeFileSync(join(root, '.scratch', taskName, 'evidence.txt'), 'synthetic evidence')
-      expect(retireScratch({ rootDirectory: root, taskName })).toEqual({
-        ok: true,
-        relativePath: join('.scratch', taskName),
-      })
-      expect(existsSync(join(root, '.scratch', taskName))).toBe(false)
-      expect(existsSync(join(root, '.scratch', 'task', 'nested', 'report.json'))).toBe(true)
-    },
-  )
+  it('retires one task without removing another task', () => {
+    const root = createRepository()
+    mkdirSync(join(root, '.scratch', 'completed-task'))
+    writeFileSync(join(root, '.scratch', 'completed-task', 'evidence.txt'), 'synthetic evidence')
+    expect(retireScratch({ rootDirectory: root, taskName: 'completed-task' })).toEqual({
+      ok: true,
+      relativePath: join('.scratch', 'completed-task'),
+    })
+    expect(existsSync(join(root, '.scratch', 'completed-task'))).toBe(false)
+    expect(existsSync(join(root, '.scratch', 'task', 'nested', 'report.json'))).toBe(true)
+  })
 
   it('refuses a missing directory and a regular file', () => {
     const root = createRepository()
-    writeFileSync(join(root, '.scratch', 'initiative-runner.lock'), '{}\n')
+    writeFileSync(join(root, '.scratch', 'task.lock'), '{}\n')
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'missing' })).toMatchObject({ ok: false })
-    expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'initiative-runner.lock' })).toMatchObject({
+    expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'task.lock' })).toMatchObject({
       ok: false,
     })
   })
