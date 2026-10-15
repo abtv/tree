@@ -24,6 +24,7 @@ import {
   tryReadPersisted,
   tryReadWindowBounds,
   typeInto,
+  unlockSystemClipboard,
   writeClipboardImage,
   writeClipboardText,
 } from './fixtures'
@@ -291,6 +292,7 @@ test.describe('persistence', () => {
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
+    unlockSystemClipboard()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
@@ -310,6 +312,7 @@ test.describe('persistence', () => {
     await writeClipboardText(first.app, 'https://example.com')
     await firePaste(node(first.window, 1))
     await expect(first.window.getByRole('link', { name: 'https://example.com' })).toBeVisible()
+    unlockSystemClipboard()
 
     await closeApp(first.app)
     const second = await launchTree(userDataDir)
@@ -324,6 +327,7 @@ test.describe('persistence', () => {
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
+    unlockSystemClipboard()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
@@ -359,6 +363,7 @@ test.describe('persistence', () => {
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
+    unlockSystemClipboard()
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
