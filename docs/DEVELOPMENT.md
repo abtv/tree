@@ -152,6 +152,8 @@ Domain tests must not require Electron or a browser environment.
 
 Vitest uses the Node.js environment by default. Renderer tests opt into jsdom when behavior requires a DOM.
 
+Completion coverage is layered: `src/domain/natural-date.test.ts` and `emoji-completion.test.ts` own expression and shortcode tables; `src/renderer/date-assist.test.ts` owns popup selection and dismissal rules; `use-node-input-bindings.test.tsx` exercises the input hook with a real store, including selection retention, reset and acceptance. The Electron completion specs retain representative real-keyboard and pointer flows, textarea and rich editors, Tree and Agenda, both editing modes, focus/caret/Undo, paste, hyperlink exclusion and popup geometry. Add recognition variants to the focused tables rather than repeating each expression across every Electron editor and mode. Keep a real-renderer case when it exercises a distinct input path or rendered state. Emoji's small-window scrolling, plain-editor suffix/restored-text and rich-editor Unicode interactions remain separate boundary checks.
+
 End-to-end tests live in `e2e/` and run with:
 
 ```bash

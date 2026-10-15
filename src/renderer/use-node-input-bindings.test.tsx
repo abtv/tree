@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore } from '../application/editor-store'
 import { MAX_DOCUMENT_DEPTH_ERROR, type TreeNode } from '../domain/document'
+import { dayNumberOf } from '../domain/calendar-date'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { createRealStoreHarness, type RealStoreOptions } from './test/real-store-harness'
 import { useNodeInputBindings } from './use-node-input-bindings'
@@ -338,6 +339,49 @@ describe('useNodeInputBindings', () => {
     press('k')
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
     expect(getCaret(input)).toBe(3)
+  })
+
+  // @requirement PRODUCT.md §20.9
+  it.each([false, true])('retains the selected date through a typed refinement (Vim %s)', async (vimEnabled) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date(2026, 9, 8, 12))
+    const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
+    f.input().focus()
+    f.type('Plan next wee')
+    f.press('n', { ctrlKey: true })
+    f.type('Plan next week')
+    const popup = f.result.current.datePopup!.popup
+    expect(popup.suggestions[popup.selected]).toEqual({
+      day: dayNumberOf({ year: 2026, month: 10, day: 13 }),
+      expression: 'next week',
+    })
+    f.press('Tab')
+    expect(f.node().text).toBe('Plan 2026-10-13')
+    expect(f.result.current.datePopup).toBeUndefined()
+    act(() => f.store.undo())
+    f.sync()
+    expect(f.node().text).toBe('Plan next week')
+    expect(f.result.current.datePopup).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §20.9
+  it.each([false, true])('resets date selection after an edit dismisses the popup (Vim %s)', async (vimEnabled) => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date(2026, 9, 8, 12))
+    const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
+    f.input().focus()
+    f.type('Plan in September')
+    f.press('n', { ctrlKey: true })
+    expect(f.result.current.datePopup?.popup.selected).toBe(1)
+    f.type('Plan in Septembe')
+    expect(f.result.current.datePopup).toBeUndefined()
+    f.type('Plan in September')
+    expect(f.result.current.datePopup?.popup.selected).toBe(0)
+    f.press('n', { ctrlKey: true })
+    f.press('Tab')
+    expect(f.node().text).toBe('Plan 2026-09-01')
+    expect(getCaret(f.input())).toBe('Plan 2026-09-01'.length)
+    expect(f.result.current.datePopup).toBeUndefined()
   })
 
   // @requirement PRODUCT.md §20.12

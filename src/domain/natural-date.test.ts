@@ -43,6 +43,7 @@ describe('natural date expression table proposed in AG-22', () => {
     ['in 3 days', ['2026-10-11']],
     ['in 3 weeks', ['2026-10-29']],
     ['3 weeks ago', ['2026-09-17']],
+    ['three weeks ago', ['2026-09-17']],
     ['in one week', ['2026-10-15']],
     ['twenty-five weeks ago', ['2026-04-16']],
     ['in 0 weeks', ['2026-10-08']],
