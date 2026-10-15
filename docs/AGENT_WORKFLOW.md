@@ -198,11 +198,17 @@ If a plan or architectural decision would affect product behavior, the Product O
 
 Tests are part of the implementation contract.
 
-When behavior changes, add or update appropriate tests.
+When behavior changes, assess existing coverage and add or update tests where it is insufficient.
 
 Every user-visible behavior described in `docs/PRODUCT.md` must be covered by at least one automated test. Behaviors that cross a process, persistence, or platform boundary — the Electron shell, preload/IPC, persistence, attachments, clipboard, drag-and-drop, and global shortcuts — must also have an end-to-end test, in addition to any unit test for the underlying rule.
 
-Domain behavior should be covered by unit tests wherever practical.
+### Selecting the test level
+
+Cover each behavior at the fastest level that can reliably detect the relevant failure. Unit and property tests cover rules, edge cases, input tables and state combinations. Component and integration tests cover collaborating handlers, hooks and application state; use a real store when asserting store outcomes. E2E covers distinct risks in real Electron wiring, keyboard and pointer dispatch, native boundaries, focus, caret, selection and rendering that the lower levels cannot faithfully exercise. Detailed examples live in `docs/DEVELOPMENT.md` §8.
+
+When selecting E2E coverage for a change, identify the failure each selected case can detect while the relevant focused tests remain green. Similar assertions at different levels are justified when they detect different failures. Do not repeat an entire input or state matrix at every level, in every editor or in every editing mode merely because those combinations exist. Select representative real-boundary cases and retain distinct handlers, editor implementations, native/DOM behavior and important failure paths.
+
+Existing tests may satisfy a change's coverage obligations. A change does not require a new test at every level when the existing assertions already detect its failure. Test count, a fixed unit/E2E ratio and a target reduction percentage are not goals.
 
 Tests must verify important edge cases, not only the happy path.
 
@@ -211,6 +217,8 @@ Coverage percentages are a gap-finding tool, not a target. Do not add tests sole
 Property-based tests using `fast-check` guard domain invariants. When a change affects tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency, add or update a property test for the affected invariants. Property tests are named `*.property.test.ts`, run with the unit suite, and are not a coverage target. Boundary wiring and presentation changes do not require property tests.
 
 Do not remove or weaken tests merely to make an implementation pass.
+
+Removing or moving redundant E2E coverage is allowed when the change identifies the focused test covering the rule and the retained E2E covering the distinct boundary or rendered state. Add missing coverage before removing the old case, preserve important failure paths and defect regressions at a level that can reproduce them, and update affected requirement/test references and screenshot ownership. Explain the mapping in the change or temporary task evidence; a permanent per-test justification registry is not required. Do not replace real boundary or rendering evidence with mocks that cannot detect the same failure.
 
 ### Navigation and caret changes
 
@@ -235,7 +243,7 @@ Record the inspected states, command, and artifact location separately from auto
 When fixing a reported defect:
 
 1. Reproduce the defect before changing the implementation.
-2. Add a regression test that fails because of the defect.
+2. Add or extend a regression test at the appropriate level that fails because of the defect.
 3. Implement the fix.
 4. Confirm that the regression test passes.
 5. When practical, verify that the test fails again when the fix is reverted or bypassed.
@@ -250,6 +258,8 @@ Any change crossing a process, IPC, filesystem, persistence, clipboard, attachme
 * a focused unit test for the underlying rule;
 * a contract test for channel names, arguments, return values, and error propagation;
 * an end-to-end test exercising the real boundary.
+
+These are coverage obligations, not a requirement to add three new tests or files for every change. Reuse existing tests when their assertions exercise the changed behavior. One test may satisfy multiple obligations only when it actually exercises and asserts each one. Keep representative real-boundary success and important failure coverage; put rule and argument variants in focused tests rather than repeating their full matrix through Electron.
 
 TypeScript types do not prove that runtime values are forwarded correctly across a boundary. Do not substitute broad UI coverage for a focused contract test when a boundary is changed.
 
@@ -395,8 +405,8 @@ Before sending, check the prompt against the relevant conversation: can the next
 A task is complete only when:
 
 * the requested behavior is implemented;
-* every affected `docs/PRODUCT.md` behavior has coverage at the appropriate level (a unit test for the rule, and an end-to-end test for boundary wiring);
-* relevant tests are added or updated;
+* every affected `docs/PRODUCT.md` behavior has coverage at the appropriate level under §9, including real E2E evidence for boundary wiring where required;
+* existing coverage is assessed and relevant tests are added or updated where needed;
 * documentation is updated when necessary;
 * the highest applicable validation tier in `docs/DEVELOPMENT.md` §9 passes;
 * no required end-to-end test is skipped because of the environment;

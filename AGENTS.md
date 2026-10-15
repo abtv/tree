@@ -122,7 +122,7 @@ An initiative reaching three substantive working tasks requires explicit accepta
 
 ## 9. Tests
 
-Before fixing defects or changing implementation/tests, read procedure §9. Every product behavior requires appropriate automated coverage; changed process/persistence/platform boundaries require real E2E coverage in addition to rule and contract tests. Do not weaken tests to pass. Property tests guard affected domain invariants. Coverage percentages identify gaps, not quotas.
+Before fixing defects or changing implementation/tests, read procedure §9. Cover each behavior at the fastest level that can reliably detect its failure. Keep rule and input matrices in focused tests; use E2E for distinct real integration, input and rendering risks. Reuse adequate existing coverage. Changed process/persistence/platform boundaries still require real E2E coverage alongside rule and contract coverage. Procedure §9 permits removing redundant E2E after identifying the retained coverage. Do not weaken tests to pass. Property tests guard affected domain invariants. Coverage percentages and test counts are not quotas.
 
 ### Navigation and caret changes
 
