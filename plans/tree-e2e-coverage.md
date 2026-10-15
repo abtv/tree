@@ -4,11 +4,13 @@
 
 Reduce repeated Electron execution while preserving meaningful regression protection. Start with remaining Tree drag-and-drop matrices, then consider Tree structural editing. Select coverage by failure mechanism, not a reduction percentage or a fixed number of Electron cases.
 
-The owner authorized research and recording this plan on 2026-10-16, then explicitly authorized **T1 only** with its proposed 4–6 active-hour budget (maximum 6 hours), measurement and review obligations. After the separate caret correction, the owner requested `conntinue T2`, authorizing T2 within its recorded scope and six-hour cap, including its early no-removal stop. T3 and its budget remain unauthorized. The selected tool is Codex. A fresh configured planner independently inspected the candidates; the primary reconciled its recommendations with source and available runtime evidence.
+The owner authorized research and recording this plan on 2026-10-16, then explicitly authorized **T1 only** with its proposed 4–6 active-hour budget (maximum 6 hours), measurement and review obligations. After the separate caret correction, the owner requested `conntinue T2`, authorizing T2 within its recorded scope and six-hour cap, including its early no-removal stop. The subsequent request `C0ntinue with T3` authorized the recorded T3 scope and four-hour cap despite T2's recommendation to stop. The selected tool is Codex. A fresh configured planner independently inspected the candidates; the primary reconciled its recommendations with source and available runtime evidence.
 
 **T1 is complete as a no-removal assessment.** Its nonzero-caret checks exposed a production defect, so replacement fidelity was not established and all original tests remain. Independent review found no meaningful issues with the assessment. The owner subsequently authorized a separate contained fix for that defect; it does not resume consolidation or authorize T2/T3. Removing none was an allowed pilot outcome; do not expand merely to achieve a case count.
 
-**T2 is complete as an early no-removal assessment.** Current timing puts its sole initial candidate at 423–424 ms of summed Electron execution. The required App replacement and fidelity work is not justified by that bounded benefit. All 19 Tab scenarios remain unchanged. P0, T1 and T2 are three substantive consolidation tasks; the delivered assessment is `Awaiting owner acceptance`. T3 is not ready or authorized.
+**T2 is complete as an early no-removal assessment.** Current timing puts its sole initial candidate at 423–424 ms of summed Electron execution. The required App replacement and fidelity work is not justified by that bounded benefit. All 19 Tab scenarios remain unchanged.
+
+**T3 is complete.** Two Enter subtree Electron cases moved to stronger real App/store coverage; native Enter, rich-editor and navigation owners remain. P0 through T3 are four substantive tasks. The delivered initiative is `Awaiting owner acceptance`; no implementation tasks remain.
 
 Application behavior, production source, harnesses, fixtures, runner/configuration, dependencies, isolation, concurrency, reset eligibility and timeout policy stay unchanged. No new browser runner, reporting framework, duration gate, production test hook, permanent per-test registry or validation archive. Do not revive the retired coverage-efficiency runner initiative. Its surviving scratch checkout is historical evidence only.
 
@@ -60,7 +62,7 @@ The earlier audit's estimates are not adopted. Inspection found material differe
 | P0 | Independent research and recorded plan | Owner's planning request | Source audit, breadcrumb checks, evidence limitations and proposed scope | Done |
 | T1 | Assess remaining Tree DnD state overlap; retain all cases when fidelity fails | Owner authorized T1 only on 2026-10-16 | No-removal assessment below; original suites retained; independent review found no meaningful issues | Done; no removals |
 | T2 | Evaluate and consolidate Tab structural state overlap | Owner's explicit T2 request after separate caret correction | Current timing, source/assertion audit and independent fidelity review; early no-removal result below | Done; no removals |
-| T3 | Consolidate Enter subtree-rule duplication | T2 assessment and explicit expansion authorization | Split-rule/App mapping, textarea and rich-editor boundary retention, measured comparison | Planned |
+| T3 | Consolidate Enter subtree-rule duplication | Owner's explicit T3 request after T2 assessment | App preservation/history matrix, two detected test-local faults in both modes, retained native/navigation cases and paired measurements below | Done; two Electron cases replaced |
 
 ### T1 — Tree drag-and-drop pilot
 
@@ -140,7 +142,7 @@ The rich-editor audit found no confirmed Tree structural Tab/Shift+Tab Electron 
 
 Focused existing handler/store/shift suites passed 595 tests. Independent source/assertion review supported the early no-removal outcome; final review and documentation validation are recorded in temporary task evidence. The final change is documentation-only, so Minimal Risk applies: formatting and documentation checks are required; unchanged test sources do not require type/lint, additional history/property suites, screenshots or fault probes. No product requirements or architecture decisions changed. T3's expansion gate is not established: recommend retaining the remaining tests. Owner acceptance of the delivered three-task assessment is required before closing this initiative; T3 still requires separate authorization.
 
-### T3 — Enter subtree rule, conditional
+### T3 — Enter subtree rule
 
 **Scope and files.** Expected changes: `src/renderer/App.test.tsx`, `e2e/editing.spec.ts`, affected guidance/references and plan/index. Exclude clipboard scenarios sharing that spec, deletion/Backspace, joins, Vim open/repeat commands, Agenda and persistence suites.
 
@@ -153,6 +155,27 @@ Focused existing handler/store/shift suites passed 595 tests. Independent source
 **Benefit, effort and risk.** The two nominated subtree cases cost 2.495 / 2.538 summed seconds historically, so estimate 0–2.5 s gross reduction, less replacement cost; no whole-suite claim. Budget 2–4 active hours. Risks are loss of subtree/attachment assertions and confusing rich-editor/native behavior with plain-text rules. Repeated Enter is explicitly retained because focus timing makes it more than a repeated split table row.
 
 **Validation and acceptance.** Low Risk. Common checks; App, document split/operations/property, command-transition and store tests; complete `e2e/editing.spec.ts` plus owning navigation cases if relied upon. A test-local fault must demonstrate that the preservation oracle fails on lost children/identity; retained cases must still assert focus/caret and rich-editor behavior. Independently review the mapping and verify no clipboard or screenshot ownership was lost.
+
+### T3 result
+
+At clean `7e2c856`, T3 replaced both editing-mode instances of `Enter at the beginning preserves the selected node subtree` with `App.test.tsx`'s `Enter at the beginning preserves the complete subtree, restores focus and replays history (Vim %s)`. The two new cases render the real App/store and send Enter at zero in Standard and Vim Insert. They assert the exact empty sibling identity before the original, the complete original tree (image, linked child, grandchild, second child and unaffected tail), location, selected identity, focus, both zero caret endpoints, mode and exact Undo/Redo restoration. No production or shared test infrastructure changed.
+
+The old empty-before/Current-after assertions map directly to the new exact-document and rendered-row assertions. The old click revealing Child maps to the exact nested hierarchy; native button navigation remains in `navigation.spec.ts`'s `clicks the circular indicator to enter a node with children and a childless node`. Its childless-first-child and leaving-node cases retain the removed setup's Cmd+./Enter/Cmd+, paths. All six owning navigation cases (both modes) pass. The complete retained editing spec passes all 26 cases, including beginning/middle/end/repeated Enter, linked contenteditable Enter and every clipboard case. Screenshot ownership is unchanged.
+
+Before removal, temporary spies called the real `createSiblingOrFirstChildTransition` through App input dispatch, then altered only its returned document: dropped original children or changed the original ID. Both faults in both modes failed the exact document assertion after verifying real transition invocation and arguments. This establishes preservation-oracle sensitivity to those transition-result faults, not general production mutation adequacy. All probes were removed. Existing `insertSiblingBefore` property coverage also checks original content and subtree IDs; no domain invariant changed.
+
+Four sequential complete-spec timing runs used the same checkout's production build, dependencies, hidden settings, reset policy and one actual worker, with no competing validation commands:
+
+| Metric | Before 1 / 2 | After 1 / 2 |
+| --- | --- | --- |
+| Passing cases and launch annotations per run | 28 / 28 | 26 / 26 |
+| Playwright duration, excluding build | 11.083 / 11.095 s | 10.599 / 10.207 s |
+| Summed test durations | 10.709 / 10.721 s | 10.174 / 9.837 s |
+| Removed candidates, summed | 0.811 / 0.830 s | Removed |
+
+No resets, retries, skips, flaky results or errors occurred. The two App cases initially took 97 ms of test execution in a focused invocation (1.02 s including Vitest startup); they join the existing App suite, so that startup is not a measured added suite cost. This is a small local reduction in repeated Electron work with stronger focused assertions. Two samples do not establish a confidence interval or full-suite acceleration; no total-test wall-time saving is claimed. Outer build/command time was not measured.
+
+Low Risk validation passed: 561 tests across App, document/operations/property, command-transition and store suites; affected renderer/E2E types, changed-test lint, formatting, documentation, requirement coverage and editing-mode checks; complete retained editing and owning navigation cases. Independent review found no meaningful issues. No product or architecture decisions, changed visual inputs, new screenshot evidence or manual application checks were needed. Exact commands, assertion mapping and fault details remain in temporary task evidence. P0–T3 are delivered within their authorized task allowances; retain this plan/index for explicit final owner acceptance before closure.
 
 ## Common validation and measurement contract
 
@@ -172,9 +195,9 @@ Shared fixtures, runner or production changes invalidate the scope and require a
 
 T1 may justify proposing T2 only when replacement tests fail on relevant faults, retained cases cover each distinct native/DOM route, independent review finds no lost regression, all selected checks pass, and current measurements show a useful tradeoff after added focused-test cost. A full-suite acceleration claim additionally requires the paired full-suite evidence. Clear local savings can justify a bounded next task even when full-suite change is inconclusive, but the owner must see that limitation. If savings are marginal, scaffolding grows, or cases prove browser-distinct, stop after T1 and recommend retaining the rest. T3 requires the same assessment after T2. Neither gate supplies implementation authorization by itself.
 
-Approved allowances: T1 at most 6 active engineering hours, one substantive implementation commit, the stated paired measurement runs, one independent review plus correction/review of invalidated findings; T2 at most 6 hours with its early no-removal stop, now delivered within that allowance. Stop after two unsuccessful recovery attempts at the same blocker without new evidence, or when the allowance is exhausted. T3's proposed maximum 4 hours remains unauthorized. These are effort estimates, not execution-time promises. No automatic budget renewal on a new session.
+Approved allowances: T1 at most 6 active engineering hours, one substantive implementation commit, the stated paired measurement runs, one independent review plus correction/review of invalidated findings; T2 at most 6 hours with its early no-removal stop; T3 at most 4 hours. All three are delivered within their allowances. Stop after two unsuccessful recovery attempts at the same blocker without new evidence, or when the allowance is exhausted. These are effort estimates, not execution-time promises. No automatic budget renewal on a new session.
 
-The full proposed initiative has four substantive tasks including research outcome P0. P0, T1 and T2 are delivered: the three-working-task threshold is reached, and the plan/index remain `Awaiting owner acceptance`. One explicit final acceptance round is required. Proposed separate closure allowance: one hour for acceptance recording, extraction of useful testing guidance and plan retirement; waiting consumes no implementation allowance. No closure allowance is currently approved.
+The initiative has four delivered substantive tasks including research outcome P0. The three-working-task threshold is reached, and the plan/index remain `Awaiting owner acceptance`. One explicit final acceptance round is required. Proposed separate closure allowance: one hour for acceptance recording, extraction of useful testing guidance and plan retirement; waiting consumes no implementation allowance. No closure allowance is currently approved.
 
 | Task/check | Classification | Expected owner action and timing |
 | --- | --- | --- |
@@ -183,18 +206,18 @@ The full proposed initiative has four substantive tasks including research outco
 | T1–T3 Vitest, Electron, screenshot evidence and review | Automated/agent inspection | Zero anticipated owner manual application-verification rounds. Primary owns commands and artifact inspection. |
 | Future Electron, artifact or reviewer access failure | Capability unresolved until that session's first operation | Supported permission/environment action only if actually blocked; dependent removals wait. Possible additional permission round, not counted as a confirmed manual check. T1 verified hidden Electron, image viewing and independent reviewer inspection; no changed renderer required visible capture. |
 | T2 expansion | Owner decision, complete | Owner requested T2 after the separate caret fix; early no-removal assessment delivered. |
-| Expansion to T3 | Owner decision | Not authorized; current evidence does not establish the expansion gate. |
+| Expansion to T3 | Owner decision, complete | Owner explicitly requested T3 after T2; two Enter cases replaced within the recorded scope. |
 | Final acceptance after threshold | Owner decision | One separate post-delivery round reviewing commits, coverage mapping and measurements; no invented UI exercise. Rejection adds only the needed repair/acceptance round. |
 
 ## Exact next action and next-session prompt
 
-Await owner acceptance of the delivered P0/T1/T2 assessment. Recommend retaining the remaining tests and closing the initiative after acceptance; do not retire this plan before that decision. No implementation task is ready. T3 remains unauthorized and its expansion gate is not established. Do not repeat unchanged measurements or the corrected caret defect solely because another session starts.
+Await owner acceptance of delivered P0–T3. No implementation tasks remain. Recommend closing the initiative after acceptance; do not retire this plan before that decision. Do not repeat unchanged validation or the corrected caret defect solely because another session starts.
 
 ```text
 Review plans/tree-e2e-coverage.md and recover current repository state.
-P0/T1/T2 are delivered and awaiting owner acceptance. T1 removed no tests;
-the separately authorized caret correction is delivered. T2's early
-assessment retained all 19 Tab cases: its sole initial candidate costs
-423–424 ms, insufficient to justify replacement scaffolding. T3 remains
-unauthorized; no full-suite acceleration or replacement fidelity is claimed.
+P0–T3 are delivered and awaiting owner acceptance. T1/T2 retained all
+tests; the separately authorized caret correction is delivered. T3 replaced
+two Enter subtree Electron cases with stronger real App/store coverage;
+native Enter, contenteditable and navigation owners remain. No implementation
+tasks remain. No full-suite acceleration is claimed.
 ```

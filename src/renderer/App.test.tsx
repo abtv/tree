@@ -530,6 +530,69 @@ describe('App', () => {
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('rent')
   })
 
+  // @requirement PRODUCT.md §5.1
+  // @requirement PRODUCT.md §10
+  it.each([false, true])(
+    'Enter at the beginning preserves the complete subtree, restores focus and replays history (Vim %s)',
+    async (vim) => {
+      const original: Document = {
+        roots: [
+          {
+            id: 'current',
+            text: 'Current',
+            attachment: { id: 'image', mimeType: 'image/png' },
+            children: [
+              {
+                id: 'child',
+                text: 'https://example.com',
+                links: [{ start: 0, end: 19, url: 'https://example.com' }],
+                children: [{ id: 'grandchild', text: 'Nested', children: [] }],
+              },
+              { id: 'other-child', text: 'Other child', children: [] },
+            ],
+          },
+          { id: 'tail', text: 'Last root', children: [] },
+        ],
+      }
+      const store = await createSeededStore(original, { currentParentId: null, selectedNodeId: 'current' })
+      vi.useFakeTimers()
+      renderReact(<App initialVimEnabled={vim} store={store} />)
+      act(() => vi.advanceTimersByTime(32))
+      const current = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      if (vim) fireEvent.keyDown(current, { key: 'i' })
+      act(() => {
+        current.focus()
+        current.setSelectionRange(0, 0)
+      })
+      fireEvent.select(current)
+
+      const assertState = (expected: Document, selectedNodeId: string): void => {
+        act(() => vi.advanceTimersByTime(32))
+        const snapshot = store.getSnapshot()
+        if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+        expect(snapshot.document).toEqual(expected)
+        expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId })
+        expect(snapshot.focus).toMatchObject({ nodeId: selectedNodeId, cursor: 0 })
+        const input = document.querySelector<HTMLTextAreaElement>(
+          `.node-row[data-node-id="${selectedNodeId}"] textarea`,
+        )!
+        expect(input).toHaveFocus()
+        expect([input.selectionStart, input.selectionEnd]).toEqual([0, 0])
+        if (vim) expect(screen.getByLabelText('Vim mode')).toHaveTextContent('INSERT')
+      }
+      assertState(original, 'current')
+      fireEvent.keyDown(current, { key: 'Enter' })
+
+      const inserted: Document = { roots: [{ id: 'created-0', text: '', children: [] }, ...original.roots] }
+      assertState(inserted, 'created-0')
+      expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('Current')
+      fireEvent.keyDown(document.activeElement!, { key: 'z', metaKey: true })
+      assertState(original, 'current')
+      fireEvent.keyDown(document.activeElement!, { key: 'z', metaKey: true, shiftKey: true })
+      assertState(inserted, 'created-0')
+    },
+  )
+
   it('deletes an empty node and focuses the previous node on Backspace', async () => {
     const store = createStore()
     await act(async () => {

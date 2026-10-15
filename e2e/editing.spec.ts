@@ -6,7 +6,6 @@ import {
   launchTree,
   lockSystemClipboard,
   node,
-  parent,
   setCursor,
   test,
   typeInto,
@@ -211,24 +210,6 @@ describeForEachEditingMode('creating nodes with Enter', () => {
     await expect(node(window, 1)).toHaveValue('')
     await expect(node(window, 2)).toHaveValue('Current')
     await expect(node(window, 1)).toBeFocused()
-  })
-
-  test('Enter at the beginning preserves the selected node subtree', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-
-    await typeInto(node(window, 1), 'Current')
-    await window.keyboard.press('Meta+.')
-    await window.keyboard.press('Enter')
-    await typeInto(node(window, 1), 'Child')
-    await window.keyboard.press('Meta+,')
-    await setCursor(node(window, 1), 0)
-    await window.keyboard.press('Enter')
-
-    await expect(node(window, 1)).toHaveValue('')
-    await expect(node(window, 2)).toHaveValue('Current')
-    await window.getByRole('button', { name: 'Enter node 2' }).click()
-    await expect(parent(window)).toHaveValue('Current')
-    await expect(node(window, 1)).toHaveValue('Child')
   })
 
   // @requirement PRODUCT.md §5.1
