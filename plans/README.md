@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Tree E2E Coverage Consolidation](tree-e2e-coverage.md) | Awaiting owner acceptance; P0–T3 delivered; two Enter cases replaced; separate caret fix delivered | Review delivered result; no implementation tasks remain |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
