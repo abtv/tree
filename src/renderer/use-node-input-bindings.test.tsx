@@ -2785,6 +2785,59 @@ describe('Vim editing switch', () => {
 })
 
 describe('drag caret freeze', () => {
+  it('does not replay a released caret after a newer focus intent', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'hello'), node('peer', 'Other')] } })
+    const source = f.input('node')
+    const peer = f.input('peer')
+    source.focus()
+    source.setSelectionRange(2, 2)
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => {
+      f.result.current.dragFreeze.end(7)
+      f.store.selectNode('peer', 1)
+    })
+    await act(async () => undefined)
+    expect(document.activeElement).toBe(peer)
+    expect([peer.selectionStart, peer.selectionEnd]).toEqual([1, 2])
+  })
+
+  it('keeps a new drag frozen when the previous release has not rendered', async () => {
+    const f = await fixture()
+    const input = f.input()
+    input.focus()
+    input.setSelectionRange(2, 2)
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => f.result.current.dragFreeze.end(7))
+    input.setSelectionRange(3, 3)
+    act(() => f.result.current.dragFreeze.begin('node', 8))
+    f.rerender()
+    await act(async () => undefined)
+    expect(document.activeElement).not.toBe(input)
+    act(() => f.result.current.dragFreeze.end(8))
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(3)
+  })
+
+  it('retains the image caret and saved text return position through a move focus intent', async () => {
+    const f = await fixture({ document: { roots: [image('hello'), node('peer', 'Other')] } })
+    const input = f.input()
+    act(() => f.store.selectNode('node', 4))
+    f.press('l')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    act(() => {
+      f.store.moveNodeToParent('node', 'peer', 0)
+      f.result.current.dragFreeze.end(7)
+    })
+    await act(async () => undefined)
+    expect(document.activeElement).toBe(input)
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    expect(input.selectionStart).toBe(5)
+    f.press('h')
+    expect(f.result.current.imageCaretNodeId).toBeUndefined()
+    expect(input.selectionStart).toBe(4)
+  })
+
   it('collapses a transient selection and restores focus and the captured caret on release', async () => {
     const f = await fixture(),
       input = f.input()

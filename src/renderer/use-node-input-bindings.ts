@@ -183,10 +183,20 @@ export function useNodeInputBindings({
       clearFrozenPointerListener()
       const input = inputs.current.get(freeze.nodeId)
       if (input === undefined) return
+      const state = store.getSnapshot()
+      pendingCaret.current = {
+        nodeId: freeze.nodeId,
+        cursor: freeze.caret.cursor,
+        normal: false,
+        revision: ++caretRevision.current,
+        focusToken: state.status === 'ready' ? state.focus?.token : undefined,
+        refocus: true,
+        restoredCaret: freeze.caret,
+      }
       input.focus({ preventScroll: true })
       setCaret(input, freeze.caret.cursor)
     },
-    [clearFrozenPointerListener],
+    [clearFrozenPointerListener, store],
   )
 
   // The caret authority suspends the captured caret while a node drag freezes the text surface and
@@ -205,6 +215,8 @@ export function useNodeInputBindings({
       }
       const input = inputs.current.get(nodeId)
       if (input === undefined || document.activeElement !== input) return
+      pendingCaret.current = undefined
+      caretRevision.current += 1
       collapseSelectionToAnchor(input)
       frozenCaret.current = freezeCaret(nodeId, pointerId, { ...caretAuthority.current.caret, cursor: getCaret(input) })
       const listener = (event: PointerEvent): void => {
@@ -265,6 +277,12 @@ export function useNodeInputBindings({
     const state = store.getSnapshot()
     if (state.status !== 'ready') return
     if (state.focus?.token === syncedImageFocusToken.current) return
+    const pending = pendingCaret.current
+    if (
+      pending?.restoredCaret !== undefined &&
+      currentPendingCaretInput(pending, state, caretRevision.current, inputs.current.get(pending.nodeId)) !== undefined
+    )
+      return
     syncedImageFocusToken.current = state.focus?.token
     const target = requireNode(state.document, state.location.selectedNodeId).node
     const next = focusCaretTransition(
@@ -620,7 +638,15 @@ export function useNodeInputBindings({
     const input = currentPendingCaretInput(pending, state, caretRevision.current, registeredInput)
     if (input === undefined) return
     if (pending.refocus === true && input.ownerDocument.activeElement !== input) input.focus()
-    if (pending.normal) setNormalCaret(input, pending.cursor)
+    if (pending.restoredCaret !== undefined) {
+      // This restoration supersedes both passes of the move's focus intent.
+      caretRevision.current += 1
+      caretAuthority.current = { nodeId: pending.nodeId, caret: pending.restoredCaret }
+      syncedImageFocusToken.current = state.status === 'ready' ? state.focus?.token : undefined
+      setImageCaretNodeId(pending.restoredCaret.imageActive ? pending.nodeId : undefined)
+      if (vimMode === 'normal') setNormalCaret(input, pending.cursor)
+      else setCaret(input, pending.cursor)
+    } else if (pending.normal) setNormalCaret(input, pending.cursor)
     else if (vimMode !== 'normal') setCaret(input, pending.cursor)
   })
 

@@ -129,6 +129,21 @@ async function hoverBreadcrumb(window: Parameters<typeof node>[0], selector: str
   await window.mouse.move(segment.x + segment.width / 2, toolbar.y + toolbar.height / 2, { steps: 5 })
 }
 
+async function selectionOffsets(input: ReturnType<typeof node>): Promise<number[] | null> {
+  return input.evaluate((element) => {
+    if (element instanceof HTMLTextAreaElement) return [element.selectionStart, element.selectionEnd]
+    const selection = element.ownerDocument.getSelection()
+    if (selection === null || selection.rangeCount === 0) return null
+    const selected = selection.getRangeAt(0)
+    if (!element.contains(selected.startContainer) || !element.contains(selected.endContainer)) return null
+    const prefix = selected.cloneRange()
+    prefix.selectNodeContents(element)
+    prefix.setEnd(selected.startContainer, selected.startOffset)
+    const start = prefix.toString().length
+    return [start, start + selected.toString().length]
+  })
+}
+
 // @requirement PRODUCT.md §2.2
 // @requirement PRODUCT.md §10
 // @requirement PRODUCT.md §11
@@ -203,13 +218,19 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
       seedDocument(userDataDir, breadcrumbSeed(expanded))
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const source = window.locator('.node-row[data-node-id="x"] .node-input')
-      await startRowDrag(window, source)
+      await startRowDrag(window, source, { xOffset: mode === 'vim' ? 24 : 8 })
+      const frozenCursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+      if (mode === 'vim') expect(frozenCursor).toBeGreaterThan(0)
       const selector = destination === 'root' ? '.location-root' : '.location-segment[data-breadcrumb-id="r"]'
       await hoverBreadcrumb(window, selector)
       await expect(window.locator('.location-drop-target')).toHaveCount(1)
       await expect(window.locator('.node-row-drop-before, .node-row-drop-after, .node-row-drop-on')).toHaveCount(0)
       await window.mouse.up()
       await expect(source).toBeFocused()
+      expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(frozenCursor)
+      expect(await selectionOffsets(source)).toEqual([frozenCursor, frozenCursor + (mode === 'vim' ? 1 : 0)])
+      if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(source).toHaveValue('Moved')
       await expect(window.locator('.node-row').last()).toHaveAttribute('data-node-id', 'x')
       await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
       await window.keyboard.press('Meta+z')
@@ -229,6 +250,49 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
       await expect(window.locator('.location-drop-target')).toHaveCount(0)
     })
   }
+
+  test('restores a rich-text caret after a breadcrumb remount and then accepts a new caret', async ({
+    userDataDir,
+  }) => {
+    const url = 'https://example.com'
+    const text = `Read ${url}`
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'p',
+            text: 'Parent',
+            children: [{ id: 'x', text, links: [{ start: 5, end: text.length, url }], children: [] }],
+          },
+        ],
+      },
+      location: { currentParentId: 'p', selectedNodeId: 'x' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const source = window.locator('.node-row[data-node-id="x"] .node-input')
+    await expect(source).toHaveAttribute('contenteditable', 'true')
+    await startRowDrag(window, source, { xOffset: 24 })
+    const frozen = await selectionOffsets(source)
+    if (frozen === null) throw new Error('The rich drag source had no selection.')
+    expect(frozen[0]).toBeGreaterThan(0)
+    await hoverBreadcrumb(window, '.location-root')
+    await window.mouse.up()
+    await expect(source).toBeFocused()
+    await expect(window.locator('.location-current')).toHaveCount(0)
+    await expect(source).toHaveText(text)
+    await expect(source.getByRole('link')).toHaveAttribute('href', url)
+    await expect.poll(() => selectionOffsets(source)).toEqual([frozen[0], frozen[0]! + (mode === 'vim' ? 1 : 0)])
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.emulateMedia({ colorScheme: appearance })
+      await window.screenshot({ path: test.info().outputPath(`rich-drop-caret-${mode}-${appearance}.png`) })
+    }
+    await window.keyboard.press(mode === 'vim' ? 'l' : 'ArrowRight')
+    await expect.poll(() => selectionOffsets(source)).toEqual([frozen[0]! + 1, frozen[0]! + (mode === 'vim' ? 2 : 1)])
+    await window.keyboard.press('Meta+z')
+    await expect(window.locator('.location-current')).toHaveText('Parent')
+    await expect(source).toBeFocused()
+    await expect.poll(() => selectionOffsets(source)).toEqual([0, mode === 'vim' ? 1 : 0])
+  })
 
   test('rejects the current parent and toolbar whitespace, and clears cancelled breadcrumb highlights', async ({
     userDataDir,
@@ -371,7 +435,13 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
       seedDocument(userDataDir, hierarchySeed())
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       if (expanded) await openAlpha(window)
-      await dragOntoRow(window, 'b', 'a')
+      const source = window.locator('.node-row[data-node-id="b"] .node-input')
+      await startRowDrag(window, source, { xOffset: mode === 'vim' ? 24 : 8 })
+      const frozenCursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+      if (mode === 'vim') expect(frozenCursor).toBeGreaterThan(0)
+      const targetBox = await window.locator('.node-row[data-node-id="a"]').boundingBox()
+      if (targetBox === null) throw new Error('The receiving row was not rendered.')
+      await window.mouse.move(targetBox.x + 30, targetBox.y + targetBox.height / 2, { steps: 5 })
       const parent = window.locator('.node-row[data-node-id="a"]')
       await expect(parent).toHaveClass(/node-row-drop-on/)
       await window.mouse.up()
@@ -381,6 +451,10 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
       const moved = window.locator('.node-row[data-node-id="b"]')
       await expect(moved).toHaveAttribute('data-depth', '1')
       await expect(moved.locator('.node-input')).toBeFocused()
+      expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(frozenCursor)
+      await expect(source).toHaveValue('Bravo')
+      expect(await selectionOffsets(source)).toEqual([frozenCursor, frozenCursor + (mode === 'vim' ? 1 : 0)])
+      if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(parent.locator('.node-disclosure-triangle')).toHaveAttribute('aria-expanded', 'true')
       await window.keyboard.press('Meta+z')
       await expect(moved).toHaveAttribute('data-depth', '0')

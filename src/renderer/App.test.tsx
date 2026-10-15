@@ -122,6 +122,30 @@ function mockAppRowRects(originTop = 0, height = 24): void {
   })
 }
 
+function mockAppDragRects(): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const breadcrumb = this.dataset.breadcrumbId
+    const left = breadcrumb === 'r' ? 40 : breadcrumb === 'p' ? 80 : 0
+    const top =
+      this.classList.contains('location-bar') || breadcrumb !== undefined
+        ? 0
+        : 48 + Number(this.dataset.nodeIndex ?? 0) * 24
+    const width = breadcrumb !== undefined ? 40 : 600
+    return {
+      x: left,
+      y: top,
+      left,
+      top,
+      right: left + width,
+      bottom: top + 24,
+      width,
+      height: 24,
+      toJSON: () => ({}),
+    }
+  })
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+}
+
 function render(ui: Parameters<typeof renderReact>[0]): ReturnType<typeof renderReact> {
   const result = renderReact(ui)
   const input = screen.queryByRole('textbox', { name: 'Node 1' })
@@ -180,28 +204,8 @@ describe('App breadcrumb move matrix', () => {
           renderReact(<App initialVimEnabled={vim} store={store} />)
           // jsdom supplies no layout or native pointer capture. Only geometry is substituted;
           // App, drag handlers, caret projection, keyboard dispatch and store history are real.
-          vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-            const breadcrumb = this.dataset.breadcrumbId
-            const left = breadcrumb === 'r' ? 40 : breadcrumb === 'p' ? 80 : 0
-            const top =
-              this.classList.contains('location-bar') || breadcrumb !== undefined
-                ? 0
-                : 48 + Number(this.dataset.nodeIndex ?? 0) * 24
-            const width = breadcrumb !== undefined ? 40 : 600
-            return {
-              x: left,
-              y: top,
-              left,
-              top,
-              right: left + width,
-              bottom: top + 24,
-              width,
-              height: 24,
-              toJSON: () => ({}),
-            }
-          })
+          mockAppDragRects()
           vi.useFakeTimers()
-          vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
           const input = (): HTMLTextAreaElement => document.querySelector('.node-row[data-node-id="x"] textarea')!
           act(() => vi.advanceTimersByTime(32))
           act(() => {
@@ -261,6 +265,179 @@ describe('App breadcrumb move matrix', () => {
           expect(document.querySelector('.location-drop-target')).toBeNull()
         })
       }
+    }
+  }
+})
+
+// @requirement PRODUCT.md §2.2
+// @requirement PRODUCT.md §2.4
+// @requirement PRODUCT.md §10
+// @requirement PRODUCT.md §11
+// @requirement PRODUCT.md §20.2.8
+describe('App drag editing-state matrix', () => {
+  for (const route of ['row', 'breadcrumb', 'gap'] as const) {
+    const states =
+      route === 'gap'
+        ? (['visual-node'] as const)
+        : (['standard', 'normal', 'insert', 'replace', 'visual', 'visual-node'] as const)
+    for (const state of states) {
+      it(`${state} preserves text, caret and history through a ${route} drop`, async () => {
+        const source = { id: 'x', text: 'Bravo', children: [{ id: 'leaf', text: 'Subtree', children: [] }] }
+        const receiver = {
+          id: 't',
+          text: 'Receiver',
+          children: [{ id: 'existing', text: 'Existing child', children: [] }],
+        }
+        const parent = { id: 'p', text: 'Parent', children: [source, receiver] }
+        const ancestor = { id: 'r', text: 'Ancestor', children: [parent] }
+        const original = { roots: [ancestor, { id: 'tail', text: 'Last root', children: [] }] }
+        const store = await createSeededStore(original, { currentParentId: 'p', selectedNodeId: 'x' })
+        renderReact(<App initialVimEnabled={state !== 'standard'} store={store} />)
+        // Only layout, scroll and external services are substituted. Keyboard/drag dispatch,
+        // session finishing, selection projection and document/history use production owners.
+        mockAppDragRects()
+        vi.useFakeTimers()
+        const input = (): HTMLTextAreaElement => document.querySelector('.node-row[data-node-id="x"] textarea')!
+        const row = (): HTMLElement => input().closest('.node-row')!
+        act(() => vi.advanceTimersByTime(32))
+        act(() => input().focus())
+        if (state === 'standard') act(() => input().setSelectionRange(2, 2))
+        else {
+          fireEvent.keyDown(input(), { key: 'l' })
+          fireEvent.keyDown(input(), { key: 'l' })
+        }
+        if (state === 'insert') fireEvent.keyDown(input(), { key: 'i' })
+        if (state === 'standard' || state === 'insert') {
+          fireEvent.change(input(), { target: { value: 'BrXavo', selectionStart: 3, selectionEnd: 3 } })
+        }
+        if (state === 'replace') {
+          fireEvent.keyDown(input(), { key: 'R' })
+          fireEvent.keyDown(input(), { key: 'X' })
+          expect(input()).toHaveValue('BrXvo')
+          expect(store.getSnapshot()).toMatchObject({ document: original })
+        }
+        if (state === 'visual') {
+          fireEvent.keyDown(input(), { key: 'v' })
+          fireEvent.keyDown(input(), { key: 'l' })
+          expect([input().selectionStart, input().selectionEnd]).toEqual([2, 4])
+        }
+        if (state === 'visual-node') {
+          fireEvent.keyDown(input(), { key: 'V' })
+          expect(row()).toHaveClass('node-row-visual-selected')
+        }
+        const edited = state === 'standard' || state === 'insert' || state === 'replace'
+        const text = state === 'replace' ? 'BrXvo' : edited ? 'BrXavo' : 'Bravo'
+        const moved = { ...source, text }
+        const editedOriginal = {
+          roots: [{ ...ancestor, children: [{ ...parent, children: [moved, receiver] }] }, original.roots[1]!],
+        }
+        const expected = {
+          roots: [
+            {
+              ...ancestor,
+              children: [
+                {
+                  ...parent,
+                  children:
+                    route === 'row'
+                      ? [{ ...receiver, children: [...receiver.children, moved] }]
+                      : route === 'gap'
+                        ? [receiver, moved]
+                        : [receiver],
+                },
+                ...(route === 'breadcrumb' ? [moved] : []),
+              ],
+            },
+            original.roots[1]!,
+          ],
+        }
+        fireEvent.pointerDown(input(), {
+          pointerId: 1,
+          button: 0,
+          isPrimary: true,
+          pointerType: 'mouse',
+          clientX: 100,
+          clientY: 60,
+        })
+        fireEvent.mouseDown(input(), { button: 0 })
+        act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+        expect(document.body).toHaveClass('node-drag-active')
+        expect(input()).not.toHaveFocus()
+        const frozenCursor = edited ? 3 : 2
+        expect(input().selectionStart).toBe(frozenCursor)
+        const point =
+          route === 'breadcrumb' ? { clientX: 60, clientY: 12 } : { clientX: 100, clientY: route === 'row' ? 84 : 100 }
+        // Toolbar events deliberately originate outside the list, exercising the fallback listener.
+        const releaseTarget =
+          route === 'breadcrumb' ? document.querySelector('.location-segment[data-breadcrumb-id="r"]')! : input()
+        fireEvent.pointerMove(releaseTarget, { pointerId: 1, ...point })
+        if (route === 'breadcrumb') expect(releaseTarget).toHaveClass('location-drop-target')
+        else
+          expect(document.querySelector(route === 'row' ? '.node-row-drop-on' : '.node-row-drop-after')).not.toBeNull()
+        fireEvent.pointerUp(releaseTarget, { pointerId: 1, ...point })
+        fireEvent.mouseUp(releaseTarget, { button: 0 })
+        act(() => vi.advanceTimersByTime(32))
+
+        const assertDocument = (tree: Document, currentParentId: string): void => {
+          const snapshot = store.getSnapshot()
+          expect(snapshot).toMatchObject({ status: 'ready', location: { currentParentId, selectedNodeId: 'x' } })
+          if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+          expect(snapshot.document).toEqual(tree)
+          expect(input()).toHaveFocus()
+        }
+        const destination = route === 'breadcrumb' ? 'r' : 'p'
+        assertDocument(expected, destination)
+        expect(input()).toHaveValue(text)
+        const normalCaret = state === 'normal' || state === 'replace' || (state === 'visual-node' && route !== 'gap')
+        expect([input().selectionStart, input().selectionEnd]).toEqual([
+          frozenCursor,
+          frozenCursor + (normalCaret ? 1 : 0),
+        ])
+        expect(row()).toHaveAttribute('data-depth', route === 'row' ? '1' : '0')
+        const mode =
+          state === 'insert' ? 'INSERT' : state === 'visual' ? 'VISUAL' : route === 'gap' ? 'VISUAL NODE' : 'NORMAL'
+        if (state !== 'standard') expect(screen.getByLabelText('Vim mode')).toHaveTextContent(mode)
+        expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(route === 'gap' ? 1 : 0)
+        expect(document.body).not.toHaveClass('node-drag-active')
+        expect(document.querySelector('.location-drop-target, .node-row-drop-on, .node-row-drop-after')).toBeNull()
+
+        const history = (shiftKey = false): void => {
+          fireEvent.keyDown(input(), { key: 'z', metaKey: true, shiftKey })
+          act(() => vi.advanceTimersByTime(32))
+        }
+        history()
+        assertDocument(editedOriginal, 'p')
+        expect(input().selectionStart).toBe(0)
+        if (route === 'gap') {
+          // Sibling reordering puts Undo/Redo on the first changed sibling (§10).
+          history()
+          assertDocument(original, 'p')
+          history(true)
+          const snapshot = store.getSnapshot()
+          expect(snapshot).toMatchObject({
+            location: { currentParentId: 'p', selectedNodeId: 't' },
+            focus: { nodeId: 't', cursor: 0 },
+          })
+          if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+          expect(snapshot.document).toEqual(expected)
+          expect(document.querySelector('.node-row[data-node-id="t"] textarea')).toHaveFocus()
+          return
+        }
+        if (edited) {
+          history()
+          assertDocument(original, 'p')
+          expect(input().selectionStart).toBe(2)
+          history(true)
+          assertDocument(editedOriginal, 'p')
+          expect(input().selectionStart).toBe(2)
+        } else {
+          history()
+          assertDocument(original, 'p')
+        }
+        history(true)
+        assertDocument(expected, route === 'breadcrumb' ? 'r' : 'p')
+        expect(input().selectionStart).toBe(0)
+      })
     }
   }
 })

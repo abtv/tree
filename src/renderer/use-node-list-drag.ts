@@ -290,11 +290,6 @@ export function useNodeListDrag({
     const onPointerUp = (event: PointerEvent): void => {
       if (pointerId === undefined || event.pointerId !== pointerId) return
       if (outsideList(event)) onListPointerUp(event)
-      else {
-        dispatch({ type: 'release', pointerId: event.pointerId })
-        setDrop(undefined)
-        setAutoScrollDirection(0)
-      }
     }
     globalThis.addEventListener('keydown', onKeyDown)
     globalThis.addEventListener('blur', onBlur)
@@ -304,14 +299,16 @@ export function useNodeListDrag({
       if (event.pointerId === pointerId && outsideList(event)) cancelDrag()
     }
     globalThis.addEventListener('pointercancel', onPointerCancel)
-    globalThis.addEventListener('pointerup', onPointerUp)
+    // Resolve toolbar/fallback drops before the caret owner's window-bubble release listener.
+    // Inside-list releases continue through the list's React handler.
+    globalThis.addEventListener('pointerup', onPointerUp, true)
     return () => {
       globalThis.removeEventListener('keydown', onKeyDown)
       globalThis.removeEventListener('blur', onBlur)
       globalThis.removeEventListener('dragstart', onNativeDragStart)
       globalThis.removeEventListener('pointermove', onPointerMove)
       globalThis.removeEventListener('pointercancel', onPointerCancel)
-      globalThis.removeEventListener('pointerup', onPointerUp)
+      globalThis.removeEventListener('pointerup', onPointerUp, true)
     }
   }, [cancelDrag, resolved.phase, resolved.source, listRef, onListPointerMove, onListPointerUp])
 

@@ -624,7 +624,7 @@ Node movement begins when the primary mouse button is pressed and held on a node
 * A gap shows a marker at the level chosen by horizontal movement from the press point: each full row-indent step right moves one level deeper, each step left moves one level shallower, and vertical movement alone keeps the source level. The level is clamped to the levels that gap permits.
 * The dragged node and its visible descendants cannot be drop targets; hovering their row middles or internal gaps shows the not-allowed cursor, and release changes nothing.
 * Releasing on an allowed gap or row completes the move. Releasing without changing the position leaves the document unchanged.
-* When the drag ends, focus and the text cursor return to the node.
+* When the drag ends, focus and the text cursor return to the node at the position captured when dragging activated. A successful move preserves that position through deferred focus restoration and a change of displayed location, including when the input is remounted. The caret uses the resulting editing mode's normal rendering and preserves an attached-image caret and its saved text return position. Later navigation and undo/redo apply their own caret rules.
 * `Escape` cancels an active drag without moving the node, and cancellation keeps text selection disabled until the primary mouse button is released.
 
 Gap targets are resolved against the visible rows with the dragged block removed. The chosen level cannot be shallower than the row below or deeper than one level below the row above. A gap inside the dragged block is invalid. Drops may reorder siblings, indent beneath a visible node, or outdent to a displayed ancestor or the document root.

@@ -6,7 +6,7 @@ Reduce repeated Electron execution while preserving meaningful regression protec
 
 The owner authorized research and recording this plan on 2026-10-16, then explicitly authorized **T1 only** with its proposed 4–6 active-hour budget (maximum 6 hours), measurement and review obligations. T2/T3 and their budgets remain unauthorized. The selected tool is Codex. A fresh configured planner independently inspected the candidates; the primary reconciled its recommendations with source and available runtime evidence.
 
-**T1 is complete as a no-removal assessment.** Its nonzero-caret checks exposed a production defect, so replacement fidelity was not established and all original tests remain. Independent review found no meaningful issues with the assessment. T2 and T3 remain unauthorized conditional expansion proposals, in that order. Removing none was an allowed pilot outcome; do not expand merely to achieve a case count.
+**T1 is complete as a no-removal assessment.** Its nonzero-caret checks exposed a production defect, so replacement fidelity was not established and all original tests remain. Independent review found no meaningful issues with the assessment. The owner subsequently authorized a separate contained fix for that defect; it does not resume consolidation or authorize T2/T3. Removing none was an allowed pilot outcome; do not expand merely to achieve a case count.
 
 Application behavior, production source, harnesses, fixtures, runner/configuration, dependencies, isolation, concurrency, reset eligibility and timeout policy stay unchanged. No new browser runner, reporting framework, duration gate, production test hook, permanent per-test registry or validation archive. Do not revive the retired coverage-efficiency runner initiative. Its surviving scratch checkout is historical evidence only.
 
@@ -94,7 +94,11 @@ The production cause has not been proved. Source inspection suggests that a move
 
 Current measurements at the unchanged executable baseline: two full runs passed 775 cases in **155.751 / 163.891 seconds**; two focused runs passed 71 DnD cases in **72.666 / 72.429 seconds**, with **94.196 / 93.924 summed test seconds**, two active spec workers, 73 launch annotations and no resets. No retries, skips or errors occurred. The three candidates cost **3.528 / 3.611 summed seconds** in the focused runs. The baseline App suite passed 96 cases with **877 ms** test execution. No replacement cost or acceleration is claimed. Since final executable inputs equal the baseline, those results remain valid; rerunning them as a nominal after-snapshot would measure variation rather than an implementation effect. The final assessment changes documentation only, so its applicable tier is Minimal Risk; test-source type/lint checks and additional owning-suite runs are not required for unchanged files.
 
-Do not expand to T2/T3 on this result. There is no ready implementation task. The recommendation is a separately authorized fix for the reproduced caret failure, followed by a fresh assessment of replacement fidelity if coverage consolidation is requested again. P0 plus T1 is two substantive tasks; no three-task acceptance gate has been reached.
+Do not expand to T2/T3 on this result. At the T1 handoff, the recommendation was a separately authorized fix for the reproduced caret failure, followed by a fresh assessment of replacement fidelity if coverage consolidation is requested again. P0 plus T1 is two substantive consolidation tasks; no three-task acceptance gate has been reached for that scope.
+
+### Separate caret defect correction
+
+After T1, the owner requested fixing the reproduced defect. The separate contained correction restores the captured caret through the existing pending-caret owner after the move's focus intent, and resolves outside-list drops before the caret release listener. Regression coverage includes nonzero positions, both editing configurations, pending edits, same-parent versus cross-parent Visual state, history, rich inputs, stale requests and image return positions. No original Electron case is removed. The correction passed all required validation stages, affected real Electron suites and existing drag scale guards. Independent code review and product verification found no meaningful issues. This resolves the runtime blocker; it does not establish a consolidation saving or authorize the conditional tasks.
 
 ### T2 — Tab structural editing, conditional
 
@@ -157,14 +161,13 @@ The full proposed initiative has four substantive tasks including this research 
 
 ## Exact next action and next-session prompt
 
-No implementation task is ready. T1 finished with no removals because its replacement trial exposed a real nonzero-caret defect. The recommendation is separate authorization to fix that defect; T2/T3 remain unauthorized. Temporary reproduction and baseline reports are retained under `.scratch/tree-e2e-coverage/t1/` for that possible follow-up; they are evidence, not implementation authority.
+No implementation task is ready without further authorization. T1 remains complete with no removals, and the separately requested caret correction is delivered. T2/T3 remain unauthorized; retrying coverage consolidation requires a fresh assessment of replacement fidelity and benefit. Do not repeat the original defect or baseline measurements solely because another session starts.
 
 ```text
 Review plans/tree-e2e-coverage.md and recover current repository state.
 T1 finished with no test removals after four real Electron nonzero-caret
-checks captured position 2 during a drag and received 0 after a row or
-breadcrumb drop. No production or test changes were committed. Recover
-the preserved reproduction and baseline reports from
-.scratch/tree-e2e-coverage/t1/. A separate fix needs owner authorization;
-T2/T3 remain unauthorized. Do not infer full-suite acceleration.
+checks captured position 2 during a drag and received 0 after a drop.
+The separately authorized caret correction is delivered with regression
+coverage. This does not resume coverage consolidation. T2/T3 remain
+unauthorized. Do not infer full-suite acceleration.
 ```
