@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Tree E2E Coverage Consolidation](tree-e2e-coverage.md) | Planned; implementation not authorized | Owner review of T1 scope and budget; T2/T3 conditional |
+| [Tree E2E Coverage Consolidation](tree-e2e-coverage.md) | T1 done with no removals; expansion gate not met | No ready task; separate caret-defect fix recommended; T2/T3 unauthorized |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
