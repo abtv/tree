@@ -132,6 +132,139 @@ function render(ui: Parameters<typeof renderReact>[0]): ReturnType<typeof render
   return result
 }
 
+// @requirement PRODUCT.md §2.2
+// @requirement PRODUCT.md §10
+// @requirement PRODUCT.md §11
+describe('App breadcrumb move matrix', () => {
+  for (const vim of [false, true]) {
+    for (const destination of ['ancestor', 'root'] as const) {
+      for (const expanded of [false, true]) {
+        it(`${vim ? 'Vim' : 'Standard'} appends to ${destination} with ${expanded ? 'expanded' : 'collapsed'} ancestors and restores history focus`, async () => {
+          const moved = { id: 'x', text: 'Moved', children: [{ id: 'leaf', text: 'Subtree', children: [] }] }
+          const parent = { id: 'p', text: 'Parent', children: [moved] }
+          const sibling = { id: 's', text: 'Sibling', children: [] }
+          const tail = { id: 'tail', text: 'Last root', children: [] }
+          const original = { roots: [{ id: 'r', text: 'Ancestor', children: [parent, sibling] }, tail] }
+          const emptiedParent = { ...parent, children: [] }
+          const expected = {
+            roots: [
+              {
+                id: 'r',
+                text: 'Ancestor',
+                children: destination === 'ancestor' ? [emptiedParent, sibling, moved] : [emptiedParent, sibling],
+              },
+              tail,
+              ...(destination === 'root' ? [moved] : []),
+            ],
+          }
+          const store = new EditorStore(
+            {
+              load: async () => ({
+                version: 3,
+                document: original,
+                location: { currentParentId: 'p', selectedNodeId: 'x' },
+                view: { expandedIds: expanded ? ['r', 'p'] : [] },
+              }),
+              save: async () => undefined,
+              readClipboard: async () => ({ kind: 'text', text: '' }),
+              writeAttachment: async () => undefined,
+              cleanupAttachments: async () => undefined,
+            },
+            () => {
+              throw new Error('Moving a subtree must preserve node identities.')
+            },
+          )
+          await act(async () => {
+            await store.initialize()
+          })
+          renderReact(<App initialVimEnabled={vim} store={store} />)
+          // jsdom supplies no layout or native pointer capture. Only geometry is substituted;
+          // App, drag handlers, caret projection, keyboard dispatch and store history are real.
+          vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const breadcrumb = this.dataset.breadcrumbId
+            const left = breadcrumb === 'r' ? 40 : breadcrumb === 'p' ? 80 : 0
+            const top =
+              this.classList.contains('location-bar') || breadcrumb !== undefined
+                ? 0
+                : 48 + Number(this.dataset.nodeIndex ?? 0) * 24
+            const width = breadcrumb !== undefined ? 40 : 600
+            return {
+              x: left,
+              y: top,
+              left,
+              top,
+              right: left + width,
+              bottom: top + 24,
+              width,
+              height: 24,
+              toJSON: () => ({}),
+            }
+          })
+          vi.useFakeTimers()
+          vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+          const input = (): HTMLTextAreaElement => document.querySelector('.node-row[data-node-id="x"] textarea')!
+          act(() => vi.advanceTimersByTime(32))
+          act(() => {
+            input().focus()
+            input().setSelectionRange(0, 0)
+          })
+          fireEvent.select(input())
+          fireEvent.pointerDown(input(), {
+            pointerId: 1,
+            button: 0,
+            isPrimary: true,
+            pointerType: 'mouse',
+            clientX: 100,
+            clientY: 60,
+          })
+          act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+          expect(document.body).toHaveClass('node-drag-active')
+          expect(input()).not.toHaveFocus()
+          const clientX = destination === 'root' ? 20 : 60
+          fireEvent.pointerMove(input(), { pointerId: 1, clientX, clientY: 12 })
+          expect(document.querySelector('.location-drop-target')).toHaveAttribute(
+            'data-breadcrumb-id',
+            destination === 'root' ? '' : 'r',
+          )
+          fireEvent.pointerUp(input(), { pointerId: 1, clientX, clientY: 12 })
+
+          const assertState = (tree: typeof original, currentParentId: string | null, cursor: number): void => {
+            act(() => vi.advanceTimersByTime(32))
+            expect(store.getSnapshot()).toMatchObject({
+              status: 'ready',
+              location: { currentParentId, selectedNodeId: 'x' },
+              focus: { nodeId: 'x', cursor: 0 },
+            })
+            const snapshot = store.getSnapshot()
+            if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+            expect(snapshot.document).toEqual(tree)
+            expect(input()).toHaveFocus()
+            expect(input().selectionStart).toBe(cursor)
+            expect(input().selectionEnd).toBe(vim && cursor === 0 ? 1 : cursor)
+            expect(document.querySelector('.location-current')?.textContent ?? null).toBe(
+              currentParentId === null ? null : currentParentId === 'r' ? 'Ancestor' : 'Parent',
+            )
+            if (vim) expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+          }
+          const destinationId = destination === 'root' ? null : 'r'
+          assertState(expected, destinationId, 0)
+          expect(Array.from(document.querySelectorAll('.node-row')).at(-1)).toHaveAttribute('data-node-id', 'x')
+          fireEvent.keyDown(input(), { key: 'z', metaKey: true })
+          assertState(original, expanded ? destinationId : 'p', 0)
+          expect(input().closest('.node-row')).toHaveAttribute(
+            'data-depth',
+            expanded ? (destination === 'root' ? '2' : '1') : '0',
+          )
+          fireEvent.keyDown(input(), { key: 'z', metaKey: true, shiftKey: true })
+          assertState(expected, destinationId, 0)
+          expect(document.body).not.toHaveClass('node-drag-active')
+          expect(document.querySelector('.location-drop-target')).toBeNull()
+        })
+      }
+    }
+  }
+})
+
 // @requirement PRODUCT.md §2.5
 describe('App strikethrough', () => {
   const tasks = {

@@ -193,39 +193,41 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
     await expect(window.locator('.node-row').last()).toHaveAttribute('data-node-id', 'x')
   })
   for (const destination of ['ancestor', 'root']) {
-    for (const expanded of [false, true]) {
-      test(`appends to ${destination} and undo ${expanded ? 'keeps the visible level' : 'navigates to the hidden node'}`, async ({
-        userDataDir,
-      }) => {
-        seedDocument(userDataDir, breadcrumbSeed(expanded))
-        const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-        const source = window.locator('.node-row[data-node-id="x"] .node-input')
-        await startRowDrag(window, source)
-        const selector = destination === 'root' ? '.location-root' : '.location-segment[data-breadcrumb-id="r"]'
-        await hoverBreadcrumb(window, selector)
-        await expect(window.locator('.location-drop-target')).toHaveCount(1)
-        await expect(window.locator('.node-row-drop-before, .node-row-drop-after, .node-row-drop-on')).toHaveCount(0)
-        await window.mouse.up()
-        await expect(source).toBeFocused()
-        await expect(window.locator('.node-row').last()).toHaveAttribute('data-node-id', 'x')
+    // App.test.tsx covers all eight destination × expansion × editing-mode combinations.
+    // Keep each destination and expansion in each mode across four real-pointer cases:
+    // Standard ancestor/hidden + root/visible; Vim ancestor/visible + root/hidden.
+    const expanded = (destination === 'ancestor') === (mode === 'vim')
+    test(`appends to ${destination} and undo ${expanded ? 'keeps the visible level' : 'navigates to the hidden node'}`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, breadcrumbSeed(expanded))
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const source = window.locator('.node-row[data-node-id="x"] .node-input')
+      await startRowDrag(window, source)
+      const selector = destination === 'root' ? '.location-root' : '.location-segment[data-breadcrumb-id="r"]'
+      await hoverBreadcrumb(window, selector)
+      await expect(window.locator('.location-drop-target')).toHaveCount(1)
+      await expect(window.locator('.node-row-drop-before, .node-row-drop-after, .node-row-drop-on')).toHaveCount(0)
+      await window.mouse.up()
+      await expect(source).toBeFocused()
+      await expect(window.locator('.node-row').last()).toHaveAttribute('data-node-id', 'x')
+      await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
+      await window.keyboard.press('Meta+z')
+      await expect(source).toBeFocused()
+      if (expanded) {
         await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
-        await window.keyboard.press('Meta+z')
-        await expect(source).toBeFocused()
-        if (expanded) {
-          await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
-          await expect(window.locator('.node-row[data-node-id="x"]')).toHaveAttribute(
-            'data-depth',
-            destination === 'root' ? '2' : '1',
-          )
-        } else await expect(window.locator('.location-current')).toHaveText('Parent')
-        expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
-        await window.keyboard.press('Meta+Shift+z')
-        await expect(source).toBeFocused()
-        // A redone root is hidden from the old parent's location; a visible ancestor location stays.
-        await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
-        await expect(window.locator('.location-drop-target')).toHaveCount(0)
-      })
-    }
+        await expect(window.locator('.node-row[data-node-id="x"]')).toHaveAttribute(
+          'data-depth',
+          destination === 'root' ? '2' : '1',
+        )
+      } else await expect(window.locator('.location-current')).toHaveText('Parent')
+      expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+      await window.keyboard.press('Meta+Shift+z')
+      await expect(source).toBeFocused()
+      // A redone root is hidden from the old parent's location; a visible ancestor location stays.
+      await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
+      await expect(window.locator('.location-drop-target')).toHaveCount(0)
+    })
   }
 
   test('rejects the current parent and toolbar whitespace, and clears cancelled breadcrumb highlights', async ({
