@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../src/domain/product-messages'
+import { captureQuitTimer } from './quit-timer'
 import {
   allowRendererError,
   blockSaves,
@@ -43,16 +44,22 @@ test.describe('shutdown failure handling', () => {
     const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
     mkdirSync(temporaryDocumentPath)
 
-    // Control renderer save timers while retaining the real main-process quit timeout.
+    // Control renderer save timers independently of the captured main-process quit timer.
     await window.clock.install()
     const initialText = 'unsaved one two three four five six seven eight nine'
     const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
     await typeInto(node(window, 1), initialText)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
+    const expireQuitTimer = await captureQuitTimer(app, 'ipc')
+
     await node(window, 1).press('Meta+q')
     await expect(window.getByText(/Operation failed:/)).toBeVisible()
     expect(app.process().exitCode).toBeNull()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+    await expireQuitTimer()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
@@ -330,8 +337,14 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), initialText)
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
     await closeMainWindow(app)
     expect(app.process().exitCode).toBeNull()
+    await expect(window.getByText(/Operation failed:.*save blocked/)).toBeVisible()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+    await expireQuitTimer()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })

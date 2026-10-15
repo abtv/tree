@@ -2,6 +2,7 @@
 import type { ElectronApplication } from '@playwright/test'
 import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { captureQuitTimer } from './quit-timer'
 import {
   allowRendererError,
   attachmentFiles,
@@ -247,7 +248,13 @@ test.describe('persistence reliability regressions', () => {
       await app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0),
     ).toBe(0)
 
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
     await clickApplicationMenuQuit(app)
+    await expect(window.getByText(/^Operation failed:.*save blocked$/)).toBeVisible()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+    await expireQuitTimer()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
