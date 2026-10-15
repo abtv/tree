@@ -17,6 +17,94 @@ import {
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
   for (const view of ['Tree', 'Agenda'] as const) {
     // @requirement PRODUCT.md §20.9
+    test(`completes distinctive prefixes and retains the selected date in ${view}`, async ({
+      userDataDir,
+    }, testInfo) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await setAgendaToday(window)
+      if (view === 'Agenda') {
+        await window.keyboard.press('Meta+p')
+        await window.locator('.agenda-row[data-node-id="n"]').click()
+      }
+      const input = window.getByRole('textbox', {
+        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
+        exact: true,
+      })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      const replace = async (expression: string): Promise<void> => {
+        await window.keyboard.press('Meta+a')
+        await window.keyboard.type(`2026-10-08 Plan ${expression}`)
+      }
+      for (const [prefix, expression, date] of [
+        ['toda', 'today', '2026-10-08'],
+        ['tomo', 'tomorrow', '2026-10-09'],
+        ['yest', 'yesterday', '2026-10-07'],
+      ] as const) {
+        await replace(prefix)
+        await expect(popup.getByRole('option')).toHaveCount(1)
+        await expect(popup).toContainText(expression)
+        await window.keyboard.press('Tab')
+        await expect(input).toHaveText(`2026-10-08 Plan ${date}`)
+        await expect(input).toBeFocused()
+        await window.keyboard.press('Meta+z')
+        await expect(input).toHaveText(`2026-10-08 Plan ${prefix}`)
+        await expect(popup).toHaveCount(0)
+      }
+      for (const literal of [
+        'yes',
+        'tom',
+        'tod',
+        'next w',
+        'next winter',
+        'last winter',
+        'next weekend',
+        'last weekend',
+      ]) {
+        await replace(literal)
+        await expect(popup).toHaveCount(0)
+        await expect(input).toHaveText(`2026-10-08 Plan ${literal}`)
+      }
+      for (const [prefix, first, selected] of [
+        ['next wee', '2026-10-12', '2026-10-13'],
+        ['last wee', '2026-09-28', '2026-09-29'],
+      ] as const) {
+        await replace(prefix)
+        await expect(popup.getByRole('option')).toHaveCount(7)
+        await expect(popup.getByRole('option').first()).toContainText(first)
+        await window.keyboard.press('Control+n')
+        await window.keyboard.type('k')
+        await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+        if (prefix === 'last wee') {
+          await window.screenshot({ path: testInfo.outputPath('previous-week-selection.png') })
+        }
+        await window.keyboard.press('Tab')
+        await expect(input).toHaveText(`2026-10-08 Plan ${selected}`)
+      }
+      await replace('in September')
+      await expect(popup.getByRole('option')).toHaveCount(2)
+      await expect(popup.getByRole('option').first()).toContainText('2027-09-01')
+      await expect(popup.getByRole('option').nth(1)).toContainText('2026-09-01')
+      await window.keyboard.press('Control+n')
+      await window.keyboard.press('Backspace')
+      await expect(popup).toHaveCount(0)
+      await window.keyboard.type('r')
+      await expect(popup.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+      await window.keyboard.press('Control+n')
+      await window.screenshot({ path: testInfo.outputPath('past-month-selection.png') })
+      await window.keyboard.press('Tab')
+      await expect(input).toHaveText('2026-10-08 Plan 2026-09-01')
+      await expect(input).toBeFocused()
+    })
+
+    // @requirement PRODUCT.md §20.9
     test(`accepts relative dates and named months in ${view}`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },

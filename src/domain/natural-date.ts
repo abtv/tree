@@ -51,8 +51,27 @@ const smallCounts = [
 const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
 const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
+// Only distinctive, explicitly supported prefixes qualify. Longest first keeps
+// recognition on the complete word when the caret is inside existing text.
+const completedPrefixes = new Map(
+  (
+    [
+      ['today', 4],
+      ['tomorrow', 4],
+      ['yesterday', 4],
+      ['next week', 8],
+      ['last week', 8],
+    ] as const
+  ).flatMap(([expression, minimum]) =>
+    Array.from(
+      { length: expression.length - minimum + 1 },
+      (_, index) => [expression.slice(0, expression.length - index), expression] as const,
+    ),
+  ),
+)
+const prefixPattern = [...completedPrefixes.keys()].map((prefix) => prefix.replace(' ', ' +')).join('|')
 const expressions = new RegExp(
-  `(?:this|next|last) +(?:${weekdayPattern})|next +week|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|in +the +end +of +(?:${months.join('|')})|(?:in|last) +(?:${months.join('|')})|(?:${monthPattern}) +[0-9]{1,2}|today|tomor(?:r(?:o(?:w)?)?)?|yesterday|${weekdayPattern}`,
+  `(?:this|next|last) +(?:${weekdayPattern})|${prefixPattern}|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|in +the +end +of +(?:${months.join('|')})|(?:in|last) +(?:${months.join('|')})|(?:${monthPattern}) +[0-9]{1,2}|${weekdayPattern}`,
   'gi',
 )
 // Stryker reports the module-initializer ObjectLiteral mutants as survivors.
@@ -117,7 +136,8 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
     return [dayNumberOf({ year, month, day })]
   }
   const monday = today - weekdayOf(today)
-  if (expression === 'next week') return Array.from({ length: 7 }, (_, index) => monday + 7 + index)
+  if (expression === 'next week' || expression === 'last week')
+    return Array.from({ length: 7 }, (_, index) => monday + (expression === 'next week' ? 7 : -7) + index)
   const namedMonth = /^(in|last) (.+)$/.exec(expression)
   const monthIndex = namedMonth ? months.indexOf(namedMonth[2]!) : -1
   if (monthIndex !== -1) {
@@ -127,7 +147,7 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
       return daysFor(`in the end of ${months[monthIndex]}`, today)
     }
     const occurrences = monthDays(monthIndex + 1, 1, today)
-    return occurrences.filter((day) => (namedMonth![1] === 'in' ? day >= today : day < today))
+    return namedMonth![1] === 'in' ? occurrences : occurrences.filter((day) => day < today)
   }
   // Anchor mutations are equivalent: the outer recognizer supplies only a
   // complete expression, never its surrounding text.
@@ -178,13 +198,14 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
     const end = start + match[0].length
     if (caret < start || caret > end) continue
     if (/[\p{L}\p{N}_]$/u.test(text.slice(0, start)) || /^[\p{L}\p{N}_]/u.test(text.slice(end))) continue
-    const expression = match[0].toLowerCase().replace(/ +/g, ' ')
+    const normalized = match[0].toLowerCase().replace(/ +/g, ' ')
+    const expression = completedPrefixes.get(normalized) ?? normalized
     const days = daysFor(expression, today).filter((day) => day >= minimumDay && day <= maximumDay)
     if (days.length === 0) continue
     return {
       start,
       end,
-      suggestions: days.map((day) => ({ day, expression: expression.startsWith('tomor') ? 'tomorrow' : expression })),
+      suggestions: days.map((day) => ({ day, expression })),
     }
   }
   return undefined

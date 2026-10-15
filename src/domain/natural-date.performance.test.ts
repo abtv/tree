@@ -8,6 +8,12 @@ const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 // @requirement PRODUCT.md §22.1
 it('recognizes relative dates well below one millisecond, including incremental typing and long text', () => {
   const expressions = [
+    ['toda', 0],
+    ['tomo', 1],
+    ['yest', -1],
+    ['next wee', 4],
+    ['last week', -10],
+    ['in November', 24],
     ['two days ago', -2],
     ['in three weeks', 21],
     ['3 weeks ago', -21],
@@ -39,7 +45,7 @@ it('recognizes relative dates well below one millisecond, including incremental 
     for (let batch = 0; batch < 20; batch++) {
       const start = performance.now()
       for (let call = 0; call < 50; call++) {
-        completeMatches += suggestDates(text, caret, today)?.suggestions.length ?? 0
+        completeMatches += suggestDates(text, caret, today)?.suggestions[0] === undefined ? 0 : 1
       }
       completeExpressionSamples.push((performance.now() - start) / 50)
     }

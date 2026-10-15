@@ -23,7 +23,16 @@ export class DateAssist {
       this.close()
       return
     }
-    this.popup = { ...match, nodeId, text, selected: 0 }
+    const previous = this.popup
+    const suggestion =
+      previous?.nodeId === nodeId && previous.start === match.start
+        ? previous.suggestions[previous.selected]
+        : undefined
+    const retained =
+      suggestion !== undefined && 'day' in suggestion
+        ? match.suggestions.findIndex((candidate) => 'day' in candidate && candidate.day === suggestion.day)
+        : -1
+    this.popup = { ...match, nodeId, text, selected: Math.max(0, retained) }
   }
 
   public observe(nodeId: string | undefined, text: string, start: number, end: number, eligible: boolean): void {

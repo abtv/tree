@@ -1401,10 +1401,10 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 #### Recognized Expressions
 
 * Recognition ignores case and permits repeated spaces between words.
-* `today` and `yesterday` require complete words; `tomor`, `tomorr`, `tomorro` and `tomorrow` offer tomorrow.
+* `toda` and `today` offer Today; prefixes of `tomorrow` from `tomo` onward offer tomorrow; prefixes of `yesterday` from `yest` onward offer yesterday. Suggestions describe the complete expression. Short ordinary words such as `yes` and `tom` remain silent.
 * Full English weekday names offer the upcoming occurrence first, including Today, followed by the next week's occurrence when the current week's is Today or future, otherwise by the current week's past occurrence.
 * `this`, `next` and `last` plus a full weekday name offer that weekday in the current, next or previous Monday-based calendar week.
-* `next week` offers next Monday first and then the remaining days in order.
+* `next wee` and `next week` offer next Monday first and then the remaining days in order. `last wee` and `last week` offer the previous Monday first and then the remaining days in order. Both use Monday-based calendar weeks. Continuing into another word, such as `next weekend`, closes suggestions without changing text.
 * A full English month name or three-letter abbreviation followed by a one- or two-digit day offers the nearest upcoming occurrence and then the nearest past occurrence; February 29 uses valid leap years.
 * `in N day(s)` and `N day(s) ago` offer the date N days after or before Today, with a nonnegative integer count written in digits or an English count from `one` through `one hundred`. Compound counts accept spaces or a hyphen between tens and units, such as `twenty five` and `twenty-five`; `one hundred` uses spaces. Thus `two days ago` and `in five days` offer the same dates as `2 days ago` and `in 5 days`.
 * Suggestions stay within the canonical calendar; unavailable alternatives are omitted.
@@ -1414,7 +1414,7 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 #### Weeks and Months
 
 * `in N week(s)` and `N week(s) ago` use the same counts as relative days and offer the date exactly N × 7 days after or before Today.
-* `in` plus a full English month name offers one date: when it names the current month, the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward; when it names another month, the nearest month start on or after Today.
+* `in` plus a full English month name offers one date when it names the current month: the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward. When it names another month, it offers the nearest upcoming month start first and the nearest past month start second. For example, on October 8, 2026, `in September` offers September 1, 2027 and September 1, 2026; the past alternative means the nearest past occurrence, rather than necessarily the previous calendar year.
 * `last` plus a full English month name offers the nearest month start strictly before Today.
 * For example, on October 8, 2026, `in 3 weeks` offers `2026-10-29`, `3 weeks ago` offers `2026-09-17`, `in October` offers `2026-10-15`, and `last October` offers `2026-10-01`. On October 10, `in October` still offers `2026-10-15`; on October 11 it offers `2026-10-31`.
 * The same case, spacing, expression-boundary and canonical-calendar rules apply.
@@ -1426,6 +1426,7 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 * The popup uses the document surface, a thin location-border-colored border and a soft shadow. It aligns its left edge with the expression's first character and sits directly below the edited row without covering it.
 * When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge.
 * Each suggestion shows its canonical date and secondary weekday/expression description; the selected suggestion uses the shared selection highlight pair.
+* Further edits in the same expression retain the selected date while it remains available, even if its index changes. When it is unavailable, or a popup opens for a different node or expression start, the first suggestion is selected. Dismissal clears the selection.
 * The footer reads `Tab accept · ⌃N ⌃P`.
 * `Ctrl+N` and `Ctrl+P` cycle suggestions, `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. These popup shortcuts deliberately override ordinary text or indentation commands only while the popup is open, supporting the keyboard-first model (§1.1); without it, Tab retains §20.2 behavior.
 

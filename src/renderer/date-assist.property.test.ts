@@ -51,3 +51,23 @@ it('never reopens a dismissed popup through arbitrary observation and navigation
     { numRuns: propertyRuns(500) },
   )
 })
+
+// @requirement PRODUCT.md §20.9
+it('retains the selected week date through arbitrary refinement and navigation', () => {
+  fc.assert(
+    fc.property(fc.array(fc.constantFrom(-1, 1)), (commands) => {
+      const assist = new DateAssist()
+      const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
+      assist.edit('n', 'next wee', 8, today, [])
+      for (const direction of commands) {
+        assist.move(direction as -1 | 1)
+        const selected = assist.popup!.suggestions[assist.popup!.selected]!
+        for (const text of ['next week', 'NEXT   WEEK', 'next wee']) {
+          assist.edit('n', text, text.length, today, [])
+          expect(assist.popup!.suggestions[assist.popup!.selected]).toEqual(selected)
+        }
+      }
+    }),
+    { numRuns: propertyRuns(500) },
+  )
+})

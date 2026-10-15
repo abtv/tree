@@ -14,18 +14,28 @@ const dates = (text: string, reference = today, caret = text.length): string[] |
 
 describe('natural date expression table proposed in AG-22', () => {
   it.each([
+    ['toda', ['2026-10-08']],
     ['today', ['2026-10-08']],
+    ['tomo', ['2026-10-09']],
     ['tomor', ['2026-10-09']],
     ['tomorr', ['2026-10-09']],
     ['tomorro', ['2026-10-09']],
     ['tomorrow', ['2026-10-09']],
     ['yesterday', ['2026-10-07']],
+    ['yest', ['2026-10-07']],
+    ['yeste', ['2026-10-07']],
+    ['yester', ['2026-10-07']],
+    ['yesterd', ['2026-10-07']],
+    ['yesterda', ['2026-10-07']],
     ['Friday', ['2026-10-09', '2026-10-16']],
     ['Monday', ['2026-10-12', '2026-10-05']],
     ['this Friday', ['2026-10-09']],
     ['next Friday', ['2026-10-16']],
     ['last Friday', ['2026-10-02']],
     ['next week', ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18']],
+    ['next wee', ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18']],
+    ['last wee', ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']],
+    ['last week', ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']],
     ['Oct 22', ['2026-10-22', '2025-10-22']],
     ['October 2', ['2027-10-02', '2026-10-02']],
     ['Oct 8', ['2026-10-08', '2025-10-08']],
@@ -38,7 +48,8 @@ describe('natural date expression table proposed in AG-22', () => {
     ['in 0 weeks', ['2026-10-08']],
     ['in October', ['2026-10-15']],
     ['last October', ['2026-10-01']],
-    ['IN   NOVEMBER', ['2026-11-01']],
+    ['IN   NOVEMBER', ['2026-11-01', '2025-11-01']],
+    ['in September', ['2027-09-01', '2026-09-01']],
     ['last January', ['2026-01-01']],
     ['3 days ago', ['2026-10-05']],
     ['in 12 days', ['2026-10-20']],
@@ -62,7 +73,19 @@ describe('natural date expression table proposed in AG-22', () => {
   it.each([
     't',
     'to',
-    'tomo',
+    'tod',
+    'tom',
+    'yes',
+    'yes, please',
+    'toddler',
+    'tomography',
+    'yesteryear',
+    'next w',
+    'last w',
+    'next winter',
+    'last winter',
+    'next weekend',
+    'last weekend',
     'mar',
     'may',
     'Fri',
@@ -95,10 +118,11 @@ describe('natural date expression table proposed in AG-22', () => {
   })
 
   it('uses month starts outside the current month, including calendar boundaries', () => {
-    expect(dates('in October', day('2026-09-30'))).toEqual(['2026-10-01'])
+    expect(dates('in October', day('2026-09-30'))).toEqual(['2026-10-01', '2025-10-01'])
     expect(dates('in October', day('2026-10-01'))).toEqual(['2026-10-15'])
     expect(dates('last October', day('2026-10-01'))).toEqual(['2025-10-01'])
-    expect(dates('in January', day('9999-12-31'))).toBeUndefined()
+    expect(dates('in January', day('9999-12-31'))).toEqual(['9999-01-01'])
+    expect(dates('in February', day('0000-01-01'))).toEqual(['0000-02-01'])
     expect(dates('last January', day('0000-01-01'))).toBeUndefined()
     expect(dates('in 1 week', day('9999-12-31'))).toBeUndefined()
     expect(dates('1 week ago', day('0000-01-01'))).toBeUndefined()
@@ -122,7 +146,7 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(dates('in February', day('2027-02-11'))).toEqual(['2027-02-28'])
     expect(dates('in April', day('2026-04-11'))).toEqual(['2026-04-30'])
     expect(dates('in December', day('9999-12-31'))).toEqual(['9999-12-31'])
-    expect(dates('in October', day('2026-11-01'))).toEqual(['2027-10-01'])
+    expect(dates('in October', day('2026-11-01'))).toEqual(['2027-10-01', '2026-10-01'])
     expect(dates('last October', day('2026-10-11'))).toEqual(['2026-10-01'])
   })
 
@@ -245,6 +269,24 @@ describe('natural date expression table proposed in AG-22', () => {
     )
     expect(suggestDates(text, 30, today)?.start).toBe(26)
     expect(suggestDates(text, 23, today)).toBeUndefined()
+  })
+
+  it('completes distinctive prefixes with full descriptions and exact replacement spans', () => {
+    for (const [fragment, expression] of [
+      ['TODA', 'today'],
+      ['tomo', 'tomorrow'],
+      ['yest', 'yesterday'],
+      ['NEXT   WEE', 'next week'],
+      ['last wee', 'last week'],
+    ]) {
+      const text = `Plan (${fragment}) at noon`
+      const match = suggestDates(text, 6 + fragment!.length, today)!
+      expect(text.slice(match.start, match.end)).toBe(fragment)
+      expect(match.suggestions.every((suggestion) => suggestion.expression === expression)).toBe(true)
+      expect(suggestDates(`${fragment}suffix`, fragment!.length, today)).toBeUndefined()
+    }
+    const text = 'Plan yesterday at noon'
+    expect(suggestDates(text, 9, today)).toMatchObject({ start: 5, end: 14 })
   })
 
   it('recognizes expressions at both caret edges and leaves surrounding words alone', () => {

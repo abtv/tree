@@ -84,3 +84,42 @@ it('excludes hyperlink spans but not adjacent text', () => {
     expect(assist.popup).toBeDefined()
   }
 })
+
+// @requirement PRODUCT.md §20.9
+it('retains a selected date through refinement and resets when that date or expression disappears', () => {
+  const assist = new DateAssist()
+  assist.edit('n', 'next wee', 8, today, [])
+  assist.move(1)
+  assist.move(1)
+  const selectedDay = assist.popup?.suggestions[assist.popup.selected]
+  expect(selectedDay).toEqual({ day: today + 6, expression: 'next week' })
+  assist.edit('n', 'next week', 9, today, [])
+  expect(assist.popup?.selected).toBe(2)
+  assist.edit('n', 'NEXT   WEEK', 11, today, [])
+  expect(assist.popup?.selected).toBe(2)
+  assist.edit('n', 'last week', 9, today, [])
+  expect(assist.popup?.selected).toBe(0)
+  assist.edit('n', 'next weekend', 12, today, [])
+  expect(assist.popup).toBeUndefined()
+  assist.edit('n', 'next week', 9, today, [])
+  expect(assist.popup?.selected).toBe(0)
+  assist.move(1)
+  assist.edit('other', 'next week', 9, today, [])
+  expect(assist.popup?.selected).toBe(0)
+  assist.move(1)
+  assist.edit('other', 'x next week', 11, today, [])
+  expect(assist.popup?.selected).toBe(0)
+})
+
+// @requirement PRODUCT.md §20.9
+it('retains a date by value when its index changes and does not carry emoji selection into dates', () => {
+  const assist = new DateAssist()
+  assist.edit('n', 'Friday', 6, today, [])
+  assist.move(1)
+  assist.edit('n', 'Friday', 6, today + 2, [])
+  expect(assist.popup?.selected).toBe(0)
+  assist.edit('n', ':roc', 4, today, [])
+  assist.move(1)
+  assist.edit('n', 'Friday', 6, today, [])
+  expect(assist.popup?.selected).toBe(0)
+})
