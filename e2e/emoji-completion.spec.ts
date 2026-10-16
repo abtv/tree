@@ -70,9 +70,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   })
 
   // @requirement PRODUCT.md §20.12
-  test('accepts emoji in a plain textarea without consuming a suffix or opening on restored text', async ({
-    userDataDir,
-  }) => {
+  test('accepts plain-editor emoji and restores literal text', async ({ userDataDir }, testInfo) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'n', text: 'Plan :rocke suffix', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'n' },
@@ -98,6 +96,28 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+z')
     await expect(input).toHaveValue('Plan :rocke suffix')
     await expect(popup).toHaveCount(0)
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.type(':1')
+    await expect(popup.getByRole('option').first()).toContainText(':100:')
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-numeric-prefix.png')) })
+    await window.keyboard.type('00')
+    await expect(popup.getByRole('option')).toHaveCount(1)
+    await window.keyboard.press('Enter')
+    await expect(input).toHaveValue('💯')
+    await expect(input).toBeFocused()
+    await window.keyboard.press('Meta+z')
+    await expect(input).toHaveValue(':100')
+    await expect(popup).toHaveCount(0)
+    for (const [shortcode, emoji] of [
+      ['+1', '👍'],
+      ['-1', '👎'],
+    ] as const) {
+      await window.keyboard.press('Meta+a')
+      await window.keyboard.type(`:${shortcode}`)
+      await expect(popup.getByRole('option')).toHaveCount(1)
+      await window.keyboard.press('Enter')
+      await expect(input).toHaveValue(emoji)
+    }
   })
 
   for (const view of ['Tree', 'Agenda'] as const) {

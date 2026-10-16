@@ -19,7 +19,7 @@ it('matches English shortcode prefixes at whitespace boundaries without consumin
     expect(match).toMatchObject({ start: text.lastIndexOf(':'), end: text.length })
     expect(match!.suggestions.length).toBeGreaterThan(8)
   }
-  for (const text of ['https://roc', '12:roc', 'word:roc', ':roc ', ':no_such_emoji', '(:roc']) {
+  for (const text of ['https://roc', 'https://1', '12:100', '12:roc', 'word:roc', ':roc ', ':no_such_emoji', '(:roc']) {
     expect(suggestEmoji(text, text.length)).toBeUndefined()
   }
   expect(suggestEmoji(':rocket', 4)).toBeUndefined()
@@ -34,5 +34,15 @@ it('includes every matching shortcode in deterministic order', () => {
     expect(suggestions.map((entry) => entry.shortcode)).toEqual(
       Object.keys(catalog).filter((shortcode) => shortcode.startsWith(prefix)),
     )
+  }
+})
+
+// @requirement PRODUCT.md §20.12
+it('keeps every catalog shortcode reachable through each typed prefix', () => {
+  for (const [shortcode, emoji] of Object.entries(catalog)) {
+    for (let length = 1; length <= shortcode.length; length++) {
+      const text = `Plan :${shortcode.slice(0, length)}`
+      expect(suggestEmoji(text, text.length)?.suggestions).toContainEqual({ shortcode, emoji })
+    }
   }
 })

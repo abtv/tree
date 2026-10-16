@@ -16,7 +16,7 @@ const entries: readonly EmojiSuggestion[] = Object.entries(catalog).map(([shortc
 export function suggestEmoji(text: string, caret: number): EmojiMatch | undefined {
   if (!Number.isInteger(caret) || caret < 0 || caret > text.length) return undefined
   if (/[a-z0-9_+-]/i.test(text[caret] ?? '')) return undefined
-  const fragment = /(?:^|\s):((?:[a-z][a-z0-9_+-]*)?)$/i.exec(text.slice(0, caret))
+  const fragment = /(?:^|\s):([a-z0-9_+-]*)$/i.exec(text.slice(0, caret))
   if (fragment === null) return undefined
   const prefix = fragment[1]!.toLowerCase()
   const suggestions = entries.filter((entry) => entry.shortcode.startsWith(prefix))

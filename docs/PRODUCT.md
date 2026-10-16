@@ -1453,7 +1453,7 @@ Every recognized canonical date (§23.2) in Tree node text, including the curren
 
 ### 20.12 Optional Emoji Completion
 
-Tree and Agenda editors offer optional emoji completion in standard editing and Vim Insert. Typing a colon at the start of text or after whitespace immediately opens suggestions. An English letter starts a shortcode prefix; subsequent letters, digits, underscores and hyphens refine it. Matching ignores case. The caret must be at the end of the fragment. A space, punctuation or no matches closes suggestions without changing literal text. URLs, time expressions and hyperlink text do not trigger suggestions.
+Tree and Agenda editors offer optional emoji completion in standard editing and Vim Insert. Typing a colon at the start of text or after whitespace immediately opens suggestions. English letters, digits, underscores, plus signs and hyphens refine the shortcode prefix from its first character, including numeric and signed aliases such as `:100`, `:+1` and `:-1`. Matching ignores case. The caret must be at the end of the fragment. A space, other punctuation or no matches closes suggestions without changing literal text. URLs, time expressions and hyperlink text do not trigger suggestions.
 
 The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. Search runs locally without network access. All matching suggestions are available in shortcode order in a compact scrollable popup; each shows the emoji and its full `:shortcode:`. Typing only `:` makes the whole catalog available. Keyboard navigation and pointer scrolling can reach every match. For example, `:roc` offers `:rock:` and `:rocket:`; `:rocke` offers 🚀. A closing colon is not required for acceptance.
 
