@@ -10,6 +10,7 @@ import {
   setMainWindowContentSize,
   test,
 } from './fixtures'
+import catalog from '../src/domain/emoji-catalog.json'
 
 describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.12
@@ -28,8 +29,9 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await setCursor(input, 5)
     await window.keyboard.type(':ma')
     const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
-    await expect(popup.getByRole('option')).toHaveCount(8)
-    for (let index = 1; index <= 8; index++) {
+    const matches = Object.keys(catalog).filter((shortcode) => shortcode.startsWith('ma'))
+    await expect(popup.getByRole('option')).toHaveCount(matches.length)
+    for (let index = 1; index <= matches.length; index++) {
       await window.keyboard.press('ArrowDown')
       const geometry = await window.evaluate(() => {
         const box = document.querySelector('.date-popup')!.getBoundingClientRect()
@@ -51,6 +53,20 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await window.keyboard.press('Tab')
     await expect(input).toBeFocused()
     await expect(input).not.toHaveValue('Plan :ma')
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.type(':')
+    await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
+    await window.keyboard.press('ArrowUp')
+    await expect(popup.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.press('Tab')
+    await expect(input).toHaveValue(catalog.zzz)
+    await window.keyboard.press('Meta+a')
+    await window.keyboard.type(':')
+    await popup.getByRole('option').last().scrollIntoViewIfNeeded()
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-catalog-end.png')) })
+    await popup.getByRole('option').last().click()
+    await expect(input).toHaveValue(catalog.zzz)
+    await expect(input).toBeFocused()
   })
 
   // @requirement PRODUCT.md §20.12
@@ -110,10 +126,16 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
       await setCursor(input, 16)
       await window.keyboard.type(':')
-      await expect(popup.getByRole('option')).toHaveCount(8)
+      await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
+      await window.keyboard.press('ArrowUp')
+      await expect(popup.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
+      await window.keyboard.press('ArrowDown')
+      await expect(popup.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
       await window.screenshot({ path: testInfo.outputPath(screenshotName(`emoji-${view}-colon.png`)) })
       await window.keyboard.type('r')
-      await expect(popup.getByRole('option')).toHaveCount(8)
+      await expect(popup.getByRole('option')).toHaveCount(
+        Object.keys(catalog).filter((shortcode) => shortcode.startsWith('r')).length,
+      )
       await window.keyboard.type('oc')
       await expect(popup.getByRole('option')).toHaveCount(2)
       await expect(popup.getByRole('option').nth(1)).toContainText('🚀')

@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import { suggestEmoji } from './emoji-completion'
+import catalog from './emoji-catalog.json'
 
 // @requirement PRODUCT.md §20.12
 it('matches English shortcode prefixes at whitespace boundaries without consuming surrounding text', () => {
@@ -16,7 +17,7 @@ it('matches English shortcode prefixes at whitespace boundaries without consumin
   for (const text of [':', 'Plan :', '\n:', ':r']) {
     const match = suggestEmoji(text, text.length)
     expect(match).toMatchObject({ start: text.lastIndexOf(':'), end: text.length })
-    expect(match?.suggestions).toHaveLength(8)
+    expect(match!.suggestions.length).toBeGreaterThan(8)
   }
   for (const text of ['https://roc', '12:roc', 'word:roc', ':roc ', ':no_such_emoji', '(:roc']) {
     expect(suggestEmoji(text, text.length)).toBeUndefined()
@@ -26,8 +27,12 @@ it('matches English shortcode prefixes at whitespace boundaries without consumin
 })
 
 // @requirement PRODUCT.md §20.12
-it('bounds suggestions and orders shortcodes deterministically', () => {
-  const suggestions = suggestEmoji(':ma', 3)!.suggestions
-  expect(suggestions).toHaveLength(8)
-  expect(suggestions.map((entry) => entry.shortcode)).toEqual(suggestions.map((entry) => entry.shortcode).sort())
+it('includes every matching shortcode in deterministic order', () => {
+  for (const prefix of ['', 'ma', 'r']) {
+    const text = `:${prefix}`
+    const suggestions = suggestEmoji(text, text.length)!.suggestions
+    expect(suggestions.map((entry) => entry.shortcode)).toEqual(
+      Object.keys(catalog).filter((shortcode) => shortcode.startsWith(prefix)),
+    )
+  }
 })

@@ -19,7 +19,7 @@ export function suggestEmoji(text: string, caret: number): EmojiMatch | undefine
   const fragment = /(?:^|\s):((?:[a-z][a-z0-9_+-]*)?)$/i.exec(text.slice(0, caret))
   if (fragment === null) return undefined
   const prefix = fragment[1]!.toLowerCase()
-  const suggestions = entries.filter((entry) => entry.shortcode.startsWith(prefix)).slice(0, 8)
+  const suggestions = entries.filter((entry) => entry.shortcode.startsWith(prefix))
   if (suggestions.length === 0) return undefined
   return { start: caret - prefix.length - 1, end: caret, suggestions }
 }
