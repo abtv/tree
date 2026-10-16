@@ -1,0 +1,17 @@
+# Owner-approved cleanup of one finished task in the trusted repository.
+# The script validates paths and Git ownership and refuses unfinished checkouts.
+# This trusts the named npm script, not arbitrary Git removal or shell deletion.
+# Restart Codex after changing rules; a static match is not a live approval test.
+prefix_rule(
+    pattern = ["npm", "run", "retire:scratch", "--"],
+    decision = "allow",
+    justification = "Retire a validated scratch task and its clean temporary worktrees without repeated approval",
+    match = ["npm run retire:scratch -- completed-task"],
+    not_match = [
+        "npm run retire:scratch-extra -- completed-task",
+        "npm run retire:scratch --prefix /other/repository -- completed-task",
+        "git worktree remove --force .scratch/task/checkout",
+        "rm -rf .scratch/task",
+        "node scripts/retire-scratch.mjs task",
+    ],
+)
