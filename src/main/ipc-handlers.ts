@@ -1,4 +1,5 @@
 import type { QuitHandshake } from './quit-handshake'
+import { isAppearancePreference, type AppearancePreference } from '../infrastructure/main/window-state'
 import {
   validateAttachmentBytes,
   validateAttachmentId,
@@ -26,6 +27,10 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  getAppearance: () => AppearancePreference
+  setAppearance: (value: AppearancePreference) => void
+  getCommandHistory: () => string[]
+  setCommandHistory: (value: string[]) => void
   ipcMain: IpcMain
   rendererUrl: string
   fileServices: FileServices
@@ -41,6 +46,10 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  getAppearance,
+  setAppearance,
+  getCommandHistory,
+  setCommandHistory,
   ipcMain,
   rendererUrl,
   fileServices,
@@ -58,6 +67,29 @@ export function registerIpcHandlers({
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
 
+  ipcMain.handle(ipcChannels.getAppearance, (event) => {
+    requireTrustedRenderer(event)
+    return getAppearance()
+  })
+  ipcMain.handle(ipcChannels.setAppearance, (event, value) => {
+    requireTrustedRenderer(event)
+    if (!isAppearancePreference(value)) throw new Error('Invalid appearance setting.')
+    setAppearance(value)
+  })
+  ipcMain.handle(ipcChannels.getCommandHistory, (event) => {
+    requireTrustedRenderer(event)
+    return getCommandHistory()
+  })
+  ipcMain.handle(ipcChannels.setCommandHistory, (event, value) => {
+    requireTrustedRenderer(event)
+    if (
+      !Array.isArray(value) ||
+      value.length > 100 ||
+      value.some((name: unknown) => typeof name !== 'string' || name.length > 100)
+    )
+      throw new Error('Invalid command history.')
+    setCommandHistory(value as string[])
+  })
   // Keep asynchronous image reads and native writes in command order, including rich Copy.
   let pendingClipboardWrite = Promise.resolve()
   const queueClipboardWrite = (write: () => Promise<void>): Promise<void> => {

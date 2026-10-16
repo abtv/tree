@@ -40,7 +40,15 @@ function createHarness() {
   const getVimEnabled = vi.fn(() => true)
   const setVimEnabled = vi.fn()
   const decodePng = vi.fn(decodePngWithZlib)
+  const getAppearance = vi.fn(() => 'system' as const)
+  const setAppearance = vi.fn()
+  const getCommandHistory = vi.fn(() => ['set-theme-dark'])
+  const setCommandHistory = vi.fn()
   registerIpcHandlers({
+    getAppearance,
+    setAppearance,
+    getCommandHistory,
+    setCommandHistory,
     ipcMain,
     rendererUrl,
     fileServices,
@@ -55,6 +63,10 @@ function createHarness() {
     setVimEnabled,
   })
   return {
+    getAppearance,
+    setAppearance,
+    getCommandHistory,
+    setCommandHistory,
     handlers,
     fileServices,
     nativeClipboard,
@@ -70,6 +82,30 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('validates appearance and bounded history before invoking preferences and propagates failures', () => {
+    const harness = createHarness()
+    const { handlers, setAppearance, setCommandHistory } = harness
+    const event = { senderFrame: { url: rendererUrl } }
+    expect(handlers.get(ipcChannels.getAppearance)!(event)).toBe('system')
+    expect(handlers.get(ipcChannels.getCommandHistory)!(event)).toEqual(['set-theme-dark'])
+    for (const value of ['system', 'light', 'dark']) handlers.get(ipcChannels.setAppearance)!(event, value)
+    expect(setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark']])
+    for (const value of [null, true, 'auto', {}])
+      expect(() => handlers.get(ipcChannels.setAppearance)!(event, value)).toThrow('Invalid appearance')
+    handlers.get(ipcChannels.setCommandHistory)!(event, ['set-theme-dark'])
+    expect(setCommandHistory).toHaveBeenCalledExactlyOnceWith(['set-theme-dark'])
+    for (const value of [null, {}, [1], ['a'.repeat(101)], Array(101).fill('set-theme-dark')])
+      expect(() => handlers.get(ipcChannels.setCommandHistory)!(event, value)).toThrow('Invalid command history')
+    expect(setCommandHistory).toHaveBeenCalledTimes(1)
+    setCommandHistory.mockImplementationOnce(() => {
+      throw new Error('disk full')
+    })
+    expect(() => handlers.get(ipcChannels.setCommandHistory)!(event, [])).toThrow('disk full')
+    setAppearance.mockImplementationOnce(() => {
+      throw new Error('appearance failed')
+    })
+    expect(() => handlers.get(ipcChannels.setAppearance)!(event, 'light')).toThrow('appearance failed')
+  })
   it('writes plain text and validated attachment bytes through the content channel', async () => {
     const { handlers, fileServices, nativeClipboard, decodePng } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
@@ -225,7 +261,7 @@ describe('main IPC handlers', () => {
   it('registers every exposed IPC channel', () => {
     const { handlers } = createHarness()
 
-    expect([...handlers.keys()]).toEqual(Object.values(ipcChannels))
+    expect(new Set(handlers.keys())).toEqual(new Set(Object.values(ipcChannels)))
   })
 
   it('validates and forwards editor context-menu requests', async () => {

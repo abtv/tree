@@ -19,6 +19,10 @@ describe('renderer Electron services', () => {
     }
   })
   const api: TreeApi = {
+    getAppearance: async () => 'system',
+    setAppearance: async () => undefined,
+    getCommandHistory: async () => [],
+    setCommandHistory: async () => undefined,
     quit: vi.fn(async () => undefined),
     quitWithoutSaving: vi.fn(async () => undefined),
     onQuitRequested: vi.fn(() => () => undefined),

@@ -16,6 +16,8 @@ Agenda direct matches reuse Tree text commands. Normal `Enter` opens the hyperli
 
 ## Mode and command families
 
+Normal-mode `:` opens the application command panel in Tree and Agenda (PRODUCT §20.2.28). **Vim divergence:** the Product Owner requested a selectable list that runs its selected application command; Up/Down move selection rather than recalling command-line history. History orders matches instead. `src/application/command-registry.test.ts`, `command-registry.property.test.ts`, `src/renderer/use-command-panel.test.tsx`, and `e2e/command-panel.spec.ts` cover matching, ordering, history, modes, cancellation, focus restoration, service execution and rendering.
+
 | PRODUCT | Case | Vim divergence | Representative automated evidence |
 | --- | --- | --- | --- |
 | §4.3, §20.2.9, §20.2.20, §23.4 | Whole-emoji horizontal movement, counted image returns, block carets and character Visual endpoints | **Vim divergence:** character positions follow rendered Unicode grapheme clusters, including joined emoji; the owner's explicit single-step emoji requirement takes precedence over component-level Vim movement. | `src/domain/text-characters.test.ts`, `src/domain/text-characters.property.test.ts`; `src/renderer/vim-caret-transition.test.ts`: “counts complete emoji”; `src/renderer/link-caret.test.ts`: “draws one block over the entire emoji”; `src/renderer/agenda-row-caret.test.ts`: “marks and copies complete emoji”; `e2e/emoji-caret.spec.ts`: “crosses each whole emoji with one horizontal step”, “returns from an attached image to a whole final emoji” |

@@ -3,7 +3,7 @@ import { ipcChannels, ipcEvents, type TreeApi } from '../shared/ipc'
 
 const mocks = vi.hoisted(() => ({
   exposeInMainWorld: vi.fn(),
-  invoke: vi.fn(() => Promise.resolve()),
+  invoke: vi.fn<(...args: unknown[]) => Promise<unknown>>(() => Promise.resolve()),
   on: vi.fn(),
   removeListener: vi.fn(),
 }))
@@ -65,6 +65,10 @@ describe('preload bridge', () => {
     await treeApi.setAlwaysOnTop(true)
     await treeApi.getVimEnabled()
     await treeApi.setVimEnabled(true)
+    await treeApi.getAppearance()
+    await treeApi.setAppearance('dark')
+    await treeApi.getCommandHistory()
+    await treeApi.setCommandHistory(['set-theme-dark'])
 
     expect(mocks.invoke.mock.calls).toEqual([
       [ipcChannels.load],
@@ -80,6 +84,10 @@ describe('preload bridge', () => {
       [ipcChannels.setAlwaysOnTop, true],
       [ipcChannels.getVimEnabled],
       [ipcChannels.setVimEnabled, true],
+      [ipcChannels.getAppearance],
+      [ipcChannels.setAppearance, 'dark'],
+      [ipcChannels.getCommandHistory],
+      [ipcChannels.setCommandHistory, ['set-theme-dark']],
     ])
   })
 
@@ -134,9 +142,28 @@ describe('preload bridge', () => {
     mocks.invoke.mockRejectedValueOnce(new Error('save failed'))
 
     await expect(treeApi.load()).rejects.toThrow('save failed')
+    mocks.invoke.mockRejectedValueOnce(new Error('history failed'))
+    await expect(treeApi.setCommandHistory(['set-theme-dark'])).rejects.toThrow('history failed')
+    mocks.invoke.mockResolvedValueOnce('dark')
+    await expect(treeApi.getAppearance()).resolves.toBe('dark')
+    mocks.invoke.mockResolvedValueOnce(['set-theme-dark'])
+    await expect(treeApi.getCommandHistory()).resolves.toEqual(['set-theme-dark'])
     mocks.invoke.mockRejectedValueOnce(new Error('clipboard failed'))
     await expect(treeApi.writeClipboardContent?.({ kind: 'image', attachmentId: 'picture' })).rejects.toThrow(
       'clipboard failed',
     )
   })
+})
+
+it('delivers appearance notifications and removes the listener', async () => {
+  const { treeApi } = await import('../preload/index')
+  const listener = vi.fn()
+  mocks.on.mockClear()
+  const remove = treeApi.onAppearanceChanged?.(listener)
+  const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: string) => void
+  expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.appearanceChanged)
+  handler({}, 'dark')
+  expect(listener).toHaveBeenCalledExactlyOnceWith('dark')
+  remove?.()
+  expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appearanceChanged, handler)
 })

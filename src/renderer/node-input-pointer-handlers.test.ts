@@ -139,6 +139,17 @@ function mouse(currentTarget: HTMLElement, extra: Record<string, unknown> = {}) 
 }
 
 describe('blur', () => {
+  it('preserves editing sessions while the command panel temporarily borrows focus', async () => {
+    const f = await fixture({ mode: 'replace' })
+    const panel = document.createElement('label')
+    panel.className = 'command-input-line'
+    const input = document.createElement('input')
+    panel.append(input)
+    f.handlers().onBlur({ relatedTarget: input } as never)
+    expect(f.deps.finishVimInsert).not.toHaveBeenCalled()
+    expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
+    expect(f.deps.changeVimMode).not.toHaveBeenCalled()
+  })
   it('clears command assembly, finishes the session, and ends the text session', async () => {
     const f = await fixture()
     const input = textarea('hello')

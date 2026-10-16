@@ -2,6 +2,10 @@ import type { DayNumber } from '../domain/calendar-date'
 import type { DateTextRange } from '../domain/date-recognition'
 import { recognizeCompletion, type CompletionMatch } from './completion-sources'
 
+export function moveSuggestionIndex(selected: number, direction: -1 | 1, length: number): number {
+  return length === 0 ? 0 : (selected + direction + length) % length
+}
+
 export type CompletionPopupState = CompletionMatch & {
   readonly nodeId: string
   readonly text: string
@@ -51,7 +55,7 @@ export class CompletionController {
     if (popup === undefined) return
     this.popup = {
       ...popup,
-      selected: (popup.selected + direction + popup.suggestions.length) % popup.suggestions.length,
+      selected: moveSuggestionIndex(popup.selected, direction, popup.suggestions.length),
     }
   }
 }

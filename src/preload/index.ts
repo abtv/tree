@@ -2,6 +2,15 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { ipcChannels, ipcEvents, type TreeApi } from '../shared/ipc'
 
 export const treeApi: TreeApi = {
+  getAppearance: () => ipcRenderer.invoke(ipcChannels.getAppearance),
+  setAppearance: (value) => ipcRenderer.invoke(ipcChannels.setAppearance, value),
+  getCommandHistory: () => ipcRenderer.invoke(ipcChannels.getCommandHistory),
+  setCommandHistory: (value) => ipcRenderer.invoke(ipcChannels.setCommandHistory, value),
+  onAppearanceChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: 'system' | 'light' | 'dark'): void => listener(value)
+    ipcRenderer.on(ipcEvents.appearanceChanged, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.appearanceChanged, handler)
+  },
   quit: (requestId) => ipcRenderer.invoke(ipcChannels.quit, requestId),
   quitWithoutSaving: () => ipcRenderer.invoke(ipcChannels.quitWithoutSaving),
   onQuitRequested: (listener) => {

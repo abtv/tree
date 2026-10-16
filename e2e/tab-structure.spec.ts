@@ -354,13 +354,12 @@ describeForEachEditingMode('node editor Tab structure commands', ({ mode }) => {
     test('keeps native Tab traversal from status-bar focus outside the editor', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const pinToggle = window.getByRole('button', { name: 'Pin window on top' })
-      const vimToggle = window.getByRole('button', { name: 'Disable Vim editing' })
-      await vimToggle.focus()
+      await pinToggle.focus()
 
       await window.keyboard.press('Tab')
-      await expect(pinToggle).toBeFocused()
+      expect(await window.evaluate(() => document.activeElement?.matches('.node-input'))).toBe(false)
       await window.keyboard.press('Shift+Tab')
-      await expect(vimToggle).toBeFocused()
+      await expect(pinToggle).toBeFocused()
     })
 
     test('moves an active image caret with Tab and restores its saved text position', async ({ userDataDir }) => {

@@ -13,6 +13,10 @@ const createdObjectUrl = 'blob:attachment'
 
 function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
   window.treeApi = {
+    getAppearance: async () => 'system',
+    setAppearance: async () => undefined,
+    getCommandHistory: async () => [],
+    setCommandHistory: async () => undefined,
     quit: async () => undefined,
     quitWithoutSaving: async () => undefined,
     onQuitRequested: () => () => undefined,

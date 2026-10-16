@@ -2,6 +2,7 @@
 import type { Page } from '@playwright/test'
 import {
   allowRendererError,
+  clickApplicationMenuItem,
   dragSelectText,
   exactMessage,
   expect,
@@ -129,7 +130,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       document: { roots: ['A', 'B', 'C', 'D'].map((text) => ({ id: text, text, children: [] })) },
       location: { currentParentId: null, selectedNodeId: 'C' },
     })
-    const { window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir)
     await node(window, 3).focus()
     await pressShifted(window, 'V')
     await window.keyboard.press('k')
@@ -138,8 +139,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await node(window, 2).focus()
-    await window.getByRole('button', { name: 'Disable Vim editing' }).click()
-    await window.getByRole('button', { name: 'Enable Vim editing' }).click()
+    await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
+    await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
     await node(window, 2).focus()
     await window.keyboard.press('3')
     await window.keyboard.press('.')

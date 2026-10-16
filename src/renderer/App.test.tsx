@@ -10,17 +10,35 @@ import './test/setup'
 import { App } from './App'
 import { HOLD_ACTIVATION_MS } from './node-drag'
 
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
+
 afterEach(() => {
   cleanup()
+  if (originalScrollIntoView === undefined) Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+  else Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView)
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
 const attachmentBytes = new Uint8Array([137, 80, 78, 71])
+let notifyVimPreference: (enabled: boolean) => void = () => undefined
+const changeVimEditingFromMenu = (enabled: boolean): void => act(() => notifyVimPreference(enabled))
 
 beforeEach(() => {
+  // jsdom has no layout scrolling; real panel scrolling is exercised by Electron coverage.
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   attachmentByteCache.clear()
   window.treeApi = {
+    onVimEnabledChanged: (listener) => {
+      notifyVimPreference = listener
+      return () => {
+        notifyVimPreference = () => undefined
+      }
+    },
+    getAppearance: async () => 'system',
+    setAppearance: async () => undefined,
+    getCommandHistory: async () => [],
+    setCommandHistory: async () => undefined,
     quit: async () => undefined,
     quitWithoutSaving: async () => undefined,
     onQuitRequested: () => () => undefined,
@@ -1731,7 +1749,7 @@ describe('App', () => {
     expect(toggle.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Pin window on top')
     expect(toggle.closest('footer.status-bar')).not.toBeNull()
     expect(toggle.closest('.location-bar')).toBeNull()
-    expect(toggle.closest('footer.status-bar')?.firstElementChild).toBe(screen.getByLabelText('Vim mode'))
+    expect(screen.getByLabelText('Vim mode').nextElementSibling).toBe(toggle.parentElement)
     expect(toggle.closest('footer.status-bar')?.lastElementChild).toBe(toggle.parentElement)
     fireEvent.click(toggle)
 
@@ -1805,7 +1823,7 @@ describe('App', () => {
     })
 
     // @requirement PRODUCT.md §9.3
-    it('follows the menu for Vim editing like the status-bar toggle, without writing the preference again', async () => {
+    it('follows the menu for Vim editing without writing the preference again', async () => {
       const store = await createSeededStore(
         { roots: [{ id: 'root', text: 'abc', children: [] }] },
         { currentParentId: null, selectedNodeId: 'root' },
@@ -1819,10 +1837,10 @@ describe('App', () => {
 
       menu.vimEnabled(true)
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
-      expect(screen.getByRole('button', { name: 'Disable Vim editing' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       menu.vimEnabled(false)
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
-      expect(screen.getByRole('button', { name: 'Enable Vim editing' })).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       expect(setVimEnabled).not.toHaveBeenCalled()
     })
 
@@ -1861,12 +1879,7 @@ describe('App', () => {
       renderReact(<App initialVimEnabled={false} store={store} />)
       const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
 
-      const toggle = screen.getByRole('button', { name: 'Enable Vim editing' })
-      expect(toggle).toHaveAttribute('aria-pressed', 'false')
-      expect(toggle).toHaveTextContent('VIM')
-      expect(toggle.parentElement?.nextElementSibling).toBe(
-        screen.getByRole('button', { name: 'Pin window on top' }).parentElement,
-      )
+      expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
       root.focus()
       root.setSelectionRange(1, 1)
@@ -1883,7 +1896,7 @@ describe('App', () => {
 
     // @requirement PRODUCT.md §20.2.1
     // @requirement PRODUCT.md §20.2.3
-    it('enables Vim editing in Normal mode, saves the choice, and keeps editor focus', async () => {
+    it('enables Vim editing from the menu in Normal mode and keeps editor focus without a duplicate write', async () => {
       const store = await seededRoot('abc')
       const setVimEnabled = vi.spyOn(window.treeApi, 'setVimEnabled')
       renderReact(<App initialVimEnabled={false} store={store} />)
@@ -1891,13 +1904,11 @@ describe('App', () => {
       root.focus()
       root.setSelectionRange(1, 1)
 
-      const toggle = screen.getByRole('button', { name: 'Enable Vim editing' })
-      expect(fireEvent.mouseDown(toggle)).toBe(false)
-      fireEvent.click(toggle)
+      changeVimEditingFromMenu(true)
 
-      expect(setVimEnabled).toHaveBeenCalledWith(true)
+      expect(setVimEnabled).not.toHaveBeenCalled()
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
-      expect(screen.getByRole('button', { name: 'Disable Vim editing' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       expect(document.activeElement).toBe(root)
       expect([root.selectionStart, root.selectionEnd]).toEqual([1, 2])
       fireEvent.keyDown(root, { key: 'x' })
@@ -1917,9 +1928,9 @@ describe('App', () => {
       fireEvent.keyDown(root, { key: 'X' })
       expect(rootText(store)).toBe('abc')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+      changeVimEditingFromMenu(false)
 
-      expect(setVimEnabled).toHaveBeenCalledWith(false)
+      expect(setVimEnabled).not.toHaveBeenCalled()
       expect(rootText(store)).toBe('Xbc')
       expect(root).toHaveValue('Xbc')
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
@@ -1937,14 +1948,14 @@ describe('App', () => {
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
       expect(document.querySelector('.node-row-visual-selected')).not.toBeNull()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+      changeVimEditingFromMenu(false)
       expect(document.querySelector('.node-row-visual-selected')).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+      changeVimEditingFromMenu(true)
 
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
       fireEvent.keyDown(root, { key: 'd' })
-      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+      changeVimEditingFromMenu(false)
+      changeVimEditingFromMenu(true)
       // A `d` left pending before the switch would turn this `d` into `dd` and delete the node.
       fireEvent.keyDown(root, { key: 'd' })
       expect(rootText(store)).toBe('abc')
@@ -1963,10 +1974,10 @@ describe('App', () => {
       expect(root).not.toHaveClass('node-input-image-caret')
       expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+      changeVimEditingFromMenu(true)
       expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-image-caret')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Disable Vim editing' }))
+      changeVimEditingFromMenu(false)
       expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-image-caret')
       expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
     })
@@ -1975,15 +1986,23 @@ describe('App', () => {
       const store = await seededRoot('abc')
       const reportError = vi.spyOn(store, 'reportError')
       vi.spyOn(window.treeApi, 'setVimEnabled').mockRejectedValue(new Error('write failed'))
-      renderReact(<App initialVimEnabled={false} store={store} />)
-
+      renderReact(<App initialVimEnabled store={store} />)
+      const root = screen.getByRole('textbox', { name: 'Node 1' })
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Enable Vim editing' }))
+        root.focus()
+        await Promise.resolve()
+      })
+      await act(async () => {
+        fireEvent.keyDown(root, { key: ':' })
+      })
+      await act(async () => {
+        fireEvent.change(screen.getByRole('combobox', { name: 'Command' }), { target: { value: 'toggle-vim-mode' } })
+        fireEvent.keyDown(screen.getByRole('combobox', { name: 'Command' }), { key: 'Enter' })
         await Promise.resolve()
       })
 
       expect(reportError).toHaveBeenCalledWith(new Error('write failed'))
-      expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+      expect(screen.queryByLabelText('Vim mode')).toBeNull()
     })
   })
 

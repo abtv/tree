@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { createFileServices } from '../infrastructure/main/file-services'
+import { createCommandHistoryStore } from '../infrastructure/main/command-history'
 import {
   createDebouncedWindowBoundsSaver,
   createAppearancePreferenceStore,
@@ -84,6 +85,13 @@ function currentAppearance(): AppearancePreference {
   return appearanceStore?.load() ?? 'system'
 }
 
+function setAppearance(value: AppearancePreference): void {
+  appearanceStore?.save(value)
+  nativeTheme.themeSource = value
+  mainWindow?.webContents.send(ipcEvents.appearanceChanged, value)
+  rebuildApplicationMenu()
+}
+
 function rebuildApplicationMenu(): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
@@ -91,12 +99,7 @@ function rebuildApplicationMenu(): void {
         { vimEnabled: isVimEnabled(), alwaysOnTop: isAlwaysOnTop(), appearance: currentAppearance() },
         {
           requestQuit: requestQuitFromMenu,
-          setAppearance: (value) => {
-            appearanceStore?.save(value)
-            // The renderer's prefers-color-scheme and the native window background follow themeSource.
-            nativeTheme.themeSource = value
-            rebuildApplicationMenu()
-          },
+          setAppearance,
           setVimEnabled: (value) => {
             vimEnabledStore?.save(value)
             mainWindow?.webContents.send(ipcEvents.vimEnabledChanged, value)
@@ -182,6 +185,7 @@ bootstrapApplication({
         .catch((error: unknown) => reportMainProcessError('Could not open external link', error))
     })
     const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
+    const commandHistory = createCommandHistoryStore(join(app.getPath('userData'), 'data', 'command-history.json'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
     appearanceStore = createAppearancePreferenceStore(join(app.getPath('userData'), 'data', 'appearance.json'))
@@ -189,6 +193,10 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
+      getAppearance: currentAppearance,
+      setAppearance,
+      getCommandHistory: commandHistory.load,
+      setCommandHistory: commandHistory.save,
       ipcMain,
       rendererUrl: resolvedRenderer.url,
       fileServices,

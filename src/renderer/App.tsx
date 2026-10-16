@@ -6,11 +6,12 @@ import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 import type { VimFoldCommand } from './vim-keyboard-types'
 import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
-import { VimToggle } from './VimToggle'
 import { LocationBar } from './LocationBar'
 import { AgendaLocationBar } from './AgendaLocationBar'
 import { AgendaView } from './AgendaView'
 import { CompletionPopup } from './CompletionPopup'
+import { CommandPanel } from './CommandPanel'
+import { useCommandPanel } from './use-command-panel'
 import { agendaDecorations, treeDecorations } from './date-decorations'
 import { richTextHtml } from './editor-dom'
 import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
@@ -112,13 +113,36 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
     setNodeVisualSelection,
     onFoldCommand: applyFoldCommand,
   })
-  const toggleVimEnabled = useCallback((): void => {
-    const nextValue = !vimEnabled
-    setVimEditing(nextValue)
-    setVimEnabled(nextValue)
-    // The editing mode already changed for this session; a failed write only loses the saved choice.
-    void window.treeApi.setVimEnabled(nextValue).catch((error: unknown) => store.reportError(error))
-  }, [vimEnabled, setVimEditing, store])
+  const applyVimEnabled = useCallback(
+    async (nextValue: boolean): Promise<void> => {
+      setVimEditing(nextValue)
+      setVimEnabled(nextValue)
+      // The editing mode already changed for this session; a failed write only loses the saved choice.
+      await window.treeApi.setVimEnabled(nextValue)
+    },
+    [setVimEditing],
+  )
+  const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+    store,
+    vimEnabled,
+    vimMode,
+    commandState: vimTextCommandState.commandState,
+    alwaysOnTop,
+    setAlwaysOnTop,
+    applyVimEnabled,
+    beforeViewChange: () => {
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.matches('.node-input')) {
+        vimTextCommandState.finishInsert?.(active)
+        if (vimMode === 'replace') vimTextCommandState.finishReplace?.(active, false)
+      }
+      clearCommandAssembly(vimTextCommandState.commandState)
+      if (vimMode === 'replace' || vimMode === 'visual-node') {
+        setNodeVisualSelection(undefined)
+        vimTextCommandState.setMode('normal')
+      }
+    },
+  })
   // `p` and `Esc` of a pending Agenda move are Vim commands, so standard editing cannot keep one.
   useEffect(() => {
     if (!vimEnabled) store.cancelAgendaMove()
@@ -310,7 +334,11 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
       className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}
       onKeyDown={(event) => {
         const target = event.target
-        if (!(target instanceof Element) || target.closest('.node-input, .agenda-list, [role="dialog"]')) return
+        if (
+          !(target instanceof Element) ||
+          target.closest('.node-input, .agenda-list, .command-input-line, [role="dialog"]')
+        )
+          return
         if (agenda !== undefined) {
           createAgendaKeyDownHandler({ store, vim: vimEnabled ? vimTextCommandState : undefined })(event)
         } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
@@ -433,20 +461,57 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
         </section>
       </div>
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
+      {commandPanel.open ? (
+        <CommandPanel
+          matches={commandPanel.matches}
+          selected={commandPanel.selected}
+          context={commandPanel.context}
+          run={commandPanel.run}
+        />
+      ) : null}
       <footer className="status-bar">
-        {vimEnabled ? (
-          <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
-            {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
-          </div>
+        {commandPanel.open ? (
+          <label className="command-input-line">
+            <span>:</span>
+            <input
+              ref={bindCommandInput}
+              value={commandPanel.input}
+              onChange={(event) => commandPanel.changeInput(event.target.value)}
+              aria-label="Command"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="command-panel"
+              aria-autocomplete="list"
+              autoComplete="off"
+              spellCheck={false}
+              aria-activedescendant={
+                commandPanel.matches[commandPanel.selected] === undefined
+                  ? undefined
+                  : `command-${commandPanel.matches[commandPanel.selected]?.name}`
+              }
+            />
+          </label>
+        ) : commandPanel.message !== undefined ? (
+          <span className="command-error" role="status">
+            {commandPanel.message}
+          </span>
         ) : null}
-        {statusMessage === undefined ? (
+        {commandPanel.open ? (
+          <span className="command-count">
+            {commandPanel.matches.length} of {commandPanel.total}
+          </span>
+        ) : commandPanel.message !== undefined ? null : statusMessage === undefined ? (
           <span aria-hidden="true" className="status-bar-spacer" />
         ) : (
           <span className="status-bar-message" role="status">
             {statusMessage}
           </span>
         )}
-        <VimToggle vimEnabled={vimEnabled} onToggle={toggleVimEnabled} />
+        {vimEnabled ? (
+          <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
+            {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
+          </div>
+        ) : null}
         <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
       </footer>
       {state.quitWithoutSavingPrompt === true ? (

@@ -33,10 +33,9 @@ describeForEachEditingMode('always-on-top window', ({ mode }) => {
     expect(toggleBox!.y).toBeGreaterThanOrEqual(statusBox!.y)
     expect(toggleBox!.y + toggleBox!.height).toBeLessThanOrEqual(statusBox!.y + statusBox!.height)
     if (mode === 'vim') {
-      // The Vim mode indicator is at the left end; the pin ends the status bar at the right.
+      // The mode indicator sits immediately before the pin at the right.
       const indicatorBox = await first.window.getByLabel('Vim mode').boundingBox()
-      expect(indicatorBox!.x - statusBox!.x).toBeLessThanOrEqual(13)
-      expect(indicatorBox!.x + indicatorBox!.width).toBeLessThanOrEqual(toggleBox!.x)
+      expect(indicatorBox!.x + indicatorBox!.width + 12).toBe(toggleBox!.x)
     } else {
       // Standard editing shows no mode indicator.
       await expect(first.window.getByLabel('Vim mode')).toHaveCount(0)

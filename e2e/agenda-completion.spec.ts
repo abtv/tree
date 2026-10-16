@@ -12,6 +12,7 @@ import {
   unlockSystemClipboard,
   writeClipboardText,
   firePaste,
+  clickApplicationMenuItem,
 } from './fixtures'
 
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
@@ -352,9 +353,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await expect(popup).toHaveCount(0)
       await window.keyboard.press('Backspace')
       await expect(popup).toBeVisible()
-      await window
-        .getByRole('button', { name: mode === 'vim' ? 'Disable Vim editing' : 'Enable Vim editing', exact: true })
-        .click()
+      await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
       await expect(popup).toHaveCount(0)
     })
   }

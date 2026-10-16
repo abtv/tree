@@ -17,12 +17,17 @@ export const ipcChannels = {
   setAlwaysOnTop: 'tree:set-always-on-top',
   getVimEnabled: 'tree:get-vim-enabled',
   setVimEnabled: 'tree:set-vim-enabled',
+  getAppearance: 'tree:get-appearance',
+  setAppearance: 'tree:set-appearance',
+  getCommandHistory: 'tree:get-command-history',
+  setCommandHistory: 'tree:set-command-history',
 } as const
 
 /** Main-to-renderer notifications that the application menu changed a preference. */
 export const ipcEvents = {
   alwaysOnTopChanged: 'tree:always-on-top-changed',
   vimEnabledChanged: 'tree:vim-enabled-changed',
+  appearanceChanged: 'tree:appearance-changed',
 } as const
 
 export type ClipboardPayload =
@@ -48,6 +53,11 @@ export interface EditorContextMenuRequest {
 export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
+  getAppearance: () => Promise<'system' | 'light' | 'dark'>
+  setAppearance: (value: 'system' | 'light' | 'dark') => Promise<void>
+  getCommandHistory: () => Promise<string[]>
+  setCommandHistory: (value: string[]) => Promise<void>
+  onAppearanceChanged?: (listener: (value: 'system' | 'light' | 'dark') => void) => () => void
   quit(requestId?: string): Promise<void>
   quitWithoutSaving(): Promise<void>
   onQuitRequested(listener: (requestId: string) => void): () => void

@@ -184,6 +184,10 @@ The important principle is that product behavior should be represented by explic
 
 ## 7. Application Layer
 
+`command-registry.ts` owns the application command panel's single registry: command names, aliases, descriptions, shortcut labels, state queries and run actions. Adding a command adds one entry; actions invoke the same existing services as application menus and toggles, including the quit handshake. Matching, ordering, history normalization and history updates are pure functions independent of React, DOM and Electron. Alphabetical registry order is prepared once; each input change scans registry entries and bounded history without document traversal.
+
+The renderer command-panel owner captures the application shortcut before editor handlers. It saves and restores native selection while borrowing focus; the input bindings forward the blur destination so that this temporary handoff preserves editing sessions. Named view actions resolve sessions through the existing input owner before dispatching the store's idempotent Agenda open/close methods. They add no document mutation or separate view state.
+
 The application layer coordinates user intentions with domain operations and infrastructure.
 
 It is responsible for use cases such as:
@@ -222,6 +226,8 @@ Performance assessment for Agenda state (`docs/PRODUCT.md` §22.1): opening, sel
 ---
 
 ## 8. UI Layer
+
+`use-command-panel.ts` owns one transient command-panel session shared by Tree and Agenda. It captures Normal-mode `:` before editor dispatch, clears pending Vim assembly through its existing owner, and restores the previous DOM focus and selection on dismissal. `CommandPanel.tsx` presents the registry matches separately from inline completion. Its selection uses the shared `moveSuggestionIndex` wrapping rule from `completion-controller.ts`. The view overlays the document above the status bar, keeping document geometry unchanged. Platform commands cross the trusted preload API; the renderer never accesses preference files.
 
 React is responsible for presentation and user interaction.
 
@@ -429,6 +435,10 @@ Infrastructure should expose narrow interfaces to the application/domain where a
 ---
 
 ## 13. Persistence
+
+`command-history.ts` stores the bounded command history in `data/command-history.json` under the application user-data directory, apart from the document. Missing/unreadable files produce empty history; loading and saving discard unknown command names and duplicates. Trusted, runtime-validated IPC reads this preference and writes it once per successful non-quit command. Write failures propagate through the renderer's existing operation-error surface. Appearance IPC reuses the menu's appearance service, updates native theme and menu checks, and notifies the renderer.
+
+Performance assessment (PRODUCT §22.1): command filtering is linear in registry entries plus the bounded history and independent of document size. History retains at most 100 names and writes one small preference file per successful non-quit run, in addition to the command's existing preference write. It adds no document writes, syncs, saves or undo snapshots. The panel retains one focus/selection restoration closure and one current match list; dismissal releases the rendered list. Focused unit/property, preference-boundary and Electron guards cover history validity and the absence of per-key preference/document writes.
 
 Persistence is responsible for saving and loading the document.
 

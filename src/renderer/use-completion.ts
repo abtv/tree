@@ -177,9 +177,9 @@ export function useCompletion(
         if (text !== compositionText.current) edit(node, event.currentTarget, event.nativeEvent)
         compositionText.current = undefined
       },
-      onBlur: () => {
+      onBlur: (event) => {
         close()
-        bindings.onBlur()
+        bindings.onBlur(event)
       },
       onPaste: (event) => {
         close()

@@ -39,7 +39,7 @@ async function capture() {
     const page = await app.firstWindow()
     page.setDefaultTimeout(10_000)
     await expect(page.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveText(demo.document.roots[0].text)
-    await expect(page.getByRole('button', { name: 'Enable Vim editing', exact: true })).toBeVisible()
+    await expect(page.getByLabel('Vim mode')).toHaveCount(0)
     // Expand only synthetic branches; their numbering follows the fixed demo resource.
     for (const index of [1, 4, 11, 5, 9]) {
       await page.getByRole('button', { name: `Expand node ${index}`, exact: true }).click()
@@ -59,7 +59,13 @@ async function capture() {
     ) {
       throw new Error('Focused nodes differ from the overview; refusing to publish inconsistent images.')
     }
-    await page.getByRole('button', { name: 'Enable Vim editing', exact: true }).click()
+    await app.evaluate(({ Menu }) => {
+      const item = Menu.getApplicationMenu()
+        ?.items.find((entry) => entry.label === 'Edit')
+        ?.submenu?.items.find((entry) => entry.label === 'Vim Editing')
+      if (item === undefined) throw new Error('Vim Editing menu item is missing.')
+      item.click(item, undefined, {})
+    })
     await expect(page.getByLabel('Vim mode')).toHaveText('NORMAL')
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(860, 520))
     await page.emulateMedia({ colorScheme: 'dark' })

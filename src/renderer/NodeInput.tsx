@@ -16,7 +16,7 @@ export interface NodeInputBindings {
   selectedAll: boolean
   disabled: boolean
   inputRef: (input: HTMLElement | null) => void
-  onBlur: () => void
+  onBlur: (event?: FocusEvent<HTMLElement>) => void
   onTextChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
   onContentInput: (event: FormEvent<HTMLElement>) => void
   onContentChange: (event: FormEvent<HTMLElement>) => void
@@ -114,9 +114,9 @@ export function NodeInput({
   const commonProps = {
     'aria-label': label,
     className,
-    onBlur: () => {
+    onBlur: (event: FocusEvent<HTMLElement>) => {
       textarea.current.focused = false
-      onBlur()
+      onBlur(event)
     },
     onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {
       onCompositionEnd(event)

@@ -137,10 +137,10 @@ The location toolbar is confined to a single line. When space is limited, shorte
 
 The toolbar is sticky: it stays fixed at the top of the window while the content scrolls beneath it, and the content never shows through it. The scrollbar belongs to the content area below the toolbar and never overlaps the toolbar.
 
-* The pin toggle sits in the status bar fixed at the bottom of the window (§20.2), immediately to the right of the Vim editing toggle and at the right end of the status bar, opposite the Vim mode indicator at the left end. The toolbar does not contain it.
+* The pin toggle sits at the right end of the status bar fixed at the bottom of the window (§20.2). When Vim editing is enabled, the mode indicator sits immediately to its left. There is no Vim editing toggle in the status bar. The toolbar does not contain the pin.
 * When enabled, the application window stays above other application windows, including after another application receives focus. The setting persists across application restarts.
 * The toggle has a visually distinct active state and a tooltip naming its current action (`Pin window on top` or `Unpin window from top`), shown above the toggle while the pointer is over it or it has keyboard focus. The tooltip is drawn by the application, because native `title` tooltips do not appear in the application window.
-* Clicking the toggle with the pointer leaves keyboard focus, the caret, and the current Vim mode in the editor, exactly as the `VIM` toggle does (§20.2); it does not focus an editor when none had focus. Focusing the toggle with `Tab` still gives it keyboard focus.
+* Clicking the toggle with the pointer leaves keyboard focus, the caret, and the current Vim mode in the editor; it does not focus an editor when none had focus. Focusing the toggle with `Tab` still gives it keyboard focus.
 * macOS may still impose limitations for some fullscreen Spaces.
 
 ### 2.3 Maximum Depth
@@ -547,6 +547,8 @@ Closing the main window quits the application on macOS, including when the appli
 
 ### 9.3 Application Menu
 
+The Vim Normal-mode command panel (§20.2.28) also runs Quit, Always on Top, Vim Editing, and the three Appearance choices through the same application services as these menu items.
+
 The menu bar has four menus, laid out as macOS applications do (§1.3):
 
 * **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
@@ -554,7 +556,7 @@ The menu bar has four menus, laid out as macOS applications do (§1.3):
 * **View** holds an **Appearance** submenu with three mutually exclusive items: **Automatic**, **Light**, and **Dark**. The item for the current choice is checked (§20.5).
 * **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
 
-The Appearance items have no status-bar counterpart. Each check item is another control for the status-bar toggle of the same name and always agrees with it. Choosing the item has exactly the effect of clicking the toggle: Vim editing switches in Normal mode or back to standard editing with the caret kept, the window is pinned or unpinned, the editor keeps its focus, and the choice is saved and restored at the next start. Using the status-bar toggle updates the check mark. The menu bar and the status bar never disagree, including at startup.
+The Appearance and Vim Editing items have no status-bar toggles. Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Always on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup.
 
 ---
 
@@ -1017,10 +1019,10 @@ At or below 500 visible rows, the list renders every row, including inline desce
 #### 20.2.1 Toggle and Preference
 
 * Vim-inspired editing is optional.
-* A `VIM` toggle in the status bar, immediately to the left of the always-on-top pin (§2.2), switches it on and off.
-* The toggle has a visually distinct active state while Vim editing is enabled, and an application-drawn tooltip naming its current action (`Enable Vim editing` or `Disable Vim editing`), shown above the toggle while the pointer is over it or it has keyboard focus.
+* Edit > Vim Editing switches it on and off. The command panel's `toggle-vim-mode` command also switches it off from Vim Normal mode (§20.2.28).
+* The status bar shows the mode indicator while Vim editing is enabled, but has no `VIM` button or editing-preference toggle.
 * No keyboard shortcut switches it.
-* Clicking the toggle leaves keyboard focus and the caret in the editor.
+* Switching the preference keeps editor focus and applies the caret behavior in §20.2.3.
 * The choice persists across application restarts as a user preference stored apart from the document; it is not a document edit, creates no undo entry, and does not trigger a document save.
 * On first launch, and whenever no saved choice exists — including installations from before the toggle existed — Vim editing is disabled.
 
@@ -1068,7 +1070,7 @@ At or below 500 visible rows, the list renders every row, including inline desce
 #### 20.2.7 Mode Indicator and Status Bar
 
 * A persistent indicator displays `INSERT`, `REPLACE`, `NORMAL`, `VISUAL`, or `VISUAL NODE`.
-* The indicator sits at the left end of a status bar fixed at the bottom of the window, while the `VIM` toggle and the always-on-top pin toggle (§2.2) stay at the right end.
+* The indicator sits at the right end of a status bar fixed at the bottom of the window, immediately to the left of the always-on-top pin toggle (§2.2). It remains visible while the command input or feedback occupies the left side (§20.2.28).
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
 
@@ -1309,6 +1311,49 @@ Normal mode also supports:
 * Vim handling is suspended during native text composition.
 * Reading a text selection's offsets preserves its endpoints and direction, including backward selections in rich text editors.
 
+#### 20.2.28 Command Panel
+
+`Cmd+Shift+P` opens the command panel in Tree or Agenda in standard editing and every Vim mode. With Vim editing enabled, `:` also opens it in Normal mode; in other modes `:` retains its ordinary key behavior. Opening discards any pending count or unfinished command, preserving the editing mode, selection and edit session.
+
+`Escape`, `Backspace` with empty input, loss of focus, window deactivation, or a click outside close it without running a command. Closing restores the previous editor focus, node, mode and selection, except when the selected command defines a different result. `toggle-vim-mode` uses the caret behavior in §20.2.3. Modal dialogs and composition retain their own input; neither opening key interrupts them. `Cmd+P` continues to toggle Agenda (§23).
+
+* The status bar's left side becomes an input line starting with `:` and the typed text.
+* Its right end shows `<matching> of <total>`, then the persistent mode indicator and pin toggle.
+* Command feedback also occupies the left side without hiding the mode indicator.
+* Long feedback truncates to leave the mode and toggles visible.
+* A full-width panel directly above the status bar overlays the document without moving it or changing its scroll position.
+* Its height follows the number of rows, up to eight; further rows scroll within the panel.
+* Each row shows its name, a short description in secondary text color, a check mark when active, and a shortcut label when available.
+* The selected row uses the shared selection highlight pair in each appearance.
+* Opening and closing have no animation (§20.4).
+
+Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `theme`, `dark`, and `set-th` match `set-theme-dark`. Aliases match only exactly. Text after an internal space is reserved for future arguments and matches nothing in this version. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
+
+An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select the next/previous row with wrapping, as in completion lists (§20.9). `Enter` or clicking a row runs the listed selection, even for a partial query such as `qui`; there is no separate prefix-abbreviation execution. With no matches, `Enter` closes the panel and displays `Not a command: <input>` at the left of the status bar for two seconds, or until the next key press if sooner. Expiry restores the ordinary status-bar content without changing editor focus, selection or mode.
+
+| Name | Alias | Description | Active state | Shortcut | Effect |
+| --- | --- | --- | --- | --- | --- |
+| `quit` | `q` | Quit Tree | — | `⌘Q` | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
+| `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |
+| `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the existing Agenda origin (§23); do nothing if already in Tree |
+| `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
+| `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
+| `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
+| `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
+| `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
+
+Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
+
+`toggle-vim-mode` can enable or disable Vim editing from the panel; Edit > Vim Editing remains available. It has no alias or dedicated keyboard shortcut. It changes the editing preference rather than the document and remains available while saving is locked.
+
+The view commands have no aliases or dedicated shortcuts. A real view change resolves editing sessions and selection exactly as `Cmd+P` does; an already-active destination preserves them. They create no document edit or undo entry. Successful execution still updates command history, including when the requested view is already active.
+
+Command names use lowercase ASCII words joined by hyphens, with the verb first: `toggle-<object>` switches an on/off state; `set-<object>-<value>` selects a value; `show-<view>` selects a named view; a bare verb acts on the whole application. New verbs require an update to this rule. `q` is the only short alias; new aliases require an owner decision. `theme` names the Appearance choice, and `auto` names Automatic.
+
+Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
+
+**Vim divergence.** At the Product Owner's request, this panel lists application commands and runs the selected row, whereas Vim runs typed command-line text. Up/Down select rows rather than recalling history; history instead orders the list. This keyboard-first model is the deliberate platform difference under §1.3.
+
 ### 20.3 Typography
 
 The application uses the bundled JetBrains Mono typeface for all user-interface text. The bundled
@@ -1327,6 +1372,8 @@ This does not govern motion the application does not itself decide to add: nativ
 
 ### 20.5 Appearance
 
+The command panel (§20.2.28) exposes the same three choices using `set-theme-auto`, `set-theme-light`, and `set-theme-dark`.
+
 The application has an appearance choice with three values, set in the **View > Appearance** menu (§9.3): **Automatic**, **Light**, and **Dark**. Automatic follows the operating system's light or dark appearance, and switching the system appearance restyles the open window immediately. Light and Dark keep that appearance whatever the system uses. Choosing an item restyles the open window immediately, including the native window surface, and the choice is saved and restored at the next start. When no choice has been saved, as at the first start, the appearance is Automatic.
 
 The application must not show unintended flashes of a contrasting background during startup, renderer loading or reloading, closing, or system appearance changes. In dark appearance, even a brief white or light-background flash is a visual defect. This applies to the whole application window, including the native surface before the renderer paints and while it is torn down. The native window background matches the document surface from window creation through closing, including after a system appearance change.
@@ -1343,7 +1390,7 @@ The dark appearance uses a palette adapted from the Emacs port of the Zenburn co
 
 In the dark appearance, Vim mode indicators share a dark gray background and use muted text colors from the document palette: green for Normal, cyan for Insert, sandy yellow for Visual and whole-node Visual, and red for Replace. The Visual indicators retain the shared selection highlight pair.
 
-The active state of the status-bar toggles (`VIM` and the pin) takes its colors from the palette of the current appearance: the same warm surface tone as a hovered disclosure chevron behind the ordinary text color, so it reads as part of the light cream palette and of the dark Zenburn palette alike. The toggles' hover text and focus outline use the hover-text and secondary colors of that palette.
+The active state of the status-bar pin takes its colors from the palette of the current appearance: the same warm surface tone as a hovered disclosure chevron behind the ordinary text color, so it reads as part of the light cream palette and of the dark Zenburn palette alike. Its hover text and focus outline use the hover-text and secondary colors of that palette.
 
 ### 20.6 Scroll Edges
 
@@ -1588,7 +1635,7 @@ The active editor retains focus, caret, selection and mode when its active day c
 
 Every other occurrence of the active node is a live mirror: it shows the current text, links and image, never owns an editor, and draws its bullet as a hollow ring in the gutter color. Selecting a mirror, by pointer or keyboard, makes it the active occurrence. Editing the active occurrence updates its mirrors immediately without moving focus or changing the scroll position. When a document change moves the active occurrence to another row, the scroll position adjusts so that the active row keeps its place in the viewport; selecting a row never takes this adjustment.
 
-While the last date is removed, the status bar shows `Add a date to keep this item in Agenda`. The message sits beside the Vim mode indicator, or at the left edge when Vim is off, is announced as a status, and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
+While the last date is removed, the status bar shows `Add a date to keep this item in Agenda`. The message sits at the left edge, while the mode indicator remains beside the pin on the right when Vim is enabled. It is announced as a status and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
 
 ### 23.8 Agenda History Focus
 
@@ -1658,7 +1705,7 @@ The moved node becomes the selected, active occurrence under the target day, whi
 
 In Vim Normal, `dd` on a direct match marks that occurrence for a move and never deletes the node. A count marks the occurrence and the following direct matches of the same day at the same nesting level, skipping rows between them that do not qualify, such as contextual ancestors and nodes at other levels, and stops at the end of the day; fewer rows than the count mark the rows that exist. `dd` on a contextual ancestor, a day container, or a gap does nothing. Marking changes no document text, no Vim register, and not the system clipboard, and it is unavailable while persistence is locked.
 
-While a move is pending, each marked occurrence stays visible with its text, bullet, and disclosure chevron dimmed, and the status bar shows `Moving 1 item · p to put · Esc to cancel`, or `Moving N items · …` for several, beside the Vim mode indicator. The text of the marked nodes does not change until the move is put. A pending move and the invalid-item hint of §23.7 never coexist, because any text edit cancels the move.
+While a move is pending, each marked occurrence stays visible with its text, bullet, and disclosure chevron dimmed, and the status bar shows `Moving 1 item · p to put · Esc to cancel`, or `Moving N items · …` for several, at the left edge. The mode indicator remains beside the pin on the right. The text of the marked nodes does not change until the move is put. A pending move and the invalid-item hint of §23.7 never coexist, because any text edit cancels the move.
 
 Navigation keeps the pending move: `j`/`k`, arrow keys, `gg`, `G`, `H`/`M`/`L`, `Ctrl+d`/`Ctrl+u`, mouse selection, scrolling, folding and unfolding, and expanding or collapsing gaps. `Esc` in any Vim mode (including the `Esc` that leaves Insert or Replace), any change of the document (a text edit or another move), Undo and Redo even when they change nothing, turning Vim off, and leaving the Agenda presentation (`Cmd+P`, `Cmd+.`) cancel it without an edit or an Undo entry. `dd` on a temporarily invalid item (§23.7) does nothing.
 
