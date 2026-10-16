@@ -100,7 +100,7 @@ for (const vimEnabled of [true, false]) {
     await expect(input).toHaveValue(`${prefix}o`)
     await expect(input).toBeFocused()
     await expect(heading).toHaveValue('Root')
-    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
     await expect
       .poll(() =>
         input.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : element.textContent)),

@@ -50,7 +50,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     }
     await window.keyboard.press('Control+p')
     await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-scrolled-small-window.png')) })
-    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
     await expect(input).toBeFocused()
     await expect(input).not.toHaveValue('Plan :ma')
     await window.keyboard.press('Meta+a')
@@ -58,7 +58,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
     await window.keyboard.press('ArrowUp')
     await expect(popup.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
-    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
     await expect(input).toHaveValue(catalog.zzz)
     await window.keyboard.press('Meta+a')
     await window.keyboard.type(':')
@@ -89,7 +89,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await window.keyboard.press('Backspace')
     await window.keyboard.type('e')
     await expect(popup).toBeVisible()
-    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
     await expect(input).toHaveValue('Plan 🚀 suffix')
     await window.keyboard.type('!')
     await expect(input).toHaveValue('Plan 🚀! suffix')
@@ -101,6 +101,50 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   })
 
   for (const view of ['Tree', 'Agenda'] as const) {
+    // @requirement PRODUCT.md §20.12
+    // @requirement PRODUCT.md §20.2.24
+    // @requirement PRODUCT.md §23.10
+    test(`keeps ordinary Tab commands while suggestions are open in ${view}`, async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'parent', text: '2026-10-08 Parent', children: [] },
+            { id: 'n', text: '2026-10-08 Plan ', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await setAgendaToday(window)
+      if (view === 'Agenda') {
+        await window.keyboard.press('Meta+p')
+        await window.locator('.agenda-row[data-node-id="n"]').click()
+      }
+      const input = window.getByRole('textbox', { name: view === 'Agenda' ? 'Agenda node n' : 'Node 2', exact: true })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
+      await setCursor(input, 16)
+      const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
+      const row = window.locator(`${view === 'Agenda' ? '.agenda-row' : '.node-row'}[data-node-id="n"]`)
+      await window.keyboard.type(':roc')
+      await expect(popup).toBeVisible()
+      await window.keyboard.press('Tab')
+      await expect(popup).toHaveCount(0)
+      if (view === 'Tree') await expect(row).toHaveAttribute('data-depth', '1')
+      await expect(input).toBeFocused()
+      await window.keyboard.press('Backspace')
+      await window.keyboard.type('c')
+      await expect(popup).toBeVisible()
+      await window.keyboard.press('Shift+Tab')
+      await expect(popup).toHaveCount(0)
+      if (view === 'Tree') await expect(row).toHaveAttribute('data-depth', '0')
+      await expect(input).toBeFocused()
+      await expect.poll(() => input.evaluate((element) => element.textContent)).toBe('2026-10-08 Plan :roc')
+      if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    })
+
     // @requirement PRODUCT.md §20.12
     test(`accepts, selects, ignores and undoes emoji in ${view}`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, {
@@ -164,7 +208,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
         await window.emulateMedia({ colorScheme: appearance })
         await window.screenshot({ path: testInfo.outputPath(screenshotName(`emoji-${view}-${appearance}.png`)) })
       }
-      await window.keyboard.press('Tab')
+      await window.keyboard.press('Enter')
       await expect.poll(readText).toBe('2026-10-08 Plan 🚀')
       await expect(input).toBeFocused()
       await expect(popup).toHaveCount(0)
@@ -217,6 +261,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await window.keyboard.type('2026-10-08 Plan :rocke')
       await expect(popup).toBeVisible()
       await window.keyboard.press('Enter')
+      await expect.poll(readText).toBe('2026-10-08 Plan 🚀')
       await expect(popup).toHaveCount(0)
       await expect(window.getByRole('listbox', { name: 'Date suggestions' })).toHaveCount(0)
     })

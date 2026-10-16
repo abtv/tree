@@ -381,7 +381,7 @@ describe('useNodeInputBindings', () => {
       day: dayNumberOf({ year: 2026, month: 10, day: 13 }),
       expression: 'next week',
     })
-    f.press('Tab')
+    f.press('Enter')
     expect(f.node().text).toBe('Plan 2026-10-13')
     expect(f.result.current.datePopup).toBeUndefined()
     act(() => f.store.undo())
@@ -404,7 +404,7 @@ describe('useNodeInputBindings', () => {
     f.type('Plan in September')
     expect(f.result.current.datePopup?.popup.selected).toBe(0)
     f.press('n', { ctrlKey: true })
-    f.press('Tab')
+    f.press('Enter')
     expect(f.node().text).toBe('Plan 2026-09-01')
     expect(getCaret(f.input())).toBe('Plan 2026-09-01'.length)
     expect(f.result.current.datePopup).toBeUndefined()
@@ -421,7 +421,7 @@ describe('useNodeInputBindings', () => {
         shortcode: 'woman_technologist',
         emoji: '👩‍💻',
       })
-      f.press('Tab')
+      f.press('Enter')
       expect(f.node().text).toBe('👩‍💻')
       expect(getCaret(f.input())).toBe('👩‍💻'.length)
       expect(f.result.current.vimMode).toBe('insert')
@@ -476,7 +476,7 @@ describe('useNodeInputBindings', () => {
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
     expect(f.result.current.datePopup).toBeUndefined()
     f.type('tomorrow')
-    f.press('Tab')
+    f.press('Enter')
     expect(f.result.current.datePopup).toBeUndefined()
     expect(f.node().text).toBe('tomorrow')
     act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
@@ -486,17 +486,75 @@ describe('useNodeInputBindings', () => {
   })
 
   // @requirement PRODUCT.md §20.9
-  it('accepts the selected suggestion with Tab, closes the popup and keeps the caret in the editor', async () => {
+  it('accepts the selected suggestion with Enter, closes the popup and keeps the caret in the editor', async () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
     const input = f.input()
     input.focus()
     f.type('tomor')
     expect(f.result.current.datePopup).toBeDefined()
-    f.press('Tab')
+    f.press('Enter')
     expect(f.result.current.datePopup).toBeUndefined()
     expect(f.node().text).not.toBe('tomor')
     expect(f.node().text).toMatch(/\d{4}-\d{2}-\d{2}/)
     expect(f.node().children).toHaveLength(0)
+    expect(f.snapshot().document.roots).toHaveLength(1)
+  })
+
+  // @requirement PRODUCT.md §20.9
+  // @requirement PRODUCT.md §20.12
+  // @requirement PRODUCT.md §20.2.24
+  it.each([false, true].flatMap((vimEnabled) => ['tomor', ':roc'].map((fragment) => ({ vimEnabled, fragment }))))(
+    'keeps ordinary Tab and Shift+Tab with $fragment suggestions open (Vim $vimEnabled)',
+    async ({ vimEnabled, fragment }) => {
+      const f = await fixture({
+        mode: 'insert',
+        vimEnabled,
+        document: { roots: [node('a', 'Parent'), node('b', '')] },
+        location: { currentParentId: null, selectedNodeId: 'b' },
+      })
+      f.input().focus()
+      f.type(fragment)
+      expect(f.result.current.datePopup).toBeDefined()
+      f.press('Tab')
+      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
+      expect(f.node('b').text).toBe(fragment)
+      expect(f.result.current.vimMode).toBe('insert')
+      f.type(fragment)
+      expect(f.result.current.datePopup).toBeDefined()
+      f.press('Tab', { shiftKey: true })
+      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.snapshot().document.roots.map((root) => root.id)).toEqual(['a', 'b'])
+      expect(f.node('b').text).toBe(fragment)
+      expect(f.result.current.vimMode).toBe('insert')
+    },
+  )
+
+  // @requirement PRODUCT.md §20.9
+  // @requirement PRODUCT.md §20.12
+  it.each([false, true])('keeps Cmd+Enter separate from acceptance (Vim %s)', async (vimEnabled) => {
+    const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
+    f.input().focus()
+    f.type(':roc')
+    f.press('Enter', { metaKey: true })
+    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.node().text).toBe(':roc')
+    expect(f.node().struckThrough).toBe(true)
+    expect(f.result.current.vimMode).toBe('insert')
+  })
+
+  // @requirement PRODUCT.md §20.9
+  // @requirement PRODUCT.md §20.12
+  it.each([false, true])('creates a sibling with Escape then Enter (Vim %s)', async (vimEnabled) => {
+    const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
+    f.input().focus()
+    f.type(':rocke')
+    f.press('Escape')
+    f.press('Enter')
+    expect(f.node('node').text).toBe(':rocke')
+    expect(f.snapshot().document.roots).toHaveLength(2)
+    expect(f.node().text).toBe('')
+    expect(f.result.current.vimMode).toBe('insert')
   })
 
   // @requirement PRODUCT.md §20.9
@@ -515,7 +573,7 @@ describe('useNodeInputBindings', () => {
     act(() =>
       f.bindings().onKeyDown({
         currentTarget: input,
-        key: 'Tab',
+        key: 'Enter',
         nativeEvent: { isComposing: true },
         preventDefault: () => undefined,
       } as never),

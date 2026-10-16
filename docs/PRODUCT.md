@@ -286,6 +286,8 @@ At any other caret position, `←` and `→` retain their ordinary text-editing 
 
 When focus is on a node in the currently displayed level, `Enter` creates a new sibling on the same level, except when the Normal-mode caret is on an attached image, where it opens that image's preview (see §20.2).
 
+When a completion popup is open in standard editing or Vim Insert, plain `Enter` accepts its selected suggestion instead (§20.9, §20.12). Dismiss it with `Escape` before pressing `Enter` to keep the literal expression and create or split a node.
+
 In that context, it never creates a child.
 
 The new node is inserted immediately before the current non-empty node when the caret is at the beginning; otherwise it is inserted immediately after the current node. An empty node is treated as being at the end for this rule, so pressing `Enter` on an empty node creates the next sibling after it.
@@ -1427,9 +1429,9 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 * When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge.
 * Each suggestion shows its canonical date and secondary weekday/expression description; the selected suggestion uses the shared selection highlight pair.
 * Further edits in the same expression retain the selected date while it remains available, even if its index changes. When it is unavailable, or a popup opens for a different node or expression start, the first suggestion is selected. Dismissal clears the selection.
-* The footer reads `↑ ↓ select · Tab accept · Esc dismiss`.
+* The footer reads `↑ ↓ select · Enter accept · Esc dismiss`.
 * Plain `↓` and `↑` cycle to the next and previous suggestions in standard editing and Vim Insert, wrapping at either end; `Ctrl+N` and `Ctrl+P` remain alternatives. Popup arrows take precedence over caret reconciliation and node navigation, retain editor focus and the text caret, and never move to another node. Without a popup, arrows keep their ordinary behavior. Modified arrows keep their ordinary editing behavior.
-* `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. These popup shortcuts deliberately override ordinary text navigation or indentation commands only while the popup is open, supporting the keyboard-first model (§1.1); without it, Tab retains §20.2 behavior.
+* Plain `Enter` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. Enter deliberately overrides ordinary node creation while the popup is open, including in Vim Insert, so completion uses the same keyboard controls in both editing modes. Modified Enter keeps its ordinary behavior. `Tab` and `Shift+Tab` dismiss the popup and retain their ordinary structural behavior (§20.2.24, §23.10).
 
 Escape closes the popup without changing the expression, caret, focus or editing mode. In Vim Insert, it preserves the current Insert session; another Escape with no popup enters Normal (§20.2.4). Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
 
@@ -1455,9 +1457,13 @@ Tree and Agenda editors offer optional emoji completion in standard editing and 
 
 The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. Search runs locally without network access. All matching suggestions are available in shortcode order in a compact scrollable popup; each shows the emoji and its full `:shortcode:`. Typing only `:` makes the whole catalog available. Keyboard navigation and pointer scrolling can reach every match. For example, `:roc` offers `:rock:` and `:rocket:`; `:rocke` offers 🚀. A closing colon is not required for acceptance.
 
-The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9), including modifier-only key handling. Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row. Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; `Tab` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit. The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged. These shortcuts override ordinary commands only while suggestions are open, following the approved keyboard-first completion interaction.
+* The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9), including modifier-only key handling.
+* Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row.
+* Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; plain `Enter` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit.
+* The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged.
+* These shortcuts override ordinary commands only while suggestions are open, following the approved keyboard-first completion interaction in standard editing and Vim Insert.
 
-Enter retains its ordinary action. Escape dismisses suggestions and preserves text, caret, focus and the editing mode, including the current Vim Insert session. Another Escape with no popup enters Normal (§20.2.4). Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
+Without a popup, Enter retains its ordinary action; modified Enter always keeps its ordinary behavior. Tab and Shift+Tab dismiss suggestions and retain their ordinary structural behavior (§20.2.24, §23.10). Escape dismisses suggestions and preserves text, caret, focus and the editing mode, including the current Vim Insert session. Another Escape with no popup enters Normal (§20.2.4). Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
 
 ---
 
@@ -1618,7 +1624,7 @@ Undo removes the node and applies the history focus rule of §23.8.
 
 #### Splitting a Dated Node
 
-* In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead.
+* In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead. An open completion popup takes precedence and accepts its selected suggestion (§20.9, §20.12).
 * The new part receives the displayed day's date, so the node stays on that day. The date is inserted at the start of the new part and replaces its leading whitespace with the single space after the date, so `2026-10-14 Prepare| release` becomes `2026-10-14 Prepare` and `2026-10-14 release`.
 * Nothing is inserted when the new part already contains that day's date as a recognized date; a date inside a hyperlink does not count.
 * Only the displayed day's date is inherited, and hyperlinks in the new part keep their text.

@@ -230,8 +230,9 @@ export function useDateAssist(
         observe()
         const popup = owner.current.popup
         if (popup !== undefined && !event.metaKey && !event.altKey && !event.shiftKey) {
-          if (!event.ctrlKey && event.key === 'Tab') {
+          if (!event.ctrlKey && event.key === 'Enter') {
             event.preventDefault()
+            event.stopPropagation()
             accept(popup.selected)
             return
           }

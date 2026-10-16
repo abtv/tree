@@ -96,7 +96,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await window.keyboard.press('Backspace')
       await window.keyboard.type('s')
       await expect(popup).toBeVisible()
-      await window.keyboard.press('Tab')
+      await window.keyboard.press('Enter')
       const text = async (): Promise<string> =>
         input.evaluate((element) =>
           element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
@@ -248,7 +248,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await expect(popup.getByRole('option')).toHaveCount(1)
       await window.keyboard.type('row')
       await expect(input).toBeFocused()
-      await window.keyboard.press('Tab')
+      await window.keyboard.press('Enter')
       await assertText('2026-10-08 Plan 2026-10-09')
       await expect(popup).toHaveCount(0)
       await window.keyboard.type('!')
@@ -288,7 +288,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await window.keyboard.press('Control+n')
       await window.keyboard.type('k')
       await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
-      await window.keyboard.press('Tab')
+      await window.keyboard.press('Enter')
       await assertText('2026-10-08 Plan 2026-10-13')
       await expect(input).toBeFocused()
 
