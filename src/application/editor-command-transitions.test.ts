@@ -333,6 +333,35 @@ describe('editor command transitions', () => {
 
   // @requirement PRODUCT.md §8.2
   // @requirement PRODUCT.md §19
+  it.each([true, false])(
+    'Backspace reaches the last visible descendant of an expanded sibling (nested open: %s)',
+    (nestedOpen) => {
+      const input: Document = {
+        roots: [
+          {
+            id: 'previous',
+            text: 'Previous',
+            children: [{ id: 'child', text: 'Child', children: [{ id: 'last', text: 'Last child', children: [] }] }],
+          },
+          { id: 'empty', text: '', children: [] },
+        ],
+      }
+      const result = deleteEmptySelectedTransition(
+        input,
+        { currentParentId: null, selectedNodeId: 'empty' },
+        (id) => id === 'previous' || (nestedOpen && id === 'child'),
+      )
+      const target = nestedOpen ? 'last' : 'child'
+      expect(result).toEqual({
+        document: { roots: [input.roots[0]] },
+        location: { currentParentId: null, selectedNodeId: target },
+        focus: { nodeId: target, cursor: nestedOpen ? 10 : 5 },
+      })
+    },
+  )
+
+  // @requirement PRODUCT.md §8.2
+  // @requirement PRODUCT.md §19
   it('uses the empty-node Backspace destinations and preserves the only root', () => {
     const empty = {
       roots: [

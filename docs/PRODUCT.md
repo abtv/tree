@@ -507,7 +507,7 @@ An empty node that has an attachment or children is still deleted this way, incl
 
 After the deletion:
 
-1. If a previous sibling exists, select it and place the text cursor at the end of its text.
+1. If a previous sibling exists, select its last visible row and place the text cursor at the end of that row's text. An expanded sibling's last visible descendant receives the caret; a collapsed sibling or a leaf receives it itself.
 2. Otherwise, if the current parent exists, select the editable current parent and place the text cursor at the end of its text.
 3. Otherwise, at the root level, select the next root node and place the text cursor at the beginning of its text.
 4. If the deleted node was the only root node, do nothing; the empty root is kept.

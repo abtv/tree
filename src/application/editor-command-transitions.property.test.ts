@@ -8,10 +8,47 @@ import {
   moveSelectionTransition,
   openBelowTransition,
   createSiblingOrFirstChildTransition,
+  deleteEmptySelectedTransition,
 } from './editor-command-transitions'
 import { buildVisibleRows } from './visible-rows'
 
 describe('editor command transition properties', () => {
+  it('deletes only the empty subtree and focuses the preceding visible row at its text end', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.record({ text: fc.string(), expanded: fc.boolean() }), { minLength: 1, maxLength: 10 }),
+        fc.boolean(),
+        (ancestors, focused) => {
+          let branch: TreeNode = { id: 'leaf', text: 'Last child', children: [] }
+          const expanded = new Set<string>()
+          for (const [index, ancestor] of ancestors.entries()) {
+            const id = `branch-${index}`
+            branch = { id, text: ancestor.text, children: [branch] }
+            if (ancestor.expanded) expanded.add(id)
+          }
+          const siblings: TreeNode[] = [
+            branch,
+            { id: 'empty', text: '', children: [{ id: 'removed-child', text: 'Removed', children: [] }] },
+          ]
+          const document: Document = {
+            roots: focused ? [{ id: 'scope', text: 'Scope', children: siblings }] : siblings,
+          }
+          const currentParentId = focused ? 'scope' : null
+          const rows = buildVisibleRows(siblings, (id) => expanded.has(id))
+          const emptyIndex = rows.findIndex((row) => row.node.id === 'empty')
+          const target = rows[emptyIndex - 1]!.node
+          const result = deleteEmptySelectedTransition(document, { currentParentId, selectedNodeId: 'empty' }, (id) =>
+            expanded.has(id),
+          )
+          expect(result?.focus).toEqual({ nodeId: target.id, cursor: target.text.length })
+          expect(result?.location).toEqual({ currentParentId, selectedNodeId: target.id })
+          expect(displayedNodes(result!.document, currentParentId)).toEqual([branch])
+          assertDocument(result!.document)
+        },
+      ),
+    )
+  })
+
   it('preserves every existing subtree while repeated empty creation ascends to the location boundary', () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { minLength: 1, maxLength: 10 }), fc.boolean(), (texts, focused) => {

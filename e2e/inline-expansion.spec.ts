@@ -69,6 +69,41 @@ function wideNestedSeed(topCount: number, expandedCount: number): { document: un
 
 // @requirement PRODUCT.md §2.4
 describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §8.2
+  test('Backspace on an empty row returns to the end of the preceding expanded child', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Bugfixes',
+            children: [{ id: 'child', text: 'Child', children: [{ id: 'last', text: 'Last child', children: [] }] }],
+          },
+          { id: 'empty', text: '', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'empty' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+    await node(window, 4).focus()
+    await window.keyboard.press('Backspace')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child', 'Last child'])
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 10)
+    await expect(node(window, 3)).toHaveJSProperty('selectionEnd', 10)
+    await window.keyboard.type('!')
+    await expect(node(window, 3)).toHaveValue('Last child!')
+    await window.screenshot({ path: test.info().outputPath(`backspace-expanded-${mode}.png`) })
+    await window.keyboard.press('Meta+z')
+    await expect(node(window, 3)).toHaveValue('Last child')
+    await window.keyboard.press('Meta+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child', 'Last child', ''])
+    await window.keyboard.press('Meta+Shift+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child', 'Last child'])
+  })
+
   // @requirement PRODUCT.md §5.1
   test('creates one empty child then one empty node to the left with Enter', async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(false))

@@ -452,10 +452,14 @@ export function deleteSiblingRangeTransition(
 export function deleteEmptySelectedTransition(
   document: Document,
   location: Location,
+  isExpanded: (id: NodeId) => boolean = () => false,
 ): StructuralTransition | undefined {
   const selected = requireNode(document, location.selectedNodeId)
   if (selected.node.id === location.currentParentId || selected.node.text !== '') return undefined
-  const previous = selected.siblings[selected.index - 1]
+  let previous = selected.siblings[selected.index - 1]
+  while (previous !== undefined && isExpanded(previous.id) && previous.children.length > 0) {
+    previous = previous.children[previous.children.length - 1]
+  }
   const next = selected.siblings[selected.index + 1]
   const nextDocument = deleteNode(document, selected.node.id)
   if (previous !== undefined) {

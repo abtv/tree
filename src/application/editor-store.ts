@@ -1177,7 +1177,11 @@ export class EditorStore {
       dayRows.findLast((row) => row.kind === 'node' && previousIds.has(row.nodeId)) ??
       dayRows.find((row) => row.kind === 'node' && row.nodeId === selected.parent?.id) ??
       dayRows.find((row) => row.kind === 'day')
-    const transition = deleteEmptySelectedTransition(state.document, state.location)
+    const transition = deleteEmptySelectedTransition(
+      state.document,
+      state.location,
+      (id) => state.agenda === undefined && state.expansion.expandedIds.has(id),
+    )
     if (transition === undefined) return
     this.endTextSession()
     this.applyStructural(
