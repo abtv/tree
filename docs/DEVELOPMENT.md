@@ -118,6 +118,8 @@ npm run lint
 
 New code must follow the project's linting rules.
 
+ESLint rejects static imports and re-exports of React, React DOM, Electron, and Node.js built-ins in `src/application/`, including nested modules and tests. Application services receive platform capabilities through interfaces instead.
+
 Do not disable lint rules locally merely to make a task pass unless there is a documented reason.
 
 ---

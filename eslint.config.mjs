@@ -11,7 +11,7 @@ const platformImportRestrictions = {
   paths: [
     ...nodeImports.map((name) => ({
       name,
-      message: 'Platform APIs belong outside the domain and renderer layers.',
+      message: 'Platform APIs belong outside the domain, application, and renderer layers.',
     })),
     {
       name: 'electron',
@@ -69,6 +69,23 @@ export default tseslint.config(
       ...reactHooks.configs.flat.recommended.rules,
       ...reactRefresh.configs.vite.rules,
       'no-restricted-imports': ['error', platformImportRestrictions],
+    },
+  },
+  {
+    files: ['src/application/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          ...platformImportRestrictions,
+          patterns: [
+            {
+              group: ['react', 'react/**', 'react-dom', 'react-dom/**', 'electron/**'],
+              message: 'The application layer must remain independent of React and platform APIs.',
+            },
+          ],
+        },
+      ],
     },
   },
   {
