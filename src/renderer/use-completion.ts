@@ -1,31 +1,31 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import { requireNode, type TreeNode } from '../domain/document'
-import { dayNumberOf, calendarDateOf, formatCanonicalDate } from '../domain/calendar-date'
-import { DateAssist } from './date-assist'
+import { dayNumberOf } from '../domain/calendar-date'
+import { CompletionController } from './completion-controller'
 import { expressionPosition, getCaret, getSelectionRange, readEditableContent } from './editor-dom'
 import type { NodeInputBindings } from './NodeInput'
-import type { DatePopupPresentation } from './DatePopup'
+import type { CompletionPopupPresentation } from './CompletionPopup'
 import type { VimMode } from './vim-editing'
 
-export function useDateAssist(
+export function useCompletion(
   store: EditorStore,
   mode: VimMode,
   locked: boolean,
   scheduleCaret: (nodeId: string, cursor: number) => void,
   vimEnabled: boolean,
 ): {
-  presentation: DatePopupPresentation | undefined
+  presentation: CompletionPopupPresentation | undefined
   accept: (index: number) => void
   decorate: (node: TreeNode, bindings: NodeInputBindings) => NodeInputBindings
   reconcile: () => void
 } {
-  const owner = useRef(new DateAssist())
+  const owner = useRef(new CompletionController())
   const input = useRef<HTMLElement | undefined>(undefined)
   const composing = useRef(false)
   const compositionText = useRef<string | undefined>(undefined)
   const context = useRef<{ parentId: string | null; agendaKey: string | undefined } | undefined>(undefined)
-  const [presentation, setPresentation] = useState<DatePopupPresentation>()
+  const [presentation, setPresentation] = useState<CompletionPopupPresentation>()
   const project = useCallback((): void => {
     const popup = owner.current.popup
     const element = input.current
@@ -102,10 +102,9 @@ export function useDateAssist(
       if (popup === undefined) return
       const suggestion = popup.suggestions[index]
       if (suggestion === undefined) return
-      const canonical = 'emoji' in suggestion ? suggestion.emoji : formatCanonicalDate(calendarDateOf(suggestion.day))
       close()
-      scheduleCaret(popup.nodeId, popup.start + canonical.length)
-      store.replaceTextRange(popup.nodeId, popup.start, popup.end, canonical)
+      scheduleCaret(popup.nodeId, popup.start + suggestion.replacement.length)
+      store.replaceTextRange(popup.nodeId, popup.start, popup.end, suggestion.replacement)
     },
     [observe, close, scheduleCaret, store],
   )

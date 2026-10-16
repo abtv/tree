@@ -140,7 +140,7 @@ describe('useNodeInputBindings', () => {
       const input = f.input()
       input.focus()
       f.type(fragment)
-      const count = f.result.current.datePopup!.popup.suggestions.length
+      const count = f.result.current.completionPopup!.popup.suggestions.length
       for (const key of ['Meta', 'Control', 'Alt', 'Shift']) {
         f.press(key, {
           metaKey: key === 'Meta',
@@ -148,22 +148,22 @@ describe('useNodeInputBindings', () => {
           altKey: key === 'Alt',
           shiftKey: key === 'Shift',
         })
-        expect(f.result.current.datePopup?.popup.selected).toBe(0)
+        expect(f.result.current.completionPopup?.popup.selected).toBe(0)
       }
       f.press('ArrowDown')
-      expect(f.result.current.datePopup?.popup.selected).toBe(1)
+      expect(f.result.current.completionPopup?.popup.selected).toBe(1)
       f.press('ArrowUp')
-      expect(f.result.current.datePopup?.popup.selected).toBe(0)
+      expect(f.result.current.completionPopup?.popup.selected).toBe(0)
       f.press('ArrowUp')
-      expect(f.result.current.datePopup?.popup.selected).toBe(count - 1)
+      expect(f.result.current.completionPopup?.popup.selected).toBe(count - 1)
       f.press('ArrowDown')
-      expect(f.result.current.datePopup?.popup.selected).toBe(0)
+      expect(f.result.current.completionPopup?.popup.selected).toBe(0)
       expect(f.snapshot().location.selectedNodeId).toBe('node')
       expect(getCaret(input)).toBe(fragment.length)
       expect(f.node().text).toBe(fragment)
       expect(f.result.current.vimMode).toBe('insert')
       f.press('Escape')
-      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.result.current.vimMode).toBe('insert')
       expect(getCaret(input)).toBe(fragment.length)
       expect(input).toBe(document.activeElement)
@@ -191,9 +191,9 @@ describe('useNodeInputBindings', () => {
       expect(f.snapshot().location.selectedNodeId).toBe('node')
       expect(f.result.current.vimMode).toBe('insert')
       f.type('Plan next wee')
-      expect(f.result.current.datePopup).toBeDefined()
+      expect(f.result.current.completionPopup).toBeDefined()
       f.press('a', { metaKey: true })
-      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.node().text).toBe('Plan next wee')
     },
   )
@@ -206,10 +206,10 @@ describe('useNodeInputBindings', () => {
     f.input().focus()
     f.press('i')
     f.type(fragment)
-    expect(f.result.current.datePopup).toBeDefined()
+    expect(f.result.current.completionPopup).toBeDefined()
     f.press('Escape')
     expect(f.result.current.vimMode).toBe('insert')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type(`${fragment}!`)
     expect(f.node().text).toBe(`${fragment}!`)
     f.press('Escape')
@@ -376,18 +376,20 @@ describe('useNodeInputBindings', () => {
     f.type('Plan next wee')
     f.press('n', { ctrlKey: true })
     f.type('Plan next week')
-    const popup = f.result.current.datePopup!.popup
+    const popup = f.result.current.completionPopup!.popup
     expect(popup.suggestions[popup.selected]).toEqual({
-      day: dayNumberOf({ year: 2026, month: 10, day: 13 }),
-      expression: 'next week',
+      id: `date:${dayNumberOf({ year: 2026, month: 10, day: 13 })}`,
+      replacement: '2026-10-13',
+      label: '2026-10-13',
+      description: 'Tue · next week',
     })
     f.press('Enter')
     expect(f.node().text).toBe('Plan 2026-10-13')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     act(() => f.store.undo())
     f.sync()
     expect(f.node().text).toBe('Plan next week')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
   })
 
   // @requirement PRODUCT.md §20.9
@@ -398,16 +400,16 @@ describe('useNodeInputBindings', () => {
     f.input().focus()
     f.type('Plan in September')
     f.press('n', { ctrlKey: true })
-    expect(f.result.current.datePopup?.popup.selected).toBe(1)
+    expect(f.result.current.completionPopup?.popup.selected).toBe(1)
     f.type('Plan in Septembe')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type('Plan in September')
-    expect(f.result.current.datePopup?.popup.selected).toBe(0)
+    expect(f.result.current.completionPopup?.popup.selected).toBe(0)
     f.press('n', { ctrlKey: true })
     f.press('Enter')
     expect(f.node().text).toBe('Plan 2026-09-01')
     expect(getCaret(f.input())).toBe('Plan 2026-09-01'.length)
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
   })
 
   // @requirement PRODUCT.md §20.12
@@ -417,9 +419,11 @@ describe('useNodeInputBindings', () => {
       const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
       f.input().focus()
       f.type(':woman_techn')
-      expect(f.result.current.datePopup?.popup.suggestions).toContainEqual({
-        shortcode: 'woman_technologist',
-        emoji: '👩‍💻',
+      expect(f.result.current.completionPopup?.popup.suggestions).toContainEqual({
+        id: 'emoji:woman_technologist',
+        replacement: '👩‍💻',
+        label: '👩‍💻',
+        description: ':woman_technologist:',
       })
       f.press('Enter')
       expect(f.node().text).toBe('👩‍💻')
@@ -428,11 +432,11 @@ describe('useNodeInputBindings', () => {
       act(() => f.store.undo())
       f.sync()
       expect(f.node().text).toBe(':woman_techn')
-      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.completionPopup).toBeUndefined()
       f.type(':roc')
       f.type(':roc ')
       expect(f.node().text).toBe(':roc ')
-      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.completionPopup).toBeUndefined()
     },
   )
 
@@ -443,27 +447,27 @@ describe('useNodeInputBindings', () => {
     input.focus()
     f.type(':roc')
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type(':rocke')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
-    expect(f.result.current.datePopup).toBeDefined()
+    expect(f.result.current.completionPopup).toBeDefined()
     input.setSelectionRange(0, 3)
     act(() => f.bindings().onSelect({ currentTarget: input } as never))
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type(':roc')
     act(() => f.bindings().onBlur())
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type(':roc')
     input.value = ':rocke'
     input.setSelectionRange(6, 6)
     act(() =>
       f.bindings().onTextChange({ currentTarget: input, nativeEvent: { inputType: 'insertFromPaste' } } as never),
     )
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type(':roc')
     act(() => f.store.editText('node', 'external'))
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
   })
 
   // @requirement PRODUCT.md §20.9
@@ -472,17 +476,17 @@ describe('useNodeInputBindings', () => {
     const input = f.input()
     input.focus()
     f.type('tomor')
-    expect(f.result.current.datePopup?.popup.suggestions).toHaveLength(1)
+    expect(f.result.current.completionPopup?.popup.suggestions).toHaveLength(1)
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type('tomorrow')
     f.press('Enter')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe('tomorrow')
     act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
-    expect(f.result.current.datePopup?.popup.text).toBe('tomorrow')
+    expect(f.result.current.completionPopup?.popup.text).toBe('tomorrow')
     act(() => f.bindings().onBlur())
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
   })
 
   // @requirement PRODUCT.md §20.9
@@ -491,9 +495,9 @@ describe('useNodeInputBindings', () => {
     const input = f.input()
     input.focus()
     f.type('tomor')
-    expect(f.result.current.datePopup).toBeDefined()
+    expect(f.result.current.completionPopup).toBeDefined()
     f.press('Enter')
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).not.toBe('tomor')
     expect(f.node().text).toMatch(/\d{4}-\d{2}-\d{2}/)
     expect(f.node().children).toHaveLength(0)
@@ -514,16 +518,16 @@ describe('useNodeInputBindings', () => {
       })
       f.input().focus()
       f.type(fragment)
-      expect(f.result.current.datePopup).toBeDefined()
+      expect(f.result.current.completionPopup).toBeDefined()
       f.press('Tab')
-      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
       expect(f.node('b').text).toBe(fragment)
       expect(f.result.current.vimMode).toBe('insert')
       f.type(fragment)
-      expect(f.result.current.datePopup).toBeDefined()
+      expect(f.result.current.completionPopup).toBeDefined()
       f.press('Tab', { shiftKey: true })
-      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.snapshot().document.roots.map((root) => root.id)).toEqual(['a', 'b'])
       expect(f.node('b').text).toBe(fragment)
       expect(f.result.current.vimMode).toBe('insert')
@@ -537,7 +541,7 @@ describe('useNodeInputBindings', () => {
     f.input().focus()
     f.type(':roc')
     f.press('Enter', { metaKey: true })
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe(':roc')
     expect(f.node().struckThrough).toBe(true)
     expect(f.result.current.vimMode).toBe('insert')
@@ -567,9 +571,9 @@ describe('useNodeInputBindings', () => {
     act(() =>
       f.bindings().onTextChange({ currentTarget: input, nativeEvent: { inputType: 'insertFromPaste' } } as never),
     )
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type('tomor')
-    expect(f.result.current.datePopup).toBeDefined()
+    expect(f.result.current.completionPopup).toBeDefined()
     act(() =>
       f.bindings().onKeyDown({
         currentTarget: input,
@@ -578,18 +582,18 @@ describe('useNodeInputBindings', () => {
         preventDefault: () => undefined,
       } as never),
     )
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe('tomor')
     f.type('tomorr')
-    expect(f.result.current.datePopup).toBeDefined()
+    expect(f.result.current.completionPopup).toBeDefined()
     act(() => f.result.current.setVimMode('normal'))
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     act(() => f.result.current.setVimMode('insert'))
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
     f.type('tomorro')
-    expect(f.result.current.datePopup).toBeDefined()
+    expect(f.result.current.completionPopup).toBeDefined()
     act(() => f.store.undo())
-    expect(f.result.current.datePopup).toBeUndefined()
+    expect(f.result.current.completionPopup).toBeUndefined()
   })
 
   it('shifts a standard editor node through the store and restores its text selection', async () => {

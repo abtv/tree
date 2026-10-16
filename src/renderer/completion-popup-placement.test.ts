@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { placeInViewport } from './date-popup-placement'
+import { placeInViewport } from './completion-popup-placement'
 
 const viewport = { width: 800, height: 600 }
 const size = { width: 200, height: 100 }

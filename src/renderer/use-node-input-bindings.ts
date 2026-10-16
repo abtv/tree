@@ -35,8 +35,8 @@ import { beginReplaceClick, beginReplaceSession, createVimEditSessionState, take
 import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
-import { useDateAssist } from './use-date-assist'
-import type { DatePopupPresentation } from './DatePopup'
+import { useCompletion } from './use-completion'
+import type { CompletionPopupPresentation } from './CompletionPopup'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -62,8 +62,8 @@ interface UseNodeInputBindingsOptions {
 }
 
 export interface NodeInputBindingsResult {
-  datePopup: DatePopupPresentation | undefined
-  acceptDate: (index: number) => void
+  completionPopup: CompletionPopupPresentation | undefined
+  acceptCompletion: (index: number) => void
   vimTextCommandState: VimTextCommandState
   bindings: (node: TreeNode) => NodeInputBindings
   dragFreeze: NodeDragCaretFreeze
@@ -142,17 +142,17 @@ export function useNodeInputBindings({
     pendingVisualSelection.current = pending
   }
 
-  const scheduleDateCaret = useCallback((nodeId: string, cursor: number): void => {
+  const scheduleCompletionCaret = useCallback((nodeId: string, cursor: number): void => {
     schedulePendingCaret({ nodeId, cursor, refocus: true })
   }, [])
-  const dateAssist = useDateAssist(
+  const completion = useCompletion(
     store,
     vimEnabled ? vimMode : 'insert',
     persistenceLocked,
-    scheduleDateCaret,
+    scheduleCompletionCaret,
     vimEnabled,
   )
-  const decorateDateBindings = dateAssist.decorate
+  const decorateCompletionBindings = completion.decorate
 
   const changeVimMode = useCallback(
     (mode: VimMode): void => {
@@ -792,7 +792,7 @@ export function useNodeInputBindings({
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>
-      decorateDateBindings(node, {
+      decorateCompletionBindings(node, {
         selectedAll: selectAllNodeId === node.id,
         disabled: persistenceLocked,
         inputRef: (input: HTMLElement | null) => {
@@ -884,7 +884,7 @@ export function useNodeInputBindings({
         }),
       }),
     [
-      decorateDateBindings,
+      decorateCompletionBindings,
       composing,
       applyCaretState,
       commandNodeVisual,
@@ -943,7 +943,7 @@ export function useNodeInputBindings({
   )
 
   useLayoutEffect(() => {
-    dateAssist.reconcile()
+    completion.reconcile()
   })
 
   return {
@@ -951,7 +951,7 @@ export function useNodeInputBindings({
     dragFreeze,
     setVimEditing,
     vimTextCommandState,
-    datePopup: dateAssist.presentation,
-    acceptDate: dateAssist.accept,
+    completionPopup: completion.presentation,
+    acceptCompletion: completion.accept,
   }
 }

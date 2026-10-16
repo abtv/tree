@@ -1,20 +1,19 @@
 import { useLayoutEffect, useRef } from 'react'
-import { calendarDateOf, formatCanonicalDate, weekdayOf } from '../domain/calendar-date'
-import type { DateAssistPopup } from './date-assist'
-import { placeInViewport } from './date-popup-placement'
+import type { CompletionPopupState } from './completion-controller'
+import { placeInViewport } from './completion-popup-placement'
 
-export interface DatePopupPresentation {
-  readonly popup: DateAssistPopup
+export interface CompletionPopupPresentation {
+  readonly popup: CompletionPopupState
   readonly left: number
   readonly top: number
   readonly rowTop: number
 }
 
-export function DatePopup({
+export function CompletionPopup({
   presentation,
   accept,
 }: {
-  presentation: DatePopupPresentation | undefined
+  presentation: CompletionPopupPresentation | undefined
   accept: (index: number) => void
 }): React.JSX.Element | null {
   const container = useRef<HTMLDivElement>(null)
@@ -43,10 +42,10 @@ export function DatePopup({
   const { popup, left, top } = presentation
   return (
     <div ref={container} className="date-popup" style={{ left, top }}>
-      <div role="listbox" aria-label={'emoji' in popup.suggestions[0]! ? 'Emoji suggestions' : 'Date suggestions'}>
+      <div role="listbox" aria-label={popup.listLabel}>
         {popup.suggestions.map((suggestion, index) => (
           <div
-            key={'emoji' in suggestion ? suggestion.shortcode : suggestion.day}
+            key={suggestion.id}
             role="option"
             aria-selected={index === popup.selected}
             className={index === popup.selected ? 'date-popup-selected' : undefined}
@@ -56,14 +55,8 @@ export function DatePopup({
               accept(index)
             }}
           >
-            <span>
-              {'emoji' in suggestion ? suggestion.emoji : formatCanonicalDate(calendarDateOf(suggestion.day))}
-            </span>
-            <span className="date-popup-description">
-              {'emoji' in suggestion
-                ? `:${suggestion.shortcode}:`
-                : `${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekdayOf(suggestion.day)]} · ${suggestion.expression}`}
-            </span>
+            <span>{suggestion.label}</span>
+            <span className="date-popup-description">{suggestion.description}</span>
           </div>
         ))}
       </div>

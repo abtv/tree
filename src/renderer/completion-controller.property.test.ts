@@ -2,13 +2,13 @@ import { expect, it } from 'vitest'
 import fc from 'fast-check'
 import { propertyRuns } from '../test/property-runs'
 import { dayNumberOf } from '../domain/calendar-date'
-import { DateAssist } from './date-assist'
+import { CompletionController } from './completion-controller'
 
 // @requirement PRODUCT.md §20.12
 it('retains literal emoji fragments and bounds selection across arbitrary popup navigation', () => {
   fc.assert(
     fc.property(fc.constantFrom(':roc', ':ma', ':woman_techn'), fc.array(fc.constantFrom(-1, 1)), (text, commands) => {
-      const assist = new DateAssist()
+      const assist = new CompletionController()
       assist.edit('n', text, text.length, dayNumberOf({ year: 2026, month: 10, day: 8 }), [])
       const count = assist.popup!.suggestions.length
       let selected = 0
@@ -29,7 +29,7 @@ it('retains literal emoji fragments and bounds selection across arbitrary popup 
 it('never reopens a dismissed popup through arbitrary observation and navigation sequences', () => {
   fc.assert(
     fc.property(fc.array(fc.integer({ min: -1, max: 1 })), (commands) => {
-      const assist = new DateAssist()
+      const assist = new CompletionController()
       const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
       assist.edit('n', 'Friday', 6, today, [])
       let selected = 0
@@ -56,7 +56,7 @@ it('never reopens a dismissed popup through arbitrary observation and navigation
 it('retains the selected week date through arbitrary refinement and navigation', () => {
   fc.assert(
     fc.property(fc.array(fc.constantFrom(-1, 1)), (commands) => {
-      const assist = new DateAssist()
+      const assist = new CompletionController()
       const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
       assist.edit('n', 'next wee', 8, today, [])
       for (const direction of commands) {

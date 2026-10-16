@@ -1,37 +1,34 @@
-import { suggestDates, type NaturalDateMatch } from '../domain/natural-date'
 import type { DayNumber } from '../domain/calendar-date'
 import type { DateTextRange } from '../domain/date-recognition'
-import { suggestEmoji, type EmojiMatch } from '../domain/emoji-completion'
+import { recognizeCompletion, type CompletionMatch } from './completion-sources'
 
-export type DateAssistPopup = (NaturalDateMatch | EmojiMatch) & {
+export type CompletionPopupState = CompletionMatch & {
   readonly nodeId: string
   readonly text: string
   readonly selected: number
 }
 
 /** Single transient owner. Only explicit typing may open it; observation only closes. */
-export class DateAssist {
-  public popup: DateAssistPopup | undefined
+export class CompletionController {
+  public popup: CompletionPopupState | undefined
 
   public close(): void {
     this.popup = undefined
   }
 
   public edit(nodeId: string, text: string, caret: number, today: DayNumber, excluded: readonly DateTextRange[]): void {
-    const match = suggestEmoji(text, caret) ?? suggestDates(text, caret, today)
+    const match = recognizeCompletion(text, caret, today)
     if (match === undefined || excluded.some((range) => range.start < match.end && range.end > match.start)) {
       this.close()
       return
     }
     const previous = this.popup
     const suggestion =
-      previous?.nodeId === nodeId && previous.start === match.start
+      match.retainsSelection && previous?.nodeId === nodeId && previous.start === match.start
         ? previous.suggestions[previous.selected]
         : undefined
     const retained =
-      suggestion !== undefined && 'day' in suggestion
-        ? match.suggestions.findIndex((candidate) => 'day' in candidate && candidate.day === suggestion.day)
-        : -1
+      suggestion === undefined ? -1 : match.suggestions.findIndex((candidate) => candidate.id === suggestion.id)
     this.popup = { ...match, nodeId, text, selected: Math.max(0, retained) }
   }
 
