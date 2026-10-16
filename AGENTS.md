@@ -142,7 +142,7 @@ Use focused rule, contract, and real-boundary tests. Procedure §9 lists require
 
 ## 10. Validation
 
-Before choosing checks or claiming validation, read procedure §10 and `docs/DEVELOPMENT.md` §9. Apply the highest relevant tier. Contained changes below High Risk use affected local E2E; High Risk retains full local validation. An empty selection or a suite that cannot execute its boundary is not a pass.
+Before choosing checks or claiming validation, read procedure §10 and `docs/DEVELOPMENT.md` §9. Apply the highest relevant functional-validation tier. Contained changes below High Risk use affected local E2E; High Risk retains full local functional validation. Select Electron performance checks separately under procedure §10; High Risk alone does not require them. An empty selection or a suite that cannot execute its boundary is not a pass.
 
 Reuse passing results for unchanged inputs, environment, and scope. Never repeat solely for reassurance, handoff, or a new reviewer. Rerun only invalidated checks and dependencies unless the risk tier or scope requires more. Record exact commands, tested inputs, scope, outcomes, and assumptions in temporary task evidence. Identify unrelated failures and blocked required validation; do not claim completion while they remain unresolved.
 

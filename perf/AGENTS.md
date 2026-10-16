@@ -15,4 +15,4 @@ Rules for the Playwright performance project in `perf/`. The root `AGENTS.md` st
 
 ## Commands
 
-* Run `npm run test:perf`; the suite also runs in `npm run check:full`.
+* Select scope under root procedure §10. Run affected specs with `npm run test:perf -- <specs>`; use `npm run test:perf` for a required full run. `npm run check:full` includes the full suite when that all-suites command is selected.

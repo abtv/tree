@@ -271,7 +271,19 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 ## 10. Validation
 
-Select validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands and when `npm run check` or `npm run check:full` is mandatory. Focused checks remain the preferred development loop.
+Select functional validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands. Focused checks remain the preferred development loop.
+
+### Selecting performance checks
+
+Keep the fast performance guards included in ordinary validation. Select Electron performance checks separately from the functional risk tier. A High Risk classification, a session ending, or a desire for extra confidence does not by itself justify an Electron performance run.
+
+For a local run, identify a concrete affected cost: interactive or startup latency, document-scale CPU work, memory growth, or disk operations. Changes to these paths, fixes for a reported slowdown, and changes to performance measurements require the smallest set of scenarios that can detect the affected regression. Preserve the assessment and scale-guard obligations in `docs/PRODUCT.md` §22. A plausible regression mechanism is enough to require a check; do not wait for proof that the change is slow.
+
+Run the full Electron performance suite when the performance impact spans the application and cannot be bounded to affected scenarios, such as an Electron or React upgrade or a broad change to rendering, state, persistence, or shared performance fixtures. A tooling-only dependency update or a correctness-only boundary fix does not automatically require Electron performance tests. Inspect the changed paths before selecting the scope. Keep the full scheduled/manual CI suite and verify the release candidate with the full suite before release, reusing valid results under the rules below.
+
+Record the affected cost and selected scenarios, or a brief reason why no Electron performance run is needed, in the task's validation evidence. Use same-machine before/after measurements for performance fixes and changes expected to affect measured costs; interpret timing noise using `docs/DEVELOPMENT.md` §12. Reuse valid measurements, and rerun only invalidated scenarios. Use the all-suites command only when its full performance stage is justified by these rules or explicitly requested.
+
+### Validation evidence
 
 Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. Keep this record in `WORKING_PLAN.md` when one is required under §8; otherwise include it in the final handoff.
 

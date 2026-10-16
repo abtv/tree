@@ -9,8 +9,8 @@ The project depends on fast-moving tooling: Electron, React, TypeScript, ESLint,
 
 ## Decision
 
-Declare every direct dependency in `package.json` with an exact version and no range operator. Upgrades are deliberate changes: update the exact version, reinstall, and run `npm run check:full`. Indirect dependencies continue to be resolved by `package-lock.json`.
+Declare every direct dependency in `package.json` with an exact version and no range operator. Upgrades are deliberate changes: update the exact version, reinstall, and complete the dependency validation defined in [Development Guide §9](../DEVELOPMENT.md#risk-based-validation), with Electron performance scope selected separately under [Agent Workflow Procedures §10](../AGENT_WORKFLOW.md#selecting-performance-checks). Indirect dependencies continue to be resolved by `package-lock.json`.
 
 ## Consequences
 
-`package.json` and the lockfile agree on the direct dependency set, so the manifest states the exact version in use and `npm ci` is reproducible without range interpretation. Security and upgrade work becomes an explicit diff rather than an incidental one. The cost is that routine patch upgrades no longer arrive automatically and must be applied intentionally; `npm audit` continues to report known vulnerabilities as the final step of `npm run check`.
+`package.json` and the lockfile agree on the direct dependency set, so the manifest states the exact version in use and `npm ci` is reproducible without range interpretation. Security and upgrade work becomes an explicit diff rather than an incidental one. The cost is that routine patch upgrades no longer arrive automatically and must be applied intentionally; `npm audit` remains required for dependency validation.

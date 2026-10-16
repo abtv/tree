@@ -348,7 +348,7 @@ The repository must also provide the complete validation command:
 npm run check:full
 ```
 
-This runs `npm run check`, the end-to-end suite, the performance suite, and finally the dependency audit (`npm audit`), so an advisory without an available fix reports after the suites rather than hiding their results. The matrix below defines when complete validation is required; the normative validation policy is in `AGENTS.md` §10.
+This runs `npm run check`, the end-to-end suite, the full Electron performance suite, and finally the dependency audit (`npm audit`), so an advisory without an available fix reports after the suites rather than hiding their results. It is an all-suites convenience command, not the default for every High Risk change. Use it when the full performance stage is required or explicitly requested; otherwise run the stages selected below. The normative validation policy is in `AGENTS.md` §10 and [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#10-validation).
 
 ### GitHub Actions
 
@@ -358,16 +358,18 @@ The Attribution workflow runs `scripts/check-attribution.mjs` on every pull requ
 
 ### Risk-Based Validation
 
-Use the highest applicable tier. Focused checks may be run during implementation, but they do not substitute for a broader required tier.
+Use the highest applicable functional-validation tier. Select Electron performance scope separately under [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#selecting-performance-checks). Focused checks may be run during implementation, but they do not substitute for a broader required functional tier.
 
 | Tier | Change risk | Required validation |
 | --- | --- | --- |
 | Minimal Risk | Documentation or content only, with no executable configuration change | Run `npm run format:check:changed` and `npm run check:docs`. Also run `npm run check:opencode` when agent workflow documentation changes. |
 | Low Risk | Executable tooling or configuration, tests, or an isolated non-runtime refactor | Run affected type, lint, formatting, governance, and focused test checks. Run `npm run check` when executable source, dependency metadata, build configuration, or validation tooling changes. Agent-prompt documentation remains Minimal Risk unless executable configuration such as `opencode.json` changes. |
-| Moderate Risk | Product, domain, or renderer behavior contained within one process, without a persistence or platform boundary | Run `npm run check`, affected unit or property tests, and focused E2E coverage for every affected user-visible requirement. Broaden E2E coverage when shared interaction or lifecycle infrastructure changes. Perform product verification of the changed flows. Run performance checks when `docs/PRODUCT.md` §22 applies. |
-| High Risk | Process, IPC, filesystem, persistence, clipboard, attachment, native shortcut, startup, shutdown, security, dependency, toolchain, shared fixture, or scale-sensitive state changes | Run `npm run check:full`, the unit, contract, real-boundary, and failure-path coverage required by `AGENTS.md` §9, applicable security checks and audit, same-machine performance comparison when performance may change, and visible verification for native behavior automation cannot inspect. |
+| Moderate Risk | Product, domain, or renderer behavior contained within one process, without a persistence or platform boundary | Run `npm run check`, affected unit or property tests, and focused E2E coverage for every affected user-visible requirement. Broaden E2E coverage when shared interaction or lifecycle infrastructure changes. Perform product verification of the changed flows. Select performance checks separately under procedure §10, preserving `docs/PRODUCT.md` §22. |
+| High Risk | Process, IPC, filesystem, persistence, clipboard, attachment, native shortcut, startup, shutdown, security, dependency, toolchain, shared fixture, or scale-sensitive state changes | Run `npm run check`, the full local E2E suite (`npm run test:e2e`), and `npm run audit`; retain the unit, contract, real-boundary, and failure-path coverage required by `AGENTS.md` §9, applicable security checks, and visible verification for native behavior automation cannot inspect. Select performance checks separately under procedure §10. Use `npm run check:full` when the full Electron performance suite is also required. |
 
 When categories overlap or the tier is uncertain, use the higher tier. A suite that cannot execute its real boundary is blocked, not passed.
+
+For selected Electron performance scenarios, use `npm run test:perf -- <specs>` and optionally `--grep <pattern>`. Use `npm run test:perf` for the full performance suite. The serial runner and measurement mechanics are described in §12. Record the selected scope and performance rationale with the functional-validation evidence; no Electron performance run is needed when there is no concrete performance trigger under procedure §10. `npm run check` continues to include the fast `test:performance` guards in every tier that requires that command.
 
 ### Local affected-spec E2E validation
 
@@ -375,7 +377,7 @@ For contained changes below High Risk, run affected E2E specs locally and leave 
 
 The selector does not infer test coverage through the Electron production build, preload/IPC or product-requirement mapping. For each affected behavior, explicitly select its owning specs with `npm run test:e2e -- <specs>` when they are absent from the changed selection. Record the actual specs/cases exercised. Playwright can exit successfully with no selected cases; this is a selection result, not a passing boundary test. Documentation-only tasks do not acquire an E2E requirement merely because this command exists.
 
-The High Risk row is unchanged: shared fixture or interaction infrastructure, startup/shutdown, process/IPC, filesystem/persistence, clipboard/attachments, native shortcuts, security, dependencies/toolchain and scale-sensitive changes still require complete local validation. Unbounded impact also requires broader coverage. CI continues to run every E2E spec in its existing shards; this command does not filter CI or the serial visible performance suite. Regressions outside the locally exercised scope may first appear in CI after a commit on `main` or in a pull request.
+Shared fixture or interaction infrastructure, startup/shutdown, process/IPC, filesystem/persistence, clipboard/attachments, native shortcuts, security, dependencies/toolchain and scale-sensitive changes still require full local functional validation under the High Risk row. Unbounded functional impact also requires broader coverage. Electron performance scope is selected separately. CI continues to run every E2E spec in its existing shards; this command does not filter CI or the serial visible performance suite. Regressions outside the locally exercised scope may first appear in CI after a commit on `main` or in a pull request.
 
 For a contained change, use a concise conversation plan, a focused development loop, the tier's required validation, and a primary-agent diff review. Add a working plan, independent reviewer, or separate product verifier only under the triggers in `AGENTS.md` §§8 and 13. A user-visible change still needs product verification by the primary agent when no separate verifier is required. Keep defect-first regressions, boundary tests, and visual evidence whenever their specific triggers in `AGENTS.md` §9 apply.
 
@@ -685,7 +687,7 @@ would instead test `a || (b && c)`, a different program. A passing synthetic sea
 is evidence about its cases, not proof of equivalence; use the recorded invariants
 to justify an equivalent disposition and name unsupported inputs separately.
 
-Performance tests live in `perf/`. They run as part of `npm run check:full`, and can also be run on their own with:
+Electron performance tests live in `perf/`. Select their scope using procedure §10 and the commands in §9; a High Risk classification alone does not require a run. The full suite runs as part of an explicitly selected `npm run check:full`, or on its own with:
 
 ```bash
 npm run test:perf
@@ -748,13 +750,13 @@ Before adding a new dependency:
 
 Major dependency changes should be documented and, when appropriate, recorded as an architectural decision.
 
-Direct dependencies are declared with exact versions and no range operators (`docs/decisions/0006-exact-dependency-pinning.md`). Upgrade a dependency by changing its exact version, reinstalling, and running `npm run check:full`; do not widen it to a range.
+Direct dependencies are declared with exact versions and no range operators (`docs/decisions/0006-exact-dependency-pinning.md`). Upgrade a dependency by changing its exact version, reinstalling, and completing High Risk functional validation under §9; select Electron performance checks separately under procedure §10. Do not widen the version to a range.
 
 `package.json` `overrides` pins `qs` to a patched version: `@stryker-mutator/core` pins `typed-rest-client` `~2.3.0`, which pins a `qs` release with known advisories. Remove the override when a Stryker release depends on a patched `typed-rest-client`.
 
 `npm audit` runs as the final step of `npm run check:full`, not of `npm run check`, so known vulnerabilities are reported at the end of complete validation. It requires registry access and fails when offline.
 
-Between validation runs, `.github/dependabot.yml` opens weekly pull requests for npm and GitHub Actions updates (minor and patch updates are grouped, major updates arrive one per pull request), and Dependabot security updates open a pull request when an advisory is published. `.github/workflows/audit.yml` runs `npm audit --audit-level=high` on pushes to `main`, daily, and on manual dispatch, so a high or critical advisory fails a visible run even when no fix pull request exists. No update is merged automatically: review each pull request, keep the exact-version rule above, and run `npm run check:full` for a dependency change.
+Between validation runs, `.github/dependabot.yml` opens weekly pull requests for npm and GitHub Actions updates (minor and patch updates are grouped, major updates arrive one per pull request), and Dependabot security updates open a pull request when an advisory is published. `.github/workflows/audit.yml` runs `npm audit --audit-level=high` on pushes to `main`, daily, and on manual dispatch, so a high or critical advisory fails a visible run even when no fix pull request exists. No update is merged automatically: review each pull request, keep the exact-version rule above, and apply the dependency validation scope above.
 
 ## Formatting
 
