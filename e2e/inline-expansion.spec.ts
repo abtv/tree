@@ -11,6 +11,7 @@ import {
   pressShifted,
   readPersisted,
   seedDocument,
+  setCursor,
   test,
 } from './fixtures'
 
@@ -37,6 +38,15 @@ function nestedSeed(): { document: unknown; location: unknown } {
   }
 }
 
+function emptyCreationSeed(focused: boolean): { document: unknown; location: unknown } {
+  return {
+    document: {
+      roots: [{ id: 'branch', text: 'Test', children: [{ id: 'text', text: 'something', children: [] }] }],
+    },
+    location: { currentParentId: focused ? 'branch' : null, selectedNodeId: 'text' },
+  }
+}
+
 function wideNestedSeed(topCount: number, expandedCount: number): { document: unknown; location: unknown } {
   return {
     document: {
@@ -59,6 +69,46 @@ function wideNestedSeed(topCount: number, expandedCount: number): { document: un
 
 // @requirement PRODUCT.md §2.4
 describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §5.1
+  test('creates one empty child then one empty node to the left with Enter', async ({ userDataDir }) => {
+    seedDocument(userDataDir, emptyCreationSeed(false))
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await node(window, 2).focus()
+    await setCursor(node(window, 2), 'something'.length)
+    await window.keyboard.press('Enter')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('Enter')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', '', ''])
+    await expect(node(window, 4)).toBeFocused()
+    const bounds = await Promise.all([1, 3, 4].map((index) => node(window, index).boundingBox()))
+    expect(bounds[2]!.x).toBe(bounds[0]!.x)
+    expect(bounds[1]!.x).toBeGreaterThan(bounds[2]!.x)
+    await window.screenshot({ path: test.info().outputPath(`empty-node-enter-${mode}.png`) })
+    await window.keyboard.press('Meta+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+    await window.keyboard.press('Meta+Shift+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', '', ''])
+    await expect(node(window, 4)).toBeFocused()
+    await window.keyboard.type('new sibling')
+    await expect(node(window, 4)).toHaveValue('new sibling')
+  })
+
+  test('keeps repeated Enter creation within the focused parent', async ({ userDataDir }) => {
+    seedDocument(userDataDir, emptyCreationSeed(true))
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await node(window, 1).focus()
+    await setCursor(node(window, 1), 'something'.length)
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Enter')
+    await expect.poll(() => nodeTexts(window)).toEqual(['something', '', ''])
+    await expect(parent(window)).toHaveValue('Test')
+    await expect(node(window, 3)).toBeFocused()
+    const bounds = await Promise.all([1, 2, 3].map((index) => node(window, index).boundingBox()))
+    expect(bounds.map((box) => box!.x)).toEqual([bounds[0]!.x, bounds[0]!.x, bounds[0]!.x])
+  })
+
   test('expands and collapses a node’s children inline without entering it or moving the caret', async ({
     userDataDir,
   }) => {
@@ -395,6 +445,37 @@ test.describe('inline node expansion (mode-independent)', () => {
 
 // @requirement PRODUCT.md §2.4
 test.describe('inline node expansion (Vim editing only)', () => {
+  // @requirement PRODUCT.md §20.2.10
+  test('creates outside an empty inline child with o and stops at the focused boundary', async ({ userDataDir }) => {
+    seedDocument(userDataDir, emptyCreationSeed(false))
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await node(window, 2).focus()
+    await window.keyboard.press('o')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('o')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', '', ''])
+    await expect(node(window, 4)).toBeFocused()
+    const bounds = await Promise.all([1, 3, 4].map((index) => node(window, index).boundingBox()))
+    expect(bounds[2]!.x).toBe(bounds[0]!.x)
+    expect(bounds[1]!.x).toBeGreaterThan(bounds[2]!.x)
+    await window.screenshot({ path: test.info().outputPath('empty-node-o.png') })
+    await window.keyboard.type('outside')
+    await expect(node(window, 4)).toHaveValue('outside')
+    await window.keyboard.press('Escape')
+    await node(window, 1).focus()
+    await window.keyboard.press('g')
+    await window.keyboard.press('d')
+    await expect(parent(window)).toHaveValue('Test')
+    await node(window, 2).focus()
+    await window.keyboard.press('o')
+    await expect.poll(() => nodeTexts(window)).toEqual(['something', '', ''])
+    await expect(parent(window)).toHaveValue('Test')
+    await expect(node(window, 3)).toBeFocused()
+  })
+
   test('moves through expanded rows on j and k, including entering and leaving branches', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })

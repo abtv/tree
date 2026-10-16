@@ -440,6 +440,64 @@ describe('editor command transitions', () => {
     expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
   })
 
+  it.each(['o', 'Enter'] as const)('creates outside an empty inline child with %s, preserving it', (command) => {
+    const input: Document = {
+      roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'empty', text: '', children: [] }] }],
+    }
+    const location = { currentParentId: null, selectedNodeId: 'empty' }
+    const result =
+      command === 'o'
+        ? openBelowTransition(input, location, () => 'created')
+        : createSiblingOrFirstChildTransition(input, location, 0, () => 'created')
+    if (!('document' in result)) throw new Error('Expected creation.')
+    expect(result.document.roots.map((node) => node.id)).toEqual(['parent', 'created'])
+    expect(result.document.roots[0]).toEqual(input.roots[0])
+    expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'created' })
+    expect(result.focus).toEqual({ nodeId: 'created', cursor: 0 })
+  })
+
+  it.each(['o', 'Enter'] as const)('keeps %s creation inside the focused parent', (command) => {
+    const input: Document = {
+      roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'empty', text: '', children: [] }] }],
+    }
+    const location = { currentParentId: 'parent', selectedNodeId: 'empty' }
+    const result =
+      command === 'o'
+        ? openBelowTransition(input, location, () => 'created')
+        : createSiblingOrFirstChildTransition(input, location, 0, () => 'created')
+    if (!('document' in result)) throw new Error('Expected creation.')
+    expect(result.document.roots).toHaveLength(1)
+    expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['empty', 'created'])
+    expect(result.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'created' })
+  })
+
+  it.each(['o', 'Enter'] as const)('does not treat an image-only node as an empty leaf for %s', (command) => {
+    const input: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: 'Parent',
+          children: [
+            {
+              id: 'image',
+              text: '',
+              attachment: { id: 'image-data', mimeType: 'image/png' },
+              children: [],
+            },
+          ],
+        },
+      ],
+    }
+    const location = { currentParentId: null, selectedNodeId: 'image' }
+    const result =
+      command === 'o'
+        ? openBelowTransition(input, location, () => 'created')
+        : createSiblingOrFirstChildTransition(input, location, 0, () => 'created')
+    if (!('document' in result)) throw new Error('Expected creation.')
+    expect(result.document.roots).toHaveLength(1)
+    expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['image', 'created'])
+  })
+
   it('opens a first child in place for a selected node with children and a sibling below for a leaf', () => {
     const child = openBelowTransition(document, { currentParentId: null, selectedNodeId: 'root' }, () => 'new-child')
 

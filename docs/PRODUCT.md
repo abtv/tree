@@ -290,7 +290,12 @@ When a completion popup is open in standard editing or Vim Insert, plain `Enter`
 
 In that context, it never creates a child.
 
-The new node is inserted immediately before the current non-empty node when the caret is at the beginning; otherwise it is inserted immediately after the current node. An empty node is treated as being at the end for this rule, so pressing `Enter` on an empty node creates the next sibling after it.
+The new node is inserted immediately before the current non-empty node when the caret is at the beginning; otherwise it is inserted immediately after the current node.
+
+* On an empty leaf (no text, attachment, or children) shown inside an inline-expanded branch, `Enter` preserves that leaf and creates a new empty sibling immediately after its parent, one level left.
+* This never creates outside the current location: on a root or a direct child of the focused current parent, it creates the next sibling at the same level.
+* Thus the first press at the end of nonempty text creates an empty sibling; the next press creates one level left when that level is available.
+* Each press creates one node and one undoable change, selects the new node at text position zero, and keeps standard editing or Vim Insert active.
 
 ### Cursor at the end
 
@@ -1113,6 +1118,7 @@ Normal mode also supports:
 
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node.
 * `o` to create an empty first child of the current parent when its heading is selected, an empty first child of the selected node when that node has at least one child, or otherwise an empty sibling below the selected node, and enter Insert mode. A first child created from a selected node keeps the displayed location unchanged and opens that node's fold so the new child is visible; `O` creates an empty sibling above the selected node, but does nothing when the editable current-parent heading is selected.
+* On an empty inline leaf, `o` uses the same one-level-left creation and current-parent boundary as `Enter` (§5.1), preserving the empty leaf and selecting the new empty node at text position zero in Insert mode. Repeating this from successive empty nodes creates one level left each time until the current location boundary, where creation stays at the same level.
 * `x` to delete the current character, `X` to delete the character before it, `r{character}` to replace it without entering Insert mode, and `s` to delete it and enter Insert mode; when deleting the final text character before an attached image, the Normal caret lands on the image, including when that was the node's only text character.
 
 #### 20.2.11 Operators

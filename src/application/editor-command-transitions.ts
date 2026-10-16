@@ -114,6 +114,8 @@ export function openBelowTransition(
   createId: () => NodeId,
 ): StructuralTransition & { expandId?: NodeId } {
   const selected = requireNode(document, location.selectedNodeId)
+  const outside = createAfterEmptyParentTransition(document, location, selected, createId)
+  if (outside !== undefined) return outside
   if (selected.node.children.length === 0 || location.currentParentId === location.selectedNodeId) {
     return createSiblingTransition(document, location, 'after', createId)
   }
@@ -127,14 +129,36 @@ export function openBelowTransition(
   }
 }
 
+/** Preserve an empty inline leaf and create after its parent, within the current location. */
+function createAfterEmptyParentTransition(
+  document: Document,
+  location: Location,
+  selected: ReturnType<typeof requireNode>,
+  createId: () => NodeId,
+): StructuralTransition | undefined {
+  if (
+    selected.node.text !== '' ||
+    selected.node.attachment !== undefined ||
+    selected.node.children.length !== 0 ||
+    selected.parent === null ||
+    selected.parent.id === location.currentParentId ||
+    selected.node.id === location.currentParentId
+  )
+    return undefined
+  return createSiblingTransition(document, { ...location, selectedNodeId: selected.parent.id }, 'after', createId)
+}
+
 export function createSiblingOrFirstChildTransition(
   document: Document,
   location: Location,
   cursor: number,
   createId: () => NodeId,
 ): StructuralTransition | RejectedTransition {
+  const current = requireNode(document, location.selectedNodeId)
+  const outside = createAfterEmptyParentTransition(document, location, current, createId)
+  if (outside !== undefined) return outside
   if (location.currentParentId === location.selectedNodeId) {
-    const parent = requireNode(document, location.selectedNodeId)
+    const parent = current
     if (parent.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) {
       return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
     }
@@ -147,7 +171,7 @@ export function createSiblingOrFirstChildTransition(
   }
 
   const id = createId()
-  const selected = requireNode(document, location.selectedNodeId).node
+  const selected = current.node
   const nextDocument =
     cursor === 0 && selected.text !== ''
       ? insertSiblingBefore(document, location.selectedNodeId, id)

@@ -1,15 +1,61 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { displayedNodes, type Document } from '../domain/document'
+import { assertDocument, displayedNodes, locateNode, type Document, type TreeNode } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE, expandNode } from './expansion-state'
 import {
   moveHorizontalTransition,
   moveSelectionBoundaryTransition,
   moveSelectionTransition,
+  openBelowTransition,
+  createSiblingOrFirstChildTransition,
 } from './editor-command-transitions'
 import { buildVisibleRows } from './visible-rows'
 
 describe('editor command transition properties', () => {
+  it('preserves every existing subtree while repeated empty creation ascends to the location boundary', () => {
+    fc.assert(
+      fc.property(fc.array(fc.string(), { minLength: 1, maxLength: 10 }), fc.boolean(), (texts, focused) => {
+        let branch: TreeNode = { id: 'empty', text: '', children: [] }
+        for (const [index, text] of texts.entries()) {
+          branch = { id: `parent-${index}`, text, children: [branch] }
+        }
+        const original: Document = { roots: [branch] }
+        const currentParentId = focused ? branch.id : null
+        for (const command of ['o', 'Enter'] as const) {
+          let document = original
+          let selectedNodeId = 'empty'
+          for (let index = 0; index < texts.length + 2; index++) {
+            const before = document
+            const selected = locateNode(before, selectedNodeId)!
+            const expectedParent =
+              selected.parent !== null && selected.parent.id !== currentParentId
+                ? (locateNode(before, selected.parent.id)!.parent?.id ?? null)
+                : (selected.parent?.id ?? null)
+            const id = `created-${index}`
+            const location = { currentParentId, selectedNodeId }
+            const result =
+              command === 'o'
+                ? openBelowTransition(before, location, () => id)
+                : createSiblingOrFirstChildTransition(before, location, 0, () => id)
+            if (!('document' in result)) throw new Error('Expected creation.')
+            document = result.document
+            selectedNodeId = id
+            assertDocument(document)
+            const created = locateNode(document, id)!
+            expect(created.parent?.id ?? null).toBe(expectedParent)
+            expect(result.location).toEqual({ currentParentId, selectedNodeId: id })
+            expect(result.focus).toEqual({ nodeId: id, cursor: 0 })
+            const withoutCreated = created.siblings.filter((node) => node.id !== id)
+            const priorSiblings =
+              expectedParent === null ? before.roots : locateNode(before, expectedParent)!.node.children
+            expect(withoutCreated).toEqual(priorSiblings)
+            expect(locateNode(document, 'empty')!.node).toEqual({ id: 'empty', text: '', children: [] })
+          }
+        }
+      }),
+    )
+  })
+
   it('moves the last-node boundary onto an image when the target has one', () => {
     fc.assert(
       fc.property(
