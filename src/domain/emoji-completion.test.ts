@@ -13,7 +13,12 @@ it('matches English shortcode prefixes at whitespace boundaries without consumin
     shortcode: 'woman_technologist',
     emoji: '👩‍💻',
   })
-  for (const text of [':r', 'https://roc', '12:roc', 'word:roc', ':roc ', ':no_such_emoji', '(:roc']) {
+  for (const text of [':', 'Plan :', '\n:', ':r']) {
+    const match = suggestEmoji(text, text.length)
+    expect(match).toMatchObject({ start: text.lastIndexOf(':'), end: text.length })
+    expect(match?.suggestions).toHaveLength(8)
+  }
+  for (const text of ['https://roc', '12:roc', 'word:roc', ':roc ', ':no_such_emoji', '(:roc']) {
     expect(suggestEmoji(text, text.length)).toBeUndefined()
   }
   expect(suggestEmoji(':rocket', 4)).toBeUndefined()

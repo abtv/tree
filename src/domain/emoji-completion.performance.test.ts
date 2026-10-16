@@ -4,7 +4,7 @@ import { suggestEmoji } from './emoji-completion'
 // @requirement PRODUCT.md §20.12
 // @requirement PRODUCT.md §22.1
 it('keeps shortcode recognition below one millisecond with long text and incremental edits', () => {
-  const prefixes = [':r', ':ro', ':roc', ':rocke', ':ma', ':woman_techn', ':no_such_emoji', 'ordinary text']
+  const prefixes = [':', ':r', ':ro', ':roc', ':rocke', ':ma', ':woman_techn', ':no_such_emoji', 'ordinary text']
   const workloads = prefixes.flatMap((prefix) => [prefix, `${'Ordinary text. '.repeat(1000)}${prefix}`])
   const samples: number[] = []
   let matches = 0
