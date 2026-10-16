@@ -1040,7 +1040,7 @@ At or below 500 visible rows, the list renders every row, including inline desce
 * When the current node is empty, Normal mode displays a non-blinking block caret at its only insertion position.
 * Pressing `i` or `a` enters Insert mode, where text entry and all existing application commands behave normally; Insert mode uses the normal thin text caret.
 * Pressing `R` enters Replace mode, where printable input overwrites existing characters and appends after the end of the node.
-* Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode.
+* Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode. If a completion popup is open in Insert, the first `Escape` only dismisses it and preserves Insert mode, focus, text and caret; another `Escape` with no popup enters Normal. This deliberate Vim divergence lets users dismiss suggestions without interrupting typing (§20.9, §20.12).
 * On an image-only node, `i`, `a`, or `A` followed by `Escape` with no typed text leaves the Normal caret on the sole image character.
 * Replace mode started on an active image commits the replacement text before the image; `Escape` then returns to Normal mode with the caret on the final replaced character and the image caret hidden.
 
@@ -1431,7 +1431,7 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 * Plain `↓` and `↑` cycle to the next and previous suggestions in standard editing and Vim Insert, wrapping at either end; `Ctrl+N` and `Ctrl+P` remain alternatives. Popup arrows take precedence over caret reconciliation and node navigation, retain editor focus and the text caret, and never move to another node. Without a popup, arrows keep their ordinary behavior. Modified arrows keep their ordinary editing behavior.
 * `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. These popup shortcuts deliberately override ordinary text navigation or indentation commands only while the popup is open, supporting the keyboard-first model (§1.1); without it, Tab retains §20.2 behavior.
 
-Escape closes the popup and retains its ordinary editing behavior: in Vim Insert it enters Normal without changing the expression. Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
+Escape closes the popup without changing the expression, caret, focus or editing mode. In Vim Insert, it preserves the current Insert session; another Escape with no popup enters Normal (§20.2.4). Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
 
 Pressing a modifier key alone, including Command, does not dismiss suggestions. An actual Command shortcut still dismisses them. This lets an external keyboard remapper send a plain arrow after the initial Command keydown without losing the popup; the application does not bind `Cmd+J` or `Cmd+K` itself.
 
@@ -1457,7 +1457,7 @@ The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. S
 
 The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9), including modifier-only key handling. Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row. Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; `Tab` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit. The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged. These shortcuts override ordinary commands only while suggestions are open, following the approved keyboard-first completion interaction.
 
-Enter retains its ordinary action. Escape dismisses suggestions and retains its ordinary action, including leaving Vim Insert. Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
+Enter retains its ordinary action. Escape dismisses suggestions and preserves text, caret, focus and the editing mode, including the current Vim Insert session. Another Escape with no popup enters Normal (§20.2.4). Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
 
 ---
 
@@ -1533,7 +1533,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 * A vertical motion that clamps at the current row preserves its caret and image return position.
 * Clicking a row selects and focuses it with the same focus dot.
 * An ordinary primary-button row click keeps Replace mode and completes any pending replacement as one edit before changing rows. A row without an editor retains Replace without accepting text edits; clicking an editable occurrence then resumes overwrite at its focused caret. Text typed after changing rows is a separate edit for Undo. This includes day containers, gaps, contextual ancestors, inactive occurrences and the focused-day heading; it does not extend Replace to navigation controls or other focus losses.
-* `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda.
+* `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda, except when it dismisses an open completion popup in Insert (§20.2.4).
 * Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
 * The caret never disappears while selection moves.
 * A selected row without an editor (a day container, a gap, a contextual ancestor, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert and standard editing, and the shared selection highlight for a selection. Whole-node Visual shows its row highlight instead.

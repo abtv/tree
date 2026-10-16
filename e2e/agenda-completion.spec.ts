@@ -50,6 +50,10 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
     await window.keyboard.press('Escape')
     await expect(popup).toHaveCount(0)
     if (mode === 'vim') {
+      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      await expect(input).toHaveJSProperty('selectionStart', 13)
+      await expect(input).toHaveJSProperty('selectionEnd', 13)
+      await window.keyboard.press('Escape')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await window.keyboard.press('ArrowDown')
       await expect(input).toBeFocused()
@@ -202,7 +206,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
     }
 
     // @requirement PRODUCT.md §20.9
-    test(`accepts, cycles, cancels and undoes completion in ${view}`, async ({ userDataDir }) => {
+    test(`accepts, cycles, cancels and undoes completion in ${view}`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -332,6 +336,10 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await expect(popup).toHaveCount(0)
       await assertText('2026-10-08 Plan tomorrow')
       if (mode === 'vim') {
+        await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+        await expect(input).toBeFocused()
+        await window.screenshot({ path: testInfo.outputPath(`date-${view}-dismissed-insert.png`) })
+        await window.keyboard.press('Escape')
         await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
         await window.keyboard.press('i')
       }

@@ -164,32 +164,58 @@ describe('useNodeInputBindings', () => {
       expect(f.result.current.vimMode).toBe('insert')
       f.press('Escape')
       expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.result.current.vimMode).toBe('insert')
+      expect(getCaret(input)).toBe(fragment.length)
+      expect(input).toBe(document.activeElement)
+      f.press('Escape')
       expect(f.result.current.vimMode).toBe(vimEnabled ? 'normal' : 'insert')
     },
   )
 
   // @requirement PRODUCT.md §20.9
-  it('consumes an open popup arrow before caret reconciliation and still dismisses actual Command shortcuts', async () => {
-    const f = await fixture({ mode: 'insert', document: { roots: [node('node', 'Plan '), node('peer', 'Other')] } })
-    const input = f.input()
-    input.focus()
-    f.type('Plan next wee')
-    // A pending native selection observation must not turn popup navigation
-    // into a node command in the same keydown.
-    input.setSelectionRange(0, 0)
-    const preventDefault = vi.fn()
-    const stopPropagation = vi.fn()
-    act(() =>
-      f.bindings().onKeyDown({ currentTarget: input, key: 'ArrowDown', preventDefault, stopPropagation } as never),
-    )
-    expect(preventDefault).toHaveBeenCalledOnce()
-    expect(stopPropagation).toHaveBeenCalledOnce()
-    expect(f.snapshot().location.selectedNodeId).toBe('node')
-    f.type('Plan next wee')
+  it.each(['ArrowDown', 'Escape'])(
+    'consumes popup %s before caret reconciliation and still dismisses actual Command shortcuts',
+    async (key) => {
+      const f = await fixture({ mode: 'insert', document: { roots: [node('node', 'Plan '), node('peer', 'Other')] } })
+      const input = f.input()
+      input.focus()
+      f.type('Plan next wee')
+      // A pending native selection observation must not turn popup handling
+      // into a node command in the same keydown.
+      input.setSelectionRange(0, 0)
+      const preventDefault = vi.fn()
+      const stopPropagation = vi.fn()
+      act(() => f.bindings().onKeyDown({ currentTarget: input, key, preventDefault, stopPropagation } as never))
+      expect(preventDefault).toHaveBeenCalledOnce()
+      expect(stopPropagation).toHaveBeenCalledOnce()
+      expect(f.snapshot().location.selectedNodeId).toBe('node')
+      expect(f.result.current.vimMode).toBe('insert')
+      f.type('Plan next wee')
+      expect(f.result.current.datePopup).toBeDefined()
+      f.press('a', { metaKey: true })
+      expect(f.result.current.datePopup).toBeUndefined()
+      expect(f.node().text).toBe('Plan next wee')
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.4
+  // @requirement PRODUCT.md §20.9
+  // @requirement PRODUCT.md §20.12
+  it.each(['next wee', ':roc'])('keeps one Insert session across dismissal of %s', async (fragment) => {
+    const f = await fixture({ document: { roots: [node('node', '')] } })
+    f.input().focus()
+    f.press('i')
+    f.type(fragment)
     expect(f.result.current.datePopup).toBeDefined()
-    f.press('a', { metaKey: true })
+    f.press('Escape')
+    expect(f.result.current.vimMode).toBe('insert')
     expect(f.result.current.datePopup).toBeUndefined()
-    expect(f.node().text).toBe('Plan next wee')
+    f.type(`${fragment}!`)
+    expect(f.node().text).toBe(`${fragment}!`)
+    f.press('Escape')
+    expect(f.result.current.vimMode).toBe('normal')
+    f.press('u')
+    expect(f.node().text).toBe('')
   })
 
   it.each(['outside', 'window'])('ends Replace when a read-only Agenda row loses focus to %s', async (path) => {

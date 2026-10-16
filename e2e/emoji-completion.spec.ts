@@ -198,6 +198,10 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await expect(popup).toHaveCount(0)
       await expect.poll(readText).toBe('2026-10-08 Plan :roc :rocke')
       if (mode === 'vim') {
+        await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+        await expect(input).toBeFocused()
+        await window.screenshot({ path: testInfo.outputPath(`emoji-${view}-dismissed-insert.png`) })
+        await window.keyboard.press('Escape')
         await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
         await window.keyboard.press('i')
       }
