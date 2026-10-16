@@ -172,7 +172,7 @@ Continue authorized work while context permits. Preserve exact remaining work an
 
 For a requested new-session prompt, follow [procedure §12, New-session prompts](docs/AGENT_WORKFLOW.md#new-session-prompts). Include the new objective and necessary conversation-only context; the receiving agent recovers permanent rules and repository state itself.
 
-For a delivery report, state delivery/status, how to inspect it, anything unverified or blocked, and any required owner action. Supply the technical evidence required by procedure §12 below that summary or in an accessible linked artifact. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
+A delivery report is a bottom-line summary of at most three short lines: delivery/status with the commit, anything failed, unverified or blocked, and any required owner action. Keep the technical evidence required by procedure §12 out of the conversation; give it on request, or link it in one line when a handoff remains. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
 
 ## 13. Completion Criteria
 

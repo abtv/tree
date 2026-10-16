@@ -384,11 +384,11 @@ For a multi-session initiative, commit the updated task status and next task wit
 
 For completed or interrupted repository work, provide an explicit delivery report. The checklist below applies to that report; a requested prompt for another session uses the separate procedure below.
 
-Start with a short Product Owner summary, in this order: what was delivered and its completion status; how to try or inspect the result; what remains unverified or blocked; and whether a Product Owner decision or action is needed. For a completed task requiring no action, say so rather than requesting confirmation. For documentation or internal changes, link the relevant result instead of inventing a manual application check. For interface changes, link representative inspected screenshots or recordings from the required visual evidence when available, using synthetic data. Reuse those artifacts rather than producing an extra demonstration solely for the handoff.
+The conversation report is a bottom-line summary of at most three short lines, in this order: what was delivered and its completion status, with the commit; what failed, remains unverified or is blocked; and whether a Product Owner decision or action is needed. For a completed task requiring no action, say so rather than requesting confirmation. Add a line only for a product decision made on the Product Owner's behalf, a possible shared cause reported by `npm run fix:history`, or, for an interface change, a link to representative inspected screenshots or recordings from the required visual evidence. Do not add headings, tables, check lists or mechanism explanations to the conversation report. Do not invent a manual application check for documentation or internal changes.
 
-Put the technical evidence below this summary, or link to an accessible temporary evidence artifact. Keep failures, blockers, and the next action visible in the summary even when details are linked. A link must remain usable at handoff; never link to a deleted working plan. Detailed evidence remains required under §10 and the list below. Do not create a permanent validation archive.
+Keep the technical evidence out of the conversation report. Give it when the Product Owner asks for it. When work is interrupted or a handoff remains, record the evidence in `WORKING_PLAN.md` or `.scratch/<task>/` and link it in one line; a link must remain usable at handoff, so never link to a deleted working plan. Failures, blockers and the next action always stay in the summary. Detailed evidence remains required under §10 and the list below. Do not create a permanent validation archive.
 
-The complete delivery report states:
+The technical evidence states:
 
 * what was completed;
 * for a defect fix, the output of `npm run fix:history`, and, when it reports a possible shared cause, a proposed structural initiative under §8 or a stated reason why none is needed;
