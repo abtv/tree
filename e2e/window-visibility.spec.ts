@@ -12,6 +12,23 @@ import {
 } from './fixtures'
 
 test.describe('hidden window mode', () => {
+  test('rejects native popup menus before they can reach the desktop', async ({ userDataDir }) => {
+    const { app } = await launchTree(userDataDir, { windows: 'hidden' })
+    const message = await app.evaluate(({ Menu }) => {
+      try {
+        // An invalid receiver keeps this regression safe even when the guard is absent.
+        Menu.prototype.popup.call({} as typeof Menu.prototype)
+        return ''
+      } catch (error) {
+        return String(error)
+      }
+    })
+    expect(message).toContain('Native popup menus are disabled in hidden E2E runs')
+    await expect(
+      app.evaluate(({ Menu }) => Menu.buildFromTemplate([{ label: 'Must stay off the desktop' }]).popup()),
+    ).rejects.toThrow('Native popup menus are disabled in hidden E2E runs')
+  })
+
   // The default e2e mode hides the application window so the suite does not steal desktop focus.
   // `TREE_E2E_VISIBLE=1` keeps windows visible for observation, so this spec forces hidden mode and
   // passes in both ambient modes. `launchTree` asserts the requested mode on every launch; this spec

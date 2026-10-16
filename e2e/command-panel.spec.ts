@@ -53,7 +53,7 @@ test.describe('Normal command panel', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'one' },
     })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const editor = node(window, 1)
     await editor.focus()
     await setCursor(editor, 2)
@@ -98,6 +98,11 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('h')
     await expect(window.locator('.command-error')).toHaveCount(0)
     await open(window)
+    await app.evaluate(({ Menu }) => {
+      Menu.prototype.popup = function (options) {
+        options?.callback?.()
+      }
+    })
     await node(window, 2).click({ button: 'right' })
     await expect(window.locator('.command-panel')).toHaveCount(0)
     // A right-button dismissal must not consume the next control click.

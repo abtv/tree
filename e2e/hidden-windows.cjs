@@ -19,6 +19,12 @@ function enableHiddenWindows() {
   if (enabled) return
   enabled = true
 
+  // Hiding BrowserWindow does not hide native menus: macOS can display them over the
+  // owner's active application. Tests must intercept popup requests explicitly.
+  electron.Menu.prototype.popup = function () {
+    throw new Error('Native popup menus are disabled in hidden E2E runs; intercept Menu.popup in the test.')
+  }
+
   const OriginalBrowserWindow = electron.BrowserWindow
 
   function HiddenBrowserWindow(options = {}) {
