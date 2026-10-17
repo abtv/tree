@@ -49,11 +49,15 @@ const smallCounts = [
   'nineteen',
 ]
 const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+// Expanding the unit alternatives is output-equivalent: relativeDaysFor still
+// rejects compound units above nine.
 const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
 const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
 // Only distinctive, explicitly supported prefixes qualify. Longest first keeps
 // recognition on the complete word when the caret is inside existing text.
 const completedPrefixes = new Map<string, string>(
+  // Undefined entries from initializer callback mutants throw during import;
+  // Stryker can report these as survivors before a suggestion is exercised.
   (
     [
       ['today', 4],
@@ -61,6 +65,8 @@ const completedPrefixes = new Map<string, string>(
       ['yesterday', 4],
       ['next week', 8],
       ['last week', 8],
+      ['next month', 9],
+      ['last month', 9],
     ] as const
   ).flatMap(([expression, minimum]) =>
     Array.from(
@@ -83,6 +89,8 @@ const qualifiedPrefixPattern =
   `(?:in|last|in +the +end +of) +(?:${months.map(namePrefixes).join('|')})|` +
   `(?:this|next|last) +(?:${weekdays.map(namePrefixes).join('|')})`
 for (const name of weekdays) {
+  // The full-name entry is optional for results: normalized full names already
+  // equal their completed expression through the caller's fallback.
   for (let length = 3; length <= name.length; length++) completedPrefixes.set(name.slice(0, length), name)
 }
 for (const [names, qualifiers] of [
@@ -98,7 +106,7 @@ for (const [names, qualifiers] of [
   }
 }
 const expressions = new RegExp(
-  `${qualifiedPrefixPattern}|${prefixPattern}|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|(?:${monthPattern}) +[0-9]{1,2}|${weekdayPattern}`,
+  `${prefixPattern}|${qualifiedPrefixPattern}|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|(?:${monthPattern}) +[0-9]{1,2}|${weekdayPattern}`,
   'gi',
 )
 // Stryker reports the module-initializer ObjectLiteral mutants as survivors.
@@ -153,10 +161,26 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
   if (expression === 'today') return [today]
   if (expression.startsWith('tomor')) return [today + 1]
   if (expression === 'yesterday') return [today - 1]
+  if (expression === 'next month' || expression === 'last month') {
+    const reference = calendarDateOf(today)
+    const index = reference.year * 12 + reference.month - 1 + (expression === 'next month' ? 1 : -1)
+    const year = Math.floor(index / 12)
+    // A nonnumeric sentinel from an array mutant is also rejected by the outer
+    // canonical-range filter; the empty array expresses no available month.
+    if (year < 0 || year > 9999) return []
+    const month = (index % 12) + 1
+    let last = 31
+    while (!isValidCalendarDate({ year, month, day: last })) last--
+    const days = [1, 15, last].map((day) => dayNumberOf({ year, month, day }))
+    // Every next-month anchor is future; every last-month anchor is past.
+    // Preference order starts at the nearest date; the popup owns display order.
+    return expression === 'next month' ? days : days.reverse()
+  }
   if (expression.startsWith('in the end of ')) {
     const month = months.indexOf(expression.slice('in the end of '.length)) + 1
     const reference = calendarDateOf(today)
     const year = reference.year + (month < reference.month ? 1 : 0)
+    // The outer canonical-range filter also rejects array-mutant sentinels.
     if (year > 9999) return []
     let day = 31
     while (!isValidCalendarDate({ year, month, day })) day--
@@ -192,6 +216,8 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
   const relative = relativeDaysFor(expression, today)
   if (relative !== undefined) return relative
   const [month, date] = expression.split(' ')
+  // Month/day descriptions are normalized to full names by the caller, so
+  // removing the abbreviation alternative is output-equivalent.
   return monthDays(months.findIndex((name) => name === month || name.slice(0, 3) === month) + 1, Number(date), today)
 }
 
@@ -199,8 +225,8 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
  * Spans use UTF-16 offsets and exclusive ends. A caret at either edge is inside.
  */
 export function suggestDates(text: string, caret: number, today: DayNumber): NaturalDateMatch | undefined {
-  // Negative/out-of-text carets also fail the match-span check below; these
-  // explicit bounds avoid scanning text for an invalid caller offset.
+  // Validate bounds before either path: relative expressions can return before
+  // the general recognizer checks whether the caret is inside its match span.
   if (!Number.isInteger(caret) || caret < 0 || caret > text.length) return undefined
   // Validate the caller's calendar value through the existing domain primitive.
   calendarDateOf(today)
@@ -226,6 +252,8 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
     if (caret < start || caret > end) continue
     if (/[\p{L}\p{N}_]$/u.test(text.slice(0, start)) || /^[\p{L}\p{N}_]/u.test(text.slice(end))) continue
     const normalized = match[0].toLowerCase().replace(/ +/g, ' ')
+    // Anchor removal is equivalent on outer-recognizer spans: a partial match
+    // in another expression cannot name a month and leaves its fallback intact.
     const monthDay = /^([a-z]+) ([0-9]{1,2})$/.exec(normalized)
     const monthName = monthDay && months.find((name) => name.startsWith(monthDay[1]!))
     const expression = monthName ? `${monthName} ${monthDay![2]}` : (completedPrefixes.get(normalized) ?? normalized)
@@ -237,12 +265,21 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
       !/(?:^|[^\p{L}\p{N}_])(?:on|by) +$/iu.test(text.slice(0, start))
     )
       continue
-    const days = daysFor(expression, today).filter((day) => day >= minimumDay && day <= maximumDay)
-    if (days.length === 0) continue
+    const ambiguous = /^(next|last) mon$/.exec(normalized)
+    const interpretations = ambiguous ? [`${ambiguous[1]} monday`, `${ambiguous[1]} month`] : [expression]
+    const suggestions = interpretations.flatMap((expression) =>
+      daysFor(expression, today)
+        .filter((day) => day >= minimumDay && day <= maximumDay)
+        .map((day) => ({ day, expression })),
+    )
+    // Stable ties keep the preexisting Monday interpretation first. Distinct
+    // labels remain available even when both meanings resolve to the same date.
+    if (ambiguous) suggestions.sort((first, second) => Math.abs(first.day - today) - Math.abs(second.day - today))
+    if (suggestions.length === 0) continue
     return {
       start,
       end,
-      suggestions: days.map((day) => ({ day, expression })),
+      suggestions,
     }
   }
   return undefined

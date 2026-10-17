@@ -12,6 +12,74 @@ const dates = (text: string, reference = today, caret = text.length): string[] |
     formatCanonicalDate(calendarDateOf(suggestion.day)),
   )
 
+// @requirement PRODUCT.md §20.9.2
+describe('adjacent calendar months', () => {
+  // @requirement PRODUCT.md §20.9.1
+  it('shows both interpretations for mon and disambiguates at mond or mont', () => {
+    for (const qualifier of ['next', 'last']) {
+      const text = `${qualifier} mon`
+      const result = suggestDates(text, text.length, day('2026-10-17'))!
+      const weekday = `${qualifier} monday`
+      const month = `${qualifier} month`
+      expect(result.suggestions).toHaveLength(4)
+      expect(result.suggestions.filter(({ expression }) => expression === weekday)).toHaveLength(1)
+      expect(result.suggestions.filter(({ expression }) => expression === month)).toHaveLength(3)
+      expect(result.suggestions[0]!.day).toBe(day(qualifier === 'next' ? '2026-10-19' : '2026-10-05'))
+      expect(dates(`${qualifier} mond`)).toEqual(dates(weekday))
+      expect(dates(`${qualifier} mont`)).toEqual(dates(month))
+      const spaced = `Plan ${qualifier.toUpperCase()}   MON at noon`
+      const match = suggestDates(spaced, spaced.indexOf(' at noon'), today)!
+      expect(spaced.slice(match.start, match.end)).toBe(`${qualifier.toUpperCase()}   MON`)
+      expect(match.suggestions).toHaveLength(4)
+    }
+    expect(suggestDates('next mon', 8, day('2026-10-31'))!.suggestions[0]!.expression).toBe('next month')
+    expect(suggestDates('last mon', 8, day('2026-10-02'))!.suggestions[0]!.expression).toBe('last month')
+  })
+
+  it('keeps both labels when Monday is also a month anchor', () => {
+    for (const [text, reference, sharedDay] of [
+      ['next mon', '2026-05-25', '2026-06-01'],
+      ['last mon', '2024-10-07', '2024-09-30'],
+    ]) {
+      const result = suggestDates(text!, text!.length, day(reference!))!
+      expect(result.suggestions).toHaveLength(4)
+      expect(
+        result.suggestions.filter(({ day: value }) => value === day(sharedDay!)).map(({ expression }) => expression),
+      ).toEqual([text!.replace('mon', 'monday'), text!.replace('mon', 'month')])
+    }
+  })
+
+  it.each([
+    ['next month', '2026-10-17', ['2026-11-01', '2026-11-15', '2026-11-30']],
+    ['last month', '2026-10-17', ['2026-09-30', '2026-09-15', '2026-09-01']],
+    ['next month', '2026-12-31', ['2027-01-01', '2027-01-15', '2027-01-31']],
+    ['last month', '2026-01-01', ['2025-12-31', '2025-12-15', '2025-12-01']],
+    ['next month', '2028-01-31', ['2028-02-01', '2028-02-15', '2028-02-29']],
+    ['last month', '2028-03-01', ['2028-02-29', '2028-02-15', '2028-02-01']],
+    ['next month', '2027-01-15', ['2027-02-01', '2027-02-15', '2027-02-28']],
+    ['last month', '2027-05-31', ['2027-04-30', '2027-04-15', '2027-04-01']],
+    ['next month', '0000-01-01', ['0000-02-01', '0000-02-15', '0000-02-29']],
+    ['last month', '9999-12-31', ['9999-11-30', '9999-11-15', '9999-11-01']],
+  ] as const)('%s at %s prefers the nearest month anchor', (text, reference, expected) => {
+    expect(dates(text, day(reference))).toEqual(expected)
+  })
+
+  it('omits a month outside the canonical calendar', () => {
+    expect(dates('last month', day('0000-01-01'))).toBeUndefined()
+    expect(dates('next month', day('9999-12-31'))).toBeUndefined()
+  })
+
+  it('recognizes full month expressions with case, spacing and exact replacement boundaries', () => {
+    const text = 'Plan LAST   MONTH at noon'
+    const match = suggestDates(text, 17, today)!
+    expect(text.slice(match.start, match.end)).toBe('LAST   MONTH')
+    expect(match.suggestions.every(({ expression }) => expression === 'last month')).toBe(true)
+    expect(dates('next months')).toBeUndefined()
+    expect(dates('last monthly')).toBeUndefined()
+    expect(dates('anext month')).toBeUndefined()
+  })
+})
+
 describe('natural date expression table proposed in AG-22', () => {
   it.each([
     ['toda', ['2026-10-08']],
@@ -288,6 +356,8 @@ describe('natural date expression table proposed in AG-22', () => {
         for (const qualifier of qualifiers) {
           const expression = `${qualifier} ${name}`
           for (let length = 3; length <= name.length; length++) {
+            // The ambiguous next/last mon matrix is covered independently above.
+            if (name === 'monday' && length === 3 && qualifier !== 'this') continue
             const fragment = `${qualifier} ${name.slice(0, length)}`
             expect(dates(fragment), fragment).toEqual(dates(expression))
             const text = `Plan (${fragment.toUpperCase().replaceAll(' ', '   ')}) at noon`
@@ -326,6 +396,11 @@ describe('natural date expression table proposed in AG-22', () => {
     }
     expect(dates('beyond Friday')).toEqual(dates('Friday'))
     expect(dates('nearby Friday')).toEqual(dates('Friday'))
+    for (const text of ['on fri', 'by fri']) {
+      const match = suggestDates(text, text.length, today)!
+      expect(match.start).toBe(3)
+      expect(dates(text)).toEqual(dates('Friday'))
+    }
   })
 
   it('keeps month/day completion available at every month prefix and preserves on and by', () => {
@@ -372,6 +447,11 @@ describe('natural date expression table proposed in AG-22', () => {
     'septembers 15',
     'septe 32',
     'febr 30',
+    'on a fri',
+    'by noon fri',
+    'Plan on Monday then fri',
+    'next mondayundefined',
+    'last septemberundefined',
   ])('rejects incomplete context and invalid continuations: %s', (text) => expect(dates(text)).toBeUndefined())
 
   it.each([
@@ -457,6 +537,7 @@ describe('natural date expression table proposed in AG-22', () => {
 
   it('rejects invalid caret offsets and calendar references', () => {
     for (const caret of [-1, 6, 0.5, NaN]) expect(suggestDates('today', caret, today)).toBeUndefined()
+    for (const caret of [-1, 13, 0.5, NaN]) expect(suggestDates('two days ago', caret, today)).toBeUndefined()
     expect(() => suggestDates('today', 5, NaN)).toThrow(RangeError)
   })
 

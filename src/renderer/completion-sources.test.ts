@@ -12,9 +12,14 @@ it('adapts date and emoji matches to shared suggestions with their selection pol
     end: 7,
     listLabel: 'Date suggestions',
     retainsSelection: true,
-    preferredSuggestionId: `date:${today + 1}`,
+    preferredSuggestionId: `date:${today + 1}:tomorrow`,
     suggestions: [
-      { id: `date:${today + 1}`, replacement: '2026-10-09', label: '2026-10-09', description: 'Fri · tomorrow' },
+      {
+        id: `date:${today + 1}:tomorrow`,
+        replacement: '2026-10-09',
+        label: '2026-10-09',
+        description: 'Fri · tomorrow',
+      },
     ],
   })
   expect(recognizeCompletion(':+1', 3, today)).toMatchObject({
@@ -33,6 +38,7 @@ it('adapts date and emoji matches to shared suggestions with their selection pol
 })
 
 // @requirement PRODUCT.md §20.9
+// @requirement PRODUCT.md §20.9.3
 it('sorts dates chronologically without changing the preferred candidate', () => {
   for (const [text, expected, preferred] of [
     ['in sep', ['2026-09-01', '2027-09-01'], '2027-09-01'],
@@ -41,6 +47,8 @@ it('sorts dates chronologically without changing the preferred candidate', () =>
     ['Friday', ['2026-10-09', '2026-10-16'], '2026-10-09'],
     ['last January', ['2026-01-01'], '2026-01-01'],
     ['in October', ['2026-10-15'], '2026-10-15'],
+    ['next month', ['2026-11-01', '2026-11-15', '2026-11-30'], '2026-11-01'],
+    ['last month', ['2026-09-01', '2026-09-15', '2026-09-30'], '2026-09-30'],
     [
       'next wee',
       ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'],
@@ -61,7 +69,7 @@ it('describes each date with its weekday', () => {
   for (let offset = 1; offset <= 7; offset += 1) {
     const day = today + offset
     const description = recognizeCompletion(`in ${offset} days`, `in ${offset} days`.length, today)?.suggestions.find(
-      (suggestion) => suggestion.id === `date:${day}`,
+      (suggestion) => suggestion.id === `date:${day}:in ${offset} days`,
     )?.description
     expect(description).toBe(`${['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'][offset - 1]} · in ${offset} days`)
   }

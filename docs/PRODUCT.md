@@ -1461,13 +1461,15 @@ A click or press that selects a node does not move a node that is fully visible,
 
 Tree and Agenda node editors offer explicit date completion in standard editing and Vim Insert. Natural-language expressions remain ordinary text until accepted. A compact popup opens only after an edit inside a recognized expression; it never opens for paste, Undo, or programmatic text changes. Hyperlink text is excluded. Vim Normal, Visual and Replace do not offer completion.
 
-#### Recognized Expressions
+#### 20.9.1 Recognized Expressions
 
 * Recognition ignores case and permits repeated spaces between words.
 * `toda` and `today` offer Today; prefixes of `tomorrow` from `tomo` onward offer tomorrow; prefixes of `yesterday` from `yest` onward offer yesterday. Suggestions describe the complete expression. Short ordinary words such as `yes` and `tom` remain silent.
 * Full English weekday names prefer the upcoming occurrence, including Today. The alternative is next week's occurrence when the current week's is Today or future, otherwise the current week's past occurrence.
 * `this`, `next` and `last` plus a full weekday name offer that weekday in the current, next or previous Monday-based calendar week.
 * Weekday names after `this`, `next` or `last`, and all month names after `in`, `last` or `in the end of`, accept prefixes from three letters through the full name (`next fri`, `next frid`, `next Friday`; `in sep`, `in sept`, `in September`). Shorter fragments offer nothing. Suggestions describe the full expression and exact canonical date.
+* `next mon` and `last mon` offer both the qualified Monday and the three adjacent-month anchors, each labeled with its full interpretation. Continuing through `mond` to `Monday` leaves only Monday; `mont` and `month` leave only the month anchors. `this mon`, `on mon` and `by mon` retain their weekday meanings.
+* Ambiguous `mon` initially selects the date closest to Today. If both interpretations share that date, Monday is preferred. Both labeled rows remain available when their dates coincide.
 * After a separate `on` or `by`, weekday names accept prefixes from three letters onward (`on fri`, `by frid`) and offer the same dates as the full bare weekday. The preposition and its spacing stay outside the replacement span, preserving deadline meaning. Without context, bare weekday prefixes offer nothing.
 * `next wee` and `next week` offer next Monday first and then the remaining days in order. `last wee` and `last week` offer the previous Monday first and then the remaining days in order. Both use Monday-based calendar weeks. Continuing into another word, such as `next weekend`, closes suggestions without changing text.
 * All English month names accept prefixes from three letters through the full name before a one- or two-digit day (`Sep 15`, `Sept 15`, `September 15`). They prefer the nearest upcoming occurrence and also offer the nearest past occurrence; February 29 uses valid leap years. Suggestions show the full month name and remain available while it is extended before the existing day. Preceding `on` or `by` stays outside the replacement span.
@@ -1476,8 +1478,9 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 * Short uncertain fragments, including `t`, `to`, `mar` and `may`, bare month names and abbreviated weekdays offer nothing.
 * The recognized span never includes adjacent words or time expressions.
 
-#### Weeks and Months
+#### 20.9.2 Weeks and Months
 
+* `next month` and `last month` offer the 1st, 15th and actual last day of the next or previous calendar month. The closest date to Today is initially selected: the 1st for next month, the last day for last month. Year transitions and leap years apply; months outside years 0000–9999 offer nothing.
 * `in N week(s)` and `N week(s) ago` use the same counts as relative days and offer the date exactly N × 7 days after or before Today.
 * `in` plus a full English month name offers one date when it names the current month: the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward. For another month, it prefers the nearest upcoming month start and also offers the nearest past month start. For example, on October 8, 2026, `in September` offers September 1, 2026 and September 1, 2027, with 2027 selected initially; the past alternative means the nearest past occurrence, rather than necessarily the previous calendar year.
 * `last` plus a full English month name offers the nearest month start strictly before Today.
@@ -1486,13 +1489,14 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 
 `in the end of` plus a full English month name offers the nearest month end on or after Today. During October, `in the end of October` offers October 31 of the current year, including on October 31 itself; after October it offers October 31 of the next year. The suggestion uses the month's actual last day, including February 29 in leap years. The same case, spacing, expression-boundary and canonical-calendar rules apply.
 
-#### Popup
+#### 20.9.3 Popup
 
 * The popup uses the document surface, a thin location-border-colored border and a soft shadow. It aligns its left edge with the expression's first character and sits directly below the edited row without covering it.
 * When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge.
 * The popup sizes to its content, keeping dates and descriptions on one line when they fit within the window. Its width never exceeds the window; longer content wraps only when the window requires it.
 * Dates appear chronologically, oldest first. The expression's preferred date is initially selected, independently of its position; week lists prefer Monday. Each row shows its canonical date and weekday/expression description. The selected row uses the shared selection highlight pair and stays visible.
 * Further edits in the same expression retain the selected date while available, even if its index changes. Otherwise, or for a different node or expression start, select the expression's preferred date. Dismissal clears the selection.
+* When multiple interpretations share a date, retain the selected labeled interpretation first. If that interpretation disappears but its date remains available, retain that date under its remaining interpretation.
 * The footer reads `↑ ↓ select · Enter accept · Esc dismiss`.
 * Plain `↓` and `↑` cycle to the next and previous suggestions in standard editing and Vim Insert, wrapping at either end; `Ctrl+N` and `Ctrl+P` remain alternatives. Popup arrows take precedence over caret reconciliation and node navigation, retain editor focus and the text caret, and never move to another node. Without a popup, arrows keep their ordinary behavior. Modified arrows keep their ordinary editing behavior.
 * Plain `Enter` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. Enter deliberately overrides ordinary node creation while the popup is open, including in Vim Insert, so completion uses the same keyboard controls in both editing modes. Modified Enter keeps its ordinary behavior. `Tab` and `Shift+Tab` dismiss the popup and retain their ordinary structural behavior (§20.2.24, §23.10).

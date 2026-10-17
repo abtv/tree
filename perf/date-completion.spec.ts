@@ -2,13 +2,16 @@ import { calendarDateOf, dayNumberOf, formatCanonicalDate } from '../src/domain/
 import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
 import { recordPerfResult } from './results'
 
-for (const vimEnabled of [true, false]) {
+for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
+  [false, true].map((month) => ({ vimEnabled, month })),
+)) {
   // @requirement PRODUCT.md §20.9
   // @requirement PRODUCT.md §22.1
-  test(`relative date autocomplete stays responsive in a 10000-node Tree (${vimEnabled ? 'Vim' : 'standard'})`, async ({
+  test(`${month ? 'adjacent month' : 'relative date'} autocomplete stays responsive in a 10000-node Tree (${vimEnabled ? 'Vim' : 'standard'})`, async ({
     userDataDir,
   }) => {
-    const prefix = 'Plan two days ag'
+    const prefix = month ? 'Plan last mont' : 'Plan two days ag'
+    const key = month ? 'h' : 'o'
     const seed = wideSeed(10_000)
     const seededDocument = seed.document as { roots: { children: { text: string }[] }[] }
     seededDocument.roots[0]!.children[0]!.text = prefix
@@ -22,7 +25,7 @@ for (const vimEnabled of [true, false]) {
     if (vimEnabled) await window.keyboard.press('A')
     else await window.keyboard.press('Meta+ArrowRight')
 
-    await window.evaluate(() => {
+    await window.evaluate((key) => {
       const probe = { paints: [] as number[], completed: [] as boolean[], inserted: [] as number[] }
       ;(window as unknown as { dateCompletionProbe: typeof probe }).dateCompletionProbe = probe
       // Key-to-DOM latency isolates the application's own work from the two
@@ -37,7 +40,7 @@ for (const vimEnabled of [true, false]) {
       globalThis.addEventListener(
         'keydown',
         (event) => {
-          if (event.key !== 'o') return
+          if (event.key !== key) return
           pendingKeyTime = event.timeStamp
           requestAnimationFrame(() =>
             requestAnimationFrame(() => {
@@ -48,17 +51,22 @@ for (const vimEnabled of [true, false]) {
         },
         { capture: true },
       )
-    })
+    }, key)
     const localDate = await window.evaluate(() => {
       const now = new Date()
       return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }
     })
-    const expectedDate = formatCanonicalDate(calendarDateOf(dayNumberOf(localDate) - 2))
+    const expectedDate = formatCanonicalDate(
+      calendarDateOf(month ? dayNumberOf({ ...localDate, day: 1 }) - 1 : dayNumberOf(localDate) - 2),
+    )
     const popup = window.getByRole('listbox', { name: 'Date suggestions' })
     for (let index = 0; index < 30; index++) {
-      await window.keyboard.press('o')
-      await expect(popup.getByRole('option')).toHaveCount(1)
-      await expect(popup.getByRole('option')).toContainText(expectedDate)
+      // Month prefixes may already qualify after Backspace. Dismiss before the
+      // measured edit so every sample still measures creating the popup DOM.
+      if (month && (await popup.count()) > 0) await window.keyboard.press('Escape')
+      await window.keyboard.press(key)
+      await expect(popup.getByRole('option')).toHaveCount(month ? 3 : 1)
+      await expect(popup.getByRole('option', { selected: true })).toContainText(expectedDate)
       await window.waitForFunction(
         (count) =>
           (window as unknown as { dateCompletionProbe: { paints: number[] } }).dateCompletionProbe.paints.length ===
@@ -79,7 +87,7 @@ for (const vimEnabled of [true, false]) {
     const insertedSorted = probe.inserted.toSorted((a, b) => a - b)
     recordPerfResult({
       kind: 'typing',
-      scenario: `relative-date-10000-${vimEnabled ? 'vim' : 'standard'}`,
+      scenario: `${month ? 'adjacent-month' : 'relative-date'}-10000-${vimEnabled ? 'vim' : 'standard'}`,
       samples: sorted.length,
       metrics: {
         firstPopupPaintMs: round(probe.paints[0]!),
@@ -97,7 +105,7 @@ for (const vimEnabled of [true, false]) {
     expect(sorted[29]).toBeLessThan(100)
     // Measured near 1 ms; the first, cold keystroke is about 5 ms.
     expect(insertedSorted[29]).toBeLessThan(10)
-    await expect(input).toHaveValue(`${prefix}o`)
+    await expect(input).toHaveValue(`${prefix}${key}`)
     await expect(input).toBeFocused()
     await expect(heading).toHaveValue('Root')
     await window.keyboard.press('Enter')

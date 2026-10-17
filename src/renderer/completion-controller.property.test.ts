@@ -15,11 +15,11 @@ it('orders every date list chronologically while selecting the existing preferre
       }),
       fc.constantFrom('Monday', 'Friday', 'in sep', 'Oct 2', 'in October', 'last January', 'next wee', 'last week'),
       (today, text) => {
-        const preferred = suggestDates(text, text.length, today)!.suggestions[0]!.day
+        const preferred = suggestDates(text, text.length, today)!.suggestions[0]!
         const assist = new CompletionController()
         assist.edit('n', text, text.length, today, [])
         const popup = assist.popup!
-        expect(popup.suggestions[popup.selected]!.id).toBe(`date:${preferred}`)
+        expect(popup.suggestions[popup.selected]!.id).toBe(`date:${preferred.day}:${preferred.expression}`)
         const dates = popup.suggestions.map(({ replacement }) => replacement)
         expect(dates).toEqual(dates.toSorted())
       },

@@ -31,8 +31,14 @@ export class CompletionController {
       match.retainsSelection && previous?.nodeId === nodeId && previous.start === match.start
         ? previous.suggestions[previous.selected]
         : undefined
-    const retained =
+    const retainedIdentity =
       suggestion === undefined ? -1 : match.suggestions.findIndex((candidate) => candidate.id === suggestion.id)
+    // At index zero, replacement fallback also finds that same first row;
+    // changing < 0 to <= 0 is therefore output-equivalent.
+    const retained =
+      retainedIdentity < 0 && suggestion !== undefined
+        ? match.suggestions.findIndex((candidate) => candidate.replacement === suggestion.replacement)
+        : retainedIdentity
     const selected =
       retained < 0 ? match.suggestions.findIndex((candidate) => candidate.id === match.preferredSuggestionId) : retained
     this.popup = { ...match, nodeId, text, selected }

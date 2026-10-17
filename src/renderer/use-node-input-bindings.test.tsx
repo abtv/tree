@@ -378,7 +378,7 @@ describe('useNodeInputBindings', () => {
     f.type('Plan next week')
     const popup = f.result.current.completionPopup!.popup
     expect(popup.suggestions[popup.selected]).toEqual({
-      id: `date:${dayNumberOf({ year: 2026, month: 10, day: 13 })}`,
+      id: `date:${dayNumberOf({ year: 2026, month: 10, day: 13 })}:next week`,
       replacement: '2026-10-13',
       label: '2026-10-13',
       description: 'Tue · next week',

@@ -8,6 +8,42 @@ it('keeps an empty suggestion list at index zero in either direction', () => {
 })
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
+it('retains a month choice through ambiguous refinement and preserves both identities on equal dates', () => {
+  const assist = new CompletionController()
+  assist.edit('n', 'next mon', 8, today, [])
+  expect(assist.popup?.suggestions).toHaveLength(4)
+  assist.move(1)
+  assist.move(1)
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-11-15')
+  assist.edit('n', 'next mont', 9, today, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-11-15')
+  assist.edit('n', 'next month', 10, today, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-11-15')
+  assist.edit('n', 'next mon', 8, today, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-11-15')
+  assist.edit('n', 'next mond', 9, today, [])
+  expect(assist.popup?.suggestions).toHaveLength(1)
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-10-12')
+
+  const overlap = dayNumberOf({ year: 2026, month: 5, day: 25 })
+  assist.close()
+  assist.edit('n', 'next mon', 8, overlap, [])
+  expect(new Set(assist.popup?.suggestions.map(({ id }) => id)).size).toBe(4)
+  assist.move(1)
+  expect(assist.popup?.suggestions[assist.popup.selected]?.description).toContain('next month')
+  assist.edit('n', 'next mont', 9, overlap, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.description).toContain('next month')
+  assist.edit('n', 'next mon', 8, overlap, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.description).toContain('next month')
+  assist.edit('n', 'next mond', 9, overlap, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-06-01')
+
+  assist.close()
+  assist.edit('n', 'last Monday', 11, today, [])
+  assist.edit('n', 'Sep 28', 6, today, [])
+  expect(assist.popup?.suggestions[assist.popup.selected]?.replacement).toBe('2026-09-28')
+})
+
 // @requirement PRODUCT.md §20.9
 it('opens on the preferred date and preserves an earlier manual choice through refinement', () => {
   const assist = new CompletionController()
@@ -63,7 +99,7 @@ it('opens only from an edit, updates suggestions, and closes rather than reopeni
     start: 0,
     end: 5,
     selected: 0,
-    suggestions: [{ id: `date:${today + 1}` }],
+    suggestions: [{ id: `date:${today + 1}:tomorrow` }],
   })
   assist.edit('n', 'Friday', 6, today, [])
   expect(assist.popup?.suggestions).toHaveLength(2)
@@ -133,7 +169,7 @@ it('retains a selected date through refinement and resets when that date or expr
   assist.move(1)
   assist.move(1)
   const selectedDay = assist.popup?.suggestions[assist.popup.selected]
-  expect(selectedDay).toMatchObject({ id: `date:${today + 6}`, description: 'Wed · next week' })
+  expect(selectedDay).toMatchObject({ id: `date:${today + 6}:next week`, description: 'Wed · next week' })
   assist.edit('n', 'next week', 9, today, [])
   expect(assist.popup?.selected).toBe(2)
   assist.edit('n', 'NEXT   WEEK', 11, today, [])
