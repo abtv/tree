@@ -88,6 +88,7 @@ Conditional checks cover both the current push and changes since an ancestral,
 fully successful source release, so a documentation-only push cannot hide a
 previously failed relevant change. Without a suitable successful baseline, both
 checks run. Changes to publication policy also require both checks.
+Scheduled or manual check runs must not cancel checks belonging to a publication.
 
 Publication independently authenticates a source-signed manifest and every file
 it authorizes, including retained assets. Unlisted files cannot enter the site.

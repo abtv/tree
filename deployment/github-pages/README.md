@@ -146,6 +146,12 @@ updates never use force. Source and target publication are serialized; queued
 older candidates are rejected using current heads. A new source push can supersede
 a checked candidate, in which case its transfer/deployment fails closed.
 
+Reusable checks include their suite prefix and `github.workflow` in concurrency
+groups. GitHub supplies the caller's workflow name during reuse, so release checks
+cannot be canceled by standalone manual or scheduled checks, or by another suite
+inside the release. Existing standalone cancellation and PR/branch separation
+remain in place. The release workflow itself preserves in-flight publication.
+
 The target also checks public source run metadata over GitHub's API, including its
 current attempt and successful gate. Public API rate limits or unavailable GitHub
 services stop the deployment. Anonymous public-source API reliability remains a

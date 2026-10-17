@@ -366,6 +366,9 @@ GitHub Actions runs `npm run check` on Ubuntu and the real Electron end-to-end s
 
 The Attribution workflow runs `scripts/check-attribution.mjs` on every pull request. It fails the check when the pull request description or any of its commits carries an agent co-authorship or "generated with/by" line, per `AGENTS.md` §12. This is the server-side backstop described in §3; it holds regardless of whether the author's machine had the `commit-msg` hook installed.
 
+Release checks are isolated from standalone manual and scheduled check cancellation;
+the concurrency rules are described in [Browser publication](../deployment/github-pages/README.md#failures-and-ordering).
+
 ### Risk-Based Validation
 
 Use the highest applicable functional-validation tier. Select Electron performance scope separately under [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#selecting-performance-checks). Focused checks may be run during implementation, but they do not substitute for a broader required functional tier.

@@ -3,8 +3,61 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), 'utf8')
 
+// Evaluate only the context references used by these workflow group templates.
+// The reusable-workflow context belongs to its caller, as GitHub documents.
+function concurrencyGroup(workflow, context) {
+  const template = workflow.match(/^ {2}group: (.+)$/m)?.[1]
+  if (!template) throw new Error('Missing workflow concurrency group')
+  const values = {
+    'github.workflow': context.workflow,
+    'github.ref': context.ref,
+    'github.event.pull_request.number || github.ref': context.pr || context.ref,
+  }
+  return template
+    .replace(/\$\{\{\s*(.*?)\s*\}\}/g, (_, expression) => {
+      if (!(expression in values)) throw new Error(`Unsupported concurrency expression: ${expression}`)
+      return values[expression]
+    })
+    .toLowerCase()
+}
+
 // @requirement PRODUCT.md §1.4
 describe('automatic publication wiring', () => {
+  it('isolates release checks from standalone manual/scheduled runs and from each other', async () => {
+    const release = await read('.github/workflows/release.yml')
+    const context = { workflow: 'Browser release', ref: 'refs/heads/main' }
+    const groups = [concurrencyGroup(release, context)]
+    for (const file of ['audit', 'e2e', 'e2e-memory', 'demo', 'ci']) {
+      const workflow = await read(`.github/workflows/${file}.yml`)
+      const standaloneName = workflow.match(/^name: (.+)$/m)[1]
+      const called = concurrencyGroup(workflow, context)
+      const standalone = concurrencyGroup(workflow, { ...context, workflow: standaloneName })
+      expect(called, file).not.toBe(standalone)
+      groups.push(called)
+      expect(workflow).toContain('cancel-in-progress: true')
+      // Successive standalone runs still supersede each other on the same ref.
+      expect(concurrencyGroup(workflow, { ...context, workflow: standaloneName, runId: 2 })).toBe(standalone)
+    }
+    expect(new Set(groups).size).toBe(groups.length)
+    expect(release).toContain('cancel-in-progress: false')
+  })
+
+  it('keeps independent PRs and branches in separate cancellation groups', async () => {
+    for (const file of ['ci', 'e2e', 'e2e-memory']) {
+      const workflow = await read(`.github/workflows/${file}.yml`)
+      const context = { workflow: workflow.match(/^name: (.+)$/m)[1], ref: 'refs/heads/main' }
+      expect(concurrencyGroup(workflow, { ...context, pr: 12 })).not.toBe(
+        concurrencyGroup(workflow, { ...context, pr: 13 }),
+      )
+      expect(concurrencyGroup(workflow, context)).not.toBe(
+        concurrencyGroup(workflow, { ...context, ref: 'refs/heads/feature' }),
+      )
+    }
+    const demo = await read('.github/workflows/demo.yml')
+    expect(concurrencyGroup(demo, { workflow: 'Generate demo', ref: 'refs/heads/main' })).not.toBe(
+      concurrencyGroup(demo, { workflow: 'Generate demo', ref: 'refs/heads/feature' }),
+    )
+  })
   it('never executes publisher-controlled target verifier scripts', async () => {
     const target = await read('deployment/github-pages/pages.yml')
     expect(target).not.toContain('run: node .github/scripts/')
