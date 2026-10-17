@@ -402,6 +402,8 @@ describe('useNodeInputBindings', () => {
     f.press('n', { ctrlKey: true })
     expect(f.result.current.completionPopup?.popup.selected).toBe(1)
     f.type('Plan in Septembe')
+    expect(f.result.current.completionPopup?.popup.selected).toBe(1)
+    f.type('Plan in Se')
     expect(f.result.current.completionPopup).toBeUndefined()
     f.type('Plan in September')
     expect(f.result.current.completionPopup?.popup.selected).toBe(0)

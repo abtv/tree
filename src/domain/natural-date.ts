@@ -53,7 +53,7 @@ const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +
 const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
 // Only distinctive, explicitly supported prefixes qualify. Longest first keeps
 // recognition on the complete word when the caret is inside existing text.
-const completedPrefixes = new Map(
+const completedPrefixes = new Map<string, string>(
   (
     [
       ['today', 4],
@@ -69,9 +69,33 @@ const completedPrefixes = new Map(
     ),
   ),
 )
-const prefixPattern = [...completedPrefixes.keys()].map((prefix) => prefix.replace(' ', ' +')).join('|')
+const prefixPattern = [...completedPrefixes.keys()].map((prefix) => prefix.replaceAll(' ', ' +')).join('|')
+
+// Encode all prefixes in one greedy branch per name, rather than scanning
+// a separate alternative for every spelling at every position in long text.
+function namePrefixes(name: string): string {
+  let suffix = ''
+  for (let index = name.length - 1; index >= 3; index--) suffix = `(?:${name[index]}${suffix})?`
+  return name.slice(0, 3) + suffix
+}
+
+const qualifiedPrefixPattern =
+  `(?:in|last|in +the +end +of) +(?:${months.map(namePrefixes).join('|')})|` +
+  `(?:this|next|last) +(?:${weekdays.map(namePrefixes).join('|')})`
+for (const [names, qualifiers] of [
+  [months, ['in', 'last', 'in the end of']],
+  [weekdays, ['this', 'next', 'last']],
+] as const) {
+  for (const qualifier of qualifiers) {
+    for (const name of names) {
+      for (let length = name.length; length >= 3; length--) {
+        completedPrefixes.set(`${qualifier} ${name.slice(0, length)}`, `${qualifier} ${name}`)
+      }
+    }
+  }
+}
 const expressions = new RegExp(
-  `(?:this|next|last) +(?:${weekdayPattern})|${prefixPattern}|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|in +the +end +of +(?:${months.join('|')})|(?:in|last) +(?:${months.join('|')})|(?:${monthPattern}) +[0-9]{1,2}|${weekdayPattern}`,
+  `${qualifiedPrefixPattern}|${prefixPattern}|in +${countPattern} +(?:days?|weeks?)|${countPattern} +(?:days?|weeks?) +ago|(?:${monthPattern}) +[0-9]{1,2}|${weekdayPattern}`,
   'gi',
 )
 // Stryker reports the module-initializer ObjectLiteral mutants as survivors.

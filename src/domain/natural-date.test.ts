@@ -165,7 +165,7 @@ describe('natural date expression table proposed in AG-22', () => {
     const match = suggestDates(text, 27, today)!
     expect(text.slice(match.start, match.end)).toBe('IN   THE END OF OCTOBER')
     expect(match.suggestions).toEqual([{ day: day('2026-10-31'), expression: 'in the end of october' }])
-    expect(dates('in the end of Oct')).toBeUndefined()
+    expect(dates('in the end of Oct')).toEqual(['2026-10-31'])
     expect(dates('in the end of Octobers')).toBeUndefined()
   })
 
@@ -258,6 +258,68 @@ describe('natural date expression table proposed in AG-22', () => {
       expect(dates(`${month} 1`)).toHaveLength(2)
     },
   )
+
+  it('completes every qualified month and weekday from three letters through its full name', () => {
+    const groups = [
+      {
+        names: [
+          'january',
+          'february',
+          'march',
+          'april',
+          'may',
+          'june',
+          'july',
+          'august',
+          'september',
+          'october',
+          'november',
+          'december',
+        ],
+        qualifiers: ['in', 'last', 'in the end of'],
+      },
+      {
+        names: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+        qualifiers: ['this', 'next', 'last'],
+      },
+    ]
+    for (const { names, qualifiers } of groups) {
+      for (const name of names) {
+        for (const qualifier of qualifiers) {
+          const expression = `${qualifier} ${name}`
+          for (let length = 3; length <= name.length; length++) {
+            const fragment = `${qualifier} ${name.slice(0, length)}`
+            expect(dates(fragment), fragment).toEqual(dates(expression))
+            const text = `Plan (${fragment.toUpperCase().replaceAll(' ', '   ')}) at noon`
+            const caret = text.indexOf(')')
+            const match = suggestDates(text, caret, today)!
+            expect(text.slice(match.start, match.end)).toBe(text.slice(6, caret))
+            expect(match.suggestions.every((suggestion) => suggestion.expression === expression)).toBe(true)
+            expect(dates(`${fragment}suffix`)).toBeUndefined()
+          }
+          expect(dates(`${qualifier} ${name.slice(0, 2)}`)).toBeUndefined()
+        }
+      }
+    }
+  })
+
+  it.each([
+    'in s',
+    'in j',
+    'next f',
+    'next t',
+    'in se',
+    'last oc',
+    'this fr',
+    'next tu',
+    'in the end of se',
+    'sep',
+    'sept',
+    'fri',
+    'sat',
+    'in septs',
+    'next fridayish',
+  ])('keeps uncertain or unrelated fragments silent: %s', (text) => expect(dates(text)).toBeUndefined())
 
   it('returns only the expression span, including its original spacing and case', () => {
     const text = 'Plan NEXT   Friday at 10, tomorrow morning'

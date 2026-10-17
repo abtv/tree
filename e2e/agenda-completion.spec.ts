@@ -65,6 +65,69 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
   })
 
   for (const view of ['Tree', 'Agenda'] as const) {
+    // @requirement PRODUCT.md §20.9
+    test(`refines qualified date prefixes without losing selection in ${view}`, async ({ userDataDir }, testInfo) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await setAgendaToday(window)
+      if (view === 'Agenda') {
+        await window.keyboard.press('Meta+p')
+        await window.locator('.agenda-row[data-node-id="n"]').click()
+      }
+      const input = window.getByRole('textbox', {
+        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
+        exact: true,
+      })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
+      await setCursor(input, 16)
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      const fragment = view === 'Tree' ? 'in se' : 'next fr'
+      await window.keyboard.type(fragment)
+      await expect(popup).toHaveCount(0)
+      await window.keyboard.type(view === 'Tree' ? 'p' : 'i')
+      await expect(popup).toBeVisible()
+      if (view === 'Tree') await window.keyboard.press('ArrowDown')
+      const selectedDate = view === 'Tree' ? '2026-09-01' : '2026-10-16'
+      const selected = popup.getByRole('option', { selected: true })
+      await expect(selected).toContainText(selectedDate)
+      await expect(selected).toContainText(view === 'Tree' ? 'in september' : 'next friday')
+      await window.keyboard.type(view === 'Tree' ? 't' : 'd')
+      await expect(selected).toContainText(selectedDate)
+      await window.screenshot({ path: testInfo.outputPath(screenshotName(`qualified-date-${view}.png`)) })
+      await window.keyboard.type(view === 'Tree' ? 'ember' : 'ay')
+      await expect(selected).toContainText(selectedDate)
+      await window.keyboard.press('Enter')
+      const text = (): Promise<string> =>
+        input.evaluate((element) =>
+          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+        )
+      await expect.poll(text).toBe(`2026-10-08 Plan ${selectedDate}`)
+      await expect(input).toBeFocused()
+      await expect(popup).toHaveCount(0)
+      await window.evaluate(() =>
+        document.addEventListener('keydown', (event) => {
+          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
+        }),
+      )
+      await window.keyboard.press('Meta+z')
+      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? 'in september' : 'next friday'}`)
+      await expect(popup).toHaveCount(0)
+      await setCursor(input, (await text()).length)
+      await window.keyboard.press('Backspace')
+      await expect(popup).toBeVisible()
+      const beforeDismissal = await text()
+      await window.keyboard.press('Escape')
+      await expect(popup).toHaveCount(0)
+      await expect.poll(text).toBe(beforeDismissal)
+      if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    })
+
     // Expression tables live in natural-date.test.ts; retain the real edit/accept/Undo path here.
     // @requirement PRODUCT.md §20.9
     test(`preserves suffixes and ignores uncertain text and paste in ${view}`, async ({ userDataDir }) => {
