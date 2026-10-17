@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Browser Tree](browser-tree.md) | D1–D5 accepted; Chrome/macOS mechanism probes passed; P1 remains partial | Continue temporary P1 Chrome probes only; Safari deferred by owner. Full matrix unverified. Full implementation and publication remain unauthorized |
+| [Browser Tree](browser-tree.md) | D1–D5 accepted; Chrome/macOS replay/rotation and failed-update probes passed; P1 remains partial | Continue P1 Chrome storage/recovery and update probes; owner will check Safari manually later. Full matrix unverified. Full implementation and publication remain unauthorized |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
