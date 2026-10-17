@@ -70,9 +70,10 @@ export function validateGate(results, { memoryRequired, demoRequired }) {
   }
 }
 
-// Keep these selectors aligned with demo.yml and e2e-memory.yml.
+// Keep suite inputs aligned with demo.yml and e2e-memory.yml. Release-policy
+// changes require both suites, including migration from the old push-only gate.
 export function selectChecks(paths) {
-  const shared = /^(?:package(?:-lock)?\.json|\.nvmrc)$/
+  const shared = /^(?:package(?:-lock)?\.json$|\.nvmrc$|\.github\/workflows\/release\.yml$|scripts\/web-release\/)/
   return {
     demo: paths.some(
       (path) =>

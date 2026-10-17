@@ -17,6 +17,9 @@ jobs:
     name: Select conditional checks
     runs-on: ubuntu-24.04
     timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: read
     outputs:
       memory: ${{ steps.changes.outputs.memory }}
       demo: ${{ steps.changes.outputs.demo }}
@@ -31,6 +34,7 @@ jobs:
       - id: changes
         env:
           BEFORE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/web-release/cli.mjs changes "$BEFORE_SHA" "$GITHUB_SHA"
 
   check:

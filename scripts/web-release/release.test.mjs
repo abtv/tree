@@ -103,4 +103,13 @@ describe('release gates', () => {
     expect(selectChecks(['package-lock.json'])).toEqual({ memory: true, demo: true })
     expect(selectChecks(['e2e/electron-entry.cjs'])).toEqual({ memory: true, demo: true })
   })
+  it('revalidates both suites when publication policy changes, including migration from push-only selection', () => {
+    for (const path of [
+      '.github/workflows/release.yml',
+      'scripts/web-release/selection.mjs',
+      'scripts/web-release/policy.mjs',
+    ]) {
+      expect(selectChecks([path])).toEqual({ memory: true, demo: true })
+    }
+  })
 })

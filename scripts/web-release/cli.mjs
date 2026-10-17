@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process'
 import { appendFile, readFile, writeFile } from 'node:fs/promises'
 import { createManifest, verifyPackage } from './package.mjs'
-import { selectChecks, validateGate } from './policy.mjs'
+import { validateGate } from './policy.mjs'
+import { selectReleaseChecks } from './selection.mjs'
 import { preparePackage } from './prepare.mjs'
 import { verifyIdentity } from './publish.mjs'
 
@@ -32,13 +32,10 @@ try {
       demoRequired: flag(process.env.RELEASE_DEMO_REQUIRED),
     })
   } else if (command === 'changes' && /^[a-f0-9]{40}$/.test(first) && /^[a-f0-9]{40}$/.test(second)) {
-    const args = /^0{40}$/.test(first)
-      ? ['ls-tree', '-r', '--name-only', '-z', second]
-      : ['diff', '--name-only', '-z', first, second, '--']
-    const paths = execFileSync('git', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
-      .split('\0')
-      .filter(Boolean)
-    const checks = selectChecks(paths)
+    const checks = await selectReleaseChecks(first, second, {
+      currentRunId: process.env.GITHUB_RUN_ID,
+      token: process.env.GH_TOKEN,
+    })
     const output = `demo=${checks.demo}\nmemory=${checks.memory}\n`
     if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required')
     await appendFile(process.env.GITHUB_OUTPUT, output)

@@ -9,11 +9,20 @@ push to main. PRs check code but cannot publish or receive publishing secrets.
 
 The release workflow calls standard validation, all six Electron E2E shards and
 their aggregate, the high-severity dependency audit, and the Chrome static-package
-check. It also calls the existing memory and demo workflows when their existing
-path selectors apply. Failed, missing or canceled checks block publication.
+check. It also calls the existing memory and demo workflows when their suite-input
+path selectors apply to the current push or to the changes since a fully successful
+source release. Selection reads the latest page of successful `release.yml` pushes
+to source main and uses the first ancestral commit, excluding the current run.
+A failed or canceled release cannot advance that baseline, so a later
+documentation-only push retains checks required by unpublished changes. If the
+bounded history has no suitable baseline, both checks run. Changes to
+`scripts/web-release/` or `release.yml` also require both checks; this establishes
+a checked baseline when migrating from the old last-push-only selector.
+Failed, missing or canceled checks block publication.
 Only a deliberately unselected memory/demo job may be skipped. The gate also
-requires successful change selection, so an unavailable old Git revision fails
-closed. Nightly/manual performance, property soak and mutation runs remain separate.
+requires successful change selection, so unavailable API history or a required
+Git revision fails closed. History is unnecessary when the current push already
+requires both checks. Nightly/manual performance, property soak and mutation runs remain separate.
 Chrome on macOS is the current browser gate; Safari and full browser parity remain
 later work. The source demo workflow keeps publishing to its existing media site.
 

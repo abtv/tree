@@ -23,6 +23,11 @@ describe('automatic publication wiring', () => {
     expect(release).toContain('name: browser-${{ github.sha }}-${{ github.run_attempt }}')
     expect(release).toContain('permission-contents: write')
     expect(release).toContain('repositories: tree-editor.github.io')
+    const selection = release.split('\n  changes:')[1].split('\n  check:')[0]
+    expect(selection).toContain('actions: read')
+    expect(selection).toContain('GH_TOKEN: ${{ github.token }}')
+    expect(selection).toContain('fetch-depth: 0')
+    expect(selection).toContain('cli.mjs changes "$BEFORE_SHA" "$GITHUB_SHA"')
     const checks = release.split('\n  publish:')[0]
     expect(checks).not.toContain('secrets.')
     expect(checks).not.toContain('secrets: inherit')

@@ -84,6 +84,11 @@ Scheduled/manual suites are separate. Safari is outside this current publication
 gate. Publication transfers the tested package without rebuilding it. Failed
 checks, transfer or pre-deployment verification leave the active release intact.
 
+Conditional checks cover both the current push and changes since an ancestral,
+fully successful source release, so a documentation-only push cannot hide a
+previously failed relevant change. Without a suitable successful baseline, both
+checks run. Changes to publication policy also require both checks.
+
 Publication independently authenticates a source-signed manifest and every file
 it authorizes, including retained assets. Unlisted files cannot enter the site.
 The target-only publisher cannot select executable verification code: the protected
