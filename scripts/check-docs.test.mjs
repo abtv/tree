@@ -10,6 +10,7 @@ import {
   extractTestTitles,
   findBrokenLinks,
   findBrokenReferences,
+  findScratchDependencies,
   findProductQuantityRestatements,
   findOversizedProductText,
   findStaleConformanceCitations,
@@ -358,6 +359,93 @@ describe('findBrokenReferences', () => {
     const adrNumbers = new Set([4])
     expect(findBrokenReferences({ content: 'See ADR 0004.', displayPath: 'docs/X.md', adrNumbers })).toEqual([])
     expect(findBrokenReferences({ content: 'See ADR 9999.', displayPath: 'docs/X.md', adrNumbers })).toHaveLength(1)
+  })
+})
+
+describe('scratch dependencies', () => {
+  const check = (content, allowTemporary = false) =>
+    findScratchDependencies({ content, displayPath: 'docs/NOTES.md', allowTemporary })
+
+  it.each([
+    'Evidence: `.scratch/task/evidence.md`.',
+    '[Evidence](../.scratch/task/evidence.md)',
+    '[Evidence][result]\n[result]: ../.scratch/task/result.json',
+    '<../.scratch/task/screenshot.png>',
+    '[Evidence](../%2escratch/task/result%2Ejson)',
+    'Read `.scratch/task/latest`.',
+  ])('rejects a permanent dependency: %s', (content) => {
+    expect(check(content)).toEqual([expect.stringContaining('docs/NOTES.md:')])
+  })
+
+  it('reports the original line number and allows temporary continuation evidence', () => {
+    expect(check('Heading\n\nRead `.scratch/task/evidence.md`.')[0]).toContain('docs/NOTES.md:3:')
+    expect(check('Read `.scratch/task/evidence.md`.', true)).toEqual([])
+  })
+
+  it('allows command examples, placeholders, directory locations, and external URLs', () => {
+    expect(
+      check(
+        [
+          'Profiles live under `.scratch/task/`.',
+          'Write `.scratch/<task>/report.json`.',
+          'Run `node .scratch/task/probe.mjs`.',
+          'Run `npm run test:e2e:diagnose -- --json-output=.scratch/task/report.json`.',
+          '```sh\nnode .scratch/task/probe.mjs\n```',
+          '[External](https://example.com/.scratch/task/report.json)',
+        ].join('\n'),
+      ),
+    ).toEqual([])
+  })
+
+  it('does not let an example command hide another dependency on the same line', () => {
+    expect(check('Run `node .scratch/task/probe.mjs`; read `.scratch/task/evidence.md`.')).toHaveLength(1)
+  })
+
+  it('checks Markdown outside the central live-document list', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'prototypes/browser/README.md', 'Read `.scratch/task/evidence.md`.')
+    writeFile(root, 'docs/notes/new.md', 'Read `.scratch/task/results.json`.')
+    expect(runChecks({ rootDirectory: root }).issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('prototypes/browser/README.md:1:'),
+        expect.stringContaining('docs/notes/new.md:1:'),
+      ]),
+    )
+  })
+
+  it('checks tracked and new Markdown in Git even when the referenced scratch artifact exists', () => {
+    const root = createTemporaryRoot()
+    execFileSync('git', ['init', '--quiet'], { cwd: root })
+    writeFile(root, '.gitignore', '.scratch/\n')
+    writeFile(root, 'README.md', 'Read `.scratch/task/evidence.md`.')
+    writeFile(root, '.scratch/task/evidence.md', 'Local evidence.\nRead `.scratch/task/other.md`.')
+    execFileSync('git', ['add', 'README.md', '.gitignore'], { cwd: root })
+    writeFile(root, 'prototypes/new/README.md', 'Read `.scratch/task/evidence.md`.')
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      expect.stringContaining('README.md:1:'),
+      expect.stringContaining('prototypes/new/README.md:1:'),
+    ])
+  })
+
+  it('permits only indexed unfinished plans and the temporary working plan', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'plans/README.md', '[Active](active.md)\n[Finished](finished.md)\n')
+    writeFile(root, 'plans/active.md', 'Status: Awaiting owner acceptance\nRead `.scratch/task/evidence.md`.')
+    writeFile(root, 'plans/finished.md', 'Status: Completed\nRead `.scratch/task/evidence.md`.')
+    writeFile(root, 'plans/unlisted.md', 'Read `.scratch/task/evidence.md`.')
+    writeFile(root, 'WORKING_PLAN.md', 'Read `.scratch/task/evidence.md`.')
+    const issues = runChecks({ rootDirectory: root }).issues
+    expect(issues).toEqual([
+      expect.stringContaining('plans/finished.md:2:'),
+      expect.stringContaining('plans/unlisted.md:1:'),
+    ])
+  })
+
+  it('rejects a plan marked completed in its index even before its own status is updated', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'plans/README.md', '| Initiative | Status | Next task |\n| [Plan](closed.md) | Closed | None |')
+    writeFile(root, 'plans/closed.md', 'Status: In progress\nRead `.scratch/task/evidence.md`.')
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([expect.stringContaining('plans/closed.md:2:')])
   })
 })
 

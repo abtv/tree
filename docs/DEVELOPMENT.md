@@ -350,6 +350,8 @@ It should run:
 
 The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents (including active initiative plans) resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
+It also scans Git-tracked and new nonignored Markdown for explicit scratch-file dependencies, including inline paths, Markdown links and reference definitions. Source copies without Git metadata are scanned recursively, excluding generated and scratch directories. Unfinished plans linked from `plans/README.md` and `WORKING_PLAN.md` may retain continuation evidence; a `Status: Completed`, `Closed`, `Done`, or `Retired` in the plan or its index row removes that exception. Directory paths ending in `/`, placeholders, fenced examples, and inline commands starting with a supported command name are allowed. This syntactic check complements the documentation and plan-closure review in `docs/AGENT_WORKFLOW.md` §11; it cannot determine whether prose states every lasting conclusion.
+
 The repository must also provide the complete validation command:
 
 ```bash

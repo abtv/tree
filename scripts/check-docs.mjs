@@ -144,6 +144,40 @@ export function findBrokenReferences({ content, displayPath, adrNumbers }) {
   return issues
 }
 
+// Commands and fenced examples describe reproducible operations, not retained evidence.
+export function findScratchDependencies({ content, displayPath, allowTemporary = false }) {
+  if (allowTemporary) return []
+  const issues = []
+  let fence
+  const lines = content.split(/\r?\n/u)
+  for (const [index, line] of lines.entries()) {
+    const delimiter = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1]
+    if (fence) {
+      if (delimiter?.[0] === fence[0] && delimiter.length >= fence.length) fence = undefined
+      continue
+    }
+    if (delimiter) {
+      fence = delimiter
+      continue
+    }
+    const prose = line
+      .replace(/(`+)(.*?)\1/g, (span, _delimiter, code) =>
+        /^(?:node|npm|npx|git|bash|sh|zsh|python3?|curl)\s/u.test(code.trim()) ? '' : span,
+      )
+      .replace(/\bhttps?:\/\/[^\s<>`]+/giu, '')
+      .replace(/%([\da-f]{2})/giu, (_encoded, byte) => String.fromCharCode(Number.parseInt(byte, 16)))
+    for (const match of prose.matchAll(/\.scratch\/[^\s`<>"')\]]+/giu)) {
+      const path = match[0].split(/[?#]/u)[0].replace(/[.,;:!]+$/u, '')
+      const leaf = path.split('/').at(-1)
+      if (!leaf || (!leaf.includes('.') && path.split('/').length < 3) || /[${}*]/u.test(path)) continue
+      issues.push(
+        `${displayPath}:${index + 1}: permanent document depends on temporary scratch file ${path}; record the conclusion here or retain reusable tooling in Git (AGENTS.md §11)`,
+      )
+    }
+  }
+  return issues
+}
+
 export function findProductQuantityRestatements({ content, displayPath }) {
   const issues = []
   for (const { pattern, description } of PRODUCT_QUANTITY_PATTERNS) {
@@ -428,7 +462,56 @@ const SKIPPED_DIRECTORIES = new Set([
   'test-results',
   'playwright-report',
   'blob-report',
+  '.scratch',
+  '.tmp',
+  '.stryker-tmp',
+  'reports',
 ])
+
+function collectMarkdownPaths(rootDirectory) {
+  if (existsSync(join(rootDirectory, '.git'))) {
+    return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', '*.md'], {
+      cwd: rootDirectory,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+    })
+      .split('\0')
+      .filter((path) => path && existsSync(join(rootDirectory, path)))
+      .sort()
+  }
+  // Also support source copies and the filesystem fixtures used by this checker.
+  const paths = []
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && !SKIPPED_DIRECTORIES.has(entry.name)) walk(join(directory, entry.name))
+      else if (entry.isFile() && entry.name.endsWith('.md'))
+        paths.push(relative(rootDirectory, join(directory, entry.name)))
+    }
+  }
+  walk(rootDirectory)
+  return paths.sort()
+}
+
+const CLOSED_PLAN_STATUS = /^(?:completed?|closed|done|retired)\b/iu
+
+function unfinishedPlanPaths(rootDirectory) {
+  const indexPath = join(rootDirectory, 'plans', 'README.md')
+  const paths = new Set()
+  if (!existsSync(indexPath)) return paths
+  for (const line of readFileSync(indexPath, 'utf8').split(/\r?\n/u)) {
+    const status = line.trim().startsWith('|') ? line.split('|')[2]?.trim() : undefined
+    if (CLOSED_PLAN_STATUS.test(status ?? '')) continue
+    for (const match of line.matchAll(/\[[^\]]+\]\(([^)#]+\.md)(?:#[^)]*)?\)/gu)) {
+      const path = relative(rootDirectory, resolve(rootDirectory, 'plans', match[1]))
+      if (!/^plans\/[^/]+\.md$/u.test(path) || path === 'plans/README.md') continue
+      const filePath = join(rootDirectory, path)
+      if (!existsSync(filePath)) continue
+      const planStatus = readFileSync(filePath, 'utf8').match(/^Status:\s*(.+)$/imu)?.[1] ?? ''
+      if (!CLOSED_PLAN_STATUS.test(planStatus)) paths.add(path)
+    }
+  }
+  return paths
+}
 
 function collectLiveDocuments(rootDirectory) {
   const documents = new Set()
@@ -476,6 +559,16 @@ function collectLiveDocuments(rootDirectory) {
 
 export function runChecks({ rootDirectory = ROOT } = {}) {
   const issues = []
+  const unfinishedPlans = unfinishedPlanPaths(rootDirectory)
+  for (const path of collectMarkdownPaths(rootDirectory)) {
+    issues.push(
+      ...findScratchDependencies({
+        content: readFileSync(join(rootDirectory, path), 'utf8'),
+        displayPath: path,
+        allowTemporary: path === 'WORKING_PLAN.md' || unfinishedPlans.has(path),
+      }),
+    )
+  }
   const adrNumbers = new Set()
   const decisionsDirectory = join(rootDirectory, 'docs', 'decisions')
   const adrFiles = []

@@ -177,6 +177,8 @@ Before completion, extract knowledge that remains useful into its durable owner:
 
 Git history is sufficient for completed implementation plans. Do not create or maintain a plan archive. After satisfying the final owner acceptance rule when applicable, remove a completed initiative plan, or a review-batch plan once the Product Owner confirms no further tasks remain, and its index entry in the commit that records completion after moving lasting knowledge to its durable owner.
 
+Before marking a plan complete or retiring it, review its temporary continuation references under §11. Move lasting conclusions and decisions into their durable owners and retain any required reusable tooling in Git. Do not close the plan while understanding its result still requires scratch files.
+
 Use Architecture Decision Records (ADRs) for important technical or architectural decisions that are worth preserving for future development.
 
 ADRs belong in:
@@ -307,6 +309,14 @@ A test suite that cannot launch the application or execute the relevant boundary
 ---
 
 ## 11. Documentation
+
+### Temporary evidence and durable documentation
+
+Apply `AGENTS.md` §11: a reader of a fresh clone must be able to understand lasting conclusions and decisions without local scratch files. Record the conclusion, its relevant limits, and any settled decision in the owning tracked document. Keep raw logs, measurements, and disposable probes in scratch; preserve a reusable script or fixture in its maintained source directory when future work requires it. Do not create a permanent validation archive.
+
+Temporary continuation references may remain in `WORKING_PLAN.md` and unfinished plans linked from `plans/README.md`. Keep their evidence available through handoff. Before closing or removing a plan, transfer lasting knowledge, replace or remove scratch dependencies, and run the documentation check. A completed or closed plan has no continuation exception, even if its index entry has not yet been removed.
+
+Directory locations, placeholders, and documented command examples may mention scratch without depending on retained files. During documentation review, distinguish those examples from instructions to read a particular local artifact. The automated check detects explicit file paths; the agent must also check indirect references such as "the results are in the local evidence file" and summarize the needed conclusion in Git.
 
 ### README Screenshots
 

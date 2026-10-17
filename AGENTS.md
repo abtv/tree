@@ -150,6 +150,8 @@ Reuse passing results for unchanged inputs, environment, and scope. Never repeat
 
 Before documentation changes, read procedure §11. Keep each requirement at its owning source; keep documentation consistent with behavior and architecture. Do not duplicate detailed policy across tool adapters. This core routes to its binding procedures; `docs/DEVELOPMENT.md` owns validation mechanics and `docs/AGENT_ROLES.md` owns roles.
 
+Committed documentation must not depend on `.scratch` files. Save lasting conclusions and decisions in Git. Temporary continuation references are allowed only in unfinished indexed plans and `WORKING_PLAN.md`; remove those dependencies before plan closure. Procedure §11 defines the exceptions and review.
+
 ### README Screenshots
 
 Follow procedure §11 when changing capture-dependent UI or proposing imagery for a major new capability. Use only isolated synthetic demo data. Existing generated images are not committed.
