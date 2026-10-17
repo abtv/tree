@@ -9,6 +9,16 @@ if (process.argv[2] === 'theme') {
   await import('./storage-test.mjs')
 } else if (process.argv[2] === 'quit') {
   await import('./quit-test.mjs')
+} else if (process.argv[2] === 'compatibility') {
+  const { checkBrowserCompatibility } = await import('./compatibility-test.mjs')
+  const browser = await chromium.launch({ channel: 'chrome', headless: true })
+  try {
+    await checkBrowserCompatibility(browser, process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/', {
+      realClipboard: true,
+    })
+  } finally {
+    await browser.close()
+  }
 } else {
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
   try {

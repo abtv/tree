@@ -20,7 +20,7 @@ const url = `http://127.0.0.1:${server.address().port}/`
 try {
   assert.equal((await fetch(`${url}main.tsx`)).status, 404)
   assert.equal((await fetch(`${url}@vite/client`)).status, 404)
-  for (const mode of ['', 'theme', 'menu', 'storage', 'quit']) {
+  for (const mode of ['', 'theme', 'menu', 'storage', 'quit', 'compatibility']) {
     const child = spawn(process.execPath, [resolve(import.meta.dirname, 'verify.mjs'), mode], {
       stdio: 'inherit',
       env: { ...process.env, TREE_WEB_URL: url },

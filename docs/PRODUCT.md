@@ -73,6 +73,10 @@ with the browser's window controls. A failed flush keeps the editor open and
 shows the save failure. Native browser closing retains the existing warning for
 pending edits.
 
+Copying a stored image starts the browser clipboard request during the user's
+command while its image data loads asynchronously. A missing image or denied
+clipboard access reports an operation error and leaves the document unchanged.
+
 A push to source `main` publishes to `https://tree-editor.github.io` only after
 the same commit passes standard validation, Electron integration, dependency
 audit and Chrome checks of the built package, plus applicable memory/demo checks.

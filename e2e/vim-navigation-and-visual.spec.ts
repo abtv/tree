@@ -768,8 +768,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const editor = node(window, 1)
 
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
-      await expect(editor).toHaveCSS('caret-color', 'rgb(55, 63, 67)')
-      await expect(editor).toHaveCSS('caret-animation', 'manual')
+      await expect(editor).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)')
+      await expect(editor).not.toHaveCSS('background-image', 'none')
+      await expect(editor).toHaveCSS('animation-name', 'none')
       await expect(editor).toHaveJSProperty('selectionStart', 0)
       await expect(editor).toHaveJSProperty('selectionEnd', 0)
     })

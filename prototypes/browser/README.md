@@ -77,8 +77,8 @@ saved page with the browser's own controls. A failed save keeps the editor open.
 Data stays in the browser. There is no device synchronization, export or import.
 Clearing site data or deleting the profile removes it. This version has no offline
 package, recovery generations or persistent-storage request. Browser/OS force
-termination can lose uncommitted work. Safari remains unverified; clipboard and
-image paths are not covered by the initial editor smoke test.
+termination can lose uncommitted work. Full Safari and Dock-app compatibility
+remains unverified; native Safari clipboard interaction still needs verification.
 
 ## Browser checks
 
@@ -103,12 +103,20 @@ npm run test:web -- theme
 npm run test:web -- menu
 npm run test:web -- storage
 npm run test:web -- quit
+npm run test:web -- compatibility
 npm run test:web:built
 ```
 
 `test:web:built` builds the static package, starts an ephemeral loopback file server,
-runs the editor, theme, menu, storage and quit checks against those files in isolated
-Chrome, and closes the server. It does not open the ordinary browser profile.
+runs the editor, theme, menu, storage, quit and compatibility checks against those
+files in isolated Chrome, and closes the server. It does not open the ordinary
+browser profile.
+
+The compatibility check covers multiline sizing, decorated text editing and undo,
+save/reload, and the image-copy activation contract with missing-data and
+permission failures. It also checks PNG copying through headless Chrome's virtual
+clipboard. It does not access the machine clipboard or establish native Safari
+clipboard behavior.
 
 The storage check covers full browser restart, writer handover, aborted writes,
 retries, dirty-close warnings, buffered editing, Insert undo grouping and invalid

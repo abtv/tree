@@ -196,11 +196,20 @@ export async function installBrowserPrototype(): Promise<{
         await navigator.clipboard.writeText(payload.text)
         return
       }
-      const bytes = await read<Uint8Array>('blobs', payload.attachmentId)
-      if (!bytes) throw new Error('Image could not be loaded.')
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': new Blob([bytes.slice()], { type: 'image/png' }) }),
-      ])
+      // Start the clipboard request during the user's command. Safari can lose
+      // activation across the IndexedDB read, so supply the image as a promise.
+      const image = read<Uint8Array>('blobs', payload.attachmentId).then((bytes) => {
+        if (!bytes) throw new Error('Image could not be loaded.')
+        return new Blob([bytes.slice()], { type: 'image/png' })
+      })
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })])
+      } catch (error) {
+        // WebKit can wrap a rejected data promise in AbortError. Keep the
+        // original image-load failure when that caused the clipboard rejection.
+        await image
+        throw error
+      }
     },
     async writeAttachment(id, bytes) {
       validateAttachmentBytes(bytes, () => true)
