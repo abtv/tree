@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ipcChannels } from '../shared/ipc'
 import type { FileServices } from '../infrastructure/main/file-services'
+import type { NativeClipboard } from '../infrastructure/main/clipboard'
 import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
 import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
@@ -26,7 +27,7 @@ function createHarness() {
     cleanupAttachments: vi.fn(async () => undefined),
   }
   const nativeClipboard = {
-    read: vi.fn(async () => []),
+    read: vi.fn<NativeClipboard['read']>(async () => []),
     readText: vi.fn(async () => ''),
     writePlainText: vi.fn<(text: string) => Promise<void>>(async () => undefined),
     writeImage: vi.fn<(png: Uint8Array) => Promise<void>>(async () => undefined),
@@ -82,6 +83,21 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('propagates oversized clipboard image errors without reading bytes or writing attachments', async () => {
+    const { handlers, nativeClipboard, fileServices } = createHarness()
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(1))
+    nativeClipboard.read.mockResolvedValue([
+      { types: ['image/png'], getType: async () => ({ size: 25 * 1024 * 1024 + 1, arrayBuffer }) },
+    ])
+    expect(ipcChannels.readClipboard).toBe('tree:read-clipboard')
+    await expect(handlers.get(ipcChannels.readClipboard)!({ senderFrame: { url: rendererUrl } })).rejects.toThrow(
+      'Clipboard image is too large (maximum 25 MiB).',
+    )
+    expect(arrayBuffer).not.toHaveBeenCalled()
+    expect(nativeClipboard.readText).not.toHaveBeenCalled()
+    expect(fileServices.writeAttachment).not.toHaveBeenCalled()
+  })
+
   it('validates appearance and bounded history before invoking preferences and propagates failures', () => {
     const harness = createHarness()
     const { handlers, setAppearance, setCommandHistory } = harness

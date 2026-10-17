@@ -693,6 +693,8 @@ Paste uses the current clipboard item created by the most recent copy operation.
 
 If the current clipboard item exposes both image and text representations, the image takes precedence. Paste the image and do not also paste the text representation.
 
+PNG clipboard images larger than 25 MiB are rejected. The application reports an operation error stating the size limit, leaves the document unchanged, and does not fall back to the item's text representation. Existing attachment format and decoded-image limits still apply to images within this byte limit.
+
 The application must support:
 
 * plain text;

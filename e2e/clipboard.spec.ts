@@ -53,6 +53,60 @@ describeForEachEditingMode('clipboard (paste at the cursor)', () => {
 
 // The tests below do not pass through an editing-mode divergence, so they run once.
 test.describe('clipboard (mode-independent)', () => {
+  // @requirement PRODUCT.md §12
+  test('rejects an oversized clipboard image before reading bytes and allows a later paste', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await typeInto(editor, 'original')
+    await writeClipboardImageAndText(app)
+    allowRendererError(
+      /^Operation failed: Error invoking remote method 'tree:read-clipboard': Error: Clipboard image is too large \(maximum 25 MiB\)\.$/,
+    )
+    // Keep the native clipboard read and production IPC handler. Override only the returned
+    // image's metadata so the regression does not allocate an oversized image on the host.
+    await app.evaluate(({ clipboard }) => {
+      const originalRead = clipboard.read.bind(clipboard)
+      const control = globalThis as typeof globalThis & { clipboardImageBytesRead?: boolean }
+      control.clipboardImageBytesRead = false
+      clipboard.read = async () => {
+        clipboard.read = originalRead
+        const items = await originalRead()
+        return items.map((item) => ({
+          types: item.types,
+          getType: async (type: string) => {
+            const blob = await item.getType(type)
+            if (type !== 'image/png' || !(blob instanceof Blob)) return blob
+            Object.defineProperty(blob, 'size', { value: 25 * 1024 * 1024 + 1 })
+            const originalArrayBuffer = blob.arrayBuffer.bind(blob)
+            blob.arrayBuffer = () => {
+              control.clipboardImageBytesRead = true
+              return originalArrayBuffer()
+            }
+            return blob
+          },
+        })) as Awaited<ReturnType<typeof clipboard.read>>
+      }
+    })
+    await firePaste(editor)
+    await expect(window.getByRole('alert')).toContainText('Clipboard image is too large (maximum 25 MiB).')
+    await window.screenshot({ path: test.info().outputPath('oversized-clipboard.png') })
+    await expect(editor).toHaveValue('original')
+    await expect(window.getByAltText('Attached image')).toHaveCount(0)
+    expect(attachmentFiles(userDataDir)).toEqual([])
+    expect(
+      await app.evaluate(
+        () => (globalThis as typeof globalThis & { clipboardImageBytesRead?: boolean }).clipboardImageBytesRead,
+      ),
+    ).toBe(false)
+
+    await writeClipboardImage(app)
+    await firePaste(editor)
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+    await expect(editor).toHaveValue('original')
+  })
+
   test('pastes plain text when the HTML clipboard representation is oversized', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const plainText = 'plain clipboard text'

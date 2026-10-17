@@ -1,8 +1,9 @@
 import type { PersistedEditorState } from '../domain/document'
 import { isValidAttachmentId, validatePersistedState } from '../domain/document'
 import type { ClipboardContent, ClipboardWritePayload, EditorContextMenuRequest } from '../shared/ipc'
+import { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
 
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+export { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
 export const MAX_ATTACHMENT_DIMENSION = 32_767
 export const MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024
 export const MAX_CONTEXT_MENU_SELECTION_CODE_POINTS = 256

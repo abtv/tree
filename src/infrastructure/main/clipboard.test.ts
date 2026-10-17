@@ -1,7 +1,33 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { extractClipboardLinks, readClipboard, writeClipboard } from './clipboard'
 
 describe('readClipboard', () => {
+  it('rejects an oversized image before reading its bytes or falling back to text', async () => {
+    const arrayBuffer = vi.fn(async () => new ArrayBuffer(1))
+    const readText = vi.fn(async () => 'fallback')
+    await expect(
+      readClipboard({
+        read: async () => [
+          { types: ['image/png', 'text/plain'], getType: async () => ({ size: 25 * 1024 * 1024 + 1, arrayBuffer }) },
+        ],
+        readText,
+      }),
+    ).rejects.toThrow('Clipboard image is too large (maximum 25 MiB).')
+    expect(arrayBuffer).not.toHaveBeenCalled()
+    expect(readText).not.toHaveBeenCalled()
+  })
+
+  it('reads image bytes when the reported size is exactly the attachment limit', async () => {
+    const arrayBuffer = vi.fn(async () => new Uint8Array([1]).buffer)
+    await expect(
+      readClipboard({
+        read: async () => [{ types: ['image/png'], getType: async () => ({ size: 25 * 1024 * 1024, arrayBuffer }) }],
+        readText: async () => '',
+      }),
+    ).resolves.toEqual({ kind: 'image', png: new Uint8Array([1]) })
+    expect(arrayBuffer).toHaveBeenCalledOnce()
+  })
+
   it('uses an image in preference to text when both representations exist', async () => {
     await expect(
       readClipboard({

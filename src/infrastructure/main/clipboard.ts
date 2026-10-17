@@ -1,5 +1,6 @@
 import type { LinkRange } from '../../domain/document'
 import type { ClipboardPayload, ClipboardWritePayload } from '../../shared/ipc'
+import { MAX_ATTACHMENT_BYTES } from '../../shared/attachment-limits'
 
 const MAX_CLIPBOARD_HTML_LENGTH = 1_048_576
 const MAX_CLIPBOARD_LINKS = 100
@@ -30,6 +31,7 @@ export async function readClipboard(clipboard: NativeClipboard): Promise<Clipboa
     const imageType = item.types.find((type) => type.toLowerCase() === 'image/png')
     if (imageType !== undefined) {
       const blob = (await item.getType(imageType)) as Blob
+      if (blob.size > MAX_ATTACHMENT_BYTES) throw new Error('Clipboard image is too large (maximum 25 MiB).')
       return { kind: 'image', png: new Uint8Array(await blob.arrayBuffer()) }
     }
   }
