@@ -1,6 +1,11 @@
 import { expect, it } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
-import { CompletionController } from './completion-controller'
+import { CompletionController, moveSuggestionIndex } from './completion-controller'
+
+it('keeps an empty suggestion list at index zero in either direction', () => {
+  expect(moveSuggestionIndex(0, -1, 0)).toBe(0)
+  expect(moveSuggestionIndex(0, 1, 0)).toBe(0)
+})
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 // @requirement PRODUCT.md §20.12

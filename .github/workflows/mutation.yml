@@ -14,21 +14,15 @@ concurrency:
 
 jobs:
   mutation:
-    name: Mutation testing (${{ matrix.shard.name }})
+    name: Mutation testing (${{ matrix.shard }})
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
-    # Each shard mutates a disjoint file set; the exclusions in stryker.config.mjs still apply on top of --mutate.
+    # The Stryker configuration owns both the full scope and each layer's shard.
     strategy:
       fail-fast: false
       matrix:
-        shard:
-          - name: domain
-            mutate: 'src/domain/**/*.ts,!src/**/*.test.ts'
-          - name: application
-            mutate: 'src/application/**/*.ts,!src/**/*.test.ts,!src/application/test/**'
-          - name: renderer
-            mutate: 'src/renderer/vim-editing.ts,src/renderer/vim-text-commands.ts,src/renderer/vim-surround.ts,src/renderer/vim-caret-transition.ts,src/renderer/vim-vertical-navigation.ts,src/renderer/vim-command-state.ts,src/renderer/vim-edit-session.ts,src/renderer/link-caret.ts,src/renderer/drag-caret-freeze.ts,src/renderer/node-drag.ts,src/renderer/list-window.ts'
+        shard: [domain, application, renderer]
 
     steps:
       - name: Check out repository
@@ -44,13 +38,15 @@ jobs:
         run: npm ci
 
       # The runner has 4 vCPUs; Stryker defaults to fewer test runner processes.
-      - name: Run mutation testing (${{ matrix.shard.name }})
-        run: npm run test:mutation -- --force --concurrency 4 --mutate '${{ matrix.shard.mutate }}'
+      - name: Run mutation testing (${{ matrix.shard }})
+        env:
+          TREE_MUTATION_SHARD: ${{ matrix.shard }}
+        run: npm run test:mutation -- --force --concurrency 4
 
       - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mutation-report-${{ matrix.shard.name }}
+          name: mutation-report-${{ matrix.shard }}
           path: reports/mutation/
           if-no-files-found: ignore

@@ -1,6 +1,13 @@
+import process from 'node:process'
+
 // Mutation testing for the domain and application layers and the pure renderer modules. See docs/DEVELOPMENT.md §12.
+const shard = process.env['TREE_MUTATION_SHARD']
+if (shard && !['domain', 'application', 'renderer'].includes(shard)) {
+  throw new Error(`Unknown mutation shard: ${shard}`)
+}
+
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
-export default {
+const config = {
   testRunner: 'vitest',
   vitest: { configFile: 'vitest.config.ts' },
   // Instrumentation measures mutated code, so submillisecond timing guards
@@ -41,3 +48,9 @@ export default {
   tempDirName: '.stryker-tmp',
   cleanTempDir: 'always',
 }
+
+// CI selects a layer from this same list, so adding a module cannot leave the scheduled run behind.
+if (shard)
+  config.mutate = config.mutate.filter((pattern) => pattern.startsWith('!') || pattern.startsWith(`src/${shard}/`))
+
+export default config
