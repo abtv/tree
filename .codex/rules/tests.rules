@@ -41,3 +41,14 @@ prefix_rule(
     ],
     not_match = ["npm run unknown", "npm install", "npm run test:e2e:visible-extra", "npm run test:e2e:diagnose-extra"],
 )
+
+# Owner-approved isolated Chrome verification of the generated static package.
+# Like the other npm rules, this trusts the repository script and matches argv,
+# not the current directory. Review script changes before using this allowance.
+prefix_rule(
+    pattern = ["npm", "run", "test:web:built"],
+    decision = "allow",
+    justification = "Build the static Tree package and verify it in isolated Chrome outside the sandbox",
+    match = ["npm run test:web:built"],
+    not_match = ["npm run test:web", "npm run test:web:built-extra", "npm run dev:web", "npm install", "node arbitrary-script.mjs"],
+)
