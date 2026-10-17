@@ -777,9 +777,14 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   cursor: default;
 }
 
-.vim-state-normal .node-input.node-input-empty:focus {
-  caret-color: var(--color-ink);
-  caret-animation: manual;
+/* Empty text has no character selection to paint. Draw its Normal block explicitly:
+   browsers that ignore caret-shape must not fall back to a thin insertion caret.
+   Font-relative dimensions also follow the larger current-parent heading. */
+.vim-state-normal .node-input.node-input-empty:not(.node-input-image-only):focus {
+  background-image: linear-gradient(var(--color-caret), var(--color-caret));
+  background-position: 6px 0;
+  background-size: 1ch 1lh;
+  background-repeat: no-repeat;
 }
 
 .vim-state-normal .node-input::selection,
@@ -1289,10 +1294,6 @@ body.node-drag-invalid * {
   .vim-state-normal .agenda-caret {
     color: var(--color-background);
     background: var(--color-caret);
-  }
-
-  .vim-state-normal .node-input.node-input-empty:focus {
-    caret-color: var(--color-caret);
   }
 
   .node-input:focus {

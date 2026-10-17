@@ -52,12 +52,28 @@ try {
   )
   assert.equal(await page.evaluate(() => window.treeApi.getAppearance()), 'system')
   assert.equal(await page.evaluate(() => window.prototypeStore.getSnapshot().operationError), undefined)
+  const empty = page.locator('[data-node-id="welcome"] .node-input')
+  await empty.fill('')
+  await page.evaluate(() => window.treeApi.setVimEnabled(true))
+  await empty.focus()
+  await page.waitForFunction(() => document.querySelector('.tree-app').classList.contains('vim-state-normal'))
+  const emptyBlock = () => empty.evaluate((element) => getComputedStyle(element).backgroundImage)
+  assert.notEqual(await emptyBlock(), 'none')
+  assert.equal(await empty.evaluate((element) => getComputedStyle(element).caretColor), 'rgba(0, 0, 0, 0)')
+  await page.screenshot({ path: '.scratch/web-prototype/empty-normal-light.png' })
+  await page.keyboard.press('i')
+  assert.equal(await emptyBlock(), 'none')
+  await page.keyboard.press('Escape')
+  assert.notEqual(await emptyBlock(), 'none')
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.screenshot({ path: '.scratch/web-prototype/empty-normal-dark.png' })
   console.log(
     JSON.stringify({
       darkUnderLightSystem: true,
       persistedAfterReload: true,
       lightUnderDarkSystem: true,
       automaticFollowsSystem: true,
+      emptyNormalBlock: true,
       status: 'passed',
     }),
   )

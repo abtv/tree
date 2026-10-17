@@ -1090,7 +1090,7 @@ At or below 500 visible rows, the list renders every row, including inline desce
 #### 20.2.4 Modes and Escape
 
 * The editor starts in Normal mode, with a block caret on the current character.
-* When the current node is empty, Normal mode displays a non-blinking block caret at its only insertion position.
+* When the current node is empty, Normal mode displays a non-blinking block caret at its only insertion position. This applies to plain and decorated editors, including the current-parent heading, in both appearances and in the browser version.
 * Pressing `i` or `a` enters Insert mode, where text entry and all existing application commands behave normally; Insert mode uses the normal thin text caret.
 * Pressing `R` enters Replace mode, where printable input overwrites existing characters and appends after the end of the node.
 * Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode. If a completion popup is open in Insert, the first `Escape` only dismisses it and preserves Insert mode, focus, text and caret; another `Escape` with no popup enters Normal. This deliberate Vim divergence lets users dismiss suggestions without interrupting typing (§20.9, §20.12).
