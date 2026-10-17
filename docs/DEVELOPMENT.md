@@ -62,15 +62,11 @@ The application should provide a development command:
 npm run dev
 ```
 
-For the preserved local browser version, use `npm run dev:web` and open
-<http://127.0.0.1:5174/>. `npm run test:web` runs its isolated Chrome smoke check;
-the `theme`, `menu` and `storage` arguments select focused checks.
-`npm run build:web` writes the independent static package to `out/web/`.
-`npm run test:web:built` builds and checks that package in isolated Chrome using
-a temporary static file server. `npm run preview:web` serves the generated files
-at <http://127.0.0.1:5175/> for local inspection. These commands do not publish.
-See [Browser version](../prototypes/browser/README.md) for storage identity and
-scope limits. This is separate from Electron validation and does not publish a site.
+The preserved browser version has separate development, static build, preview
+and isolated Chrome commands. See [Browser version](../prototypes/browser/README.md)
+for their exact invocations, local URLs, storage identity and scope limits.
+Local build/check commands do not publish. The source main-push pipeline and
+one-time access setup are in [Browser publication](../deployment/github-pages/README.md).
 
 Successful persistence operations are quiet during normal development. To enable detailed persistence operation and path logging while investigating a failure, run:
 
@@ -598,7 +594,8 @@ Requirement traceability uses a standalone comment directly above a test or suit
 // @requirement PRODUCT.md §13.1
 ```
 
-`npm run check:requirements` scans `src/**/*.test.*`, `e2e/**/*.ts`, and `perf/**/*.ts`.
+`npm run check:requirements` scans `src/**/*.test.*`, `scripts/**/*.test.*`,
+`e2e/**/*.ts`, `perf/**/*.ts` and the browser verification entry points.
 It requires a marker for every numbered leaf section of `docs/PRODUCT.md` and for
 parents with their own text; unnumbered subheadings belong to the nearest numbered
 section. Numbered headings at levels two through four are supported (for example,

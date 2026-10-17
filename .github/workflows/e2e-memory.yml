@@ -4,22 +4,7 @@ on:
   schedule:
     - cron: '0 4 * * 0'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'e2e/shared-application*.spec.ts'
-      - 'e2e/fixtures.ts'
-      - 'e2e/global-setup.ts'
-      - 'e2e/*.cjs'
-      - 'e2e/electron-process.ts'
-      - 'e2e/clipboard-lock.ts'
-      - 'playwright*.config.ts'
-      - 'tsconfig.e2e.json'
-      - 'scripts/e2e-diagnose.mjs'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.nvmrc'
-      - '.github/workflows/e2e*.yml'
+  workflow_call:
   pull_request:
     paths:
       - 'e2e/shared-application*.spec.ts'
@@ -50,10 +35,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -68,7 +53,7 @@ jobs:
 
       - name: Upload memory evidence and failure traces
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-memory
           path: |

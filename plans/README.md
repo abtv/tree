@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Browser Tree](browser-tree.md) | D1–D5 accepted; accepted browser version preserved; static package prepared and checked in Chrome; P1 remains partial | Await owner direction. No publication or automatic continuation of P2–P8. Whole-project checks have pre-existing blockers recorded in the plan. Safari, physical input and scale gates remain open; Docker setup is suspended |
+| [Browser Tree](browser-tree.md) | Accepted browser version preserved; static package checked in Chrome; secure automatic-publication files prepared and locally reviewed; activation pending; P1 remains partial | Owner updates target workflow/App setup and pushes source for real signed deployment and rejection checks. No agent push or automatic continuation of P2–P8; Safari, physical input and scale work remain separate |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

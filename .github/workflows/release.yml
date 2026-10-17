@@ -1,0 +1,169 @@
+name: Browser release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Preserve in-flight publication; reject stale candidates before transfer/deploy.
+concurrency:
+  group: browser-release-main
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Select conditional checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      memory: ${{ steps.changes.outputs.memory }}
+      demo: ${{ steps.changes.outputs.demo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: node scripts/web-release/cli.mjs changes "$BEFORE_SHA" "$GITHUB_SHA"
+
+  check:
+    name: Standard checks
+    uses: ./.github/workflows/ci.yml
+  electron:
+    name: Desktop integration
+    uses: ./.github/workflows/e2e.yml
+  audit:
+    name: Dependency audit
+    uses: ./.github/workflows/audit.yml
+  chrome:
+    name: Browser integration
+    uses: ./.github/workflows/browser.yml
+  memory:
+    name: Memory checks
+    needs: changes
+    if: needs.changes.outputs.memory == 'true'
+    uses: ./.github/workflows/e2e-memory.yml
+  demo:
+    name: Demo checks
+    needs: changes
+    if: needs.changes.outputs.demo == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/demo.yml
+
+  gate:
+    name: Release gate
+    if: always()
+    needs: [changes, check, electron, audit, chrome, memory, demo]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Require all applicable checks of this commit
+        env:
+          RELEASE_RESULTS: ${{ toJSON(needs) }}
+          RELEASE_MEMORY_REQUIRED: ${{ needs.changes.outputs.memory }}
+          RELEASE_DEMO_REQUIRED: ${{ needs.changes.outputs.demo }}
+        run: node scripts/web-release/cli.mjs gate
+
+  sign:
+    name: Sign authenticated package
+    needs: [gate]
+    if: github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: browser-${{ github.sha }}-${{ github.run_attempt }}
+          path: signed-browser
+      - name: Authenticate previous assets and prepare complete manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/web-release/cli.mjs prepare signed-browser/web signed-browser/web-provenance.json
+      - name: Attest the exact manifest committing to all package bytes
+        id: attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: signed-browser/web-provenance.json
+          create-storage-record: false
+      - name: Preserve detached proof
+        env:
+          BUNDLE_PATH: ${{ steps.attestation.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" signed-browser/web-provenance.sigstore.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: signed-browser-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            signed-browser/web/
+            signed-browser/web-provenance.json
+            signed-browser/web-provenance.sigstore.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Transfer verified browser package
+    needs: [sign]
+    if: github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: web-publication
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Download the tested package from this attempt
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: signed-browser-${{ github.sha }}-${{ github.run_attempt }}
+          path: verified-browser
+      - name: Check package and source gate before obtaining write access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/web-release/publish.mjs preflight verified-browser/web verified-browser/web-provenance.json
+      - name: Create target-only installation token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        with:
+          app-id: ${{ vars.WEB_PUBLISH_APP_ID }}
+          private-key: ${{ secrets.WEB_PUBLISH_APP_PRIVATE_KEY }}
+          owner: tree-editor
+          repositories: tree-editor.github.io
+          permission-contents: write
+      - name: Append package to hosting repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEB_TARGET_TOKEN: ${{ steps.app.outputs.token }}
+        run: node scripts/web-release/publish.mjs transfer verified-browser/web verified-browser/web-provenance.json

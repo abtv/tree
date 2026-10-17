@@ -20,10 +20,11 @@ depend on browser capabilities and secure contexts. Opening `index.html` with
 or rewrite requirement. Keep old hashed assets available during an update, upload
 new assets first and replace `index.html` last (or use an atomic deployment).
 
-The planned destination is `https://tree-editor.github.io`, from the separate
-`tree-editor/tree-editor.github.io` repository. This task does not transfer files,
-change repository settings, enable deployment automation or publish anything.
-The source repository's existing demo Pages workflow is a separate destination.
+The destination is `https://tree-editor.github.io`, from the separate
+`tree-editor/tree-editor.github.io` repository. Source pushes to main use the
+[automatic publication pipeline](../../deployment/github-pages/README.md) after
+one-time access setup. Local build/check commands do not publish. The source
+repository's existing demo Pages workflow remains a separate destination.
 
 Before publication, explain the storage boundary: the local development origin
 and `https://tree-editor.github.io` have separate browser storage. Existing localhost

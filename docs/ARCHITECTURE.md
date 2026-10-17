@@ -36,6 +36,21 @@ It preserves the same browser adapter and storage identity. This checkpoint is
 not final browser architecture or publication; its constraints are in
 [Browser version](../prototypes/browser/README.md).
 
+The browser publication workflow composes the existing checks with a Chrome
+package check through reusable Actions workflows. A gated, short-lived GitHub
+App token writes package/provenance paths to the separate hosting
+repository. After the gate, a separate OIDC signing job attests the complete
+manifest, including independently authenticated retained assets. The publisher
+replaces the whole `site/` tree, removing unlisted bytes. The target workflow
+obtains verifier code from source main at an independently resolved immutable SHA;
+it never executes target scripts. It verifies the detached attestation and hashes,
+source run/SHA/attempt and current heads. A separate Pages/OIDC write job deploys
+the read-only verifier's artifact. The App has no Workflows write permission.
+This protects against a stolen target publisher token, while source maintainers
+and GitHub/Sigstore remain trusted. Browser-local
+documents never enter this pipeline. Setup and trust boundaries are described in
+[Browser publication](../deployment/github-pages/README.md).
+
 ---
 
 ## 3. Architectural Layers

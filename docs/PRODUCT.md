@@ -57,7 +57,7 @@ The owner-reviewed browser version under `prototypes/browser/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
 behavior remain as accepted. This checkpoint adds no synchronization, accounts,
-export/import, offline package or automatic publication. It does not claim full
+export/import or offline package. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
 Existing browser notes must not be cleared or migrated by building or installing
@@ -65,6 +65,20 @@ the package. Notes belong to the browser profile and exact origin: localhost and
 the permanent HTTPS address have separate storage. Before publication, explain
 that notes will not transfer automatically. The existing browser save and storage
 limitations are described in [Browser version](../prototypes/browser/README.md).
+
+A push to source `main` publishes to `https://tree-editor.github.io` only after
+the same commit passes standard validation, Electron integration, dependency
+audit and Chrome checks of the built package, plus applicable memory/demo checks.
+Scheduled/manual suites are separate. Safari is outside this current publication
+gate. Publication transfers the tested package without rebuilding it. Failed
+checks, transfer or pre-deployment verification leave the active release intact.
+
+Publication independently authenticates a source-signed manifest and every file
+it authorizes, including retained assets. Unlisted files cannot enter the site.
+The target-only publisher cannot select executable verification code: the protected
+workflow obtains it from trusted source main at an independently resolved SHA.
+Verification runs without Pages/OIDC write permissions; a separate job deploys
+the resulting artifact. Source maintainers and hosting administrators remain trusted.
 
 ---
 

@@ -137,7 +137,7 @@ describe('repository discovery', () => {
       mkdirSync(dirname(join(root, path)), { recursive: true })
       writeFileSync(join(root, path), content)
     }
-    write('docs/PRODUCT.md', '## 1. One\n## 2. Two\n## 3. Three\n## 4. Four\n## 5. Five\n## 6. Six\n')
+    write('docs/PRODUCT.md', '## 1. One\n## 2. Two\n## 3. Three\n## 4. Four\n## 5. Five\n## 6. Six\n## 7. Seven\n')
     write('src/nested/one.test.tsx', '// @requirement PRODUCT.md §1\n')
     write('src/two.ts', '// @requirement PRODUCT.md §2\n')
     write('e2e/nested/two.spec.ts', '// @requirement PRODUCT.md §2\n')
@@ -146,9 +146,10 @@ describe('repository discovery', () => {
     write('prototypes/browser/build.mjs', '// @requirement PRODUCT.md §4\n')
     write('prototypes/browser/verify-built.mjs', '// @requirement PRODUCT.md §5\n')
     write('prototypes/browser/theme-test.mjs', '// @requirement PRODUCT.md §6\n')
+    write('scripts/release/rules.test.mjs', '// @requirement PRODUCT.md §7\n')
     expect(runChecks({ rootDirectory: root, exemptions: new Map(), boundarySections: new Set(['2']) })).toEqual({
       issues: ['PRODUCT.md §4: missing test marker'],
-      requirementCount: 6,
+      requirementCount: 7,
     })
   })
 })

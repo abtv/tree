@@ -43,6 +43,43 @@ spellchecker downloads no dictionaries. A future Windows or Linux build must dis
 Hunspell dictionary download before shipping, because Electron may otherwise download dictionaries
 from a Google-hosted CDN on first use.
 
+## Browser publication
+
+The browser's static package is published separately from the desktop application.
+Source tests receive no publication secrets. Only a successful main-push release
+gate can obtain a short-lived App token scoped to Contents write on
+`tree-editor/tree-editor.github.io`, without Workflows, Actions, Pages or
+administration write permissions. GitHub's separate Workflows permission protects
+the owner-installed workflow from that token. The workflow obtains verifier code
+from trusted source main at an independently resolved immutable SHA, not from
+publisher-controlled target scripts or metadata.
+
+A separate gated source job uses OIDC/Sigstore to attest the exact manifest bytes.
+The manifest commits to every current and retained file's size and SHA256. Old
+assets are admitted only after verifying their previous detached attestation and
+bytes; target-provided unsigned hashes never become signing inputs. Cumulative
+bounds apply before fetching retained assets. The target independently verifies
+the signature's repository, workflow, main ref, source digest and hosted runner,
+plus current source run/attempt/gate and every package byte. The publisher replaces
+the whole site tree, and the verifier rejects all unlisted files. Approved static
+asset extensions exclude HTML/SVG. No archive extraction is used.
+
+Read-only verification uploads the authenticated artifact. A separate job with
+Pages/OIDC write executes only SHA-pinned Actions and protected inline head checks;
+it has no checkout or repository script execution. Publication-reachable Actions
+are SHA-pinned, with Dependabot updates in both repositories. Neither repository
+stores browser notes. Source main maintainers, target workflow administrators,
+GitHub-hosted runners, GitHub and Sigstore remain trust roots; compromise of those
+roots is outside the target-only publisher-token protection.
+
+The App private key belongs only in the source `web-publication` environment
+secret. Repository/workflow maintainers and dependency install scripts are trusted;
+do not give untrusted code access to that environment. Protect main and review
+workflow changes as appropriate. Manual setup must not weaken existing environment
+protection. GitHub Pages serves application resources and may log IP addresses;
+it does not receive the browser's IndexedDB document. Operational setup and
+failure handling are in [Browser publication](../deployment/github-pages/README.md).
+
 ## Distribution hardening before shipment
 
 The repository does not yet package the application: `npm run build` produces unpackaged build

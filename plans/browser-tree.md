@@ -1,7 +1,50 @@
 # Browser Tree: research and proposed delivery plan
 
-Status: D1–D5 accepted; P1 Chrome/macOS storage/quota, ownership/lifecycle, update, PNG decoding, headless virtual-clipboard and CSP-denied-Service-Worker mechanisms have passing evidence. Explicit frozen-writer verification is blocked by an ineffective lifecycle command in this automation setup. Physical keys, OS clipboard/prompt behavior, real-editor scale and the full support matrix remain unverified. P1 remains partial; the owner will check Safari manually later. Full implementation and publication remain unauthorized.
+Status: D1–D5 accepted; static package and Chrome-only automatic publication files prepared and locally reviewed. First signed GitHub execution remains pending owner setup/push. P1 remains partial: frozen-writer, physical-input, Safari, real-editor scale and the full support matrix remain unverified. Remaining full-parity implementation is not authorized by the bounded publication task.
 Research date: 2026-10-17.
+Secure-publication hardening (owner, 2026-10-17): implement independent attestation
+of the manifest committing to every published file; authenticate retained assets;
+pin publication Actions and separate verification from Pages/OIDC write jobs.
+Source main, approved workflow code and GitHub/Sigstore are trusted. A compromised
+target-only Contents-write App must not forge provenance or alter executable
+verification code. Target workflow uses source tools at an independently resolved
+immutable source main SHA, never target scripts. App Workflows write remains denied.
+The owner will manually update the target repository and GitHub settings. Do not
+edit or push that checkout, source main, or publish. Anonymous API reliability is
+deferred. This review batch includes findings1–5 and the deliberate in-progress
+source run behavior; #5 is deferred, the other security findings are in scope.
+Validation is High Risk for security boundaries; real signed CI/deployment
+acceptance remains pending owner setup and push, separate from local validation.
+
+| Review item | Implementation state |
+| --- | --- |
+| 1. Independent package authenticity | Source OIDC job attests a complete manifest; target verifies detached Sigstore proof and every size/hash using independently sourced trusted code |
+| 2. Unverified retained files | Source authenticates previous manifest/bytes before merging; cumulative bounds precede downloads; whole-tree transfer and exact target checks exclude extras |
+| 3. Mutable Action tags | Publication-reachable source and target Actions use verified full SHAs; target Dependabot configuration supplied |
+| 4. Deployment privileges | Read-only target verification/hosted checks are separate from Pages/OIDC write deployment with no checkout or repository scripts |
+| 5. Anonymous source API reliability | Deferred by owner; no cross-repository reading credential added |
+
+Acceptance remains pending: owner replaces target workflow using
+`deployment/github-pages/`, confirms App permissions/secrets, and pushes intended
+source commits. The transfer probes workflow-write denial in a temporary branch;
+target `workflow_dispatch` with `rejection_probe` checks a real authenticated
+baseline and corrupted local copy without deployment. Do not call this operational
+or claim publisher-token protection is verified through GitHub before those pass.
+Docker and automatic settings setup were removed at owner request. No source or
+target push, App setup or deployment was performed by this hardening task.
+
+Automatic-publication task (owner, 2026-10-17): implement publication after source
+main pushes and all applicable checks pass. Chrome is sufficient for this current
+release gate; do not start Safari or the remaining full-parity initiative.
+This supersedes earlier publication-preparation holds only for this bounded task.
+Use accepted D5: short-lived target-only App, verified package handoff and trusted
+target Pages Actions. Preserve the separate source media site. Do not push the
+existing local source commits on the owner's behalf; activate when the owner pushes.
+Source/target API reads work and target admin access is reported. There are no
+publication secrets yet. The owner must create/install the App and put its private
+key directly into the source environment secret before an actual automated run.
+Pipeline and one-time setup are in `deployment/github-pages/README.md`.
+
 Static-hosting task (owner, 2026-10-17): prepare the accepted browser version for
 the permanent address with a static build and hosting files, verify the generated
 package in Chrome, and commit. Preserve the accepted editor, compact menu, themes,
