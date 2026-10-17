@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { resolve } from 'node:path'
 
-const url = 'http://127.0.0.1:5174/'
+const url = process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/'
 const profile = resolve(`.scratch/web-prototype/storage-profile-${Date.now()}`)
 const launch = () =>
   chromium.launchPersistentContext(profile, {

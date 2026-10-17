@@ -6,7 +6,7 @@ try {
   const context = await browser.newContext({ colorScheme: 'light', viewport: { width: 1100, height: 760 } })
   const page = await context.newPage()
   page.setDefaultTimeout(5000)
-  await page.goto('http://127.0.0.1:5174/')
+  await page.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   const command = async (name) => {
     await page.keyboard.press('Meta+Shift+p')

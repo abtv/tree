@@ -8,7 +8,7 @@ try {
   page.setDefaultTimeout(6000)
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto('http://127.0.0.1:5174/')
+  await page.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   assert.equal(await page.title(), 'Tree')
   assert.equal(await page.locator('#prototype-toolbar').count(), 0)
@@ -55,7 +55,7 @@ try {
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   assert.equal(await page.locator('[data-node-id="welcome"] .node-input').inputValue(), 'Editing after using the menu')
   const blocked = await context.newPage()
-  await blocked.goto('http://127.0.0.1:5174/')
+  await blocked.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
   await blocked.getByRole('alert').filter({ hasText: 'already open' }).waitFor()
   await blocked.close()
   await page.setViewportSize({ width: 390, height: 760 })

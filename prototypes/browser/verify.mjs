@@ -15,7 +15,7 @@ if (process.argv[2] === 'theme') {
     page.setDefaultTimeout(12000)
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
-    await page.goto('http://127.0.0.1:5174/')
+    await page.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
     await page.locator('[data-node-id="welcome"] .node-input').waitFor()
     assert.equal(await page.locator('.node-input').count(), 5)
     await page.locator('[data-node-id="welcome"] .node-input').fill('Browser editing is working')
@@ -62,7 +62,7 @@ if (process.argv[2] === 'theme') {
     await page.emulateMedia({ colorScheme: 'dark' })
     await page.screenshot({ path: '.scratch/web-prototype/tree-dark.png' })
     const blocked = await context.newPage()
-    await blocked.goto('http://127.0.0.1:5174/')
+    await blocked.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
     await blocked.waitForFunction(() =>
       document.getElementById('prototype-problem').textContent.includes('already open'),
     )

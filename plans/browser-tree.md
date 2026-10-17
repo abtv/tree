@@ -2,6 +2,30 @@
 
 Status: D1–D5 accepted; P1 Chrome/macOS storage/quota, ownership/lifecycle, update, PNG decoding, headless virtual-clipboard and CSP-denied-Service-Worker mechanisms have passing evidence. Explicit frozen-writer verification is blocked by an ineffective lifecycle command in this automation setup. Physical keys, OS clipboard/prompt behavior, real-editor scale and the full support matrix remain unverified. P1 remains partial; the owner will check Safari manually later. Full implementation and publication remain unauthorized.
 Research date: 2026-10-17.
+Static-hosting task (owner, 2026-10-17): prepare the accepted browser version for
+the permanent address with a static build and hosting files, verify the generated
+package in Chrome, and commit. Preserve the accepted editor, compact menu, themes,
+Agenda and Vim. Do not start the rest of the initiative, configure Docker, add
+sync/accounts/export/import, delete existing browser notes or publish. This narrow
+authorization supersedes the earlier implementation hold only for this task.
+The owner has been told that localhost and the permanent origin have separate
+storage and existing notes do not transfer automatically; repeat this explanation
+before any later publication. Safari, physical input and scale gates remain open.
+Static-hosting result: `npm run build:web` produces `out/web/` with HTML, hashed
+JavaScript/CSS/font assets and `.nojekyll`. `npm run test:web:built` passed the
+editor, theme, menu and storage checks in isolated Chrome 155 against the generated
+files, including full browser restart and write-failure paths. Accepted UI and
+the browser adapter/database are unchanged. Hosting and update instructions are
+in `prototypes/browser/README.md`; no deployment workflow or publication was added.
+Types, unit coverage, serial fast performance guards, desktop build, scoped lint
+and formatting, docs and requirement coverage pass. Full `npm run check` remains
+blocked by the unrelated untracked Docker verifier's lint/format errors;
+`check:opencode` also exposes the previously documented `dev:web` workflow's
+missing allow rule. These files/permissions were not changed. This is a prepared
+Chrome-checked package, not a passed full browser release gate.
+Next task: await explicit owner direction. Do not automatically resume P2–P8 or
+publish; retain all existing Safari, physical-input, scale and release gates.
+
 Local implementation checkpoint (owner, 2026-10-17): after reviewing the browser
 editor, theme, compact menu and storage corrections, the owner explicitly asked
 to preserve the working code in ordinary project files and commit it. The scope

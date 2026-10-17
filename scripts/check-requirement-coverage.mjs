@@ -135,13 +135,18 @@ export function runChecks({
       if (entry.isDirectory()) walk(path, kind)
       else if (
         entry.isFile() &&
-        (kind === 'src' ? /\.test\.[cm]?[jt]sx?$/.test(entry.name) : /\.ts$/.test(entry.name))
+        (kind === 'src'
+          ? /\.test\.[cm]?[jt]sx?$/.test(entry.name)
+          : kind === 'browser'
+            ? /^(verify(?:-built)?|.*-test)\.mjs$/.test(entry.name)
+            : /\.ts$/.test(entry.name))
       ) {
         files.push({ path: relative(rootDirectory, path).split('\\').join('/'), content: readFileSync(path, 'utf8') })
       }
     }
   }
   for (const kind of ['src', 'e2e', 'perf']) walk(join(rootDirectory, kind), kind)
+  walk(join(rootDirectory, 'prototypes/browser'), 'browser')
   return checkCoverage({
     product: readFileSync(join(rootDirectory, 'docs/PRODUCT.md'), 'utf8'),
     files,

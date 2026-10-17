@@ -51,6 +51,21 @@ A requirement in this document that deliberately differs from the guidelines tak
 
 Every change to user-visible behavior is checked against the guidelines before it is considered complete. A conflict that is not already recorded as a deliberate difference is reported to the Product Owner instead of being settled silently, under `AGENTS.md` §14.
 
+### 1.4 Browser static-hosting checkpoint
+
+The owner-reviewed browser version under `prototypes/browser/` can be built as
+static files for HTTPS hosting. Once hosted, using it requires no local server.
+The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
+behavior remain as accepted. This checkpoint adds no synchronization, accounts,
+export/import, offline package or automatic publication. It does not claim full
+browser parity or completion of the Browser Tree initiative.
+
+Existing browser notes must not be cleared or migrated by building or installing
+the package. Notes belong to the browser profile and exact origin: localhost and
+the permanent HTTPS address have separate storage. Before publication, explain
+that notes will not transfer automatically. The existing browser save and storage
+limitations are described in [Browser version](../prototypes/browser/README.md).
+
 ---
 
 ## 2. Tree Model
