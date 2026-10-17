@@ -22,6 +22,7 @@ const config = {
     'src/renderer/vim-text-commands.ts',
     'src/renderer/vim-surround.ts',
     'src/renderer/vim-caret-transition.ts',
+    'src/renderer/caret-projection-state.ts',
     'src/renderer/vim-vertical-navigation.ts',
     'src/renderer/vim-command-state.ts',
     'src/renderer/vim-edit-session.ts',

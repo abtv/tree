@@ -65,6 +65,12 @@ export default defineConfig({
           functions: 99,
           lines: 99,
         },
+        'src/renderer/caret-projection-state.ts': {
+          statements: 99,
+          branches: 99,
+          functions: 99,
+          lines: 99,
+        },
         // The input bindings hook and the modules extracted from it: module floors sit just below
         // measurement; the hook's floor was rebased below its measurement as covered code moved out.
         'src/renderer/use-node-input-bindings.ts': {
