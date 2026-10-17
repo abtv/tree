@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Browser Tree](browser-tree.md) | Research recorded; awaiting decisions and implementation authorization | Discuss material decisions D1–D5; no runtime implementation or publication authorized |
+| [Browser Tree](browser-tree.md) | D1–D5 accepted; P1 technical verification partially executed and blocked | Continue temporary P1 probes; isolate WebKit Blob failure and resolve Safari/Chrome runner access. Full implementation and publication remain unauthorized |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
