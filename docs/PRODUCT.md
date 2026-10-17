@@ -1298,7 +1298,7 @@ Normal mode also supports:
 
 #### 20.2.24 Tab and Shift+Tab
 
-* When a node editor has keyboard focus, plain Tab moves the focused node and its whole subtree in one level, and Shift+Tab moves it out one level. In whole-node Visual mode, these keys move the selected sibling range; in every other Vim mode and in standard editing, they move only the focused node.
+* When a node editor has keyboard focus, plain Tab moves the focused node and its whole subtree in one level, and Shift+Tab moves it out one level. While completion suggestions are open, plain Tab instead accepts the selected suggestion (§20.9, §20.12); Escape then Tab permits the ordinary structural action. In whole-node Visual mode, these keys move the selected sibling range; in every other Vim mode and in standard editing, they move only the focused node.
 * The move keeps the editing mode, focus, caret, and text selection. In Normal mode it discards an unfinished command. In Replace mode it commits any buffered replacement as one undoable edit, performs the move as a separate command, and continues in Replace mode with a new replacement session at the same caret. In Insert mode the move ends the current text undo session and keeps Insert mode active.
 * Whole-node Visual mode keeps its range through the move, and an active image caret keeps its saved text position.
 * Each Tab press requests one level and uses the same maximum-depth behavior as `>` and `<`.
@@ -1497,9 +1497,9 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 * Dates appear chronologically, oldest first. The expression's preferred date is initially selected, independently of its position; week lists prefer Monday. Each row shows its canonical date and weekday/expression description. The selected row uses the shared selection highlight pair and stays visible.
 * Further edits in the same expression retain the selected date while available, even if its index changes. Otherwise, or for a different node or expression start, select the expression's preferred date. Dismissal clears the selection.
 * When multiple interpretations share a date, retain the selected labeled interpretation first. If that interpretation disappears but its date remains available, retain that date under its remaining interpretation.
-* The footer reads `↑ ↓ select · Enter accept · Esc dismiss`.
+* The footer reads `↑ ↓ select · Enter/Tab accept · Esc dismiss`.
 * Plain `↓` and `↑` cycle to the next and previous suggestions in standard editing and Vim Insert, wrapping at either end; `Ctrl+N` and `Ctrl+P` remain alternatives. Popup arrows take precedence over caret reconciliation and node navigation, retain editor focus and the text caret, and never move to another node. Without a popup, arrows keep their ordinary behavior. Modified arrows keep their ordinary editing behavior.
-* Plain `Enter` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. Enter deliberately overrides ordinary node creation while the popup is open, including in Vim Insert, so completion uses the same keyboard controls in both editing modes. Modified Enter keeps its ordinary behavior. `Tab` and `Shift+Tab` dismiss the popup and retain their ordinary structural behavior (§20.2.24, §23.10).
+* Plain `Enter` or `Tab` accepts, and clicking a suggestion accepts it without moving focus from the editor. Acceptance replaces only the recognized span as one undoable edit, places the collapsed caret after the canonical date, and preserves the editing mode. Enter deliberately overrides ordinary node creation and Tab overrides ordinary indentation while the popup is open, including in Vim Insert, so completion uses the same keyboard controls in both editing modes. Without a popup, Tab keeps its ordinary behavior. Modified Enter and Tab keep their ordinary behavior; modified Tab dismisses the popup, including `Shift+Tab` (§20.2.24, §23.10).
 
 Escape closes the popup without changing the expression, caret, focus or editing mode. In Vim Insert, it preserves the current Insert session; another Escape with no popup enters Normal (§20.2.4). Moving the caret outside the expression, selecting text, leaving the editor, changing mode or starting composition closes the popup. Native composition remains uninterrupted and offers completion only after its committed edit. After dismissal or acceptance, the popup reopens only after a new qualifying edit. One Undo restores the accepted expression and does not reopen the popup.
 
@@ -1527,11 +1527,13 @@ The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. S
 
 * The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9), including modifier-only key handling.
 * Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row.
-* Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; plain `Enter` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit.
+* Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; plain `Enter`, plain `Tab` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit.
 * The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged.
 * These shortcuts override ordinary commands only while suggestions are open, following the approved keyboard-first completion interaction in standard editing and Vim Insert.
 
-Without a popup, Enter retains its ordinary action; modified Enter always keeps its ordinary behavior. Tab and Shift+Tab dismiss suggestions and retain their ordinary structural behavior (§20.2.24, §23.10). Escape dismisses suggestions and preserves text, caret, focus and the editing mode, including the current Vim Insert session. Another Escape with no popup enters Normal (§20.2.4). Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
+Without a popup, Enter and Tab retain their ordinary actions; modified Enter always keeps its ordinary behavior. Modified Tab dismisses suggestions and retains its ordinary behavior, including Shift+Tab's structural action (§20.2.24, §23.10).
+
+Escape dismisses suggestions and preserves text, caret, focus and the editing mode, including the current Vim Insert session. Another Escape with no popup enters Normal (§20.2.4). Selection, caret movement outside the fragment, blur, row/view/mode changes, paste, Undo and external changes dismiss without acceptance. Composition suspends suggestions until the committed edit. Only a new qualifying edit opens suggestions; one Undo restores the accepted fragment without reopening them.
 
 ---
 
@@ -1675,6 +1677,8 @@ Canonical dates are recognized immediately after typing or pasting. Date emphasi
 ### 23.10 Structural Restrictions
 
 Agenda does not reorder existing siblings, change their real parents, delete subtrees, or transfer contextual ancestors between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,`, Vim `>`/`<`, `J`/`gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, whole-node Visual, and structural dot repeats do nothing and retain focus, caret, mode, and text. Awaited text characters and surround delimiters still work.
+
+These structural restrictions do not override completion acceptance (§20.9, §20.12).
 
 `Backspace` on an empty childless direct match deletes it under the ordinary empty-node deletion rules. Selection moves to the previous sibling occurrence on that day, otherwise its contextual parent, otherwise the day container. If the day itself disappears, selection falls back to the nearest displayed day, earlier on a tie, preserving the compressed timeline. An empty node with children is retained. Removing text or dates never deletes a node automatically.
 

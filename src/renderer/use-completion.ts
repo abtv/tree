@@ -229,7 +229,7 @@ export function useCompletion(
         observe()
         const popup = owner.current.popup
         if (popup !== undefined && !event.metaKey && !event.altKey && !event.shiftKey) {
-          if (!event.ctrlKey && event.key === 'Enter') {
+          if (!event.ctrlKey && (event.key === 'Enter' || event.key === 'Tab')) {
             event.preventDefault()
             event.stopPropagation()
             accept(popup.selected)

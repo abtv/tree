@@ -60,7 +60,7 @@ export function CompletionPopup({
           </div>
         ))}
       </div>
-      <div className="date-popup-footer">↑ ↓ select · Enter accept · Esc dismiss</div>
+      <div className="date-popup-footer">↑ ↓ select · Enter/Tab accept · Esc dismiss</div>
     </div>
   )
 }

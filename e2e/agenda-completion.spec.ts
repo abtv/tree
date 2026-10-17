@@ -188,7 +188,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
 
     // @requirement PRODUCT.md §20.9
     // @requirement PRODUCT.md §20.9.2
-    test(`offers three adjacent-month anchors and accepts the closest default in ${view}`, async ({
+    test(`offers three adjacent-month anchors and accepts the closest default with Tab in ${view}`, async ({
       userDataDir,
     }, testInfo) => {
       seedDocument(userDataDir, {
@@ -222,14 +222,27 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       }
       const closest = view === 'Tree' ? expected[0]! : expected[2]!
       await expect(popup.getByRole('option', { selected: true })).toContainText(closest)
+      await expect(window.locator('.date-popup-footer')).toHaveText('↑ ↓ select · Enter/Tab accept · Esc dismiss')
       await window.screenshot({ path: testInfo.outputPath(screenshotName(`adjacent-month-${view}.png`)) })
-      await window.keyboard.press('Enter')
+      await window.keyboard.press('Tab')
       const text = (): Promise<string> =>
         input.evaluate((element) =>
           element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
         )
       await expect.poll(text).toBe(`2026-10-08 Plan ${closest}`)
       await expect(input).toBeFocused()
+      await expect
+        .poll(() =>
+          input.evaluate((element) => {
+            if (element instanceof HTMLTextAreaElement) return [element.selectionStart, element.selectionEnd]
+            const selection = globalThis.getSelection()!
+            const range = selection.getRangeAt(0).cloneRange()
+            range.selectNodeContents(element)
+            range.setEnd(selection.anchorNode!, selection.anchorOffset)
+            return [range.toString().length, selection.isCollapsed]
+          }),
+        )
+        .toEqual([26, true])
       await expect(popup).toHaveCount(0)
       await window.evaluate(() =>
         document.addEventListener('keydown', (event) => {

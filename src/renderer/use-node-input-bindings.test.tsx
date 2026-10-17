@@ -511,7 +511,7 @@ describe('useNodeInputBindings', () => {
   // @requirement PRODUCT.md §20.12
   // @requirement PRODUCT.md §20.2.24
   it.each([false, true].flatMap((vimEnabled) => ['tomor', ':roc'].map((fragment) => ({ vimEnabled, fragment }))))(
-    'keeps ordinary Tab and Shift+Tab with $fragment suggestions open (Vim $vimEnabled)',
+    'accepts $fragment with Tab and keeps closed-popup Tab and Shift+Tab structural (Vim $vimEnabled)',
     async ({ vimEnabled, fragment }) => {
       const f = await fixture({
         mode: 'insert',
@@ -522,10 +522,18 @@ describe('useNodeInputBindings', () => {
       f.input().focus()
       f.type(fragment)
       expect(f.result.current.completionPopup).toBeDefined()
+      f.press('ArrowDown')
+      const popup = f.result.current.completionPopup!.popup
+      const replacement = popup.suggestions[popup.selected]!.replacement
       f.press('Tab')
       expect(f.result.current.completionPopup).toBeUndefined()
+      expect(f.snapshot().document.roots.map((root) => root.id)).toEqual(['a', 'b'])
+      expect(f.node('b').text).toBe(replacement)
+      expect(f.input()).toBe(document.activeElement)
+      expect(f.result.current.vimMode).toBe('insert')
+      f.press('Tab')
       expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
-      expect(f.node('b').text).toBe(fragment)
+      expect(f.node('b').text).toBe(replacement)
       expect(f.result.current.vimMode).toBe('insert')
       f.type(fragment)
       expect(f.result.current.completionPopup).toBeDefined()
@@ -536,6 +544,17 @@ describe('useNodeInputBindings', () => {
       expect(f.result.current.vimMode).toBe('insert')
     },
   )
+
+  // @requirement PRODUCT.md §20.9
+  // @requirement PRODUCT.md §20.12
+  it.each(['ctrlKey', 'altKey', 'metaKey'] as const)('does not accept completion with %s+Tab', async (modifier) => {
+    const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
+    f.input().focus()
+    f.type(':roc')
+    f.press('Tab', { [modifier]: true })
+    expect(f.node().text).toBe(':roc')
+    expect(f.result.current.completionPopup).toBeUndefined()
+  })
 
   // @requirement PRODUCT.md §20.9
   // @requirement PRODUCT.md §20.12

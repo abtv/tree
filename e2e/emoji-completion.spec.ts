@@ -124,7 +124,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     // @requirement PRODUCT.md §20.12
     // @requirement PRODUCT.md §20.2.24
     // @requirement PRODUCT.md §23.10
-    test(`keeps ordinary Tab commands while suggestions are open in ${view}`, async ({ userDataDir }) => {
+    test(`accepts with Tab and preserves structural Tab after dismissal in ${view}`, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -150,8 +150,27 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       const row = window.locator(`${view === 'Agenda' ? '.agenda-row' : '.node-row'}[data-node-id="n"]`)
       await window.keyboard.type(':roc')
       await expect(popup).toBeVisible()
+      await window.keyboard.press('ArrowDown')
+      await expect(popup.getByRole('option', { selected: true })).toContainText(':rocket:')
       await window.keyboard.press('Tab')
       await expect(popup).toHaveCount(0)
+      await expect.poll(() => input.evaluate((element) => element.textContent)).toBe('2026-10-08 Plan 🚀')
+      if (view === 'Tree') await expect(row).toHaveAttribute('data-depth', '0')
+      await expect(input).toBeFocused()
+      await window.evaluate(() =>
+        document.addEventListener('keydown', (event) => {
+          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
+        }),
+      )
+      await window.keyboard.press('Meta+z')
+      await expect.poll(() => input.evaluate((element) => element.textContent)).toBe('2026-10-08 Plan :roc')
+      await expect(popup).toHaveCount(0)
+      await setCursor(input, 20)
+      await window.keyboard.press('Backspace')
+      await window.keyboard.type('c')
+      await expect(popup).toBeVisible()
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('Tab')
       if (view === 'Tree') await expect(row).toHaveAttribute('data-depth', '1')
       await expect(input).toBeFocused()
       await window.keyboard.press('Backspace')
