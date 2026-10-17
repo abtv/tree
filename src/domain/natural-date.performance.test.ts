@@ -6,6 +6,8 @@ const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 
 // @requirement PRODUCT.md §20.9
 // @requirement PRODUCT.md §22.1
+// CI can need more than five seconds for the full workload. This timeout limits
+// total test duration; the assertions below still enforce the per-call budgets.
 it('recognizes relative dates well below one millisecond, including incremental typing and long text', () => {
   const expressions = [
     ['toda', 0],
@@ -105,4 +107,4 @@ it('recognizes relative dates well below one millisecond, including incremental 
   // Long-text batches independently enforce the requested ceiling, so the
   // many short prefixes cannot hide a slower complete expression.
   expect(Math.max(...completeExpressionSamples)).toBeLessThan(1)
-})
+}, 15_000)
