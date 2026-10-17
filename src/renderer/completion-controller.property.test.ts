@@ -3,6 +3,30 @@ import fc from 'fast-check'
 import { propertyRuns } from '../test/property-runs'
 import { dayNumberOf } from '../domain/calendar-date'
 import { CompletionController } from './completion-controller'
+import { suggestDates } from '../domain/natural-date'
+
+// @requirement PRODUCT.md §20.9
+it('orders every date list chronologically while selecting the existing preferred date', () => {
+  fc.assert(
+    fc.property(
+      fc.integer({
+        min: dayNumberOf({ year: 2000, month: 1, day: 1 }),
+        max: dayNumberOf({ year: 2100, month: 1, day: 1 }),
+      }),
+      fc.constantFrom('Monday', 'Friday', 'in sep', 'Oct 2', 'in October', 'last January', 'next wee', 'last week'),
+      (today, text) => {
+        const preferred = suggestDates(text, text.length, today)!.suggestions[0]!.day
+        const assist = new CompletionController()
+        assist.edit('n', text, text.length, today, [])
+        const popup = assist.popup!
+        expect(popup.suggestions[popup.selected]!.id).toBe(`date:${preferred}`)
+        const dates = popup.suggestions.map(({ replacement }) => replacement)
+        expect(dates).toEqual(dates.toSorted())
+      },
+    ),
+    { numRuns: propertyRuns(500) },
+  )
+})
 
 // @requirement PRODUCT.md §20.12
 it('retains literal emoji fragments and bounds selection across arbitrary popup navigation', () => {

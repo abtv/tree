@@ -14,6 +14,8 @@ export interface CompletionMatch extends DateTextRange {
   readonly listLabel: string
   /** Whether refining the matched text keeps the selected suggestion by ID. */
   readonly retainsSelection: boolean
+  /** Preferred choice independently of the displayed suggestion order. */
+  readonly preferredSuggestionId: string
   readonly suggestions: readonly CompletionSuggestion[]
 }
 
@@ -28,6 +30,7 @@ export function recognizeCompletion(text: string, caret: number, today: DayNumbe
       end: emoji.end,
       listLabel: 'Emoji suggestions',
       retainsSelection: false,
+      preferredSuggestionId: `emoji:${emoji.suggestions[0]!.shortcode}`,
       suggestions: emoji.suggestions.map(({ emoji, shortcode }) => ({
         id: `emoji:${shortcode}`,
         replacement: emoji,
@@ -42,14 +45,17 @@ export function recognizeCompletion(text: string, caret: number, today: DayNumbe
     end: dates.end,
     listLabel: 'Date suggestions',
     retainsSelection: true,
-    suggestions: dates.suggestions.map(({ day, expression }) => {
-      const canonical = formatCanonicalDate(calendarDateOf(day))
-      return {
-        id: `date:${day}`,
-        replacement: canonical,
-        label: canonical,
-        description: `${weekdays[weekdayOf(day)]} · ${expression}`,
-      }
-    }),
+    preferredSuggestionId: `date:${dates.suggestions[0]!.day}`,
+    suggestions: dates.suggestions
+      .toSorted((first, second) => first.day - second.day)
+      .map(({ day, expression }) => {
+        const canonical = formatCanonicalDate(calendarDateOf(day))
+        return {
+          id: `date:${day}`,
+          replacement: canonical,
+          label: canonical,
+          description: `${weekdays[weekdayOf(day)]} · ${expression}`,
+        }
+      }),
   }
 }

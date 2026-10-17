@@ -12,6 +12,7 @@ it('adapts date and emoji matches to shared suggestions with their selection pol
     end: 7,
     listLabel: 'Date suggestions',
     retainsSelection: true,
+    preferredSuggestionId: `date:${today + 1}`,
     suggestions: [
       { id: `date:${today + 1}`, replacement: '2026-10-09', label: '2026-10-09', description: 'Fri · tomorrow' },
     ],
@@ -29,6 +30,30 @@ it('adapts date and emoji matches to shared suggestions with their selection pol
     description: ':+1:',
   })
   expect(recognizeCompletion('plain', 5, today)).toBeUndefined()
+})
+
+// @requirement PRODUCT.md §20.9
+it('sorts dates chronologically without changing the preferred candidate', () => {
+  for (const [text, expected, preferred] of [
+    ['in sep', ['2026-09-01', '2027-09-01'], '2027-09-01'],
+    ['Oct 2', ['2026-10-02', '2027-10-02'], '2027-10-02'],
+    ['Monday', ['2026-10-05', '2026-10-12'], '2026-10-12'],
+    ['Friday', ['2026-10-09', '2026-10-16'], '2026-10-09'],
+    ['last January', ['2026-01-01'], '2026-01-01'],
+    ['in October', ['2026-10-15'], '2026-10-15'],
+    [
+      'next wee',
+      ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'],
+      '2026-10-12',
+    ],
+  ] as const) {
+    const match = recognizeCompletion(text, text.length, today)!
+    expect(
+      match.suggestions.map(({ replacement }) => replacement),
+      text,
+    ).toEqual(expected)
+    expect(match.suggestions.find(({ id }) => id === match.preferredSuggestionId)?.replacement, text).toBe(preferred)
+  }
 })
 
 // @requirement PRODUCT.md §20.9

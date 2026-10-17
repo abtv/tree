@@ -33,7 +33,9 @@ export class CompletionController {
         : undefined
     const retained =
       suggestion === undefined ? -1 : match.suggestions.findIndex((candidate) => candidate.id === suggestion.id)
-    this.popup = { ...match, nodeId, text, selected: Math.max(0, retained) }
+    const selected =
+      retained < 0 ? match.suggestions.findIndex((candidate) => candidate.id === match.preferredSuggestionId) : retained
+    this.popup = { ...match, nodeId, text, selected }
   }
 
   public observe(nodeId: string | undefined, text: string, start: number, end: number, eligible: boolean): void {

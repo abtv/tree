@@ -8,6 +8,31 @@ it('keeps an empty suggestion list at index zero in either direction', () => {
 })
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
+// @requirement PRODUCT.md §20.9
+it('opens on the preferred date and preserves an earlier manual choice through refinement', () => {
+  const assist = new CompletionController()
+  const selected = () => assist.popup?.suggestions[assist.popup.selected]?.replacement
+  assist.edit('n', 'in sep', 6, today, [])
+  expect(assist.popup?.suggestions.map(({ replacement }) => replacement)).toEqual(['2026-09-01', '2027-09-01'])
+  expect(assist.popup?.selected).toBe(1)
+  expect(selected()).toBe('2027-09-01')
+  assist.move(-1)
+  expect(selected()).toBe('2026-09-01')
+  assist.edit('n', 'in September', 12, today, [])
+  expect(selected()).toBe('2026-09-01')
+  assist.edit('n', 'in jan', 6, today, [])
+  expect(selected()).toBe('2027-01-01')
+  assist.move(-1)
+  assist.edit('other', 'in jan', 6, today, [])
+  expect(selected()).toBe('2027-01-01')
+  assist.move(-1)
+  assist.edit('other', 'x in jan', 8, today, [])
+  expect(selected()).toBe('2027-01-01')
+  assist.move(-1)
+  assist.close()
+  assist.edit('other', 'x in jan', 8, today, [])
+  expect(selected()).toBe('2027-01-01')
+})
 // @requirement PRODUCT.md §20.12
 it('shares dismissal, selection and hyperlink exclusion with emoji completion', () => {
   const assist = new CompletionController()
@@ -132,8 +157,9 @@ it('retains a date by value when its index changes and does not carry emoji sele
   const assist = new CompletionController()
   assist.edit('n', 'Friday', 6, today, [])
   assist.move(1)
-  assist.edit('n', 'Friday', 6, today + 2, [])
+  assist.edit('n', 'Friday', 6, today + 9, [])
   expect(assist.popup?.selected).toBe(0)
+  expect(assist.popup?.suggestions[0]?.replacement).toBe('2026-10-16')
   assist.edit('n', ':roc', 4, today, [])
   assist.move(1)
   assist.edit('n', 'Friday', 6, today, [])

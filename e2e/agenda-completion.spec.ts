@@ -149,7 +149,19 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await expect(popup).toHaveCount(0)
       await window.keyboard.type(view === 'Tree' ? 'p' : 'i')
       await expect(popup).toBeVisible()
-      if (view === 'Tree') await window.keyboard.press('ArrowDown')
+      if (view === 'Tree') {
+        await expect(popup.getByRole('option').first()).toContainText('2026-09-01')
+        await expect(popup.getByRole('option').last()).toContainText('2027-09-01')
+        await expect(popup.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
+        const visible = await popup.getByRole('option', { selected: true }).evaluate((element) => {
+          const selected = element.getBoundingClientRect()
+          const container = element.closest('.date-popup')!.getBoundingClientRect()
+          return selected.top >= container.top && selected.bottom <= container.bottom
+        })
+        expect(visible).toBe(true)
+        await window.screenshot({ path: testInfo.outputPath(screenshotName('chronological-date-preferred.png')) })
+        await window.keyboard.press('ArrowUp')
+      }
       const selectedDate = view === 'Tree' ? '2026-09-01' : '2026-10-16'
       const selected = popup.getByRole('option', { selected: true })
       await expect(selected).toContainText(selectedDate)
