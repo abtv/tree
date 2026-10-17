@@ -62,6 +62,12 @@ The application should provide a development command:
 npm run dev
 ```
 
+For the preserved local browser version, use `npm run dev:web` and open
+<http://127.0.0.1:5174/>. `npm run test:web` runs its isolated Chrome smoke check;
+the `theme`, `menu` and `storage` arguments select focused checks. See
+[Local browser version](../prototypes/browser/README.md) for storage identity and
+scope limits. This is separate from Electron validation and does not publish a site.
+
 Successful persistence operations are quiet during normal development. To enable detailed persistence operation and path logging while investigating a failure, run:
 
 ```text

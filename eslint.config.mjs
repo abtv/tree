@@ -34,6 +34,7 @@ export default tseslint.config(
       'playwright.config.ts',
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts}',
+      'prototypes/browser/**/*.mjs',
       'e2e/**/*.{ts,cjs}',
       'perf/**/*.ts',
       'src/main/**/*.ts',
@@ -42,6 +43,12 @@ export default tseslint.config(
     ],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    files: ['prototypes/browser/**/*.{ts,tsx,mjs}'],
+    languageOptions: {
+      globals: globals.browser,
     },
   },
   {

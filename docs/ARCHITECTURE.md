@@ -27,6 +27,13 @@ The application uses:
 
 Do not change the core technology stack without explicit Product Owner approval.
 
+The owner-reviewed local browser implementation is preserved separately under
+`prototypes/browser/`. It reuses the React renderer, application store and domain
+through a browser `TreeApi` adapter, using IndexedDB and Web Locks. The existing
+Electron entry points remain unchanged. This checkpoint is a local development
+target, not final browser architecture or publication; its constraints are in
+[Local browser version](../prototypes/browser/README.md).
+
 ---
 
 ## 3. Architectural Layers

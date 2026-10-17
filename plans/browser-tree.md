@@ -2,6 +2,23 @@
 
 Status: D1–D5 accepted; P1 Chrome/macOS storage/quota, ownership/lifecycle, update, PNG decoding, headless virtual-clipboard and CSP-denied-Service-Worker mechanisms have passing evidence. Explicit frozen-writer verification is blocked by an ineffective lifecycle command in this automation setup. Physical keys, OS clipboard/prompt behavior, real-editor scale and the full support matrix remain unverified. P1 remains partial; the owner will check Safari manually later. Full implementation and publication remain unauthorized.
 Research date: 2026-10-17.
+Local implementation checkpoint (owner, 2026-10-17): after reviewing the browser
+editor, theme, compact menu and storage corrections, the owner explicitly asked
+to preserve the working code in ordinary project files and commit it. The scope
+is `prototypes/browser/`, named local run/check commands and supporting documentation.
+Preserve the localhost origin/database so the existing browser document remains
+accessible. Synchronization, export/import, Docker setup and publication are
+excluded. This checkpoint does not authorize full P2–P8 delivery or waive remaining
+browser parity, scale and release validation. Reuse prior valid prototype evidence
+and check the tracked entry point after relocation.
+Checkpoint result: source and isolated Chrome checks are preserved in
+`prototypes/browser/`, with `npm run dev:web` and `npm run test:web`. Browser
+smoke, theme, menu and storage checks pass from the relocated source; types and
+desktop build also pass. Whole-project lint/format checks remain blocked by the
+unrelated untracked `scripts/browser-container/verify.mjs` from suspended Docker
+work. Preserve those files; the owner canceled its image build, which must not
+be retried. This checkpoint is complete; wait for owner direction before selecting
+another implementation task or publication.
 Continuation scope: the owner installed Chrome and requested Chrome-only verification, without Safari. On 2026-10-17 the owner requested continued Chrome technical verification and plan updates, and will check Safari manually later. Temporary Chrome probes and plan updates remain authorized. This changes the current verification scope, not the future browser support or release gates. No Safari/WebKit execution is needed for this continuation. Manual Safari evidence does not by itself establish the recurring automated Safari release gate proposed in P6.
 Authorization (owner, 2026-10-17): accept the five recommendations D1–D5; perform technical verification with temporary prototypes and tests; update this plan from the results; agree any new constraints with the owner. Disposable experiments under `.scratch/browser-feasibility/` are authorized. Full application implementation, repository-settings changes, push, and publication remain unauthorized. P0 requirements/ADR finalization and P2–P8 require later authorization. The accepted recommendations retain their explicit unresolved details and do not accept unspecified parity exceptions.
 

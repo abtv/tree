@@ -15,6 +15,8 @@
     "prepare": "git config core.hooksPath .githooks",
     "predev": "node scripts/rename-dev-app.mjs",
     "dev": "electron-vite dev",
+    "dev:web": "node prototypes/browser/server.mjs",
+    "test:web": "node prototypes/browser/verify.mjs",
     "prestart": "node scripts/rename-dev-app.mjs",
     "start": "electron-vite preview",
     "build": "electron-vite build",

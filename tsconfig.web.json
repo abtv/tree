@@ -17,6 +17,8 @@
     "types": ["vite/client", "vitest/globals"]
   },
   "include": [
+    "prototypes/browser/**/*.ts",
+    "prototypes/browser/**/*.tsx",
     "src/renderer/**/*.ts",
     "src/renderer/**/*.tsx",
     "src/domain/**/*.ts",

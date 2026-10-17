@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Browser Tree](browser-tree.md) | D1–D5 accepted; Chrome quota rollback/retry and CSP-denied-Service-Worker probes passed; frozen-writer verification blocked; P1 remains partial | Fresh session: P1 temporary shared-editor feasibility harness for real-editor input/scale evidence. Physical keys/OS clipboard/prompts remain unverified; owner will check Safari manually later. Full implementation and publication remain unauthorized |
+| [Browser Tree](browser-tree.md) | D1–D5 accepted; owner-reviewed local browser version preserved under `prototypes/browser/`; P1 remains partial | Local source checkpoint complete. Await owner direction before further implementation or publication. Safari, physical input and scale gates remain open; Docker setup is suspended |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
