@@ -166,7 +166,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
 
     if (view === 'Tree') {
       // @requirement PRODUCT.md §20.9
-      test('keeps the popup inside the window at the bottom and right edges', async ({ userDataDir }) => {
+      test('keeps the popup inside the window at the bottom and right edges', async ({ userDataDir }, testInfo) => {
         const roots = Array.from({ length: 30 }, (_, index) => ({
           id: `r${index}`,
           text: index === 29 ? `${'a'.repeat(45)} ` : `Row ${index}`,
@@ -203,6 +203,18 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         expect(geometry.box.top).toBeGreaterThanOrEqual(0)
         expect(geometry.box.bottom).toBeLessThanOrEqual(geometry.height)
         expect(geometry.box.bottom).toBeLessThanOrEqual(geometry.rowTop)
+        const rows = await popup.getByRole('option').evaluateAll((options) =>
+          options.map((option) => {
+            const spans = Array.from(option.querySelectorAll('span'))
+            return spans.map((span) => {
+              const range = document.createRange()
+              range.selectNodeContents(span)
+              return range.getClientRects().length
+            })
+          }),
+        )
+        expect(rows).toEqual(Array.from({ length: 7 }, () => [1, 1]))
+        await window.screenshot({ path: testInfo.outputPath(screenshotName('date-popup-content-width.png')) })
       })
     }
 

@@ -1,5 +1,8 @@
 .date-popup {
   position: fixed;
+  width: max-content;
+  max-width: 100vw;
+  box-sizing: border-box;
   z-index: 20;
   background: var(--color-background);
   color: var(--color-text);

@@ -1486,6 +1486,7 @@ Tree and Agenda node editors offer explicit date completion in standard editing 
 
 * The popup uses the document surface, a thin location-border-colored border and a soft shadow. It aligns its left edge with the expression's first character and sits directly below the edited row without covering it.
 * When the window has too little room below the row, the popup sits directly above the row instead, and it shifts left as far as needed to stay inside the window's right edge.
+* The popup sizes to its content, keeping dates and descriptions on one line when they fit within the window. Its width never exceeds the window; longer content wraps only when the window requires it.
 * Each suggestion shows its canonical date and secondary weekday/expression description; the selected suggestion uses the shared selection highlight pair.
 * Further edits in the same expression retain the selected date while it remains available, even if its index changes. When it is unavailable, or a popup opens for a different node or expression start, the first suggestion is selected. Dismissal clears the selection.
 * The footer reads `↑ ↓ select · Enter accept · Esc dismiss`.
