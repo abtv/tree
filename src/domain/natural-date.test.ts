@@ -303,6 +303,77 @@ describe('natural date expression table proposed in AG-22', () => {
     }
   })
 
+  it('completes weekdays after on and by while preserving each preposition and surrounding text', () => {
+    for (const name of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']) {
+      for (const preposition of ['on', 'by']) {
+        for (let length = 3; length <= name.length; length++) {
+          const fragment = name.slice(0, length)
+          const text = `Plan ${preposition.toUpperCase()}   ${fragment.toUpperCase()} at noon`
+          const start = text.indexOf(fragment.toUpperCase())
+          const end = start + fragment.length
+          const match = suggestDates(text, end, today)!
+          expect(match, text).toBeDefined()
+          expect(match.start).toBe(start)
+          expect(match.end).toBe(end)
+          expect(match.suggestions.map(({ day }) => formatCanonicalDate(calendarDateOf(day)))).toEqual(dates(name))
+          expect(match.suggestions.every(({ expression }) => expression === name)).toBe(true)
+          expect(text.slice(0, match.start) + 'DATE' + text.slice(match.end)).toBe(
+            `Plan ${preposition.toUpperCase()}   DATE at noon`,
+          )
+        }
+        expect(dates(`${preposition} ${name.slice(0, 2)}`)).toBeUndefined()
+      }
+    }
+    expect(dates('beyond Friday')).toEqual(dates('Friday'))
+    expect(dates('nearby Friday')).toEqual(dates('Friday'))
+  })
+
+  it('keeps month/day completion available at every month prefix and preserves on and by', () => {
+    const names = [
+      'january',
+      'february',
+      'march',
+      'april',
+      'may',
+      'june',
+      'july',
+      'august',
+      'september',
+      'october',
+      'november',
+      'december',
+    ]
+    for (const name of names) {
+      for (let length = 3; length <= name.length; length++) {
+        for (const preposition of ['', 'on ', 'by ']) {
+          const fragment = `${name.slice(0, length)} 15`
+          const text = `Plan ${preposition}${fragment} at noon`
+          const match = suggestDates(text, 5 + preposition.length + fragment.length, today)!
+          expect(match, text).toBeDefined()
+          expect(text.slice(match.start, match.end)).toBe(fragment)
+          expect(match.start).toBe(5 + preposition.length)
+          expect(match.suggestions.map(({ day }) => formatCanonicalDate(calendarDateOf(day)))).toEqual(
+            dates(`${name} 15`),
+          )
+          expect(match.suggestions.every(({ expression }) => expression === `${name} 15`)).toBe(true)
+        }
+      }
+    }
+  })
+
+  it.each([
+    'on fr',
+    'by fr',
+    'on fridays',
+    'by fridayish',
+    'beyond fri',
+    'nearby fri',
+    'se 15',
+    'septembers 15',
+    'septe 32',
+    'febr 30',
+  ])('rejects incomplete context and invalid continuations: %s', (text) => expect(dates(text)).toBeUndefined())
+
   it.each([
     'in s',
     'in j',

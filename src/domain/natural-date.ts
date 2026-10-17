@@ -25,8 +25,8 @@ const months = [
   'november',
   'december',
 ]
-const weekdayPattern = weekdays.join('|')
-const monthPattern = months.map((month) => `${month}|${month.slice(0, 3)}`).join('|')
+const weekdayPattern = weekdays.map(namePrefixes).join('|')
+const monthPattern = months.map(namePrefixes).join('|')
 const smallCounts = [
   'one',
   'two',
@@ -82,6 +82,9 @@ function namePrefixes(name: string): string {
 const qualifiedPrefixPattern =
   `(?:in|last|in +the +end +of) +(?:${months.map(namePrefixes).join('|')})|` +
   `(?:this|next|last) +(?:${weekdays.map(namePrefixes).join('|')})`
+for (const name of weekdays) {
+  for (let length = 3; length <= name.length; length++) completedPrefixes.set(name.slice(0, length), name)
+}
 for (const [names, qualifiers] of [
   [months, ['in', 'last', 'in the end of']],
   [weekdays, ['this', 'next', 'last']],
@@ -223,7 +226,17 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
     if (caret < start || caret > end) continue
     if (/[\p{L}\p{N}_]$/u.test(text.slice(0, start)) || /^[\p{L}\p{N}_]/u.test(text.slice(end))) continue
     const normalized = match[0].toLowerCase().replace(/ +/g, ' ')
-    const expression = completedPrefixes.get(normalized) ?? normalized
+    const monthDay = /^([a-z]+) ([0-9]{1,2})$/.exec(normalized)
+    const monthName = monthDay && months.find((name) => name.startsWith(monthDay[1]!))
+    const expression = monthName ? `${monthName} ${monthDay![2]}` : (completedPrefixes.get(normalized) ?? normalized)
+    // Only on/by enables an otherwise bare weekday prefix. Keep the context
+    // outside the replacement span so accepting a deadline preserves meaning.
+    if (
+      expression !== normalized &&
+      weekdays.includes(expression) &&
+      !/(?:^|[^\p{L}\p{N}_])(?:on|by) +$/iu.test(text.slice(0, start))
+    )
+      continue
     const days = daysFor(expression, today).filter((day) => day >= minimumDay && day <= maximumDay)
     if (days.length === 0) continue
     return {

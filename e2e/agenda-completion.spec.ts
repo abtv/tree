@@ -66,6 +66,63 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
 
   for (const view of ['Tree', 'Agenda'] as const) {
     // @requirement PRODUCT.md §20.9
+    test(`preserves prepositions while refining weekday and month-day prefixes in ${view}`, async ({
+      userDataDir,
+    }, testInfo) => {
+      const initial = `2026-10-08 Plan ${view === 'Tree' ? 'on  at noon' : 'by Sep 15 at noon'}`
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'n', text: initial, children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await setAgendaToday(window)
+      if (view === 'Agenda') {
+        await window.keyboard.press('Meta+p')
+        await window.locator('.agenda-row[data-node-id="n"]').click()
+      }
+      const input = window.getByRole('textbox', {
+        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
+        exact: true,
+      })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
+      await setCursor(input, view === 'Tree' ? 19 : 22)
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      if (view === 'Tree') {
+        await window.keyboard.type('fr')
+        await expect(popup).toHaveCount(0)
+      }
+      await window.keyboard.type(view === 'Tree' ? 'i' : 't')
+      await expect(popup.getByRole('option')).toHaveCount(2)
+      await window.keyboard.press('ArrowDown')
+      const selectedDate = view === 'Tree' ? '2026-10-16' : '2026-09-15'
+      const selected = popup.getByRole('option', { selected: true })
+      await expect(selected).toContainText(selectedDate)
+      await expect(selected).toContainText(view === 'Tree' ? 'friday' : 'september 15')
+      await window.screenshot({ path: testInfo.outputPath(screenshotName(`preposition-date-${view}.png`)) })
+      await window.keyboard.type(view === 'Tree' ? 'day' : 'ember')
+      await expect(selected).toContainText(selectedDate)
+      await window.keyboard.press('Enter')
+      const text = (): Promise<string> =>
+        input.evaluate((element) =>
+          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+        )
+      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? 'on' : 'by'} ${selectedDate} at noon`)
+      await expect(input).toBeFocused()
+      await expect(popup).toHaveCount(0)
+      await window.evaluate(() =>
+        document.addEventListener('keydown', (event) => {
+          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
+        }),
+      )
+      await window.keyboard.press('Meta+z')
+      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? 'on friday' : 'by September 15'} at noon`)
+      await expect(popup).toHaveCount(0)
+    })
+
+    // @requirement PRODUCT.md §20.9
     test(`refines qualified date prefixes without losing selection in ${view}`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
