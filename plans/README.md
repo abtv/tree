@@ -4,6 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
+| [Browser Tree](browser-tree.md) | Research recorded; awaiting decisions and implementation authorization | Discuss material decisions D1–D5; no runtime implementation or publication authorized |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
