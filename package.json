@@ -57,6 +57,7 @@
     "test:e2e:timing": "npm run build && PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e-timing.json playwright test --reporter=list,json && node scripts/e2e-timing.mjs",
     "test:e2e:visible": "TREE_E2E_VISIBLE=1 npm run test:e2e --",
     "test:perf": "npm run build && playwright test -c perf.config.ts",
+    "test:perf:safari": "npm run build:web && npm run build && node scripts/safari-perf.mjs",
     "test:perf:profile": "AGENDA_CPU_PROFILE=1 npm run test:perf --",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:requirements && npm run check:e2e-modes && npm run check:opencode && npm run test:coverage && npm run test:performance && npm run build",
     "check:full": "npm run check && playwright test && playwright test -c perf.config.ts && npm run audit"

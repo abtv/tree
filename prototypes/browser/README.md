@@ -122,3 +122,37 @@ The storage check covers full browser restart, writer handover, aborted writes,
 retries, dirty-close warnings, buffered editing, Insert undo grouping and invalid
 stored data. Screenshots and synthetic browser profiles remain ignored scratch
 artifacts. The server binds only to the local loopback address.
+
+### Local Safari performance comparisons
+
+Run `npm run test:perf:safari` on macOS to compare real Safari with Electron.
+The single runner in `scripts/safari-perf.mjs` exercises typing in a large Tree,
+Agenda opening/navigation/scrolling, and typing while an automatic save is pending.
+It builds both versions, starts an ephemeral loopback server and SafariDriver on
+port 7056, and runs the same scenarios serially in visible Safari and Electron.
+Enable Safari remote automation before the first run (`safaridriver --enable`);
+the runner does not change that system setting. This optional local command is
+not added to agent permission allowlists: use the normal approval mechanism,
+outside the sandbox in Codex. Do not interact with the test windows while it runs.
+Safari uses isolated WebDriver sessions and a fresh origin; Electron uses
+synthetic profiles under `.scratch/safari-perf/`.
+
+Results are written to `test-results/safari-perf-results.json`. They measure the
+time from a captured input/keyboard event to two animation frames, using the same
+renderer clock in both engines. They exclude automation-command round trips.
+The native drivers have different input cadence, so these measurements compare
+individual response latency rather than typing throughput. Scroll samples use
+programmatic scrolling; they do not measure trackpad gestures.
+
+The save scenario delays each adapter's save promise, asserts it remains pending
+across the next native keystroke, and checks that the real save persists typed
+words. It is a slow-save responsiveness proxy, not a storage-throughput benchmark.
+The browser runner instruments the existing exposed prototype store's service
+object; the Electron runner uses the existing test-owned IPC wrapper. Neither
+adds production hooks. Safari and Electron retain their different storage
+implementations and save policies. These are diagnostic measurements without
+timing thresholds, separate from the ordinary Electron suite and CI. Repeat
+samples help expose noise; they do not establish identical browser/desktop
+rendering or startup costs. For a shorter run, use
+`npm run test:perf:safari -- --repetitions=1`; the default is three repetitions of
+each scenario in each application.
