@@ -62,6 +62,31 @@ describe('GitHub release trust', () => {
     expect(fetch.mock.calls[0][0]).toBe('https://api.github.com/repos/abtv/tree/pages')
     expect(fetch.mock.calls[0][1].redirect).toBe('error')
   })
+  it('recognizes explicit GitHub App permission denials without exposing response text', async () => {
+    const path = '/repos/tree-editor/tree-editor.github.io/contents/.github/workflows/probe.yml'
+    const refusal =
+      'refusing to allow a GitHub App to create or update workflow `.github/workflows/probe.yml` without `workflows` permission'
+    for (const [status, message, expected] of [
+      [403, refusal, true],
+      [403, 'API rate limit exceeded', false],
+      [403, 'You have exceeded a secondary rate limit', false],
+      [403, 'Resource not accessible by integration', true],
+      [403, refusal.replace('probe.yml', 'other.yml'), false],
+      [403, null, false],
+      [404, refusal, undefined],
+      [429, refusal, undefined],
+      [500, refusal, undefined],
+    ]) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ message }), { status })))
+      await expect(api(path, { token: 'secret', method: 'PUT', body: {} })).rejects.toMatchObject({
+        status,
+        message: `GitHub API PUT failed (${status})`,
+        ...(expected === undefined ? {} : { workflowWriteDenied: expected }),
+      })
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('invalid JSON', { status: 403 })))
+    await expect(api(path, { method: 'PUT' })).rejects.toMatchObject({ workflowWriteDenied: false })
+  })
   it('checks source identity, current head, exact attempt and successful unique gate including pagination', async () => {
     const { manifest } = await fixture()
     const request = sourceRequest({ jobs: [{ name: 'other' }, goodGate], paginated: true })
@@ -138,10 +163,12 @@ describe('atomic package transfer', () => {
           ],
         }
       if (path.includes('/contents/.github/workflows/')) {
-        const error = new Error('Resource not accessible by integration')
+        const error = new Error('Workflow write denied')
         error.status = 403
+        error.workflowWriteDenied = true
         throw error
       }
+      if (path.endsWith('/contents/tree-publisher-permission-probe.txt')) return { content: { sha: 'probe' } }
       if (options.method === 'DELETE') return undefined
       if (options.method === 'PATCH') {
         if (conflict) throw new Error('GitHub API PATCH failed (422)')

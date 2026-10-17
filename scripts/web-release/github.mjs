@@ -18,6 +18,16 @@ export async function api(path, { token, method = 'GET', body } = {}) {
   if (!response.ok) {
     const error = new Error(`GitHub API ${method} failed (${response.status})`)
     error.status = response.status
+    // Keep remote text out of diagnostics. The probe establishes ordinary
+    // Contents writes before accepting this documented permission denial.
+    if (response.status === 403 && method === 'PUT' && path.includes('/contents/.github/workflows/')) {
+      const data = await response.json().catch(() => null)
+      const workflow = path.slice(path.indexOf('/contents/') + '/contents/'.length)
+      error.workflowWriteDenied =
+        data?.message === 'Resource not accessible by integration' ||
+        data?.message ===
+          `refusing to allow a GitHub App to create or update workflow \`${workflow}\` without \`workflows\` permission`
+    }
     throw error
   }
   return response.status === 204 ? undefined : response.json()

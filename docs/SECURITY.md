@@ -54,6 +54,11 @@ the owner-installed workflow from that token. The workflow obtains verifier code
 from trusted source main at an independently resolved immutable SHA, not from
 publisher-controlled target scripts or metadata.
 
+The publisher permission probe first proves ordinary Contents API writes on its
+temporary branch, then requires a recognized permission-denial response for a
+workflow write with the same token and branch. An unrelated or ambiguous API
+failure cannot establish that permission boundary and stops publication.
+
 A separate gated source job uses OIDC/Sigstore to attest the exact manifest bytes.
 The manifest commits to every current and retained file's size and SHA256. Old
 assets are admitted only after verifying their previous detached attestation and

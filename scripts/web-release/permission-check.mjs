@@ -8,6 +8,18 @@ export async function assertWorkflowWriteDenied(root, baseSha, manifest, { reque
     body: { ref: `refs/heads/${branch}`, sha: baseSha },
   })
   try {
+    // Prove ordinary Contents writes work through the same API and branch.
+    // Only then can its documented integration-permission denial distinguish
+    // the workflow write from an inaccessible repository or read-only token.
+    await request(`${root}/contents/tree-publisher-permission-probe.txt`, {
+      token,
+      method: 'PUT',
+      body: {
+        branch,
+        message: 'ci(pages): probe publisher contents permission',
+        content: Buffer.from('Temporary permission probe\n').toString('base64'),
+      },
+    })
     try {
       await request(`${root}/contents/.github/workflows/tree-publisher-permission-probe.yml`, {
         token,
@@ -21,7 +33,7 @@ export async function assertWorkflowWriteDenied(root, baseSha, manifest, { reque
         },
       })
     } catch (error) {
-      if (error.status === 403 || error.status === 404) return
+      if (error.status === 403 && error.workflowWriteDenied === true) return
       throw error
     }
     throw new Error('Publisher can write workflows; publication refused')

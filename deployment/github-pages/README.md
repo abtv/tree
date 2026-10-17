@@ -72,8 +72,15 @@ and [workflow trigger](https://docs.github.com/en/actions/how-tos/write-workflow
 mechanisms. The private key is a publishing credential; protect source main and
 review trusted workflow changes. No repository secret is needed for PR checks.
 The App's lack of Workflows write is mandatory. Each transfer creates a uniquely
-named temporary probe branch, attempts to add a harmless dispatch-only workflow,
-and requires GitHub to reject that write. It removes the probe branch before
+named temporary probe branch and first writes an ordinary file through the
+Contents API. It then attempts to add a harmless dispatch-only workflow on that
+same branch with the same token and requires a recognized permission denial.
+The accepted HTTP 403 messages are GitHub's documented `Resource not accessible
+by integration` or its explicit refusal naming the workflow and missing
+`workflows` permission. Rate limits, missing resources and unrecognized responses
+stop publication; an HTTP status alone is not proof. See GitHub's
+[REST permission-error documentation](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api#resource-not-accessible).
+It removes the probe branch before
 transferring the package. If workflow write succeeds or any other error/cleanup
 failure occurs, publication stops; main and the live release are untouched by
 the probe. Contents write alone can
