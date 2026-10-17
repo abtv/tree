@@ -33,6 +33,7 @@ function createStore(): EditorStore {
     createSibling: vi.fn(() => true),
     cut: vi.fn(async () => true),
     deleteEmptySelected: vi.fn(),
+    deletePreviousEmpty: vi.fn(() => true),
     deleteLink: vi.fn(() => false),
     deleteSelected: vi.fn(() => true),
     endTextSession: vi.fn(),
@@ -3772,6 +3773,50 @@ describe('editor keyboard handler', () => {
 
     expect(store.enter).toHaveBeenCalledOnce()
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
+  })
+
+  it('dispatches Backspace at a collapsed start caret to preceding-empty-row deletion', () => {
+    const store = createStore()
+    const input = document.createElement('textarea')
+    input.value = 'Bugfixes'
+    input.setSelectionRange(0, 0)
+    const { handle } = handler(store, { id: 'node', text: 'Bugfixes', children: [] })
+    const event = keyEvent(input, 'Backspace')
+    handle(event)
+    expect(store.deletePreviousEmpty).toHaveBeenCalledWith(0)
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { start: 1, end: 1, options: {} },
+    { start: 0, end: 3, options: {} },
+    { start: 0, end: 0, options: { altKey: true } },
+    { start: 0, end: 0, options: { ctrlKey: true } },
+    { start: 0, end: 0, options: { shiftKey: true } },
+  ])(
+    'keeps text ranges, nonzero carets and modified Backspace out of adjacent-row deletion: %j',
+    ({ start, end, options }) => {
+      const store = createStore()
+      const input = document.createElement('textarea')
+      input.value = 'Bugfixes'
+      input.setSelectionRange(start, end, 'backward')
+      const { handle } = handler(store, { id: 'node', text: 'Bugfixes', children: [] })
+      handle(keyEvent(input, 'Backspace', options))
+      expect(store.deletePreviousEmpty).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([true, false])('interrupts Insert recording only after a successful adjacent-row deletion: %s', (removed) => {
+    const store = createStore()
+    vi.mocked(store.deletePreviousEmpty).mockReturnValue(removed)
+    const input = document.createElement('textarea')
+    input.value = 'Current'
+    input.setSelectionRange(0, 0)
+    const { handle, vim } = vimHandler(store, { id: 'node', text: 'Current', children: [] })
+    vim.mode = 'insert'
+    handle(keyEvent(input, 'Backspace'))
+    expect(vim.finishInsert).toHaveBeenCalledTimes(removed ? 1 : 0)
+    expect(vim.setMode).not.toHaveBeenCalled()
   })
 
   it('selects all linked content and leaves Backspace to native character editing', async () => {

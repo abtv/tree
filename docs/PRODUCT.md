@@ -516,6 +516,12 @@ When the deleted node is a visible descendant shown by inline expansion (§2.4),
 
 This is an explicit user action. Empty nodes are never deleted automatically.
 
+### 8.3 Backspace at the Beginning of a Nonempty Node
+
+In Tree standard editing and Vim Insert, plain `Backspace` with a collapsed text caret at position zero removes the immediately preceding visible row only if that row has no text, attachment, or children. The current node, its subtree, selection, caret at zero, location, and editing mode remain unchanged. The preceding row may be the last visible descendant of an expanded sibling. A collapsed node with children is not empty for this rule.
+
+If no eligible preceding row exists, nothing changes; text from different nodes is never merged by this command. The editable current-parent heading cannot be removed this way. Each removal is one undoable change. A successful removal interrupts Vim Insert recording while keeping the previous repeatable change; a no-op keeps the Insert recording. Backspace on an empty current node retains §8.2, and Backspace with selected text or a caret after position zero retains ordinary text editing.
+
 ---
 
 ## 9. Cmd+0

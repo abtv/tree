@@ -32,6 +32,7 @@ import {
   createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
+  deletePreviousEmptyTransition,
   deleteSelectedTransition,
   deleteSiblingRangeTransition,
   enterTransition,
@@ -1157,6 +1158,22 @@ export class EditorStore {
     if (document === undefined) return false
     this.endTextSession()
     this.applyStructural(document, state.location, state.focus)
+    return true
+  }
+
+  public deletePreviousEmpty(cursor: number): boolean {
+    const state = this.runtime.ready()
+    if (this.isPersistenceLocked() || state.agenda !== undefined) return false
+    const transition = deletePreviousEmptyTransition(state.document, state.location, cursor, (id) =>
+      state.expansion.expandedIds.has(id),
+    )
+    if (transition === undefined) return false
+    this.endTextSession()
+    this.applyStructural(
+      transition.document,
+      transition.location,
+      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+    )
     return true
   }
 

@@ -44,6 +44,7 @@ export const command = fc.record({
     'split',
     'delete',
     'deleteEmpty',
+    'deletePreviousEmpty',
     'move',
     'enter',
     'leave',
@@ -74,6 +75,7 @@ export type CommandAction = {
     | 'split'
     | 'delete'
     | 'deleteEmpty'
+    | 'deletePreviousEmpty'
     | 'move'
     | 'enter'
     | 'leave'
@@ -196,6 +198,9 @@ export async function applyCommand(
       break
     case 'deleteEmpty':
       store.deleteEmptySelected()
+      break
+    case 'deletePreviousEmpty':
+      store.deletePreviousEmpty(action.a % 2)
       break
     case 'move': {
       const rows = store.getVisibleRows()

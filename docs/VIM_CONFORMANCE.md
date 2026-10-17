@@ -18,6 +18,8 @@ Agenda direct matches reuse Tree text commands. Normal `Enter` opens the hyperli
 
 Tree empty-node creation with Normal `o` and Insert `Enter` follows PRODUCT §5.1 and §20.2.10. **Vim divergence:** an empty inline leaf is preserved while the new node is created after its parent, one level left, stopping at the focused location boundary. This is the owner's requested tree-creation behavior. `src/application/editor-command-transitions.test.ts` and `editor-command-transitions.property.test.ts` cover destination and preservation; `e2e/inline-expansion.spec.ts` covers repeated creation, focus, mode, boundary, geometry, and undo/redo.
 
+Tree Insert `Backspace` at the start of a nonempty node follows PRODUCT §8.3. **Vim divergence:** it removes a preceding visible empty leaf without merging nodes or moving the current caret; a preceding row with content stays unchanged. The transition unit/property tests, renderer keyboard-handler tests, and `e2e/empty-node.spec.ts` cover eligibility, selection, focus, mode, and history.
+
 Normal-mode `:` opens the application command panel in Tree and Agenda (PRODUCT §20.2.28). **Vim divergence:** the Product Owner requested a selectable list that runs its selected application command; Up/Down move selection rather than recalling command-line history. History orders matches instead. `src/application/command-registry.test.ts`, `command-registry.property.test.ts`, `src/renderer/use-command-panel.test.tsx`, and `e2e/command-panel.spec.ts` cover matching, ordering, history, modes, cancellation, focus restoration, service execution and rendering.
 
 | PRODUCT | Case | Vim divergence | Representative automated evidence |

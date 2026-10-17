@@ -519,6 +519,17 @@ export function createEditorKeyDownHandler({
     else if (event.key === 'Backspace' && node.text === '') {
       event.preventDefault()
       store.deleteEmptySelected()
+    } else if (
+      event.key === 'Backspace' &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      cursor === 0 &&
+      getSelectionRange(event.currentTarget).end === 0
+    ) {
+      event.preventDefault()
+      if (store.deletePreviousEmpty(cursor)) vim?.finishInsert(event.currentTarget)
     } else if (event.key === 'Enter') {
       event.preventDefault()
       store.createSiblingOrFirstChild(cursor)

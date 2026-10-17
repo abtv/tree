@@ -449,6 +449,30 @@ export function deleteSiblingRangeTransition(
   }
 }
 
+function lastVisibleDescendant(node: TreeNode, isExpanded: (id: NodeId) => boolean): TreeNode {
+  while (isExpanded(node.id) && node.children.length > 0) node = node.children[node.children.length - 1]!
+  return node
+}
+
+export function deletePreviousEmptyTransition(
+  document: Document,
+  location: Location,
+  cursor: number,
+  isExpanded: (id: NodeId) => boolean = () => false,
+): StructuralTransition | undefined {
+  const selected = requireNode(document, location.selectedNodeId)
+  if (cursor !== 0 || selected.node.text === '' || selected.node.id === location.currentParentId) return undefined
+  const sibling = selected.siblings[selected.index - 1]
+  if (sibling === undefined) return undefined
+  const previous = lastVisibleDescendant(sibling, isExpanded)
+  if (previous.text !== '' || previous.attachment !== undefined || previous.children.length > 0) return undefined
+  return {
+    document: deleteNode(document, previous.id),
+    location,
+    focus: { nodeId: selected.node.id, cursor: 0 },
+  }
+}
+
 export function deleteEmptySelectedTransition(
   document: Document,
   location: Location,
@@ -456,10 +480,8 @@ export function deleteEmptySelectedTransition(
 ): StructuralTransition | undefined {
   const selected = requireNode(document, location.selectedNodeId)
   if (selected.node.id === location.currentParentId || selected.node.text !== '') return undefined
-  let previous = selected.siblings[selected.index - 1]
-  while (previous !== undefined && isExpanded(previous.id) && previous.children.length > 0) {
-    previous = previous.children[previous.children.length - 1]
-  }
+  const sibling = selected.siblings[selected.index - 1]
+  const previous = sibling === undefined ? undefined : lastVisibleDescendant(sibling, isExpanded)
   const next = selected.siblings[selected.index + 1]
   const nextDocument = deleteNode(document, selected.node.id)
   if (previous !== undefined) {

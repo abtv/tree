@@ -1,7 +1,77 @@
 // @editing-modes: both
-import { describeForEachEditingMode, expect, launchTree, node, parent, test, typeInto } from './fixtures'
+import {
+  describeForEachEditingMode,
+  expect,
+  launchTree,
+  node,
+  nodeTexts,
+  parent,
+  seedDocument,
+  setCursor,
+  test,
+  typeInto,
+} from './fixtures'
 
-describeForEachEditingMode('Backspace on empty nodes', () => {
+describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
+  // @requirement PRODUCT.md §8.3
+  test('removes the preceding blank at a nonempty row’s start without moving its caret', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'blank', text: '', children: [] },
+          { id: 'current', text: 'Bugfixes', children: [{ id: 'child', text: 'Child', children: [] }] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'current' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await window.getByRole('button', { name: 'Expand node 2' }).click()
+    await node(window, 2).focus()
+    await setCursor(node(window, 2), 0)
+    await window.keyboard.press('Backspace')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child'])
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 0)
+    await window.screenshot({ path: test.info().outputPath(`remove-preceding-blank-${mode}.png`) })
+    await window.keyboard.press('Meta+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['', 'Bugfixes', 'Child'])
+    await window.keyboard.press('Meta+Shift+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child'])
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.type('X')
+    await expect(node(window, 1)).toHaveValue('XBugfixes')
+  })
+
+  test('keeps nonempty preceding text and removes no row for a text selection', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'previous', text: 'Previous', children: [] },
+          { id: 'blank', text: '', children: [] },
+          { id: 'current', text: 'Current', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'current' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await node(window, 1).focus()
+    await setCursor(node(window, 1), 0)
+    await window.keyboard.press('Backspace')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Previous', '', 'Current'])
+    await node(window, 3).focus()
+    await setCursor(node(window, 3), 0)
+    await window.keyboard.press('Shift+ArrowRight')
+    await window.keyboard.press('Backspace')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Previous', '', 'urrent'])
+    await setCursor(node(window, 3), 0)
+    await window.keyboard.press('Backspace')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Previous', 'urrent'])
+    await window.keyboard.press('Backspace')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Previous', 'urrent'])
+    await expect(node(window, 2)).toBeFocused()
+  })
+
   test('deletes an empty node and focuses the previous sibling at the end', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

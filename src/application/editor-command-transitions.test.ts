@@ -9,6 +9,7 @@ import {
   createSiblingTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
+  deletePreviousEmptyTransition,
   deleteSelectedTransition,
   deleteSiblingRangeTransition,
   enterTransition,
@@ -66,6 +67,53 @@ function rowsFor(
 const rootLocation = { currentParentId: null, selectedNodeId: 'alpha' }
 
 describe('editor command transitions', () => {
+  it('removes the preceding empty visible leaf while preserving the current row and caret', () => {
+    const current: TreeNode = {
+      id: 'current',
+      text: 'Bugfixes',
+      children: [{ id: 'child', text: 'Child', children: [] }],
+    }
+    const input: Document = { roots: [{ id: 'empty', text: '', children: [] }, current] }
+    expect(deletePreviousEmptyTransition(input, { currentParentId: null, selectedNodeId: 'current' }, 0)).toEqual({
+      document: { roots: [current] },
+      location: { currentParentId: null, selectedNodeId: 'current' },
+      focus: { nodeId: 'current', cursor: 0 },
+    })
+  })
+
+  it.each([
+    { id: 'previous', text: 'Text', children: [] },
+    { id: 'previous', text: ' ', children: [] },
+    { id: 'previous', text: '', attachment: { id: 'image', mimeType: 'image/png' as const }, children: [] },
+    { id: 'previous', text: '', children: [{ id: 'child', text: '', children: [] }] },
+  ])('retains a preceding row that has content or children: %j', (previous) => {
+    const input: Document = { roots: [previous, { id: 'current', text: 'Current', children: [] }] }
+    expect(
+      deletePreviousEmptyTransition(input, { currentParentId: null, selectedNodeId: 'current' }, 0),
+    ).toBeUndefined()
+  })
+
+  it('deletes a preceding expanded branch’s last empty leaf, but never a hidden leaf', () => {
+    const input: Document = {
+      roots: [
+        { id: 'parent', text: 'Parent', children: [{ id: 'empty', text: '', children: [] }] },
+        { id: 'current', text: 'Current', children: [] },
+      ],
+    }
+    const location = { currentParentId: null, selectedNodeId: 'current' }
+    expect(deletePreviousEmptyTransition(input, location, 0)).toBeUndefined()
+    expect(deletePreviousEmptyTransition(input, location, 0, () => true)?.document.roots).toEqual([
+      { id: 'parent', text: 'Parent', children: [] },
+      input.roots[1],
+    ])
+    expect(deletePreviousEmptyTransition(input, location, 1, () => true)).toBeUndefined()
+    expect(deletePreviousEmptyTransition(input, { ...location, selectedNodeId: 'parent' }, 0)).toBeUndefined()
+    expect(deletePreviousEmptyTransition(input, { ...location, selectedNodeId: 'empty' }, 0)).toBeUndefined()
+    expect(
+      deletePreviousEmptyTransition(input, { currentParentId: 'current', selectedNodeId: 'current' }, 0, () => true),
+    ).toBeUndefined()
+  })
+
   it('rejects a child at maximum depth before requesting an ID', () => {
     const deepest: TreeNode = {
       id: 'n19',

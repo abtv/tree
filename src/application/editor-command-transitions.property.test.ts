@@ -9,10 +9,36 @@ import {
   openBelowTransition,
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
+  deletePreviousEmptyTransition,
 } from './editor-command-transitions'
 import { buildVisibleRows } from './visible-rows'
 
 describe('editor command transition properties', () => {
+  it('removes exactly one preceding blank without changing the current subtree at any displayed depth', () => {
+    fc.assert(
+      fc.property(fc.array(fc.string(), { minLength: 1, maxLength: 10 }), (texts) => {
+        const current: TreeNode = {
+          id: 'current',
+          text: 'Current',
+          children: [{ id: 'kept', text: 'Kept', children: [] }],
+        }
+        const blank: TreeNode = { id: 'blank', text: '', children: [] }
+        let branch: TreeNode = { id: 'parent', text: 'Parent', children: [blank, current] }
+        for (const [index, text] of texts.entries()) branch = { id: `ancestor-${index}`, text, children: [branch] }
+        const document: Document = { roots: [branch] }
+        const location = { currentParentId: branch.id, selectedNodeId: current.id }
+        const result = deletePreviousEmptyTransition(document, location, 0, () => true)!
+        assertDocument(result.document)
+        expect(locateNode(result.document, 'blank')).toBeUndefined()
+        expect(locateNode(result.document, 'current')!.node).toEqual(current)
+        expect(locateNode(result.document, 'parent')!.node.children).toEqual([current])
+        expect(result.location).toEqual(location)
+        expect(result.focus).toEqual({ nodeId: 'current', cursor: 0 })
+        expect(deletePreviousEmptyTransition(result.document, result.location, 0, () => true)).toBeUndefined()
+      }),
+    )
+  })
+
   it('deletes only the empty subtree and focuses the preceding visible row at its text end', () => {
     fc.assert(
       fc.property(
