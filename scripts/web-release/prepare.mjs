@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { api } from './github.mjs'
 import { readMetadata, verifyAttestation, MAX_METADATA_BYTES } from './attestation.mjs'
 import { verifyPackage } from './package.mjs'
-import { MAX_FILE_BYTES, validateManifest } from './policy.mjs'
+import { assetPaths, MAX_ASSET_GENERATIONS, MAX_FILE_BYTES, validateManifest } from './policy.mjs'
 
 function decodeBlob(blob, limit) {
   if (
@@ -26,6 +26,9 @@ function decodeBlob(blob, limit) {
 
 export async function preparePackage(directory, manifestFile, { request = api, attest = verifyAttestation } = {}) {
   const current = validateManifest(await readMetadata(manifestFile))
+  if (current.schema !== 2 || current.assetGenerations.length !== 1) {
+    throw new Error('Preparation requires a fresh single-build manifest')
+  }
   await verifyPackage(directory, current)
   const root = '/repos/tree-editor/tree-editor.github.io'
   const head = await request(`${root}/git/ref/heads/main`)
@@ -63,6 +66,15 @@ export async function preparePackage(directory, manifestFile, { request = api, a
   // newly signed manifest. Unsigned target data must never become trusted input.
   const old = await attest(oldManifestFile, oldBundleFile)
   validateManifest(old)
+  // Legacy manifests have no build boundaries. Keep their entire authenticated
+  // asset set as one generation until normal retention evicts it.
+  const currentAssets = assetPaths(current)
+  const previousGenerations = old.schema === 2 ? old.assetGenerations : [assetPaths(old)]
+  const assetGenerations = [
+    currentAssets,
+    ...previousGenerations.filter((paths) => JSON.stringify([...paths].sort()) !== JSON.stringify(currentAssets)),
+  ].slice(0, MAX_ASSET_GENERATIONS)
+  const keep = new Set(assetGenerations.flat())
   const files = new Map(current.files.map((file) => [file.path, file]))
   const additions = []
   for (const file of old.files.filter((file) => file.path.startsWith('assets/'))) {
@@ -71,11 +83,13 @@ export async function preparePackage(directory, manifestFile, { request = api, a
       if (existing.sha256 !== file.sha256 || existing.size !== file.size) throw new Error('Retained asset collision')
       continue
     }
+    if (!keep.has(file.path)) continue
     additions.push(file)
     files.set(file.path, file)
   }
   const merged = validateManifest({
     ...current,
+    assetGenerations,
     files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path, 'en')),
   })
   // Check cumulative bounds before downloading or retaining old asset buffers.

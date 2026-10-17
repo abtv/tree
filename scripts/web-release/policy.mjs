@@ -2,6 +2,14 @@ export const SOURCE_REPOSITORY = 'abtv/tree'
 export const MAX_FILES = 128
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_PACKAGE_BYTES = 25 * 1024 * 1024
+export const MAX_ASSET_GENERATIONS = 3
+
+export function assetPaths(manifest) {
+  return manifest.files
+    .filter((file) => file.path.startsWith('assets/'))
+    .map((file) => file.path)
+    .sort()
+}
 
 export function allowedPath(path) {
   return (
@@ -13,7 +21,7 @@ export function allowedPath(path) {
 
 export function validateManifest(manifest) {
   if (
-    manifest?.schema !== 1 ||
+    ![1, 2].includes(manifest?.schema) ||
     manifest.sourceRepository !== SOURCE_REPOSITORY ||
     typeof manifest.sourceSha !== 'string' ||
     !/^[a-f0-9]{40}$/.test(manifest.sourceSha) ||
@@ -50,6 +58,32 @@ export function validateManifest(manifest) {
     ![...paths].some((path) => /^assets\/.+\.(?:woff2?|ttf|otf)$/.test(path))
   ) {
     throw new Error('Incomplete or oversized release package')
+  }
+  if (manifest.schema === 2) {
+    const generations = manifest.assetGenerations
+    if (!Array.isArray(generations) || !generations.length || generations.length > MAX_ASSET_GENERATIONS) {
+      throw new Error('Invalid asset generations')
+    }
+    const covered = new Set()
+    const identities = new Set()
+    for (const generation of generations) {
+      if (
+        !Array.isArray(generation) ||
+        !generation.length ||
+        generation.length > MAX_FILES ||
+        generation.some((path) => typeof path !== 'string' || !path.startsWith('assets/') || !paths.has(path)) ||
+        new Set(generation).size !== generation.length ||
+        !generation.some((path) => path.endsWith('.js')) ||
+        !generation.some((path) => path.endsWith('.css')) ||
+        !generation.some((path) => /\.(?:woff2?|ttf|otf)$/.test(path))
+      )
+        throw new Error('Invalid asset generation')
+      const key = JSON.stringify([...generation].sort())
+      if (identities.has(key)) throw new Error('Duplicate asset generation')
+      identities.add(key)
+      for (const path of generation) covered.add(path)
+    }
+    if (assetPaths(manifest).some((path) => !covered.has(path))) throw new Error('Untracked release asset')
   }
   return manifest
 }

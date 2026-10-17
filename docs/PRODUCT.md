@@ -92,6 +92,16 @@ Scheduled or manual check runs must not cancel checks belonging to a publication
 
 Publication independently authenticates a source-signed manifest and every file
 it authorizes, including retained assets. Unlisted files cannot enter the site.
+
+Publication retains assets from the current and two previous distinct asset sets,
+ordered by their most recent publication to the target repository. Identical sets
+do not consume another slot; shared files are stored once. Legacy manifests without
+build boundaries count as one complete old set during migration. Pruning happens
+only while preparing the next signed package, never as a separate live-site deletion.
+The existing file and byte limits still stop an oversized publication before transfer.
+This retention is not a full-release rollback archive or a time-based guarantee for
+old tabs, and it does not change browser note storage.
+
 The target-only publisher cannot select executable verification code: the protected
 workflow obtains it from trusted source main at an independently resolved SHA.
 Verification runs without Pages/OIDC write permissions; a separate job deploys

@@ -106,6 +106,8 @@ describe('authenticated retained assets', () => {
       sha256: createHash('sha256').update(oldBytes).digest('hex'),
     }
     const old = { ...f.manifest, sourceSha: 'd'.repeat(40), sourceRunId: '9', files: [...f.manifest.files, file] }
+    old.schema = 1
+    delete old.assetGenerations
     const blobs = new Map()
     const tree = []
     for (const [path, bytes] of [

@@ -56,7 +56,7 @@ describe('release manifest and package', () => {
   it('rejects untrusted identities, duplicate/traversing paths and oversized manifests', async () => {
     const manifest = await createManifest(await fixture(), identity)
     for (const replacement of [
-      { schema: 2 },
+      { schema: 3 },
       { sourceRepository: 'other/tree' },
       { sourceSha: 'main' },
       { sourceRunId: '1e3' },

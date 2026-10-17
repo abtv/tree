@@ -132,10 +132,22 @@ and verifying their bytes before the new manifest is signed. Unlisted target fil
 are removed by the whole-tree replacement, and target verification rejects extras.
 Only JavaScript, CSS and font assets are accepted; HTML/SVG assets are rejected.
 No archive is extracted, and no transferred JavaScript is executed in CI.
-If retained assets eventually exceed those bounds, publication fails safely;
-review a source-side retention-policy change before retrying. Manually deleting
-files from an already signed package makes verification fail; it does not prune
-the authenticated manifest.
+Schema 2 manifests record up to three asset sets, newest first: the current build
+and two previous distinct builds transferred to the target repository. Repeating
+the same set does not consume a slot; returning to a retained set moves it to the
+front. Shared assets occupy one file. Preparation omits assets outside these sets
+before signing; there is no separate deletion against the active site. A schema 1
+manifest remains verifiable and its entire asset list becomes one legacy set,
+which normal retention eventually evicts. No target workflow update is needed:
+it obtains the verifier from source main.
+
+The 128-file, 10 MiB-per-file and 25 MiB-total limits still apply to the complete
+retained package. If three sets exceed them, publication fails before transfer;
+it does not silently evict another set. Retention counts target transfers, not days
+or successful Pages deployments. Very old tabs or cached HTML may reference an
+evicted asset and need a reload. Only the current HTML is retained, so these sets
+are not a full-release rollback archive. Manually deleting files from an already
+signed package makes verification fail; it does not prune the authenticated manifest.
 
 ## Failures and ordering
 

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { allowedPath, MAX_FILE_BYTES, MAX_FILES, MAX_PACKAGE_BYTES, validateManifest } from './policy.mjs'
+import { allowedPath, assetPaths, MAX_FILE_BYTES, MAX_FILES, MAX_PACKAGE_BYTES, validateManifest } from './policy.mjs'
 
 export async function inspectPackage(directory) {
   const files = []
@@ -39,7 +39,8 @@ export async function inspectPackage(directory) {
 }
 
 export async function createManifest(directory, identity) {
-  return validateManifest({ schema: 1, ...identity, files: await inspectPackage(directory) })
+  const manifest = { ...identity, schema: 2, files: await inspectPackage(directory) }
+  return validateManifest({ ...manifest, assetGenerations: [assetPaths(manifest)] })
 }
 
 export async function verifyPackage(directory, manifest) {
@@ -56,6 +57,13 @@ export async function verifyPackage(directory, manifest) {
     )
   ) {
     throw new Error('Release package differs from manifest')
+  }
+  if (manifest.schema === 2) {
+    const current = new Set(manifest.assetGenerations[0])
+    const html = await readFile(join(directory, 'index.html'), 'utf8')
+    for (const match of html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/gi)) {
+      if (!current.has(match[1].slice(2))) throw new Error('HTML references a non-current asset')
+    }
   }
   return manifest
 }
