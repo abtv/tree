@@ -88,12 +88,14 @@ under `.scratch/web-prototype/`; they do not use the ordinary browser profile.
 Google Chrome must be installed. In Codex, browser launch uses the normal
 outside-sandbox approval mechanism.
 
-The tracked Codex rule in `.codex/rules/tests.rules` allows `npm run test:web:built`
-outside the sandbox. It trusts this repository's script, including its build and
-Chrome launch; review script changes before running it. Restart Codex with the
-project configuration trusted to load the rule. A rule match alone does not prove
-that the running session has loaded it. The rule matches command arguments, not
-the current directory, so use it only in a trusted checkout.
+The tracked Codex rules in `.codex/rules/tests.rules` allow `npm run test:web:built`,
+`npm run test:web` (including check selection), `npm run dev:web`, and
+`npm run preview:web` outside the sandbox. They trust this repository's named
+scripts, including builds, Chrome launches, and local servers; review script
+changes before running them. Restart Codex with the project configuration trusted
+to load the rules. A rule match alone does not prove that the running session has
+loaded them. The rules match command arguments, not the current directory, so use
+these allowances only in a trusted checkout.
 
 ```sh
 npm run test:web

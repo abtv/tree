@@ -52,3 +52,20 @@ prefix_rule(
     match = ["npm run test:web:built"],
     not_match = ["npm run test:web", "npm run test:web:built-extra", "npm run dev:web", "npm install", "node arbitrary-script.mjs"],
 )
+
+# Owner-approved browser checks and local-only development/preview servers.
+# These allowances trust the named repository scripts outside the sandbox;
+# they do not permit arbitrary npm scripts, publishing, or dependency changes.
+prefix_rule(
+    pattern = ["npm", "run", ["test:web", "dev:web", "preview:web"]],
+    decision = "allow",
+    justification = "Run trusted browser checks and local Tree servers without repeated approval",
+    match = [
+        "npm run test:web",
+        "npm run test:web -- quit",
+        "npm run test:web -- storage",
+        "npm run dev:web",
+        "npm run preview:web",
+    ],
+    not_match = ["npm run test:web:built", "npm run test:web-extra", "npm run dev:web-extra", "npm run preview:web-extra", "npm run deploy", "npm install", "npm exec node", "node arbitrary-script.mjs"],
+)
