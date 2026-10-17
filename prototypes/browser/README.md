@@ -70,6 +70,10 @@ lock document editing. A failed transaction preserves the previous saved head;
 the current unsaved work remains in the open tab. Invalid stored documents are
 not replaced with a sample.
 
+Tree's Quit command saves pending edits and then requests window closure without
+a successful-save dialog. If the browser refuses scripted closure, close the
+saved page with the browser's own controls. A failed save keeps the editor open.
+
 Data stays in the browser. There is no device synchronization, export or import.
 Clearing site data or deleting the profile removes it. This version has no offline
 package, recovery generations or persistent-storage request. Browser/OS force
@@ -96,11 +100,12 @@ npm run test:web
 npm run test:web -- theme
 npm run test:web -- menu
 npm run test:web -- storage
+npm run test:web -- quit
 npm run test:web:built
 ```
 
 `test:web:built` builds the static package, starts an ephemeral loopback file server,
-runs the editor, theme, menu and storage checks against those files in isolated
+runs the editor, theme, menu, storage and quit checks against those files in isolated
 Chrome, and closes the server. It does not open the ordinary browser profile.
 
 The storage check covers full browser restart, writer handover, aborted writes,

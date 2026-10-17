@@ -7,6 +7,8 @@ if (process.argv[2] === 'theme') {
   await import('./menu-test.mjs')
 } else if (process.argv[2] === 'storage') {
   await import('./storage-test.mjs')
+} else if (process.argv[2] === 'quit') {
+  await import('./quit-test.mjs')
 } else {
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
   try {

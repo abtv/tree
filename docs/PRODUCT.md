@@ -66,6 +66,13 @@ the permanent HTTPS address have separate storage. Before publication, explain
 that notes will not transfer automatically. The existing browser save and storage
 limitations are described in [Browser version](../prototypes/browser/README.md).
 
+The browser Quit command flushes pending edits and requests window closure only
+after saving succeeds. It does not show a successful-save dialog. If the browser
+refuses scripted closure, the saved editor stays open and the user can close it
+with the browser's window controls. A failed flush keeps the editor open and
+shows the save failure. Native browser closing retains the existing warning for
+pending edits.
+
 A push to source `main` publishes to `https://tree-editor.github.io` only after
 the same commit passes standard validation, Electron integration, dependency
 audit and Chrome checks of the built package, plus applicable memory/demo checks.

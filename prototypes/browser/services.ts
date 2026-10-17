@@ -118,9 +118,11 @@ export async function installBrowserPrototype(): Promise<{
   const flush = async () => {
     try {
       await store?.flushPersistence()
+      return true
     } catch (error) {
       status('Save failed — keep this tab open')
       store?.reportError(error)
+      return false
     }
   }
   const services: EditorServices = {
@@ -255,8 +257,7 @@ export async function installBrowserPrototype(): Promise<{
     },
     setCommandHistory: (value) => write('preferences', 'commands', value),
     async quit() {
-      await flush()
-      if (!dirty) alert('Saved locally. You can close this tab.')
+      if ((await flush()) && !dirty) window.close()
     },
     async quitWithoutSaving() {
       throw new Error('Close the browser tab to leave the prototype.')
