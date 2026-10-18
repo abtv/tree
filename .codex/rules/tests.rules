@@ -31,15 +31,27 @@ prefix_rule(
 
 # Named Electron workflows accept spec paths and Playwright flags without shell env prefixes.
 prefix_rule(
-    pattern = ["npm", "run", ["test:e2e", "test:e2e:changed", "test:e2e:diagnose", "test:e2e:visible", "test:perf", "test:perf:profile"]],
+    pattern = ["npm", "run", ["test:e2e", "test:e2e:changed", "test:e2e:diagnose", "test:e2e:memory", "test:e2e:visible", "test:perf", "test:perf:safari", "test:perf:profile"]],
     decision = "allow",
     match = [
         "npm run test:e2e:changed -- --list",
+        "npm run test:e2e:memory",
+        "npm run test:e2e:memory -- --workers=1",
         "npm run test:e2e:diagnose -- --shared-reset=reload --json-output=.scratch/diagnostics/report.json e2e/navigation.spec.ts --workers=6 --repeat-each=5 --reporter=dot,json",
         "npm run test:e2e:visible -- e2e/drag-and-drop-hierarchy.spec.ts --workers=1 --update-snapshots",
         "npm run test:perf:profile -- perf/agenda-scale.spec.ts --grep deep-100000-dense",
+        "npm run test:perf:safari",
     ],
-    not_match = ["npm run unknown", "npm install", "npm run test:e2e:visible-extra", "npm run test:e2e:diagnose-extra"],
+    not_match = ["npm run unknown", "npm install", "npm run test:e2e:visible-extra", "npm run test:e2e:diagnose-extra", "npm run test:e2e:memory-extra", "npm run test:perf:safari-extra"],
+)
+
+# Named desktop launch and synthetic media workflows require host GUI access.
+prefix_rule(
+    pattern = ["npm", "run", ["dev", "start", "demo:video", "screenshots:readme"]],
+    decision = "allow",
+    justification = "Run trusted desktop development and isolated synthetic media workflows without repeated approval",
+    match = ["npm run dev", "npm run start", "npm run demo:video", "npm run screenshots:readme"],
+    not_match = ["npm run dev-extra", "npm run start-extra", "npm run demo:video-extra", "npm run screenshots:readme-extra", "npm run deploy", "npm install"],
 )
 
 # Owner-approved isolated Chrome verification of the generated static package.

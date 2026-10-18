@@ -368,6 +368,46 @@ for (const command of documentedWorkflows) {
   checked += 1
 }
 
+// Package scripts outside the main development guide need the same approval coverage.
+// Lifecycle hooks run through their parent npm workflow rather than as standalone commands.
+const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+  scripts: Record<string, string>
+}
+const lifecycleHooks = new Set(['postinstall', 'prepare', 'predev', 'prestart', 'pretest:web:built'])
+for (const name of lifecycleHooks) assert.ok(name in packageJson.scripts, `Stale lifecycle exemption: ${name}`)
+for (const name of Object.keys(packageJson.scripts)) {
+  if (lifecycleHooks.has(name)) continue
+  for (const command of [`npm run ${name}`, `npm run ${name} -- --help`]) {
+    // Media workflows currently permit their exact invocation only.
+    if (command.endsWith(' -- --help') && ['screenshots:readme', 'demo:video', 'test:e2e:timing'].includes(name))
+      continue
+    assert.equal(
+      permissionFor(config.agent.develop.permission.bash, command),
+      'allow',
+      `develop: package workflow ${command} should resolve to allow`,
+    )
+    checked += 1
+  }
+  if (
+    [
+      'dev:web',
+      'build:web',
+      'preview:web',
+      'test:web',
+      'test:web:built',
+      'test:e2e:memory',
+      'test:perf:safari',
+    ].includes(name)
+  ) {
+    assert.notEqual(
+      permissionFor(config.agent.develop.permission.bash, `npm run ${name}-extra`),
+      'allow',
+      `develop: ${name} allowance must not include lookalike workflow names`,
+    )
+    checked += 1
+  }
+}
+
 // AGENTS.md §4 requires repository edits to go through the agent's own file-editing tool. Both
 // OpenCode and Claude Code enforce that by denying interpreters and in-place stream editing, and
 // the two configurations previously drifted: OpenCode denied them while Claude Code did not. This
