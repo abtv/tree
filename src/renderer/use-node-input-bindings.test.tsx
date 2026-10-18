@@ -1326,21 +1326,19 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
-  it.each([true, false])('replays a clamped join span, spacing %s, and stops before a partial join', async (spaced) => {
+  it('replays a clamped gJ join span and stops before a partial join', async () => {
     const f = await fixture({
       document: { roots: [node('a', ' A '), node('b', ' B '), node('c', ' C '), node('d', ' D ')] },
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
     f.press('9')
-    if (!spaced) f.press('g')
+    f.press('g')
     f.press('J')
     f.press('u')
     act(() => f.store.selectNode('a', 0))
     f.press('3')
     f.press('.')
-    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(
-      spaced ? [' A B C ', ' D '] : [' A  B  C ', ' D '],
-    )
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual([' A  B  C ', ' D '])
     f.press('u')
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
   })
@@ -1391,6 +1389,7 @@ describe('useNodeInputBindings', () => {
     f.press('U')
     f.press('w')
     f.press('Y')
+    f.press('g')
     f.press('J')
     f.press('w')
     f.press('.')
@@ -1614,15 +1613,16 @@ describe('useNodeInputBindings', () => {
     expect(f.node().text).toBe('captured')
   })
 
-  it('joins a whole-node Visual range with J or gJ and returns to Normal mode', async () => {
+  it('joins a whole-node Visual range with gJ and returns to Normal mode', async () => {
     const f = await fixture({ document: { roots: [node('a', 'alpha '), node('b', ' beta'), node('c', 'gamma')] } })
     f.press('V')
     f.press('j')
+    f.press('g')
     f.press('J')
-    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha beta', 'gamma'])
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha  beta', 'gamma'])
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.snapshot().location.selectedNodeId).toBe('a')
-    expect(f.snapshot().focus).toMatchObject({ nodeId: 'a', cursor: 5 })
+    expect(f.snapshot().focus).toMatchObject({ nodeId: 'a', cursor: 6 })
     f.press('u')
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha ', ' beta', 'gamma'])
     // After the undo, the same range joins without touching its whitespace for gJ.
@@ -1646,9 +1646,11 @@ describe('useNodeInputBindings', () => {
     })
     const before = f.snapshot().document
     f.press('V')
+    f.press('g')
     f.press('J')
     expect(f.result.current.vimMode).toBe('visual-node')
     f.press('j')
+    f.press('g')
     f.press('J')
     expect(f.result.current.vimMode).toBe('visual-node')
     expect(f.snapshot().document).toBe(before)

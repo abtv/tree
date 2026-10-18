@@ -402,7 +402,7 @@ describe('editor keyboard handler', () => {
     expect(vim.verticalOperator).not.toHaveBeenCalled()
   })
 
-  it('routes whole-node Visual J and gJ, and discards a count or other prefix for them', () => {
+  it('routes whole-node Visual J and K as counted motions and keeps gJ as joining', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'node'
@@ -410,8 +410,14 @@ describe('editor keyboard handler', () => {
     const press = (...keys: string[]): void => {
       for (const key of keys) handle(keyEvent(input, key))
     }
-    press('J', 'g', 'J', '3', 'J')
-    expect(vi.mocked(vim.nodeVisual.join).mock.calls).toEqual([[true], [false], [true]])
+    press('J', 'K', 'g', 'J', '3', 'J', '2', 'K', 'g', 'K')
+    expect(vi.mocked(vim.nodeVisual.join).mock.calls).toEqual([[false]])
+    expect(vi.mocked(vim.nodeVisual.move).mock.calls).toEqual([
+      ['down', 10],
+      ['up', 10],
+      ['down', 30],
+      ['up', 20],
+    ])
     expect(vim.commandState.pending).toBeUndefined()
     // Character Visual mode has no join: `J` neither joins nor edits there.
     const character = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual')
@@ -3150,7 +3156,73 @@ describe('editor keyboard handler', () => {
     expect(snapshot().location.selectedNodeId).toBe('root')
   })
 
-  describe('Normal J and gJ', () => {
+  describe('fast vertical motions', () => {
+    it.each(['J', 'K'])(
+      'matches counted lowercase navigation for %s across text, images and boundaries',
+      async (key) => {
+        const roots: TreeNode[] = Array.from({ length: 26 }, (_, index) => ({
+          id: `n${index}`,
+          text: index % 5 === 0 ? '' : 'long enough text',
+          children: [],
+          ...(index % 3 === 0 ? { attachment: { id: `image${index}`, mimeType: 'image/png' as const } } : {}),
+        }))
+        for (const start of [0, 12, 25]) {
+          for (const count of [1, 2]) {
+            for (const cursor of [0, 4, roots[start]!.text.length]) {
+              const options = { document: { roots }, location: { currentParentId: null, selectedNodeId: `n${start}` } }
+              const fast = await textFixture(roots[start]!, 'normal', options)
+              const slow = await textFixture(roots[start]!, 'normal', options)
+              for (const f of [fast, slow]) {
+                f.input.setSelectionRange(cursor, cursor)
+                f.vim.commandState.lastChange = { kind: 'delete', motion: 'w', count: 1 }
+                f.vim.register.current = { kind: 'text', value: 'kept' }
+              }
+              fast.press(String(count), key)
+              slow.press(...String(count * 10), key.toLowerCase())
+              expect(fast.snapshot().location).toEqual(slow.snapshot().location)
+              expect(fast.snapshot().focus).toEqual(slow.snapshot().focus)
+              expect(fast.caret()).toEqual(slow.caret())
+              expect(fast.snapshot().document.roots).toEqual(roots)
+              expect(fast.vim.commandState.lastChange).toEqual({ kind: 'delete', motion: 'w', count: 1 })
+              expect(fast.vim.commandState.pending).toBeUndefined()
+              expect(fast.vim.register.current).toEqual({ kind: 'text', value: 'kept' })
+              expect(fast.vim.mode).toBe('normal')
+            }
+          }
+        }
+      },
+    )
+
+    it.each(['J', 'K'])('preserves character Visual selection and treats awaited %s as text', async (key) => {
+      const n = { id: 'node', text: 'aJbKc', children: [] }
+      const visual = await textFixture(n, 'visual')
+      visual.input.setSelectionRange(1, 4)
+      visual.press('2', key)
+      expect([visual.input.selectionStart, visual.input.selectionEnd]).toEqual([1, 4])
+      expect(visual.vim.mode).toBe('visual')
+      const f = await textFixture(n)
+      f.input.setSelectionRange(0, 0)
+      f.press('f', key)
+      expect(f.input.selectionStart).toBe(key === 'J' ? 1 : 3)
+      f.press('r', key)
+      expect(f.snapshot().document.roots[0]!.text).toBe(n.text)
+    })
+
+    it.each(['dJ', 'dK', 'gK', 'zJ', 'zK'])('does not navigate for unsupported sequence %s', async (keys) => {
+      const roots = [
+        { id: 'a', text: 'alpha', children: [] },
+        { id: 'b', text: 'beta', children: [] },
+      ]
+      const f = await textFixture(roots[0]!, 'normal', { document: { roots } })
+      const before = f.snapshot()
+      f.press(...keys)
+      expect(f.snapshot().location).toEqual(before.location)
+      expect(f.snapshot().document).toBe(before.document)
+      expect(f.vim.commandState.pending).toBeUndefined()
+    })
+  })
+
+  describe('Normal gJ', () => {
     const siblings = {
       roots: [
         { id: 'a', text: 'alpha  ', children: [] },
@@ -3171,34 +3243,34 @@ describe('editor keyboard handler', () => {
         { document: siblings, location },
       )
 
-    it('joins with the next sibling, trimming and inserting one space for J', async () => {
+    it('joins with the next sibling without changing whitespace for gJ', async () => {
       const { press, snapshot, vim } = await fixture('a')
       vim.register.current = { kind: 'text', value: 'kept' }
-      press('J')
-      expect(snapshot().document.roots.map((root) => root.text)).toEqual(['alpha beta', 'gamma'])
+      press('g', 'J')
+      expect(snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
       expect(snapshot().location.selectedNodeId).toBe('a')
       expect(vim.register.current).toEqual({ kind: 'text', value: 'kept' })
       expect(vim.mode).toBe('normal')
       expect(vim.syncImageCaretToFocus).toHaveBeenCalled()
     })
 
-    it('keeps the texts unchanged for gJ and applies a count to either form', async () => {
+    it('keeps the texts unchanged for gJ and applies a count', async () => {
       const gj = await fixture('a')
       gj.press('g', 'J')
       expect(gj.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
       const counted = await fixture('a')
-      counted.press('3', 'J')
-      expect(counted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha beta gamma'])
+      counted.press('3', 'g', 'J')
+      expect(counted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    betagamma'])
       const gCounted = await fixture('a')
       gCounted.press('3', 'g', 'J')
       expect(gCounted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    betagamma'])
-      // `1J` still joins two nodes, and a count past the end clamps at the last sibling.
+      // `1gJ` still joins two nodes, and a count past the end clamps at the last sibling.
       const one = await fixture('a')
-      one.press('1', 'J')
-      expect(one.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha beta', 'gamma'])
+      one.press('1', 'g', 'J')
+      expect(one.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
       const clamped = await fixture('b')
-      clamped.press('9', 'J')
-      expect(clamped.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha  ', '  beta gamma'])
+      clamped.press('9', 'g', 'J')
+      expect(clamped.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha  ', '  betagamma'])
     })
 
     it('does nothing on the last sibling or the current-parent heading, and discards the pending count', async () => {
@@ -3210,7 +3282,7 @@ describe('editor keyboard handler', () => {
       expect(last.vim.commandState.pending).toBeUndefined()
       const heading = await fixture('a', { currentParentId: 'a', selectedNodeId: 'a' })
       const headingBefore = heading.snapshot().document
-      heading.press('J')
+      heading.press('g', 'J')
       expect(heading.snapshot().document).toBe(headingBefore)
     })
 
@@ -3222,8 +3294,6 @@ describe('editor keyboard handler', () => {
       expect(snapshot().document.roots).toHaveLength(3)
       expect(vim.commandState.pending).toBeUndefined()
       expect(vim.commandState.lastChange).toBe(saved)
-      press('J')
-      expect(vim.commandState.lastChange).toEqual({ kind: 'structural-join', span: 2, spaced: true })
       press('g', 'J')
       expect(snapshot().document.roots.length).toBeLessThan(3)
       expect(vim.commandState.lastChange).toEqual({ kind: 'structural-join', span: 2, spaced: false })

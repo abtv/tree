@@ -84,14 +84,13 @@ describe('structural dot replay invariants', () => {
         fc.integer({ min: 2, max: 30 }),
         fc.integer({ min: 2, max: 8 }),
         fc.integer({ min: 1, max: 12 }),
-        fc.boolean(),
-        async (size, requestedSpan, repetitions, spaced) => {
+        async (size, requestedSpan, repetitions) => {
           const initial = nodes(size)
           const f = await harness(initial)
           try {
             const span = Math.min(size, requestedSpan)
             f.count(requestedSpan)
-            if (!spaced) f.press('g')
+            f.press('g')
             f.press('J')
             f.press('u')
             const completed = Math.min(repetitions, Math.floor((size - 1) / (span - 1)))
@@ -108,7 +107,7 @@ describe('structural dot replay invariants', () => {
               initial
                 .slice(0, joined)
                 .map((item) => item.text)
-                .join(spaced ? ' ' : ''),
+                .join(''),
             )
             expect(result.slice(1)).toEqual(initial.slice(joined))
             for (let index = 0; index < completed; index += 1) f.press('u')

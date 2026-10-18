@@ -179,7 +179,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       else expect(f.snapshot().document).toBe(before)
     })
 
-    it.each(['J', 'gJ', 'dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gp', 'gP', 'd2j', 'c2k', 'y2j'])(
+    it.each(['gJ', 'dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gp', 'gP', 'd2j', 'c2k', 'y2j'])(
       '%s structural sequence leaves the occurrence and document unchanged',
       async (keys) => {
         const f = await fixture(element)

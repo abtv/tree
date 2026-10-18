@@ -370,12 +370,12 @@ export function createAgendaKeyDownHandler({
         store.enter()
       }
     } else if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
-    else if (event.key === 'ArrowDown' || (normal && event.key === 'j' && pending?.prefix === undefined)) {
+    else if (event.key === 'ArrowDown' || (normal && ['j', 'J'].includes(event.key) && pending?.prefix === undefined)) {
       finishClickReplace()
-      vertical('down', count)
-    } else if (event.key === 'ArrowUp' || (normal && event.key === 'k' && pending?.prefix === undefined)) {
+      vertical('down', count * (event.key === 'J' ? 10 : 1))
+    } else if (event.key === 'ArrowUp' || (normal && ['k', 'K'].includes(event.key) && pending?.prefix === undefined)) {
       finishClickReplace()
-      vertical('up', count)
+      vertical('up', count * (event.key === 'K' ? 10 : 1))
     } else if (normal && event.key === 'g' && pending?.prefix === 'g') {
       const target = Math.min(rows.length - 1, count - 1)
       select(target, false, firstNonWhitespace(textOf(rows[target]!)), true)

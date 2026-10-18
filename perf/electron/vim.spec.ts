@@ -212,7 +212,7 @@ test.describe('Vim interactions at scale', () => {
     expect(deletePaintMs).toBeLessThan(100)
   })
 
-  test('counted 100J responds in a 10000-sibling level', async ({ userDataDir }) => {
+  test('counted 100gJ responds in a 10000-sibling level', async ({ userDataDir }) => {
     const seed = wideSeed(10_000)
     seed.location = { currentParentId: 'root', selectedNodeId: 'c100' }
     seedDocument(userDataDir, seed)
@@ -233,14 +233,14 @@ test.describe('Vim interactions at scale', () => {
       )
     })
 
-    for (const key of ['1', '0', '0', 'J']) await window.keyboard.press(key)
+    for (const key of ['1', '0', '0', 'g', 'J']) await window.keyboard.press(key)
     await window.waitForFunction(() => (window as unknown as { joinPaints: number[] }).joinPaints.length === 1)
     const joinPaintMs = await window.evaluate(() => (window as unknown as { joinPaints: number[] }).joinPaints[0]!)
     // The node and the ninety-nine siblings after it are one node: c100 absorbed c101 through c199.
     await expect(window.locator('.node-row[data-node-id="c101"]')).toHaveCount(0)
     await expect(window.locator('.node-row[data-node-id="c199"]')).toHaveCount(0)
     await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(
-      /^Child 100 Child 101 .* Child 199$/u,
+      /^Child 100Child 101.*Child 199$/u,
     )
     recordPerfResult({
       kind: 'state',
@@ -253,7 +253,7 @@ test.describe('Vim interactions at scale', () => {
     await window.keyboard.press('.')
     await window.waitForFunction(() => (window as unknown as { joinPaints: number[] }).joinPaints.length === 2)
     const repeatPaintMs = await window.evaluate(() => (window as unknown as { joinPaints: number[] }).joinPaints[1]!)
-    await expect(input).toHaveValue(/^Child 100 Child 101 .* Child 199$/u)
+    await expect(input).toHaveValue(/^Child 100Child 101.*Child 199$/u)
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-repeat-join-wide-10000',
@@ -263,7 +263,7 @@ test.describe('Vim interactions at scale', () => {
     expect(repeatPaintMs).toBeLessThan(100)
   })
 
-  test('whole-node Visual J over a whole 10000-sibling level responds', async ({ userDataDir }) => {
+  test('whole-node Visual gJ over a whole 10000-sibling level responds', async ({ userDataDir }) => {
     const seed = wideSeed(10_000)
     seedDocument(userDataDir, seed)
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
@@ -289,13 +289,14 @@ test.describe('Vim interactions at scale', () => {
       )
     })
 
+    await window.keyboard.press('g')
     await window.keyboard.press('J')
     await window.waitForFunction(() => (window as unknown as { joinAllPaintMs?: number }).joinAllPaintMs !== undefined)
     const joinPaintMs = await window.evaluate(() => (window as unknown as { joinAllPaintMs: number }).joinAllPaintMs)
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.node-row[data-node-id="c9999"]')).toHaveCount(0)
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue(
-      /^Child 0 Child 1 .* Child 9999$/u,
+      /^Child 0Child 1.*Child 9999$/u,
     )
     recordPerfResult({
       kind: 'state',

@@ -26,6 +26,41 @@ const dayKey = (month: number, day: number): string => `day:${dayNumber(month, d
 const nodeKey = (month: number, day: number, id: string): string => `node:${dayNumber(month, day)}:${id}`
 const gapKey = `gap:${dayNumber(10, 17)}:${dayNumber(11, 30)}`
 const row = (window: Page, key: string) => window.locator(`.agenda-row[data-agenda-key="${key}"]`)
+
+// @requirement PRODUCT.md §23.4
+// @requirement PRODUCT.md §23.14
+test('J and K navigate Agenda labels and matches and extend whole-node Visual by ten', async ({
+  userDataDir,
+}, testInfo) => {
+  seedDocument(userDataDir, {
+    document: { roots: Array.from({ length: 26 }, (_, i) => node(`n${i}`, `2026-10-14 Row ${i}`)) },
+    location: { currentParentId: null, selectedNodeId: 'n0' },
+  })
+  const { window } = await launchTree(userDataDir)
+  await openAndSelect(window, nodeKey(10, 14, 'n0'))
+  await window.keyboard.press('Shift+J')
+  await expect(row(window, nodeKey(10, 14, 'n10')).locator('.node-input')).toBeFocused()
+  await window.keyboard.press('Shift+K')
+  await expect(row(window, nodeKey(10, 14, 'n0')).locator('.node-input')).toBeFocused()
+  await row(window, dayKey(10, 14)).locator('.agenda-label').click()
+  await window.keyboard.press('Shift+J')
+  await expect(row(window, nodeKey(10, 14, 'n9')).locator('.node-input')).toBeFocused()
+  await window.keyboard.press('Shift+K')
+  await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+  await row(window, nodeKey(10, 14, 'n0'))
+    .locator('.node-input')
+    .click()
+  await window.keyboard.press('Escape')
+  await window.keyboard.press('Shift+V')
+  await window.keyboard.press('2')
+  await window.keyboard.press('Shift+J')
+  await expect(row(window, nodeKey(10, 14, 'n20')).locator('.node-input')).toBeFocused()
+  await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(21)
+  await window.keyboard.press('Shift+K')
+  await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(11)
+  await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+  await window.screenshot({ path: testInfo.outputPath('fast-agenda-visual.png') })
+})
 const message = (window: Page) => window.locator('.status-bar-message')
 const persistedTexts = (userDataDir: string): string[] =>
   readPersisted(userDataDir).document.roots[0]!.children.map((child) => child.text)
@@ -411,7 +446,7 @@ test.describe('Agenda Vim commands', () => {
       await expect(row(window, nodeKey(10, 14, id))).not.toHaveClass(/agenda-row-visual-selected/)
     await expect(row(window, nodeKey(10, 20, 'a'))).not.toHaveClass(/agenda-row-visual-selected/)
     // Unsupported range edits cannot reach Tree operations.
-    for (const key of ['>', '<', 'J', 'c', 'y', 'p', 'Meta+Enter']) await window.keyboard.press(key)
+    for (const key of ['>', '<', 'c', 'y', 'p', 'Meta+Enter']) await window.keyboard.press(key)
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(3)
     await window.keyboard.press('o')
     await expect(row(window, nodeKey(10, 14, 'a')).locator('.node-input')).toBeFocused()

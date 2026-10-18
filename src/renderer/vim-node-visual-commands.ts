@@ -264,7 +264,7 @@ interface JoinNodeVisualDeps {
   setNodeVisualSelection: (selection: NodeVisualSelection | undefined) => void
 }
 
-// `J` and `gJ` end whole-node Visual mode only when the join happened; a rejected or impossible
+// `gJ` ends whole-node Visual mode only when the join happened; a rejected or impossible
 // join leaves the mode and the selected range alone.
 export function joinNodeVisual(deps: JoinNodeVisualDeps, spaced: boolean): void {
   const { store, commandState, nodeVisualSelection, changeVimMode, syncImageCaretToFocus, setNodeVisualSelection } =

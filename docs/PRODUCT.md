@@ -303,7 +303,7 @@ Each toggle is one undoable change, and undo or redo places the caret at the beg
 The state belongs to the node and travels with it:
 
 * Splitting a node with `Enter` or a multiline paste keeps the state on the part that keeps the node's identity; the new part starts normal. Every newly created node starts normal, including the nodes `Enter`, `o`, and `O` create.
-* Joining nodes with `J` or `gJ` keeps the state of the first node, as it keeps its identity.
+* Joining nodes with `gJ` keeps the state of the first node, as it keeps its identity.
 * Moving a node, by dragging or by `>` and `<`, keeps its state, and a node or subtree put with `p` or `P` copies the state of every copied node.
 * The system clipboard carries text only, so copying text and pasting it creates no struck-through node.
 * Saving and reopening the application keeps every node's state. A document saved before struck-through nodes existed opens with every node normal.
@@ -1205,6 +1205,7 @@ Normal mode supports:
 * `gg`, `G`, `H`, `M`, `L`, `Ctrl+d`, and `Ctrl+u` place the caret on the destination's first non-whitespace text character. An attached image is the destination only when the node has no text; an empty node without an image uses its sole insertion position. These commands clear any saved image return position.
 * `h` and `l` to move by character within the current node; when the node has an image, it acts as a final character after the text, and an image-only node's sole character is its image.
 * `j` and `k` to move between the location's visible rows, walking through an expanded node's visible children rather than skipping them; for a node with text and an image, the text and image are separate rows, so `j` moves from text to image and `k` returns to the previous text position; when `k` moves from the first child to a current parent with an image, the image is the destination; `j` on the image moves to the next visible row, while `k` on an image-only node moves to the previous visible row.
+* **Vim divergence:** `J` and `K` are fast vertical motions: they behave as `10j` and `10k` in Normal and Visual modes. A preceding count multiplies the distance (`2J` is `20j`). They preserve the corresponding motion's caret, image, range and boundary rules and never join nodes. Whole-node Visual extends its sibling range; character-wise Visual stays unchanged, just as with `j` and `k`. These aliases do not apply after operators or prefixes; `gJ` remains the join command. Awaited characters and Insert/Replace text remain literal. This deliberately replaces Vim's join/help bindings with faster navigation.
 * When no previous visible row exists and there is no current parent, `k` on an image-only node leaves it selected with its image caret active.
 * Only one caret is visible at a time: the text caret is hidden while the image caret is active.
 * `l` or `j` from text into the image saves the text position it left; `h` from the image restores that position and applies any remaining count from there, and after an `l` count larger than the text, `h` returns to the final text character.
@@ -1277,12 +1278,12 @@ Normal mode also supports:
 
 Normal mode also supports:
 
-* `J` and `gJ` to join the current node with the next sibling; a count joins that many siblings (at least two), clamped at the last sibling, and a node with no following sibling, or the editable current-parent heading, makes no change.
-* `J` removes the trailing whitespace of the earlier text and the leading whitespace of the later text at each join, then inserts one space when both remaining texts are non-empty; `gJ` concatenates the texts unchanged.
+* `gJ` to join the current node with the next sibling; a count joins that many siblings (at least two), clamped at the last sibling, and a node with no following sibling, or the editable current-parent heading, makes no change.
+* `gJ` concatenates the texts unchanged, without trimming or inserting spaces.
 * The first node keeps its ID, hyperlink ranges move with their text, and the children of every joined node follow in sibling order with their IDs intact; children keep their depth, so a join never exceeds the maximum depth (§2.3).
 * If only one participating node has an attachment, the result keeps it; if two or more have attachments, even the same one, the whole join is rejected with the operation error `Cannot join nodes that both have attachments` and changes nothing.
-* A join is one undoable command, leaves the local Vim register unchanged, and puts the Normal caret at the first join point after trimming: on the inserted space for `J` when one is inserted, otherwise on the first character of the appended text, clamped to the final text character or the attached image.
-* Whole-node Visual `J` and `gJ` join the selected range the same way and return to Normal mode; a range that cannot join keeps whole-node Visual mode and its selection. Character-wise Visual `J` and `gJ` are not commands.
+* A join is one undoable command, leaves the local Vim register unchanged, and puts the Normal caret at the first character of the appended text, clamped to the final text character or the attached image.
+* Whole-node Visual `gJ` joins the selected range the same way and returns to Normal mode; a range that cannot join keeps whole-node Visual mode and its selection. Character-wise Visual `gJ` is not a command.
 
 #### 20.2.15 Fold Commands
 
@@ -1301,7 +1302,7 @@ Normal mode also supports:
 * A count on `p` or `P` repeats the most recent subtree register that many times, assigning fresh IDs to every copy, and inserts all copies as one undoable command; a put rejected by the depth limit (§2.3) or by ancestry inserts no copy.
 * Plain-text `p` and `P` repeat the register value by the requested count in one edit.
 * `0` remains the beginning-of-text motion when no count is pending.
-* Counts do not extend commands across nodes for in-node text edits, and do not apply to whole-node commands (other than `J` and `gJ` in Normal mode, and `>`, `<`, `p`, `P`, `j`, and `k` in Visual mode), sibling creation, or the fold commands.
+* Counts do not extend commands across nodes for in-node text edits, and do not apply to whole-node commands (other than `gJ` in Normal mode, and `>`, `<`, `p`, `P`, `j`, `k`, `J`, and `K` in Visual mode), sibling creation, or the fold commands.
 * `u`, `Ctrl+r`, `Ctrl+o`, `Ctrl+d`, and `Ctrl+u` do not accept a count. Each of them discards a command that is still being assembled — a pending count, operator, prefix, or a command awaiting a character or delimiter — and makes no change; a command awaiting a character or delimiter takes `u` as that character instead, and the `g` prefix takes it as the `gu` operator.
 * Word-motion deletion and yanking stop at the next word start, while `cw` changes through the current word end when the caret is on non-whitespace; `$` ranges include the final character.
 * Text operators affect only the current node's text, preserving the node, children, hyperlinks outside the edited range, and attachment.
@@ -1381,7 +1382,7 @@ Normal mode also supports:
 #### 20.2.23 Whole-Node Visual Mode and Shifts
 
 * Whole-node Visual mode (`V`) selects a contiguous range of siblings at the currently displayed level — not the location's visible rows (§2.4) — including every selected node's descendants.
-* `j`, `k`, `gg`, and `G` extend the range, and `j` and `k` accept a count that moves the active end that many siblings, clamped at the first and last sibling, without changing the selection's direction; `o` exchanges its ends.
+* `j`, `k`, `gg`, and `G` extend the range, and `j` and `k` accept a count that moves the active end that many siblings, clamped at the first and last sibling, without changing the selection's direction; `J` and `K` move ten times that count as specified in §20.2.9; `o` exchanges its ends.
 * A motion clamped at the active end keeps the range, caret position, and any active image caret with its saved text return position.
 * The current-parent heading is excluded.
 * `y` copies the selected subtrees into the local register; `d` and `x` copy and delete them; `c` and `s` copy and replace them with one empty node before entering Insert mode; `u` and `U` change the case of text in the selected subtrees.
@@ -1708,7 +1709,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 #### Moving Between Rows
 
 * Up and Down move over visible Agenda rows and clamp at either edge.
-* In Vim Normal, counted `j`/`k`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count, caret and viewport rules as Tree.
+* In Vim Normal, counted `j`/`k`, `J`/`K`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count, caret and viewport rules as Tree.
 * Vertical movement preserves the horizontal text offset, clamped to the destination text, including when crossing day containers, gaps and contextual ancestors.
 * Normal `j`/`k` treat a direct match's attached image as Tree does: moving down from text enters the image and records the text caret, moving up from that image restores it, and arriving from below activates the image with the originating text position remembered. A counted motion applies the originating node's image transition first, then follows Tree's counted row and column rules for the remaining steps.
 * `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` land on the destination's first non-whitespace text character, using a direct match's image only when it has no text, as in §20.2.9.
@@ -1784,7 +1785,7 @@ Canonical dates are recognized immediately after typing or pasting. Date emphasi
 
 ### 23.10 Structural Restrictions
 
-Agenda does not reorder existing siblings, change their real parents, delete subtrees, or transfer contextual ancestors between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,`, Vim `>`/`<`, `J`/`gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, whole-node Visual, and structural dot repeats do nothing and retain focus, caret, mode, and text. Awaited text characters and surround delimiters still work.
+Agenda does not reorder existing siblings, change their real parents, delete subtrees, or transfer contextual ancestors between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,`, Vim `>`/`<`, `gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, whole-node Visual structural edits, and structural dot repeats do nothing and retain focus, caret, mode, and text. Awaited text characters and surround delimiters still work. Whole-node Visual navigation and deferred moves follow §23.14.
 
 These structural restrictions do not override completion acceptance (§20.9, §20.12).
 
@@ -1850,7 +1851,7 @@ Without a pending move, a node-register `p`/`P` does nothing in Agenda and a tex
 
 `V` in Vim Normal on a valid direct match enters whole-node Visual mode. The range includes only visible direct matches of that day at the anchor's nesting level, even across different real parents. Contextual ancestors and nodes at other levels between them are skipped and keep their ordinary appearance. Qualifying rows use the shared selection highlight foreground and background, including their dates. Day containers, gaps, contextual ancestors, and temporarily invalid items cannot start a range.
 
-`j`/`k` and counts extend through qualifying rows; `gg`/`G` reach the first/last qualifying row of that day, stopping at its edges. Moving focus to another node places its text caret at offset zero; a clamped motion keeps the caret. `o` swaps the endpoints as in Tree. `Esc` or `V` ends the range in Normal; `Esc` also cancels a pending move. Pointer navigation or folding that hides an endpoint ends an obsolete range, as does leaving Agenda or changing the document through history or text shortcuts.
+`j`/`k` and counts extend through qualifying rows; `J`/`K` extend by ten times that count, as in Tree. `gg`/`G` reach the first/last qualifying row of that day, stopping at its edges. Moving focus to another node places its text caret at offset zero; a clamped motion keeps the caret. `o` swaps the endpoints as in Tree. `Esc` or `V` ends the range in Normal; `Esc` also cancels a pending move. Pointer navigation or folding that hides an endpoint ends an obsolete range, as does leaving Agenda or changing the document through history or text shortcuts.
 
 Whole-node Visual `d` marks exactly the selected occurrences for the pending move of §23.13 and returns to Normal without changing text, history, registers, or clipboard. Putting the group replaces only the source dates in those nodes in one Undo step, leaving parents, order, descendants, and other dates unchanged. Other whole-node Visual mutation commands do nothing in Agenda. This deliberately differs from Vim's line deletion and structural range editing: Agenda edits a temporal projection of the same nodes.
 

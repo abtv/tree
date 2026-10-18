@@ -44,6 +44,57 @@ const selectionColors = (field: ReturnType<typeof node>) =>
 test.describe('Vim editing: navigation and Visual modes', () => {
   test.use({ sharedApplicationReset: sharedApplicationAdopted() })
 
+  // @requirement PRODUCT.md §20.2.9
+  // @requirement PRODUCT.md §20.2.23
+  test('moves ten rows with J and K and extends Visual ranges without joining', async ({ userDataDir }, testInfo) => {
+    const node = (window: Page, index: number) => window.getByRole('textbox', { name: `Node ${index}`, exact: true })
+    const roots = Array.from({ length: 26 }, (_, index) => ({
+      id: `n${index}`,
+      text: `Row ${index} text`,
+      children: [],
+    }))
+    seedDocument(userDataDir, { document: { roots }, location: { currentParentId: null, selectedNodeId: 'n0' } })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await setCursor(node(window, 1), 4)
+    await pressShifted(window, 'J')
+    await expect(node(window, 11)).toBeFocused()
+    await expect(node(window, 11)).toHaveJSProperty('selectionStart', 4)
+    await pressShifted(window, 'K')
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('2')
+    await pressShifted(window, 'J')
+    await expect(node(window, 21)).toBeFocused()
+    await pressShifted(window, 'V')
+    await pressShifted(window, 'K')
+    await expect(node(window, 11)).toBeFocused()
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(11)
+    await window.screenshot({ path: testInfo.outputPath('fast-visual.png') })
+    await pressShifted(window, 'K')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(21)
+    await pressShifted(window, 'K')
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(21)
+    await pressShifted(window, 'J')
+    await expect(node(window, 11)).toBeFocused()
+    await expect(window.locator('.node-row-visual-selected')).toHaveCount(11)
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('2')
+    await pressShifted(window, 'K')
+    await expect(node(window, 1)).toBeFocused()
+    await window.screenshot({ path: testInfo.outputPath('fast-normal.png') })
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    const start = await node(window, 1).evaluate((field) => (field as HTMLTextAreaElement).selectionStart)
+    const end = await node(window, 1).evaluate((field) => (field as HTMLTextAreaElement).selectionEnd)
+    await pressShifted(window, 'J')
+    await pressShifted(window, 'K')
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', start)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', end)
+    expect(await nodeTexts(window)).toEqual(roots.map((root) => root.text))
+  })
+
   // @requirement PRODUCT.md §20.2.20
   test('leaves character Visual at its active endpoint', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
@@ -153,19 +204,19 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // The original join clamps to three siblings. Dot requires all three, rather than a partial join.
     await node(window, 2).focus()
     await window.keyboard.press('9')
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
     await window.keyboard.press('u')
     await node(window, 1).focus()
     await window.keyboard.press('3')
     await window.keyboard.press('.')
-    await expect.poll(() => outline(window)).toEqual(['A B C', 'D'])
+    await expect.poll(() => outline(window)).toEqual(['ABC', 'D'])
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-join-light.png')
     await window.keyboard.press('u')
     await expect.poll(() => outline(window)).toEqual(['A', 'B', 'C', 'D'])
     await window.keyboard.press('Control+r')
-    await expect.poll(() => outline(window)).toEqual(['A B C', 'D'])
+    await expect.poll(() => outline(window)).toEqual(['ABC', 'D'])
   })
 
   test('replays counted gp and gP with captured incoming subtrees and their destination', async ({ userDataDir }) => {
@@ -2016,7 +2067,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha1', 'Bravo'])
   })
 
-  test('joins siblings with J and gJ, keeps every child, and undoes each join as one step', async ({ userDataDir }) => {
+  test('joins siblings with gJ, keeps every child, and undoes each join as one step', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -2033,17 +2084,18 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await node(window, 1).focus()
     await setCursor(node(window, 1), 0)
 
-    // `J` trims the whitespace at the join, inserts one space, keeps the first ID, and puts the caret on it.
+    // `gJ` keeps whitespace and the first ID, and puts the caret on the first appended character.
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
-    await expect.poll(() => outline(window)).toEqual(['Alpha Bravo', 'Charlie', 'Delta'])
+    await expect.poll(() => outline(window)).toEqual(['Alpha    Bravo', 'Charlie', 'Delta'])
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(node(window, 1)).toBeFocused()
-    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 5)
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 7)
     await expect(window.getByRole('alert')).toHaveCount(0)
     // Both nodes' children now follow under the retained node, in sibling order.
     await window.keyboard.press('z')
     await window.keyboard.press('o')
-    await expect.poll(() => outline(window)).toEqual(['Alpha Bravo', '  A1', '  B1', 'Charlie', 'Delta'])
+    await expect.poll(() => outline(window)).toEqual(['Alpha    Bravo', '  A1', '  B1', 'Charlie', 'Delta'])
     await window.keyboard.press('u')
     // The fold choice is not part of the document history, so Alpha stays open after the undo.
     await expect.poll(() => outline(window)).toEqual(['Alpha  ', '  A1', '  Bravo', 'Charlie', 'Delta'])
@@ -2064,23 +2116,26 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // A count joins that many siblings as one undo step, clamped at the last sibling.
     await node(window, 1).focus()
     await window.keyboard.press('3')
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
-    await expect.poll(() => outline(window)).toEqual(['Alpha Bravo Charlie', 'Delta'])
+    await expect.poll(() => outline(window)).toEqual(['Alpha    BravoCharlie', 'Delta'])
     await window.keyboard.press('u')
     await expect.poll(() => outline(window)).toEqual(before)
     await node(window, 3).focus()
     await window.keyboard.press('9')
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
-    await expect.poll(() => outline(window)).toEqual(['Alpha  ', '  Bravo', 'Charlie Delta'])
+    await expect.poll(() => outline(window)).toEqual(['Alpha  ', '  Bravo', 'CharlieDelta'])
 
     // The last sibling has nothing to join: no change and no error.
     await node(window, 3).focus()
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
     await expect(window.getByRole('alert')).toHaveCount(0)
-    expect(await outline(window)).toEqual(['Alpha  ', '  Bravo', 'Charlie Delta'])
+    expect(await outline(window)).toEqual(['Alpha  ', '  Bravo', 'CharlieDelta'])
   })
 
-  test('joins a whole-node Visual range with J and gJ and returns to Normal mode', async ({ userDataDir }) => {
+  test('joins a whole-node Visual range with gJ and returns to Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: ['Alpha ', ' Bravo', 'Charlie', 'Delta'].map((text, index) => ({ id: `n${index}`, text, children: [] })),
@@ -2093,12 +2148,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('k')
     await window.keyboard.press('k')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(3)
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
-    await expect.poll(() => outline(window)).toEqual(['Alpha Bravo Charlie', 'Delta'])
+    await expect.poll(() => outline(window)).toEqual(['Alpha  BravoCharlie', 'Delta'])
     await expect(node(window, 1)).toBeFocused()
-    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 5)
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 6)
 
     await window.keyboard.press('u')
     await expect.poll(() => outline(window)).toEqual(['Alpha ', ' Bravo', 'Charlie', 'Delta'])
@@ -2113,6 +2169,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // A one-node range has nothing to join: the mode and the selection stay.
     await node(window, 3).focus()
     await window.keyboard.press('V')
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)

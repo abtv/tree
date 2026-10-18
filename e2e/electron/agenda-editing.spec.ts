@@ -320,7 +320,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     for (const key of ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+,']) await window.keyboard.press(key)
     if (mode === 'vim') {
       await window.keyboard.press('Escape')
-      for (const command of ['>', '<', 'dd', 'dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gp', 'gP', 'gJ', 'p', 'P', 'V', 'J'])
+      for (const command of ['>', '<', 'dd', 'dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gp', 'gP', 'gJ', 'p', 'P', 'V'])
         await window.keyboard.type(command)
     }
     await expect(input).toHaveText('2026-10-14 Prepare 2026-10-20')

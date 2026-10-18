@@ -34,6 +34,30 @@ async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-
 }
 
 describe('read-only Agenda keyboard', () => {
+  it.each(['J', 'K'])('matches counted row navigation for %s on labels and editors', async (key) => {
+    const document = {
+      roots: Array.from({ length: 26 }, (_, i) => ({ id: `n${i}`, text: `2026-10-15 Row ${i}`, children: [] })),
+    }
+    for (const start of [0, 12, 26]) {
+      for (const count of [1, 2]) {
+        const fast = await fixture(document)
+        const slow = await fixture(document)
+        for (const f of [fast, slow]) {
+          const rows = f.store.getAgendaRows()
+          f.store.applyAgenda({ kind: 'select', key: rows[start]!.key, cursor: 4 })
+        }
+        fast.press(String(count))
+        fast.press(key)
+        for (const digit of String(count * 10)) slow.press(digit)
+        slow.press(key.toLowerCase())
+        expect(fast.snapshot().agenda).toEqual(slow.snapshot().agenda)
+        expect(fast.snapshot().focus).toEqual(slow.snapshot().focus)
+        expect(fast.snapshot().document).toEqual(slow.snapshot().document)
+        expect(fast.vim.commandState.pending).toBeUndefined()
+      }
+    }
+  })
+
   it.each([
     ['ArrowDown', {}],
     ['ArrowUp', {}],

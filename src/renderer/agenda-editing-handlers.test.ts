@@ -228,25 +228,7 @@ describe('Agenda editing command boundaries', () => {
     f.commandState.lastChange = { kind: 'structural-delete', span: 1 }
     const last = f.commandState.lastChange
     const register = f.vim.register.current
-    for (const command of [
-      'dd',
-      'dj',
-      'dk',
-      'cj',
-      'ck',
-      'yj',
-      'yk',
-      'gp',
-      'gP',
-      'gJ',
-      'V',
-      'J',
-      '>',
-      '<',
-      'p',
-      'P',
-      '.',
-    ]) {
+    for (const command of ['dd', 'dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gp', 'gP', 'gJ', 'V', '>', '<', 'p', 'P', '.']) {
       for (const key of command) f.press(key)
       expect(f.commandState.pending).toBeUndefined()
       expect(f.snapshot().document).toBe(before)

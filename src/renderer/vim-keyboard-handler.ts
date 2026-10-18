@@ -135,10 +135,16 @@ export function handleVimKey(
       clearPending(commandState)
       if (shiftCount > 0) vim.nodeVisual.shift(event.key === '>' ? 'in' : 'out', shiftCount)
       return handled()
-    } else if (event.key === 'j' || event.key === 'k') {
+    } else if (event.key === 'J' && commandState.pending?.prefix === 'g') {
+      clearPending(commandState)
+      vim.nodeVisual.join(false)
+    } else if ((event.key === 'J' || event.key === 'K') && commandState.pending?.prefix !== undefined) {
+      clearPending(commandState)
+    } else if (['j', 'k', 'J', 'K'].includes(event.key)) {
       vim.nodeVisual.move(
-        event.key === 'j' ? 'down' : 'up',
-        commandState.pending?.prefix === undefined ? parseCount(commandState.pending?.count ?? '') : 1,
+        event.key.toLowerCase() === 'j' ? 'down' : 'up',
+        (commandState.pending?.prefix === undefined ? parseCount(commandState.pending?.count ?? '') : 1) *
+          (event.key === 'J' || event.key === 'K' ? 10 : 1),
       )
     } else if (event.key === 'G') vim.nodeVisual.move('last')
     else if (event.key === 'g' && commandState.pending?.prefix !== 'g') {
@@ -147,17 +153,12 @@ export function handleVimKey(
       clearPending(commandState)
       vim.nodeVisual.move('first')
     } else if (event.key === 'o') vim.nodeVisual.swap()
-    else if (event.key === 'J') {
-      // `J` trims and inserts one space; `gJ` joins the texts unchanged. A count is discarded below.
-      const spaced = commandState.pending?.prefix !== 'g'
-      clearPending(commandState)
-      vim.nodeVisual.join(spaced)
-    } else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1) {
+    else if ('ydxcspPuU'.includes(event.key) && event.key.length === 1) {
       if ((event.key === 'p' || event.key === 'P') && commandState.pending?.prefix === undefined)
         vim.nodeVisual.command(event.key, parseCount(commandState.pending?.count ?? ''))
       else vim.nodeVisual.command(event.key as NodeVisualCommand)
     }
-    // A count only belongs to `>`, `<`, `p`, `P`, `j`, and `k` here; any other key discards it.
+    // Counts belong to shifts, puts and vertical motions here; any other key discards them.
     if (commandState.pending !== undefined && commandState.pending.count !== '')
       commandState.pending = { ...commandState.pending, count: '' }
     return handled()
@@ -320,7 +321,7 @@ export function handleVimKey(
     const structural =
       event.key === '>' ||
       event.key === '<' ||
-      (!visual && pending.prefix !== 'z' && ['o', 'O', 'J'].includes(event.key)) ||
+      (!visual && pending.prefix !== 'z' && ['o', 'O'].includes(event.key)) ||
       (pending.prefix === 'g' && ['J', 'p', 'P', 'd'].includes(event.key)) ||
       (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
       (!visual && ['p', 'P'].includes(event.key) && !textPut) ||
@@ -347,7 +348,7 @@ export function handleVimKey(
     if (
       !visual &&
       pending.operator === undefined &&
-      ((['j', 'k', 'G', 'H', 'M', 'L'].includes(event.key) && pending.prefix === undefined) ||
+      ((['j', 'k', 'J', 'K', 'G', 'H', 'M', 'L'].includes(event.key) && pending.prefix === undefined) ||
         (event.key === 'g' && pending.prefix === 'g') ||
         pending.prefix === 'z')
     ) {
@@ -394,7 +395,7 @@ export function handleVimKey(
     }
   }
 
-  /** Normal `J` and `gJ`: join this node with the following siblings; a count joins that many. */
+  /** Normal `gJ`: join this node with the following siblings; a count joins that many. */
   const joinNodes = (spaced: boolean): void => {
     const state = store.getSnapshot()
     if (state.status !== 'ready') return
@@ -673,13 +674,13 @@ export function handleVimKey(
       setSelectionRange(input, cursor, cursor)
       vim.setMode('visual-node')
     }
-  } else if (!visual && (event.key === 'j' || event.key === 'k')) {
+  } else if (!visual && ['j', 'k', 'J', 'K'].includes(event.key)) {
     navigateVertically({
       store,
       node,
       caret: vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
-      direction: event.key === 'j' ? 'down' : 'up',
-      count,
+      direction: event.key.toLowerCase() === 'j' ? 'down' : 'up',
+      count: count * (event.key === 'J' || event.key === 'K' ? 10 : 1),
       applyCaretState: vim.applyCaretState,
     })
   } else if (visual && event.key === 'v') {
@@ -795,8 +796,6 @@ export function handleVimKey(
     applyTextChange(store, node, input, cursor, vim, { kind: 'case', mode: 'toggle', count })
   } else if (!visual && (event.key === 'p' || event.key === 'P')) {
     putRegister(event.key, false)
-  } else if (!visual && event.key === 'J') {
-    joinNodes(true)
   } else if (!visual && event.key === '.') {
     const last = commandState.lastChange
     if (last !== undefined) {

@@ -1289,8 +1289,9 @@ test.describe('Vim editing: image caret', () => {
 
     // The image of the later node moves to the retained node, and nothing is cleaned up.
     await node(window, 1).focus()
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
-    await expect(node(window, 1)).toHaveValue('Plain First')
+    await expect(node(window, 1)).toHaveValue('PlainFirst')
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 5)
     await expect(
       window.locator('.node-row[data-node-id="plain"]').getByRole('button', { name: 'Open image preview' }),
@@ -1299,9 +1300,10 @@ test.describe('Vim editing: image caret', () => {
 
     // Two attached nodes cannot join: the whole join is rejected with the approved message.
     allowRendererError(exactMessage('Operation failed: Cannot join nodes that both have attachments'))
+    await window.keyboard.press('g')
     await pressShifted(window, 'J')
     await expect(window.getByText('Operation failed: Cannot join nodes that both have attachments')).toBeVisible()
-    await expect(node(window, 1)).toHaveValue('Plain First')
+    await expect(node(window, 1)).toHaveValue('PlainFirst')
     await expect(node(window, 2)).toHaveValue('Second')
     await expect(imageButtons).toHaveCount(2)
 
