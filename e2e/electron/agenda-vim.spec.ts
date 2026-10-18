@@ -1,6 +1,6 @@
 // @editing-modes: vim
 import type { Page } from '@playwright/test'
-import type { TreeNode } from '../src/domain/document'
+import type { TreeNode } from '../../src/domain/document'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {

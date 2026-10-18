@@ -1,6 +1,6 @@
 // @editing-modes: both
 import type { Page } from '@playwright/test'
-import type { TreeNode } from '../src/domain/document'
+import type { TreeNode } from '../../src/domain/document'
 import {
   describeForEachEditingMode,
   expect,

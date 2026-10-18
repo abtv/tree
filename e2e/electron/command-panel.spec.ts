@@ -2,7 +2,7 @@
 import type { Page } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../src/domain/product-messages'
+import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../../src/domain/product-messages'
 import {
   applicationMenuItemChecked,
   checkedApplicationSubmenuItems,
@@ -123,7 +123,7 @@ test.describe('Normal command panel', () => {
     const { app, window } = first
     await node(window, 1).focus()
     const before = await window.evaluate(() =>
-      (globalThis as unknown as { treeApi: import('../src/shared/ipc').TreeApi }).treeApi.load(),
+      (globalThis as unknown as { treeApi: import('../../src/shared/ipc').TreeApi }).treeApi.load(),
     )
     await window.clock.install()
     for (const [query, value, label] of [
@@ -147,7 +147,7 @@ test.describe('Normal command panel', () => {
     await fireIdleSave(window)
     expect(
       await window.evaluate(() =>
-        (globalThis as unknown as { treeApi: import('../src/shared/ipc').TreeApi }).treeApi.load(),
+        (globalThis as unknown as { treeApi: import('../../src/shared/ipc').TreeApi }).treeApi.load(),
       ),
     ).toEqual(before)
     await closeApp(app)

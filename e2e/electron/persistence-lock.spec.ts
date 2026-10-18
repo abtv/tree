@@ -1,6 +1,6 @@
 // @editing-modes: independent
 import { existsSync } from 'node:fs'
-import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../src/domain/product-messages'
+import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../../src/domain/product-messages'
 import {
   allowRendererError,
   blockSaves,

@@ -1,36 +1,8 @@
-# End-to-End AGENTS.md
+# End-to-End tests
 
-Rules for the Playwright Electron suite in `e2e/`. The root `AGENTS.md` still applies.
+The root `AGENTS.md` applies to both targets. Read the target's nested instructions before changing its tests or helpers.
 
-## Rules
-
-* Tests drive the production build in `out/` and isolate data with a temporary `--user-data-dir`.
-* Keep the canonical rendering scale in Electron's launch arguments and the per-launch renderer-scale assertion. Do not change screenshot tolerances to compensate for display scaling; follow `docs/DEVELOPMENT.md` §9 and ADR 0019 when rendering infrastructure changes.
-* Hidden runs execute spec files in parallel across the workers configured in `playwright.config.ts`; selected long-running suites also distribute their independent tests across those workers through `configureHiddenParallelTests()`. Visible runs stay serial. The suite requires macOS with a display, and hidden windows still need a GUI session.
-* Opt into hidden test-level parallelism only for suites whose tests are independent and use the per-test fixtures for data, cleanup, error observation, and shared-system locking. Never opt `e2e/shortcut.spec.ts` into it.
-* Every worker owns its own applications. Data directories and stale-process cleanup use the per-worker marker `tree-e2e-p<pid>-`, so a launch can only ever terminate apps started by the same worker. Leftovers from earlier runs are removed once in `e2e/global-setup.ts`, before workers start.
-* Never run two Playwright invocations at the same time: the global setup cleans stale `tree-e2e-` applications and would terminate the other invocation's apps.
-* Launch hidden windows by default and keep the per-launch window-mode assertion. Select visibility only through `launchTree` (`windows: 'hidden' | 'visible'`) or `TREE_E2E_VISIBLE=1`, and implement it only through the test-owned entry (`e2e/electron-entry.cjs` and `e2e/hidden-windows.cjs`). Never add window-visibility hooks to application code.
-* Hidden runs reject native `Menu.popup` calls because macOS can display them over the owner's active application. Intercept popup requests before right-clicking an editor, invoke the completion callback, and assert the intended command or dismissal. Use visible execution when verifying the native popup itself.
-* Never register the real machine-global `Cmd+0` accelerator outside `e2e/shortcut.spec.ts`. Parallel launches use the test-owned shortcut stub, selected through `launchTree({ shortcut: 'stub' | 'real' })` and implemented only in `e2e/shortcut-stub.cjs`; every launch asserts the requested mode. `e2e/shortcut.spec.ts` must request `real`.
-* The system clipboard is machine-global. The clipboard helpers in `fixtures.ts` and `firePaste` acquire the cross-process lock in `e2e/clipboard-lock.ts`. A test that makes the application read or write the clipboard another way (Cmd+C, Cmd+X, Cmd+V, or a context-menu Copy or Paste) must call `lockSystemClipboard()` before the first clipboard interaction, unless a preceding clipboard helper already acquired it. Acquire as late as possible. Call `unlockSystemClipboard()` after assertions confirm the last asynchronous clipboard read/write has finished and no subsequent interaction needs its contents; the per-test fixture teardown releases it as a fallback. A later independent paste must reacquire and rewrite the clipboard. Keep the lock across a Copy/Cut-to-Paste sequence and its clipboard assertions.
-* Put per-test teardown in the `userDataDir` fixture, never in a module-level `test.afterEach`: Playwright caches imported helper modules for the lifetime of a worker, so a module-level hook attaches only to the first test file's suite and silently stops running for later files.
-* Shared applications require explicit reviewed eligibility under ADR 0021. `sharedApplicationAdopted()` selects same-window reload for hidden eligible owners and fresh execution for visible runs or `TREE_E2E_SHARED_RESET=off`; the global default stays fresh. The navigation/Tab prototype keeps its existing environment-only opt-in until adoption. Do not reuse clocks, initialization scripts, replaced handlers, unsupported seeds or lifecycle cases. Infrastructure fault injection in `shared-application.spec.ts` is not permission to retain instrumentation in adopted editing tests.
-* A reset or launch failure must close the owned process and invalidate its application, URL and bounds before deleting data. If bounded teardown cannot establish process exit, preserve the directory and report failure. Successful resets acknowledge a blank renderer, drain original production IPC and any native bounds debounce, then remove data. Worker shutdown uses the same disposal path.
-* Own every Electron child process: register it before waiting for readiness, clean it up on launch or readiness failure, and tear down with bounded escalation. Never kill arbitrary Electron processes.
-* Address the application's main window through the `fixtures.ts` helpers (`closeMainWindow`, `setMainWindowBounds`, `readMainWindowBounds`); never use `BrowserWindow.getFocusedWindow()` for correctness, because the suite runs on a live desktop and the application may not be frontmost.
-* Inject IPC delays, failures, and probes only through the test-owned entry `e2e/electron-entry.cjs` and its `globalThis.__treeIpc` registry; never read Electron-private internals such as `ipcMain._invokeHandlers`.
-* For editing-command shortcuts, suppress the native browser behavior so the test proves the application handles the command (`docs/decisions/0003-renderer-owns-standard-editing-commands.md`).
-* Every spec file declares its editing-mode category on its first line (`// @editing-modes: both | vim | independent | explicit`); `npm run check:e2e-modes` enforces it. Use the asserted-behavior and setup distinction in `docs/DEVELOPMENT.md` §8 to select cases for `describeForEachEditingMode`; take screenshot names from its `screenshotName`. Do not set `vimPreference` in a test run through the helper. Follow the test-level and redundancy policy in root `AGENTS.md` §9 and its procedure before adding or removing E2E cases.
-* To assert an idle-saved change, call `fireIdleSave(window)` and poll with `idleSavePoll`; never wait for the real idle interval of `docs/PRODUCT.md` §16.1. See `docs/DEVELOPMENT.md` §8.
-* To assert an action leaves persisted state unchanged, install the page clock before the action, call `fireIdleSave(window)`, and await a renderer `treeApi.load()` read to drain queued disk work before comparing snapshots. An equality assertion or poll made before a save is due or finished can pass despite an unintended edit.
-* Observe visible save and operation errors; a test that intentionally induces one must declare the exact expected message.
-* Temporary diagnostic specs are named `_*.spec.ts` in this directory. When the investigation finishes, move them to `test-results/` instead of deleting them: that directory is gitignored and Playwright clears it at the start of every run.
-
-## Commands
-
-* Run `npm run test:e2e`. Do not count blocked or skipped boundary tests as passing.
-* Run `TREE_E2E_VISIBLE=1 npm run test:e2e` to observe the real UI.
-* Run `TREE_E2E_VISIBLE=1 npm run test:e2e -- <spec>` or `TREE_E2E_VISIBLE=1 npx playwright test <spec>` to observe a single spec with visible windows.
-* In Codex, use `npm run test:e2e:visible -- <spec>` for visible runs so the project allow rule covers changing spec paths and flags. Do not prepend `TREE_E2E_VISIBLE=1` to that command or wrap it in an explicit shell invocation. See `docs/DEVELOPMENT.md` §8 for rule loading and restart requirements.
-* Prefer these documented command forms. One-off diagnostic environment variables are not pre-approved and must not be added to `opencode.json`.
+- `electron/` owns Electron tests, launch fixtures, process controls and screenshot baselines. Use the root `playwright.config.ts` and `playwright.memory.config.ts`.
+- `web/` owns Chrome tests and browser fixtures. Use the root `playwright.web.config.ts`.
+- Keep target-specific helpers inside their target directory. Put a helper at this level only when both targets use it.
+- Preserve target isolation, test coverage and synthetic test data when reorganizing files.

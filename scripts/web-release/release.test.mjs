@@ -98,10 +98,10 @@ describe('release gates', () => {
       demo: false,
     })
     expect(selectChecks(['src/renderer/main.tsx'])).toEqual({ memory: false, demo: true })
-    expect(selectChecks(['e2e/shared-application-memory.spec.ts'])).toEqual({ memory: true, demo: false })
+    expect(selectChecks(['e2e/electron/shared-application-memory.spec.ts'])).toEqual({ memory: true, demo: false })
     expect(selectChecks(['.github/workflows/e2e.yml'])).toEqual({ memory: true, demo: false })
     expect(selectChecks(['package-lock.json'])).toEqual({ memory: true, demo: true })
-    expect(selectChecks(['e2e/electron-entry.cjs'])).toEqual({ memory: true, demo: true })
+    expect(selectChecks(['e2e/electron/electron-entry.cjs'])).toEqual({ memory: true, demo: true })
   })
   it('revalidates both suites when publication policy changes, including migration from push-only selection', () => {
     for (const path of [

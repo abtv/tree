@@ -24,7 +24,7 @@ async function capture() {
       args: [
         '--force-device-scale-factor=1',
         `--user-data-dir=${dataDirectory}`,
-        join(root, 'e2e/electron-entry.cjs'),
+        join(root, 'e2e/electron/electron-entry.cjs'),
         // CI runners have no trackpad, so macOS would draw classic scrollbars that narrow the outline.
         // The user-defaults argument follows the entry, or Electron takes it for the application path.
         '-AppleShowScrollBars',

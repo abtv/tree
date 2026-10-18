@@ -15,7 +15,7 @@ import {
   startRowDrag,
   test,
 } from './fixtures'
-import { MAX_DOCUMENT_DEPTH } from '../src/domain/document'
+import { MAX_DOCUMENT_DEPTH } from '../../src/domain/document'
 
 function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
   mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })

@@ -171,7 +171,7 @@ async function record() {
       args: [
         '--force-device-scale-factor=1.5',
         `--user-data-dir=${profile}`,
-        join(root, 'e2e/electron-entry.cjs'),
+        join(root, 'e2e/electron/electron-entry.cjs'),
         '--tree-test-appearance=dark',
       ],
       cwd: root,

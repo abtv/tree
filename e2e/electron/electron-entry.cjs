@@ -93,11 +93,11 @@ if (sharedReset) {
 
 // Hidden windows are opt-in at the entry level: the e2e fixtures always pass the selected
 // mode explicitly, while the performance fixtures keep the application visible for
-// presented-window measurements. `e2e/fixtures.ts` asserts the selected mode after launch.
+// presented-window measurements. `e2e/electron/fixtures.ts` asserts the selected mode after launch.
 if (process.env['TREE_E2E_HIDDEN'] === '1') enableHiddenWindows()
 
 // Parallel E2E runs stub the machine-global shortcut; the fixtures select the mode per launch and
 // assert it after launch. The performance fixtures never enable this stub.
 if (process.env['TREE_E2E_SHORTCUT_STUB'] === '1') enableShortcutStub()
 
-require(join(__dirname, '..', 'out', 'main', 'index.js'))
+require(join(__dirname, '..', '..', 'out', 'main', 'index.js'))

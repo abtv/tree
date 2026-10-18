@@ -2,7 +2,7 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
-import type { TreeNode } from '../src/domain/document'
+import type { TreeNode } from '../../src/domain/document'
 import {
   describeForEachEditingMode,
   expect,

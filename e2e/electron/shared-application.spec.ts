@@ -16,7 +16,7 @@ import {
   type Launched,
   type SharedApplication,
 } from './fixtures'
-import { WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS } from '../src/infrastructure/main/window-state'
+import { WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS } from '../../src/infrastructure/main/window-state'
 
 test.describe.configure({ mode: 'default' })
 

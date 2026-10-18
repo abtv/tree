@@ -7,12 +7,12 @@ on:
   workflow_call:
   pull_request:
     paths:
-      - 'e2e/shared-application*.spec.ts'
-      - 'e2e/fixtures.ts'
-      - 'e2e/global-setup.ts'
-      - 'e2e/*.cjs'
-      - 'e2e/electron-process.ts'
-      - 'e2e/clipboard-lock.ts'
+      - 'e2e/electron/shared-application*.spec.ts'
+      - 'e2e/electron/fixtures.ts'
+      - 'e2e/electron/global-setup.ts'
+      - 'e2e/electron/*.cjs'
+      - 'e2e/electron/electron-process.ts'
+      - 'e2e/electron/clipboard-lock.ts'
       - 'playwright*.config.ts'
       - 'tsconfig.e2e.json'
       - 'scripts/e2e-diagnose.mjs'

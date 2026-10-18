@@ -4,7 +4,7 @@
 // accelerator fails application startup. macOS accelerators are machine-global, so parallel E2E
 // workers cannot each register the real shortcut. The e2e entry enables this stub for hidden
 // parallel runs: every launch except the dedicated shortcut spec receives a `globalShortcut` whose
-// registration succeeds locally without touching the operating system. `e2e/fixtures.ts` asserts the
+// registration succeeds locally without touching the operating system. `e2e/electron/fixtures.ts` asserts the
 // requested mode after launch, so a stub that stops applying fails loudly on the first launch.
 //
 // Like the hidden-window override, `globalShortcut` cannot be replaced by assignment, so the

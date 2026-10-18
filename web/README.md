@@ -85,7 +85,8 @@ remains unverified; native Safari clipboard interaction still needs verification
 ## Browser checks
 
 Chrome E2E specs live in `e2e/web/` and use Playwright Test through
-`playwright.web.config.ts`. Electron uses the separate `playwright.config.ts`.
+`playwright.web.config.ts`. Electron tests live beside them in `e2e/electron/`
+and use the separate `playwright.config.ts`.
 Both targets use Playwright assertions, fixtures, traces and reports. Google
 Chrome must be installed; no downloaded Playwright browser is required.
 The suite requires headless mode so its clipboard checks use Chrome's virtual

@@ -128,13 +128,13 @@ Every control above has an automated check. The verification map:
 
 | Control | Focused tests | Real-boundary tests |
 | --- | --- | --- |
-| Renderer isolation | `src/main/window.test.ts` | every `e2e/*.spec.ts` launch |
-| Restricted navigation and external links | `src/main/window.test.ts` | `e2e/csp.spec.ts`, `e2e/hyperlink.spec.ts` |
-| Renderer session permissions and network egress | `src/main/window.test.ts` | `e2e/csp.spec.ts`, `e2e/hyperlink.spec.ts` |
-| Trusted IPC callers and payload validation | `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts` | `e2e/attachment-validation.spec.ts` |
-| Persisted-state validation on save | `src/domain/document.test.ts`, `src/main/ipc-security.test.ts` | `e2e/persistence.spec.ts`, `e2e/persistence-reliability.spec.ts` |
-| Attachment validation and decoding | `src/main/ipc-security.test.ts`, `src/main/png-decoder.test.ts` | `e2e/attachment-validation.spec.ts` |
-| Content security policy | production build plugin | `e2e/csp.spec.ts` |
+| Renderer isolation | `src/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
+| Restricted navigation and external links | `src/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
+| Renderer session permissions and network egress | `src/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
+| Trusted IPC callers and payload validation | `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
+| Persisted-state validation on save | `src/domain/document.test.ts`, `src/main/ipc-security.test.ts` | `e2e/electron/persistence.spec.ts`, `e2e/electron/persistence-reliability.spec.ts` |
+| Attachment validation and decoding | `src/main/ipc-security.test.ts`, `src/main/png-decoder.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
+| Content security policy | production build plugin | `e2e/electron/csp.spec.ts` |
 | Domain and layer import boundaries | `eslint.config.mjs` import restrictions | lint step of `npm run check` |
 
 `npm run check:full` runs the unit, contract, end-to-end, and performance suites. `npm audit` runs as the final step of `npm run check:full`; a registry connectivity failure must be reported rather than treated as a clean audit. Between runs, a daily workflow audits dependencies at high severity or above and Dependabot proposes updates; `docs/DEVELOPMENT.md` describes both.

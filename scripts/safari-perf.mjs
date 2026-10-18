@@ -167,7 +167,7 @@ async function launch(state, insert) {
     await writeFile(join(profile, 'data/document.json'), JSON.stringify(state))
     await writeFile(join(profile, 'data/vim-enabled.json'), 'true')
     app = await _electron.launch({
-      args: [`--user-data-dir=${profile}`, resolve('e2e/electron-entry.cjs')],
+      args: [`--user-data-dir=${profile}`, resolve('e2e/electron/electron-entry.cjs')],
       env: { ...process.env, TREE_E2E_HIDDEN: '0' },
     })
     page = await app.firstWindow()

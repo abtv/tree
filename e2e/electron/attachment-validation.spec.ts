@@ -1,7 +1,7 @@
 // @editing-modes: both
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { pngIhdr, pngWith } from '../src/main/png-test-utils'
+import { pngIhdr, pngWith } from '../../src/main/png-test-utils'
 import {
   attachmentFiles,
   clickApplicationMenuQuit,

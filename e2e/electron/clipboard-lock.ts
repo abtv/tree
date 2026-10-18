@@ -10,7 +10,7 @@ import { join } from 'node:path'
 // The lock is a directory created atomically with `mkdir`, holding an owner file with the owning
 // worker PID, acquisition time, and a unique token. A lock whose owner process is gone is broken by
 // atomically renaming the directory to a quarantine name, so exactly one waiter can claim a stale
-// lock. A live owner is never considered stale, even if its test runs long. `e2e/global-setup.ts`
+// lock. A live owner is never considered stale, even if its test runs long. `e2e/electron/global-setup.ts`
 // removes a leftover lock before a run starts.
 const LOCK_NAME = 'tree-e2e-clipboard.lock'
 const LOCK_DIRECTORY = join(tmpdir(), LOCK_NAME)

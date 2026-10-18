@@ -1,6 +1,6 @@
 // @editing-modes: both
 import { writeFileSync } from 'node:fs'
-import { dayNumberOf } from '../src/domain/calendar-date'
+import { dayNumberOf } from '../../src/domain/calendar-date'
 import {
   describeForEachEditingMode,
   expect,

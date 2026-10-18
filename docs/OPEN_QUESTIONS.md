@@ -202,7 +202,7 @@ One defect of a class is fixed; whether the class has other members is not known
 
 ### What we are watching
 
-Any transition where the Product Owner sees a blink, a jump, or content that arrives late. The cheapest observation is a frame-by-frame record of the geometry of a row that sits below the changing content, as in `e2e/leave-layout-stability.spec.ts`: the list of distinct positions a row takes during the transition should have one entry.
+Any transition where the Product Owner sees a blink, a jump, or content that arrives late. The cheapest observation is a frame-by-frame record of the geometry of a row that sits below the changing content, as in `e2e/electron/leave-layout-stability.spec.ts`: the list of distinct positions a row takes during the transition should have one entry.
 
 ### What would settle it
 
@@ -222,5 +222,5 @@ Product Owner statement (2026-10-03): after the `Ctrl+o` defect was fixed, they 
   3. The first link in a node: `src/renderer/NodeInput.tsx` swaps a `textarea` for a `contentEditable` element, and `src/renderer/use-node-input-bindings.ts` restores focus and caret in a layout effect and again in a microtask.
   4. Scroll position on entering and leaving a node: one scroll container serves all levels, and `revealInViewport` in `src/renderer/scroll-viewport.ts` centered a selected row that is not fully visible, which read as a jump. Keyboard movement at the window edge now scrolls by about one row (`docs/PRODUCT.md` §20.8); entering and leaving a node was not re-checked.
   5. The bundled font: `@font-face` in `src/renderer/styles.css` sets no `font-display`.
-  6. Lists above 500 rows: row heights are estimated at 25 px until measured (`src/renderer/list-window.ts`); `e2e/windowed-list.spec.ts` already records a shift from image loading there as accepted.
+  6. Lists above 500 rows: row heights are estimated at 25 px until measured (`src/renderer/list-window.ts`); `e2e/electron/windowed-list.spec.ts` already records a shift from image loading there as accepted.
 - 2026-10-03 — Repository fact: `AGENTS.md` §9 requires flash-free window creation, loading, reloading, and closing (`docs/PRODUCT.md` §20.5). Whether any requirement covers transitions inside the editor was not checked.

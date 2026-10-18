@@ -159,7 +159,7 @@ const developCases = {
     'git blame src/renderer/NodeList.tsx',
     'cp test-results/example/trace.zip test-results/keep.zip',
     'cp -R test-results/example test-results/keep',
-    'mv e2e/_drag-diagnostic.spec.ts test-results/',
+    'mv e2e/electron/_drag-diagnostic.spec.ts test-results/',
     'mv perf/_probe.spec.ts test-results/',
     'mv perf/_probe-a.spec.ts perf/_probe-b.spec.ts test-results/',
     'mv test-results/keep.zip test-results/archive.zip',
@@ -206,7 +206,7 @@ const developCases = {
     'mv source destination',
     'cp test-results/example/trace.zip ~/.ssh/authorized_keys',
     'mv src/domain test-results/domain',
-    'mv e2e/history.spec.ts test-results/',
+    'mv e2e/electron/history.spec.ts test-results/',
     // Only underscore-prefixed perf probe files may move into the scratch directory.
     'mv perf/foo.spec.ts src/',
     'mv perf/foo.spec.ts',

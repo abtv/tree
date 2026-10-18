@@ -20,7 +20,7 @@ describe('editing-mode categories', () => {
       spec('e2e/a.spec.ts', 'both', "describeForEachEditingMode('a', () => {})\n"),
       spec('e2e/b.spec.ts', 'vim'),
       spec('e2e/c.spec.ts', 'independent'),
-      spec('e2e/vim-toggle.spec.ts', 'explicit'),
+      spec('e2e/electron/vim-toggle.spec.ts', 'explicit'),
     ]
     expect(checkEditingModes({ files })).toEqual({ issues: [], specCount: 4 })
   })
@@ -66,10 +66,10 @@ describe('editing-mode categories', () => {
 
   it('reserves "explicit" for the preference spec', () => {
     expect(checkEditingModes({ files: [spec('e2e/a.spec.ts', 'explicit')] }).issues).toEqual([
-      'e2e/a.spec.ts: only e2e/vim-toggle.spec.ts may use the "explicit" category',
+      'e2e/a.spec.ts: only e2e/electron/vim-toggle.spec.ts may use the "explicit" category',
     ])
-    expect(checkEditingModes({ files: [spec('e2e/vim-toggle.spec.ts', 'vim')] }).issues).toEqual([
-      'e2e/vim-toggle.spec.ts: must use the "explicit" category',
+    expect(checkEditingModes({ files: [spec('e2e/electron/vim-toggle.spec.ts', 'vim')] }).issues).toEqual([
+      'e2e/electron/vim-toggle.spec.ts: must use the "explicit" category',
     ])
   })
 })
@@ -86,7 +86,7 @@ describe('repository discovery', () => {
     write('e2e/nested/bad.spec.ts', 'export {}\n')
     write('e2e/web/browser.spec.mjs', 'export {}\n')
     write('e2e/_diagnostic.spec.ts', 'export {}\n')
-    write('e2e/fixtures.ts', 'export {}\n')
+    write('e2e/electron/fixtures.ts', 'export {}\n')
     write('e2e/notes.spec.txt', 'export {}\n')
     expect(runChecks({ rootDirectory: root })).toEqual({
       issues: [

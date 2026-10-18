@@ -18,7 +18,7 @@ The end-to-end suite launches the real Electron application for every test. Appl
 
 ## Decision
 
-`npm run test:e2e` launches hidden application windows by default. `e2e/fixtures.ts` resolves the selected mode and always passes it explicitly to the test-owned entry, which calls `enableHiddenWindows()` from `e2e/hidden-windows.cjs` before loading `out/main/index.js`. That module patches `Module._load` so the application bundle's `require('electron')` receives a memoized `Proxy` whose `BrowserWindow` property is a function wrapper forcing `show: false`. A function wrapper, not a subclass, preserves `getAllWindows`, `fromWebContents`, and `instanceof`.
+`npm run test:e2e` launches hidden application windows by default. `e2e/electron/fixtures.ts` resolves the selected mode and always passes it explicitly to the test-owned entry, which calls `enableHiddenWindows()` from `e2e/electron/hidden-windows.cjs` before loading `out/main/index.js`. That module patches `Module._load` so the application bundle's `require('electron')` receives a memoized `Proxy` whose `BrowserWindow` property is a function wrapper forcing `show: false`. A function wrapper, not a subclass, preserves `getAllWindows`, `fromWebContents`, and `instanceof`.
 
 Every launch asserts the selected mode and fails with an actionable message when the override stops applying, so an Electron or Node upgrade that invalidates the interception fails on the first launch instead of silently showing windows during a hidden run. `TREE_E2E_VISIBLE=1` runs the suite with visible windows for observing the real UI, including the product verification of native macOS surfaces owned by `docs/DEVELOPMENT.md` §8.
 

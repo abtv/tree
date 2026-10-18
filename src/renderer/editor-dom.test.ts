@@ -428,7 +428,7 @@ describe('editor DOM adapters', () => {
 
     // A mouse selection can end inside the anchor at its final text offset while the rendered
     // selection appears to include the whole label; the boundary-point rule does not count that
-    // as covering the anchor. See e2e/clipboard.spec.ts "selects linked characters with the mouse".
+    // as covering the anchor. See e2e/electron/clipboard.spec.ts "selects linked characters with the mouse".
     setDomSelection(element.firstChild!, 0, label, label.textContent?.length ?? 0)
     updateSelectedLinks(element)
     expect(link.classList.contains('link-selected')).toBe(false)

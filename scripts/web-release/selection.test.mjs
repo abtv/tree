@@ -56,7 +56,7 @@ function successfulRun(sha) {
 
 describe('release check selection across pushes', () => {
   it.each([
-    ['e2e/fixtures.ts', 'memory=true', 'demo=false'],
+    ['e2e/electron/fixtures.ts', 'memory=true', 'demo=false'],
     ['src/renderer/main.tsx', 'demo=true', 'memory=false'],
   ])('keeps %s changes required after a failed release followed by documentation', async (path, required, skipped) => {
     const fixture = await history(path)
@@ -78,7 +78,7 @@ describe('release check selection across pushes', () => {
   })
 
   it('returns to selective skipping after the relevant changes have a successful source release', async () => {
-    const fixture = await history('e2e/fixtures.ts')
+    const fixture = await history('e2e/electron/fixtures.ts')
     const request = vi.fn(async () => ({ workflow_runs: [successfulRun(fixture.before)] }))
     await expect(
       selectReleaseChecks(fixture.before, fixture.after, {
@@ -95,8 +95,8 @@ describe('release check selection across pushes', () => {
   })
 
   it('counts removed matching paths when a change renames them outside the selector', async () => {
-    const fixture = await history('e2e/fixtures.ts')
-    fixture.git('mv', 'e2e/fixtures.ts', 'renamed.txt')
+    const fixture = await history('e2e/electron/fixtures.ts')
+    fixture.git('mv', 'e2e/electron/fixtures.ts', 'renamed.txt')
     // Worktree changes are not part of a release candidate; create its immutable commit.
     fixture.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--quiet', '-m', 'Rename')
     const after = fixture.git('rev-parse', 'HEAD')
@@ -182,7 +182,7 @@ describe('release selection history trust and failures', () => {
     expect(request).not.toHaveBeenCalled()
     await expect(
       select([baseline], (file, args) => {
-        if (args[0] === 'diff' && args[4] === before) return 'e2e/fixtures.ts\0'
+        if (args[0] === 'diff' && args[4] === before) return 'e2e/electron/fixtures.ts\0'
         return 'README.md\0'
       }),
     ).resolves.toEqual({ memory: true, demo: false })

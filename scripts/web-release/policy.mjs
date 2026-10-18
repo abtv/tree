@@ -117,9 +117,9 @@ export function selectChecks(paths) {
           'scripts/record-demo.mjs',
           'scripts/readme-screenshots.mjs',
           'docs/images/demo-document.json',
-          'e2e/electron-entry.cjs',
-          'e2e/hidden-windows.cjs',
-          'e2e/shortcut-stub.cjs',
+          'e2e/electron/electron-entry.cjs',
+          'e2e/electron/hidden-windows.cjs',
+          'e2e/electron/shortcut-stub.cjs',
           'electron.vite.config.ts',
           '.github/workflows/demo.yml',
         ].includes(path),
@@ -127,14 +127,14 @@ export function selectChecks(paths) {
     memory: paths.some(
       (path) =>
         shared.test(path) ||
-        /^e2e\/(?:shared-application[^/]*\.spec\.ts|[^/]+\.cjs)$/.test(path) ||
+        /^e2e\/electron\/(?:shared-application[^/]*\.spec\.ts|[^/]+\.cjs)$/.test(path) ||
         /^playwright[^/]*\.config\.ts$/.test(path) ||
         /^\.github\/workflows\/e2e[^/]*\.yml$/.test(path) ||
         [
-          'e2e/fixtures.ts',
-          'e2e/global-setup.ts',
-          'e2e/electron-process.ts',
-          'e2e/clipboard-lock.ts',
+          'e2e/electron/fixtures.ts',
+          'e2e/electron/global-setup.ts',
+          'e2e/electron/electron-process.ts',
+          'e2e/electron/clipboard-lock.ts',
           'tsconfig.e2e.json',
           'scripts/e2e-diagnose.mjs',
         ].includes(path),

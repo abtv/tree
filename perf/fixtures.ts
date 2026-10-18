@@ -2,7 +2,7 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { cleanupStaleElectronProcesses } from '../e2e/electron-process'
+import { cleanupStaleElectronProcesses } from '../e2e/electron/electron-process'
 
 export interface Launched {
   app: ElectronApplication
@@ -72,7 +72,7 @@ export async function launchTree(
       args: [
         `--user-data-dir=${userDataDir}`,
         ...(options.memoryProbe === true ? ['--enable-precise-memory-info', '--js-flags=--expose-gc'] : []),
-        join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+        join(process.cwd(), 'e2e', 'electron', 'electron-entry.cjs'),
       ],
       cwd: process.cwd(),
       // The performance suite measures a presented window (paint latency, typing cost, heap growth),

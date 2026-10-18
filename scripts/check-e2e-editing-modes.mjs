@@ -8,7 +8,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // behavior can differ between the editing modes must be converted to `both` rather than parked.
 export const CATEGORIES = new Set(['both', 'vim', 'independent', 'explicit'])
 
-export const EXPLICIT_FILES = new Set(['e2e/vim-toggle.spec.ts'])
+export const EXPLICIT_FILES = new Set(['e2e/electron/vim-toggle.spec.ts'])
 
 const HELPER = 'describeForEachEditingMode'
 const MARKER = /^\/\/ @editing-modes: (\S+)\s*$/
@@ -45,7 +45,7 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name)
       if (entry.isDirectory()) walk(path)
-      // `_*.spec.ts` files are temporary diagnostics (e2e/AGENTS.md) and are not part of the suite.
+      // `_*.spec.ts` files are temporary diagnostics (e2e/electron/AGENTS.md) and are not part of the suite.
       else if (entry.isFile() && /\.spec\.(?:ts|mjs)$/.test(entry.name) && !entry.name.startsWith('_')) {
         files.push({ path: relative(rootDirectory, path).split('\\').join('/'), content: readFileSync(path, 'utf8') })
       }

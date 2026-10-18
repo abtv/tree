@@ -2,19 +2,18 @@ import { defineConfig } from '@playwright/test'
 
 // Hidden runs execute spec files in parallel across workers, and selected long-running suites opt
 // into test-level parallelism. Visible runs stay serial because they share the desktop and exist to
-// observe the real UI. The global default remains file-parallel so `e2e/shortcut.spec.ts` keeps its
+// observe the real UI. The global default remains file-parallel so `e2e/electron/shortcut.spec.ts` keeps its
 // real, machine-global `Cmd+0` tests on one worker; other parallel launches use the shortcut stub.
 const hiddenParallelRun = process.env['TREE_E2E_VISIBLE'] !== '1'
 
 // The Vim end-to-end suite is split across three files that share the snapshot directory created
-// for the original e2e/vim-editing.spec.ts. A project-scoped snapshotPathTemplate keeps those
+// for the original vim-editing.spec.ts. A project-scoped snapshotPathTemplate keeps those
 // baselines in place without moving them or changing every other spec's snapshot directory.
 const vimSpecFile = /vim-(?:image-caret|text-editing|navigation-and-visual)\.spec\.ts$/
 
 export default defineConfig({
-  testDir: './e2e',
-  testIgnore: ['web/**'],
-  globalSetup: './e2e/global-setup.ts',
+  testDir: './e2e/electron',
+  globalSetup: './e2e/electron/global-setup.ts',
   fullyParallel: false,
   workers: hiddenParallelRun ? (process.env['CI'] ? 4 : 6) : 1,
   forbidOnly: !!process.env['CI'],
@@ -25,7 +24,7 @@ export default defineConfig({
   projects: [
     {
       // Every other spec keeps the default per-file snapshot directory.
-      testIgnore: ['web/**', vimSpecFile, /shared-application-memory\.spec\.ts$/],
+      testIgnore: [vimSpecFile, /shared-application-memory\.spec\.ts$/],
     },
     {
       name: 'vim',

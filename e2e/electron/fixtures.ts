@@ -2,8 +2,8 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SAVE_IDLE_MILLISECONDS } from '../src/application/save-policy'
-import { WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS } from '../src/infrastructure/main/window-state'
+import { SAVE_IDLE_MILLISECONDS } from '../../src/application/save-policy'
+import { WINDOW_BOUNDS_SAVE_DELAY_MILLISECONDS } from '../../src/infrastructure/main/window-state'
 import {
   acquireSystemClipboardLock,
   releaseSystemClipboardLock,
@@ -45,7 +45,7 @@ export type ShortcutMode = 'real' | 'stub'
 
 // Every launch uses a user-data prefix that identifies this Playwright worker. Stale-process cleanup
 // then only ever addresses apps launched by this worker, so parallel workers cannot kill each
-// other's applications. `e2e/global-setup.ts` cleans leftovers from earlier runs before workers start.
+// other's applications. `e2e/electron/global-setup.ts` cleans leftovers from earlier runs before workers start.
 const userDataMarker = `tree-e2e-p${process.pid}-`
 
 // Hidden windows are the default so the suite does not steal desktop focus. Set
@@ -319,7 +319,7 @@ export interface EditingModeContext {
  * Runs `body` once per editing mode, each time in its own describe block whose title names the mode.
  * Tests declared inside launch with that mode unless they pass an explicit `vimPreference`. Tests whose
  * behavior exists only in Vim editing belong in a separate describe block that launches with Vim
- * explicitly (`e2e/AGENTS.md`).
+ * explicitly (`e2e/electron/AGENTS.md`).
  */
 export function describeForEachEditingMode(title: string, body: (context: EditingModeContext) => void): void {
   for (const mode of EDITING_MODES) {
@@ -718,7 +718,7 @@ export async function launchTree(
               // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
               '--force-device-scale-factor=1',
               `--user-data-dir=${userDataDir}`,
-              join(process.cwd(), 'e2e', 'electron-entry.cjs'),
+              join(process.cwd(), 'e2e', 'electron', 'electron-entry.cjs'),
               ...(shared === undefined ? [] : ['--tree-test-shared-application']),
               // Overlay scrollbars reserve no width, while classic ones narrow the centered outline. macOS
               // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
@@ -863,7 +863,7 @@ export async function launchTree(
   }
 }
 
-// The hidden-window override lives in the test-owned entry (`e2e/hidden-windows.cjs`) and depends
+// The hidden-window override lives in the test-owned entry (`e2e/electron/hidden-windows.cjs`) and depends
 // on a Node module-load patch that an Electron or Node upgrade could invalidate. Fail the launch
 // immediately when the requested mode did not take effect instead of silently showing windows
 // during a hidden run or hiding windows during a visible one.
@@ -876,7 +876,7 @@ async function assertWindowMode(app: ElectronApplication, mode: WindowMode): Pro
   }
   if (mode === 'hidden' && visibility[0] === true) {
     throw new Error(
-      'The e2e window mode is hidden, but the application window is visible. The hidden-window override in e2e/hidden-windows.cjs is not applying.',
+      'The e2e window mode is hidden, but the application window is visible. The hidden-window override in e2e/electron/hidden-windows.cjs is not applying.',
     )
   }
   if (mode === 'visible' && visibility[0] === false) {
@@ -884,7 +884,7 @@ async function assertWindowMode(app: ElectronApplication, mode: WindowMode): Pro
   }
 }
 
-// The shortcut mode is applied by the test-owned entry (`e2e/shortcut-stub.cjs`) and, like the
+// The shortcut mode is applied by the test-owned entry (`e2e/electron/shortcut-stub.cjs`) and, like the
 // hidden-window override, depends on a Node module-load patch that an Electron or Node upgrade
 // could invalidate. Fail the launch immediately when the requested mode did not take effect instead
 // of silently registering the real machine-global accelerator in a parallel run.
@@ -892,7 +892,7 @@ async function assertShortcutMode(app: ElectronApplication, mode: ShortcutMode):
   const registered = await app.evaluate(({ globalShortcut }) => globalShortcut.isRegistered('CommandOrControl+0'))
   if (mode === 'stub' && registered) {
     throw new Error(
-      'The e2e shortcut mode is stub, but the real global Cmd+0 shortcut is registered. The shortcut stub in e2e/shortcut-stub.cjs is not applying.',
+      'The e2e shortcut mode is stub, but the real global Cmd+0 shortcut is registered. The shortcut stub in e2e/electron/shortcut-stub.cjs is not applying.',
     )
   }
   if (mode === 'real' && !registered) {

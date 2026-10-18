@@ -10,7 +10,7 @@ import {
   setMainWindowContentSize,
   test,
 } from './fixtures'
-import catalog from '../src/domain/emoji-catalog.json'
+import catalog from '../../src/domain/emoji-catalog.json'
 
 describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.12

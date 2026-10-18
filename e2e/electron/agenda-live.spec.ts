@@ -1,6 +1,6 @@
 // @editing-modes: both
-import type { TreeNode } from '../src/domain/document'
-import { dayNumberOf } from '../src/domain/calendar-date'
+import type { TreeNode } from '../../src/domain/document'
+import { dayNumberOf } from '../../src/domain/calendar-date'
 import {
   describeForEachEditingMode,
   expect,
