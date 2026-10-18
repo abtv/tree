@@ -172,7 +172,7 @@ Node text is always edited inline. A node must not have a persistent input borde
 
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. A quick press and release still places the text cursor at the clicked position, and pressing and dragging selects text. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
 
-Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a sibling (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. Node rows end 28px short of the right edge of the content area, so wrapped text does not touch the window edge. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
+Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a node (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. Node rows end 28px short of the right edge of the content area, so wrapped text does not touch the window edge. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
 
 Node rows retain the document-surface background when focused or hovered (warm paper in the light appearance); focus and hover must not tint the editing row. Apart from the dark bullet of the selected node, a focused node must not display an additional more-options or selection-dot ornament.
 
@@ -352,17 +352,17 @@ At any other caret position, `←` and `→` retain their ordinary text-editing 
 
 ### 5.1 Enter
 
-When focus is on a node in the currently displayed level, `Enter` creates a new sibling on the same level, except when the Normal-mode caret is on an attached image, where it opens that image's preview (see §20.2).
+In standard editing and Vim Insert, `Enter` creates a node or splits its text according to the caret position. Vim Normal `Enter` keeps its image-preview and hyperlink behavior (see §20.2).
 
 When a completion popup is open in standard editing or Vim Insert, plain `Enter` accepts its selected suggestion instead (§20.9, §20.12). Dismiss it with `Escape` before pressing `Enter` to keep the literal expression and create or split a node.
 
-In that context, it never creates a child.
+At the end of text, `Enter` follows the same placement rule as Vim `o` (§20.2.10): an expanded node with children receives a new empty first child, before its existing children; a collapsed node or a leaf receives a new empty sibling after its entire subtree. The current location and existing folds stay unchanged. An expanded parent with empty text also receives a first child; it is not an empty leaf.
 
-The new node is inserted immediately before the current non-empty node when the caret is at the beginning; otherwise it is inserted immediately after the current node.
+At the beginning of nonempty text, the new empty sibling is inserted immediately before the current node. In the middle of text, the suffix becomes a new sibling after the current node's entire subtree. These two rules do not depend on expansion.
 
 * On an empty leaf (no text, attachment, or children) shown inside an inline-expanded branch, `Enter` preserves that leaf and creates a new empty sibling immediately after its parent, one level left.
 * This never creates outside the current location: on a root or a direct child of the focused current parent, it creates the next sibling at the same level.
-* Thus the first press at the end of nonempty text creates an empty sibling; the next press creates one level left when that level is available.
+* Thus the first press at the end of nonempty text creates an empty child or sibling as specified above; the next press on that empty leaf creates one level left when that level is available.
 * Each press creates one node and one undoable change, selects the new node at text position zero, and keeps standard editing or Vim Insert active.
 
 ### Cursor at the end
@@ -380,7 +380,7 @@ Current
 |
 ```
 
-The new node has empty text, is selected, and receives the text cursor at the beginning of its text. The UI does not display a `New node` placeholder.
+The example above is a leaf. An expanded parent creates the empty node as its first child instead. The new node has empty text, is selected, and receives the text cursor at the beginning of its text. The UI does not display a `New node` placeholder.
 
 ### Cursor at the beginning
 

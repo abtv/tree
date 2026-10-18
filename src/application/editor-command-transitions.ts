@@ -154,6 +154,7 @@ export function createSiblingOrFirstChildTransition(
   location: Location,
   cursor: number,
   createId: () => NodeId,
+  expanded = false,
 ): StructuralTransition | RejectedTransition {
   const current = requireNode(document, location.selectedNodeId)
   const outside = createAfterEmptyParentTransition(document, location, current, createId)
@@ -170,6 +171,8 @@ export function createSiblingOrFirstChildTransition(
       focus: { nodeId: id, cursor: 0 },
     }
   }
+
+  if (cursor === current.node.text.length) return openBelowTransition(document, location, createId, expanded)
 
   const id = createId()
   const selected = current.node

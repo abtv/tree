@@ -807,7 +807,13 @@ export class EditorStore {
   public createSiblingOrFirstChild(cursor: number): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
-    const transition = createSiblingOrFirstChildTransition(state.document, state.location, cursor, this.createId)
+    const transition = createSiblingOrFirstChildTransition(
+      state.document,
+      state.location,
+      cursor,
+      this.createId,
+      isNodeExpanded(state.expansion, state.location.selectedNodeId),
+    )
     if (transition.kind === 'rejected') {
       this.reportError(new Error(transition.message))
       return

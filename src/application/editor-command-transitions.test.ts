@@ -476,6 +476,55 @@ describe('editor command transitions', () => {
     expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
   })
 
+  it.each([
+    { expanded: true, cursor: 4, child: true },
+    { expanded: false, cursor: 4, child: false },
+    { expanded: true, cursor: 0, child: false },
+    { expanded: true, cursor: 2, child: false },
+  ])('Enter respects expansion only at text end: %j', ({ expanded, cursor, child }) => {
+    const location = { currentParentId: null, selectedNodeId: 'root' }
+    const result = createSiblingOrFirstChildTransition(document, location, cursor, () => 'created', expanded)
+    if (!('document' in result)) throw new Error('Expected creation.')
+    expect(result.document.roots.map((node) => node.id)).toEqual(
+      child
+        ? ['root', 'other-root']
+        : cursor === 0
+          ? ['created', 'root', 'other-root']
+          : ['root', 'created', 'other-root'],
+    )
+    const original = result.document.roots.find((node) => node.id === 'root')!
+    expect(original.children.map((node) => node.id)).toEqual(
+      child ? ['created', 'first', 'second'] : ['first', 'second'],
+    )
+    expect(original.text).toBe(cursor === 2 ? 'Ro' : 'Root')
+    expect(result.location).toEqual({ ...location, selectedNodeId: 'created' })
+    expect(result.focus).toEqual({ nodeId: 'created', cursor: 0 })
+  })
+
+  it.each(['', 'Parent'])('Enter preserves an expanded parent and its attachment at text end (%j)', (text) => {
+    const original: TreeNode = {
+      id: 'parent',
+      text,
+      struckThrough: true,
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [{ id: 'child', text: 'Child', children: [] }],
+    }
+    const result = createSiblingOrFirstChildTransition(
+      { roots: [original] },
+      { currentParentId: null, selectedNodeId: 'parent' },
+      text.length,
+      () => 'new',
+      true,
+    )
+    if (!('document' in result)) throw new Error('Expected creation.')
+    expect(result.document.roots[0]).toEqual({
+      ...original,
+      children: [{ id: 'new', text: '', children: [] }, ...original.children],
+    })
+    expect(result.document.roots[0]!.children[1]).toBe(original.children[0])
+    expect(result.focus).toEqual({ nodeId: 'new', cursor: 0 })
+  })
+
   it('creates an empty sibling before or after without changing the selected node text', () => {
     const before = createSiblingTransition(
       document,

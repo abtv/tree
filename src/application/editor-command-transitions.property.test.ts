@@ -20,7 +20,8 @@ describe('editor command transition properties', () => {
         fc.array(fc.string(), { minLength: 1, maxLength: 8 }),
         fc.boolean(),
         fc.boolean(),
-        (texts, expanded, focused) => {
+        fc.constantFrom('o', 'Enter'),
+        (texts, expanded, focused, command) => {
           const branch: TreeNode = {
             id: 'branch',
             text: 'Branch',
@@ -31,7 +32,11 @@ describe('editor command transition properties', () => {
             roots: focused ? [{ id: 'scope', text: 'Scope', children: siblings }] : siblings,
           }
           const location = { currentParentId: focused ? 'scope' : null, selectedNodeId: 'branch' }
-          const result = openBelowTransition(document, location, () => 'new', expanded)
+          const result =
+            command === 'o'
+              ? openBelowTransition(document, location, () => 'new', expanded)
+              : createSiblingOrFirstChildTransition(document, location, branch.text.length, () => 'new', expanded)
+          if (!('document' in result)) throw new Error('Expected creation.')
           assertDocument(result.document)
           const created = locateNode(result.document, 'new')!
           expect(created.parent?.id ?? null).toBe(expanded ? 'branch' : location.currentParentId)

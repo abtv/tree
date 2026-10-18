@@ -2241,6 +2241,30 @@ describe('EditorStore', () => {
     })
   })
 
+  it.each([false, true])('Enter at text end follows the selected parent expansion (expanded: %s)', async (expanded) => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('created'))
+    await store.initialize()
+    if (expanded) store.toggleExpansion('root')
+    const before = store.getSnapshot() as ReadySnapshot
+    store.createSiblingOrFirstChild(4)
+    const after = store.getSnapshot() as ReadySnapshot
+    expect(after.document.roots.map((node) => node.id)).toEqual(expanded ? ['root'] : ['root', 'created'])
+    expect(after.document.roots[0]!.children.map((node) => node.id)).toEqual(
+      expanded ? ['created', 'child'] : ['child'],
+    )
+    expect(after.location).toEqual({ currentParentId: null, selectedNodeId: 'created' })
+    expect(after.focus).toMatchObject({ nodeId: 'created', cursor: 0 })
+    expect(after.expansion).toBe(before.expansion)
+    store.undo()
+    expect((store.getSnapshot() as ReadySnapshot).document).toEqual(before.document)
+    store.redo()
+    expect((store.getSnapshot() as ReadySnapshot).document).toEqual(after.document)
+  })
+
   it('creates a first child from the focused current parent', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
     await store.initialize()
