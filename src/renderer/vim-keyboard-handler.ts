@@ -37,6 +37,7 @@ import { editCaretTransition, horizontalCaretTransition } from './vim-caret-tran
 import { navigateVertically } from './vim-vertical-navigation'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import type { ShortcutProfile } from './shortcut-profile'
 import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 /** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2.15). */
@@ -103,6 +104,7 @@ export function handleVimKey(
   store: EditorStore,
   node: TreeNode,
   vim: VimKeyboardState,
+  shortcuts?: ShortcutProfile,
 ): boolean {
   const commandState = vim.commandState
   // A modifier, lock, dead-key, or IME keydown stays pending-command-neutral; it is not the command
@@ -312,7 +314,7 @@ export function handleVimKey(
     // Without a pending move a text register puts as ordinary editing; a node register has nothing to put (D1).
     const textPut = plainPut && vim.register.current.kind === 'text'
     if (!visual && pending.operator === undefined && pending.prefix === 'g' && event.key === 'd') {
-      createAgendaKeyDownHandler({ store, vim })(event)
+      createAgendaKeyDownHandler({ store, vim, shortcuts })(event)
       return true
     }
     const structural =
@@ -349,7 +351,7 @@ export function handleVimKey(
         (event.key === 'g' && pending.prefix === 'g') ||
         pending.prefix === 'z')
     ) {
-      createAgendaKeyDownHandler({ store, vim })(event)
+      createAgendaKeyDownHandler({ store, vim, shortcuts })(event)
       return true
     }
   }

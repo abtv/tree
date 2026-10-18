@@ -39,6 +39,7 @@ import { createTextEditHandlers } from './node-input-text-handlers'
 import { useCompletion } from './use-completion'
 import type { CompletionPopupPresentation } from './CompletionPopup'
 import type { EditorServices } from '../application/editor-store-types'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
@@ -62,6 +63,8 @@ interface UseNodeInputBindingsOptions {
    * the keyboard handler dispatches the command here instead of touching it directly.
    */
   onFoldCommand?: (command: VimFoldCommand, nodeId: string) => void
+  /** The platform's primary-modifier profile; Apple conventions when absent. */
+  shortcuts?: ShortcutProfile
 }
 
 export interface NodeInputBindingsResult {
@@ -91,6 +94,7 @@ export function useNodeInputBindings({
   nodeVisualSelection,
   setNodeVisualSelection = () => undefined,
   onFoldCommand = () => undefined,
+  shortcuts = APPLE_SHORTCUTS,
 }: UseNodeInputBindingsOptions): NodeInputBindingsResult {
   const inputs = useRef(new Map<string, HTMLElement>())
   const viewportReveal = useMemo(() => createViewportReveal(), [])
@@ -143,6 +147,7 @@ export function useNodeInputBindings({
     persistenceLocked,
     scheduleCompletionCaret,
     vimEnabled,
+    shortcuts,
   )
   const decorateCompletionBindings = completion.decorate
 
@@ -667,7 +672,7 @@ export function useNodeInputBindings({
       }
       if (
         caretProjection.current.mode === 'replace' &&
-        !event.ctrlKey &&
+        !shortcuts.isContextMenuClick(event) &&
         row !== undefined &&
         row !== null &&
         !target?.closest('.node-input, button, a[href]')
@@ -744,7 +749,7 @@ export function useNodeInputBindings({
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [changeVimMode, finishVimReplace])
+  }, [changeVimMode, finishVimReplace, shortcuts])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>
@@ -793,11 +798,13 @@ export function useNodeInputBindings({
             finishVimInsert,
             finishVimReplace,
             setSelectAllNodeId,
+            shortcuts,
           },
           node,
         ),
         onKeyDown: createEditorKeyDownHandler({
           store,
+          shortcuts,
           nativePaste: capturePasteClipboard !== undefined,
           node,
           isComposing: () => composing,
@@ -873,6 +880,7 @@ export function useNodeInputBindings({
       vimSession,
       vimCommandState,
       vimTextCommandState,
+      shortcuts,
     ],
   )
 

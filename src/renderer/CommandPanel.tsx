@@ -1,16 +1,19 @@
 import { useEffect, useRef } from 'react'
 import type { ApplicationCommand, CommandContext } from '../application/command-registry'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function CommandPanel({
   matches,
   selected,
   context,
   run,
+  shortcuts = APPLE_SHORTCUTS,
 }: {
   matches: readonly ApplicationCommand[]
   selected: number
   context: CommandContext
   run(command: ApplicationCommand): void
+  shortcuts?: ShortcutProfile
 }): React.JSX.Element {
   const panel = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -31,7 +34,9 @@ export function CommandPanel({
           <span className="command-name">{command.name}</span>
           <span className="command-description">{command.description}</span>
           <span className="command-state">{command.active(context) ? '✓' : ''}</span>
-          <span className="command-shortcut">{command.shortcut}</span>
+          <span className="command-shortcut">
+            {command.shortcut === undefined ? '' : shortcuts.format(command.shortcut)}
+          </span>
         </div>
       ))}
     </div>

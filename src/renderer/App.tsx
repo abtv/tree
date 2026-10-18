@@ -30,6 +30,7 @@ import { useScrollRestoration } from './use-scroll-restoration'
 import { useLeftCommandKey } from './use-left-command-key'
 import type { VimMode } from './vim-editing'
 import type { EditorServices } from '../application/editor-store-types'
+import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 
 interface AppProps {
   store: EditorStore
@@ -40,6 +41,8 @@ interface AppProps {
   /** Enable native rich editing only in text-entry modes in the browser adapter. */
   deferRichEditing?: boolean
   capturePasteClipboard?: (data: DataTransfer) => EditorServices['readClipboard']
+  /** The platform whose primary-modifier convention shortcuts follow (`docs/ARCHITECTURE.md` §8). */
+  shortcutPlatform?: ShortcutPlatform
 }
 
 export function App({
@@ -48,7 +51,9 @@ export function App({
   vimAvailable = true,
   deferRichEditing = false,
   capturePasteClipboard,
+  shortcutPlatform = 'apple',
 }: AppProps): React.JSX.Element {
+  const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
@@ -64,7 +69,7 @@ export function App({
   const [vimMode, setVimMode] = useState<VimMode>(initialVimEnabled ? 'normal' : 'insert')
   const richEditingEnabled = !deferRichEditing || !vimEnabled || vimMode === 'insert' || vimMode === 'replace'
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
-  const leftCommandKeyPressed = useLeftCommandKey()
+  const leftCommandKeyPressed = useLeftCommandKey(shortcuts)
   useEffect(() => {
     void window.treeApi
       .getAlwaysOnTop()
@@ -126,6 +131,7 @@ export function App({
     nodeVisualSelection,
     setNodeVisualSelection,
     onFoldCommand: applyFoldCommand,
+    shortcuts,
   })
   const applyVimEnabled = useCallback(
     async (nextValue: boolean): Promise<void> => {
@@ -138,6 +144,7 @@ export function App({
   )
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     vimAvailable,
+    shortcuts,
     store,
     vimEnabled,
     vimMode,
@@ -357,8 +364,8 @@ export function App({
         )
           return
         if (agenda !== undefined) {
-          createAgendaKeyDownHandler({ store, vim: vimEnabled ? vimTextCommandState : undefined })(event)
-        } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
+          createAgendaKeyDownHandler({ store, vim: vimEnabled ? vimTextCommandState : undefined, shortcuts })(event)
+        } else if (shortcuts.isPrimary(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
           event.preventDefault()
           clearCommandAssembly(vimTextCommandState.commandState)
           if (vimMode === 'visual-node') {
@@ -400,6 +407,7 @@ export function App({
               dragFreeze={dragFreeze}
               locked={persistenceLocked}
               vim={vimEnabled ? vimTextCommandState : undefined}
+              shortcuts={shortcuts}
               visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
               renderInput={renderAgendaInput}
               renderAttachment={renderAgendaAttachment}
@@ -485,6 +493,7 @@ export function App({
           selected={commandPanel.selected}
           context={commandPanel.context}
           run={commandPanel.run}
+          shortcuts={shortcuts}
         />
       ) : null}
       <footer className="status-bar">

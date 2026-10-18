@@ -9,6 +9,7 @@ import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export type {
   VimFindCommand,
@@ -152,6 +153,8 @@ export interface EditorKeyboardHandlerDependencies {
   shiftFocusedNode: (direction: 'in' | 'out', selection: { start: number; end: number }, cursor: number) => void
   /** Absent while Vim editing is disabled: every key then takes the standard editing path. */
   vim?: VimKeyboardState | undefined
+  /** The platform's primary-modifier profile; Apple conventions when absent. */
+  shortcuts?: ShortcutProfile
 }
 
 export function createEditorKeyDownHandler({
@@ -163,6 +166,7 @@ export function createEditorKeyDownHandler({
   onPreviewAttachment,
   shiftFocusedNode,
   vim,
+  shortcuts = APPLE_SHORTCUTS,
 }: EditorKeyboardHandlerDependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event): void => {
     // PRODUCT §20.2.27 suspends Vim handling during native text composition. The `composing` state is
@@ -175,6 +179,7 @@ export function createEditorKeyDownHandler({
     // flag marks as composing" and "clears a pending fold prefix through composition started by a
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
     if (isComposing() || event.nativeEvent?.isComposing) return
+    const primary = shortcuts.isPrimary(event)
     const snapshot = store.getSnapshot()
     const agenda = snapshot.status === 'ready' ? snapshot.agenda : undefined
     if (agenda !== undefined) {
@@ -190,7 +195,7 @@ export function createEditorKeyDownHandler({
         block('structure')
         return
       }
-      if (event.metaKey && event.key === 'Backspace') {
+      if (primary && event.key === 'Backspace') {
         block('structure')
         return
       }
@@ -201,7 +206,7 @@ export function createEditorKeyDownHandler({
           store.splitAgendaNode(getCaret(event.currentTarget))
         return
       }
-      if (event.metaKey && event.key === 'Enter') {
+      if (primary && event.key === 'Enter') {
         if (vim?.mode === 'visual-node') {
           event.preventDefault()
           return
@@ -220,13 +225,13 @@ export function createEditorKeyDownHandler({
         if (node.children.length === 0) store.deleteEmptySelected()
         return
       }
-      if (event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {
+      if (primary && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {
         event.preventDefault()
         finishVimSessionBeforeNavigation(vim, event.currentTarget)
         store.closeAgenda()
         return
       }
-      if (event.metaKey && event.key === '.') {
+      if (primary && event.key === '.') {
         event.preventDefault()
         finishVimSessionBeforeNavigation(vim, event.currentTarget)
         store.closeAgenda()
@@ -235,7 +240,7 @@ export function createEditorKeyDownHandler({
         vim?.syncImageCaretToFocus()
         return
       }
-      if (event.metaKey && event.key === ',') {
+      if (primary && event.key === ',') {
         event.preventDefault()
         if (agenda.focusedDay !== undefined) {
           finishVimSessionBeforeNavigation(vim, event.currentTarget)
@@ -243,7 +248,7 @@ export function createEditorKeyDownHandler({
         }
         return
       }
-      if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
+      if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
         event.preventDefault()
         clearCommandAssemblyBeforeCommand(vim)
         store.applyAgenda({ kind: 'toggle-fold', key: agenda.selectedKey })
@@ -269,7 +274,7 @@ export function createEditorKeyDownHandler({
           (vim?.mode === 'normal' && event.ctrlKey && (event.key === 'd' || event.key === 'u')))
       ) {
         finishVimSessionBeforeNavigation(vim, event.currentTarget)
-        createAgendaKeyDownHandler({ store, vim })(event)
+        createAgendaKeyDownHandler({ store, vim, shortcuts })(event)
         return
       }
     }
@@ -309,10 +314,10 @@ export function createEditorKeyDownHandler({
       }
       return
     }
-    const selectingAll = event.metaKey && event.key.toLowerCase() === 'a'
+    const selectingAll = primary && event.key.toLowerCase() === 'a'
     if (selectingAll && vim?.mode === 'insert') vim.finishInsert(event.currentTarget)
-    const copying = event.metaKey && event.key.toLowerCase() === 'c'
-    const pasting = event.metaKey && event.key.toLowerCase() === 'v'
+    const copying = primary && event.key.toLowerCase() === 'c'
+    const pasting = primary && event.key.toLowerCase() === 'v'
     // Browser paste supplies clipboard data without a second permission request. The paste handler
     // still owns the edit and resolves Vim sessions; Electron keeps its keydown-owned command.
     if (pasting && nativePaste) return
@@ -424,7 +429,7 @@ export function createEditorKeyDownHandler({
         return
       }
       if (vim.mode !== 'insert') {
-        if (handleVimKey(event, store, node, vim)) return
+        if (handleVimKey(event, store, node, vim, shortcuts)) return
         event.preventDefault()
         return
       }
@@ -443,19 +448,19 @@ export function createEditorKeyDownHandler({
         setSelectAllNodeId(node.id)
         input.classList.add('select-all')
       })
-    } else if (event.metaKey && event.key.toLowerCase() === 'c') {
+    } else if (primary && event.key.toLowerCase() === 'c') {
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {
         event.preventDefault()
         void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
       }
-    } else if (event.metaKey && event.key.toLowerCase() === 'v') {
+    } else if (primary && event.key.toLowerCase() === 'v') {
       event.preventDefault()
       // A paste edits this node's text, so any session or command assembly describing the old text
       // must resolve before the store changes.
       finishVimSessionBeforeTextEdit(vim, event.currentTarget)
       void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
-    } else if (event.metaKey && event.key.toLowerCase() === 'x') {
+    } else if (primary && event.key.toLowerCase() === 'x') {
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {
         event.preventDefault()
@@ -464,22 +469,22 @@ export function createEditorKeyDownHandler({
         finishVimSessionBeforeTextEdit(vim, event.currentTarget)
         void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
       }
-    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
+    } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.openAgenda(getCaret(event.currentTarget))
-    } else if (event.metaKey && event.key === '.') {
+    } else if (primary && event.key === '.') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.enter()
       vim?.syncImageCaretToFocus()
-    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
+    } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
       // Toggles the selected node's own fold like `za`. The caret and the Insert session are
       // untouched, so only the unfinished command assembly clears.
       event.preventDefault()
       clearCommandAssemblyBeforeCommand(vim)
       store.applyFold('toggle', node.id)
-    } else if (event.metaKey && event.key === 'Enter') {
+    } else if (primary && event.key === 'Enter') {
       // Every Cmd-modified Enter is claimed so it can never fall through to node creation; only the
       // plain Cmd+Enter toggles the strikethrough (PRODUCT §2.5) of the whole-node Visual range, or
       // else of this node. A pending Replace edit commits first without rewriting the DOM, so the
@@ -491,21 +496,21 @@ export function createEditorKeyDownHandler({
       commitPendingReplace(vim, event.currentTarget)
       clearCommandAssemblyBeforeCommand(vim)
       store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id)
-    } else if (event.metaKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
+    } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
       event.preventDefault()
       if (node.attachment !== undefined) {
         onPreviewAttachment(node.attachment.id)
       }
-    } else if (event.metaKey && event.key === ',') {
+    } else if (primary && event.key === ',') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.leave()
       vim?.syncImageCaretToFocus()
-    } else if (event.metaKey && event.key === 'Backspace') {
+    } else if (primary && event.key === 'Backspace') {
       event.preventDefault()
       finishVimSessionBeforeNavigation(vim, event.currentTarget)
       store.deleteSelected()
-    } else if (event.metaKey && event.key.toLowerCase() === 'z') {
+    } else if (primary && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       if (vim?.mode === 'replace') {
         vim.finishReplace(event.currentTarget, true)
@@ -517,10 +522,10 @@ export function createEditorKeyDownHandler({
       if (event.shiftKey) store.redo()
       else store.undo()
       vim?.syncImageCaretToFocus()
-    } else if (event.metaKey && event.key.toLowerCase() === 'q') {
+    } else if (primary && event.key.toLowerCase() === 'q') {
       event.preventDefault()
       void window.treeApi.quit().catch((error: unknown) => store.reportError(error))
-    } else if (event.metaKey && event.key === '0') event.preventDefault()
+    } else if (primary && event.key === '0') event.preventDefault()
     else if (event.key === 'Backspace' && node.text === '') {
       event.preventDefault()
       store.deleteEmptySelected()

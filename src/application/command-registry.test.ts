@@ -6,6 +6,12 @@ const names = (query: string, history: readonly string[] = []): string[] =>
 
 describe('command registry', () => {
   // @requirement PRODUCT.md §20.2.28
+  it('records only the quit shortcut, as data without a platform label', () => {
+    const shortcuts = commandRegistry.filter((command) => command.shortcut !== undefined)
+    expect(shortcuts.map((command) => [command.name, command.shortcut])).toEqual([['quit', { key: 'Q' }]])
+  })
+
+  // @requirement PRODUCT.md §20.2.28
   it.each([
     ['theme', ['set-theme-auto', 'set-theme-dark', 'set-theme-light']],
     ['set-th', ['set-theme-auto', 'set-theme-dark', 'set-theme-light']],

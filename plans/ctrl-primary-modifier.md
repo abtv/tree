@@ -1,6 +1,6 @@
 # Ctrl as the Primary Modifier in the Browser Version
 
-Status: In progress. T1 is Ready.
+Status: In progress. T1 is Done. T2 is Ready.
 
 Planned 2026-10-18 at `10bf845`, clean tree. Coding tool: Claude Code. A smaller model is expected to implement the tasks, so each task names its files, steps, evidence and validation tier.
 
@@ -137,8 +137,8 @@ Working tasks: 4 (T1 to T4). Closure and the owner rounds are not working tasks.
 
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| T1 | Shortcut profile seam; Apple behavior identical | none | Apple table equals `metaKey`; Electron and Chrome suites pass unchanged | Ready |
-| T2 | Non-Apple rules, parity tests, PRODUCT.md §1.5, Vim conformance row | T1 | both profiles pass the parity and precedence matrices; docs checks pass | Planned |
+| T1 | Shortcut profile seam; Apple behavior identical | none | Apple table equals `metaKey`; Electron and Chrome suites pass unchanged | Done |
+| T2 | Non-Apple rules, parity tests, PRODUCT.md §1.5, Vim conformance row | T1 | both profiles pass the parity and precedence matrices; docs checks pass | Ready |
 | Round A | Owner macOS native-keyboard check | T2 | owner reports pass or waives | Planned |
 | T3 | Browser activation, labels, Chrome E2E on both mappings | T2, Round A | local Chrome suites pass; Linux CI passes | Planned |
 | T4 | Probe, constraint record, acceptance package | T3 | every constraint recorded in PRODUCT.md §1.5; no open reserved decision | Planned |
@@ -204,6 +204,9 @@ Audit list (negative guards whose meaning changes). Decide each, and write a tes
 5. `agenda-row-text-keys.ts`: Ctrl early return, copy, select-all, word motion.
 6. The two `!event.ctrlKey` replace-click exclusions become Apple-only.
 7. Popup close on a primary shortcut ignores a bare Control keydown.
+8. `use-command-panel.ts`: the Cmd+Shift+P test ends with `&& !event.ctrlKey && !event.altKey`. On `other`, `isPrimary` requires Ctrl, so the `!event.ctrlKey` term must go or Ctrl+Shift+P never opens the panel. Found in the T1 review.
+
+T1 left these as implemented (Apple-equal): the two replace-click exclusions already call `shortcuts.isContextMenuClick` (item 6 only needs the `other` tests), and the Agenda word motion in `handleThinKey` already calls `shortcuts.isWordMotion`. T1 did not touch any other negative guard.
 
 Acceptance evidence:
 
@@ -371,10 +374,15 @@ Minor gaps settled under the section 2 delegation and approved by the owner on 2
 
 ## 9. Next Task
 
-Exact next task: **T1** (Ready). After T1, continue to T2 in the same session only if T1 raised no surprise and context stays manageable ([AGENT_WORKFLOW §12](../docs/AGENT_WORKFLOW.md#12-git)). Stop after T2 and ask the owner for Round A. Do not start T3 before the owner reports Round A or waives it.
+Exact next task: **T2** (Ready). T1 is committed. Stop after T2 and ask the owner for Round A. Do not start T3 before the owner reports Round A or waives it.
+
+Environment notes from T1:
+
+* `npm run check`, `npm run test:e2e` and `npm run test:web` ran outside the Claude Code sandbox. Inside it, `scripts/web-release/selection.test.mts` fails on `git init` templates.
+* A narrow mutation run needs `--ignorePatterns '.scratch,src/**/*.performance.test.ts'` as one value. Otherwise Stryker fails copying an older task's `.scratch/browser-feasibility` Chrome bundle.
 
 Prompt for the next session:
 
 ```text
-Continue the initiative in plans/ctrl-primary-modifier.md and run task T1 (status Ready). The plan records the owner's whole-initiative approval, decisions D1 to D7, the delegation, G1 to G8, the budget and the review roles; do not reopen them. Follow the plan's T1 files, steps, acceptance evidence and validation. Use WORKING_PLAN.md for the independent reviewer and delete it before the commit. Commit T1 with the plan's status and next-task update. After T2, stop and ask the owner for Round A; do not start T3 before the owner reports it.
+Continue the initiative in plans/ctrl-primary-modifier.md and run task T2 (status Ready). The plan records the owner's whole-initiative approval, decisions D1 to D7, the delegation, G1 to G8, the budget and the review roles; do not reopen them. Follow the plan's T2 files, steps, audit list (items 1 to 8), acceptance evidence and validation. Use WORKING_PLAN.md for the independent reviewer and delete it before the commit. Commit T2 with the plan's status and next-task update. After T2, stop and ask the owner for Round A; do not start T3 before the owner reports it.
 ```

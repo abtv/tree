@@ -29,6 +29,7 @@ import {
 } from './scroll-viewport'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { useAgendaDrag } from './use-agenda-drag'
+import type { ShortcutProfile } from './shortcut-profile'
 
 /** A direct match owns an editor when it is the active occurrence or has at most one date. */
 function isEditableOccurrence(
@@ -54,7 +55,9 @@ export function AgendaView({
   dragFreeze,
   locked = false,
   visualNodeSelection,
+  shortcuts,
 }: {
+  shortcuts?: ShortcutProfile
   store: EditorStore
   agenda: AgendaState
   document: Document
@@ -427,6 +430,7 @@ export function AgendaView({
           store,
           vim,
           rowText,
+          shortcuts,
           beforeSelect: (preserve) => {
             reveal.current = preserve ? 'none' : 'keyboard'
           },

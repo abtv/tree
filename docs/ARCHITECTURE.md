@@ -220,7 +220,7 @@ The important principle is that product behavior should be represented by explic
 
 ## 7. Application Layer
 
-`command-registry.ts` owns the application command panel's single registry: command names, aliases, descriptions, shortcut labels, state queries and run actions. Adding a command adds one entry; actions invoke the same existing services as application menus and toggles, including the quit handshake. Matching, ordering, history normalization and history updates are pure functions independent of React, DOM and Electron. Alphabetical registry order is prepared once; each input change scans registry entries and bounded history without document traversal.
+`command-registry.ts` owns the application command panel's single registry: command names, aliases, descriptions, shortcut data (a key and a Shift flag; the renderer formats the label), state queries and run actions. Adding a command adds one entry; actions invoke the same existing services as application menus and toggles, including the quit handshake. Matching, ordering, history normalization and history updates are pure functions independent of React, DOM and Electron. Alphabetical registry order is prepared once; each input change scans registry entries and bounded history without document traversal.
 
 The renderer command-panel owner captures the application shortcut before editor handlers. It saves and restores native selection while borrowing focus; the input bindings forward the blur destination so that this temporary handoff preserves editing sessions. Named view actions resolve sessions through the existing input owner before dispatching the store's idempotent Agenda open/close methods. They add no document mutation or separate view state.
 
@@ -264,6 +264,8 @@ Performance assessment for Agenda state (`docs/PRODUCT.md` §22.1): opening, sel
 ## 8. UI Layer
 
 `use-command-panel.ts` owns one transient command-panel session shared by Tree and Agenda. It captures Normal-mode `:` before editor dispatch, clears pending Vim assembly through its existing owner, and restores the previous DOM focus and selection on dismissal. `CommandPanel.tsx` presents the registry matches separately from inline completion. Its selection uses the shared `moveSuggestionIndex` wrapping rule from `completion-controller.ts`. The view overlays the document above the status bar, keeping document geometry unchanged. Platform commands cross the trusted preload API; the renderer never accesses preference files.
+
+`shortcut-profile.ts` is the renderer's single answer to "is this key event a primary-modifier shortcut". Two constant profiles, `apple` (Cmd) and `other` (Ctrl), also supply the bare-modifier key name, the left-modifier key code, the macOS-only context-menu click test, the word-motion modifier and shortcut labels. It has no React, DOM or Electron imports. `App` takes an optional `shortcutPlatform` prop (default `apple`, like `vimAvailable`), resolves the constant profile and passes it as an optional dependency, defaulting to `apple`, to the input bindings, the Agenda key handlers, the completion and command-panel hooks and the pointer handlers. The Electron entry point passes nothing. No module-level mutable state exists, and no key event allocates. Performance assessment (`docs/PRODUCT.md` §22.1): the change adds one constant-time predicate call per key event and no state, writes, syncs or retained memory, so no Electron performance run applies.
 
 React is responsible for presentation and user interaction.
 

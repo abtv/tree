@@ -13,6 +13,7 @@ import { pointerCaretTransition, type VimCaretState } from './vim-caret-transiti
 import { beginReplaceClick, beginReplaceSession, takeReplaceClick, type VimEditSessionState } from './vim-edit-session'
 import type { VimMode } from './vim-editing'
 import type { EditorServices } from '../application/editor-store-types'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 /** Keep a readonly occurrence mounted until its link click has been dispatched. */
 export function preventReadOnlyLinkFocus(event: MouseEvent<HTMLElement>): void {
@@ -42,6 +43,7 @@ interface PointerHandlerDeps {
   finishVimInsert: (input: HTMLElement, completed?: boolean) => void
   finishVimReplace: (input?: HTMLElement, retreat?: boolean, preserveSelection?: boolean) => boolean
   setSelectAllNodeId: (nodeId: string | undefined) => void
+  shortcuts?: ShortcutProfile | undefined
 }
 
 export function createPointerHandlers(
@@ -68,6 +70,7 @@ export function createPointerHandlers(
     finishVimInsert,
     finishVimReplace,
     setSelectAllNodeId,
+    shortcuts = APPLE_SHORTCUTS,
   } = deps
   return {
     onBlur: (event?: FocusEvent<HTMLElement>) => {
@@ -123,7 +126,7 @@ export function createPointerHandlers(
       const link = target instanceof Element ? target.closest('a[href]') : null
       if (link === null || !event.currentTarget.contains(link)) return
       event.preventDefault()
-      if (event.metaKey) window.open(link.getAttribute('href') ?? '', '_blank')
+      if (shortcuts.isPrimary(event)) window.open(link.getAttribute('href') ?? '', '_blank')
     },
     onCut: () => store.markNextTextEditStandalone(),
     onFocus: (event: FocusEvent<HTMLElement>) => {
@@ -168,7 +171,8 @@ export function createPointerHandlers(
       const foreignSession = session.replace !== undefined && session.replace.nodeId !== node.id
       if (!foreignSession) finishVimReplace(event.currentTarget, false, event.button === 2 || event.detail >= 2)
       takeReplaceClick(session)
-      if (getMode() === 'replace' && event.button === 0 && !event.ctrlKey) beginReplaceClick(session)
+      if (getMode() === 'replace' && event.button === 0 && !shortcuts.isContextMenuClick(event))
+        beginReplaceClick(session)
       clearCommandAssembly(commandState)
     },
     onMouseUp: (event: MouseEvent<HTMLElement>) => {

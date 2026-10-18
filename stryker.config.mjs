@@ -34,6 +34,7 @@ const config = {
     'src/renderer/agenda-drop-targets.ts',
     'src/renderer/completion-controller.ts',
     'src/renderer/completion-sources.ts',
+    'src/renderer/shortcut-profile.ts',
     '!src/**/*.test.ts',
     '!src/application/test/**',
   ],

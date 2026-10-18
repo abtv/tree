@@ -16,11 +16,17 @@ export interface CommandContext {
   view: 'tree' | 'agenda'
 }
 
+/** A keyboard shortcut as data: the primary modifier is implied; the renderer formats the label per platform. */
+export interface CommandShortcut {
+  key: string
+  shift?: boolean
+}
+
 export interface ApplicationCommand {
   name: string
   aliases: readonly string[]
   description: string
-  shortcut: string
+  shortcut?: CommandShortcut
   active(context: CommandContext): boolean
   run(services: CommandServices, context: CommandContext): Promise<void>
 }
@@ -30,7 +36,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: 'show-agenda',
     aliases: [],
     description: 'Show Agenda',
-    shortcut: '',
     active: (context) => context.view === 'agenda',
     run: (services) => services.showAgenda(),
   },
@@ -38,7 +43,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: 'show-tree',
     aliases: [],
     description: 'Show Tree',
-    shortcut: '',
     active: (context) => context.view === 'tree',
     run: (services) => services.showTree(),
   },
@@ -46,7 +50,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: 'quit',
     aliases: ['q'],
     description: 'Quit Tree',
-    shortcut: '⌘Q',
+    shortcut: { key: 'Q' },
     active: () => false,
     run: (services) => services.quit(),
   },
@@ -54,7 +58,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: 'toggle-always-on-top',
     aliases: [],
     description: 'Keep the window above other windows',
-    shortcut: '',
     active: (context) => context.alwaysOnTop,
     run: (services, context) => services.setAlwaysOnTop(!context.alwaysOnTop),
   },
@@ -62,7 +65,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: 'toggle-vim-mode',
     aliases: [],
     description: 'Use Vim editing',
-    shortcut: '',
     active: (context) => context.vimEnabled,
     run: (services, context) => services.setVimEnabled(!context.vimEnabled),
   },
@@ -76,7 +78,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: `set-theme-${name}`,
     aliases: [],
     description,
-    shortcut: '',
     active: (context) => context.appearance === value,
     run: (services) => services.setAppearance(value),
   })),

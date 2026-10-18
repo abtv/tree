@@ -13,6 +13,7 @@ import type { VimCommandState } from './vim-command-state'
 import { clearPending } from './vim-command-state'
 import { moveSuggestionIndex } from './completion-controller'
 import { getCaret } from './editor-dom'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function useCommandPanel(options: {
   store: EditorStore
@@ -24,9 +25,11 @@ export function useCommandPanel(options: {
   setAlwaysOnTop(value: boolean): void
   applyVimEnabled(value: boolean): Promise<void>
   beforeViewChange(): void
+  shortcuts?: ShortcutProfile
 }) {
   const { store, vimEnabled, vimMode, commandState, alwaysOnTop, setAlwaysOnTop, applyVimEnabled, beforeViewChange } =
     options
+  const shortcuts = options.shortcuts ?? APPLE_SHORTCUTS
   const [open, setOpen] = useState(false)
   const vimAvailable = options.vimAvailable ?? true
   const [input, setInput] = useState('')
@@ -158,7 +161,11 @@ export function useCommandPanel(options: {
       }
       const target = event.target
       const shortcut =
-        event.key.toLowerCase() === 'p' && event.shiftKey && event.metaKey && !event.ctrlKey && !event.altKey
+        event.key.toLowerCase() === 'p' &&
+        event.shiftKey &&
+        shortcuts.isPrimary(event) &&
+        !event.ctrlKey &&
+        !event.altKey
       const colon =
         event.key === ':' && !event.metaKey && !event.ctrlKey && !event.altKey && vimEnabled && vimMode === 'normal'
       if (
@@ -201,7 +208,7 @@ export function useCommandPanel(options: {
     }
     document.addEventListener('keydown', keydown, true)
     return () => document.removeEventListener('keydown', keydown, true)
-  }, [open, input, selected, matches, run, close, message, vimEnabled, vimMode, commandState, store])
+  }, [open, input, selected, matches, run, close, message, vimEnabled, vimMode, commandState, store, shortcuts])
 
   useEffect(() => {
     if (!open) return

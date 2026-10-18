@@ -13,6 +13,7 @@ import { requireNode } from '../domain/document'
 import { agendaRowLabel } from './agenda-labels'
 import { firstNonWhitespace } from './vim-editing'
 import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 /** The text and caret of the selected row when it has no editor, owned by the Agenda view. */
 export interface AgendaRowText {
@@ -29,6 +30,8 @@ interface Dependencies {
   vim?: VimTextCommandState | undefined
   beforeSelect?: ((preserveViewport: boolean) => void) | undefined
   rowText?: AgendaRowText | undefined
+  /** The platform's primary-modifier profile; Apple conventions when absent. */
+  shortcuts?: ShortcutProfile | undefined
 }
 
 /** Navigation over occurrence keys; Tree text and structural handlers never see these keys. */
@@ -37,6 +40,7 @@ export function createAgendaKeyDownHandler({
   vim,
   beforeSelect,
   rowText,
+  shortcuts = APPLE_SHORTCUTS,
 }: Dependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event) => {
     if (event.nativeEvent?.isComposing || ['Shift', 'Control', 'Meta', 'Alt'].includes(event.key)) return
@@ -172,8 +176,9 @@ export function createAgendaKeyDownHandler({
         caret: rowText.caret(),
         setCaret: rowText.setCaret,
         copy: rowText.copy,
+        shortcuts,
       })
-    if (event.metaKey) {
+    if (shortcuts.isPrimary(event)) {
       if (rowTextKey()) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)

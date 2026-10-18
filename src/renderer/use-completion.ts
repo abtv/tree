@@ -7,6 +7,7 @@ import { expressionPosition, getCaret, getSelectionRange, readEditableContent } 
 import type { NodeInputBindings } from './NodeInput'
 import type { CompletionPopupPresentation } from './CompletionPopup'
 import type { VimMode } from './vim-editing'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function useCompletion(
   store: EditorStore,
@@ -14,6 +15,7 @@ export function useCompletion(
   locked: boolean,
   scheduleCaret: (nodeId: string, cursor: number) => void,
   vimEnabled: boolean,
+  shortcuts: ShortcutProfile = APPLE_SHORTCUTS,
 ): {
   presentation: CompletionPopupPresentation | undefined
   accept: (index: number) => void
@@ -244,7 +246,7 @@ export function useCompletion(
         }
         if (
           event.key === 'Escape' ||
-          (event.metaKey && event.key !== 'Meta') ||
+          (shortcuts.isPrimary(event) && event.key !== shortcuts.bareModifierKey) ||
           event.key === 'Enter' ||
           event.key === 'Tab'
         )
@@ -252,7 +254,7 @@ export function useCompletion(
         bindings.onKeyDown(event)
       },
     }),
-    [edit, close, observe, accept, project, mode, locked],
+    [edit, close, observe, accept, project, mode, locked, shortcuts],
   )
   return { presentation, accept, decorate, reconcile: observe }
 }

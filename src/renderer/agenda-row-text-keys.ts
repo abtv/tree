@@ -5,15 +5,18 @@ import type { VimFindCommand } from './vim-keyboard-types'
 import { copyRange, clampCaret, selectionRange, type RowCaret, type RowCaretMode } from './agenda-row-caret'
 import { isTextMotion, parseCount, repeatedFindMotion, textMotion } from './vim-text-commands'
 import { moveCharacterOffset } from '../domain/text-characters'
+import { APPLE_SHORTCUTS, type ShortcutModifierEvent, type ShortcutProfile } from './shortcut-profile'
 
 export interface RowTextKeyContext {
-  event: { key: string; shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }
+  event: ShortcutModifierEvent & { key: string; shiftKey: boolean; altKey: boolean }
   vim: VimTextCommandState | undefined
   text: string
   caret: RowCaret
   setCaret: (caret: RowCaret) => void
   /** Writes plain text to the system clipboard. */
   copy: (text: string) => void
+  /** The platform's primary-modifier profile; Apple conventions when absent. */
+  shortcuts?: ShortcutProfile | undefined
 }
 
 export function rowCaretMode(vim: VimTextCommandState | undefined): RowCaretMode {
@@ -29,7 +32,7 @@ export function rowCaretMode(vim: VimTextCommandState | undefined): RowCaretMode
  * Returns whether the key was consumed; the caller prevents the default action either way.
  */
 export function handleRowTextKey(context: RowTextKeyContext): boolean {
-  const { event, vim, text, setCaret, copy } = context
+  const { event, vim, text, setCaret, copy, shortcuts = APPLE_SHORTCUTS } = context
   const mode = rowCaretMode(vim)
   if (mode === 'hidden' || event.ctrlKey) return false
   const length = text.length
@@ -49,7 +52,7 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
     )
   }
   const vimText = mode === 'normal' || mode === 'visual'
-  if (event.metaKey) {
+  if (shortcuts.isPrimary(event)) {
     if (event.altKey) return false
     const lower = key.toLowerCase()
     if (lower === 'c' && !event.shiftKey) {
@@ -158,7 +161,7 @@ function handleThinKey(
   caret: RowCaret,
   place: (anchor: number, focus: number) => void,
 ): boolean {
-  const { event, text } = context
+  const { event, text, shortcuts = APPLE_SHORTCUTS } = context
   const key = event.key
   const length = text.length
   const start = Math.min(caret.anchor, caret.focus)
@@ -170,7 +173,7 @@ function handleThinKey(
   }
   if (key !== 'ArrowLeft' && key !== 'ArrowRight') return false
   const left = key === 'ArrowLeft'
-  if (event.altKey) {
+  if (shortcuts.isWordMotion(event)) {
     extend(left ? moveWordBackward(text, caret.focus) : Math.min(length, moveWordEnd(text, caret.focus) + 1))
     return true
   }
