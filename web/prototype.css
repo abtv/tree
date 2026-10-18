@@ -33,6 +33,9 @@
 #tree-menu button:focus-visible {
   background: var(--color-location-border);
 }
+body:has(.image-preview-overlay) #tree-menu-button {
+  visibility: hidden;
+}
 #tree-menu-button:focus-visible,
 #tree-menu button:focus-visible {
   outline: 2px solid var(--color-text);

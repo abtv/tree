@@ -60,6 +60,10 @@ behavior remain as accepted. This checkpoint adds no synchronization, accounts,
 export/import or offline package. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
+While an image preview is open, the browser's ellipsis menu button is hidden.
+Closing the preview restores it. The preview close button stays 16 pixels from
+the top and right edges of the content area.
+
 On iPhones and iPads, the browser version always uses standard editing and hides
 the Vim menu option, command-panel entry and mode indicator, even with an external
 keyboard attached. Detection uses the iPhone/iPad browser identity, including

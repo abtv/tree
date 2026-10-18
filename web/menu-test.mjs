@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
+import { onePixelPng } from '../src/main/png-test-utils.ts'
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 try {
@@ -19,6 +20,34 @@ try {
     await open()
     await page.getByRole('dialog', { name: 'Tree menu' }).getByRole('button', { name, exact: true }).click()
     await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))
+  }
+  const checkPreviewMenu = async () => {
+    await page.evaluate(
+      async (bytes) => {
+        await window.treeApi.writeAttachment('preview-menu-image', new Uint8Array(bytes))
+        window.prototypeStore.pasteSubtree('welcome', 'after', {
+          id: 'preview-source',
+          text: 'Preview menu regression',
+          attachment: { id: 'preview-menu-image', mimeType: 'image/png' },
+          children: [],
+        })
+      },
+      [...onePixelPng],
+    )
+    for (const appearance of ['Light', 'Dark']) {
+      await choose(appearance)
+      await page.getByRole('button', { name: 'Open image preview' }).click()
+      const close = page.getByRole('button', { name: 'Close image preview' })
+      await close.waitFor()
+      assert.equal(await page.locator('#tree-menu-button').isVisible(), false, 'Preview must hide the Tree menu button')
+      const bounds = await close.boundingBox()
+      assert.equal(bounds.y, 16)
+      assert.equal(bounds.x + bounds.width, 1100 - 16)
+      await page.screenshot({ path: `.scratch/preview-menu/preview-${appearance.toLowerCase()}.png` })
+      await close.click()
+      assert.equal(await page.locator('#tree-menu-button').isVisible(), true, 'Closing preview must restore the menu')
+    }
+    await choose('Light')
   }
   await page.screenshot({ path: '.scratch/web-prototype/menu-closed-light.png' })
   await open()
@@ -63,6 +92,9 @@ try {
   const bounds = await page.getByRole('dialog', { name: 'Tree menu' }).boundingBox()
   assert(bounds.x >= 0 && bounds.x + bounds.width <= 390)
   await page.screenshot({ path: '.scratch/web-prototype/menu-narrow.png' })
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 1100, height: 760 })
+  await checkPreviewMenu()
   assert.deepEqual(errors, [])
   // Exercise the real adapter, saved preference, command panel and editor together.
   for (const [name, userAgent, platform, maxTouchPoints, width] of [
