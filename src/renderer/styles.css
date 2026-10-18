@@ -458,6 +458,16 @@ body:not(.node-drag-active) .location-link:hover {
   position: relative;
   --row-indent: 20px;
 }
+/* Retain the painted window while native scrolling waits for its range update. The inner offset
+   and rows change together; the compositor never scrolls the old window into an empty spacer. */
+.agenda-list-windowed {
+  overflow: clip;
+}
+.agenda-window-anchor {
+  position: sticky;
+  top: 0;
+  height: 0;
+}
 .agenda-row-day,
 .agenda-row-gap {
   display: flex;

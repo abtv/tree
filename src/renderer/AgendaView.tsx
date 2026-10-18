@@ -237,7 +237,7 @@ export function AgendaView({
   }, [layoutState, rows, revision, updateViewport])
   useEffect(() => {
     if (!windowed) return undefined
-    // A native scroll can paint before React's deferred commit, leaving only off-screen rows.
+    // Replace the anchored window in this event; it retains its previous paint until delivery.
     // Flush only this external event; layout-effect updates keep their existing commit ordering.
     const unsubscribe = onViewportScroll(() => flushSync(updateViewport))
     globalThis.addEventListener('resize', updateViewport)
@@ -347,6 +347,7 @@ export function AgendaView({
   // A changed row array needs compatible offsets immediately, before the measuring effect commits.
   const layout = layoutState.rows === rows ? layoutState.layout : buildLayout(rows, EMPTY_HEIGHTS)
   const range = agendaListWindow(rows, layout, viewport, agenda.selectedKey)
+  const windowOffset = range === undefined ? 0 : (layout.offsets[range.start] ?? 0)
   const renderRow = (index: number, pinned = false): React.JSX.Element => {
     const row = rows[index]!
     if (row.kind === 'day' && agenda.focusedDay !== undefined) {
@@ -354,7 +355,7 @@ export function AgendaView({
         <div
           key={row.key}
           className={`current-parent agenda-row agenda-focused-heading${pinned ? ' agenda-row-pinned' : ''}`}
-          style={pinned ? { top: layout.offsets[index] ?? 0 } : undefined}
+          style={pinned ? { top: (layout.offsets[index] ?? 0) - windowOffset } : undefined}
           data-agenda-key={row.key}
           role="row"
           aria-selected={row.key === agenda.selectedKey}
@@ -389,7 +390,7 @@ export function AgendaView({
         pinned={pinned}
         dragging={drag.sourceKey === row.key}
         dropTarget={drag.dropHeaderKey === row.key}
-        pinnedOffset={layout.offsets[index] ?? 0}
+        pinnedOffset={(layout.offsets[index] ?? 0) - windowOffset}
         marks={editable ? undefined : marksFor(row)}
         mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
         pendingSource={row.kind === 'node' && isPendingMoveSource(agenda, row.nodeId, row.day)}
@@ -402,28 +403,13 @@ export function AgendaView({
   const children: ReactNode[] = []
   if (range === undefined) rows.forEach((_, index) => children.push(renderRow(index)))
   else {
-    children.push(
-      <div
-        key="leading-spacer"
-        aria-hidden="true"
-        className="agenda-list-spacer"
-        style={{ height: layout.offsets[range.start] ?? 0 }}
-      />,
-    )
     for (let index = range.start; index < range.end; index += 1) children.push(renderRow(index))
     if (range.pinnedIndex !== undefined) children.push(renderRow(range.pinnedIndex, true))
-    children.push(
-      <div
-        key="trailing-spacer"
-        aria-hidden="true"
-        className="agenda-list-spacer"
-        style={{ height: layout.total - (layout.offsets[range.end] ?? 0) }}
-      />,
-    )
   }
   return (
     <div
-      className="agenda-list"
+      className={`agenda-list${range === undefined ? '' : ' agenda-list-windowed'}`}
+      style={range === undefined ? undefined : { height: layout.total }}
       ref={listRef}
       role="grid"
       aria-label={agenda.focusedDay === undefined ? 'Agenda timeline' : 'Focused Agenda day'}
@@ -447,7 +433,11 @@ export function AgendaView({
         })(event)
       }
     >
-      {children}
+      <div className={range === undefined ? undefined : 'agenda-window-anchor'}>
+        <div style={range === undefined ? undefined : { position: 'relative', top: windowOffset - viewport.start }}>
+          {children}
+        </div>
+      </div>
     </div>
   )
 }

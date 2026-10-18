@@ -79,7 +79,6 @@ it('bounds mounted rows, pins distant selection and preserves its DOM across a f
   harness.store.openAgenda()
   const { container } = render(<View store={harness.store} />)
   expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
-  expect(container.querySelectorAll('.agenda-list-spacer').length).toBe(2)
   const rows = harness.store.getAgendaRows()
   const distant = rows.find((row) => row.kind === 'node' && row.nodeId === 'n599')!
   act(() => harness.store.applyAgenda({ kind: 'select', key: distant.key }))
@@ -88,7 +87,7 @@ it('bounds mounted rows, pins distant selection and preserves its DOM across a f
   expect(element.classList.contains('agenda-row-pinned')).toBe(true)
   const day = rows.find((row) => row.kind === 'day' && row.content)!
   act(() => harness.store.applyAgenda({ kind: 'toggle-fold', key: day.key }))
-  expect(container.querySelectorAll('.agenda-list-spacer').length).toBe(0)
+  expect(container.querySelectorAll('.agenda-row').length).toBe(harness.store.getAgendaRows().length)
   expect(container.querySelector(`[data-agenda-key="${day.key}"]`)).toBe(document.activeElement)
   act(() => harness.store.applyAgenda({ kind: 'toggle-fold', key: day.key }))
   expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)

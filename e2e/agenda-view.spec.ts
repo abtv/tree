@@ -72,7 +72,9 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+p')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
     await expectFocused(selected)
-    await expect(window.locator('.agenda-list-spacer')).toHaveCount(2)
+    expect(
+      await window.locator('.scroll-viewport').evaluate((element) => element.scrollHeight > element.clientHeight * 10),
+    ).toBe(true)
     expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
     await window.keyboard.press('Escape')
     if (mode === 'vim') await window.keyboard.press('G')

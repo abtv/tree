@@ -33,14 +33,23 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
       const anchorOffset = selection?.anchorOffset
       const focusNode = selection?.focusNode
       const focusOffset = selection?.focusOffset
-      const samples: { visible: number; coverage: number; focused: boolean; caret: boolean; mounted: number }[] = []
-      for (const fraction of [0.5, 0.8, 0.15, 0.6]) {
+      const samples: {
+        visible: number
+        coverage: number
+        expectedCoverage: number
+        focused: boolean
+        caret: boolean
+        mounted: number
+      }[] = []
+      const pendingVisible: number[] = []
+      for (const fraction of [0.5, 0.8, 0.15, 0.6, 1, 0]) {
         await new Promise<void>((resolve) => {
           document.addEventListener(
             'scroll',
             (event) => {
               if (event.target !== viewport) return
               const bounds = viewport.getBoundingClientRect()
+              const listBounds = document.querySelector('.agenda-list')!.getBoundingClientRect()
               const rows = [...document.querySelectorAll<HTMLElement>('.agenda-row')]
               const visible = rows
                 .map((row) => row.getBoundingClientRect())
@@ -48,6 +57,7 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
               const selection = getSelection()
               samples.push({
                 visible: visible.length,
+                expectedCoverage: Math.min(bounds.bottom, listBounds.bottom) - Math.max(bounds.top, listBounds.top),
                 coverage:
                   visible.length === 0
                     ? 0
@@ -66,14 +76,24 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
             { capture: true, once: true },
           )
           viewport.scrollTop = (viewport.scrollHeight - viewport.clientHeight) * fraction
+          // The compositor may present this scroll offset before delivering the scroll event.
+          // Keep the last painted window present until its replacement can commit.
+          const bounds = viewport.getBoundingClientRect()
+          pendingVisible.push(
+            [...document.querySelectorAll<HTMLElement>('.agenda-row')].filter((row) => {
+              const rect = row.getBoundingClientRect()
+              return rect.bottom > bounds.top && rect.top < bounds.bottom
+            }).length,
+          )
         })
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       }
-      return { samples, height: viewport.clientHeight }
+      return { samples, pendingVisible }
     })
+    for (const visible of samples.pendingVisible) expect(visible).toBeGreaterThan(5)
     for (const sample of samples.samples) {
       expect(sample.visible).toBeGreaterThan(5)
-      expect(sample.coverage).toBeGreaterThan(samples.height - 60)
+      expect(sample.coverage).toBeGreaterThanOrEqual(sample.expectedCoverage - 1)
       expect(sample.focused).toBe(true)
       expect(sample.caret).toBe(true)
       expect(sample.mounted).toBeLessThan(100)

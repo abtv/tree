@@ -47,6 +47,46 @@ async function centerOf(window: Page, key: string): Promise<{ x: number; y: numb
 }
 
 describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => {
+  // @requirement PRODUCT.md §23.6
+  // @requirement PRODUCT.md §23.12
+  test('auto-scrolls a windowed timeline and resolves the drop under a stationary pointer', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 600 }, (_, index) =>
+          node(`dated-${index}`, `2026-10-${index < 60 ? '14' : '15'} Item ${index}`),
+        ),
+      },
+      location: { currentParentId: null, selectedNodeId: 'dated-0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    const source = row(window, nodeKey(10, 14, 'dated-0'))
+    await startRowDrag(window, source.locator('.node-input'))
+    await expect(source).toHaveClass(/agenda-row-dragging/)
+    const viewport = window.locator('.scroll-viewport')
+    const bounds = await viewport.boundingBox()
+    if (bounds === null) throw new Error('Agenda viewport was not rendered.')
+    const initialScroll = await viewport.evaluate((element) => element.scrollTop)
+    await window.mouse.move(bounds.x + 200, bounds.y + bounds.height - 8)
+    // The pointer stays still while native scrolling replaces the mounted row window.
+    await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(initialScroll + 600)
+    await expect(source).toHaveClass(/agenda-row-pinned/)
+    await expect(row(window, dayKey(10, 15))).toHaveClass(/agenda-row-drop-on/)
+    expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+    await window.mouse.up()
+
+    const moved = row(window, nodeKey(10, 15, 'dated-0'))
+    await expect(moved).toHaveAttribute('aria-selected', 'true')
+    await expect(moved.locator('.node-input')).toBeFocused()
+    await expect(moved.locator('.node-input')).toHaveText('2026-10-15 Item 0')
+    await expect(window.locator('.agenda-row-dragging, .agenda-row-drop-on')).toHaveCount(0)
+    await fireIdleSave(window)
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, idleSavePoll)
+      .toBe('2026-10-15 Item 0')
+  })
+
   // @requirement PRODUCT.md §23.12
   test('drags an inactive occurrence onto another day, changing only that date, and Undo restores it', async ({
     userDataDir,
