@@ -3,6 +3,55 @@ import { recordPerfResult } from '../results'
 import { startRowDrag } from '../../e2e/electron/fixtures'
 
 test.describe('Vim interactions at scale', () => {
+  // @requirement PRODUCT.md §22.2
+  test('repeated Normal navigation through wrapped text keeps paint latency low', async ({ userDataDir }) => {
+    const seed = wideSeed(1_000)
+    const children = (seed.document as { roots: { children: { text: string }[] }[] }).roots[0]!.children
+    children.forEach((node, index) => {
+      if (index % 4 === 2) node.text = 'A wrapped synthetic note for navigation. '.repeat(12)
+      if (index === 12) node.text = 'A tall synthetic note for navigation. '.repeat(100)
+    })
+    seedDocument(userDataDir, seed)
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeFocused()
+    await window.evaluate(() => {
+      const paints: number[] = []
+      ;(window as unknown as { repeatedNavigationPaints: number[] }).repeatedNavigationPaints = paints
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'j' && event.key !== 'k') return
+          const start = event.timeStamp
+          requestAnimationFrame(() => requestAnimationFrame(() => paints.push(performance.now() - start)))
+        },
+        true,
+      )
+    })
+    for (const key of ['j', 'k']) {
+      for (let step = 0; step < 140; step++) {
+        await window.keyboard.down(key)
+        await window.waitForTimeout(30)
+      }
+      await window.keyboard.up(key)
+    }
+    await window.waitForFunction(
+      () => (window as unknown as { repeatedNavigationPaints: number[] }).repeatedNavigationPaints.length === 280,
+    )
+    const paints = await window.evaluate(() =>
+      (window as unknown as { repeatedNavigationPaints: number[] }).repeatedNavigationPaints.sort((a, b) => a - b),
+    )
+    const p95 = paints[Math.floor(paints.length * 0.95)]!
+    const max = paints[paints.length - 1]!
+    recordPerfResult({
+      kind: 'state',
+      scenario: 'vim-repeated-wrapped-1000',
+      metrics: { paintP95Ms: round(p95), paintMaxMs: round(max) },
+    })
+    expect(p95).toBeLessThan(50)
+    expect(max).toBeLessThan(100)
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Root')
+  })
+
   test('character Visual selection responds through repeated motions', async ({ userDataDir }) => {
     const children = Array.from({ length: 1_000 }, (_, index) => ({
       id: `c${index}`,

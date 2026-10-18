@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createViewportReveal } from './viewport-reveal'
-import { notifyViewportLayout, revealInViewport } from './scroll-viewport'
+import { notifyViewportLayout, revealInViewport, revealRectInViewport } from './scroll-viewport'
+import { caretLineRect } from './editor-dom'
+
+vi.mock('./editor-dom', () => ({ caretLineRect: vi.fn(() => new DOMRect(0, 700, 400, 20)) }))
 
 vi.mock('./scroll-viewport', async (original) => ({
   ...(await original<typeof import('./scroll-viewport')>()),
   revealInViewport: vi.fn(),
+  revealRectInViewport: vi.fn(),
 }))
 
 let notify: () => void
@@ -56,6 +60,53 @@ function fixture() {
 }
 
 describe('viewport reveal lifecycle', () => {
+  it('retains a line destination until its input mounts, then remeasures it on layout', () => {
+    const { row, reveal } = fixture()
+    const input: { current?: HTMLElement } = {}
+    let current = true
+    reveal.beginLine(
+      () => input.current,
+      80,
+      () => current,
+    )
+    expect(reveal.hasLine()).toBe(true)
+    expect(revealRectInViewport).not.toHaveBeenCalled()
+    input.current = row
+    reveal.correct()
+    notifyViewportLayout()
+    expect(caretLineRect).toHaveBeenLastCalledWith(row, 80)
+    expect(revealRectInViewport).toHaveBeenCalledTimes(2)
+    expect(revealRectInViewport).toHaveBeenLastCalledWith(new DOMRect(0, 700, 400, 20), true)
+    expect(revealInViewport).not.toHaveBeenCalled()
+    current = false
+    expect(reveal.hasLine()).toBe(false)
+    notify()
+    expect(observed.size).toBe(0)
+    expect(revealRectInViewport).toHaveBeenCalledTimes(2)
+  })
+
+  it('replaces a line destination and relinquishes it on deliberate scrolling', () => {
+    const { row, reveal } = fixture()
+    reveal.beginLine(
+      () => row,
+      0,
+      () => true,
+    )
+    reveal.beginLine(
+      () => row,
+      40,
+      () => true,
+    )
+    expect(caretLineRect).toHaveBeenLastCalledWith(row, 40)
+    document.dispatchEvent(new Event('wheel'))
+    expect(reveal.hasLine()).toBe(false)
+    notifyViewportLayout()
+    expect(revealRectInViewport).toHaveBeenCalledTimes(2)
+    reveal.begin(row, true, () => true)
+    expect(reveal.hasLine()).toBe(false)
+    expect(revealInViewport).toHaveBeenCalledOnce()
+  })
+
   it('observes only destination, content and viewport and reapplies policy without moving focus', () => {
     const { row, content, viewport, reveal } = fixture()
     const active = document.activeElement

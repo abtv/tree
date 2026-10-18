@@ -56,6 +56,7 @@ async function fixture(selection?: NodeVisualSelection, text = 'hello', unavaila
     applyCaretState: vi.fn(),
     syncImageCaretToFocus: vi.fn(),
     moveVimViewport: vi.fn(),
+    revealVerticalCaret: vi.fn(),
     changeVimMode: vi.fn(),
     onPreviewAttachment: vi.fn(),
     schedulePendingCaret: vi.fn(),

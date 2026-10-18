@@ -112,6 +112,23 @@ export function visualTextGeometry(element: HTMLElement): {
   }
 }
 
+/** Current text-line bounds, including textarea wrapping, without changing the live selection. */
+export function caretLineRect(element: HTMLElement, cursor: number): DOMRect {
+  const bounds = element.getBoundingClientRect()
+  // Hidden or not-yet-laid-out inputs have no text line to reveal.
+  if (bounds.width === 0 && bounds.height === 0) return bounds
+  const style = getComputedStyle(element)
+  const height = Number.parseFloat(style.lineHeight) || bounds.height
+  const geometry = visualTextGeometry(element)
+  try {
+    const position = geometry.position(cursor)
+    const top = bounds.top + (nodeText(element).length === 0 ? Number.parseFloat(style.paddingTop) || 0 : position.top)
+    return new DOMRect(bounds.left, top - element.scrollTop, bounds.width, height)
+  } finally {
+    geometry.dispose()
+  }
+}
+
 /** Find a character on the adjacent visual line, or on the entry line of another node. */
 export function visualLineCursor(
   text: string,

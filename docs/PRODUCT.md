@@ -1536,6 +1536,8 @@ A difference between paths is allowed only where this document records it and it
 
 The content area is the scrolling region between the location toolbar and the status bar (§2.2, §20.2). When the selection or the caret moves to another node, the content scrolls so the destination is visible and the position it ends in does not depend on the key or direction that led there.
 
+In Tree, Normal `j`/`k` reveal the destination text line instead of the whole node, including when the caret stays in the same node. The context and minimum-distance rules below apply to that line. A wrapped node is revealed progressively as the caret approaches an edge; a node taller than the viewport does not keep its start visible at the expense of its caret. Counts and `J`/`K` apply this rule to the final destination. Image destinations and other commands retain their node-reveal rules.
+
 #### Context
 
 * After a keyboard command that reveals a node, the selected node lies at least one context away from the top and bottom edge of the content area, so a node that fits between those contexts never sits in the scroll-edge fades (§20.6) and the next `j` or `k` does not have to scroll first.
@@ -1551,7 +1553,8 @@ A destination more than half the height of the content area beyond its nearest e
 #### Document Edges
 
 * When a move in one direction would stop within two contexts of the start or end of the content, the content scrolls all the way to that edge.
-* Reaching the first node by walking with `k` or with `gg` reaches the document start, including when that node is taller than the area between the contexts. Reaching the last node by walking with `j` or with `G` reaches the document end when that node fits between the contexts; otherwise its visible start takes priority over reaching the end. These paths end at the same scroll position instead of leaving part of the document's own padding unscrolled.
+* Whole-node boundary navigation (`gg`/`G`) reaches the document start for the first node, including when it is taller than the area between the contexts. It reaches the document end for the last node when that node fits between the contexts; otherwise its visible start takes priority over reaching the end.
+* For Normal text-line navigation, reaching the first or last node is not itself an edge destination: the caret's line remains visible while traversing that node. Reaching its first or final text line uses the same directional document-edge snapping rule.
 * The content never scrolls against the direction of the move.
 * At the start or end of the content the selected node may lie closer to the edge than the context, because nothing can scroll further.
 

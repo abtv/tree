@@ -3,14 +3,17 @@ import {
   onViewportScroll,
   refreshViewportContext,
   revealInViewport,
+  revealRectInViewport,
   viewportContent,
   viewportScroller,
 } from './scroll-viewport'
+import { caretLineRect } from './editor-dom'
 
 interface RevealIntent {
-  element: Element
+  element: () => Element | undefined
   keepContext: boolean
   isCurrent: () => boolean
+  cursor?: number
 }
 
 /** One navigation's geometry projection; it never writes focus, caret, selection or document state. */
@@ -19,6 +22,7 @@ export function createViewportReveal() {
   let observer: ResizeObserver | undefined
   let expectedScroll = 0
   let expectedMax = 0
+  let observedElement: Element | undefined
 
   const metrics = () => {
     const viewport = viewportScroller()
@@ -30,26 +34,40 @@ export function createViewportReveal() {
   const cancel = (): void => {
     intent = undefined
     observer?.disconnect()
+    observedElement = undefined
   }
   const correct = (): void => {
     if (intent === undefined) return
-    if (!intent.element.isConnected || !intent.isCurrent()) return cancel()
-    revealInViewport(intent.element, intent.keepContext)
+    if (!intent.isCurrent()) return cancel()
+    const element = intent.element()
+    // A counted motion can end outside the mounted window. Retain its intent until React mounts it.
+    if (element === undefined) return
+    if (!element.isConnected) return cancel()
+    if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
+    else revealRectInViewport(caretLineRect(element as HTMLElement, intent.cursor), intent.keepContext)
     const { top, max } = metrics()
     expectedScroll = top
     expectedMax = max
-  }
-  const begin = (element: Element, keepContext: boolean, isCurrent: () => boolean): void => {
-    cancel()
-    intent = { element, keepContext, isCurrent }
-    correct()
-    if (typeof ResizeObserver === 'undefined') return
+    if (typeof ResizeObserver === 'undefined' || observedElement === element) return
     observer ??= new ResizeObserver(correct)
+    observer.disconnect()
+    observedElement = element
     // Three targets regardless of document size: destination, content and the fixed viewport.
     for (const target of new Set([element, viewportContent(), viewportScroller()])) {
       if (target !== undefined) observer.observe(target)
     }
   }
+  const begin = (element: Element, keepContext: boolean, isCurrent: () => boolean): void => {
+    cancel()
+    intent = { element: () => element, keepContext, isCurrent }
+    correct()
+  }
+  const beginLine = (element: () => HTMLElement | undefined, cursor: number, isCurrent: () => boolean): void => {
+    cancel()
+    intent = { element, cursor, keepContext: true, isCurrent }
+    correct()
+  }
+  const hasLine = (): boolean => intent?.cursor !== undefined && intent.isCurrent()
   const mount = (): (() => void) => {
     refreshViewportContext()
     const onScroll = (): void => {
@@ -83,5 +101,5 @@ export function createViewportReveal() {
       globalThis.removeEventListener('resize', onResize)
     }
   }
-  return { begin, correct, cancel, mount }
+  return { begin, beginLine, hasLine, correct, cancel, mount }
 }

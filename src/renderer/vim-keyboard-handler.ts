@@ -763,6 +763,7 @@ export function handleVimKey(
     } finally {
       for (const measured of geometries.values()) measured.dispose()
     }
+    vim.revealVerticalCaret()
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, node, input, motionCursor, node.text.length)
   } else if (visual && event.key === 'o') {

@@ -51,8 +51,13 @@ export function scrollViewportBy(deltaY: number): void {
  * the context on both sides: keyboard motion asks for it, a pointer press does not.
  */
 export function revealInViewport(element: Element, keepContext = false): void {
-  const { top, bottom } = viewportBounds()
   const rect = element.getBoundingClientRect()
+  revealRectInViewport(rect, keepContext)
+}
+
+/** Apply the same context policy to a measured text line instead of a whole row. */
+export function revealRectInViewport(rect: DOMRect, keepContext = false): void {
+  const { top, bottom } = viewportBounds()
   // An element that is not laid out has no position to reveal.
   if (rect.width === 0 && rect.height === 0) return
   const height = bottom - top

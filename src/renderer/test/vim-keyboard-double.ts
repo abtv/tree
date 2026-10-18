@@ -88,6 +88,7 @@ export function createVimKeyboardDouble(
     finishReplace: vi.fn(() => false),
     moveBoundary: vi.fn(),
     moveViewport: vi.fn(),
+    revealVerticalCaret: vi.fn(),
     syncImageCaretToFocus: vi.fn(),
     setMode: vi.fn((next: VimMode) => {
       vim.mode = next

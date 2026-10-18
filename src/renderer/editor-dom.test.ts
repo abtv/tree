@@ -19,9 +19,43 @@ import {
   visualLineCursor,
   visualTextGeometry,
   unmountedNodeGeometry,
+  caretLineRect,
 } from './editor-dom'
 
 describe('visual text geometry', () => {
+  it('measures the textarea caret line in viewport coordinates and disposes its mirror', () => {
+    const input = document.createElement('textarea')
+    input.value = 'wrapped text'
+    input.style.lineHeight = '20px'
+    input.scrollTop = 5
+    input.setSelectionRange(3, 4)
+    const range = document.createRange()
+    Object.assign(range, { getBoundingClientRect: () => new DOMRect(10, 40, 10, 20) })
+    const create = vi.spyOn(document, 'createRange').mockReturnValue(range)
+    const bounds = vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(new DOMRect(30, 100, 200, 80))
+    const children = document.body.childElementCount
+    try {
+      expect(caretLineRect(input, 3)).toEqual(new DOMRect(30, 135, 200, 20))
+      expect(getSelectionRange(input)).toEqual({ start: 3, end: 4 })
+      expect(document.body.childElementCount).toBe(children)
+    } finally {
+      create.mockRestore()
+      bounds.mockRestore()
+    }
+  })
+
+  it('uses the padded first line for an empty editor', () => {
+    const input = document.createElement('textarea')
+    input.style.lineHeight = '20px'
+    input.style.paddingTop = '4px'
+    const bounds = vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(new DOMRect(30, 100, 200, 28))
+    try {
+      expect(caretLineRect(input, 0)).toEqual(new DOMRect(30, 104, 200, 20))
+    } finally {
+      bounds.mockRestore()
+    }
+  })
+
   it('measures a textarea through a disposable mirror without changing its selection', () => {
     const input = document.createElement('textarea')
     input.value = 'before 👩‍💻 after'

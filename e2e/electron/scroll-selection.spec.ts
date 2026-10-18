@@ -78,6 +78,22 @@ async function launchDelayedImage(userDataDir: string) {
 }
 
 // @requirement PRODUCT.md §20.8
+test('entering an image keeps its delayed-load reveal active', async ({ userDataDir }) => {
+  const { window, release } = await launchDelayedImage(userDataDir)
+  await window.keyboard.press('G')
+  await window.keyboard.press('j')
+  await expect(window.locator('.node-input:focus')).toHaveClass(/node-input-image-caret/u)
+  await release()
+  await expect(window.getByAltText('Attached image')).toBeVisible()
+  await expect
+    .poll(async () => {
+      const state = await geometry(window)
+      return state.height > 100 && state.gap >= 25
+    })
+    .toBe(true)
+})
+
+// @requirement PRODUCT.md §20.8
 test('keeps the last windowed row visible after a delayed image loads', async ({ userDataDir }, info) => {
   const { window, release } = await launchDelayedImage(userDataDir)
   await window.keyboard.press('G')

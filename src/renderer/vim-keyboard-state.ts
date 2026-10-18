@@ -33,6 +33,7 @@ interface VimKeyboardStateDeps {
   applyCaretState: VimKeyboardState['applyCaretState']
   syncImageCaretToFocus: VimKeyboardState['syncImageCaretToFocus']
   moveVimViewport: VimKeyboardState['moveViewport']
+  revealVerticalCaret: VimKeyboardState['revealVerticalCaret']
   changeVimMode: VimKeyboardState['setMode']
   onPreviewAttachment: VimKeyboardState['openAttachment']
   schedulePendingCaret: (pending: Pick<PendingCaret, 'nodeId' | 'input' | 'cursor'>) => void
@@ -62,6 +63,7 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
     applyCaretState,
     syncImageCaretToFocus,
     moveVimViewport,
+    revealVerticalCaret,
     changeVimMode,
     onPreviewAttachment,
     schedulePendingCaret,
@@ -149,6 +151,7 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
       syncImageCaretToFocus()
     },
     moveViewport: moveVimViewport,
+    revealVerticalCaret,
     syncImageCaretToFocus,
     setMode: changeVimMode,
     openAttachment: onPreviewAttachment,

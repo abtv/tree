@@ -1,5 +1,6 @@
 // @editing-modes: vim
 import type { Page } from '@playwright/test'
+import { caretGeometry } from './caret-line-geometry'
 import {
   allowRendererError,
   clickApplicationMenuItem,
@@ -1637,8 +1638,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const start = await focusedRow()
     const rowsPerScreen = Math.floor((start.view[1]! - start.view[0]!) / start.height)
 
-    // Walking down never hides the focused row; the first scroll moves the content by about one row
-    // and leaves the row one row height above the bottom edge, instead of centering it.
+    // Walking down keeps the text line visible with one row of context, without centering it.
     let scrolledBy = 0
     for (let step = 0; step < rowsPerScreen + 2 && scrolledBy === 0; step += 1) {
       await window.keyboard.press('j')
@@ -1648,8 +1648,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       scrolledBy = state.scrollTop
       if (scrolledBy > 0) {
         expect(scrolledBy).toBeLessThanOrEqual(state.height * 3)
-        expect(state.bottom).toBeGreaterThanOrEqual(state.height * 0.9)
-        expect(state.bottom).toBeLessThanOrEqual(state.height * 1.1)
+        const caret = await caretGeometry(window)
+        expect(caret.bottom).toBeGreaterThanOrEqual(state.height * 0.9)
+        expect(caret.bottom).toBeLessThanOrEqual(state.height * 1.1)
       }
     }
     expect(scrolledBy).toBeGreaterThan(0)
@@ -1707,7 +1708,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
 
     // @requirement PRODUCT.md §20.8
-    test('keeps one row of context on every keyboard step through nested and wrapped nodes, in both directions', async ({
+    test('keeps one row of context around the caret line through nested and wrapped nodes, in both directions', async ({
       userDataDir,
     }) => {
       seedDocument(userDataDir, longNestedSeed())
@@ -1718,8 +1719,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           await window.keyboard.press(key)
           await expect
             .poll(async () => {
-              const { top, gap, scrollTop, max } = await selectedRowGeometry(window)
-              return (top >= 25 || scrollTop === 0) && (gap >= 25 || scrollTop >= max - 1)
+              const { top, bottom, scroll, max } = await caretGeometry(window)
+              return (top >= 25 || scroll === 0) && (bottom >= 25 || scroll >= max - 1)
             })
             .toBe(true)
         }
