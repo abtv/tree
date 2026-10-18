@@ -115,6 +115,43 @@ describe('editor command transition properties', () => {
     )
   })
 
+  it('keeps repeated empty creation before following siblings at the same level', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.string(), { minLength: 1, maxLength: 8 }),
+        fc.constantFrom('o', 'Enter'),
+        (texts, command) => {
+          const following = texts.map((text, index) => ({ id: `next-${index}`, text, children: [] }))
+          let document: Document = {
+            roots: [
+              { id: 'parent', text: 'Parent', children: [{ id: 'empty', text: '', children: [] }, ...following] },
+            ],
+          }
+          let selectedNodeId = 'empty'
+          for (let index = 0; index < 3; index++) {
+            const id = `created-${index}`
+            const location = { currentParentId: null, selectedNodeId }
+            const result =
+              command === 'o'
+                ? openBelowTransition(document, location, () => id)
+                : createSiblingOrFirstChildTransition(document, location, 0, () => id)
+            if (!('document' in result)) throw new Error('Expected creation.')
+            assertDocument(result.document)
+            expect(result.document.roots).toHaveLength(1)
+            const children = result.document.roots[0]!.children
+            expect(children[index]!.id).toBe(selectedNodeId)
+            expect(children[index + 1]).toEqual({ id, text: '', children: [] })
+            expect(children.slice(index + 2)).toEqual(following)
+            expect(result.focus).toEqual({ nodeId: id, cursor: 0 })
+            expect(result.location).toEqual({ ...location, selectedNodeId: id })
+            document = result.document
+            selectedNodeId = id
+          }
+        },
+      ),
+    )
+  })
+
   it('preserves every existing subtree while repeated empty creation ascends to the location boundary', () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { minLength: 1, maxLength: 10 }), fc.boolean(), (texts, focused) => {

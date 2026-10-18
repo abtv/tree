@@ -566,6 +566,36 @@ describe('editor command transitions', () => {
     expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
   })
 
+  it.each(['o', 'Enter'] as const)(
+    'keeps %s after an empty inline leaf at its level when a sibling follows',
+    (command) => {
+      const input: Document = {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            children: [
+              { id: 'empty', text: '', children: [] },
+              { id: 'next', text: 'Next', children: [{ id: 'descendant', text: 'Kept', children: [] }] },
+            ],
+          },
+        ],
+      }
+      const location = { currentParentId: null, selectedNodeId: 'empty' }
+      const result =
+        command === 'o'
+          ? openBelowTransition(input, location, () => 'new')
+          : createSiblingOrFirstChildTransition(input, location, 0, () => 'new')
+      if (!('document' in result)) throw new Error('Expected creation.')
+      expect(result.document.roots).toHaveLength(1)
+      expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['empty', 'new', 'next'])
+      expect(result.document.roots[0]!.children[0]).toBe(input.roots[0]!.children[0])
+      expect(result.document.roots[0]!.children[2]).toBe(input.roots[0]!.children[1])
+      expect(result.location).toEqual({ ...location, selectedNodeId: 'new' })
+      expect(result.focus).toEqual({ nodeId: 'new', cursor: 0 })
+    },
+  )
+
   it.each(['o', 'Enter'] as const)('creates outside an empty inline child with %s, preserving it', (command) => {
     const input: Document = {
       roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'empty', text: '', children: [] }] }],

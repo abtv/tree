@@ -143,6 +143,44 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
   })
 
   // @requirement PRODUCT.md §5.1
+  test('keeps Enter on an empty inline node before a following sibling at the same level', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Inbox',
+            children: [
+              { id: 'blank', text: '', children: [] },
+              { id: 'next', text: 'Next task', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'blank' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await node(window, 2).focus()
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Enter')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
+    await expect(node(window, 4)).toBeFocused()
+    await expect(node(window, 4)).toHaveJSProperty('selectionStart', 0)
+    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    const bounds = await Promise.all([2, 3, 4, 5].map((index) => node(window, index).boundingBox()))
+    expect(bounds.map((box) => box!.x)).toEqual(Array(4).fill(bounds[0]!.x))
+    await window.screenshot({ path: test.info().outputPath(`empty-before-sibling-${mode}.png`) })
+    await window.keyboard.press('Meta+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', 'Next task'])
+    await window.keyboard.press('Meta+Shift+z')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
+    await expect(node(window, 4)).toBeFocused()
+    await window.keyboard.type('New task')
+    await expect(node(window, 4)).toHaveValue('New task')
+  })
+
+  // @requirement PRODUCT.md §5.1
   test('creates one empty child then one empty node to the left with Enter', async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(false))
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
@@ -518,6 +556,44 @@ test.describe('inline node expansion (mode-independent)', () => {
 
 // @requirement PRODUCT.md §2.4
 test.describe('inline node expansion (Vim editing only)', () => {
+  // @requirement PRODUCT.md §20.2.10
+  // @requirement PRODUCT.md §20.2.19
+  test('keeps o and its dot replay before a following sibling at the empty node level', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Inbox',
+            children: [
+              { id: 'blank', text: '', children: [] },
+              { id: 'next', text: 'Next task', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'blank' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+    await window.getByRole('button', { name: 'Expand node 1' }).click()
+    await node(window, 2).focus()
+    await window.keyboard.press('o')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', 'Next task'])
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await window.screenshot({ path: test.info().outputPath('empty-before-sibling-o.png') })
+    await window.keyboard.type('Inserted')
+    await window.keyboard.press('Escape')
+    await node(window, 2).focus()
+    await window.keyboard.press('.')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', 'Inserted', 'Inserted', 'Next task'])
+    await expect(node(window, 3)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.keyboard.press('u')
+    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', 'Inserted', 'Next task'])
+  })
+
   // @requirement PRODUCT.md §20.2.10
   test('creates outside an empty inline child with o and stops at the focused boundary', async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(false))

@@ -130,7 +130,7 @@ export function openBelowTransition(
   }
 }
 
-/** Preserve an empty inline leaf and create after its parent, within the current location. */
+/** Preserve a last empty inline leaf and create after its parent, within the current location. */
 function createAfterEmptyParentTransition(
   document: Document,
   location: Location,
@@ -141,6 +141,7 @@ function createAfterEmptyParentTransition(
     selected.node.text !== '' ||
     selected.node.attachment !== undefined ||
     selected.node.children.length !== 0 ||
+    selected.index < selected.siblings.length - 1 ||
     selected.parent === null ||
     selected.parent.id === location.currentParentId ||
     selected.node.id === location.currentParentId
