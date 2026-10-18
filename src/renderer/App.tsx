@@ -34,11 +34,18 @@ interface AppProps {
   store: EditorStore
   /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
   initialVimEnabled: boolean
+  /** Platforms that do not offer Vim also omit its command-panel entry. */
+  vimAvailable?: boolean
   /** Enable native rich editing only in text-entry modes in the browser adapter. */
   deferRichEditing?: boolean
 }
 
-export function App({ store, initialVimEnabled, deferRichEditing = false }: AppProps): React.JSX.Element {
+export function App({
+  store,
+  initialVimEnabled,
+  vimAvailable = true,
+  deferRichEditing = false,
+}: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
@@ -126,6 +133,7 @@ export function App({ store, initialVimEnabled, deferRichEditing = false }: AppP
     [setVimEditing],
   )
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+    vimAvailable,
     store,
     vimEnabled,
     vimMode,

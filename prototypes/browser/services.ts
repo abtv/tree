@@ -7,6 +7,7 @@ import { SAVE_IDLE_MILLISECONDS } from '../../src/application/save-policy'
 import { extractClipboardLinks } from '../../src/infrastructure/main/clipboard'
 import { validateAttachmentBytes, MAX_ATTACHMENT_BYTES } from '../../src/main/ipc-security'
 import { applyAppearance } from './appearance'
+import { isIPhoneOrIPad } from './device'
 
 const status = (text: string) => {
   document.getElementById('prototype-save-status')!.textContent = text
@@ -18,6 +19,7 @@ const status = (text: string) => {
 export async function installBrowserPrototype(): Promise<{
   services: EditorServices
   clock: Clock
+  vimAvailable: boolean
   connect(store: EditorStore): void
 }> {
   if (window.top !== window.self) throw new Error('Open the prototype directly, outside a frame.')
@@ -106,7 +108,9 @@ export async function installBrowserPrototype(): Promise<{
             : 'Saved locally in this browser',
     )
   }
-  let vimEnabled = (await read<boolean>('preferences', 'vim')) ?? false
+  const vimAvailable = !isIPhoneOrIPad(navigator)
+  let vimEnabled = vimAvailable && ((await read<boolean>('preferences', 'vim')) ?? false)
+  document.getElementById('prototype-vim-controls')!.hidden = !vimAvailable
   const savedAppearance = await read<string>('preferences', 'appearance')
   let appearance: 'system' | 'light' | 'dark' =
     savedAppearance === 'light' || savedAppearance === 'dark' ? savedAppearance : 'system'
@@ -235,6 +239,7 @@ export async function installBrowserPrototype(): Promise<{
       return vimEnabled
     },
     async setVimEnabled(value) {
+      if (!vimAvailable) return
       await write('preferences', 'vim', value)
       vimEnabled = value
       updateVim()
@@ -304,6 +309,7 @@ export async function installBrowserPrototype(): Promise<{
     document.addEventListener(event, () => queueMicrotask(updateStatus))
   }
   return {
+    vimAvailable,
     services,
     // Use the existing save scheduler without calling its shutdown edit finishers on
     // each autosave. Other editor timers keep their normal delays.

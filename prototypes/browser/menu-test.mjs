@@ -64,6 +64,88 @@ try {
   assert(bounds.x >= 0 && bounds.x + bounds.width <= 390)
   await page.screenshot({ path: '.scratch/web-prototype/menu-narrow.png' })
   assert.deepEqual(errors, [])
+  // Exercise the real adapter, saved preference, command panel and editor together.
+  for (const [name, userAgent, platform, maxTouchPoints, width] of [
+    ['iphone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'iPhone', 5, 390],
+    ['ipad-mobile', 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', 'iPad', 5, 820],
+    ['ipad-desktop', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 'MacIntel', 5, 820],
+  ]) {
+    const mobile = await browser.newContext({ userAgent, viewport: { width, height: 760 }, hasTouch: true })
+    await mobile.addInitScript(
+      ({ platform, maxTouchPoints }) => {
+        Object.defineProperty(navigator, 'platform', { get: () => platform })
+        Object.defineProperty(navigator, 'maxTouchPoints', { get: () => maxTouchPoints })
+      },
+      { platform, maxTouchPoints },
+    )
+    const device = await mobile.newPage()
+    const deviceErrors = []
+    device.on('pageerror', (error) => deviceErrors.push(error.message))
+    await device.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
+    await device.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+    await device.evaluate(async () => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('tree-browser-prototype', 1)
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('preferences', 'readwrite')
+        tx.objectStore('preferences').put(true, 'vim')
+        tx.oncomplete = resolve
+        tx.onabort = () => reject(tx.error)
+      })
+      db.close()
+    })
+    await device.reload()
+    await device.locator('.tree-app').waitFor()
+    assert.equal(await device.evaluate(() => window.treeApi.getVimEnabled()), false)
+    await device.evaluate(() => window.treeApi.setVimEnabled(true))
+    assert.equal(await device.evaluate(() => window.treeApi.getVimEnabled()), false)
+    assert.equal(await device.locator('.vim-mode').count(), 0)
+    await device.getByRole('button', { name: 'Tree menu', exact: true }).click()
+    assert.equal(await device.getByRole('button', { name: 'Vim Editing', exact: true }).count(), 0)
+    await device.screenshot({ path: `.scratch/web-prototype/${name}-standard-menu.png` })
+    await device.keyboard.press('Escape')
+    const editor = device.locator('[data-node-id="welcome"] .node-input')
+    await editor.fill('Standard editing on this device')
+    await editor.press('Escape')
+    await editor.press('End')
+    await device.keyboard.type(' works')
+    assert.equal(await editor.inputValue(), 'Standard editing on this device works')
+    await device.keyboard.press('Meta+Shift+p')
+    await device.locator('.command-panel').waitFor()
+    assert.equal(await device.locator('.command-panel').getByText('toggle-vim-mode', { exact: true }).count(), 0)
+    await device.keyboard.type('toggle-vim-mode')
+    assert.equal(await device.locator('.command-panel [role="option"]').count(), 0)
+    await device.keyboard.press('Escape')
+    await device.waitForFunction(
+      () => document.getElementById('prototype-save-status').textContent === 'Saved locally in this browser',
+    )
+    await device.reload()
+    await device.locator('.tree-app').waitFor()
+    assert.equal(await editor.inputValue(), 'Standard editing on this device works')
+    assert.equal(await device.locator('.vim-mode').count(), 0)
+    // A platform override must not erase an existing preference.
+    assert.equal(
+      await device.evaluate(async () => {
+        const request = indexedDB.open('tree-browser-prototype', 1)
+        const db = await new Promise((resolve) => {
+          request.onsuccess = () => resolve(request.result)
+        })
+        const tx = db.transaction('preferences')
+        const value = tx.objectStore('preferences').get('vim')
+        await new Promise((resolve) => {
+          tx.oncomplete = resolve
+        })
+        db.close()
+        return value.result
+      }),
+      true,
+    )
+    assert.deepEqual(deviceErrors, [])
+    await mobile.close()
+  }
   console.log(
     JSON.stringify({
       mouseMenu: true,

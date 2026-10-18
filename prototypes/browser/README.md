@@ -62,6 +62,8 @@ Another browser, profile, hostname or port has separate storage.
 
 The ellipsis button opens Tree, Agenda, Vim Editing and appearance controls.
 The menu also shows local save status. Only one tab may edit at a time.
+On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
+see [the browser requirements](../../docs/PRODUCT.md#14-browser-static-hosting-checkpoint).
 
 Committed edits autosave after a short idle interval. Pending Vim Replace text
 remains marked unsaved until committed. Closing with pending work warns and

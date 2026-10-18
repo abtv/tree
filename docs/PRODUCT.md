@@ -60,6 +60,12 @@ behavior remain as accepted. This checkpoint adds no synchronization, accounts,
 export/import or offline package. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
+On iPhones and iPads, the browser version always uses standard editing and hides
+the Vim menu option, command-panel entry and mode indicator, even with an external
+keyboard attached. Detection uses the iPhone/iPad browser identity, including
+iPadOS's Mac identity with multiple touch points. A saved Vim preference is ignored
+on these devices without overwriting it. Other platforms retain existing behavior.
+
 In the browser, rich text fields enable native editing in standard editing and
 Vim Insert/Replace modes. Normal and Visual modes keep the same focusable field
 without native editing, avoiding browser editing work during navigation. Mode
