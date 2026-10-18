@@ -1452,6 +1452,8 @@ Text is drawn character by character: the typeface's ligatures and contextual al
 
 The application does not animate its own interface. Navigation, entering and leaving a node, expanding and collapsing a node inline, creating and deleting nodes, reordering, selection, Vim mode changes, and error states all apply immediately: no transition, easing, or fade stands between the user's action and its visible result.
 
+The browser version suppresses the browser's fading tap highlight on editor and menu controls, including node dots on iPhone and iPad. Existing control feedback applies immediately.
+
 This deepens the Responsiveness commitment in §1.1: even a smooth, well-performing animation still spends a fixed delay before the user can act on its result, and that delay cannot be removed by animation quality alone.
 
 This does not govern motion the application does not itself decide to add: native macOS window chrome, and scrolling driven directly by continuous user input, such as the page's own scroll position or the drag auto-scroll in §11 and §20.1, whose motion is the direct feedback of an ongoing input rather than a transition inserted after an action completes. It likewise does not govern appearance that follows the scroll position directly and has no duration of its own, such as the scroll-edge fades in §20.6.

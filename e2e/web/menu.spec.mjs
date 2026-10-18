@@ -114,6 +114,14 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     device.on('pageerror', (error) => deviceErrors.push(error.message))
     await device.goto(baseURL)
     await device.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+    // @requirement PRODUCT.md §20.4
+    const enter = device.locator('[data-node-id="welcome"] .node-enter-control')
+    expect(await enter.evaluate((element) => getComputedStyle(element).webkitTapHighlightColor)).toBe(
+      'rgba(0, 0, 0, 0)',
+    )
+    await enter.tap()
+    await expect(device.locator('[data-node-id="welcome"] .node-enter-control')).toHaveCount(0)
+    await device.getByRole('button', { name: 'Top level', exact: true }).tap()
     await device.evaluate(async () => {
       const db = await new Promise((resolve, reject) => {
         const request = indexedDB.open('tree-browser-prototype', 1)

@@ -1,3 +1,10 @@
+.tree-app,
+#tree-menu-button,
+#tree-menu {
+  /* Suppress the browser's fading tap overlay; controls already provide their own feedback. */
+  -webkit-tap-highlight-color: transparent;
+}
+
 .tree-app {
   height: 100vh;
   --title-bar-height: 0px;
