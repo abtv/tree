@@ -1,20 +1,19 @@
-import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
-import { onePixelPng } from '../src/main/png-test-utils.ts'
+// @editing-modes: independent
+import { test, expect, capture } from './fixtures.mjs'
+import { onePixelPng } from '../../src/main/png-test-utils.ts'
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true })
-try {
-  const context = await browser.newContext({ viewport: { width: 1100, height: 760 }, colorScheme: 'light' })
+test('uses the menu, previews and mobile editing policy', async ({ newContext, baseURL }) => {
+  const context = await newContext({ viewport: { width: 1100, height: 760 }, colorScheme: 'light' })
   const page = await context.newPage()
   page.setDefaultTimeout(6000)
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
+  await page.goto(baseURL)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
-  assert.equal(await page.title(), 'Tree')
-  assert.equal(await page.locator('#prototype-toolbar').count(), 0)
-  assert.equal(await page.evaluate(() => document.querySelector('.tree-app').getBoundingClientRect().height), 760)
-  assert.equal(await page.evaluate(() => window.treeApi.getVimEnabled()), false)
+  expect(await page.title()).toBe('Tree')
+  expect(await page.locator('#prototype-toolbar').count()).toBe(0)
+  expect(await page.evaluate(() => document.querySelector('.tree-app').getBoundingClientRect().height)).toBe(760)
+  expect(await page.evaluate(() => window.treeApi.getVimEnabled())).toBe(false)
   const open = () => page.getByRole('button', { name: 'Tree menu', exact: true }).click()
   const choose = async (name) => {
     await open()
@@ -39,20 +38,20 @@ try {
       await page.getByRole('button', { name: 'Open image preview' }).click()
       const close = page.getByRole('button', { name: 'Close image preview' })
       await close.waitFor()
-      assert.equal(await page.locator('#tree-menu-button').isVisible(), false, 'Preview must hide the Tree menu button')
+      expect(await page.locator('#tree-menu-button').isVisible(), 'Preview must hide the Tree menu button').toBe(false)
       const bounds = await close.boundingBox()
-      assert.equal(bounds.y, 16)
-      assert.equal(bounds.x + bounds.width, 1100 - 16)
-      await page.screenshot({ path: `.scratch/preview-menu/preview-${appearance.toLowerCase()}.png` })
+      expect(bounds.y).toBe(16)
+      expect(bounds.x + bounds.width).toBe(1100 - 16)
+      await capture(page, `preview-${appearance.toLowerCase()}.png`)
       await close.click()
-      assert.equal(await page.locator('#tree-menu-button').isVisible(), true, 'Closing preview must restore the menu')
+      expect(await page.locator('#tree-menu-button').isVisible(), 'Closing preview must restore the menu').toBe(true)
     }
     await choose('Light')
   }
-  await page.screenshot({ path: '.scratch/web-prototype/menu-closed-light.png' })
+  await capture(page, 'menu-closed-light.png')
   await open()
   await page.getByRole('dialog', { name: 'Tree menu' }).waitFor()
-  await page.screenshot({ path: '.scratch/web-prototype/menu-open-light.png' })
+  await capture(page, 'menu-open-light.png')
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))
   await choose('Agenda')
@@ -64,8 +63,8 @@ try {
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#3f3f3f',
   )
   await open()
-  assert.equal(await page.getByRole('button', { name: 'Dark', exact: true }).getAttribute('aria-pressed'), 'true')
-  await page.screenshot({ path: '.scratch/web-prototype/menu-open-dark.png' })
+  expect(await page.getByRole('button', { name: 'Dark', exact: true }).getAttribute('aria-pressed')).toBe('true')
+  await capture(page, 'menu-open-dark.png')
   await page.mouse.click(400, 400)
   await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))
   await choose('Vim Editing')
@@ -82,27 +81,27 @@ try {
   )
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
-  assert.equal(await page.locator('[data-node-id="welcome"] .node-input').inputValue(), 'Editing after using the menu')
+  expect(await page.locator('[data-node-id="welcome"] .node-input').inputValue()).toBe('Editing after using the menu')
   const blocked = await context.newPage()
-  await blocked.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
+  await blocked.goto(baseURL)
   await blocked.getByRole('alert').filter({ hasText: 'already open' }).waitFor()
   await blocked.close()
   await page.setViewportSize({ width: 390, height: 760 })
   await open()
   const bounds = await page.getByRole('dialog', { name: 'Tree menu' }).boundingBox()
-  assert(bounds.x >= 0 && bounds.x + bounds.width <= 390)
-  await page.screenshot({ path: '.scratch/web-prototype/menu-narrow.png' })
+  expect(bounds.x >= 0 && bounds.x + bounds.width <= 390).toBeTruthy()
+  await capture(page, 'menu-narrow.png')
   await page.keyboard.press('Escape')
   await page.setViewportSize({ width: 1100, height: 760 })
   await checkPreviewMenu()
-  assert.deepEqual(errors, [])
+  expect(errors).toEqual([])
   // Exercise the real adapter, saved preference, command panel and editor together.
   for (const [name, userAgent, platform, maxTouchPoints, width] of [
     ['iphone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'iPhone', 5, 390],
     ['ipad-mobile', 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', 'iPad', 5, 820],
     ['ipad-desktop', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 'MacIntel', 5, 820],
   ]) {
-    const mobile = await browser.newContext({ userAgent, viewport: { width, height: 760 }, hasTouch: true })
+    const mobile = await newContext({ userAgent, viewport: { width, height: 760 }, hasTouch: true })
     await mobile.addInitScript(
       ({ platform, maxTouchPoints }) => {
         Object.defineProperty(navigator, 'platform', { get: () => platform })
@@ -113,7 +112,7 @@ try {
     const device = await mobile.newPage()
     const deviceErrors = []
     device.on('pageerror', (error) => deviceErrors.push(error.message))
-    await device.goto(process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
+    await device.goto(baseURL)
     await device.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
     await device.evaluate(async () => {
       const db = await new Promise((resolve, reject) => {
@@ -131,35 +130,35 @@ try {
     })
     await device.reload()
     await device.locator('.tree-app').waitFor()
-    assert.equal(await device.evaluate(() => window.treeApi.getVimEnabled()), false)
+    expect(await device.evaluate(() => window.treeApi.getVimEnabled())).toBe(false)
     await device.evaluate(() => window.treeApi.setVimEnabled(true))
-    assert.equal(await device.evaluate(() => window.treeApi.getVimEnabled()), false)
-    assert.equal(await device.locator('.vim-mode').count(), 0)
+    expect(await device.evaluate(() => window.treeApi.getVimEnabled())).toBe(false)
+    expect(await device.locator('.vim-mode').count()).toBe(0)
     await device.getByRole('button', { name: 'Tree menu', exact: true }).click()
-    assert.equal(await device.getByRole('button', { name: 'Vim Editing', exact: true }).count(), 0)
-    await device.screenshot({ path: `.scratch/web-prototype/${name}-standard-menu.png` })
+    expect(await device.getByRole('button', { name: 'Vim Editing', exact: true }).count()).toBe(0)
+    await capture(device, `${name}-standard-menu.png`)
     await device.keyboard.press('Escape')
     const editor = device.locator('[data-node-id="welcome"] .node-input')
     await editor.fill('Standard editing on this device')
     await editor.press('Escape')
     await editor.press('End')
     await device.keyboard.type(' works')
-    assert.equal(await editor.inputValue(), 'Standard editing on this device works')
+    expect(await editor.inputValue()).toBe('Standard editing on this device works')
     await device.keyboard.press('Meta+Shift+p')
     await device.locator('.command-panel').waitFor()
-    assert.equal(await device.locator('.command-panel').getByText('toggle-vim-mode', { exact: true }).count(), 0)
+    expect(await device.locator('.command-panel').getByText('toggle-vim-mode', { exact: true }).count()).toBe(0)
     await device.keyboard.type('toggle-vim-mode')
-    assert.equal(await device.locator('.command-panel [role="option"]').count(), 0)
+    expect(await device.locator('.command-panel [role="option"]').count()).toBe(0)
     await device.keyboard.press('Escape')
     await device.waitForFunction(
       () => document.getElementById('prototype-save-status').textContent === 'Saved locally in this browser',
     )
     await device.reload()
     await device.locator('.tree-app').waitFor()
-    assert.equal(await editor.inputValue(), 'Standard editing on this device works')
-    assert.equal(await device.locator('.vim-mode').count(), 0)
+    expect(await editor.inputValue()).toBe('Standard editing on this device works')
+    expect(await device.locator('.vim-mode').count()).toBe(0)
     // A platform override must not erase an existing preference.
-    assert.equal(
+    expect(
       await device.evaluate(async () => {
         const request = indexedDB.open('tree-browser-prototype', 1)
         const db = await new Promise((resolve) => {
@@ -173,26 +172,8 @@ try {
         db.close()
         return value.result
       }),
-      true,
-    )
-    assert.deepEqual(deviceErrors, [])
+    ).toBe(true)
+    expect(deviceErrors).toEqual([])
     await mobile.close()
   }
-  console.log(
-    JSON.stringify({
-      mouseMenu: true,
-      nonVim: true,
-      agendaAndTree: true,
-      vimToggle: true,
-      appearance: true,
-      escapeAndOutsideDismiss: true,
-      editAndReload: true,
-      blockedTabErrorVisible: true,
-      narrowViewport: true,
-      errors,
-      status: 'passed',
-    }),
-  )
-} finally {
-  await browser.close()
-}
+})

@@ -13,6 +13,7 @@ const vimSpecFile = /vim-(?:image-caret|text-editing|navigation-and-visual)\.spe
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['web/**'],
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: hiddenParallelRun ? (process.env['CI'] ? 4 : 6) : 1,
@@ -24,7 +25,7 @@ export default defineConfig({
   projects: [
     {
       // Every other spec keeps the default per-file snapshot directory.
-      testIgnore: [vimSpecFile, /shared-application-memory\.spec\.ts$/],
+      testIgnore: ['web/**', vimSpecFile, /shared-application-memory\.spec\.ts$/],
     },
     {
       name: 'vim',

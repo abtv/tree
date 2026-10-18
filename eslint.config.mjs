@@ -22,7 +22,17 @@ const platformImportRestrictions = {
 
 export default tseslint.config(
   {
-    ignores: ['coverage/**', 'node_modules/**', 'out/**', 'reports/**', '.stryker-tmp/**', '.scratch/**'],
+    ignores: [
+      'coverage/**',
+      'node_modules/**',
+      'out/**',
+      'reports/**',
+      'test-results/**',
+      'playwright-report/**',
+      'blob-report/**',
+      '.stryker-tmp/**',
+      '.scratch/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -31,11 +41,11 @@ export default tseslint.config(
       'electron.vite.config.ts',
       'eslint.config.mjs',
       'vitest.config.ts',
-      'playwright.config.ts',
+      'playwright*.config.ts',
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts}',
       'web/**/*.mjs',
-      'e2e/**/*.{ts,cjs}',
+      'e2e/**/*.{ts,cjs,mjs}',
       'perf/**/*.ts',
       'src/main/**/*.ts',
       'src/preload/**/*.ts',
@@ -47,6 +57,12 @@ export default tseslint.config(
   },
   {
     files: ['web/**/*.{ts,tsx,mjs}'],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+  {
+    files: ['e2e/web/**/*.mjs'],
     languageOptions: {
       globals: globals.browser,
     },

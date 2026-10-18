@@ -84,11 +84,18 @@ remains unverified; native Safari clipboard interaction still needs verification
 
 ## Browser checks
 
-For `test:web`, run the development server first. Checks use isolated Chrome
-contexts or fresh disk profiles
-under `.scratch/web-prototype/`; they do not use the ordinary browser profile.
-Google Chrome must be installed. In Codex, browser launch uses the normal
-outside-sandbox approval mechanism.
+Chrome E2E specs live in `e2e/web/` and use Playwright Test through
+`playwright.web.config.ts`. Electron uses the separate `playwright.config.ts`.
+Both targets use Playwright assertions, fixtures, traces and reports. Google
+Chrome must be installed; no downloaded Playwright browser is required.
+The suite requires headless mode so its clipboard checks use Chrome's virtual
+clipboard rather than the machine clipboard.
+In Codex, browser launch uses the normal outside-sandbox approval mechanism.
+
+`test:web` starts and stops the local development server automatically, or reuses
+an existing server at the documented development URL outside CI. Tests use
+isolated contexts and fixture-owned synthetic profiles, never the ordinary
+browser profile. Persistent profiles are removed after their contexts close.
 
 The tracked Codex rules in `.codex/rules/tests.rules` allow `npm run test:web:built`,
 `npm run test:web` (including check selection), `npm run dev:web`, and
@@ -109,10 +116,20 @@ npm run test:web -- compatibility
 npm run test:web:built
 ```
 
-`test:web:built` builds the static package, starts an ephemeral loopback file server,
-runs the editor, theme, menu, storage, quit and compatibility checks against those
-files in isolated Chrome, and closes the server. It does not open the ordinary
-browser profile.
+`test:web:built` builds the static package through its npm pre-hook, starts the
+loopback preview server, runs the same specs plus static-package assertions, and
+closes the server. A pre-existing preview server is not reused. Local builds and
+tests do not publish. `TREE_WEB_URL` can select an externally managed server;
+when set, Playwright does not start or stop that server.
+
+Arguments after `--` are standard Playwright Test arguments. A name such as
+`menu` selects matching spec paths; `--grep` selects test titles and `--list`
+previews selection. Omitting a selection runs the complete Chrome suite.
+The static-package test is skipped against the development server.
+
+Screenshots, failure traces and test artifacts are written to `test-results/web/`.
+The HTML report is `playwright-report/web/`; view it with
+`npx playwright show-report playwright-report/web`. CI retains failure artifacts.
 
 The compatibility check covers multiline sizing, decorated text editing and undo,
 save/reload, and the image-copy activation contract with missing-data and
@@ -120,9 +137,9 @@ permission failures. It also checks PNG copying through headless Chrome's virtua
 clipboard. It does not access the machine clipboard or establish native Safari
 clipboard behavior.
 
-The storage check covers full browser restart, writer handover, aborted writes,
+The storage spec covers full browser restart, writer handover, aborted writes,
 retries, dirty-close warnings, buffered editing, Insert undo grouping and invalid
-stored data. Screenshots and synthetic browser profiles remain ignored scratch
+stored data. Generated reports and synthetic profiles remain ignored runner
 artifacts. The server binds only to the local loopback address.
 
 ### Local Safari performance comparisons

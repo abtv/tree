@@ -84,12 +84,16 @@ describe('repository discovery', () => {
     }
     write('e2e/ok.spec.ts', '// @editing-modes: independent\n')
     write('e2e/nested/bad.spec.ts', 'export {}\n')
+    write('e2e/web/browser.spec.mjs', 'export {}\n')
     write('e2e/_diagnostic.spec.ts', 'export {}\n')
     write('e2e/fixtures.ts', 'export {}\n')
     write('e2e/notes.spec.txt', 'export {}\n')
     expect(runChecks({ rootDirectory: root })).toEqual({
-      issues: ['e2e/nested/bad.spec.ts: the first line must be "// @editing-modes: <category>"'],
-      specCount: 2,
+      issues: [
+        'e2e/nested/bad.spec.ts: the first line must be "// @editing-modes: <category>"',
+        'e2e/web/browser.spec.mjs: the first line must be "// @editing-modes: <category>"',
+      ],
+      specCount: 3,
     })
   })
 })

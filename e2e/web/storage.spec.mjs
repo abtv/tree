@@ -1,16 +1,6 @@
-import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
-import { resolve } from 'node:path'
+// @editing-modes: independent
+import { test, expect, capture } from './fixtures.mjs'
 
-const url = process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/'
-const profile = resolve(`.scratch/web-prototype/storage-profile-${Date.now()}`)
-const launch = () =>
-  chromium.launchPersistentContext(profile, {
-    channel: 'chrome',
-    headless: true,
-    viewport: { width: 1100, height: 760 },
-  })
-let context
 const ready = (page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
 const saved = (page) =>
   page.waitForFunction(
@@ -35,11 +25,14 @@ const readHead = (page) =>
       db.close()
     }
   })
-try {
-  context = await launch()
+test('preserves browser storage through restart and failure recovery', async ({
+  persistentContext: launch,
+  baseURL,
+}) => {
+  let context = await launch()
   let page = context.pages()[0]
   page.setDefaultTimeout(6000)
-  await page.goto(url)
+  await page.goto(baseURL)
   await ready(page)
   await input(page).fill('Saved across a complete Chrome restart')
   await saved(page)
@@ -47,21 +40,19 @@ try {
   context = await launch()
   page = context.pages()[0]
   page.setDefaultTimeout(6000)
-  await page.goto(url)
+  await page.goto(baseURL)
   await ready(page)
-  assert.equal(await input(page).inputValue(), 'Saved across a complete Chrome restart')
-  console.log('PASS full browser restart with a separate synthetic disk profile')
+  expect(await input(page).inputValue()).toBe('Saved across a complete Chrome restart')
 
   const blocked = await context.newPage()
-  await blocked.goto(url)
+  await blocked.goto(baseURL)
   await blocked.getByRole('alert').filter({ hasText: 'already open' }).waitFor()
-  assert.equal(await blocked.locator('.node-input').count(), 0)
+  expect(await blocked.locator('.node-input').count()).toBe(0)
   await page.close()
   await blocked.reload()
   await ready(blocked)
-  assert.equal(await input(blocked).inputValue(), 'Saved across a complete Chrome restart')
+  expect(await input(blocked).inputValue()).toBe('Saved across a complete Chrome restart')
   page = blocked
-  console.log('PASS second writer blocked, then ownership handed over after close')
 
   const previous = await readHead(page)
   await page.evaluate(() => {
@@ -79,16 +70,15 @@ try {
   })
   await input(page).fill('Unsaved work must remain in this tab')
   await page.locator('#prototype-problem').filter({ hasText: 'Save failed' }).waitFor()
-  assert.deepEqual(await readHead(page), previous)
-  assert.equal(await input(page).inputValue(), 'Unsaved work must remain in this tab')
-  await page.screenshot({ path: '.scratch/web-prototype/storage-write-failure.png' })
+  expect(await readHead(page)).toEqual(previous)
+  expect(await input(page).inputValue()).toBe('Unsaved work must remain in this tab')
+  await capture(page, 'storage-write-failure.png')
   await page.evaluate(() => {
     window.storageTest.fail = false
   })
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   await saved(page)
-  assert.equal((await readHead(page)).document.roots[0].text, 'Unsaved work must remain in this tab')
-  console.log('PASS transaction abort preserves previous head and in-memory edit; retry succeeds')
+  expect((await readHead(page)).document.roots[0].text).toBe('Unsaved work must remain in this tab')
 
   // Real typing followed by immediate close must offer a browser-level warning.
   await input(page).press('End')
@@ -96,11 +86,10 @@ try {
   const warning = page.waitForEvent('dialog', { timeout: 1500 })
   await page.close({ runBeforeUnload: true })
   const dialog = await warning
-  assert.equal(dialog.type(), 'beforeunload')
+  expect(dialog.type()).toBe('beforeunload')
   await dialog.dismiss()
-  assert.equal(page.isClosed(), false)
+  expect(page.isClosed()).toBe(false)
   await saved(page)
-  console.log('PASS immediate dirty-close warning and cancel keep the editor open')
 
   await page.locator('#tree-menu-button').click()
   await page.locator('#prototype-vim').click()
@@ -113,37 +102,35 @@ try {
   await page.waitForTimeout(800)
   const durableText = (await readHead(page)).document.roots[0].text
   const visibleText = await input(page).inputValue()
-  console.log(JSON.stringify({ visibleReplace: visibleText, durableReplace: durableText }))
-  assert.notEqual(durableText, visibleText)
-  assert.equal(await page.locator('#prototype-save-status').textContent(), 'Editing — not saved yet')
-  assert(await page.locator('.tree-app.vim-state-replace').count())
+
+  expect(durableText).not.toBe(visibleText)
+  expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
+  expect(await page.locator('.tree-app.vim-state-replace').count()).toBeTruthy()
   await page.keyboard.press('Meta+Shift+p')
   await page.getByRole('combobox', { name: 'Command', exact: true }).waitFor()
   await page.getByRole('combobox', { name: 'Command', exact: true }).fill('theme')
-  assert.equal(
+  expect(
     await page.locator('#prototype-save-status').textContent(),
-    'Editing — not saved yet',
     'Command palette focus must not hide the uncommitted Replace buffer',
-  )
+  ).toBe('Editing — not saved yet')
   const replaceWarning = page.waitForEvent('dialog', { timeout: 1500 })
   await page.close({ runBeforeUnload: true })
   await (await replaceWarning).dismiss()
-  assert.equal(page.isClosed(), false)
+  expect(page.isClosed()).toBe(false)
   await saved(page)
-  assert.equal((await readHead(page)).document.roots[0].text, visibleText)
-  console.log('PASS buffered Vim Replace is marked unsaved, warns on close, and saves after canceled close')
+  expect((await readHead(page)).document.roots[0].text).toBe(visibleText)
+
   await page.keyboard.press('Escape')
 
   const beforeInsert = await input(page).inputValue()
   await input(page).press('A')
   await input(page).pressSequentially(' continued')
   await saved(page)
-  assert(await page.locator('.tree-app.vim-state-insert').count())
+  expect(await page.locator('.tree-app.vim-state-insert').count()).toBeTruthy()
   await input(page).press('Escape')
   await input(page).press('u')
   await saved(page)
-  assert.equal(await input(page).inputValue(), beforeInsert)
-  console.log('PASS autosave preserves Insert mode and its single undo session')
+  expect(await input(page).inputValue()).toBe(beforeInsert)
 
   // A store publication can precede removal of the old active DOM row.
   await page.evaluate(() => {
@@ -157,8 +144,7 @@ try {
   await saved(page)
   await page.reload()
   await ready(page)
-  assert.equal(await page.locator('[data-node-id="second"]').count(), 0)
-  console.log('PASS focused node deletion saves and reloads without a stale-DOM exception')
+  expect(await page.locator('[data-node-id="second"]').count()).toBe(0)
 
   await page.evaluate(() => {
     window.prototypeStore.selectNode('project', 0)
@@ -169,16 +155,14 @@ try {
   await parent.press('R')
   await parent.press('Q')
   await page.waitForTimeout(50)
-  assert.equal(await page.locator('#prototype-save-status').textContent(), 'Editing — not saved yet')
+  expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
   await parent.press('Escape')
   await saved(page)
-  assert.equal(
-    (await readHead(page)).document.roots.find((node) => node.id === 'project').text,
+  expect((await readHead(page)).document.roots.find((node) => node.id === 'project').text).toBe(
     await parent.inputValue(),
   )
   await page.evaluate(() => window.prototypeStore.navigateToAncestor(null))
   await input(page).click()
-  console.log('PASS current-parent buffered editing is tracked and saved')
 
   // Reload cleared the fault injector; restore it for the repeated-failure case.
   await page.evaluate(() => {
@@ -203,10 +187,10 @@ try {
   await input(page).pressSequentially(' retry me')
   await input(page).press('Escape')
   await page.waitForFunction(() => window.prototypeStore.getSnapshot().persistenceLocked === true)
-  assert.equal(await page.evaluate(() => window.storageTest.writes), 3)
+  expect(await page.evaluate(() => window.storageTest.writes)).toBe(3)
   await page.waitForTimeout(700)
-  assert.equal(await page.evaluate(() => window.storageTest.writes), 3)
-  await page.screenshot({ path: '.scratch/web-prototype/storage-locked.png' })
+  expect(await page.evaluate(() => window.storageTest.writes)).toBe(3)
+  await capture(page, 'storage-locked.png')
   const unsavedText = await input(page).inputValue()
   await page.evaluate(() => {
     window.storageTest.fail = false
@@ -215,14 +199,12 @@ try {
   await page.close({ runBeforeUnload: true })
   await (await retryWarning).dismiss()
   await saved(page)
-  assert.equal((await readHead(page)).document.roots[0].text, unsavedText)
-  assert.equal(await page.evaluate(() => window.prototypeStore.getSnapshot().persistenceLocked), undefined)
-  console.log('PASS three failures stop automatic retries; canceled close retries and unlocks')
+  expect((await readHead(page)).document.roots[0].text).toBe(unsavedText)
+  expect(await page.evaluate(() => window.prototypeStore.getSnapshot().persistenceLocked)).toBe(undefined)
 
   const writesBeforeIdle = await page.evaluate(() => window.storageTest.writes)
   await page.waitForTimeout(700)
-  assert.equal(await page.evaluate(() => window.storageTest.writes), writesBeforeIdle)
-  console.log('PASS idle editor performs no repeated document writes')
+  expect(await page.evaluate(() => window.storageTest.writes)).toBe(writesBeforeIdle)
 
   await page.evaluate(async () => {
     const db = await new Promise((resolve) => {
@@ -240,9 +222,6 @@ try {
   await page.reload()
   await page.waitForFunction(() => !window.prototypeStore || window.prototypeStore.getSnapshot().status !== 'loading')
   await page.locator('.node-input').waitFor({ state: 'hidden' })
-  assert.deepEqual(await readHead(page), { invalid: 'preserve this evidence' })
-  await page.screenshot({ path: '.scratch/web-prototype/storage-invalid.png' })
-  console.log('PASS invalid stored document remains intact; sample is not substituted')
-} finally {
-  await context?.close()
-}
+  expect(await readHead(page)).toEqual({ invalid: 'preserve this evidence' })
+  await capture(page, 'storage-invalid.png')
+})

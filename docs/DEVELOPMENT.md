@@ -162,6 +162,12 @@ Vitest uses the Node.js environment by default. Renderer tests opt into jsdom wh
 
 ### Choosing test coverage
 
+The Chrome E2E target uses Playwright Test specs in `e2e/web/` and the separate
+`playwright.web.config.ts`. Electron discovery excludes the Chrome directory.
+Browser commands, selection arguments, isolated contexts, restart profiles,
+server cleanup and report paths are described in
+[Browser checks](../web/README.md#browser-checks).
+
 `AGENTS.md` §9 and procedure §9 own the test-level and redundancy policy. Apply it by separating rule variants from the real interaction being verified:
 
 | What can fail | Preferred coverage | Representative Electron coverage |

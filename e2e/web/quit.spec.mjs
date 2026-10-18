@@ -1,9 +1,8 @@
-import assert from 'node:assert/strict'
-import { chromium } from '@playwright/test'
+// @editing-modes: independent
+import { test, expect, capture } from './fixtures.mjs'
 
-const browser = await chromium.launch({ channel: 'chrome', headless: true })
-try {
-  const context = await browser.newContext()
+test('flushes quit edits and recovers from failed or refused close', async ({ newContext, baseURL }) => {
+  const context = await newContext()
   const opener = await context.newPage()
   const dialogs = []
   context.on('page', (page) => {
@@ -14,7 +13,7 @@ try {
   })
   const open = async () => {
     const popup = opener.waitForEvent('popup')
-    await opener.evaluate((url) => window.open(url), process.env.TREE_WEB_URL ?? 'http://127.0.0.1:5174/')
+    await opener.evaluate((url) => window.open(url), baseURL)
     const page = await popup
     page.setDefaultTimeout(6000)
     await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
@@ -35,9 +34,9 @@ try {
   await page.keyboard.press('Meta+Shift+p')
   await page.getByRole('combobox', { name: 'Command', exact: true }).fill('quit')
   await pressToClose('Enter')
-  assert.deepEqual(dialogs, [], 'A successful quit must not show an informational alert')
+  expect(dialogs, 'A successful quit must not show an informational alert').toEqual([])
   page = await open()
-  assert.equal(await input().inputValue(), 'Quit must save this pending edit')
+  expect(await input().inputValue()).toBe('Quit must save this pending edit')
 
   await page.locator('#tree-menu-button').click()
   await page.locator('#prototype-vim').click()
@@ -47,10 +46,10 @@ try {
   await input().press('R')
   await input().press('Z')
   const bufferedText = await input().inputValue()
-  assert.equal(await page.locator('#prototype-save-status').textContent(), 'Editing — not saved yet')
+  expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
   await pressToClose('Meta+q')
   page = await open()
-  assert.equal(await input().inputValue(), bufferedText, 'Keyboard quit must flush the pending Replace buffer')
+  expect(await input().inputValue(), 'Keyboard quit must flush the pending Replace buffer').toBe(bufferedText)
   await page.locator('#tree-menu-button').click()
   await page.locator('#prototype-vim').click()
 
@@ -67,21 +66,16 @@ try {
     window.close = () => window.quitCloseCalls++
   })
   await page.evaluate(() => window.treeApi.quit())
-  assert.equal(await page.evaluate(() => window.quitCloseCalls), 0)
+  expect(await page.evaluate(() => window.quitCloseCalls)).toBe(0)
   await page.getByRole('alert').filter({ hasText: 'Synthetic quit flush failure' }).waitFor()
-  assert.equal(page.isClosed(), false)
+  expect(page.isClosed()).toBe(false)
   await page.evaluate(() => window.restoreQuitFlush())
   await input().fill('Retry saves without a success dialog')
   await page.evaluate(() => window.treeApi.quit())
-  assert.equal(await page.evaluate(() => window.quitCloseCalls), 1)
-  assert.deepEqual(dialogs, [], 'A browser refusing close must remain modal-free')
+  expect(await page.evaluate(() => window.quitCloseCalls)).toBe(1)
+  expect(dialogs, 'A browser refusing close must remain modal-free').toEqual([])
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
-  assert.equal(await input().inputValue(), 'Retry saves without a success dialog')
-  await page.screenshot({ path: '.scratch/web-prototype/quit-without-alert.png' })
-  console.log(
-    'PASS quit saves and closes without alerts; failed flush stays open; retry and refused close preserve edits',
-  )
-} finally {
-  await browser.close()
-}
+  expect(await input().inputValue()).toBe('Retry saves without a success dialog')
+  await capture(page, 'quit-without-alert.png')
+})

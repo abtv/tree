@@ -144,8 +144,8 @@ describe('repository discovery', () => {
     write('perf/three.spec.ts', '// @requirement PRODUCT.md §3\n')
     write('e2e/four.txt', '// @requirement PRODUCT.md §4\n')
     write('web/build.mjs', '// @requirement PRODUCT.md §4\n')
-    write('web/verify-built.mjs', '// @requirement PRODUCT.md §5\n')
-    write('web/theme-test.mjs', '// @requirement PRODUCT.md §6\n')
+    write('e2e/web/package.spec.mjs', '// @requirement PRODUCT.md §5\n')
+    write('e2e/web/theme.spec.mjs', '// @requirement PRODUCT.md §6\n')
     write('scripts/release/rules.test.mjs', '// @requirement PRODUCT.md §7\n')
     expect(runChecks({ rootDirectory: root, exemptions: new Map(), boundarySections: new Set(['2']) })).toEqual({
       issues: ['PRODUCT.md §4: missing test marker'],
