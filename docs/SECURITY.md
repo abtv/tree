@@ -1,47 +1,74 @@
 # Security Policy
 
+Tree is currently distributed as a website at <https://tree-editor.github.io>.
+The browser version is the current distribution focus; the macOS Electron application
+remains in development and is not yet packaged for distribution. This policy covers
+the published website and the source on `main`, including the desktop implementation.
+
 ## Reporting a vulnerability
 
-This is a local macOS desktop application. It reads and writes local document and attachment files and does not run a network service. If you believe you have found a security issue, report it privately to the repository owner rather than opening a public issue, and do not include secrets or personal document content. There are no released versions yet; the policy applies to the current `main` branch.
+Report suspected vulnerabilities privately to the repository owner rather than
+opening a public issue. Identify whether the issue affects the hosted website,
+publication pipeline or desktop application, and include reproduction steps with
+synthetic data. Do not include secrets or personal document content.
 
 ## Security model
 
-The Electron renderer is treated as untrusted with respect to the main process. The process boundary is the primary security control: the renderer has no direct Node.js or filesystem access, and every capability it needs crosses a narrow, validated preload/IPC surface. The structural boundaries are owned by `docs/ARCHITECTURE.md` §4, §7, and §15–§17.
+Both versions keep documents and attachments locally and share editor and domain
+logic. Neither has a cloud document service or sends telemetry. Their security
+boundaries and update mechanisms differ:
 
-The main controls are:
+| Boundary | Website | macOS desktop |
+| --- | --- | --- |
+| Execution | Browser sandbox and origin isolation | Sandboxed Electron renderer with validated preload/IPC access to the main process |
+| Document storage | IndexedDB in the browser profile for the site's origin | Local document and attachment files managed by the main process |
+| Permissions | Browser-controlled clipboard and platform capabilities | Main-process capabilities; renderer permission requests are denied |
+| Distribution | HTTPS resources from the verified GitHub Pages publication | Packaged, signed and notarized application required before shipment |
 
-* **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
-* **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
-* **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/electron/main/ipc-handlers.ts`, `src/electron/main/ipc-security.ts`).
-* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only local schemes and, for an unpackaged development renderer, requests to that renderer's own origin. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
-* **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/electron/main/ipc-security.ts`).
-* **Bounded attachments.** Attachment writes accept only validated PNG data within a bounded payload size and with bounded decoded dimensions (maximum 32767 pixels per side and 64 megapixels total), and the image must decode through the platform decoder before bytes are stored (`src/electron/main/ipc-security.ts`, `src/electron/main/png-decoder.ts`).
-* **Bounded clipboard image reads.** PNG clipboard blobs exceeding the attachment byte limit are rejected before `arrayBuffer()` copies their bytes into application memory (`src/infrastructure/main/clipboard.ts`). This does not bound memory allocated internally by Electron or macOS while obtaining the clipboard blob.
-* **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs, and denies child frames, workers, and media. (Chromium ignores `frame-ancestors` when the policy is delivered by a meta element.)
-* **Domain purity.** The domain does not depend on Electron, Node, the filesystem, or the DOM, and dependencies point toward it (`docs/ARCHITECTURE.md` §4, §18). ESLint enforces the import boundaries (`eslint.config.mjs`).
+Local storage does not protect against malicious code running with access to that
+storage. In the browser, application code served from the trusted origin can read
+the document; publication integrity is therefore part of document confidentiality.
+Neither version provides application-level encryption at rest or protection from
+a compromised operating system or browser profile.
 
-Transient security considerations, such as the attachment byte limit and the PNG chunk rules, are owned by the implementing modules and `docs/ARCHITECTURE.md`, not restated here.
+## Browser runtime and storage
 
-## Network egress and content disclosure
+The website is a static package. It needs no application server, Node.js process
+or Electron installation on the user's computer. GitHub Pages serves application
+resources; it does not receive the IndexedDB document. Browser integration is
+implemented in `src/web/services.ts`.
 
-Tree makes no network requests of its own, sends no telemetry, and stores documents and attachments
-only on the local machine; it has no cloud document service. Content can still be disclosed to a
-third party when the user explicitly invokes these features:
+* **Origin and profile isolation.** Documents, images and preferences belong to the
+  site's origin in the current browser profile. Localhost, the hosted website,
+  other browsers and other profiles have separate storage. There is no automatic
+  transfer or synchronization. Reserve the hosting origin for trusted Tree code:
+  different URL paths on the same origin do not isolate IndexedDB data.
+* **Content security policy.** The production build adds a meta CSP allowing
+  same-origin scripts, fonts and connections, inline styles, and local attachment
+  images. It blocks inline scripts, child frames, workers, objects, base URL changes
+  and form submissions (`scripts/web/build.mts`). Browser startup also rejects
+  execution inside a frame. The meta policy is not an HTTP `frame-ancestors` control.
+* **Untrusted content.** Shared rendering escapes node text and link attributes;
+  domain normalization accepts only HTTP(S) link destinations. Clipboard HTML is
+  reduced to text and link ranges rather than inserted as arbitrary markup.
+  Stored documents are validated when loaded; invalid stored data is not replaced
+  with a new sample document.
+* **Clipboard and attachments.** Browser permission and user-activation rules
+  govern clipboard APIs. Native paste uses the event's clipboard data. PNG input
+  passes shared byte, structure and decoded-dimension limits, then the browser
+  decoder before storage. These checks do not bound memory allocated internally
+  by the browser while reading the clipboard.
+* **Writer ownership.** A Web Lock permits one editing tab at a time. IndexedDB
+  transactions preserve the last committed value when a write aborts. This is a
+  consistency control, not a barrier against malicious same-origin code.
 
-* **Open an external hyperlink.** `src/electron/main/index.ts` hands the HTTP(S) URL to the operating
-  system's default hyperlink application, typically a browser. The URL may itself contain document
-  content. This implements the link-opening behavior in `docs/PRODUCT.md` §12.
-* **Search with Google.** `src/electron/main/editor-context-menu.ts` sends the selected text as a Google
-  search query through the system browser. This is the user-invoked menu item specified in
-  `docs/PRODUCT.md` §13.2.
-* **macOS Look Up.** `src/electron/main/editor-context-menu.ts` passes selected text to the macOS lookup
-  service. Depending on the user's macOS settings, that service may consult network sources. This is
-  the native Look Up item specified in `docs/PRODUCT.md` §13.2.
-
-The editor enables spellchecking in `src/renderer/NodeInput.tsx`. On macOS, the operating system's
-spellchecker downloads no dictionaries. A future Windows or Linux build must disable Electron's
-Hunspell dictionary download before shipping, because Electron may otherwise download dictionaries
-from a Google-hosted CDN on first use.
+The current package has no Service Worker, offline package, persistent-storage
+request, recovery generations, export or import. Adding the website to a browser's
+Dock or home screen does not add those protections. Clearing site data, deleting
+the profile or browser storage eviction can remove notes; force termination can
+lose uncommitted work. Browser storage is not a backup. Current compatibility and
+save limitations are owned by [Browser version](../src/web/README.md) and
+[the browser requirements](PRODUCT.md#14-browser-static-hosting-checkpoint).
 
 ## Browser publication
 
@@ -85,7 +112,60 @@ protection. GitHub Pages serves application resources and may log IP addresses;
 it does not receive the browser's IndexedDB document. Operational setup and
 failure handling are in [Browser publication](../deployment/github-pages/README.md).
 
-## Distribution hardening before shipment
+Both repositories use active main-branch rulesets blocking force pushes and
+deletion, plus repository secret scanning and push protection. These controls
+reduce history-rewrite and credential-leak risks; they do not require review of
+ordinary commits or make a compromised writer harmless. A stolen target publisher
+token can still corrupt retained assets or provenance and block later publication.
+Signature failures must stop publication; recovery must restore authenticated
+files without bypassing verification.
+
+## Desktop runtime
+
+The Electron renderer is treated as untrusted with respect to the main process.
+It has no direct Node.js or filesystem access. Its capabilities cross a narrow,
+validated preload/IPC surface. The structural boundaries are owned by
+`docs/ARCHITECTURE.md` §4, §7, and §15–§17.
+
+* **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
+* **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/electron/main/ipc-handlers.ts`, `src/electron/main/ipc-security.ts`).
+* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only local schemes and, for an unpackaged development renderer, requests to that renderer's own origin. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/electron/main/ipc-security.ts`).
+* **Bounded attachments.** Attachment writes accept only PNG data within the shared byte, structure and decoded-dimension limits, and the image must decode through the platform decoder before bytes are stored (`src/electron/main/ipc-security.ts`, `src/electron/main/png-decoder.ts`).
+* **Bounded clipboard image reads.** PNG clipboard blobs exceeding the attachment byte limit are rejected before `arrayBuffer()` copies their bytes into application memory (`src/infrastructure/main/clipboard.ts`). This does not bound memory allocated internally by Electron or macOS while obtaining the clipboard blob.
+* **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs, and denies child frames, workers, and media. Chromium ignores `frame-ancestors` when the policy is delivered by a meta element.
+
+Attachment limits and PNG chunk rules are owned by the implementing modules and
+`docs/ARCHITECTURE.md`. Shared domain code remains independent of React, Electron,
+Node, filesystem and DOM APIs; ESLint enforces the import boundaries.
+
+## Network egress and content disclosure
+
+The website downloads its application resources over HTTPS from GitHub Pages.
+The desktop application runs from local resources and does not run a network
+service. Neither version uploads documents or attachments or sends telemetry.
+Local storage still permits disclosure through user-invoked features:
+
+* **Open an external hyperlink.** The website opens the destination in another
+  browser context; Electron hands the HTTP(S) URL to the operating system through
+  `src/electron/main/index.ts`. The URL may itself contain document content.
+* **Clipboard use.** Copying makes selected content available to other applications
+  through the system clipboard. Browser clipboard access is subject to browser
+  permissions; Electron accesses it through validated IPC.
+* **Search with Google (desktop).** `src/electron/main/editor-context-menu.ts` sends
+  selected text as a Google search query through the system browser.
+* **macOS Look Up (desktop).** The native context menu passes selected text to the
+  macOS lookup service, which may consult network sources depending on OS settings.
+
+The editor enables spellchecking in `src/renderer/NodeInput.tsx`. Browser-provided
+spelling, translation and similar services follow the user's browser settings.
+On macOS, the desktop operating system's spellchecker downloads no dictionaries.
+A future Windows or Linux desktop build must disable Electron's Hunspell dictionary
+download before shipping, because Electron may otherwise download dictionaries
+from a Google-hosted CDN on first use.
+
+## Desktop distribution hardening before shipment
 
 The repository does not yet package the application: `npm run build` produces unpackaged build
 output, not a distributable application. Before a build is handed to anyone, the distribution must:
@@ -124,10 +204,16 @@ These boundaries reduce accidental access and unsafe tool use; they do not make 
 
 ## Verification
 
-Every control above has an automated check. The verification map:
+Runtime and publication checks are mapped below. Repository settings, account
+security and future desktop signing requirements also need operational verification;
+local tests do not establish those controls.
 
 | Control | Focused tests | Real-boundary tests |
 | --- | --- | --- |
+| Browser package and CSP presence | `scripts/web/build.mts` build policy | `e2e/web/package.spec.mjs` against the built package; this checks CSP presence, not every directive's enforcement |
+| Browser storage ownership and failed writes | Shared document validation tests | `e2e/web/storage.spec.mjs` |
+| Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mjs`, `e2e/web/compatibility.spec.mjs` |
+| Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |
 | Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
 | Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
 | Renderer session permissions and network egress | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
@@ -137,4 +223,13 @@ Every control above has an automated check. The verification map:
 | Content security policy | production build plugin | `e2e/electron/csp.spec.ts` |
 | Domain and layer import boundaries | `eslint.config.mjs` import restrictions | lint step of `npm run check` |
 
-`npm run check:full` runs the unit, contract, end-to-end, and performance suites. `npm audit` runs as the final step of `npm run check:full`; a registry connectivity failure must be reported rather than treated as a clean audit. Between runs, a daily workflow audits dependencies at high severity or above and Dependabot proposes updates; `docs/DEVELOPMENT.md` describes both.
+The browser suite is separate from Electron: `npm run test:web:built` exercises
+the generated static package, and source publication runs that suite in Chromium.
+The release gate and real deployment acceptance checks are described in
+[Browser publication](../deployment/github-pages/README.md#failures-and-ordering).
+
+`npm run check:full` runs the shared unit/contract checks and Electron end-to-end
+and performance suites, followed by `npm audit`. It does not include the browser
+suite. A registry connectivity failure must be reported rather than treated as a
+clean audit. Between runs, a daily workflow audits dependencies at high severity
+or above and Dependabot proposes updates; `docs/DEVELOPMENT.md` describes both.
