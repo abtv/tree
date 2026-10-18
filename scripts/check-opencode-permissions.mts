@@ -395,6 +395,7 @@ for (const name of Object.keys(packageJson.scripts)) {
       'preview:web',
       'test:web',
       'test:web:built',
+      'test:web:chromium',
       'test:e2e:memory',
       'test:perf:safari',
     ].includes(name)

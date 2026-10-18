@@ -20,6 +20,7 @@
     "preview:web": "node scripts/web/static-server.mts",
     "pretest:web:built": "npm run build:web",
     "test:web:built": "TREE_WEB_BUILT=1 playwright test -c playwright.web.config.ts",
+    "test:web:chromium": "node scripts/web/chromium.mts",
     "test:web": "playwright test -c playwright.web.config.ts",
     "prestart": "node scripts/rename-dev-app.mts",
     "start": "electron-vite preview",

@@ -383,6 +383,24 @@ npm run check:full
 
 This runs `npm run check`, the end-to-end suite, the full Electron performance suite, and finally the dependency audit (`npm audit`), so an advisory without an available fix reports after the suites rather than hiding their results. It is an all-suites convenience command, not the default for every High Risk change. Use it when the full performance stage is required or explicitly requested; otherwise run the stages selected below. The normative validation policy is in `AGENTS.md` §10 and [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#10-validation).
 
+### Chromium container tests
+
+Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
+
+Docker must be running. The Product Owner prepares dependencies manually from the repository root:
+
+```bash
+make chromium-image
+```
+
+This builds the dependency image using Docker's cache. To refresh the base image and force a clean dependency installation, the owner runs `make chromium-image-rebuild`. Both targets need network access. Agents must not execute these targets, build or pull images, or install dependencies for this workflow. If the image is missing or stale, the test command stops and asks the owner to run `make chromium-image`. The Makefile defaults to help, not a build.
+
+Preparation uses `scripts/web/chromium.Dockerfile` and installs locked dependencies with lifecycle scripts disabled. The Dockerfile-specific ignore file limits the build context to the package manifests. The runner never builds or pulls an image. Its image tag depends on dependency-related package fields, the lockfile, the Dockerfile, its ignore file, and the Makefile. Code, documentation, and npm-script edits alone reuse the image; dependency, lockfile, or recipe changes require owner preparation. The runner resolves the tag to a local immutable image ID before execution.
+
+In Codex, use host execution (`sandbox_permissions: "require_escalated"`) from the first invocation. `.codex/rules/chromium.rules` approves only this named npm workflow, not general Docker access. As with the existing npm permissions, the rule trusts mutable repository scripts and matches command arguments, not the working directory. Review runner, package script, Dockerfile, and rule changes together. It is not a security boundary against an agent that changes those files. Trust the project configuration and restart Codex after rule changes; native rule matching alone does not prove the current session loaded the rule.
+
+The container's network restriction applies to test execution. It does not disable the coding agent's other network tools or revoke existing Docker permissions. Owner-only preparation is a workflow rule; enforcing it against an agent that can change the runner requires a separately protected launcher and host access controls.
+
 ### GitHub Actions
 
 GitHub Actions runs `npm run check` on Ubuntu and the real Electron end-to-end suite in six macOS shards for every pull request and push to `main`; the Electron suite also supports manual dispatch, and each shard is limited to 12 minutes. The jobs run independently, and superseded runs for the same pull request or branch are canceled. The performance suite runs on a scheduled or manual macOS workflow and is intentionally separate from pull-request validation because its measurements are machine-sensitive and macOS minutes are limited for private repositories. Failed E2E and performance runs upload their available reports and result artifacts. Mutation testing runs on a weekly or manual Ubuntu workflow, separate from pull-request validation because of its run time (§12).

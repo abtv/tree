@@ -109,6 +109,8 @@
           "npm run test:web *": "allow",
           "npm run test:web:built": "allow",
           "npm run test:web:built *": "allow",
+          "npm run test:web:chromium": "allow",
+          "npm run test:web:chromium *": "allow",
           "npm run start": "allow",
           "npm run start *": "allow",
           "npm run build": "allow",

@@ -1,0 +1,10 @@
+# Trusts this repository's reviewed npm script, like the existing test rules.
+# This is an argv prefix, not a cwd restriction or protection against script edits.
+# The runner rejects arguments and fixes Docker's isolation options.
+prefix_rule(
+    pattern = ["npm", "run", "test:web:chromium"],
+    decision = "allow",
+    justification = "Run only the named offline Chromium container test workflow",
+    match = ["npm run test:web:chromium"],
+    not_match = ["docker run", "docker build", "npm run test:web:chromium-extra", "npm exec node"],
+)
