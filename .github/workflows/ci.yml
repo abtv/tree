@@ -15,7 +15,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-24.04
-    timeout-minutes: 2
+    timeout-minutes: 4
 
     steps:
       - name: Check out repository
