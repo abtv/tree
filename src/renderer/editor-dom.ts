@@ -1,7 +1,169 @@
 import type { LinkRange, TreeNode } from '../domain/document'
 import { findDateLikeTokens } from '../domain/date-recognition'
 import { markedPieces, type CaretMark } from './agenda-row-caret'
-import { characterStart, moveCharacterOffset } from '../domain/text-characters'
+import { characterBoundaries, characterStart, moveCharacterOffset } from '../domain/text-characters'
+
+/** Measure a windowed-out Tree row with the same row styles and indentation as a mounted row. */
+export function unmountedNodeGeometry(
+  node: TreeNode,
+  depth: number,
+): ReturnType<typeof visualTextGeometry> | undefined {
+  const list = document.querySelector<HTMLElement>('.node-list')
+  if (list === null) return undefined
+  const row = document.createElement('div')
+  row.className = 'node-row'
+  row.style.setProperty('--row-depth', String(depth))
+  Object.assign(row.style, {
+    position: 'absolute',
+    left: '0',
+    right: '0',
+    top: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+  })
+  row.setAttribute('aria-hidden', 'true')
+  const input = document.createElement('div')
+  input.className = 'node-input'
+  input.innerHTML = richTextHtml(node)
+  row.append(input)
+  list.append(row)
+  try {
+    const geometry = visualTextGeometry(input)
+    return {
+      position: geometry.position,
+      dispose: () => {
+        geometry.dispose()
+        row.remove()
+      },
+    }
+  } catch (error) {
+    row.remove()
+    throw error
+  }
+}
+
+/** Measure wrapped text without changing the live selection. Dispose after a vertical command. */
+export function visualTextGeometry(element: HTMLElement): {
+  position: (offset: number) => { top: number; left: number }
+  dispose: () => void
+} {
+  let measured = element
+  if (element instanceof HTMLTextAreaElement) {
+    measured = document.createElement('div')
+    const style = getComputedStyle(element)
+    for (const property of [
+      'font-family',
+      'font-size',
+      'font-weight',
+      'font-style',
+      'font-variant',
+      'font-stretch',
+      'line-height',
+      'letter-spacing',
+      'padding',
+      'border',
+      'box-sizing',
+      'word-break',
+      'overflow-wrap',
+      'tab-size',
+      'text-indent',
+    ])
+      measured.style.setProperty(property, style.getPropertyValue(property))
+    Object.assign(measured.style, {
+      position: 'fixed',
+      visibility: 'hidden',
+      whiteSpace: 'pre-wrap',
+      width: `${element.getBoundingClientRect().width}px`,
+      left: '0',
+      top: '0',
+    })
+    measured.textContent = element.value
+    document.body.append(measured)
+  }
+  const text = nodeText(element)
+  const textNodes: { node: Node; start: number; end: number }[] = []
+  const walker = document.createTreeWalker(measured, NodeFilter.SHOW_TEXT)
+  let child = walker.nextNode()
+  let start = 0
+  while (child !== null) {
+    const end = start + (child.textContent?.length ?? 0)
+    textNodes.push({ node: child, start, end })
+    start = end
+    child = walker.nextNode()
+  }
+  const range = document.createRange()
+  return {
+    position: (offset) => {
+      const cursor = characterStart(text, Math.min(offset, Math.max(0, text.length - 1)))
+      const part = textNodes.find((part) => cursor >= part.start && cursor < part.end)
+      if (part === undefined) return { top: 0, left: 0 }
+      range.setStart(part.node, cursor - part.start)
+      const end = moveCharacterOffset(text, cursor, 1)
+      const last = textNodes.find((part) => end > part.start && end <= part.end) ?? part
+      range.setEnd(last.node, end - last.start)
+      const rect = range.getBoundingClientRect()
+      const origin = measured.getBoundingClientRect()
+      return { top: rect.top - origin.top, left: rect.left - origin.left }
+    },
+    dispose: () => {
+      range.detach()
+      if (measured !== element) measured.remove()
+    },
+  }
+}
+
+/** Find a character on the adjacent visual line, or on the entry line of another node. */
+export function visualLineCursor(
+  text: string,
+  position: (offset: number) => { top: number; left: number },
+  cursor: number,
+  direction: 'up' | 'down',
+  preferredLeft: number,
+  entering = false,
+): number | undefined {
+  if (text.length === 0) return undefined
+  const last = characterStart(text, text.length - 1)
+  const currentTop = position(cursor).top
+  // Find the first character satisfying a monotonic condition, in UTF-16 offsets. Normalize the
+  // final result to a grapheme boundary, so emoji are never split by a motion.
+  const lowerBound = (predicate: (offset: number) => boolean): number => {
+    let low = 0
+    let high = text.length
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2)
+      if (predicate(middle)) high = middle
+      else low = middle + 1
+    }
+    return low
+  }
+  let target: number
+  if (entering) target = direction === 'down' ? 0 : last
+  else if (direction === 'down') {
+    target = lowerBound((offset) => position(offset).top > currentTop + 1)
+    if (target === text.length) return undefined
+  } else {
+    const lineStart = lowerBound((offset) => position(offset).top >= currentTop - 1)
+    if (lineStart === 0) return undefined
+    target = characterStart(text, lineStart - 1)
+  }
+  const targetTop = position(target).top
+  const lineStart = lowerBound((offset) => position(offset).top >= targetTop - 1)
+  const lineEnd = lowerBound((offset) => position(offset).top > targetTop + 1)
+  // Logical offsets remain ordered by line, but bidi runs can reverse their x coordinates.
+  // Inspect only the destination line to choose the nearest whole character in either direction.
+  let nearest = lineStart
+  let distance = Infinity
+  for (const offset of characterBoundaries(text)) {
+    if (offset < lineStart) continue
+    if (offset >= lineEnd) break
+    const candidateDistance = Math.abs(position(offset).left - preferredLeft)
+    if (candidateDistance < distance) {
+      nearest = offset
+      distance = candidateDistance
+    }
+  }
+  return nearest
+}
 
 /** Measure a UTF-16 text offset without disturbing the live selection. */
 export function expressionPosition(

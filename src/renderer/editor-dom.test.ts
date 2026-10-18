@@ -16,7 +16,100 @@ import {
   setCaret,
   setNormalCaret,
   updateSelectedLinks,
+  visualLineCursor,
+  visualTextGeometry,
+  unmountedNodeGeometry,
 } from './editor-dom'
+
+describe('visual text geometry', () => {
+  it('measures a textarea through a disposable mirror without changing its selection', () => {
+    const input = document.createElement('textarea')
+    input.value = 'before 👩‍💻 after'
+    input.style.fontSize = '17px'
+    input.setSelectionRange(2, 4)
+    const range = document.createRange()
+    Object.assign(range, { getBoundingClientRect: () => new DOMRect(20, 40, 10, 20) })
+    const create = vi.spyOn(document, 'createRange').mockReturnValue(range)
+    const rect = vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 40))
+    try {
+      const geometry = visualTextGeometry(input)
+      expect(document.body.lastElementChild?.getAttribute('style')).toContain('width: 200px')
+      expect(document.body.lastElementChild?.getAttribute('style')).toContain('font-size: 17px')
+      expect(geometry.position(8)).toEqual({ left: 20, top: 40 })
+      expect(range.toString()).toBe('👩‍💻')
+      expect(getSelectionRange(input)).toEqual({ start: 2, end: 4 })
+      const mirror = document.body.lastElementChild!
+      geometry.dispose()
+      expect(mirror.isConnected).toBe(false)
+    } finally {
+      create.mockRestore()
+      rect.mockRestore()
+    }
+  })
+
+  it('measures rich graphemes across spans without creating a textarea mirror', () => {
+    const input = document.createElement('div')
+    input.innerHTML = 'a<span>👩</span><a>‍💻</a>b'
+    const range = document.createRange()
+    Object.assign(range, { getBoundingClientRect: () => new DOMRect(15, 20, 10, 20) })
+    const create = vi.spyOn(document, 'createRange').mockReturnValue(range)
+    const before = document.body.childElementCount
+    try {
+      const geometry = visualTextGeometry(input)
+      expect(geometry.position(2)).toEqual({ left: 15, top: 20 })
+      expect(range.toString()).toBe('👩‍💻')
+      geometry.dispose()
+      expect(document.body.childElementCount).toBe(before)
+    } finally {
+      create.mockRestore()
+    }
+  })
+
+  it('uses an isolated row with the destination indentation and removes it after measurement', () => {
+    const list = document.createElement('section')
+    list.className = 'node-list'
+    document.body.append(list)
+    try {
+      const geometry = unmountedNodeGeometry(node('long text'), 3)
+      expect(geometry).toBeDefined()
+      const row = list.firstElementChild as HTMLElement
+      expect(row.style.getPropertyValue('--row-depth')).toBe('3')
+      expect(row.getAttribute('aria-hidden')).toBe('true')
+      geometry?.dispose()
+      expect(list.children).toHaveLength(0)
+    } finally {
+      list.remove()
+    }
+  })
+})
+
+describe('visual line cursor', () => {
+  const text = 'abcdefghijkl'
+  const position = (offset: number) => ({ top: Math.floor(offset / 4) * 20, left: (offset % 4) * 10 })
+
+  it.each([
+    [30, 20, 10, 0],
+    [0, 30, 20, 10],
+  ])('keeps the column when a line has nonmonotonic character positions: %j', (...left) => {
+    const bidiPosition = (offset: number) => ({ top: Math.floor(offset / 4) * 20, left: left[offset % 4]! })
+    const column = left.indexOf(20)
+    expect(visualLineCursor('abcdefgh', bidiPosition, column, 'down', 20)).toBe(column + 4)
+    expect(visualLineCursor('abcdefgh', bidiPosition, column + 4, 'up', 20)).toBe(column)
+  })
+
+  it('moves within wrapped text in both directions and stops at its edges', () => {
+    expect(visualLineCursor(text, position, 1, 'down', 10)).toBe(5)
+    expect(visualLineCursor(text, position, 5, 'up', 10)).toBe(1)
+    expect(visualLineCursor(text, position, 1, 'up', 10)).toBeUndefined()
+    expect(visualLineCursor(text, position, 9, 'down', 10)).toBeUndefined()
+  })
+
+  it('enters the first or last displayed line and clamps to a short line', () => {
+    expect(visualLineCursor(text, position, 0, 'up', 20, true)).toBe(10)
+    expect(visualLineCursor(text, position, 0, 'down', 20, true)).toBe(2)
+    expect(visualLineCursor(text.slice(0, 10), position, 6, 'down', 20)).toBe(9)
+  })
+})
 
 function node(text: string, links?: TreeNode['links']): TreeNode {
   return { id: 'node', text, ...(links === undefined ? {} : { links }), children: [] }

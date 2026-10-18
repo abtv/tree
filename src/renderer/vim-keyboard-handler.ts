@@ -1,8 +1,16 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
 import { vimNormalClipboardContent, vimSelectionClipboardContent } from '../application/vim-clipboard-content'
-import { cloneNode, linkAtPosition, locateNode, type TreeNode } from '../domain/document'
-import { getCaret, getSelectionRange, setCaret, setSelectionRange } from './editor-dom'
+import { cloneNode, linkAtPosition, locateNode, requireNode, type TreeNode } from '../domain/document'
+import {
+  getCaret,
+  getSelectionRange,
+  setCaret,
+  setSelectionRange,
+  visualTextGeometry,
+  visualLineCursor,
+  unmountedNodeGeometry,
+} from './editor-dom'
 import {
   calculateSurround,
   caseEdits,
@@ -113,6 +121,8 @@ export function handleVimKey(
     event.preventDefault()
     return true
   }
+  const countDigit = /^[1-9]$/u.test(event.key) || (event.key === '0' && (commandState.pending?.count ?? '') !== '')
+  if (!['j', 'k', 'J', 'K'].includes(event.key) && !countDigit) commandState.verticalGoal = undefined
   if (vim.mode === 'visual-node') {
     const handled = (): true => {
       event.preventDefault()
@@ -675,14 +685,84 @@ export function handleVimKey(
       vim.setMode('visual-node')
     }
   } else if (!visual && ['j', 'k', 'J', 'K'].includes(event.key)) {
-    navigateVertically({
-      store,
-      node,
-      caret: vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
-      direction: event.key.toLowerCase() === 'j' ? 'down' : 'up',
-      count: count * (event.key === 'J' || event.key === 'K' ? 10 : 1),
-      applyCaretState: vim.applyCaretState,
-    })
+    const direction = event.key.toLowerCase() === 'j' ? 'down' : 'up'
+    const geometries = new Map<string, ReturnType<typeof visualTextGeometry>>()
+    const geometry = (target: TreeNode): ReturnType<typeof visualTextGeometry> | undefined => {
+      const existing = geometries.get(target.id)
+      if (existing !== undefined) return existing
+      const element =
+        target.id === node.id
+          ? input
+          : target.id === (snapshot.status === 'ready' ? snapshot.location.currentParentId : null)
+            ? input.ownerDocument.querySelector<HTMLElement>('.current-parent-input')
+            : input.ownerDocument.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(target.id)}"] .node-input`)
+      if (element !== null && element.getBoundingClientRect().width === 0) return undefined
+      const result =
+        element === null
+          ? unmountedNodeGeometry(target, store.getVisibleRows().find((row) => row.node.id === target.id)?.depth ?? 0)
+          : visualTextGeometry(element)
+      if (result === undefined) return undefined
+      geometries.set(target.id, result)
+      return result
+    }
+    const startingGeometry = geometry(node)
+    const goal = commandState.verticalGoal
+    const viewportWidth = input.ownerDocument.documentElement.clientWidth
+    const initialCaret = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
+    let previousCaret = initialCaret
+    let preferredLeft =
+      goal !== undefined &&
+      goal.nodeId === node.id &&
+      goal.cursor === cursor &&
+      goal.viewportWidth === viewportWidth &&
+      goal.text === node.text &&
+      goal.focusToken === (snapshot.status === 'ready' ? snapshot.focus.token : undefined)
+        ? goal.left
+        : (startingGeometry?.position(cursor).left ?? 0)
+    try {
+      navigateVertically({
+        store,
+        node,
+        caret: initialCaret,
+        direction,
+        count: count * (event.key === 'J' || event.key === 'K' ? 10 : 1),
+        applyCaretState: (nodeId, caret, fromFocus) => {
+          const state = store.getSnapshot()
+          if (
+            startingGeometry !== undefined &&
+            state.status === 'ready' &&
+            fromFocus &&
+            previousCaret.imageActive &&
+            !caret.imageActive
+          )
+            preferredLeft =
+              geometry(requireNode(state.document, nodeId).node)?.position(caret.cursor).left ?? preferredLeft
+          previousCaret = caret
+          if (fromFocus === undefined) vim.applyCaretState(nodeId, caret)
+          else vim.applyCaretState(nodeId, caret, fromFocus)
+          if (state.status === 'ready' && startingGeometry !== undefined) {
+            commandState.verticalGoal = {
+              nodeId,
+              cursor: caret.cursor,
+              left: preferredLeft,
+              viewportWidth,
+              focusToken: state.focus.token,
+              text: requireNode(state.document, nodeId).node.text,
+            }
+          }
+        },
+        textLineCursor: (target, cursor, entering, resetColumn) => {
+          if (startingGeometry === undefined) return undefined
+          if (resetColumn) preferredLeft = 0
+          const measured = geometry(target)
+          return measured === undefined
+            ? undefined
+            : visualLineCursor(target.text, measured.position, cursor, direction, preferredLeft, entering)
+        },
+      })
+    } finally {
+      for (const measured of geometries.values()) measured.dispose()
+    }
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, node, input, motionCursor, node.text.length)
   } else if (visual && event.key === 'o') {

@@ -80,7 +80,18 @@ export function createPointerHandlers(
       setSelectAllNodeId(undefined)
       // A blur moves focus to a non-input control (a breadcrumb or enter-control click) or to
       // another node, so the command assembly that belongs to this node must clear with it.
+      const goal = commandState.verticalGoal
+      const snapshot = store.getSnapshot()
+      const verticalArrival =
+        event?.relatedTarget instanceof Element &&
+        event.relatedTarget.matches('.node-input') &&
+        goal !== undefined &&
+        goal.nodeId !== node.id &&
+        snapshot.status === 'ready' &&
+        snapshot.location.selectedNodeId === goal.nodeId &&
+        snapshot.focus.token === goal.focusToken
       clearCommandAssembly(commandState)
+      if (verticalArrival) commandState.verticalGoal = goal
       // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and
       // immediately moving focus onto it, which blurs *this* node as an incidental side effect
       // before the user has typed anything into the new one. Only finish a structural session

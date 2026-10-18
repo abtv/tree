@@ -15,6 +15,7 @@ import {
   readPersisted,
   seedDocument,
   setCursor,
+  setMainWindowBounds,
   startRowDrag,
   test,
 } from './fixtures'
@@ -33,6 +34,46 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: image caret', () => {
+  // @requirement PRODUCT.md §20.2.9
+  test('walks wrapped text before its image and returns from the next node through the final text line', async ({
+    userDataDir,
+  }, testInfo) => {
+    const text = 'A synthetic wrapped note with an attached image. '.repeat(8)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'wrapped', text, attachment: { id: 'wrapped-image', mimeType: 'image/png' }, children: [] },
+          { id: 'next', text: 'Next node', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'wrapped' },
+    })
+    seedAttachmentImage(userDataDir, 'wrapped-image')
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 680, height: 800 })
+    const first = node(window, 1)
+    await first.focus()
+    await setCursor(first, 0)
+    await window.keyboard.press('j')
+    await expect(first).not.toHaveClass(/node-input-image-caret/u)
+    await expect(first).toBeFocused()
+    await window.keyboard.press('$')
+    await window.keyboard.press('j')
+    await expect(first).toHaveClass(/node-input-image-caret/u)
+    await window.keyboard.press('k')
+    await expect(first).toHaveJSProperty('selectionStart', text.length - 1)
+    await window.keyboard.press('j')
+    await window.keyboard.press('j')
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('k')
+    await expect(first).toHaveClass(/node-input-image-caret/u)
+    await window.keyboard.press('k')
+    await expect(first).not.toHaveClass(/node-input-image-caret/u)
+    expect(await first.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBeGreaterThan(0)
+    await window.screenshot({ path: testInfo.outputPath('wrapped-image-return.png') })
+  })
+
   // @requirement PRODUCT.md §20.2.23
   for (const boundary of ['first', 'last'] as const) {
     test(`preserves text and image return carets when Visual Node motion clamps at the ${boundary} sibling`, async ({

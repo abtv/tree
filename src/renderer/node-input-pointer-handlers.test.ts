@@ -141,6 +141,29 @@ function mouse(currentTarget: HTMLElement, extra: Record<string, unknown> = {}) 
 }
 
 describe('blur', () => {
+  it.each(['arrival', 'same-node', 'different-selection', 'stale-focus', 'no-goal', 'control', 'loading'] as const)(
+    'retains the desired vertical column only for its verified destination: %s',
+    async (context) => {
+      const f = await fixture({ mode: 'normal' })
+      const handlers = f.handlers()
+      f.store.selectNode('other', 0)
+      const goal = {
+        nodeId: context === 'same-node' ? 'node' : context === 'different-selection' ? 'missing' : 'other',
+        cursor: 0,
+        left: 120,
+        viewportWidth: 640,
+        focusToken: f.snapshot().focus.token + (context === 'stale-focus' ? 1 : 0),
+        text: 'other',
+      }
+      f.commandState.verticalGoal = context === 'no-goal' ? undefined : goal
+      const destination = document.createElement(context === 'control' ? 'button' : 'textarea')
+      if (context !== 'control') destination.className = 'node-input'
+      if (context === 'loading') vi.spyOn(f.store, 'getSnapshot').mockReturnValue({ status: 'loading' })
+      handlers.onBlur({ relatedTarget: destination } as never)
+      expect(f.commandState.verticalGoal).toBe(context === 'arrival' ? goal : undefined)
+    },
+  )
+
   it('preserves editing sessions while the command panel temporarily borrows focus', async () => {
     const f = await fixture({ mode: 'replace' })
     const panel = document.createElement('label')

@@ -92,6 +92,46 @@ function scriptedStore(
 const IMAGE = { id: 'image', mimeType: 'image/png' as const }
 
 describe('Vim vertical navigation', () => {
+  it('consumes wrapped text steps before entering an image in a counted motion', () => {
+    const current = { ...node('a', 'abcdefghijkl'), attachment: IMAGE }
+    const navigationStore = store({ roots: [current, node('b', 'next')] }, 'a', null)
+    const applyCaretState = vi.fn()
+    const textLineCursor = (_node: TreeNode, cursor: number, entering: boolean) =>
+      entering ? 0 : cursor < 8 ? cursor + 4 : undefined
+    navigateVertically({
+      store: navigationStore,
+      node: current,
+      caret: { cursor: 0, imageActive: false },
+      direction: 'down',
+      count: 3,
+      applyCaretState,
+      textLineCursor,
+    })
+    expect(navigationStore.snapshot.location.selectedNodeId).toBe('a')
+    expect(applyCaretState.mock.calls.map((call) => call[1])).toEqual([
+      { cursor: 4, imageActive: false },
+      { cursor: 8, imageActive: false },
+      { cursor: 12, imageActive: true, imageTextReturnCursor: 8 },
+    ])
+  })
+
+  it('uses the destination text line even when the carried offset would reach its image', () => {
+    const first = node('a', 'abcdefghijkl')
+    const second = { ...node('b', 'hi'), attachment: IMAGE }
+    const navigationStore = store({ roots: [first, second] }, 'a', null)
+    const applyCaretState = vi.fn()
+    navigateVertically({
+      store: navigationStore,
+      node: first,
+      caret: { cursor: 10, imageActive: false },
+      direction: 'down',
+      count: 1,
+      applyCaretState,
+      textLineCursor: (_node, _cursor, entering) => (entering ? 1 : undefined),
+    })
+    expect(applyCaretState).toHaveBeenLastCalledWith('b', { cursor: 1, imageActive: false }, true)
+  })
+
   it('does nothing while the store is not ready', () => {
     const applyCaretState = vi.fn()
     const navigationStore = scriptedStore({ status: 'loading' }, [], (_direction, _cursor, current) => current)

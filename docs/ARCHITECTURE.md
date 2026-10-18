@@ -272,6 +272,10 @@ Performance assessment for Agenda state (`docs/PRODUCT.md` §22.1): opening, sel
 
 React is responsible for presentation and user interaction.
 
+Tree Normal vertical navigation uses `vim-vertical-navigation.ts` for caret and node transitions and a text-line callback measured by `editor-dom.ts`. Rich inputs use DOM ranges; textareas use a temporary mirror with the current computed font and width. An unmounted destination uses a temporary hidden row under the real list, sharing its indentation and input styles. Measurements live only for the command and are disposed afterward. `VimCommandState.verticalGoal` retains one desired horizontal position with the expected node, cursor, focus token, text and viewport width; mismatching context or a nonvertical command invalidates it. Pointer input clears it through the existing command-state owner; a blur caused by vertical navigation preserves it for the destination.
+
+Performance assessment (§22.1 of PRODUCT): vertical motions add layout reads over the visited inputs, with binary searches for line boundaries and a nearest-character scan of the destination line that also handles bidirectional text. They retain at most the command's measured rows until disposal plus one desired-position record afterward. They add no document edits, history entries, disk writes or syncs. The existing windowed Normal-navigation performance scenarios guard document-scale latency; wrapped-line E2E cases guard layout and cleanup behavior.
+
 The UI layer includes:
 
 * React components;

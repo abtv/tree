@@ -26,6 +26,17 @@ export type VimVisualMemory =
  * behavior is unit-testable without a browser.
  */
 export interface VimCommandState {
+  /** Desired text-relative x for consecutive Tree Normal vertical motions. */
+  verticalGoal?:
+    | {
+        nodeId: string
+        cursor: number
+        left: number
+        viewportWidth: number
+        focusToken: number | undefined
+        text: string
+      }
+    | undefined
   pending?: VimPendingCommand | undefined
   lastChange?: VimRepeatChange | undefined
   lastFind?: VimFindCommand | undefined
@@ -104,6 +115,7 @@ export function clearVisualRange(state: VimCommandState): void {
  * the last character find, and the structural insert session survive.
  */
 export function clearCommandAssembly(state: VimCommandState): void {
+  state.verticalGoal = undefined
   clearPending(state)
   clearVisualRange(state)
 }

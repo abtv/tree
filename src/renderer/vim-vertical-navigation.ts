@@ -15,6 +15,7 @@ export interface VimVerticalNavigationOptions {
   direction: 'up' | 'down'
   count: number
   applyCaretState: (nodeId: string, state: VimCaretState, isFocus?: boolean) => void
+  textLineCursor?: (node: TreeNode, cursor: number, entering: boolean, resetColumn?: boolean) => number | undefined
 }
 
 /** Apply counted vertical motion, including same-node image steps and focus transitions. */
@@ -25,6 +26,7 @@ export function navigateVertically({
   direction,
   count,
   applyCaretState,
+  textLineCursor,
 }: VimVerticalNavigationOptions): void {
   let currentNode = node
   let caret = initialCaret
@@ -33,6 +35,15 @@ export function navigateVertically({
   for (let index = 0; index < count; index += 1) {
     const before = store.getSnapshot()
     if (before.status !== 'ready') break
+    if (!caret.imageActive) {
+      const lineCursor = textLineCursor?.(currentNode, caret.cursor, false)
+      if (lineCursor !== undefined) {
+        caret = { cursor: lineCursor, imageActive: false }
+        navigationCursor = lineCursor
+        applyCaretState(currentNode.id, caret)
+        continue
+      }
+    }
     // Counted vertical motion crosses onto the adjacent visible row, or to the current-parent
     // heading when moving up from the first visible row.
     const rows = store.getVisibleRows()
@@ -48,7 +59,7 @@ export function navigateVertically({
       caret,
       direction,
       currentNode.text.length,
-      index === 0 && currentNode.attachment !== undefined,
+      currentNode.id === node.id && currentNode.attachment !== undefined,
       canCrossNode,
     )
     if (!step.crossNode) {
@@ -84,6 +95,7 @@ export function navigateVertically({
     }
     if (after.document === undefined) continue
     const crossedToDifferentNode = after.location.selectedNodeId !== currentNode.id
+    const leftImage = caret.imageActive
     currentNode = requireNode(after.document, after.location.selectedNodeId).node
     caret = focusCaretTransition(
       caret,
@@ -93,6 +105,15 @@ export function navigateVertically({
       true,
       direction === 'up' && crossedToDifferentNode,
     )
+    // Retain the existing counted-image arrival offset; wrapped text only changes text-line steps.
+    if (crossedToDifferentNode && currentNode.text.length > 0 && !(leftImage && index > 0 && direction === 'down')) {
+      const lineCursor = textLineCursor?.(currentNode, caret.cursor, true, direction === 'down' && leftImage)
+      if (lineCursor !== undefined)
+        caret =
+          direction === 'up' && caret.imageActive
+            ? { ...caret, imageTextReturnCursor: lineCursor }
+            : { cursor: lineCursor, imageActive: false }
+    }
     applyCaretState(currentNode.id, caret, true)
   }
 }

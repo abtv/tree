@@ -34,6 +34,17 @@ function populatedState(): VimCommandState {
 }
 
 describe('createVimCommandState', () => {
+  it('keeps the desired vertical column through count assembly but clears it for a new command context', () => {
+    const state = populatedState()
+    const goal = { nodeId: 'a', cursor: 2, left: 100, viewportWidth: 640, focusToken: 1, text: 'abc' }
+    state.verticalGoal = goal
+    clearPending(state)
+    expect(state.verticalGoal).toBe(goal)
+    clearCommandAssembly(state)
+    expect(state.verticalGoal).toBeUndefined()
+    expect(state.lastChange).toBe(change)
+  })
+
   it('starts with every slot empty', () => {
     const state = createVimCommandState()
     expect(state.pending).toBeUndefined()

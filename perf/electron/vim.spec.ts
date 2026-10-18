@@ -724,12 +724,22 @@ test.describe('Vim interactions at scale', () => {
     test(`wide-${siblingCount} Normal navigation stays windowed`, async ({ userDataDir }) => {
       const middle = Math.floor(siblingCount / 2)
       const seed = wideSeed(siblingCount)
+      if (siblingCount === 1_000) {
+        const seedDocumentValue = seed.document as { roots: { children: { text: string }[] }[] }
+        seedDocumentValue.roots[0]!.children[middle]!.text =
+          'A wrapped synthetic note for vertical navigation. '.repeat(12)
+      }
       seed.location = { currentParentId: 'root', selectedNodeId: `c${middle}` }
       seedDocument(userDataDir, seed)
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const middleInput = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
       await middleInput.focus()
       await expect(middleInput).toBeFocused()
+      if (siblingCount === 1_000) {
+        await window.keyboard.press('j')
+        await expect(middleInput).toBeFocused()
+        await window.keyboard.press('k')
+      }
 
       await window.evaluate(() => {
         const samples: number[] = []

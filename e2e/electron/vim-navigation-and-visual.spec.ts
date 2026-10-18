@@ -11,6 +11,7 @@ import {
   lockSystemClipboard,
   node,
   nodeTexts,
+  parent,
   pressShifted,
   seedDocument,
   setCursor,
@@ -41,8 +42,241 @@ const selectionColors = (field: ReturnType<typeof node>) =>
     return { background: style?.backgroundColor, color: style?.color }
   })
 
+const caretOffset = (field: ReturnType<typeof node>) =>
+  field.evaluate((element) => {
+    if (element instanceof HTMLTextAreaElement) return element.selectionStart
+    const selection = window.getSelection()
+    if (selection === null || selection.rangeCount === 0) return -1
+    const prefix = document.createRange()
+    prefix.selectNodeContents(element)
+    prefix.setEnd(selection.getRangeAt(0).startContainer, selection.getRangeAt(0).startOffset)
+    return prefix.toString().length
+  })
+
 test.describe('Vim editing: navigation and Visual modes', () => {
   test.use({ sharedApplicationReset: sharedApplicationAdopted() })
+
+  test.describe('wrapped Normal navigation', () => {
+    test.use({ sharedApplicationReset: 'off' })
+
+    // @requirement PRODUCT.md §20.2.9
+    test('keeps the visual column across wrapped bidirectional text', async ({ userDataDir }) => {
+      const url = 'https://example.com'
+      const text = '\u05d0\u05d1\u05d2\u05d3\u05d4\u05d5\u05d6\u05d7\u05d8 '.repeat(20) + url
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'bidi', text, links: [{ start: text.length - url.length, end: text.length, url }], children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'bidi' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await setMainWindowBounds(app, { width: 680, height: 640 })
+      const first = node(window, 1)
+      await first.focus()
+      const positions = await first.evaluate((element) => {
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+        const positions: { left: number; top: number }[] = []
+        let child = walker.nextNode()
+        while (child !== null) {
+          for (let index = 0; index < (child.textContent?.length ?? 0); index += 1) {
+            const range = document.createRange()
+            range.setStart(child, index)
+            range.setEnd(child, index + 1)
+            const { left, top } = range.getBoundingClientRect()
+            positions.push({ left, top })
+          }
+          child = walker.nextNode()
+        }
+        return positions
+      })
+      const start = 3
+      const origin = positions[start]!
+      const nextTop = positions.find((position) => position.top > origin.top + 1)!.top
+      const candidates = positions
+        .map((position, offset) => ({ ...position, offset }))
+        .filter((position) => Math.abs(position.top - nextTop) < 1)
+        .sort((a, b) => Math.abs(a.left - origin.left) - Math.abs(b.left - origin.left))
+      await setCursor(first, start)
+      await window.keyboard.press('j')
+      await expect.poll(() => caretOffset(first)).toBe(candidates[0]!.offset)
+      await window.keyboard.press('k')
+      await expect.poll(() => caretOffset(first)).toBe(start)
+    })
+
+    for (const rich of [false, true]) {
+      // @requirement PRODUCT.md §20.2.9
+      test(`walks wrapped visual lines before leaving a ${rich ? 'rich' : 'plain'} node with j and k`, async ({
+        userDataDir,
+      }, testInfo) => {
+        const base = 'A long synthetic note with several words that wrap across visible lines. '.repeat(4)
+        const url = 'https://example.com'
+        const text = rich ? base + url : base
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              {
+                id: 'wrapped',
+                text,
+                children: [],
+                ...(rich ? { links: [{ start: base.length, end: text.length, url }] } : {}),
+              },
+              { id: 'next', text: 'Next node', children: [] },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'wrapped' },
+        })
+        const { app, window } = await launchTree(userDataDir)
+        await setMainWindowBounds(app, { width: 540, height: 640 })
+        const first = node(window, 1)
+        expect(await first.evaluate((element) => element instanceof HTMLTextAreaElement)).toBe(!rich)
+        await first.focus()
+        await setCursor(first, 0)
+        await window.keyboard.press('j')
+        await expect(first).toBeFocused()
+        const secondLine = await caretOffset(first)
+        expect(secondLine).toBeGreaterThan(0)
+        await window.screenshot({ path: testInfo.outputPath('wrapped-second-line.png') })
+        await window.keyboard.press('k')
+        await expect.poll(() => caretOffset(first)).toBe(0)
+        const narrowWidth = await first.evaluate((element) => element.getBoundingClientRect().width)
+        await setMainWindowBounds(app, { width: 1100, height: 640 })
+        await expect
+          .poll(() => first.evaluate((element) => element.getBoundingClientRect().width))
+          .toBeGreaterThan(narrowWidth)
+        await window.keyboard.press('j')
+        expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+        await window.keyboard.press('k')
+        await expect.poll(() => caretOffset(first)).toBe(0)
+        await setMainWindowBounds(app, { width: 640, height: 640 })
+        await expect.poll(() => first.evaluate((element) => element.getBoundingClientRect().width)).toBe(narrowWidth)
+        await window.keyboard.press('j')
+        await expect.poll(() => caretOffset(first)).toBe(secondLine)
+        await window.keyboard.press('k')
+        await setCursor(first, 10)
+        await window.keyboard.press('j')
+        expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+        await window.keyboard.press('k')
+        await expect.poll(() => caretOffset(first)).toBe(10)
+        await setCursor(first, 0)
+        await window.keyboard.press('2')
+        await window.keyboard.press('j')
+        await expect(first).toBeFocused()
+        expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+        await window.keyboard.press('2')
+        await window.keyboard.press('k')
+        await expect.poll(() => caretOffset(first)).toBe(0)
+        await window.keyboard.press('9')
+        await window.keyboard.press('9')
+        await window.keyboard.press('j')
+        await expect(node(window, 2)).toBeFocused()
+        await window.keyboard.press('k')
+        await expect(first).toBeFocused()
+        expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+      })
+    }
+
+    // @requirement PRODUCT.md §20.2.9
+    test('counts wrapped lines in unmounted destinations with the same offsets as mounted rows', async ({
+      userDataDir,
+    }) => {
+      const node = (window: Page, index: number) => window.getByRole('textbox', { name: `Node ${index}`, exact: true })
+      seedDocument(userDataDir, {
+        document: {
+          roots: Array.from({ length: 600 }, (_, index) => ({
+            id: `n${index}`,
+            text: index === 100 ? 'A wrapped destination with synthetic words. '.repeat(12) : `Row ${index}`,
+            children: [],
+          })),
+        },
+        location: { currentParentId: null, selectedNodeId: 'n0' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await setMainWindowBounds(app, { width: 680, height: 640 })
+      await node(window, 1).focus()
+      await expect(node(window, 101)).toHaveCount(0)
+      await window.keyboard.type('101j')
+      await expect(node(window, 101)).toBeFocused()
+      const secondLine = await caretOffset(node(window, 101))
+      expect(secondLine).toBeGreaterThan(0)
+      await window.keyboard.press('k')
+      await expect.poll(() => caretOffset(node(window, 101))).toBe(0)
+      await window.keyboard.press('k')
+      await expect(node(window, 100)).toBeFocused()
+      await window.keyboard.type('2j')
+      await expect(node(window, 101)).toBeFocused()
+      await expect.poll(() => caretOffset(node(window, 101))).toBe(secondLine)
+      await expect(window.locator('.node-list > [aria-hidden="true"].node-row')).toHaveCount(0)
+    })
+
+    // @requirement PRODUCT.md §20.2.9
+    test('walks the current-parent heading before moving to its first child and back', async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            {
+              id: 'heading',
+              text: 'A long synthetic current parent heading. '.repeat(5),
+              children: [{ id: 'child', text: 'Child', children: [] }],
+            },
+          ],
+        },
+        location: { currentParentId: 'heading', selectedNodeId: 'heading' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await setMainWindowBounds(app, { width: 680, height: 640 })
+      await parent(window).focus()
+      await setCursor(parent(window), 0)
+      await window.keyboard.press('j')
+      await expect(parent(window)).toBeFocused()
+      expect(await caretOffset(parent(window))).toBeGreaterThan(0)
+      await window.keyboard.press('k')
+      await expect.poll(() => caretOffset(parent(window))).toBe(0)
+      await window.keyboard.type('99j')
+      await expect(node(window, 1)).toBeFocused()
+      await window.keyboard.press('k')
+      await expect(parent(window)).toBeFocused()
+      expect(await caretOffset(parent(window))).toBeGreaterThan(0)
+    })
+
+    // @requirement PRODUCT.md §20.2.9
+    test('remembers the desired column through short nodes and resets it after pointer and text motions', async ({
+      userDataDir,
+    }) => {
+      const long = 'abcdefghijklmnopqrstuvwxyz'
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'first', text: long, children: [] },
+            { id: 'short', text: 'tiny', children: [] },
+            { id: 'last', text: long, children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await node(window, 1).focus()
+      await setCursor(node(window, 1), 20)
+      await window.keyboard.press('j')
+      await expect.poll(() => caretOffset(node(window, 2))).toBe(3)
+      await window.keyboard.press('j')
+      await expect.poll(() => caretOffset(node(window, 3))).toBe(20)
+      await window.keyboard.press('k')
+      await expect.poll(() => caretOffset(node(window, 2))).toBe(3)
+      await window.keyboard.press('k')
+      await expect.poll(() => caretOffset(node(window, 1))).toBe(20)
+      await window.keyboard.press('j')
+      await window.keyboard.press('h')
+      await window.keyboard.press('j')
+      await expect.poll(() => caretOffset(node(window, 3))).toBe(2)
+      await window.keyboard.press('k')
+      await node(window, 2).click({ position: { x: 7, y: 8 } })
+      const clicked = await caretOffset(node(window, 2))
+      await window.keyboard.press('j')
+      await expect.poll(() => caretOffset(node(window, 3))).toBe(clicked)
+    })
+  })
 
   // @requirement PRODUCT.md §20.2.9
   // @requirement PRODUCT.md §20.2.23
