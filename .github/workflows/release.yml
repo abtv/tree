@@ -1,4 +1,4 @@
-name: Browser release
+name: CI and browser release
 
 on:
   push:
