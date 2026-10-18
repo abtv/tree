@@ -104,19 +104,20 @@ export function createFirstChildTransition(
 }
 
 /**
- * Vim `o` on a selected node (`docs/PRODUCT.md` §20.2.10): a node with children gets an empty first child
- * in place, without changing the displayed location; a leaf, or the current-parent heading, keeps the
+ * Vim `o` on a selected node (`docs/PRODUCT.md` §20.2.10): an expanded node with children gets an empty first child
+ * in place, without changing the displayed location; a collapsed node, leaf, or current-parent heading keeps the
  * plain sibling-below creation. `expandId` names the node whose fold must open to show the new child.
  */
 export function openBelowTransition(
   document: Document,
   location: Location,
   createId: () => NodeId,
+  expanded = false,
 ): StructuralTransition & { expandId?: NodeId } {
   const selected = requireNode(document, location.selectedNodeId)
   const outside = createAfterEmptyParentTransition(document, location, selected, createId)
   if (outside !== undefined) return outside
-  if (selected.node.children.length === 0 || location.currentParentId === location.selectedNodeId) {
+  if (!expanded || selected.node.children.length === 0 || location.currentParentId === location.selectedNodeId) {
     return createSiblingTransition(document, location, 'after', createId)
   }
   // A node with children is above the depth limit, so a new child beside them always fits.

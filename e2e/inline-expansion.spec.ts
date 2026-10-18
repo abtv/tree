@@ -609,7 +609,9 @@ test.describe('inline node expansion (Vim editing only)', () => {
     ])
   })
 
-  test('opens an empty first child with o on a collapsed node that has children, keeping the location', async ({
+  // @requirement PRODUCT.md §20.2.10
+  // @requirement PRODUCT.md §20.2.19
+  test('opens below with o and dot at the visible level without changing folds or location', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, nestedSeed())
@@ -619,18 +621,70 @@ test.describe('inline node expansion (Vim editing only)', () => {
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
 
     await window.keyboard.press('o')
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
+    await window.screenshot({ path: test.info().outputPath('o-collapsed.png') })
     await window.keyboard.type('New')
     await window.keyboard.press('Escape')
 
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Bravo'])
+    await window.keyboard.press('u')
+    expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
+    await window.keyboard.press('u')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+    await window.keyboard.press('Control+r')
+    expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
+    await window.keyboard.press('Control+r')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Bravo'])
+    await window.keyboard.press('u')
+    await window.keyboard.press('u')
+
+    // Replay uses the target's current fold, rather than the original insertion level.
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
+    await window.keyboard.press('.')
     expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     expect(await window.getByLabel('Current location').innerText()).toBe(locationBefore)
+
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await window.keyboard.press('o')
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Alpha child one', 'Alpha child two', 'Bravo'])
+    const rows = window.locator('.node-row')
+    expect(await rows.nth(1).getAttribute('data-depth')).toBe(await rows.nth(2).getAttribute('data-depth'))
+    expect(Number(await rows.nth(1).getAttribute('data-depth'))).toBe(
+      Number(await rows.nth(0).getAttribute('data-depth')) + 1,
+    )
+    await window.screenshot({ path: test.info().outputPath('o-expanded.png') })
+    await window.keyboard.type('Child')
+    await window.keyboard.press('Escape')
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('c')
+    await window.keyboard.press('.')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Bravo'])
+    await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.keyboard.press('u')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Alpha child one', 'Alpha child two', 'Bravo'])
 
     // A leaf still gets a sibling below.
     await node(window, 5).focus()
     await window.keyboard.press('o')
     await window.keyboard.press('Escape')
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Alpha child one', 'Alpha child two', 'Bravo', ''])
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Alpha child one', 'Alpha child two', 'Bravo', ''])
   })
 
   test('keeps the location when deleting with dd and undoing with u a visible descendant', async ({ userDataDir }) => {

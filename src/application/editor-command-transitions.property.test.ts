@@ -14,6 +14,41 @@ import {
 import { buildVisibleRows } from './visible-rows'
 
 describe('editor command transition properties', () => {
+  it('opens below at the visible level while preserving existing subtrees and identities', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.string(), { minLength: 1, maxLength: 8 }),
+        fc.boolean(),
+        fc.boolean(),
+        (texts, expanded, focused) => {
+          const branch: TreeNode = {
+            id: 'branch',
+            text: 'Branch',
+            children: texts.map((text, index) => ({ id: `child-${index}`, text, children: [] })),
+          }
+          const siblings = [branch, { id: 'next', text: 'Next', children: [] }]
+          const document: Document = {
+            roots: focused ? [{ id: 'scope', text: 'Scope', children: siblings }] : siblings,
+          }
+          const location = { currentParentId: focused ? 'scope' : null, selectedNodeId: 'branch' }
+          const result = openBelowTransition(document, location, () => 'new', expanded)
+          assertDocument(result.document)
+          const created = locateNode(result.document, 'new')!
+          expect(created.parent?.id ?? null).toBe(expanded ? 'branch' : location.currentParentId)
+          expect(created.siblings.map((node) => node.id)).toEqual(
+            expanded ? ['new', ...branch.children.map((node) => node.id)] : ['branch', 'new', 'next'],
+          )
+          expect(locateNode(result.document, 'branch')!.node.children.filter((node) => node.id !== 'new')).toEqual(
+            branch.children,
+          )
+          expect(locateNode(result.document, 'next')!.node).toBe(siblings[1])
+          expect(result.location).toEqual({ ...location, selectedNodeId: 'new' })
+          expect(result.focus).toEqual({ nodeId: 'new', cursor: 0 })
+        },
+      ),
+    )
+  })
+
   it('removes exactly one preceding blank without changing the current subtree at any displayed depth', () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { minLength: 1, maxLength: 10 }), (texts) => {

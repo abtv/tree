@@ -835,11 +835,16 @@ export class EditorStore {
   }
 
   private openTransition(
-    state: { document: Document; location: Location },
+    state: { document: Document; location: Location; expansion: ExpansionState },
     position: 'before' | 'after',
   ): StructuralTransition & { expandId?: NodeId } {
     return position === 'after'
-      ? openBelowTransition(state.document, state.location, this.createId)
+      ? openBelowTransition(
+          state.document,
+          state.location,
+          this.createId,
+          isNodeExpanded(state.expansion, state.location.selectedNodeId),
+        )
       : createSiblingTransition(state.document, state.location, position, this.createId)
   }
 
@@ -939,7 +944,7 @@ export class EditorStore {
 
   /**
    * Vim `p` (`docs/PRODUCT.md` §20.2.13): on a node with children, "after" puts the content before its
-   * first child, like `o`, and `expandId` names the node whose fold must open to show it. `P` keeps
+   * first child even when collapsed, and `expandId` names the fold that must open to show it. `P` keeps
    * the plain sibling-before insertion.
    */
   private putTarget(

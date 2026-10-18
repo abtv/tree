@@ -2321,45 +2321,61 @@ describe('EditorStore', () => {
     })
   })
 
-  it('opens a first child in place, expanding a collapsed node, when the selected node has children', async () => {
-    const services = loadedState(
-      {
-        roots: [
-          {
-            id: 'root',
-            text: 'Root',
-            children: [
-              { id: 'p', text: 'P', children: [{ id: 'c', text: 'C', children: [] }] },
-              { id: 'leaf', text: 'Leaf', children: [] },
-            ],
-          },
-        ],
-      },
-      { currentParentId: 'root', selectedNodeId: 'p' },
-    )
-    const store = new EditorStore(services, ids('first', 'repeat'))
-    const ready = (target: EditorStore) => target.getSnapshot() as ReadySnapshot
-    await store.initialize()
-    expect(ready(store).expansion.expandedIds.has('p')).toBe(false)
+  it.each([false, true])(
+    'opens below according to expansion, including replay with text (expanded: %s)',
+    async (expanded) => {
+      const services = loadedState(
+        {
+          roots: [
+            {
+              id: 'root',
+              text: 'Root',
+              children: [
+                { id: 'p', text: 'P', children: [{ id: 'c', text: 'C', children: [] }] },
+                { id: 'leaf', text: 'Leaf', children: [] },
+              ],
+            },
+          ],
+        },
+        { currentParentId: 'root', selectedNodeId: 'p' },
+      )
+      const store = new EditorStore(services, ids('first', 'repeat'))
+      const ready = (target: EditorStore) => target.getSnapshot() as ReadySnapshot
+      await store.initialize()
+      if (expanded) store.toggleExpansion('p')
+      const expansionBefore = ready(store).expansion
 
-    expect(store.createSibling('after')).toBe(true)
-    expect(ready(store)).toMatchObject({
-      document: {
-        roots: [{ children: [{ id: 'p', children: [{ id: 'first', text: '' }, { id: 'c' }] }, { id: 'leaf' }] }],
-      },
-      location: { currentParentId: 'root', selectedNodeId: 'first' },
-      focus: { nodeId: 'first', cursor: 0 },
-    })
-    expect(ready(store).expansion.expandedIds.has('p')).toBe(true)
+      expect(store.createSibling('after')).toBe(true)
+      expect(ready(store)).toMatchObject({
+        document: {
+          roots: [
+            {
+              children: expanded
+                ? [{ id: 'p', children: [{ id: 'first', text: '' }, { id: 'c' }] }, { id: 'leaf' }]
+                : [{ id: 'p', children: [{ id: 'c' }] }, { id: 'first', text: '' }, { id: 'leaf' }],
+            },
+          ],
+        },
+        location: { currentParentId: 'root', selectedNodeId: 'first' },
+        focus: { nodeId: 'first', cursor: 0 },
+      })
+      expect(ready(store).expansion).toBe(expansionBefore)
 
-    store.undo()
-    expect(ready(store).document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['c'])
+      store.undo()
+      expect(ready(store).document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['c'])
+      store.redo()
+      expect(ready(store).location.selectedNodeId).toBe('first')
+      store.undo()
 
-    store.selectNode('p', 0)
-    store.createSiblingWithText('after', 'Typed')
-    expect(ready(store).document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['repeat', 'c'])
-    expect(ready(store).document.roots[0]!.children[0]!.children[0]!.text).toBe('Typed')
-  })
+      store.selectNode('p', 0)
+      store.createSiblingWithText('after', 'Typed')
+      const parent = ready(store).document.roots[0]!.children[0]!
+      expect(parent.children.map((node) => node.id)).toEqual(expanded ? ['repeat', 'c'] : ['c'])
+      const inserted = expanded ? parent.children[0]! : ready(store).document.roots[0]!.children[1]!
+      expect(inserted).toMatchObject({ id: 'repeat', text: 'Typed' })
+      expect(ready(store).expansion).toBe(expansionBefore)
+    },
+  )
 
   it('returns to the current parent after deleting its only child', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))

@@ -575,8 +575,13 @@ describe('editor command transitions', () => {
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['image', 'created'])
   })
 
-  it('opens a first child in place for a selected node with children and a sibling below for a leaf', () => {
-    const child = openBelowTransition(document, { currentParentId: null, selectedNodeId: 'root' }, () => 'new-child')
+  it('opens a first child in place for an expanded node with children and a sibling below for a leaf', () => {
+    const child = openBelowTransition(
+      document,
+      { currentParentId: null, selectedNodeId: 'root' },
+      () => 'new-child',
+      true,
+    )
 
     if (!('document' in child)) throw new Error('Expected an accepted transition.')
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['new-child', 'first', 'second'])
@@ -584,11 +589,26 @@ describe('editor command transitions', () => {
     expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
     expect(child.expandId).toBe('root')
 
-    const sibling = openBelowTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, () => 'below')
+    // A remembered expansion may remain after the final child is removed; a leaf still gets a sibling.
+    const sibling = openBelowTransition(
+      document,
+      { currentParentId: 'root', selectedNodeId: 'first' },
+      () => 'below',
+      true,
+    )
     if (!('document' in sibling)) throw new Error('Expected an accepted transition.')
     expect(sibling.document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'below', 'second'])
     expect(sibling.location).toEqual({ currentParentId: 'root', selectedNodeId: 'below' })
     expect(sibling.expandId).toBeUndefined()
+  })
+
+  it('opens a sibling after a collapsed subtree without changing its children or expansion', () => {
+    const result = openBelowTransition(document, { currentParentId: null, selectedNodeId: 'root' }, () => 'below')
+    expect(result.document.roots.map((node) => node.id)).toEqual(['root', 'below', 'other-root'])
+    expect(result.document.roots[0]).toBe(document.roots[0])
+    expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'below' })
+    expect(result.focus).toEqual({ nodeId: 'below', cursor: 0 })
+    expect(result.expandId).toBeUndefined()
   })
 
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {
