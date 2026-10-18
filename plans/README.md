@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Ctrl as the primary modifier in the browser](ctrl-primary-modifier.md) | Awaiting owner acceptance | Round C: accept the delivered result or report issues |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
