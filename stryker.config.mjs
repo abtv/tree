@@ -6,7 +6,7 @@ if (shard && !['domain', 'application', 'renderer'].includes(shard)) {
   throw new Error(`Unknown mutation shard: ${shard}`)
 }
 
-/** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
+/** @satisfies {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
   testRunner: 'vitest',
   vitest: { configFile: 'vitest.config.ts' },

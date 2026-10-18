@@ -11,7 +11,7 @@ prefix_rule(
     justification = "Run the trusted repository's unit tests outside the sandbox without repeated approval",
     match = [
         "npm test",
-        "npm test -- scripts/retire-scratch.test.mjs",
+        "npm test -- scripts/retire-scratch.test.mts",
     ],
     not_match = ["npm install", "npm exec node", "node arbitrary-script.mjs", "npm testing"],
 )
@@ -20,7 +20,7 @@ prefix_rule(
     decision = "allow",
     justification = "Run the trusted repository's named validation workflows outside the sandbox without repeated approval",
     match = [
-        "npm run test -- scripts/retire-scratch.test.mjs",
+        "npm run test -- scripts/retire-scratch.test.mts",
         "npm run test:coverage",
         "npm run test:performance",
         "npm run check",

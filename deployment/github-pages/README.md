@@ -45,6 +45,11 @@ from commit `1e5bd76` is obsolete; remove it in the same normal target commit.
 Do not amend or reset that earlier commit. Preserve README and application data.
 The workflow-only update does not publish a package.
 
+Release tools now use `.mts` and run directly on the pinned Node 24 runtime.
+The `cli.mjs`, `publish.mjs`, and `verify-target.mjs` entry points remain as small
+compatibility launchers for previously installed workflows. Updating the target
+workflow to the current template is not required for this filename migration.
+
 The protected target workflow resolves `abtv/tree` main through GitHub's API,
 then checks out verifier code at that immutable SHA. The signed manifest must
 name the same source SHA. It never executes target scripts, local Actions or

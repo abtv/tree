@@ -50,7 +50,7 @@ jobs:
       - name: Report performance drift
         if: always()
         continue-on-error: true
-        run: node scripts/perf-report.mjs test-results/perf-results.json perf-baseline/perf-results.json
+        run: node scripts/perf-report.mts test-results/perf-results.json perf-baseline/perf-results.json
 
       - name: Upload performance results
         if: always()

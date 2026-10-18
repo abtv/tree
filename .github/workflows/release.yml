@@ -35,7 +35,7 @@ jobs:
         env:
           BEFORE_SHA: ${{ github.event.before }}
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/web-release/cli.mjs changes "$BEFORE_SHA" "$GITHUB_SHA"
+        run: node scripts/web-release/cli.mts changes "$BEFORE_SHA" "$GITHUB_SHA"
 
   check:
     name: Standard checks
@@ -82,7 +82,7 @@ jobs:
           RELEASE_RESULTS: ${{ toJSON(needs) }}
           RELEASE_MEMORY_REQUIRED: ${{ needs.changes.outputs.memory }}
           RELEASE_DEMO_REQUIRED: ${{ needs.changes.outputs.demo }}
-        run: node scripts/web-release/cli.mjs gate
+        run: node scripts/web-release/cli.mts gate
 
   sign:
     name: Sign authenticated package
@@ -109,7 +109,7 @@ jobs:
       - name: Authenticate previous assets and prepare complete manifest
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/web-release/cli.mjs prepare signed-browser/web signed-browser/web-provenance.json
+        run: node scripts/web-release/cli.mts prepare signed-browser/web signed-browser/web-provenance.json
       - name: Attest the exact manifest committing to all package bytes
         id: attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
@@ -156,7 +156,7 @@ jobs:
       - name: Check package and source gate before obtaining write access
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/web-release/publish.mjs preflight verified-browser/web verified-browser/web-provenance.json
+        run: node scripts/web-release/publish.mts preflight verified-browser/web verified-browser/web-provenance.json
       - name: Create target-only installation token
         id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
@@ -170,4 +170,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           WEB_TARGET_TOKEN: ${{ steps.app.outputs.token }}
-        run: node scripts/web-release/publish.mjs transfer verified-browser/web verified-browser/web-provenance.json
+        run: node scripts/web-release/publish.mts transfer verified-browser/web verified-browser/web-provenance.json

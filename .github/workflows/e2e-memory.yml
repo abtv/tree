@@ -15,7 +15,7 @@ on:
       - 'e2e/electron/clipboard-lock.ts'
       - 'playwright*.config.ts'
       - 'tsconfig.e2e.json'
-      - 'scripts/e2e-diagnose.mjs'
+      - 'scripts/e2e-diagnose.mts'
       - 'package.json'
       - 'package-lock.json'
       - '.nvmrc'

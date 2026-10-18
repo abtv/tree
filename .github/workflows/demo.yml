@@ -28,7 +28,7 @@ jobs:
       - name: Record demo video
         run: npm run demo:video
       - name: Capture README screenshots
-        run: node scripts/readme-screenshots.mjs
+        run: node scripts/readme-screenshots.mts
       # Pages replaces the whole site on each deployment, so the video and screenshots publish together.
       - name: Assemble Pages content
         run: |

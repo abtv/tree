@@ -12,6 +12,6 @@ prefix_rule(
         "npm run retire:scratch --prefix /other/repository -- completed-task",
         "git worktree remove --force .scratch/task/checkout",
         "rm -rf .scratch/task",
-        "node scripts/retire-scratch.mjs task",
+        "node scripts/retire-scratch.mts task",
     ],
 )
