@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 
 const ready = (page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
 const saved = (page) =>
@@ -106,7 +106,7 @@ test('preserves browser storage through restart and failure recovery', async ({
   expect(durableText).not.toBe(visibleText)
   expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
   expect(await page.locator('.tree-app.vim-state-replace').count()).toBeTruthy()
-  await page.keyboard.press('Meta+Shift+p')
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
   await page.getByRole('combobox', { name: 'Command', exact: true }).waitFor()
   await page.getByRole('combobox', { name: 'Command', exact: true }).fill('theme')
   expect(

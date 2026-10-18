@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 
 test('flushes quit edits and recovers from failed or refused close', async ({ newContext, baseURL }) => {
   const context = await newContext()
@@ -31,7 +31,7 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
     await closed
   }
   await input().fill('Quit must save this pending edit')
-  await page.keyboard.press('Meta+Shift+p')
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
   await page.getByRole('combobox', { name: 'Command', exact: true }).fill('quit')
   await pressToClose('Enter')
   expect(dialogs, 'A successful quit must not show an informational alert').toEqual([])
@@ -47,7 +47,7 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
   await input().press('Z')
   const bufferedText = await input().inputValue()
   expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
-  await pressToClose('Meta+q')
+  await pressToClose(`${primaryKey}+q`)
   page = await open()
   expect(await input().inputValue(), 'Keyboard quit must flush the pending Replace buffer').toBe(bufferedText)
   await page.locator('#tree-menu-button').click()

@@ -31,6 +31,9 @@ Platform entry points live in `src/electron/main/`, `src/electron/preload/`
 and `src/web/`. Shared domain, application, renderer, contracts and infrastructure
 remain directly under `src/`. Browser build and server tools live in `scripts/web/`.
 
+The browser entry detects Apple device identity through `src/web/device.ts` and
+injects the existing Apple or non-Apple shortcut profile into `App`.
+
 The owner-reviewed local browser implementation under `src/web/` reuses the
 React renderer, application store and domain
 through a browser `TreeApi` adapter, using IndexedDB and Web Locks. The Electron

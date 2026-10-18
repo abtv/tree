@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture, pressPaste } from './fixtures.mjs'
+import { test, expect, capture, pressPaste, primaryKey } from './fixtures.mjs'
 
 // @requirement PRODUCT.md §1.4
 test('uses native text paste in every Vim mode and editor location', async ({ newContext, baseURL }) => {
@@ -33,7 +33,7 @@ test('uses native text paste in every Vim mode and editor location', async ({ ne
     }
   })
   for (const scope of ['tree', 'parent', 'agenda']) {
-    if (scope === 'agenda') await page.keyboard.press('Meta+p')
+    if (scope === 'agenda') await page.keyboard.press(`${primaryKey}+p`)
     const input =
       scope === 'parent'
         ? page.getByRole('textbox', { name: 'Current parent', exact: true })
@@ -87,9 +87,9 @@ test('pastes an external image from the native event without requesting clipboar
   expect(await page.evaluate(() => window.programmaticReads)).toBe(0)
   expect(await page.evaluate(() => window.nativePastes)).toBe(1)
   await capture(page, 'native-image-paste.png')
-  await page.keyboard.press('Meta+z')
+  await page.keyboard.press(`${primaryKey}+z`)
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(0)
-  await page.keyboard.press('Meta+Shift+z')
+  await page.keyboard.press(`${primaryKey}+Shift+z`)
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(1)
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   await page.reload()

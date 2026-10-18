@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test'
 import { rm } from 'node:fs/promises'
 
 export { expect }
+export const primaryKey = process.platform === 'darwin' ? 'Meta' : 'Control'
 
 export const test = base.extend({
   newContext: async ({ browser, headless }, use) => {
@@ -9,12 +10,21 @@ export const test = base.extend({
     const contexts = []
     try {
       await use(async (options = {}) => {
+        const { shortcutPlatform, ...contextOptions } = options
         const context = await browser.newContext({
           viewport: { width: 1100, height: 760 },
           colorScheme: 'light',
-          ...options,
+          ...contextOptions,
         })
         contexts.push(context)
+        if (shortcutPlatform) {
+          await context.addInitScript(
+            (platform) => {
+              Object.defineProperty(navigator, 'platform', { configurable: true, get: () => platform })
+            },
+            shortcutPlatform === 'apple' ? 'MacIntel' : 'Win32',
+          )
+        }
         return context
       })
     } finally {
@@ -41,21 +51,16 @@ export const test = base.extend({
   },
 })
 
-// Presses Command+V with the native paste command. Playwright attaches that command itself only on a
-// macOS host; Chromium on Linux binds paste to Ctrl+V, so the same key event is sent through CDP there.
-export async function pressPaste(page) {
-  if (process.platform === 'darwin') {
-    await page.keyboard.press('Meta+v')
-    return
-  }
+// Send the native paste command for either profile, independent of the host's keyboard mapping.
+export async function pressPaste(page, modifier = primaryKey) {
   const session = await page.context().newCDPSession(page)
-  const key = { modifiers: 4, key: 'v', code: 'KeyV', windowsVirtualKeyCode: 86 }
+  const key = { modifiers: modifier === 'Control' ? 2 : 4, key: 'v', code: 'KeyV', windowsVirtualKeyCode: 86 }
   try {
-    await page.keyboard.down('Meta')
+    await page.keyboard.down(modifier)
     await session.send('Input.dispatchKeyEvent', { type: 'keyDown', text: 'v', commands: ['paste'], ...key })
     await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
   } finally {
-    await page.keyboard.up('Meta')
+    await page.keyboard.up(modifier)
     await session.detach()
   }
 }

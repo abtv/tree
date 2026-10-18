@@ -18,6 +18,7 @@ export const EXEMPTIONS = new Map([
 
 // AGENTS.md §9: native shell/shortcuts, persistence, attachments, clipboard, and drag-and-drop.
 export const BOUNDARY_SECTIONS = new Set([
+  '1.5',
   '2.2',
   '2.3',
   '2.4',

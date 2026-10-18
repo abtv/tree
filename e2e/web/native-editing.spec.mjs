@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture, pressPaste } from './fixtures.mjs'
+import { test, expect, capture, pressPaste, primaryKey } from './fixtures.mjs'
 
 // @requirement PRODUCT.md §1.4
 // Real browser events exercise the browser-only App policy, including all three rich-input sites.
@@ -45,7 +45,7 @@ test('preserves native editing across modes and input scopes', async ({ newConte
     ).toBeTruthy()
   }
   for (const scope of ['tree', 'parent', 'agenda']) {
-    if (scope === 'agenda') await page.keyboard.press('Meta+p')
+    if (scope === 'agenda') await page.keyboard.press(`${primaryKey}+p`)
     const input = field(scope)
     await input.click()
     await input.evaluate((element) => {
@@ -78,7 +78,7 @@ test('preserves native editing across modes and input scopes', async ({ newConte
     await mode('NORMAL', false)
   }
   // Return to Tree; whole-node Visual does not need a native editing host either.
-  await page.keyboard.press('Meta+p')
+  await page.keyboard.press(`${primaryKey}+p`)
   const input = field('tree')
   await input.click()
   await page.keyboard.press('V')
@@ -106,16 +106,16 @@ test('preserves native editing across modes and input scopes', async ({ newConte
   await expect(page.getByLabel('Vim mode')).toHaveCount(0)
   await expect(input).toHaveAttribute('contenteditable', 'true')
   await expect(input).toBeFocused()
-  await page.keyboard.press('Meta+z')
+  await page.keyboard.press(`${primaryKey}+z`)
   await expect(input).toHaveText(beforeReplace)
   await input.fill('2026-10-18 Typed é 😀 after switching')
   await test.step('copies, cuts and pastes through headless Chrome virtual clipboard', async () => {
-    await page.keyboard.press('Meta+a')
-    await page.keyboard.press('Meta+c')
+    await page.keyboard.press(`${primaryKey}+a`)
+    await page.keyboard.press(`${primaryKey}+c`)
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe('2026-10-18 Typed é 😀 after switching')
-    await page.keyboard.press('Meta+x')
+    await page.keyboard.press(`${primaryKey}+x`)
     await expect(input).toHaveText('')
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))

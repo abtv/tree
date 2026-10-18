@@ -1,6 +1,6 @@
 # Ctrl as the Primary Modifier in the Browser Version
 
-Status: In progress. T1 and T2 are Done. Round A (owner macOS check) is next; T3 waits for it.
+Status: In progress. T1 to T3 are Done. Round A passed on 2026-10-18; T4 is next.
 
 Planned 2026-10-18 at `10bf845`, clean tree. Coding tool: Claude Code. A smaller model is expected to implement the tasks, so each task names its files, steps, evidence and validation tier.
 
@@ -139,8 +139,8 @@ Working tasks: 4 (T1 to T4). Closure and the owner rounds are not working tasks.
 | --- | --- | --- | --- | --- |
 | T1 | Shortcut profile seam; Apple behavior identical | none | Apple table equals `metaKey`; Electron and Chrome suites pass unchanged | Done |
 | T2 | Non-Apple rules, parity tests, PRODUCT.md §1.5, Vim conformance row | T1 | both profiles pass the parity and precedence matrices; docs checks pass | Done |
-| Round A | Owner macOS native-keyboard check | T2 | owner reports pass or waives | Ready |
-| T3 | Browser activation, labels, Chrome E2E on both mappings | T2, Round A | local Chrome suites pass; Linux CI passes | Planned |
+| Round A | Owner macOS native-keyboard check | T2 | Owner reported “I checked on Mac, it works” on 2026-10-18 | Done |
+| T3 | Browser activation, labels, Chrome E2E on both mappings | T2, Round A | macOS Chrome and Linux arm64 container checks passed (accepted pre-push equivalent); CI awaits owner push | Done |
 | T4 | Probe, constraint record, acceptance package | T3 | every constraint recorded in PRODUCT.md §1.5; no open reserved decision | Planned |
 | Closure | Owner acceptance, plan retirement | T4, Round C | explicit owner acceptance | Planned |
 
@@ -374,7 +374,17 @@ Minor gaps settled under the section 2 delegation and approved by the owner on 2
 
 ## 9. Next Task
 
-Exact next task: **Round A**, then **T3**. T1 and T2 are committed. The owner runs SC1 to SC13 (section 6) on macOS or waives the check. Do not start T3 before the owner reports Round A or waives it.
+Exact next task: **T4**. The owner reported Round A passed on macOS on 2026-10-18.
+T3 activated browser detection and passed standard validation, macOS development
+and built Chrome suites, and the accepted local Linux arm64 Chromium equivalent.
+Independent reviewer and product verifier found no meaningful issues. Normal and
+narrow Ctrl+Q label screenshots were inspected. No push was made; hosted behavior
+and the actual CI run are not verified. The owner controls publication by pushing.
+
+T3 pointer evidence: macOS reserves native Ctrl+click even with a non-Apple
+navigator override, so the Mac test uses a renderer click contract for that case.
+Linux exercises the actual Ctrl pointer sequence. Browser automation does not
+establish real-keyboard accelerator delivery (RD3).
 
 Decisions made in T2 (inside D2 to D4, recorded in PRODUCT.md §1.5):
 
@@ -391,5 +401,5 @@ Environment notes from T1:
 Prompt for the next session:
 
 ```text
-Continue the initiative in plans/ctrl-primary-modifier.md and run task T2 (status Ready). The plan records the owner's whole-initiative approval, decisions D1 to D7, the delegation, G1 to G8, the budget and the review roles; do not reopen them. Follow the plan's T2 files, steps, audit list (items 1 to 8), acceptance evidence and validation. Use WORKING_PLAN.md for the independent reviewer and delete it before the commit. Commit T2 with the plan's status and next-task update. After T2, stop and ask the owner for Round A; do not start T3 before the owner reports it.
+Continue the initiative in plans/ctrl-primary-modifier.md with T4. Round A passed and T3 is complete. Run the headed browser-accelerator probe, record verified and unverified constraints in their owning documentation, validate and commit T4, then request final owner acceptance. Do not push or publish. The plan records the approved scope, decisions, budget and closure gate.
 ```

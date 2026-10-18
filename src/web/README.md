@@ -67,6 +67,12 @@ Another browser, profile, hostname or port has separate storage.
 
 The ellipsis button opens Tree, Agenda, Vim Editing and appearance controls.
 The menu also shows local save status. Only one tab may edit at a time.
+
+Apple devices use Cmd shortcuts. Other platforms use Ctrl, with Alt for Option
+and Home/End for line boundaries. The command panel shows the matching labels.
+See [keyboard mappings and exceptions](../../docs/PRODUCT.md#15-keyboard-modifiers-outside-apple-platforms).
+Real-keyboard delivery of browser-reserved shortcuts on Linux and Windows remains
+unverified; Chromium automation checks application handling and default prevention.
 On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
 see [the browser requirements](../../docs/PRODUCT.md#14-browser-static-hosting-checkpoint).
 

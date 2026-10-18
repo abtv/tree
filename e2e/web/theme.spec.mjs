@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 
 test('persists appearance and follows system changes', async ({ newContext, baseURL }) => {
   const context = await newContext({ colorScheme: 'light', viewport: { width: 1100, height: 760 } })
@@ -8,7 +8,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
   await page.goto(baseURL)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   const command = async (name) => {
-    await page.keyboard.press('Meta+Shift+p')
+    await page.keyboard.press(`${primaryKey}+Shift+p`)
     await page.getByRole('combobox', { name: 'Command', exact: true }).fill(name)
     await page.getByRole('combobox', { name: 'Command', exact: true }).press('Enter')
   }

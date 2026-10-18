@@ -4,6 +4,7 @@ import { ErrorBoundary } from '../renderer/ErrorBoundary'
 import { EditorStore } from '../application/editor-store'
 import { installBrowserPrototype } from './services'
 import { capturePasteClipboard } from './paste'
+import { isApplePlatform } from './device'
 import '../renderer/styles.css'
 import './styles.css'
 
@@ -17,6 +18,7 @@ try {
       <App
         initialVimEnabled={await window.treeApi.getVimEnabled()}
         vimAvailable={bridge.vimAvailable}
+        shortcutPlatform={isApplePlatform(navigator) ? 'apple' : 'other'}
         store={store}
         deferRichEditing
         capturePasteClipboard={capturePasteClipboard}

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { checkCoverage, parseSections, runChecks } from './check-requirement-coverage.mts'
+import { BOUNDARY_SECTIONS, checkCoverage, parseSections, runChecks } from './check-requirement-coverage.mts'
 
 const roots: string[] = []
 afterEach(() => {
@@ -18,6 +18,16 @@ function check(
 }
 
 describe('requirement section parsing', () => {
+  it('requires browser shortcut mapping to have real-boundary coverage', () => {
+    expect(BOUNDARY_SECTIONS.has('1.5')).toBe(true)
+    expect(
+      check(
+        '## 1. Overview\n### 1.5 Keyboard mapping\nRule',
+        [{ path: 'src/device.test.ts', content: '// @requirement PRODUCT.md §1.5\n' }],
+        { boundarySections: new Set(['1.5']) },
+      ).issues,
+    ).toEqual(['PRODUCT.md §1.5: missing E2E marker'])
+  })
   it('accepts four-level headings and rejects number-depth mismatches', () => {
     expect(parseSections('## 1. Parent\n### 1.1 Child\n#### 1.1.1 Leaf\nRule')).toEqual([
       { id: '1', title: 'Parent', required: false },

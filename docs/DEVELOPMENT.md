@@ -164,6 +164,13 @@ Vitest uses the Node.js environment by default. Renderer tests opt into jsdom wh
 
 ### Choosing test coverage
 
+Browser E2E uses `primaryKey` from `e2e/web/fixtures.mjs` for the host's Cmd or
+Ctrl shortcuts. Dual-profile checks override the browser platform identity and
+press the corresponding modifier. `pressPaste(page, modifier)` supplies the CDP
+native paste command for either mapping. These synthetic events verify application
+dispatch and default prevention; they do not establish real-keyboard delivery of
+browser-reserved shortcuts.
+
 The Chrome E2E target uses Playwright Test specs in `e2e/web/` and the separate
 `playwright.web.config.ts`. Electron specs, launch helpers and screenshot baselines
 live in `e2e/electron/`, selected by `playwright.config.ts`. Each target discovers
