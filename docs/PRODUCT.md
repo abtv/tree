@@ -703,6 +703,8 @@ The undo/redo history retains at most the 200 most recent entries. A history ent
 
 Mouse drag-and-drop moves one node together with its subtree. Between-row gaps can reorder siblings or move the node to another parent. Dropping onto the middle of a node row makes the dragged node its last child. Dropping onto an ancestor breadcrumb segment or the root glyph appends to that destination and follows it, as specified in §2.2.
 
+On touch devices, holding the empty gutter beside a node or its trailing row margin starts the same drag after 200 ms. Holding text retains native text selection and its magnifier. The node dot and fold arrow keep their existing actions. Touch dragging uses the same destinations and cancellation rules in Tree and Agenda; Agenda still permits only its existing draggable occurrences. Moving more than 4 pixels before activation or releasing early cancels the hold. Browser scrolling, text selection and callouts are disabled only on the empty drag surfaces, preserving native gestures over text and elsewhere.
+
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Pointer movement within 4 pixels does not cancel the pending hold, but moving farther before the threshold cancels the pending drag so the gesture selects text instead; the pending hold also cancels if the pointer leaves the row.
 
 * Once drag mode activates, the cursor changes to `grabbing`, text selection and caret movement stop, and the source row stays in place with its gray drag highlight. Keeping the source visible preserves its outline context while the user chooses a destination.

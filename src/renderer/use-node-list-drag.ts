@@ -47,7 +47,7 @@ interface NodeListDrag {
   onRowPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
   onListPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
   onListPointerUp: (event: ReactPointerEvent<HTMLElement>) => void
-  onListPointerCancel: () => void
+  onListPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void
   onLostPointerCapture: (event: ReactPointerEvent<HTMLElement>) => void
   onListClick: (event: ReactMouseEvent<HTMLElement>) => void
   recomputeDropIndex: () => void
@@ -179,6 +179,12 @@ export function useNodeListDrag({
   const onRowPointerDown = useCallback(
     (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (locked) return
+      if (!event.isPrimary) return
+      if (event.pointerType === 'touch') {
+        if (!(event.target instanceof Element) || !event.target.closest('.node-touch-drag-surface')) return
+        event.preventDefault()
+        if (listRef.current !== null) setCapture(listRef.current, event.pointerId)
+      }
       if (event.button === 2) event.preventDefault()
       if (
         event.target instanceof Element &&
@@ -199,12 +205,13 @@ export function useNodeListDrag({
         pointerType: event.pointerType,
       })
     },
-    [dragFreeze, locked],
+    [dragFreeze, locked, listRef],
   )
 
   const onRowPointerLeave = useCallback(
     (nodeId: string, event: ReactPointerEvent<HTMLDivElement>): void => {
       if (resolved.phase !== 'pending' || resolved.source?.nodeId !== nodeId) return
+      if (event.pointerType === 'touch') return
       // Chromium resets the hovered element when the window loses focus and reports the reset
       // with no buttons pressed. That is not the held pointer leaving the row, so the pending
       // hold survives; a real leave still cancels while the primary button is held.
@@ -215,8 +222,9 @@ export function useNodeListDrag({
   )
 
   const onListPointerMove = useCallback(
-    (event: Pick<PointerEvent, 'clientX' | 'clientY'>): void => {
+    (event: Pick<PointerEvent, 'clientX' | 'clientY' | 'pointerId' | 'pointerType'>): void => {
       if (resolved.phase === 'idle' || resolved.source === undefined) return
+      if (event.pointerId !== resolved.source.pointerId) return
       if (resolved.phase === 'pending') {
         const origin = pressPointRef.current
         if (origin !== undefined && exceedsHoldTolerance(origin.x, origin.y, event.clientX, event.clientY)) {
@@ -232,8 +240,7 @@ export function useNodeListDrag({
         const inside =
           event.clientY >= bounds.top &&
           event.clientY < bounds.bottom &&
-          event.clientX >= bounds.left &&
-          event.clientX <= bounds.right
+          (event.pointerType === 'touch' || (event.clientX >= bounds.left && event.clientX <= bounds.right))
         if (!inside) cancelDrag()
         return
       }
@@ -249,6 +256,7 @@ export function useNodeListDrag({
 
   const onListPointerUp = useCallback(
     (event: Pick<PointerEvent, 'pointerId' | 'clientX' | 'clientY' | 'target'>): void => {
+      if (resolved.source !== undefined && resolved.source.pointerId !== event.pointerId) return
       if (freeze !== undefined && freeze.pointerId === event.pointerId) {
         suppressClickRef.current = event.target instanceof Node && listRef.current?.contains(event.target) === true
         const resolvedDrop = computeDrop(event.clientX, event.clientY)
@@ -265,7 +273,7 @@ export function useNodeListDrag({
       setDrop(undefined)
       setAutoScrollDirection(0)
     },
-    [freeze, computeDrop, rows, onDrop, dragFreeze, listRef],
+    [freeze, computeDrop, rows, onDrop, dragFreeze, listRef, resolved.source],
   )
 
   useEffect(() => {
@@ -312,7 +320,9 @@ export function useNodeListDrag({
     }
   }, [cancelDrag, resolved.phase, resolved.source, listRef, onListPointerMove, onListPointerUp])
 
-  const onListPointerCancel = (): void => cancelDrag()
+  const onListPointerCancel = (event: ReactPointerEvent<HTMLElement>): void => {
+    if (event.pointerId === resolved.source?.pointerId) cancelDrag()
+  }
 
   const onLostPointerCapture = (event: ReactPointerEvent<HTMLElement>): void => {
     if (event.pointerId === freeze?.pointerId) cancelDrag()

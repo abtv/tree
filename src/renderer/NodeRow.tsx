@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
+import { TouchDragSurface } from './TouchDragSurface'
 
 interface NodeRowProps {
   node: TreeNode
@@ -87,6 +88,7 @@ export const NodeRow = memo(function NodeRow({
       ref={(element) => rowRef(node.id, element)}
       style={style}
     >
+      <TouchDragSurface />
       {focused ? <span aria-hidden="true" className="node-focus-marker" /> : null}
       <button
         aria-label={`Enter node ${index + 1}`}

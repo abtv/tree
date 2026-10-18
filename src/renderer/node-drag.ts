@@ -32,7 +32,7 @@ export function nodeDragReducer(state: NodeDragState, action: NodeDragAction): N
   switch (action.type) {
     case 'press':
       if (state.phase !== 'idle') return state
-      if (action.button !== 0 || !action.isPrimary || action.pointerType !== 'mouse') return state
+      if (action.button !== 0 || !action.isPrimary || !['mouse', 'touch'].includes(action.pointerType)) return state
       return { phase: 'pending', source: action.source }
     case 'hold':
       // Mutation triage: `source` is defined in every non-idle phase, so the optional chain here and in

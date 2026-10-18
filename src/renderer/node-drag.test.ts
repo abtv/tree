@@ -24,10 +24,13 @@ describe('nodeDragReducer', () => {
     expect(nodeDragReducer(IDLE_NODE_DRAG, press())).toEqual({ phase: 'pending', source })
   })
 
+  it('arms a pending hold on a primary touch press', () => {
+    expect(nodeDragReducer(IDLE_NODE_DRAG, press({ pointerType: 'touch' }))).toEqual({ phase: 'pending', source })
+  })
+
   it('ignores secondary buttons, non-primary pointers, and unsupported pointer types', () => {
     expect(nodeDragReducer(IDLE_NODE_DRAG, press({ button: 2 }))).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(IDLE_NODE_DRAG, press({ isPrimary: false }))).toBe(IDLE_NODE_DRAG)
-    expect(nodeDragReducer(IDLE_NODE_DRAG, press({ pointerType: 'touch' }))).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(IDLE_NODE_DRAG, press({ pointerType: 'pen' }))).toBe(IDLE_NODE_DRAG)
   })
 

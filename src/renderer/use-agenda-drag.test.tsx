@@ -203,15 +203,34 @@ it('never drags contextual ancestors, day headers, gaps, or from the chevron', a
 })
 
 // @requirement PRODUCT.md §23.12
-it('ignores secondary buttons and touch pointers', async () => {
+it('ignores secondary buttons and touch pointers on text', async () => {
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
   down(source, ctx.centerOf(firstKey), { button: 2 })
   down(source, ctx.centerOf(firstKey), { isPrimary: false })
-  down(source, ctx.centerOf(firstKey), { pointerType: 'touch' })
+  down(source.querySelector('.node-input, .agenda-text')!, ctx.centerOf(firstKey), { pointerType: 'touch' })
   hold()
   expect(ctx.container.querySelector('.agenda-row-dragging')).toBeNull()
+})
+
+// @requirement PRODUCT.md §11
+// @requirement PRODUCT.md §23.12
+it('drags from an empty touch surface and ignores another finger before dropping', async () => {
+  vi.useFakeTimers()
+  const ctx = await setup()
+  const source = ctx.element(firstKey)
+  down(source.querySelector('.node-touch-drag-surface')!, ctx.centerOf(firstKey), { pointerType: 'touch' })
+  hold()
+  expect(source).toHaveClass('agenda-row-dragging')
+  const header = `day:${day(10, 15)}`
+  move(source, ctx.centerOf(header))
+  fireEvent.pointerUp(source, { pointerId: 2, clientY: ctx.centerOf(firstKey) })
+  fireEvent.pointerCancel(source, { pointerId: 2 })
+  expect(source).toHaveClass('agenda-row-dragging')
+  expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
+  up(source, ctx.centerOf(header))
+  expect(textOf(ctx, 'first')).toBe('2026-10-15 Prepare 2026-10-20')
 })
 
 // @requirement PRODUCT.md §23.12

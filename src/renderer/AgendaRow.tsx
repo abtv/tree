@@ -1,5 +1,6 @@
 import { memo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import type { AgendaRow as Row } from '../application/agenda-rows'
+import { TouchDragSurface } from './TouchDragSurface'
 import type { TreeNode } from '../domain/document'
 import { agendaDecorations } from './date-decorations'
 import { agendaDateLabel, agendaGapLabel, agendaRowLabel } from './agenda-labels'
@@ -88,6 +89,7 @@ export const AgendaRow = memo(function AgendaRow({
       }}
       style={{ '--row-depth': depth, ...(pinned ? { top: pinnedOffset } : {}) } as CSSProperties}
     >
+      {row.kind === 'node' && row.role === 'match' && !mirror ? <TouchDragSurface /> : null}
       {selected ? <span aria-hidden="true" className="node-focus-marker" /> : null}
       {row.kind === 'gap' ||
       (row.kind === 'day' && row.content) ||

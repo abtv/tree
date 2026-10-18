@@ -34,7 +34,7 @@ interface AgendaDrag {
   onListPointerLeave: (event: ReactPointerEvent<HTMLElement>) => void
   onListPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
   onListPointerUp: (event: ReactPointerEvent<HTMLElement>) => void
-  onListPointerCancel: () => void
+  onListPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void
   onLostPointerCapture: (event: ReactPointerEvent<HTMLElement>) => void
   onListClick: (event: ReactMouseEvent<HTMLElement>) => void
 }
@@ -135,6 +135,12 @@ export function useAgendaDrag({
   const onListPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>): void => {
       if (locked || !(event.target instanceof Element)) return
+      if (!event.isPrimary) return
+      if (event.pointerType === 'touch') {
+        if (!event.target.closest('.node-touch-drag-surface')) return
+        event.preventDefault()
+        if (listRef.current !== null) setCapture(listRef.current, event.pointerId)
+      }
       if (event.target.closest('.node-enter-control, .node-disclosure-triangle') !== null) return
       const key = event.target.closest<HTMLElement>('[data-agenda-key]')?.dataset.agendaKey
       const row = key === undefined ? undefined : rowsByKey.get(key)
@@ -154,12 +160,13 @@ export function useAgendaDrag({
         pointerType: event.pointerType,
       })
     },
-    [dragFreeze, locked, rows, rowsByKey],
+    [dragFreeze, locked, rows, rowsByKey, listRef],
   )
 
   const onListPointerMove = useCallback(
-    (event: Pick<PointerEvent, 'clientX' | 'clientY'>): void => {
+    (event: Pick<PointerEvent, 'clientX' | 'clientY' | 'pointerId' | 'pointerType'>): void => {
       if (resolved.phase === 'idle' || resolved.source === undefined) return
+      if (event.pointerId !== pointerId) return
       if (resolved.phase === 'pending') {
         const origin = pressPointRef.current
         if (origin !== undefined && exceedsHoldTolerance(origin.x, origin.y, event.clientX, event.clientY)) {
@@ -175,8 +182,7 @@ export function useAgendaDrag({
         const inside =
           event.clientY >= bounds.top &&
           event.clientY < bounds.bottom &&
-          event.clientX >= bounds.left &&
-          event.clientX <= bounds.right
+          (event.pointerType === 'touch' || (event.clientX >= bounds.left && event.clientX <= bounds.right))
         if (!inside) cancelDrag()
         return
       }
@@ -186,11 +192,12 @@ export function useAgendaDrag({
       const { top, bottom } = viewportBounds()
       setAutoScrollDirection(autoScrollStep(event.clientY - top, bottom - top))
     },
-    [resolved, cancelDrag, elementsRef, computeTarget, source],
+    [resolved, cancelDrag, elementsRef, computeTarget, source, pointerId],
   )
 
   const onListPointerLeave = useCallback(
     (event: ReactPointerEvent<HTMLElement>): void => {
+      if (event.pointerType === 'touch') return
       // A reset hover reports no buttons (the window lost focus); only a held pointer leaving cancels.
       if (resolved.phase === 'pending' && event.buttons !== 0) cancelDrag()
     },
@@ -199,6 +206,7 @@ export function useAgendaDrag({
 
   const onListPointerUp = useCallback(
     (event: Pick<PointerEvent, 'pointerId' | 'clientY' | 'target'>): void => {
+      if (pointerId !== undefined && pointerId !== event.pointerId) return
       if (freeze !== undefined && pointerId === event.pointerId) {
         suppressClickRef.current = event.target instanceof Node && listRef.current?.contains(event.target) === true
         const dropped = computeTarget(event.clientY)
@@ -287,7 +295,9 @@ export function useAgendaDrag({
     onListPointerLeave,
     onListPointerMove,
     onListPointerUp,
-    onListPointerCancel: cancelDrag,
+    onListPointerCancel: (event) => {
+      if (event.pointerId === pointerId) cancelDrag()
+    },
     onLostPointerCapture,
     onListClick,
   }

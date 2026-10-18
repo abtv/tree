@@ -462,6 +462,13 @@ body:not(.node-drag-active) .location-link:hover {
    and rows change together; the compositor never scrolls the old window into an empty spacer. */
 .agenda-list-windowed {
   overflow: clip;
+  /* Include the empty trailing touch surface in the clip without widening the text rows. */
+  margin-right: -28px;
+  padding-right: 28px;
+}
+
+.agenda-list-windowed .agenda-row-pinned {
+  right: 28px;
 }
 .agenda-window-anchor {
   position: sticky;
@@ -604,6 +611,33 @@ body:not(.node-drag-active) .location-link:hover {
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
+}
+
+.node-touch-drag-surface {
+  display: none;
+}
+
+@media (any-pointer: coarse) {
+  .node-touch-drag-surface {
+    display: block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .node-touch-drag-gutter {
+    left: -8px;
+    width: 29px;
+  }
+
+  .node-touch-drag-end {
+    right: -28px;
+    width: 28px;
+  }
 }
 
 .node-enter-control::before {
