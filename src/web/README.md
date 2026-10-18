@@ -73,6 +73,12 @@ and Home/End for line boundaries. The command panel shows the matching labels.
 See [keyboard mappings and exceptions](../../docs/PRODUCT.md#15-keyboard-modifiers-outside-apple-platforms).
 Real-keyboard delivery of browser-reserved shortcuts on Linux and Windows remains
 unverified; Chromium automation checks application handling and default prevention.
+
+Both shortcut profiles passed the macOS Chrome and Linux arm64 Chromium checks.
+Chrome assigns Ctrl+N to a new window; if it does not reach a suggestion popup,
+use the arrow keys. Actual Windows AltGr input remains unverified. These limits
+are recorded with the mapping in the linked requirements.
+
 On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
 see [the browser requirements](../../docs/PRODUCT.md#14-browser-static-hosting-checkpoint).
 

@@ -1,6 +1,6 @@
 # Ctrl as the Primary Modifier in the Browser Version
 
-Status: In progress. T1 to T3 are Done. Round A passed on 2026-10-18; T4 is next.
+Status: Awaiting owner acceptance. T1 to T4 are Done. Round A passed on 2026-10-18.
 
 Planned 2026-10-18 at `10bf845`, clean tree. Coding tool: Claude Code. A smaller model is expected to implement the tasks, so each task names its files, steps, evidence and validation tier.
 
@@ -141,8 +141,8 @@ Working tasks: 4 (T1 to T4). Closure and the owner rounds are not working tasks.
 | T2 | Non-Apple rules, parity tests, PRODUCT.md §1.5, Vim conformance row | T1 | both profiles pass the parity and precedence matrices; docs checks pass | Done |
 | Round A | Owner macOS native-keyboard check | T2 | Owner reported “I checked on Mac, it works” on 2026-10-18 | Done |
 | T3 | Browser activation, labels, Chrome E2E on both mappings | T2, Round A | macOS Chrome and Linux arm64 container checks passed (accepted pre-push equivalent); CI awaits owner push | Done |
-| T4 | Probe, constraint record, acceptance package | T3 | every constraint recorded in PRODUCT.md §1.5; no open reserved decision | Planned |
-| Closure | Owner acceptance, plan retirement | T4, Round C | explicit owner acceptance | Planned |
+| T4 | Probe, constraint record, acceptance package | T3 | Headed probe completed; verified and unverified constraints recorded in PRODUCT.md §1.5; no open reserved decision | Done |
+| Closure | Owner acceptance, plan retirement | T4, Round C | explicit owner acceptance | Awaiting owner acceptance |
 
 Each task uses a temporary `WORKING_PLAN.md` for its reviewer's clean context. Delete it before the task commit. Commit the task together with this plan's status and next-task update.
 
@@ -367,19 +367,24 @@ Minor gaps settled under the section 2 delegation and approved by the owner on 2
 * **G7** A bare Control keydown is neutral. Principle: PRODUCT.md §20.9.3.
 * **G8** AltGr is character entry, never a shortcut. Principle: D1 (only a deliberate Ctrl is primary).
 * Constraint, not a gap: Ctrl+N likely cannot work in Chromium on Linux and Windows (F1).
-* Unverified recall to confirm during the work:
-  * Chromium's reserved shortcut list.
-  * Windows AltGr reporting.
-  * That synthetic events skip accelerators (the T4 probe).
+* T4 confirmed [Chrome's documented shortcuts](https://support.google.com/chrome/answer/157179?hl=en): Ctrl+N opens a window, Ctrl+T opens a tab and Ctrl+W closes a tab. Their interception is an expected browser constraint; actual real-keyboard routing on Linux and Windows remains unverified (RD3).
+* AltGraph exclusion is unit-tested. Actual Windows AltGr event reporting and character entry remain unverified; no Windows verification claim is made.
+* The headed macOS Chrome T4 probe delivered synthetic Meta+N without preventing it and left the browser page-target count at one. The probe confirms bypass of the new-window accelerator in that automation path, not native routing on another platform. The lasting conclusion is in DEVELOPMENT.md §8.
 
 ## 9. Next Task
 
-Exact next task: **T4**. The owner reported Round A passed on macOS on 2026-10-18.
-T3 activated browser detection and passed standard validation, macOS development
-and built Chrome suites, and the accepted local Linux arm64 Chromium equivalent.
-Independent reviewer and product verifier found no meaningful issues. Normal and
-narrow Ctrl+Q label screenshots were inspected. No push was made; hosted behavior
-and the actual CI run are not verified. The owner controls publication by pushing.
+Exact next task: **Round C: final owner acceptance** of the delivered T4 commit.
+Do not retire this plan until the owner accepts the result. Initial implementation
+approval and Round A do not substitute for Round C.
+
+Acceptance package:
+
+* T3 activation is committed as `05a2ba7`; T4 is the commit containing this final constraint record.
+* Round A passed: the owner reported “I checked on Mac, it works” on 2026-10-18.
+* [PRODUCT.md §1.5](../docs/PRODUCT.md#15-keyboard-modifiers-outside-apple-platforms) owns the mapping, exceptions and verification limits. Inspect that section and the delivered Ctrl labels/behavior; accept the result or list issues.
+* Standard validation, macOS development and built Chrome checks, and the accepted local Linux arm64 Chromium equivalent passed. Independent reviewer and product verifier found no meaningful issues. Normal and narrow Ctrl+Q label screenshots were inspected.
+* T4 changed documentation only. Standard/runtime results from T3 remain valid; affected documentation and requirement checks passed again.
+* No push was made. Hosted behavior and the actual CI run are not verified; the owner controls publication by pushing. Real-keyboard Linux/Windows delivery and Windows AltGr remain unverified by the approved RD3 decision.
 
 T3 pointer evidence: macOS reserves native Ctrl+click even with a non-Apple
 navigator override, so the Mac test uses a renderer click contract for that case.
@@ -401,5 +406,5 @@ Environment notes from T1:
 Prompt for the next session:
 
 ```text
-Continue the initiative in plans/ctrl-primary-modifier.md with T4. Round A passed and T3 is complete. Run the headed browser-accelerator probe, record verified and unverified constraints in their owning documentation, validate and commit T4, then request final owner acceptance. Do not push or publish. The plan records the approved scope, decisions, budget and closure gate.
+The Ctrl primary modifier initiative is awaiting owner acceptance. Recover its delivered result and constraints from plans/ctrl-primary-modifier.md. If the owner explicitly accepts the delivered T4 result, complete the recorded closure steps and retire the plan; otherwise preserve the acceptance gate. Do not push or publish.
 ```

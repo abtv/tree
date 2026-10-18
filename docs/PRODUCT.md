@@ -149,7 +149,9 @@ Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with t
 | `Ctrl+Y` | Previews an image; it does not redo. Redo is `Ctrl+Shift+Z`. |
 | `Ctrl+Backspace` | Deletes the node; it does not delete a word. Undo restores it. |
 | `Ctrl+P` | Opens Agenda; it replaces Print. |
-| `Ctrl+N` | Cycles suggestions. Chromium may reserve it, so it may not reach the page. |
+| `Ctrl+N` | Cycles suggestions when delivered. Chrome assigns it to a new window, so it may not reach the page. Arrow keys remain available. |
+
+Chromium automation verifies application dispatch for both profiles on macOS and Linux arm64, including default prevention for mapped commands and native-paste handling. It does not prove delivery from a real keyboard: [Chrome documents](https://support.google.com/chrome/answer/157179?hl=en) `Ctrl+N/T/W` as window/tab shortcuts. Their interception is an expected browser constraint. AltGraph exclusion is unit-tested; actual AltGr event reporting and character entry on Windows remain unverified. Other non-Apple platforms and browsers other than Chromium are not verified.
 
 ---
 

@@ -171,6 +171,12 @@ native paste command for either mapping. These synthetic events verify applicati
 dispatch and default prevention; they do not establish real-keyboard delivery of
 browser-reserved shortcuts.
 
+A headed macOS Chrome probe on 2026-10-18 delivered Playwright's `Meta+N` to an
+unhandled page without creating another browser page target. This confirms that
+this automation path did not invoke Chrome's new-window accelerator; it does not
+establish real-keyboard routing on any platform. Keep application default-prevention
+assertions separate from browser-accelerator claims.
+
 The Chrome E2E target uses Playwright Test specs in `e2e/web/` and the separate
 `playwright.web.config.ts`. Electron specs, launch helpers and screenshot baselines
 live in `e2e/electron/`, selected by `playwright.config.ts`. Each target discovers
