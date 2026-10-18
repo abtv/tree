@@ -208,7 +208,9 @@ Node movement begins when the primary mouse button is pressed and held on a node
 
 Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a node (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. Node rows end 28px short of the right edge of the content area, so wrapped text does not touch the window edge. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
 
-Node rows retain the document-surface background when focused or hovered (warm paper in the light appearance); focus and hover must not tint the editing row. Apart from the dark bullet of the selected node, a focused node must not display an additional more-options or selection-dot ornament.
+While the Tree or Agenda list contains keyboard focus, only its selected row has a subtle full-width background tint, including its indentation and full wrapped or image height. The tint mixes the ordinary text color at 8% over the document surface in either appearance. Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their existing feedback takes precedence.
+
+The selected node retains its dark bullet without an additional more-options or selection-dot ornament. The editable Tree current-parent heading retains its ordinary background.
 
 The current parent is presented above its children as a larger, bold, editable heading without a bullet.
 

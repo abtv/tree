@@ -444,6 +444,7 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .agenda-focused-heading {
+  --active-row-inset: -24px;
   margin: 0 0 6px 24px;
   padding: 0 6px 2px;
   font-size: 24px;
@@ -716,6 +717,26 @@ body:not(.node-drag-active) .location-link:hover {
   height: 7px;
   border-radius: 50%;
   background: var(--color-text);
+  pointer-events: none;
+}
+
+/* Extend the active row through indentation without moving content or dimming other rows. */
+body:not(.node-drag-active)
+  .tree-app:not(.vim-state-visual-node)
+  :is(.node-list, .agenda-list):focus-within
+  :is(.node-row:has(> .node-focus-marker), .agenda-row[aria-selected='true']) {
+  isolation: isolate;
+}
+
+body:not(.node-drag-active)
+  .tree-app:not(.vim-state-visual-node)
+  :is(.node-list, .agenda-list):focus-within
+  :is(.node-row:has(> .node-focus-marker), .agenda-row[aria-selected='true'])::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 var(--active-row-inset, calc(-28px - var(--row-depth, 0) * var(--row-indent)));
+  z-index: -1;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
   pointer-events: none;
 }
 
