@@ -9,6 +9,7 @@ import { createRealStoreHarness } from './test/real-store-harness'
 import { beginStructuralOpen, createVimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 import { beginReplaceClick, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
+import { OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import type { VimMode } from './vim-editing'
 import type { VimTextCommandState } from './editor-input-handlers'
 
@@ -124,7 +125,8 @@ async function fixture(
     inputs,
     commandState,
     session,
-    handlers: () => createPointerHandlers(deps, harness.node()),
+    handlers: (shortcuts?: ShortcutProfile) =>
+      createPointerHandlers(shortcuts === undefined ? deps : { ...deps, shortcuts }, harness.node()),
     setMode: (value: VimMode) => {
       mode = value
     },
@@ -272,6 +274,17 @@ describe('mouse down', () => {
   ] as const)('marks the click intent for %s: %s', async (_name, mode, extra, marked) => {
     const f = await fixture({ mode })
     f.handlers().onMouseDown(mouse(textarea('hello'), extra))
+    expect(f.session.replaceClick === true).toBe(marked)
+  })
+
+  // @requirement PRODUCT.md §1.5
+  it.each([
+    ['a Control-click in Replace', { button: 0, ctrlKey: true }, true],
+    ['a primary click in Replace', { button: 0 }, true],
+    ['a right click in Replace', { button: 2 }, false],
+  ] as const)('marks the click intent on the other profile for %s: %s', async (_name, extra, marked) => {
+    const f = await fixture({ mode: 'replace' })
+    f.handlers(OTHER_SHORTCUTS).onMouseDown(mouse(textarea('hello'), extra))
     expect(f.session.replaceClick === true).toBe(marked)
   })
 
@@ -554,6 +567,30 @@ describe('link click', () => {
     const { input, link } = linkInput()
     f.handlers().onClick({ target: link, currentTarget: input, metaKey: true, preventDefault: vi.fn() } as never)
     expect(open).toHaveBeenCalledExactlyOnceWith('https://example.test', '_blank')
+  })
+
+  // @requirement PRODUCT.md §1.5
+  it.each([
+    ['Ctrl', { ctrlKey: true }, 1],
+    ['Cmd', { metaKey: true }, 0],
+    ['Ctrl+Meta', { ctrlKey: true, metaKey: true }, 0],
+    ['no modifier', {}, 0],
+  ] as const)('opens the link on %s+click on the other profile: %s opens', async (_name, modifiers, opens) => {
+    const f = await fixture()
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const { input, link } = linkInput()
+    const event = { target: link, currentTarget: input, preventDefault: vi.fn(), ...modifiers } as never
+    f.handlers(OTHER_SHORTCUTS).onClick(event)
+    expect((event as { preventDefault: () => void }).preventDefault).toHaveBeenCalledOnce()
+    expect(open).toHaveBeenCalledTimes(opens)
+  })
+
+  it('does not open the link on Ctrl+click on the Apple profile', async () => {
+    const f = await fixture()
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const { input, link } = linkInput()
+    f.handlers().onClick({ target: link, currentTarget: input, ctrlKey: true, preventDefault: vi.fn() } as never)
+    expect(open).not.toHaveBeenCalled()
   })
 
   it.each(['plain text', 'a link outside the input', 'a non-element target'] as const)(

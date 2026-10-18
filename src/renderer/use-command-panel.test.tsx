@@ -5,6 +5,7 @@ import { EditorStore } from '../application/editor-store'
 import { createVimCommandState } from './vim-command-state'
 import type { VimMode } from './vim-editing'
 import { useCommandPanel } from './use-command-panel'
+import { APPLE_SHORTCUTS, OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 afterEach(() => {
   cleanup()
@@ -12,7 +13,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function setup(mode: VimMode = 'normal', enabled = true, rich = false) {
+async function setup(
+  mode: VimMode = 'normal',
+  enabled = true,
+  rich = false,
+  shortcuts: ShortcutProfile = APPLE_SHORTCUTS,
+) {
   const historyWrite = vi.fn(async () => undefined)
   const appearanceWrite = vi.fn<(value: 'system' | 'light' | 'dark') => Promise<void>>(async () => undefined)
   window.treeApi = {
@@ -59,6 +65,7 @@ async function setup(mode: VimMode = 'normal', enabled = true, rich = false) {
       setAlwaysOnTop: () => undefined,
       applyVimEnabled: async () => undefined,
       beforeViewChange: () => undefined,
+      shortcuts,
     })
     return (
       <>
@@ -70,6 +77,7 @@ async function setup(mode: VimMode = 'normal', enabled = true, rich = false) {
           <textarea aria-label="Editor" defaultValue="alpha" />
         )}
         {panel.message === undefined ? null : <span role="status">{panel.message}</span>}
+        {panel.open ? <output aria-label="Selected row">{panel.selected}</output> : null}
         {panel.open ? (
           <input
             className="command-input-line"
@@ -202,5 +210,48 @@ describe('command panel owner', () => {
     editor.addEventListener('click', clicked)
     fireEvent.click(editor)
     expect(clicked).toHaveBeenCalledOnce()
+  })
+})
+
+describe('command panel shortcuts per platform profile', () => {
+  // @requirement PRODUCT.md §1.5
+  it.each([
+    ['Cmd+Shift+P on other', OTHER_SHORTCUTS, { metaKey: true }, false],
+    ['Ctrl+Shift+P on other', OTHER_SHORTCUTS, { ctrlKey: true }, true],
+    ['Ctrl+Meta+Shift+P on other', OTHER_SHORTCUTS, { ctrlKey: true, metaKey: true }, false],
+    ['Ctrl+Alt+Shift+P on other', OTHER_SHORTCUTS, { ctrlKey: true, altKey: true }, false],
+    ['Cmd+Shift+P on Apple', APPLE_SHORTCUTS, { metaKey: true }, true],
+    ['Ctrl+Shift+P on Apple', APPLE_SHORTCUTS, { ctrlKey: true }, false],
+    ['Cmd+Ctrl+Shift+P on Apple', APPLE_SHORTCUTS, { metaKey: true, ctrlKey: true }, false],
+  ])('%s opens the panel: %s', async (_name, profile, modifiers, opens) => {
+    const { editor } = await setup('normal', true, false, profile)
+    fireEvent.keyDown(editor, { key: 'P', shiftKey: true, ...modifiers })
+    expect(screen.queryByLabelText('Command') !== null).toBe(opens)
+  })
+
+  // @requirement PRODUCT.md §1.5
+  it.each([OTHER_SHORTCUTS, APPLE_SHORTCUTS])(
+    'moves the open panel selection with Ctrl+N and Ctrl+P',
+    async (profile) => {
+      const { editor } = await setup('normal', true, false, profile)
+      fireEvent.keyDown(editor, { key: ':' })
+      const command = screen.getByLabelText('Command')
+      expect(screen.getByLabelText('Selected row').textContent).toBe('0')
+      fireEvent.keyDown(command, { key: 'n', ctrlKey: true })
+      expect(screen.getByLabelText('Selected row').textContent).toBe('1')
+      fireEvent.keyDown(command, { key: 'n', ctrlKey: true })
+      expect(screen.getByLabelText('Selected row').textContent).toBe('2')
+      fireEvent.keyDown(command, { key: 'p', ctrlKey: true })
+      expect(screen.getByLabelText('Selected row').textContent).toBe('1')
+    },
+  )
+
+  // @requirement PRODUCT.md §1.5
+  it('keeps Ctrl+P navigation ahead of the Agenda command while the panel is open', async () => {
+    const { editor, store } = await setup('normal', true, false, OTHER_SHORTCUTS)
+    const open = vi.spyOn(store, 'openAgenda')
+    fireEvent.keyDown(editor, { key: ':' })
+    fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'p', ctrlKey: true })
+    expect(open).not.toHaveBeenCalled()
   })
 })

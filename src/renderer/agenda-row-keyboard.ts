@@ -13,7 +13,7 @@ import { requireNode } from '../domain/document'
 import { agendaRowLabel } from './agenda-labels'
 import { firstNonWhitespace } from './vim-editing'
 import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
-import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
+import { APPLE_SHORTCUTS, isMappedPrimaryKey, isVimCtrlKey, type ShortcutProfile } from './shortcut-profile'
 
 /** The text and caret of the selected row when it has no editor, owned by the Agenda view. */
 export interface AgendaRowText {
@@ -44,6 +44,8 @@ export function createAgendaKeyDownHandler({
 }: Dependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event) => {
     if (event.nativeEvent?.isComposing || ['Shift', 'Control', 'Meta', 'Alt'].includes(event.key)) return
+    // Meta is only ever the primary modifier (Cmd); where it is not, the combination has no command.
+    if (event.metaKey && !shortcuts.isPrimary(event)) return
     const state = store.getSnapshot()
     if (state.status !== 'ready' || state.agenda === undefined) return
     const rows = store.getAgendaRows()
@@ -178,7 +180,9 @@ export function createAgendaKeyDownHandler({
         copy: rowText.copy,
         shortcuts,
       })
-    if (shortcuts.isPrimary(event)) {
+    // Ctrl+D/U/O/R stay Vim commands where Ctrl is the primary modifier; the app has no such Cmd shortcut.
+    const vimCtrl = event.ctrlKey && !event.metaKey && !event.altKey && isVimCtrlKey(event.key)
+    if (shortcuts.isPrimary(event) && !vimCtrl) {
       if (rowTextKey()) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
@@ -222,6 +226,15 @@ export function createAgendaKeyDownHandler({
       } else if (['backspace', 'enter', ',', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
+      } else if (
+        shortcuts.platform === 'other' &&
+        vim !== undefined &&
+        vim.mode !== 'insert' &&
+        !isMappedPrimaryKey(event.key)
+      ) {
+        // Unmapped Ctrl combinations stay blocked in the non-Insert Vim modes (PRODUCT §1.5).
+        event.preventDefault()
+        clearCommandAssembly(vim.commandState)
       }
       return
     }

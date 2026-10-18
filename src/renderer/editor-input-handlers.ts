@@ -9,7 +9,7 @@ import { handleVimKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
-import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
+import { APPLE_SHORTCUTS, isMappedPrimaryKey, type ShortcutProfile } from './shortcut-profile'
 
 export type {
   VimFindCommand,
@@ -180,6 +180,8 @@ export function createEditorKeyDownHandler({
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
     if (isComposing() || event.nativeEvent?.isComposing) return
     const primary = shortcuts.isPrimary(event)
+    // Meta is only ever the primary modifier (Cmd); where it is not, the combination has no command.
+    if (event.metaKey && !primary) return
     const snapshot = store.getSnapshot()
     const agenda = snapshot.status === 'ready' ? snapshot.agenda : undefined
     if (agenda !== undefined) {
@@ -199,7 +201,7 @@ export function createEditorKeyDownHandler({
         block('structure')
         return
       }
-      if (event.key === 'Enter' && !event.metaKey && !(vim?.mode === 'normal' && element === 'match')) {
+      if (event.key === 'Enter' && !primary && !event.metaKey && !(vim?.mode === 'normal' && element === 'match')) {
         event.preventDefault()
         // Normal direct matches use Tree's link/image command below; splitting is standard/Insert only.
         if ((vim === undefined || vim.mode === 'insert') && agendaAllows(element, 'split'))
@@ -269,8 +271,7 @@ export function createEditorKeyDownHandler({
       if (
         !event.metaKey &&
         !event.altKey &&
-        (event.key === 'ArrowUp' ||
-          event.key === 'ArrowDown' ||
+        (((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !primary) ||
           (vim?.mode === 'normal' && event.ctrlKey && (event.key === 'd' || event.key === 'u')))
       ) {
         finishVimSessionBeforeNavigation(vim, event.currentTarget)
@@ -393,7 +394,8 @@ export function createEditorKeyDownHandler({
      * commands above do: a Ctrl-modified key can never be the awaited character. Excludes the bare
      * `Control` keydown itself — pressing the modifier alone fires that event with `ctrlKey` already
      * true, before the combined key arrives, and it must not discard a command a following Ctrl+d/u/o/r
-     * press still needs to see pending.
+     * press still needs to see pending. Where Ctrl is the primary modifier, its mapped application
+     * commands continue to the command chain below (PRODUCT §1.5).
      */
     if (
       vim !== undefined &&
@@ -401,7 +403,8 @@ export function createEditorKeyDownHandler({
       !event.altKey &&
       event.ctrlKey &&
       event.key !== 'Control' &&
-      vim.mode !== 'insert'
+      vim.mode !== 'insert' &&
+      !(primary && isMappedPrimaryKey(event.key))
     ) {
       event.preventDefault()
       discardsUnfinishedCommand(vim)

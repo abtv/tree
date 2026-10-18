@@ -17,7 +17,11 @@ import {
   type SequenceSpec,
 } from './test/vim-sequence-model'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 import type { VimMode } from './vim-editing'
+
+/** The profile under test; set per `describe.each` case. */
+let platform: ShortcutPlatform = 'apple'
 
 // These sequences run the production hook against a real EditorStore. Its focus effects, deferred
 // projection, and command handlers apply the caret themselves, so a competing or omitted
@@ -81,6 +85,7 @@ async function assertHookSequence(
       setImageCaretNodeId,
       onPreviewAttachment: preview,
       onFoldCommand: (command, id) => store.applyFold(command, id),
+      shortcuts: shortcutProfile(platform),
     })
     return { ...binding, vimMode, imageCaretNodeId }
   })
@@ -118,7 +123,11 @@ async function assertHookSequence(
     act(() => tasks.splice(0).forEach((task) => task()))
     syncView()
   }
-  const press = (key: string, modifiers: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean } = {}): void => {
+  // `primary` presses the platform's primary modifier; `ctrlKey` is the Vim Ctrl key on both profiles.
+  const press = (
+    key: string,
+    { primary = false, ...modifiers }: { primary?: boolean; ctrlKey?: boolean; shiftKey?: boolean } = {},
+  ): void => {
     const index = selectedIndex()
     act(() =>
       hook.result.current.bindings(currentNode(index)).onKeyDown({
@@ -129,6 +138,7 @@ async function assertHookSequence(
         altKey: false,
         preventDefault: () => undefined,
         ...modifiers,
+        ...(primary ? (platform === 'apple' ? { metaKey: true } : { ctrlKey: true }) : {}),
       } as never),
     )
     syncView()
@@ -194,7 +204,7 @@ async function assertHookSequence(
           syncView()
         }
       } else if (event.kind === 'history') {
-        if (event.shortcut) press('z', { metaKey: true, shiftKey: event.direction === 'redo' })
+        if (event.shortcut) press('z', { primary: true, shiftKey: event.direction === 'redo' })
         else if (event.direction === 'undo') press('u')
         else press('r', { ctrlKey: true })
       } else if (event.kind === 'interrupt') {
@@ -229,7 +239,16 @@ async function assertHookSequence(
 
 const stepArbitrary: fc.Arbitrary<Step> = fc.record({ event: sequenceEventArbitrary, flush: fc.boolean() })
 
-describe('production hook sequences against an independent model', () => {
+// The model holds on both profiles: the history shortcut is Cmd+Z on Apple platforms and Ctrl+Z elsewhere,
+// while Ctrl+R stays the Vim redo (PRODUCT §1.5).
+describe.each(['apple', 'other'] as const)('production hook sequences against an independent model (%s)', (profile) => {
+  beforeEach(() => {
+    platform = profile
+  })
+  afterEach(() => {
+    platform = 'apple'
+  })
+
   it('keeps an upward image destination actionable while its focus work is still queued', async () => {
     await assertHookSequence(
       [

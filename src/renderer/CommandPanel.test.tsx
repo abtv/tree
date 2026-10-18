@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { commandRegistry, type CommandContext } from '../application/command-registry'
 import { CommandPanel } from './CommandPanel'
-import { APPLE_SHORTCUTS } from './shortcut-profile'
+import { APPLE_SHORTCUTS, OTHER_SHORTCUTS } from './shortcut-profile'
 
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
 
@@ -37,5 +37,20 @@ describe('command panel presentation', () => {
     )
     const quit = screen.getAllByRole('option').find((row) => row.id === 'command-quit')!
     expect(quit.querySelector('.command-shortcut')?.textContent).toBe('formatted')
+  })
+
+  // @requirement PRODUCT.md §1.5
+  it('shows the quit shortcut as Ctrl+Q with the other profile', () => {
+    render(
+      <CommandPanel
+        matches={commandRegistry}
+        selected={0}
+        context={context}
+        run={vi.fn()}
+        shortcuts={OTHER_SHORTCUTS}
+      />,
+    )
+    const quit = screen.getAllByRole('option').find((row) => row.id === 'command-quit')!
+    expect(quit.querySelector('.command-shortcut')?.textContent).toBe('Ctrl+Q')
   })
 })

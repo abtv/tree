@@ -9,6 +9,7 @@ import { dayNumberOf } from '../domain/calendar-date'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { createRealStoreHarness, type RealStoreOptions } from './test/real-store-harness'
 import { useNodeInputBindings } from './use-node-input-bindings'
+import { OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import type { VimMode } from './vim-editing'
 import { getCaret, setCaret } from './editor-dom'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
@@ -26,7 +27,9 @@ afterEach(() => {
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const image = (text = 'ab'): TreeNode => ({ ...node('node', text), attachment: { id: 'image', mimeType: 'image/png' } })
 
-async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?: boolean } = {}) {
+async function fixture(
+  options: RealStoreOptions & { mode?: VimMode; vimEnabled?: boolean; shortcuts?: ShortcutProfile } = {},
+) {
   const harness = await createRealStoreHarness(options)
   const { store } = harness
   const preview = vi.fn()
@@ -48,6 +51,7 @@ async function fixture(options: RealStoreOptions & { mode?: VimMode; vimEnabled?
       setImageCaretNodeId,
       onPreviewAttachment: preview,
       onFoldCommand: (command, id) => store.applyFold(command, id),
+      ...(options.shortcuts === undefined ? {} : { shortcuts: options.shortcuts }),
     })
     return { ...binding, vimMode, selection, imageCaretNodeId, setVimMode }
   })
@@ -197,6 +201,48 @@ describe('useNodeInputBindings', () => {
       expect(f.node().text).toBe('Plan next wee')
     },
   )
+
+  // @requirement PRODUCT.md §1.5
+  it.each([false, true])(
+    'keeps the popup through a bare Control keydown and cycles it with Ctrl+N and Ctrl+P on the other profile (Vim %s)',
+    async (vimEnabled) => {
+      const f = await fixture({
+        mode: 'insert',
+        vimEnabled,
+        shortcuts: OTHER_SHORTCUTS,
+        document: { roots: [node('node', ''), node('peer', 'Other')] },
+      })
+      f.input().focus()
+      f.type('next wee')
+      const count = f.result.current.completionPopup!.popup.suggestions.length
+      f.press('Control', { ctrlKey: true })
+      expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+      f.press('n', { ctrlKey: true })
+      expect(f.result.current.completionPopup?.popup.selected).toBe(1)
+      f.press('p', { ctrlKey: true })
+      expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+      f.press('p', { ctrlKey: true })
+      expect(f.result.current.completionPopup?.popup.selected).toBe(count - 1)
+      expect(f.snapshot().agenda).toBeUndefined()
+      expect(f.node().text).toBe('next wee')
+    },
+  )
+
+  // @requirement PRODUCT.md §1.5
+  it('dismisses the popup with a Ctrl shortcut but not with Cmd on the other profile', async () => {
+    const f = await fixture({
+      mode: 'insert',
+      shortcuts: OTHER_SHORTCUTS,
+      document: { roots: [node('node', 'Plan '), node('peer', 'Other')] },
+    })
+    f.input().focus()
+    f.type('Plan next wee')
+    f.press('a', { metaKey: true })
+    expect(f.result.current.completionPopup).toBeDefined()
+    f.press('a', { ctrlKey: true })
+    expect(f.result.current.completionPopup).toBeUndefined()
+    expect(f.node().text).toBe('Plan next wee')
+  })
 
   // @requirement PRODUCT.md §20.2.4
   // @requirement PRODUCT.md §20.9

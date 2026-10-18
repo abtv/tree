@@ -26,6 +26,14 @@ export interface ShortcutProfile {
   readonly leftModifierCode: 'MetaLeft' | 'ControlLeft'
   /** Whether the event carries the primary modifier of this platform. */
   isPrimary(event: ShortcutModifierEvent): boolean
+  /**
+   * Whether Ctrl is held for a purpose other than the primary modifier: any Ctrl on Apple platforms,
+   * Ctrl with Meta or AltGr elsewhere. Text-key handlers that leave Ctrl combinations to native
+   * behavior bail out on it.
+   */
+  hasNonPrimaryCtrl(event: ShortcutModifierEvent): boolean
+  /** Whether primary+Left/Right move to the line start/end (Cmd on Apple); elsewhere Home/End do. */
+  readonly primaryArrowToLineEdge: boolean
   /** Whether a press with this event is the platform's context-menu gesture (Ctrl+click on macOS). */
   isContextMenuClick(event: { ctrlKey: boolean }): boolean
   /** Whether the event carries the word-motion modifier (Option on Apple platforms, Ctrl elsewhere). */
@@ -39,6 +47,8 @@ export const APPLE_SHORTCUTS: ShortcutProfile = {
   bareModifierKey: 'Meta',
   leftModifierCode: 'MetaLeft',
   isPrimary: (event) => event.metaKey,
+  hasNonPrimaryCtrl: (event) => event.ctrlKey,
+  primaryArrowToLineEdge: true,
   isContextMenuClick: (event) => event.ctrlKey,
   isWordMotion: (event) => event.altKey,
   format: (shortcut) => `${shortcut.shift === true ? '⇧' : ''}⌘${shortcut.key.toUpperCase()}`,
@@ -50,9 +60,24 @@ export const OTHER_SHORTCUTS: ShortcutProfile = {
   leftModifierCode: 'ControlLeft',
   // Windows reports AltGr as Ctrl+Alt; AltGraph state marks that press as character entry.
   isPrimary: (event) => event.ctrlKey && !event.metaKey && event.getModifierState?.('AltGraph') !== true,
+  hasNonPrimaryCtrl: (event) => event.ctrlKey && !OTHER_SHORTCUTS.isPrimary(event),
+  primaryArrowToLineEdge: false,
   isContextMenuClick: () => false,
   isWordMotion: (event) => event.ctrlKey,
   format: (shortcut) => `Ctrl+${shortcut.shift === true ? 'Shift+' : ''}${shortcut.key.toUpperCase()}`,
+}
+
+/**
+ * Keys that stay Vim commands under Ctrl in Normal mode (half-page down/up, leave node, redo). The
+ * app has no Cmd+D/U/O/R, so they never collide with a primary shortcut (PRODUCT §1.5).
+ */
+export function isVimCtrlKey(key: string): boolean {
+  return ['d', 'u', 'o', 'r'].includes(key.toLowerCase())
+}
+
+/** Keys of the application commands that the primary modifier runs; other Ctrl keys stay unmapped. */
+export function isMappedPrimaryKey(key: string): boolean {
+  return ['a', 'c', 'x', 'v', 'z', 'y', 'e', 'p', 'q', '0', '.', ',', 'enter', 'backspace'].includes(key.toLowerCase())
 }
 
 export function shortcutProfile(platform: ShortcutPlatform): ShortcutProfile {

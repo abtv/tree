@@ -34,7 +34,9 @@ export function rowCaretMode(vim: VimTextCommandState | undefined): RowCaretMode
 export function handleRowTextKey(context: RowTextKeyContext): boolean {
   const { event, vim, text, setCaret, copy, shortcuts = APPLE_SHORTCUTS } = context
   const mode = rowCaretMode(vim)
-  if (mode === 'hidden' || event.ctrlKey) return false
+  // Meta is only ever the primary modifier (Cmd); on other platforms it has no command and no text motion.
+  if (mode === 'hidden' || shortcuts.hasNonPrimaryCtrl(event) || (event.metaKey && !shortcuts.isPrimary(event)))
+    return false
   const length = text.length
   const caret = clampCaret(context.caret, text, mode)
   const key = event.key
@@ -69,6 +71,8 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
       return true
     }
     if (!vimText && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+      // Where Ctrl is primary, Ctrl+Left/Right are word motions and Home/End reach the line edges.
+      if (!shortcuts.primaryArrowToLineEdge) return handleThinKey(context, caret, place)
       const target = key === 'ArrowLeft' ? 0 : length
       place(event.shiftKey ? caret.anchor : target, target)
       return true
@@ -172,6 +176,8 @@ function handleThinKey(
     return true
   }
   if (key !== 'ArrowLeft' && key !== 'ArrowRight') return false
+  // Alt is no word-motion modifier where Ctrl is primary, so it leaves the arrow inert.
+  if (event.altKey && !shortcuts.isWordMotion(event)) return false
   const left = key === 'ArrowLeft'
   if (shortcuts.isWordMotion(event)) {
     extend(left ? moveWordBackward(text, caret.focus) : Math.min(length, moveWordEnd(text, caret.focus) + 1))

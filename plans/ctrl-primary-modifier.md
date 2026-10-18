@@ -1,6 +1,6 @@
 # Ctrl as the Primary Modifier in the Browser Version
 
-Status: In progress. T1 is Done. T2 is Ready.
+Status: In progress. T1 and T2 are Done. Round A (owner macOS check) is next; T3 waits for it.
 
 Planned 2026-10-18 at `10bf845`, clean tree. Coding tool: Claude Code. A smaller model is expected to implement the tasks, so each task names its files, steps, evidence and validation tier.
 
@@ -138,8 +138,8 @@ Working tasks: 4 (T1 to T4). Closure and the owner rounds are not working tasks.
 | ID | Outcome | Depends on | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | T1 | Shortcut profile seam; Apple behavior identical | none | Apple table equals `metaKey`; Electron and Chrome suites pass unchanged | Done |
-| T2 | Non-Apple rules, parity tests, PRODUCT.md §1.5, Vim conformance row | T1 | both profiles pass the parity and precedence matrices; docs checks pass | Ready |
-| Round A | Owner macOS native-keyboard check | T2 | owner reports pass or waives | Planned |
+| T2 | Non-Apple rules, parity tests, PRODUCT.md §1.5, Vim conformance row | T1 | both profiles pass the parity and precedence matrices; docs checks pass | Done |
+| Round A | Owner macOS native-keyboard check | T2 | owner reports pass or waives | Ready |
 | T3 | Browser activation, labels, Chrome E2E on both mappings | T2, Round A | local Chrome suites pass; Linux CI passes | Planned |
 | T4 | Probe, constraint record, acceptance package | T3 | every constraint recorded in PRODUCT.md §1.5; no open reserved decision | Planned |
 | Closure | Owner acceptance, plan retirement | T4, Round C | explicit owner acceptance | Planned |
@@ -374,7 +374,14 @@ Minor gaps settled under the section 2 delegation and approved by the owner on 2
 
 ## 9. Next Task
 
-Exact next task: **T2** (Ready). T1 is committed. Stop after T2 and ask the owner for Round A. Do not start T3 before the owner reports Round A or waives it.
+Exact next task: **Round A**, then **T3**. T1 and T2 are committed. The owner runs SC1 to SC13 (section 6) on macOS or waives the check. Do not start T3 before the owner reports Round A or waives it.
+
+Decisions made in T2 (inside D2 to D4, recorded in PRODUCT.md §1.5):
+
+* Meta is inert on the `other` profile in the editor and Agenda handlers (early return when Meta is held and is not primary).
+* Unmapped Ctrl keys are blocked in Agenda rows without an editor in non-Insert Vim modes, like in editors (R4).
+* Alt+Left/Right is inert in Agenda rows without an editor on `other`; word motion is Ctrl+Left/Right (G2).
+* `Ctrl+Left/Right` in node editors follow `Option+Left/Right` today, including crossing at a node boundary; Home and End never cross.
 
 Environment notes from T1:
 

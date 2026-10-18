@@ -3,7 +3,8 @@
 import type { KeyboardEvent } from 'react'
 import fc from 'fast-check'
 import { propertyRuns } from '../test/property-runs'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 import { EditorStore, type EditorServices } from '../application/editor-store'
 import { requireNode, type Document, type TreeNode } from '../domain/document'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
@@ -19,6 +20,9 @@ import {
   type SequenceExpected as Expected,
   type SequenceSpec as Spec,
 } from './test/vim-sequence-model'
+
+/** The profile under test; set per `describe.each` case. */
+let platform: ShortcutPlatform = 'apple'
 
 async function assertSequence(
   specs: Spec[],
@@ -123,7 +127,9 @@ async function assertSequence(
     future: [],
   }
   paint()
-  const press = (key: string, metaKey = false, ctrlKey = false, shiftKey = false): void => {
+  // `primary` presses the platform's primary modifier; `ctrlKey` is the Vim Ctrl key on both profiles.
+  const press = (key: string, primary = false, ctrlKey = false, shiftKey = false): void => {
+    const metaKey = primary && platform === 'apple'
     const state = store.getSnapshot()
     if (state.status !== 'ready') throw new Error('Store did not initialize')
     const index = selectedIndex()
@@ -136,12 +142,13 @@ async function assertSequence(
       onPreviewAttachment: () => undefined,
       shiftFocusedNode: () => undefined,
       vim,
+      shortcuts: shortcutProfile(platform),
     })
     handler({
       currentTarget: inputs[index]!,
       key,
       metaKey,
-      ctrlKey,
+      ctrlKey: ctrlKey || (primary && platform === 'other'),
       shiftKey,
       altKey: false,
       preventDefault: () => undefined,
@@ -193,7 +200,16 @@ async function assertSequence(
   }
 }
 
-describe('mixed Vim event sequences against an independent model', () => {
+// The independent model holds on both profiles: Cmd+Z/Shift+Z on Apple platforms and Ctrl+Z/Shift+Z elsewhere
+// undo and redo, while Ctrl+R stays the Vim redo (PRODUCT §1.5).
+describe.each(['apple', 'other'] as const)('mixed Vim event sequences against an independent model (%s)', (profile) => {
+  beforeEach(() => {
+    platform = profile
+  })
+  afterEach(() => {
+    platform = 'apple'
+  })
+
   // Found by seed 711207, path "20": a second undo consumed a duplicate history entry.
   it('undoes each of two separate Vim replacements exactly once', async () => {
     await assertSequence(

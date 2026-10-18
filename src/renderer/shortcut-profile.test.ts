@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APPLE_SHORTCUTS, OTHER_SHORTCUTS, shortcutProfile } from './shortcut-profile'
+import { APPLE_SHORTCUTS, OTHER_SHORTCUTS, isMappedPrimaryKey, isVimCtrlKey, shortcutProfile } from './shortcut-profile'
 
 interface Flags {
   metaKey: boolean
@@ -83,6 +83,43 @@ describe('other shortcut profile', () => {
   it('formats shortcut labels with Ctrl', () => {
     expect(OTHER_SHORTCUTS.format({ key: 'Q' })).toBe('Ctrl+Q')
     expect(OTHER_SHORTCUTS.format({ key: 'p', shift: true })).toBe('Ctrl+Shift+P')
+  })
+})
+
+describe('profile Ctrl and arrow rules', () => {
+  // @requirement PRODUCT.md §1.5
+  it.each(allFlagCombinations)('reports a non-primary Ctrl per platform for %o', (flags) => {
+    expect(APPLE_SHORTCUTS.hasNonPrimaryCtrl(flags)).toBe(flags.ctrlKey)
+    expect(OTHER_SHORTCUTS.hasNonPrimaryCtrl(flags)).toBe(flags.ctrlKey && flags.metaKey)
+    const altGraph = {
+      ...flags,
+      getModifierState: (key: string) => key === 'AltGraph' && flags.ctrlKey && flags.altKey,
+    }
+    expect(OTHER_SHORTCUTS.hasNonPrimaryCtrl(altGraph)).toBe(flags.ctrlKey && (flags.metaKey || flags.altKey))
+  })
+
+  it('sends primary+Left/Right to the line edge on Apple platforms only', () => {
+    expect(APPLE_SHORTCUTS.primaryArrowToLineEdge).toBe(true)
+    expect(OTHER_SHORTCUTS.primaryArrowToLineEdge).toBe(false)
+  })
+
+  it.each(['d', 'u', 'o', 'r', 'D', 'R'])('keeps %s a Vim Ctrl key', (key) => {
+    expect(isVimCtrlKey(key)).toBe(true)
+  })
+
+  it.each(['n', 'p', 'a', 'Enter', 'Control'])('does not treat %s as a Vim Ctrl key', (key) => {
+    expect(isVimCtrlKey(key)).toBe(false)
+  })
+
+  it.each(['a', 'C', 'x', 'v', 'z', 'Z', 'y', 'e', 'p', 'q', '0', '.', ',', 'Enter', 'Backspace'])(
+    'maps %s to an application command',
+    (key) => {
+      expect(isMappedPrimaryKey(key)).toBe(true)
+    },
+  )
+
+  it.each(['d', 'u', 'o', 'r', 'n', 'f', 'Control', 'Tab', 'ArrowLeft'])('leaves %s unmapped', (key) => {
+    expect(isMappedPrimaryKey(key)).toBe(false)
   })
 })
 

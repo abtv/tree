@@ -164,7 +164,7 @@ export function useCommandPanel(options: {
         event.key.toLowerCase() === 'p' &&
         event.shiftKey &&
         shortcuts.isPrimary(event) &&
-        !event.ctrlKey &&
+        !shortcuts.hasNonPrimaryCtrl(event) &&
         !event.altKey
       const colon =
         event.key === ':' && !event.metaKey && !event.ctrlKey && !event.altKey && vimEnabled && vimMode === 'normal'

@@ -49,6 +49,8 @@ The application is a native-feeling macOS application and follows Apple's Human 
 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
+Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.
+
 Every change to user-visible behavior is checked against the guidelines before it is considered complete. A conflict that is not already recorded as a deliberate difference is reported to the Product Owner instead of being settled silently, under `AGENTS.md` §14.
 
 ### 1.4 Browser static-hosting checkpoint
@@ -126,6 +128,28 @@ The target-only publisher cannot select executable verification code: the protec
 workflow obtains it from trusted source main at an independently resolved SHA.
 Verification runs without Pages/OIDC write permissions; a separate job deploys
 the resulting artifact. Source maintainers and hosting administrators remain trusted.
+
+### 1.5 Keyboard Modifiers Outside Apple Platforms
+
+The primary modifier is Cmd on Apple platforms (macOS, iOS, iPadOS) and Ctrl on every other platform. Electron runs on macOS only, so this section applies to the browser version (§1.4). Linux and Windows are the targeted platforms. Real-keyboard delivery of the shortcuts in Chromium on Linux and Windows is unverified.
+
+Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with the same Shift and Alt qualifiers, and the label `⌘Q` shows as `Ctrl+Q`. Option is Alt. The rules below settle the differences.
+
+* Super/Meta combinations have no command. AltGr is character entry, never a shortcut.
+* `Cmd+Left` and `Cmd+Right` are `Home` and `End`. `Option+Left` and `Option+Right` are `Ctrl+Left` and `Ctrl+Right`. In Agenda rows without an editor the same keys apply. `Home` and `End` never cross a node (§4.3); `Ctrl+Left` and `Ctrl+Right` behave as `Option+Left` and `Option+Right` do.
+* `Ctrl+click` opens a link, and holding left Ctrl shows the link cursor. Ctrl+click is no context-menu gesture there.
+* In Vim Normal, `Ctrl+D`, `Ctrl+U`, `Ctrl+O` and `Ctrl+R` stay Vim commands, because the application has no such Cmd shortcut. In the other non-Insert Vim modes they stay blocked. `Ctrl+V` pastes.
+* In the non-Insert Vim modes every unmapped Ctrl combination is blocked. In standard editing and Vim Insert it keeps its native behavior.
+* `Ctrl+N` and `Ctrl+P` move the selection while a completion popup or the command panel is open (§20.2.28, §20.9.3). Otherwise `Ctrl+P` opens or closes Agenda.
+* A bare Control keydown neither dismisses suggestions nor discards a pending Vim command.
+
+| Shortcut | Consequence |
+| --- | --- |
+| `Ctrl+0` | Does nothing while a node has focus, like `Cmd+0`; the browser zoom reset is unavailable there. |
+| `Ctrl+Y` | Previews an image; it does not redo. Redo is `Ctrl+Shift+Z`. |
+| `Ctrl+Backspace` | Deletes the node; it does not delete a word. Undo restores it. |
+| `Ctrl+P` | Opens Agenda; it replaces Print. |
+| `Ctrl+N` | Cycles suggestions. Chromium may reserve it, so it may not reach the page. |
 
 ---
 
@@ -1425,7 +1449,7 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 
 | Name | Alias | Description | Active state | Shortcut | Effect |
 | --- | --- | --- | --- | --- | --- |
-| `quit` | `q` | Quit Tree | — | `⌘Q` | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
+| `quit` | `q` | Quit Tree | — | `⌘Q` (`Ctrl+Q` outside Apple platforms, §1.5) | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
 | `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |
 | `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the existing Agenda origin (§23); do nothing if already in Tree |
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
