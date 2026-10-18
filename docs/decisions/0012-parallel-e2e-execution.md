@@ -9,7 +9,7 @@ When this decision was made, the complete validation command ran the end-to-end 
 
 Three constraints prevented naive parallelization:
 
-- `globalShortcut.register('CommandOrControl+0')` is machine-global, and the application treats a failed registration as a fatal startup error (`src/main/bootstrap.ts`). A second concurrent application therefore cannot open a window.
+- `globalShortcut.register('CommandOrControl+0')` is machine-global, and the application treats a failed registration as a fatal startup error (`src/electron/main/bootstrap.ts`). A second concurrent application therefore cannot open a window.
 - Every launch called `cleanupStaleElectronProcesses('tree-e2e-')` before starting, and every launched application carries a `tree-e2e-*` user-data directory. With several workers, one worker's launch would terminate sibling workers' applications.
 - The macOS system clipboard is machine-global. Many specs write it and then paste, so interleaved workers would observe each other's clipboard content.
 

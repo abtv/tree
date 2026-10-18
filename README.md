@@ -50,7 +50,7 @@ npm run start
 The build produces unpackaged output, not an installable `.app` or `.dmg`. See the [Development Guide](docs/DEVELOPMENT.md) for setup details, checks, and troubleshooting.
 
 The local browser version runs with `npm run dev:web` at <http://127.0.0.1:5174/>.
-Its source, checks and current limitations are in [Browser version](web/README.md).
+Its source, checks and current limitations are in [Browser version](src/web/README.md).
 
 ## Documentation
 

@@ -27,13 +27,13 @@ export default defineConfig({
         'src/domain/document-operations.ts': { branches: 80 },
         'src/application/editor-save-scheduler.ts': { branches: 80 },
         'src/application/editor-store.ts': { branches: 80 },
-        'src/main/ipc-security.ts': {
+        'src/electron/main/ipc-security.ts': {
           statements: 90,
           branches: 85,
           functions: 100,
           lines: 95,
         },
-        'src/main/ipc-handlers.ts': {
+        'src/electron/main/ipc-handlers.ts': {
           statements: 95,
           branches: 80,
           functions: 100,
@@ -136,12 +136,14 @@ export default defineConfig({
       },
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
+        // Preserve the pre-relocation shared/Electron unit metric; browser adapters are covered by Chrome E2E.
+        'src/web/**',
         'src/**/*.test.{ts,tsx}',
         'src/**/*.d.ts',
         'src/renderer/test/**',
         'src/application/test/**',
         'src/test/**',
-        'src/main/index.ts',
+        'src/electron/main/index.ts',
         'src/renderer/main.tsx',
       ],
     },

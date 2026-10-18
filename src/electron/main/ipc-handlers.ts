@@ -1,5 +1,5 @@
 import type { QuitHandshake } from './quit-handshake'
-import { isAppearancePreference, type AppearancePreference } from '../infrastructure/main/window-state'
+import { isAppearancePreference, type AppearancePreference } from '../../infrastructure/main/window-state'
 import {
   validateAttachmentBytes,
   validateAttachmentId,
@@ -11,10 +11,10 @@ import {
   isTrustedRendererUrl,
   type PngDecoder,
 } from './ipc-security'
-import { ipcChannels } from '../shared/ipc'
-import type { FileServices } from '../infrastructure/main/file-services'
-import { readClipboard, writeClipboard, type NativeClipboard } from '../infrastructure/main/clipboard'
-import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../shared/ipc'
+import { ipcChannels } from '../../shared/ipc'
+import type { FileServices } from '../../infrastructure/main/file-services'
+import { readClipboard, writeClipboard, type NativeClipboard } from '../../infrastructure/main/clipboard'
+import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../../shared/ipc'
 import type { WebContents } from 'electron'
 
 export interface IpcInvokeEvent {

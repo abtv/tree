@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 
 const server = await createServer({
   configFile: false,
-  root: resolve(import.meta.dirname),
+  root: resolve(import.meta.dirname, '../../src/web'),
   esbuild: { jsx: 'automatic' },
   server: {
     host: '127.0.0.1',

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ElectronApplication } from '@playwright/test'
 import type { TreeApi } from '../../src/shared/ipc'
-import { onePixelPng } from '../../src/main/png-test-utils'
+import { onePixelPng } from '../../src/electron/main/png-test-utils'
 import {
   allowRendererError,
   attachmentPath,

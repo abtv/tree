@@ -1,10 +1,10 @@
 import { createRoot } from 'react-dom/client'
-import { App } from '../src/renderer/App'
-import { ErrorBoundary } from '../src/renderer/ErrorBoundary'
-import { EditorStore } from '../src/application/editor-store'
+import { App } from '../renderer/App'
+import { ErrorBoundary } from '../renderer/ErrorBoundary'
+import { EditorStore } from '../application/editor-store'
 import { installBrowserPrototype } from './services'
-import '../src/renderer/styles.css'
-import './prototype.css'
+import '../renderer/styles.css'
+import './styles.css'
 
 try {
   const bridge = await installBrowserPrototype()

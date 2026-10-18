@@ -41,3 +41,11 @@ it('keeps platform imports available to infrastructure', async () => {
   })
   expect(result.messages).toEqual([])
 })
+
+it.each(['../electron/main/bootstrap', '../web/services'])(
+  'keeps platform source %s out of the domain',
+  async (source) => {
+    const [result] = await eslint.lintText(`export * from '${source}'`, { filePath: 'src/domain/example.ts' })
+    expect(result.messages).toEqual([expect.objectContaining({ ruleId: 'no-restricted-imports', severity: 2 })])
+  },
+)

@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from 'electron'
-import type { AppearancePreference } from '../infrastructure/main/window-state'
+import type { AppearancePreference } from '../../infrastructure/main/window-state'
 
 export interface ApplicationMenuState {
   vimEnabled: boolean

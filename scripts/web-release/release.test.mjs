@@ -98,6 +98,8 @@ describe('release gates', () => {
       demo: false,
     })
     expect(selectChecks(['src/renderer/main.tsx'])).toEqual({ memory: false, demo: true })
+    expect(selectChecks(['src/electron/main/index.ts'])).toEqual({ memory: false, demo: true })
+    expect(selectChecks(['src/web/main.tsx', 'scripts/web/build.mjs'])).toEqual({ memory: false, demo: false })
     expect(selectChecks(['e2e/electron/shared-application-memory.spec.ts'])).toEqual({ memory: true, demo: false })
     expect(selectChecks(['.github/workflows/e2e.yml'])).toEqual({ memory: true, demo: false })
     expect(selectChecks(['package-lock.json'])).toEqual({ memory: true, demo: true })

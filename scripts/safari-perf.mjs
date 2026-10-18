@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron } from '@playwright/test'
-import { createStaticServer } from '../web/static-server.mjs'
+import { createStaticServer } from './web/static-server.mjs'
 
 // Local measurements only: no CI thresholds and no changes to the ordinary perf suite.
 const output = resolve('.scratch/safari-perf')

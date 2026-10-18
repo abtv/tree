@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { ipcChannels, ipcEvents, type TreeApi } from '../shared/ipc'
+import { ipcChannels, ipcEvents, type TreeApi } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
   getAppearance: () => ipcRenderer.invoke(ipcChannels.getAppearance),

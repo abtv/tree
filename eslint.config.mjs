@@ -44,11 +44,10 @@ export default tseslint.config(
       'playwright*.config.ts',
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts}',
-      'web/**/*.mjs',
       'e2e/**/*.{ts,cjs,mjs}',
       'perf/**/*.ts',
-      'src/main/**/*.ts',
-      'src/preload/**/*.ts',
+      'src/electron/main/**/*.ts',
+      'src/electron/preload/**/*.ts',
       'src/infrastructure/main/**/*.ts',
     ],
     languageOptions: {
@@ -56,7 +55,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['web/**/*.{ts,tsx,mjs}'],
+    files: ['src/web/**/*.{ts,tsx}'],
     languageOptions: {
       globals: globals.browser,
     },
@@ -125,8 +124,8 @@ export default tseslint.config(
                 'react/*',
                 '../application/**',
                 '../infrastructure/**',
-                '../main/**',
-                '../preload/**',
+                '../electron/**',
+                '../web/**',
                 '../renderer/**',
               ],
               message: 'The domain must not depend on UI, application orchestration, or infrastructure.',

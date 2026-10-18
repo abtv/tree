@@ -1,6 +1,6 @@
 // @editing-modes: independent
 import { test, expect, capture } from './fixtures.mjs'
-import { onePixelPng } from '../../src/main/png-test-utils.ts'
+import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
 test('uses the menu, previews and mobile editing policy', async ({ newContext, baseURL }) => {
   const context = await newContext({ viewport: { width: 1100, height: 760 }, colorScheme: 'light' })

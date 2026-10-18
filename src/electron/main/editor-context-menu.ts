@@ -1,5 +1,5 @@
 import type { BrowserWindow, MenuItemConstructorOptions, WebContents } from 'electron'
-import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../shared/ipc'
+import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../../shared/ipc'
 
 export interface EditorContextMenuMenu {
   popup(options: { window: BrowserWindow; x: number; y: number; callback: () => void }): void

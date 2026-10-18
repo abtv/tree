@@ -1,4 +1,4 @@
-import { QUIT_SAVE_ERROR } from '../domain/product-messages'
+import { QUIT_SAVE_ERROR } from '../../domain/product-messages'
 import { QuitHandshake } from './quit-handshake'
 
 export interface BeforeQuitEvent {

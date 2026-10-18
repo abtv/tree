@@ -112,7 +112,7 @@ export function selectChecks(paths) {
     demo: paths.some(
       (path) =>
         shared.test(path) ||
-        /^src\//.test(path) ||
+        /^src\/(?!web\/)/.test(path) ||
         [
           'scripts/record-demo.mjs',
           'scripts/readme-screenshots.mjs',

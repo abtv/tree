@@ -1,6 +1,6 @@
 // @editing-modes: independent
 import { test, expect } from './fixtures.mjs'
-import { onePixelPng } from '../../src/main/png-test-utils.ts'
+import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
 // Clipboard checks use only headless Chrome's virtual clipboard.
 test('preserves wrapping, undo and image clipboard contracts', async ({ newContext, baseURL }) => {

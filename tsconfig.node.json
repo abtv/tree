@@ -20,8 +20,8 @@
     "eslint.config.mjs",
     "vitest.config.ts",
     "vitest.config.test.ts",
-    "src/main/**/*.ts",
-    "src/preload/**/*.ts",
+    "src/electron/main/**/*.ts",
+    "src/electron/preload/**/*.ts",
     "src/domain/**/*.ts",
     "src/shared/**/*.ts",
     "src/infrastructure/main/**/*.ts"

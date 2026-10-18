@@ -63,7 +63,7 @@ npm run dev
 ```
 
 The preserved browser version has separate development, static build, preview
-and isolated Chrome commands. See [Browser version](../web/README.md)
+and isolated Chrome commands. See [Browser version](../src/web/README.md)
 for their exact invocations, local URLs, storage identity and scope limits.
 Local build/check commands do not publish. The source main-push pipeline and
 one-time access setup are in [Browser publication](../deployment/github-pages/README.md).
@@ -152,7 +152,7 @@ npm run test:coverage
 
 Coverage uses the V8 provider and reports statements, branches, functions, and lines for sources under `src/`. It covers the unit and component tests only; end-to-end coverage is not collected. Coverage output is written to `coverage/`, which is not committed.
 
-The unit coverage metric excludes the Electron and React composition roots (`src/main/index.ts` and `src/renderer/main.tsx`). Their import-time global wiring is exercised through the end-to-end suite; lifecycle orchestration is extracted into testable modules and remains included in unit coverage.
+The unit coverage metric covers shared and Electron source and excludes their composition roots (`src/electron/main/index.ts` and `src/renderer/main.tsx`). Their import-time global wiring is exercised through the end-to-end suite; lifecycle orchestration is extracted into testable modules and remains included in unit coverage. Browser source under `src/web/` retains its pre-relocation exclusion from this metric; its unit tests still run, and Chrome E2E exercises the browser adapter and composition.
 
 Tests should primarily cover domain and application behavior.
 
@@ -168,7 +168,7 @@ live in `e2e/electron/`, selected by `playwright.config.ts`. Each target discove
 only its own directory.
 Browser commands, selection arguments, isolated contexts, restart profiles,
 server cleanup and report paths are described in
-[Browser checks](../web/README.md#browser-checks).
+[Browser checks](../src/web/README.md#browser-checks).
 
 `AGENTS.md` §9 and procedure §9 own the test-level and redundancy policy. Apply it by separating rule variants from the real interaction being verified:
 
@@ -715,7 +715,7 @@ Electron performance tests live in `perf/`. Select their scope using procedure �
 npm run test:perf
 ```
 
-Optional, approval-required [local Safari comparisons](../web/README.md#local-safari-performance-comparisons)
+Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.
 
 The domain date-recognition timing guard in `src/domain/natural-date.performance.test.ts` runs with the unit suite's coverage step but not in its parallel worker pool: `vitest.config.ts` excludes `*.performance.test.ts`, and `npm run test:performance` runs those files serially in their own Vitest invocation as step 9 of `npm run check`, because a scheduler pause in a neighboring worker would inflate the timed result. It checks the first relative-date lookup, mixed batches of English counts, incremental typing, and long surrounding text, and the p99 of individual calls. `perf/date-completion.spec.ts` complements it with popup paint latency, the key-to-popup-insertion latency that does not depend on the display refresh rate, and acceptance through the running application in both editing modes. Mutation workers exclude `*.performance.test.ts` because instrumentation changes the work being timed; ordinary validation still runs these guards. `perf/agenda-scale.spec.ts` opens the Agenda on synthetic 100,000-node documents of wide, deep, and mixed shape, with dates on every node or on every twentieth, and measures opening, scrolling, navigation, typing, date completion, an occurrence move, and Undo. Set `AGENDA_CPU_PROFILE=1` to print a renderer CPU profile summary for diagnosis; profiled timings are not comparable to the ceilings. The timing assertions are soft so every behavioral check still runs after a latency failure.

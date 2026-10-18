@@ -2,10 +2,10 @@ import { build } from 'vite'
 import { resolve } from 'node:path'
 import { writeFile } from 'node:fs/promises'
 
-const outDir = resolve(import.meta.dirname, '../out/web')
+const outDir = resolve(import.meta.dirname, '../../out/web')
 await build({
   configFile: false,
-  root: import.meta.dirname,
+  root: resolve(import.meta.dirname, '../../src/web'),
   base: './',
   esbuild: { jsx: 'automatic' },
   build: { outDir, emptyOutDir: true, target: 'es2022' },

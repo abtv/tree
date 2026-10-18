@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve, sep, extname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const root = resolve(import.meta.dirname, '../out/web')
+const root = resolve(import.meta.dirname, '../../out/web')
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

@@ -1,6 +1,6 @@
 import type { MenuItem, MenuItemConstructorOptions } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
-import type { AppearancePreference } from '../infrastructure/main/window-state'
+import type { AppearancePreference } from '../../infrastructure/main/window-state'
 import { applicationMenuTemplate } from './application-menu'
 
 function createActions() {

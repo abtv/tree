@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ipcChannels, ipcEvents, type TreeApi } from '../shared/ipc'
+import { ipcChannels, ipcEvents, type TreeApi } from '../../shared/ipc'
 
 const mocks = vi.hoisted(() => ({
   exposeInMainWorld: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
 
 describe('preload bridge', () => {
   beforeAll(async () => {
-    await import('../preload/index')
+    await import('./index')
   })
 
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('preload bridge', () => {
   })
 
   it('forwards the quit handshake request ID to the main process', async () => {
-    const { treeApi } = await import('../preload/index')
+    const { treeApi } = await import('./index')
 
     await treeApi.quit('request-1')
 
@@ -35,7 +35,7 @@ describe('preload bridge', () => {
   })
 
   it('forwards the quit-without-saving request to the main process', async () => {
-    const { treeApi } = await import('../preload/index')
+    const { treeApi } = await import('./index')
 
     await treeApi.quitWithoutSaving()
 
@@ -43,7 +43,7 @@ describe('preload bridge', () => {
   })
 
   it('forwards every request channel and argument', async () => {
-    const { treeApi } = (await import('../preload/index')) as { treeApi: TreeApi }
+    const { treeApi } = (await import('./index')) as { treeApi: TreeApi }
     const state = {
       version: 1 as const,
       document: { roots: [{ id: 'root', text: '', children: [] }] },
@@ -92,7 +92,7 @@ describe('preload bridge', () => {
   })
 
   it('registers and removes quit event listeners', async () => {
-    const { treeApi } = (await import('../preload/index')) as { treeApi: TreeApi }
+    const { treeApi } = (await import('./index')) as { treeApi: TreeApi }
     const requested = vi.fn()
     const failed = vi.fn()
 
@@ -112,7 +112,7 @@ describe('preload bridge', () => {
   })
 
   it('delivers menu-driven preference changes and removes the listeners', async () => {
-    const { treeApi } = (await import('../preload/index')) as { treeApi: TreeApi }
+    const { treeApi } = (await import('./index')) as { treeApi: TreeApi }
     const alwaysOnTop = vi.fn()
     const vimEnabled = vi.fn()
     mocks.on.mockClear()
@@ -138,7 +138,7 @@ describe('preload bridge', () => {
   })
 
   it('preserves rejected IPC promises', async () => {
-    const { treeApi } = (await import('../preload/index')) as { treeApi: TreeApi }
+    const { treeApi } = (await import('./index')) as { treeApi: TreeApi }
     mocks.invoke.mockRejectedValueOnce(new Error('save failed'))
 
     await expect(treeApi.load()).rejects.toThrow('save failed')
@@ -156,7 +156,7 @@ describe('preload bridge', () => {
 })
 
 it('delivers appearance notifications and removes the listener', async () => {
-  const { treeApi } = await import('../preload/index')
+  const { treeApi } = await import('./index')
   const listener = vi.fn()
   mocks.on.mockClear()
   const remove = treeApi.onAppearanceChanged?.(listener)

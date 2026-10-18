@@ -13,9 +13,9 @@ import {
 } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import type { NativeClipboard } from '../infrastructure/main/clipboard'
-import { createFileServices } from '../infrastructure/main/file-services'
-import { createCommandHistoryStore } from '../infrastructure/main/command-history'
+import type { NativeClipboard } from '../../infrastructure/main/clipboard'
+import { createFileServices } from '../../infrastructure/main/file-services'
+import { createCommandHistoryStore } from '../../infrastructure/main/command-history'
 import {
   createDebouncedWindowBoundsSaver,
   createAppearancePreferenceStore,
@@ -25,8 +25,8 @@ import {
   type AppearancePreferenceStore,
   type BooleanPreferenceStore,
   type WindowBounds,
-} from '../infrastructure/main/window-state'
-import { ipcEvents } from '../shared/ipc'
+} from '../../infrastructure/main/window-state'
+import { ipcEvents } from '../../shared/ipc'
 import { applicationMenuTemplate } from './application-menu'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'

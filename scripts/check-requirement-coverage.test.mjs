@@ -143,7 +143,7 @@ describe('repository discovery', () => {
     write('e2e/nested/two.spec.ts', '// @requirement PRODUCT.md §2\n')
     write('perf/three.spec.ts', '// @requirement PRODUCT.md §3\n')
     write('e2e/four.txt', '// @requirement PRODUCT.md §4\n')
-    write('web/build.mjs', '// @requirement PRODUCT.md §4\n')
+    write('scripts/web/build.mjs', '// @requirement PRODUCT.md §4\n')
     write('e2e/web/package.spec.mjs', '// @requirement PRODUCT.md §5\n')
     write('e2e/web/theme.spec.mjs', '// @requirement PRODUCT.md §6\n')
     write('scripts/release/rules.test.mjs', '// @requirement PRODUCT.md §7\n')

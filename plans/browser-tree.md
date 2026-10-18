@@ -59,7 +59,7 @@ JavaScript/CSS/font assets and `.nojekyll`. `npm run test:web:built` passed the
 editor, theme, menu and storage checks in isolated Chrome 155 against the generated
 files, including full browser restart and write-failure paths. Accepted UI and
 the browser adapter/database are unchanged. Hosting and update instructions are
-in `web/README.md`; no deployment workflow or publication was added.
+in `src/web/README.md`; no deployment workflow or publication was added.
 Types, unit coverage, serial fast performance guards, desktop build, scoped lint
 and formatting, docs and requirement coverage pass. Full `npm run check` remains
 blocked by the unrelated untracked Docker verifier's lint/format errors;
@@ -72,14 +72,14 @@ publish; retain all existing Safari, physical-input, scale and release gates.
 Local implementation checkpoint (owner, 2026-10-17): after reviewing the browser
 editor, theme, compact menu and storage corrections, the owner explicitly asked
 to preserve the working code in ordinary project files and commit it. The scope
-is `web/`, named local run/check commands and supporting documentation.
+is `src/web/`, named local run/check commands and supporting documentation.
 Preserve the localhost origin/database so the existing browser document remains
 accessible. Synchronization, export/import, Docker setup and publication are
 excluded. This checkpoint does not authorize full P2–P8 delivery or waive remaining
 browser parity, scale and release validation. Reuse prior valid prototype evidence
 and check the tracked entry point after relocation.
 Checkpoint result: source and isolated Chrome checks are preserved in
-`web/`, with `npm run dev:web` and `npm run test:web`. Browser
+`src/web/`, with `npm run dev:web` and `npm run test:web`. Browser
 smoke, theme, menu and storage checks pass from the relocated source; types and
 desktop build also pass. Whole-project lint/format checks remain blocked by the
 unrelated untracked `scripts/browser-container/verify.mjs` from suspended Docker
@@ -141,12 +141,12 @@ The domain already excludes Electron, DOM, React, and filesystem dependencies. T
 | Current owner | Dependency and required browser treatment |
 | --- | --- |
 | [renderer/main.tsx](../src/renderer/main.tsx), [renderer/lifecycle.ts](../src/renderer/lifecycle.ts) | Hardwired Electron services, preference bootstrap, quit request/acknowledgment. Add separate browser composition and lifecycle; share editor mounting |
-| [shared/ipc.ts](../src/shared/ipc.ts), [preload/index.ts](../src/preload/index.ts) | Explicit desktop API for persistence, attachments, clipboard, preferences, native context menu and quit. Retain the Electron boundary; extract platform-neutral value contracts rather than emulate IPC in a browser global |
+| [shared/ipc.ts](../src/shared/ipc.ts), [preload/index.ts](../src/electron/preload/index.ts) | Explicit desktop API for persistence, attachments, clipboard, preferences, native context menu and quit. Retain the Electron boundary; extract platform-neutral value contracts rather than emulate IPC in a browser global |
 | [electron-services.ts](../src/infrastructure/renderer/electron-services.ts), [AttachmentPreview.tsx](../src/renderer/AttachmentPreview.tsx) | Preview imports an Electron-named singleton byte cache directly. Inject attachment reading/cache ownership and retain bounded caching and object-URL cleanup |
 | [App.tsx](../src/renderer/App.tsx), [use-command-panel.ts](../src/renderer/use-command-panel.ts), [editor-input-handlers.ts](../src/renderer/editor-input-handlers.ts), [node-input-pointer-handlers.ts](../src/renderer/node-input-pointer-handlers.ts) | Direct `window.treeApi` calls for preferences, quit and context menus. Route through a narrow platform interface; capabilities must have explicit product dispositions |
-| [file-services.ts](../src/infrastructure/main/file-services.ts), [quit-handshake.ts](../src/main/quit-handshake.ts) | Serialized filesystem work, durable replacement, retained generations and controlled shutdown. Browser storage must implement the same safety intent with transactions; filesystem rename/fsync and guaranteed quit waiting cannot simply be copied |
-| [clipboard.ts](../src/infrastructure/main/clipboard.ts), [ipc-security.ts](../src/main/ipc-security.ts), [png-decoder.ts](../src/main/png-decoder.ts) | Electron clipboard and PNG decoding/validation. Share pure validation, link extraction and size rules; add browser event/API adapters and browser decoding, without importing Node `Buffer` or Electron |
-| [application-menu.ts](../src/main/application-menu.ts), [editor-context-menu.ts](../src/main/editor-context-menu.ts), [window.ts](../src/main/window.ts) | Native menus, Look Up, Google search, external links, geometry, appearance and window pinning. See D2/D3; no silent omissions |
+| [file-services.ts](../src/infrastructure/main/file-services.ts), [quit-handshake.ts](../src/electron/main/quit-handshake.ts) | Serialized filesystem work, durable replacement, retained generations and controlled shutdown. Browser storage must implement the same safety intent with transactions; filesystem rename/fsync and guaranteed quit waiting cannot simply be copied |
+| [clipboard.ts](../src/infrastructure/main/clipboard.ts), [ipc-security.ts](../src/electron/main/ipc-security.ts), [png-decoder.ts](../src/electron/main/png-decoder.ts) | Electron clipboard and PNG decoding/validation. Share pure validation, link extraction and size rules; add browser event/API adapters and browser decoding, without importing Node `Buffer` or Electron |
+| [application-menu.ts](../src/electron/main/application-menu.ts), [editor-context-menu.ts](../src/electron/main/editor-context-menu.ts), [window.ts](../src/electron/main/window.ts) | Native menus, Look Up, Google search, external links, geometry, appearance and window pinning. See D2/D3; no silent omissions |
 | [electron.vite.config.ts](../electron.vite.config.ts), [renderer/index.html](../src/renderer/index.html), [styles.css](../src/renderer/styles.css) | Desktop build and CSP, worker prohibition, font asset, draggable title area and macOS presentation. Add a separate browser Vite entry/config and platform styling; preserve common layout and editing code |
 
 Recommendation: one domain, application store, command registry, Vim command/session/caret owners, Tree/Agenda components, completion logic and principal styles. Separate Electron and browser composition roots and infrastructure. Keep platform access injected and outside business rules. Reuse React, TypeScript and Vite. A framework migration, editor replacement, CRDT, server, account system, or separate browser product is unnecessary.
@@ -268,7 +268,7 @@ Offline acceptance includes normal browser quit/restart with retained profile, f
 
 ## 7. Large-document performance
 
-Reuse the current synthetic workload generators and scenarios from [perf/](../perf/), including Tree typing/startup, wide-list navigation/expansion, counted Vim operations, node Visual commands, Agenda wide/deep/mixed dense/sparse data, completion, state/history, attachments and typing during save. Existing fixtures include large document and wide-sibling scales; the scenario definitions and budgets stay with their owning tests. Browser shipping scope retains those workloads.
+Reuse the current synthetic workload generators and scenarios from [perf/](../perf), including Tree typing/startup, wide-list navigation/expansion, counted Vim operations, node Visual commands, Agenda wide/deep/mixed dense/sparse data, completion, state/history, attachments and typing during save. Existing fixtures include large document and wide-sibling scales; the scenario definitions and budgets stay with their owning tests. Browser shipping scope retains those workloads.
 
 Measure the following in visible branded Chrome and real Safari on controlled machines:
 

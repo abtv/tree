@@ -10,12 +10,12 @@ The Electron renderer is treated as untrusted with respect to the main process. 
 
 The main controls are:
 
-* **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/main/index.ts`).
-* **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/main/window.ts`, `src/main/index.ts`).
-* **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/main/ipc-handlers.ts`, `src/main/ipc-security.ts`).
-* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only local schemes and, for an unpackaged development renderer, requests to that renderer's own origin. External links still go to the operating system browser through `shell.openExternal` (`src/main/window.ts`, `src/main/index.ts`).
-* **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/main/ipc-security.ts`).
-* **Bounded attachments.** Attachment writes accept only validated PNG data within a bounded payload size and with bounded decoded dimensions (maximum 32767 pixels per side and 64 megapixels total), and the image must decode through the platform decoder before bytes are stored (`src/main/ipc-security.ts`, `src/main/png-decoder.ts`).
+* **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
+* **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/electron/main/ipc-handlers.ts`, `src/electron/main/ipc-security.ts`).
+* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only local schemes and, for an unpackaged development renderer, requests to that renderer's own origin. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/electron/main/ipc-security.ts`).
+* **Bounded attachments.** Attachment writes accept only validated PNG data within a bounded payload size and with bounded decoded dimensions (maximum 32767 pixels per side and 64 megapixels total), and the image must decode through the platform decoder before bytes are stored (`src/electron/main/ipc-security.ts`, `src/electron/main/png-decoder.ts`).
 * **Bounded clipboard image reads.** PNG clipboard blobs exceeding the attachment byte limit are rejected before `arrayBuffer()` copies their bytes into application memory (`src/infrastructure/main/clipboard.ts`). This does not bound memory allocated internally by Electron or macOS while obtaining the clipboard blob.
 * **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs, and denies child frames, workers, and media. (Chromium ignores `frame-ancestors` when the policy is delivered by a meta element.)
 * **Domain purity.** The domain does not depend on Electron, Node, the filesystem, or the DOM, and dependencies point toward it (`docs/ARCHITECTURE.md` §4, §18). ESLint enforces the import boundaries (`eslint.config.mjs`).
@@ -28,13 +28,13 @@ Tree makes no network requests of its own, sends no telemetry, and stores docume
 only on the local machine; it has no cloud document service. Content can still be disclosed to a
 third party when the user explicitly invokes these features:
 
-* **Open an external hyperlink.** `src/main/index.ts` hands the HTTP(S) URL to the operating
+* **Open an external hyperlink.** `src/electron/main/index.ts` hands the HTTP(S) URL to the operating
   system's default hyperlink application, typically a browser. The URL may itself contain document
   content. This implements the link-opening behavior in `docs/PRODUCT.md` §12.
-* **Search with Google.** `src/main/editor-context-menu.ts` sends the selected text as a Google
+* **Search with Google.** `src/electron/main/editor-context-menu.ts` sends the selected text as a Google
   search query through the system browser. This is the user-invoked menu item specified in
   `docs/PRODUCT.md` §13.2.
-* **macOS Look Up.** `src/main/editor-context-menu.ts` passes selected text to the macOS lookup
+* **macOS Look Up.** `src/electron/main/editor-context-menu.ts` passes selected text to the macOS lookup
   service. Depending on the user's macOS settings, that service may consult network sources. This is
   the native Look Up item specified in `docs/PRODUCT.md` §13.2.
 
@@ -128,12 +128,12 @@ Every control above has an automated check. The verification map:
 
 | Control | Focused tests | Real-boundary tests |
 | --- | --- | --- |
-| Renderer isolation | `src/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
-| Restricted navigation and external links | `src/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
-| Renderer session permissions and network egress | `src/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
-| Trusted IPC callers and payload validation | `src/main/ipc-security.test.ts`, `src/main/ipc-handlers.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
-| Persisted-state validation on save | `src/domain/document.test.ts`, `src/main/ipc-security.test.ts` | `e2e/electron/persistence.spec.ts`, `e2e/electron/persistence-reliability.spec.ts` |
-| Attachment validation and decoding | `src/main/ipc-security.test.ts`, `src/main/png-decoder.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
+| Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
+| Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
+| Renderer session permissions and network egress | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
+| Trusted IPC callers and payload validation | `src/electron/main/ipc-security.test.ts`, `src/electron/main/ipc-handlers.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
+| Persisted-state validation on save | `src/domain/document.test.ts`, `src/electron/main/ipc-security.test.ts` | `e2e/electron/persistence.spec.ts`, `e2e/electron/persistence-reliability.spec.ts` |
+| Attachment validation and decoding | `src/electron/main/ipc-security.test.ts`, `src/electron/main/png-decoder.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
 | Content security policy | production build plugin | `e2e/electron/csp.spec.ts` |
 | Domain and layer import boundaries | `eslint.config.mjs` import restrictions | lint step of `npm run check` |
 
