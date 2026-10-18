@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, pressPaste } from './fixtures.mjs'
 
 // @requirement PRODUCT.md §1.4
 test('uses native text paste in every Vim mode and editor location', async ({ newContext, baseURL }) => {
@@ -46,7 +46,7 @@ test('uses native text paste in every Vim mode and editor location', async ({ ne
       if (mode === 'replace') await page.keyboard.press('R')
       if (mode === 'visual') await page.keyboard.press('v')
       const before = await input.innerText()
-      await page.keyboard.press('Meta+v')
+      await pressPaste(page)
       await expect(input, `${scope} ${mode}`).toHaveText('PASTED' + before)
       await page.keyboard.press('Escape')
       await page.keyboard.press('u')
@@ -82,7 +82,7 @@ test('pastes an external image from the native event without requesting clipboar
   })
   const input = page.locator('.node-row[data-node-id="welcome"] .node-input')
   await input.fill('')
-  await page.keyboard.press('Meta+v')
+  await pressPaste(page)
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(1)
   expect(await page.evaluate(() => window.programmaticReads)).toBe(0)
   expect(await page.evaluate(() => window.nativePastes)).toBe(1)

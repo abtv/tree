@@ -92,10 +92,13 @@ remains unverified; native Safari clipboard interaction still needs verification
 Chrome E2E specs live in `e2e/web/` and use Playwright Test through
 `playwright.web.config.ts`. Electron tests live beside them in `e2e/electron/`
 and use the separate `playwright.config.ts`.
-Both targets use Playwright assertions, fixtures, traces and reports. Google
-Chrome must be installed; no downloaded Playwright browser is required.
-The suite requires headless mode so its clipboard checks use Chrome's virtual
-clipboard rather than the machine clipboard.
+Both targets use Playwright assertions, fixtures, traces and reports. On macOS
+the suite uses the installed Google Chrome; no downloaded Playwright browser is
+required. Google Chrome has no Linux arm64 build, so on Linux the suite uses
+Playwright's Chromium in new headless mode; install it with
+`npx playwright install --with-deps chromium`. CI runs the suite on Linux arm64.
+The suite requires headless mode so its clipboard checks use the browser's
+virtual clipboard rather than the machine clipboard.
 In Codex, browser launch uses the normal outside-sandbox approval mechanism.
 
 `test:web` starts and stops the local development server automatically, or reuses

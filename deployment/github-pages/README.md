@@ -23,11 +23,12 @@ Only a deliberately unselected memory/demo job may be skipped. The gate also
 requires successful change selection, so unavailable API history or a required
 Git revision fails closed. History is unnecessary when the current push already
 requires both checks. Nightly/manual performance, property soak and mutation runs remain separate.
-Chrome on macOS is the current browser gate; Safari and full browser parity remain
-later work. The source demo workflow keeps publishing to its existing media site.
+Playwright's Chromium on Linux arm64 is the current browser gate; Google Chrome,
+Safari and full browser parity remain later work. The source demo workflow keeps
+publishing to its existing media site.
 
-Chrome builds and tests `out/web/` once. An artifact named with source SHA and run
-attempt contains exactly those files and a per-file SHA256 manifest. After the
+The browser job builds and tests `out/web/` once. An artifact named with source
+SHA and run attempt contains exactly those files and a per-file SHA256 manifest. After the
 gate succeeds, a separate signing job authenticates retained old assets and
 commits every current and retained file's size/hash to one complete manifest.
 It signs the exact manifest through GitHub OIDC/Sigstore using `actions/attest`.

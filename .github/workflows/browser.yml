@@ -10,7 +10,7 @@ permissions:
 jobs:
   chrome:
     name: Chrome static package
-    runs-on: macos-15
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -21,7 +21,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Verify generated files in isolated Chrome
+      # Google Chrome has no Linux arm64 build; the suite uses Playwright's Chromium there.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify generated files in isolated Chromium
         run: npm run test:web:built
       - name: Preserve Chrome test reports
         if: failure()

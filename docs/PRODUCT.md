@@ -99,7 +99,7 @@ through its existing text/image paste, size-limit, undo and save rules.
 
 A push to source `main` publishes to `https://tree-editor.github.io` only after
 the same commit passes standard validation, Electron integration, dependency
-audit and Chrome checks of the built package, plus applicable memory/demo checks.
+audit and Chromium checks of the built package, plus applicable memory/demo checks.
 Scheduled/manual suites are separate. Safari is outside this current publication
 gate. Publication transfers the tested package without rebuilding it. Failed
 checks, transfer or pre-deployment verification leave the active release intact.

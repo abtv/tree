@@ -3,6 +3,8 @@ import { defineConfig } from '@playwright/test'
 const built = process.env['TREE_WEB_BUILT'] === '1'
 const externalURL = process.env['TREE_WEB_URL']
 const baseURL = externalURL ?? `http://127.0.0.1:${built ? 5175 : 5174}/`
+// Google Chrome has no Linux arm64 build, so Linux uses Playwright's Chromium in new headless mode.
+const channel = process.platform === 'darwin' ? 'chrome' : 'chromium'
 
 export default defineConfig({
   testDir: './e2e/web',
@@ -16,7 +18,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 10_000 },
   reporter: [['list'], ['html', { outputFolder: 'playwright-report/web', open: 'never' }]],
-  projects: [{ name: built ? 'chrome-built' : 'chrome', use: { channel: 'chrome' } }],
+  projects: [{ name: built ? 'chrome-built' : 'chrome', use: { channel } }],
   use: {
     baseURL,
     headless: true,

@@ -48,7 +48,7 @@ Electron keeps the default native-editing path; plain textareas are unaffected.
 This adds no document writes, syncs, retained snapshots or document traversal.
 Mode changes update attributes on the bounded set of mounted inputs.
 
-The browser publication workflow composes the existing checks with a Chrome
+The browser publication workflow composes the existing checks with a Chromium
 package check through reusable Actions workflows. A gated, short-lived GitHub
 App token writes package/provenance paths to the separate hosting
 repository. After the gate, a separate OIDC signing job attests the complete

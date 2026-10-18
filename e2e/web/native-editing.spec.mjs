@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, pressPaste } from './fixtures.mjs'
 
 // @requirement PRODUCT.md §1.4
 // Real browser events exercise the browser-only App policy, including all three rich-input sites.
@@ -120,7 +120,7 @@ test('preserves native editing across modes and input scopes', async ({ newConte
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe('2026-10-18 Typed é 😀 after switching')
-    await page.keyboard.press('Meta+v')
+    await pressPaste(page)
     await expect(input).toHaveText('2026-10-18 Typed é 😀 after switching')
   })
   await page.evaluate(() => window.prototypeStore.flushPersistence())
