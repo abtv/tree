@@ -246,7 +246,7 @@
           "cp test-results/* test-results/*": "allow",
           "cp -R test-results/* test-results/*": "allow",
           "mv e2e/electron/_* test-results/*": "allow",
-          "mv perf/_* test-results/*": "allow",
+          "mv perf/electron/_* test-results/*": "allow",
           "mv test-results/* test-results/*": "allow",
           "TREE_E2E_VISIBLE=1 npm run test:e2e": "allow",
           "TREE_E2E_VISIBLE=1 npm run test:e2e *": "allow",

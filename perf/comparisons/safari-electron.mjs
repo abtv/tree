@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron } from '@playwright/test'
-import { createStaticServer } from './web/static-server.mjs'
+import { createStaticServer } from '../../scripts/web/static-server.mjs'
 
 // Local measurements only: no CI thresholds and no changes to the ordinary perf suite.
 const output = resolve('.scratch/safari-perf')
@@ -319,7 +319,7 @@ async function run(kind) {
       motion: summarize(await evaluate(() => window.perfProbe.motion)),
     }
   } else {
-    // Hold the save promise open in both adapters, as in perf/save-responsiveness.spec.ts.
+    // Hold the save promise open in both adapters, as in perf/electron/save-responsiveness.spec.ts.
     // The real file/IndexedDB write still runs; this is a slow-save responsiveness proxy.
     if (browser === 'electron') {
       await app.evaluate(() => {

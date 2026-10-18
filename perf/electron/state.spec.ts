@@ -11,7 +11,7 @@ import {
   test,
   writeClipboardImageSized,
 } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 interface SaveControl {
   saves: number

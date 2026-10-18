@@ -1,6 +1,6 @@
-import { calendarDateOf, dayNumberOf, formatCanonicalDate } from '../src/domain/calendar-date'
+import { calendarDateOf, dayNumberOf, formatCanonicalDate } from '../../src/domain/calendar-date'
 import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
   [false, true].map((month) => ({ vimEnabled, month })),

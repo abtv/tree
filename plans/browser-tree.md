@@ -403,7 +403,7 @@ Source snapshot: `fceee5f`, initially clean. No shipping source, package metadat
 
   The subsequent isolated probe passed string insert/read and aborted string replacement, then failed at the first Blob insert with the same error (exit 1). Blob read and aborted replacement were therefore not reached. Further equivalent retries have no new evidence; next investigate the test-engine environment and compare on an owner-approved real Safari runner.
 
-Single-run Chromium wide-tree measurements (shape reproduced from `perf/fixtures.ts` `wideSeed`, not the full editor):
+Single-run Chromium wide-tree measurements (shape reproduced from `perf/electron/fixtures.ts` `wideSeed`, not the full editor):
 
 | Child nodes | Logical JSON bytes | JSON serialization | Snapshot enqueue / transaction complete | Checkpoint enqueue / complete | Five individual delta transactions |
 | --- | --- | --- | --- | --- | --- |

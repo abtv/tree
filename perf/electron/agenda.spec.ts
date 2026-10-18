@@ -1,5 +1,5 @@
 import { agendaSeed, expect, launchTree, round, seedDocument, test } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 type LaunchedApp = Awaited<ReturnType<typeof launchTree>>['app']
 

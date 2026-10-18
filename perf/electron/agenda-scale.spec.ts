@@ -1,5 +1,5 @@
 import { expect, launchTree, round, seedDocument, test, type Seed } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 interface Node {
   id: string

@@ -1,6 +1,6 @@
 import { performance as nodePerformance } from 'node:perf_hooks'
 import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, type Seed } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 async function measureStartup(
   userDataDir: string,

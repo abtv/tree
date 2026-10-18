@@ -151,7 +151,7 @@ artifacts. The server binds only to the local loopback address.
 ### Local Safari performance comparisons
 
 Run `npm run test:perf:safari` on macOS to compare real Safari with Electron.
-The single runner in `scripts/safari-perf.mjs` exercises typing in a large Tree,
+The single runner in `perf/comparisons/safari-electron.mjs` exercises typing in a large Tree,
 Agenda opening/navigation/scrolling, and typing while an automatic save is pending.
 It builds both versions, starts an ephemeral loopback server and SafariDriver on
 port 7056, and runs the same scenarios serially in visible Safari and Electron.

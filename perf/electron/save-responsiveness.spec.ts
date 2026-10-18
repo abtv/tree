@@ -1,5 +1,5 @@
 import { expect, largeSeed, launchTree, round, seedDocument, test } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): Promise<void> {
   seedDocument(userDataDir, largeSeed(100, 100))

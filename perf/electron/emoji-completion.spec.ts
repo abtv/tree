@@ -1,6 +1,6 @@
 import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
-import { recordPerfResult } from './results'
-import catalog from '../src/domain/emoji-catalog.json'
+import { recordPerfResult } from '../results'
+import catalog from '../../src/domain/emoji-catalog.json'
 
 // @requirement PRODUCT.md §20.12
 // @requirement PRODUCT.md §22.1

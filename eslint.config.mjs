@@ -45,7 +45,7 @@ export default tseslint.config(
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts}',
       'e2e/**/*.{ts,cjs,mjs}',
-      'perf/**/*.ts',
+      'perf/**/*.{ts,mjs}',
       'src/electron/main/**/*.ts',
       'src/electron/preload/**/*.ts',
       'src/infrastructure/main/**/*.ts',

@@ -1,5 +1,5 @@
 import { agendaSeed, expect, launchTree, seedDocument, test } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 for (const view of ['Tree', 'Agenda'] as const) {
   // @requirement PRODUCT.md §22.2

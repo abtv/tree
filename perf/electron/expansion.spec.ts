@@ -1,5 +1,5 @@
 import { collectRendererHeap, expect, largeSeed, launchTree, round, seedDocument, test } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 const EXPANDED_TOP_LEVEL_COUNT = 250
 

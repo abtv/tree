@@ -1,5 +1,5 @@
 import { expect, launchTree, round, seedDocument, test } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 // @requirement PRODUCT.md §20.11
 // @requirement PRODUCT.md §22.1

@@ -1,5 +1,5 @@
 import { expect, launchTree, largeSeed, round, seedDocument, test, wideSeed, type Seed } from './fixtures'
-import { recordPerfResult } from './results'
+import { recordPerfResult } from '../results'
 
 const TYPED = 'abcdefghijklmnopqrstuvwxyz'.repeat(4)
 

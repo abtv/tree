@@ -160,8 +160,8 @@ const developCases = {
     'cp test-results/example/trace.zip test-results/keep.zip',
     'cp -R test-results/example test-results/keep',
     'mv e2e/electron/_drag-diagnostic.spec.ts test-results/',
-    'mv perf/_probe.spec.ts test-results/',
-    'mv perf/_probe-a.spec.ts perf/_probe-b.spec.ts test-results/',
+    'mv perf/electron/_probe.spec.ts test-results/',
+    'mv perf/electron/_probe-a.spec.ts perf/electron/_probe-b.spec.ts test-results/',
     'mv test-results/keep.zip test-results/archive.zip',
     // Chained commands from real sessions: each segment must resolve to allow.
     'ls -la .opencode; git stash list; git branch -a',
@@ -208,11 +208,11 @@ const developCases = {
     'mv src/domain test-results/domain',
     'mv e2e/electron/history.spec.ts test-results/',
     // Only underscore-prefixed perf probe files may move into the scratch directory.
-    'mv perf/foo.spec.ts src/',
-    'mv perf/foo.spec.ts',
-    'mv perf/foo.spec.ts test-results/',
-    'mv perf/_probe.spec.ts test-results',
-    'mv perf/_probe.spec.ts ~/Desktop/',
+    'mv perf/electron/foo.spec.ts src/',
+    'mv perf/electron/foo.spec.ts',
+    'mv perf/electron/foo.spec.ts test-results/',
+    'mv perf/electron/_probe.spec.ts test-results',
+    'mv perf/electron/_probe.spec.ts ~/Desktop/',
     // Ad-hoc environment prefixes stay approval-gated for the new inspection tools.
     'PROBE_PID=1 pgrep -af "tree-perf-"',
     'npm run unknown',

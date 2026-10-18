@@ -1,6 +1,6 @@
 import { expect, largeSeed, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
-import { recordPerfResult } from './results'
-import { startRowDrag } from '../e2e/electron/fixtures'
+import { recordPerfResult } from '../results'
+import { startRowDrag } from '../../e2e/electron/fixtures'
 
 test.describe('Vim interactions at scale', () => {
   test('character Visual selection responds through repeated motions', async ({ userDataDir }) => {
