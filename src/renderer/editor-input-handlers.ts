@@ -143,6 +143,7 @@ export function executeEditorContextMenuCommand(
 
 export interface EditorKeyboardHandlerDependencies {
   store: EditorStore
+  nativePaste?: boolean
   node: TreeNode
   isComposing: () => boolean
   setSelectAllNodeId: (nodeId: string | undefined) => void
@@ -155,6 +156,7 @@ export interface EditorKeyboardHandlerDependencies {
 
 export function createEditorKeyDownHandler({
   store,
+  nativePaste = false,
   node,
   isComposing,
   setSelectAllNodeId,
@@ -311,6 +313,9 @@ export function createEditorKeyDownHandler({
     if (selectingAll && vim?.mode === 'insert') vim.finishInsert(event.currentTarget)
     const copying = event.metaKey && event.key.toLowerCase() === 'c'
     const pasting = event.metaKey && event.key.toLowerCase() === 'v'
+    // Browser paste supplies clipboard data without a second permission request. The paste handler
+    // still owns the edit and resolves Vim sessions; Electron keeps its keydown-owned command.
+    if (pasting && nativePaste) return
     if (!selectingAll && !copying && !pasting) {
       setSelectAllNodeId(undefined)
       event.currentTarget.classList.remove('select-all')

@@ -93,6 +93,10 @@ Copying a stored image starts the browser clipboard request during the user's
 command while its image data loads asynchronously. A missing image or denied
 clipboard access reports an operation error and leaves the document unchanged.
 
+Browser keyboard paste uses the clipboard data supplied by the native paste event,
+without requesting separate clipboard-read confirmation. Tree handles that data
+through its existing text/image paste, size-limit, undo and save rules.
+
 A push to source `main` publishes to `https://tree-editor.github.io` only after
 the same commit passes standard validation, Electron integration, dependency
 audit and Chrome checks of the built package, plus applicable memory/demo checks.

@@ -1273,9 +1273,9 @@ export class EditorStore {
     return true
   }
 
-  public async paste(nodeId: NodeId, cursor: number): Promise<void> {
+  public async paste(nodeId: NodeId, cursor: number, readClipboard?: EditorServices['readClipboard']): Promise<void> {
     if (this.isPersistenceLocked()) return
-    await this.trackEdit(this.pasteFromClipboard(nodeId, cursor))
+    await this.trackEdit(this.pasteFromClipboard(nodeId, cursor, readClipboard))
   }
 
   private async trackEdit(operation: Promise<void>): Promise<void> {
@@ -1287,11 +1287,15 @@ export class EditorStore {
     }
   }
 
-  private async pasteFromClipboard(nodeId: NodeId, cursor: number): Promise<void> {
+  private async pasteFromClipboard(
+    nodeId: NodeId,
+    cursor: number,
+    readClipboard?: EditorServices['readClipboard'],
+  ): Promise<void> {
     this.runtime.ready()
     this.endTextSession()
     await this.pendingClipboardOperation
-    const clipboard = await this.services.readClipboard()
+    const clipboard = await (readClipboard === undefined ? this.services.readClipboard() : readClipboard())
     if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) {
       return
     }

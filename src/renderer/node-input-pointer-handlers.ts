@@ -12,6 +12,7 @@ import { clearCommandAssembly, type VimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
 import { beginReplaceClick, beginReplaceSession, takeReplaceClick, type VimEditSessionState } from './vim-edit-session'
 import type { VimMode } from './vim-editing'
+import type { EditorServices } from '../application/editor-store-types'
 
 /** Keep a readonly occurrence mounted until its link click has been dispatched. */
 export function preventReadOnlyLinkFocus(event: MouseEvent<HTMLElement>): void {
@@ -21,6 +22,7 @@ export function preventReadOnlyLinkFocus(event: MouseEvent<HTMLElement>): void {
 
 interface PointerHandlerDeps {
   store: EditorStore
+  capturePasteClipboard?: ((data: DataTransfer) => EditorServices['readClipboard']) | undefined
   selectedNodeId: string | undefined
   persistenceLocked: boolean
   vimMode: VimMode
@@ -51,6 +53,7 @@ export function createPointerHandlers(
 > {
   const {
     store,
+    capturePasteClipboard,
     selectedNodeId,
     persistenceLocked,
     vimMode,
@@ -219,7 +222,10 @@ export function createPointerHandlers(
       setSelectAllNodeId(undefined)
       event.preventDefault()
       finishVimSessionBeforeTextEdit(vimTextCommandState, event.currentTarget)
-      void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
+      const source = capturePasteClipboard?.(event.clipboardData)
+      void store
+        .paste(node.id, getCaret(event.currentTarget), source)
+        .catch((error: unknown) => store.reportError(error))
     },
     onSelect: (event: SyntheticEvent<HTMLElement>) => {
       if (vimMode === 'normal') return

@@ -3,6 +3,7 @@ import { App } from '../renderer/App'
 import { ErrorBoundary } from '../renderer/ErrorBoundary'
 import { EditorStore } from '../application/editor-store'
 import { installBrowserPrototype } from './services'
+import { capturePasteClipboard } from './paste'
 import '../renderer/styles.css'
 import './styles.css'
 
@@ -18,6 +19,7 @@ try {
         vimAvailable={bridge.vimAvailable}
         store={store}
         deferRichEditing
+        capturePasteClipboard={capturePasteClipboard}
       />
     </ErrorBoundary>,
   )

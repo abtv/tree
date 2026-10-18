@@ -483,6 +483,22 @@ describe('select', () => {
 })
 
 describe('paste', () => {
+  it('captures event clipboard data and forwards its reader to the real store', async () => {
+    const f = await fixture()
+    const source = vi.fn(async () => ({ kind: 'text' as const, text: ' event' }))
+    const transfer = {} as DataTransfer
+    const capturePasteClipboard = vi.fn(() => source)
+    const input = textarea('hello', 5)
+    createPointerHandlers({ ...f.deps, capturePasteClipboard }, f.node()).onPaste({
+      currentTarget: input,
+      clipboardData: transfer,
+      preventDefault: vi.fn(),
+    } as never)
+    expect(capturePasteClipboard).toHaveBeenCalledExactlyOnceWith(transfer)
+    await vi.waitFor(() => expect(f.node().text).toBe('hello event'))
+    expect(source).toHaveBeenCalledOnce()
+  })
+
   it('finishes the Vim session, cancels the native paste, and pastes through the store', async () => {
     const f = await fixture({ mode: 'replace' })
     f.clipboard.current = { kind: 'text', text: ' world' }

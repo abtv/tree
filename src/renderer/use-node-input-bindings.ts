@@ -38,9 +38,11 @@ import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
 import { useCompletion } from './use-completion'
 import type { CompletionPopupPresentation } from './CompletionPopup'
+import type { EditorServices } from '../application/editor-store-types'
 
 interface UseNodeInputBindingsOptions {
   store: EditorStore
+  capturePasteClipboard?: ((data: DataTransfer) => EditorServices['readClipboard']) | undefined
   selectedNodeId?: string | undefined
   focus?: FocusIntent | undefined
   onPreviewAttachment: (attachmentId: string) => void
@@ -77,6 +79,7 @@ export interface NodeInputBindingsResult {
 
 export function useNodeInputBindings({
   store,
+  capturePasteClipboard,
   selectedNodeId,
   focus,
   onPreviewAttachment,
@@ -775,6 +778,7 @@ export function useNodeInputBindings({
         ...createPointerHandlers(
           {
             store,
+            capturePasteClipboard,
             selectedNodeId,
             persistenceLocked,
             vimMode,
@@ -794,6 +798,7 @@ export function useNodeInputBindings({
         ),
         onKeyDown: createEditorKeyDownHandler({
           store,
+          nativePaste: capturePasteClipboard !== undefined,
           node,
           isComposing: () => composing,
           setSelectAllNodeId,
@@ -838,6 +843,7 @@ export function useNodeInputBindings({
       }),
     [
       decorateCompletionBindings,
+      capturePasteClipboard,
       composing,
       applyCaretState,
       commandNodeVisual,

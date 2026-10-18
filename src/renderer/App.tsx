@@ -29,6 +29,7 @@ import { SCROLL_VIEWPORT_CLASS } from './scroll-viewport'
 import { useScrollRestoration } from './use-scroll-restoration'
 import { useLeftCommandKey } from './use-left-command-key'
 import type { VimMode } from './vim-editing'
+import type { EditorServices } from '../application/editor-store-types'
 
 interface AppProps {
   store: EditorStore
@@ -38,6 +39,7 @@ interface AppProps {
   vimAvailable?: boolean
   /** Enable native rich editing only in text-entry modes in the browser adapter. */
   deferRichEditing?: boolean
+  capturePasteClipboard?: (data: DataTransfer) => EditorServices['readClipboard']
 }
 
 export function App({
@@ -45,6 +47,7 @@ export function App({
   initialVimEnabled,
   vimAvailable = true,
   deferRichEditing = false,
+  capturePasteClipboard,
 }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
@@ -114,6 +117,7 @@ export function App({
     selectedNodeId,
     focus,
     onPreviewAttachment: setPreviewAttachmentId,
+    capturePasteClipboard,
     persistenceLocked,
     vimEnabled,
     vimMode,

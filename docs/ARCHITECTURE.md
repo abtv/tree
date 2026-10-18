@@ -610,6 +610,13 @@ Vim external yanks and Normal `dd` use a separate `writeClipboardContent` servic
 
 ### Editing commands
 
+In the browser adapter, keyboard paste reaches the native paste event. Browser
+infrastructure captures the event's text, HTML and PNG file synchronously and
+supplies a clipboard reader to the existing store paste operation. The renderer
+prevents default insertion and resolves Vim sessions before dispatching the edit.
+This avoids a separate programmatic clipboard-read permission prompt. Electron
+retains the shortcut ownership described below.
+
 The application installs only a minimal application menu, so macOS does not route the standard editing commands (Undo, Redo, Cut, Copy, Paste, Select All) to the renderer, and the native `copy`, `cut`, and `paste` DOM events do not fire. The editor key handler must own these commands: intercept the shortcut, prevent the native default, and perform the operation through the editor store and the clipboard service. The application must not rely on native menu roles or native clipboard DOM events. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
 
 Editable node fields also expose a native macOS contextual menu. The renderer captures the node's selection and capabilities, the main process presents the platform menu, and the selected Cut, Copy, Paste, or Select All command returns to the renderer and uses the same editor-store path as the keyboard command. Look Up uses Electron's native definition service and Search with Google opens the selected text externally. The menu is attached only to editable node inputs, so other controls do not acquire editor commands.

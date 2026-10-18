@@ -51,6 +51,41 @@ function ids(...values: string[]): () => string {
   return () => values[index++] ?? `id-${index}`
 }
 
+describe('event-supplied paste source', () => {
+  it('uses the captured source instead of reading the system clipboard', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Hello', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const systemRead = vi.spyOn(services, 'readClipboard')
+    const store = new EditorStore(services, ids('new'), new FakeClock())
+    await store.initialize()
+    await store.paste('root', 5, async () => ({ kind: 'text', text: ' world' }))
+    expect((store.getSnapshot() as ReadySnapshot).document.roots[0]?.text).toBe('Hello world')
+    expect(systemRead).not.toHaveBeenCalled()
+    store.undo()
+    expect((store.getSnapshot() as ReadySnapshot).document.roots[0]?.text).toBe('Hello')
+  })
+
+  it('propagates captured source failures without reading the system clipboard or changing the document', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'Hello', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const systemRead = vi.spyOn(services, 'readClipboard')
+    const store = new EditorStore(services, ids('new'), new FakeClock())
+    await store.initialize()
+    const before = store.getSnapshot()
+    await expect(
+      store.paste('root', 5, async () => {
+        throw new Error('Clipboard read failed')
+      }),
+    ).rejects.toThrow('Clipboard read failed')
+    expect(store.getSnapshot()).toEqual(before)
+    expect(systemRead).not.toHaveBeenCalled()
+  })
+})
+
 function loadedState(document: unknown, location: unknown): EditorServices & { saves: unknown[] } {
   const services = createServices()
   services.load = async () => ({ version: 1, document, location })

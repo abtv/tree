@@ -94,6 +94,28 @@ function handler(store: EditorStore, node: TreeNode, composing = false) {
   }
 }
 
+it('leaves browser Cmd+V to the native paste event without changing a pending Vim session', () => {
+  const store = createStore()
+  const node: TreeNode = { id: 'node', text: 'hello', children: [] }
+  const input = document.createElement('textarea')
+  input.value = node.text
+  const { vim } = createVimKeyboardDouble(node.id, { mode: 'replace' })
+  const event = keyEvent(input, 'v', { metaKey: true })
+  createEditorKeyDownHandler({
+    store,
+    node,
+    nativePaste: true,
+    vim,
+    isComposing: () => false,
+    setSelectAllNodeId: vi.fn(),
+    onPreviewAttachment: vi.fn(),
+    shiftFocusedNode: vi.fn(),
+  })(event)
+  expect(event.preventDefault).not.toHaveBeenCalled()
+  expect(vim.finishReplace).not.toHaveBeenCalled()
+  expect(store.paste).not.toHaveBeenCalled()
+})
+
 function vimHandler(
   store: EditorStore,
   node: TreeNode,
