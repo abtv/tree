@@ -60,6 +60,12 @@ behavior remain as accepted. This checkpoint adds no synchronization, accounts,
 export/import or offline package. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
+In the browser, rich text fields enable native editing in standard editing and
+Vim Insert/Replace modes. Normal and Visual modes keep the same focusable field
+without native editing, avoiding browser editing work during navigation. Mode
+changes preserve text, focus, caret, selection and application editing commands.
+Plain textareas and desktop editing retain their existing behavior.
+
 Existing browser notes must not be cleared or migrated by building or installing
 the package. Notes belong to the browser profile and exact origin: localhost and
 the permanent HTTPS address have separate storage. Before publication, explain

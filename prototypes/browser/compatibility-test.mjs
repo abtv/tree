@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { onePixelPng } from '../../src/main/png-test-utils.ts'
+import { checkNativeEditing } from './native-editing-test.mjs'
 
 // Shared by isolated Chrome checks and bounded WebKit analysis. Only headless
 // Chrome's virtual clipboard may be used for the realClipboard branch.
 export async function checkBrowserCompatibility(browser, url, { realClipboard = false } = {}) {
+  await checkNativeEditing(browser, url, { realClipboard })
   const context = await browser.newContext({ viewport: { width: 1100, height: 760 } })
   try {
     if (realClipboard) await context.grantPermissions(['clipboard-read', 'clipboard-write'])

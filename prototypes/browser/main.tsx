@@ -13,7 +13,7 @@ try {
   await store.initialize()
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
-      <App initialVimEnabled={await window.treeApi.getVimEnabled()} store={store} />
+      <App initialVimEnabled={await window.treeApi.getVimEnabled()} store={store} deferRichEditing />
     </ErrorBoundary>,
   )
   const menu = document.getElementById('tree-menu')!

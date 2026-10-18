@@ -36,6 +36,14 @@ It preserves the same browser adapter and storage identity. This checkpoint is
 not final browser architecture or publication; its constraints are in
 [Browser version](../prototypes/browser/README.md).
 
+The browser composition opts into `App.deferRichEditing`. App derives native
+editing availability from the Vim preference and mode and passes it to Tree,
+current-parent and Agenda inputs. `NodeInput` changes `contenteditable` on the
+existing rich field and keeps a non-editable field focusable with `tabindex`.
+Electron keeps the default native-editing path; plain textareas are unaffected.
+This adds no document writes, syncs, retained snapshots or document traversal.
+Mode changes update attributes on the bounded set of mounted inputs.
+
 The browser publication workflow composes the existing checks with a Chrome
 package check through reusable Actions workflows. A gated, short-lived GitHub
 App token writes package/provenance paths to the separate hosting

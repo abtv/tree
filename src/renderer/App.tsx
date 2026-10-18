@@ -34,9 +34,11 @@ interface AppProps {
   store: EditorStore
   /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
   initialVimEnabled: boolean
+  /** Enable native rich editing only in text-entry modes in the browser adapter. */
+  deferRichEditing?: boolean
 }
 
-export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
+export function App({ store, initialVimEnabled, deferRichEditing = false }: AppProps): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
@@ -50,6 +52,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled)
   const [vimMode, setVimMode] = useState<VimMode>(initialVimEnabled ? 'normal' : 'insert')
+  const richEditingEnabled = !deferRichEditing || !vimEnabled || vimMode === 'insert' || vimMode === 'replace'
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
   const leftCommandKeyPressed = useLeftCommandKey()
   useEffect(() => {
@@ -251,6 +254,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
           node={node}
           label={label}
           decorations={treeDecorations(node)}
+          richEditingEnabled={richEditingEnabled}
           {...nodeInputBindings(node)}
         />
         {node.attachment === undefined ? null : (
@@ -262,7 +266,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
         )}
       </>
     ),
-    [isImageCaretActive, nodeInputBindings],
+    [isImageCaretActive, nodeInputBindings, richEditingEnabled],
   )
   const renderAgendaAttachment = useCallback(
     (node: TreeNode, editable: boolean): React.JSX.Element | null =>
@@ -285,11 +289,12 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           imageCaretActive={isImageCaretActive(node)}
           decorations={agendaDecorations(node, day)}
+          richEditingEnabled={richEditingEnabled}
           {...nodeInputBindings(node)}
         />
       </>
     ),
-    [isImageCaretActive, nodeInputBindings],
+    [isImageCaretActive, nodeInputBindings, richEditingEnabled],
   )
   const renderAgendaText = useCallback(
     (node: TreeNode, day: number, marks: readonly CaretMark[]): React.JSX.Element => (
@@ -413,6 +418,7 @@ export function App({ store, initialVimEnabled }: AppProps): React.JSX.Element {
                     label="Current parent"
                     parent
                     decorations={treeDecorations(currentParent)}
+                    richEditingEnabled={richEditingEnabled}
                     {...nodeInputBindings(currentParent)}
                   />
                   {currentParent.attachment === undefined ? null : (

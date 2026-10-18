@@ -40,6 +40,7 @@ interface NodeInputProps extends NodeInputBindings {
   imageOnly?: boolean
   imageCaretActive?: boolean
   decorations?: readonly TextDecoration[] | undefined
+  richEditingEnabled?: boolean
 }
 
 export function NodeInput({
@@ -49,6 +50,7 @@ export function NodeInput({
   imageOnly = false,
   imageCaretActive = false,
   decorations,
+  richEditingEnabled = true,
   selectedAll,
   disabled,
   inputRef,
@@ -166,7 +168,8 @@ export function NodeInput({
   return (
     <div
       {...commonProps}
-      contentEditable={!disabled}
+      contentEditable={!disabled && richEditingEnabled}
+      tabIndex={richEditingEnabled ? undefined : 0}
       ref={attach}
       aria-multiline="true"
       role="textbox"

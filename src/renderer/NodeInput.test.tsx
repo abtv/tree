@@ -32,6 +32,62 @@ const bindings: NodeInputBindings = {
 }
 
 const node = (text: string) => ({ id: 'n', text, children: [] })
+
+describe('native rich editing', () => {
+  it('retains native editing by default and locks either rich editing policy', () => {
+    const value = node('2026-10-18 Review')
+    const field = (disabled: boolean, richEditingEnabled?: boolean) => (
+      <NodeInput
+        {...bindings}
+        node={value}
+        label="Node 1"
+        decorations={treeDecorations(value)}
+        disabled={disabled}
+        {...(richEditingEnabled === undefined ? {} : { richEditingEnabled })}
+      />
+    )
+    const { rerender } = render(field(false))
+    expect(screen.getByLabelText('Node 1')).toHaveAttribute('contenteditable', 'true')
+    for (const enabled of [true, false]) {
+      rerender(field(true, enabled))
+      expect(screen.getByLabelText('Node 1')).toHaveAttribute('contenteditable', 'false')
+    }
+  })
+
+  it('keeps plain textareas editable when rich editing is deferred', () => {
+    render(<NodeInput {...bindings} node={node('Plain text')} label="Node 1" richEditingEnabled={false} />)
+    const input = screen.getByLabelText('Node 1') as HTMLTextAreaElement
+    expect(input.tagName).toBe('TEXTAREA')
+    expect(input.readOnly).toBe(false)
+  })
+
+  it('keeps the same focused rich field when native editing changes', () => {
+    const value = node('2026-10-18 Review the details')
+    const field = (enabled: boolean) => (
+      <NodeInput
+        {...bindings}
+        node={value}
+        label="Node 1"
+        decorations={treeDecorations(value)}
+        richEditingEnabled={enabled}
+      />
+    )
+    const { rerender } = render(field(false))
+    const input = screen.getByLabelText('Node 1')
+    expect(input.getAttribute('contenteditable')).toBe('false')
+    expect(input.tabIndex).toBe(0)
+    input.focus()
+    rerender(field(true))
+    expect(screen.getByLabelText('Node 1')).toBe(input)
+    expect(document.activeElement).toBe(input)
+    expect(input.getAttribute('contenteditable')).toBe('true')
+    rerender(field(false))
+    expect(document.activeElement).toBe(input)
+    expect(input.getAttribute('contenteditable')).toBe('false')
+    expect(input.textContent).toBe(value.text)
+  })
+})
+
 function view(text: string): React.JSX.Element {
   const value = node(text)
   return <NodeInput {...bindings} node={value} label="Node 1" decorations={treeDecorations(value)} />
