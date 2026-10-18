@@ -37,7 +37,7 @@ export function currentDependencyImage() {
     readFileSync(resolve(root, 'package-lock.json')),
     readFileSync(resolve(root, 'scripts/web/chromium.Dockerfile')),
     readFileSync(resolve(root, 'scripts/web/chromium.Dockerfile.dockerignore')),
-    readFileSync(resolve(root, 'Makefile')),
+    readFileSync(resolve(root, 'scripts/web/chromium-image.mk')),
   )
 }
 

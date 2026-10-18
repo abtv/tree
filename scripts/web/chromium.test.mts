@@ -45,8 +45,8 @@ it('runs only a local immutable image with the fixed isolation settings', () => 
 it('reuses dependencies for script edits but invalidates changed install inputs', () => {
   const bytes = (value: string) => Buffer.from(value)
   const manifest = { dependencies: { react: '19.3.0' }, scripts: { test: 'old' } }
-  const name = (value: unknown, lock = 'lock', recipe = 'recipe', ignore = 'ignore', makefile = 'makefile') =>
-    dependencyImage(bytes(JSON.stringify(value)), bytes(lock), bytes(recipe), bytes(ignore), bytes(makefile))
+  const name = (value: unknown, lock = 'lock', recipe = 'recipe', ignore = 'ignore', buildRecipe = 'buildRecipe') =>
+    dependencyImage(bytes(JSON.stringify(value)), bytes(lock), bytes(recipe), bytes(ignore), bytes(buildRecipe))
   const image = name(manifest)
   expect(name({ ...manifest, scripts: { test: 'new' }, description: 'new' })).toBe(image)
   expect(name({ ...manifest, dependencies: { react: '20.0.0' } })).not.toBe(image)
@@ -58,7 +58,7 @@ it('reuses dependencies for script edits but invalidates changed install inputs'
 
 it('stops at a missing image without building, pulling, archiving, or running anything', () => {
   spawn.mockReturnValueOnce({ status: 1, stdout: '', stderr: 'No such image' } as ReturnType<typeof spawnSync>)
-  expect(() => run([])).toThrow('make chromium-image')
+  expect(() => run([])).toThrow('make setup')
   expect(spawn).toHaveBeenCalledTimes(1)
   expect(spawn.mock.calls[0]![0]).toBe('docker')
   expect(spawn.mock.calls[0]![1]).toEqual([

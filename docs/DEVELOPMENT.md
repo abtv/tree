@@ -56,6 +56,31 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install
 
 ## 4. Running the Application
 
+### Terminal shortcuts
+
+Run `make` from the repository root to show these shortcuts. They delegate to the
+existing npm workflows; the npm commands remain available for focused runs and
+less frequent checks.
+
+| Command | Purpose | Underlying workflow |
+| --- | --- | --- |
+| `make` | Show help | No tests or preparation |
+| `make setup` | Prepare the web-test Docker image; owner only, requires network | [Chromium dependency preparation](#chromium-container-tests) |
+| `make check` | Standard checks, unit coverage, timing guards, and production build | `npm run check` |
+| `make unit` | Unit tests | `npm test` |
+| `make e2e-electron` | Electron end-to-end tests | `npm run test:e2e` |
+| `make e2e-web` | Web end-to-end tests in offline Docker Chromium | `npm run test:web:chromium` |
+| `make dev-electron` | Electron development mode | `npm run dev` |
+| `make dev-web` | Web development server | `npm run dev:web` |
+| `make perf-electron` | Full Electron performance suite | `npm run test:perf` |
+
+Test and development targets never run `setup` automatically. Agents continue
+using the named npm workflows and their existing permissions, including only
+`npm run test:web:chromium` for container tests. No general Make/Docker permission
+is required or added for these owner-facing shortcuts.
+
+### Electron development
+
 The application should provide a development command:
 
 ```bash
@@ -390,12 +415,12 @@ Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 
 Docker must be running. The Product Owner prepares dependencies manually from the repository root:
 
 ```bash
-make chromium-image
+make setup
 ```
 
-This builds the dependency image using Docker's cache. To refresh the base image and force a clean dependency installation, the owner runs `make chromium-image-rebuild`. Both targets need network access. Agents must not execute these targets, build or pull images, or install dependencies for this workflow. If the image is missing or stale, the test command stops and asks the owner to run `make chromium-image`. The Makefile defaults to help, not a build.
+This builds the dependency image using Docker's cache and needs network access. Agents must not execute this target, build or pull images, or install dependencies for this workflow. If the image is missing or stale, the test command stops and asks the owner to run `make setup`. The Makefile defaults to help, not a build. The former `chromium-image` and `chromium-image-rebuild` targets are replaced by `setup`.
 
-Preparation uses `scripts/web/chromium.Dockerfile` and installs locked dependencies with lifecycle scripts disabled. The Dockerfile-specific ignore file limits the build context to the package manifests. The runner never builds or pulls an image. Its image tag depends on dependency-related package fields, the lockfile, the Dockerfile, its ignore file, and the Makefile. Code, documentation, and npm-script edits alone reuse the image; dependency, lockfile, or recipe changes require owner preparation. The runner resolves the tag to a local immutable image ID before execution.
+Preparation uses `scripts/web/chromium.Dockerfile` and installs locked dependencies with lifecycle scripts disabled. The Dockerfile-specific ignore file limits the build context to the package manifests. The runner never builds or pulls an image. Its image tag depends on dependency-related package fields, the lockfile, the Dockerfile, its ignore file, and the separate build recipe in `scripts/web/chromium-image.mk`. The root Makefile includes that recipe; edits to its other commands or help do not change the image tag. Code, documentation, and npm-script edits alone reuse the image; dependency, lockfile, or recipe changes require owner preparation. The runner resolves the tag to a local immutable image ID before execution. Moving the build recipe out of the root Makefile changes the tag once, so an image prepared before this move requires `make setup`.
 
 In Codex, use host execution (`sandbox_permissions: "require_escalated"`) from the first invocation. `.codex/rules/chromium.rules` approves only this named npm workflow, not general Docker access. As with the existing npm permissions, the rule trusts mutable repository scripts and matches command arguments, not the working directory. Review runner, package script, Dockerfile, and rule changes together. It is not a security boundary against an agent that changes those files. Trust the project configuration and restart Codex after rule changes; native rule matching alone does not prove the current session loaded the rule.
 

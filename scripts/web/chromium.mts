@@ -48,7 +48,7 @@ export function run(args: string[]) {
   const inspected = spawnSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { encoding: 'utf8' })
   if (inspected.error || inspected.status !== 0) {
     throw new Error(
-      `Chromium dependency image is unavailable. Ask the owner to run: make chromium-image\nAgents must not build, pull, or install dependencies.\n${inspected.error?.message ?? inspected.stderr}`,
+      `Chromium dependency image is unavailable. Ask the owner to run: make setup\nAgents must not build, pull, or install dependencies.\n${inspected.error?.message ?? inspected.stderr}`,
     )
   }
   const dockerArgs = containerArguments(inspected.stdout.trim())
