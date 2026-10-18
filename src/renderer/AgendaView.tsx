@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
 import type { AgendaState } from '../application/agenda-state'
@@ -236,7 +237,9 @@ export function AgendaView({
   }, [layoutState, rows, revision, updateViewport])
   useEffect(() => {
     if (!windowed) return undefined
-    const unsubscribe = onViewportScroll(updateViewport)
+    // A native scroll can paint before React's deferred commit, leaving only off-screen rows.
+    // Flush only this external event; layout-effect updates keep their existing commit ordering.
+    const unsubscribe = onViewportScroll(() => flushSync(updateViewport))
     globalThis.addEventListener('resize', updateViewport)
     return () => {
       unsubscribe()

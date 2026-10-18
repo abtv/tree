@@ -1702,6 +1702,8 @@ Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles the selected 
 
 Agenda uses the windowing behavior of §20.1 above 500 projected rows, including day headers and gaps. The selected occurrence stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Folding, gap reveal and window resizing update the layout without losing selection or focus; windowing adds no document saves.
 
+Scrolling must populate the newly visible range before the next rendered frame, including large scrollbar jumps and rapid direction changes. The viewport must not flash empty while its rows are replaced. Scrolling preserves the selected occurrence, active editor, caret, text selection and editing mode.
+
 ### 23.7 Active Occurrence and Date Removal
 
 Selecting a direct match makes that node's occurrence on that day active. Adding a date keeps the active occurrence on its day. Removing its date moves it to the chronologically nearest remaining recognized date, choosing the earlier day on a tie. A live edit reveals that destination if folded so editing can continue; unrelated folds remain unchanged.

@@ -290,6 +290,8 @@ Agenda whole-node Visual keeps its endpoints in the existing renderer selection 
 
 Agenda windowing reuses `list-window.ts` and the key-based layout helpers in `node-list-layout.ts`, leaving `NodeList` unchanged. `agenda-list-layout.ts` selects the viewport range and optional selected occurrence pin. Heights and DOM elements are keyed by occurrence, not real node id; row changes prune obsolete measurements and width changes invalidate them. Cached offsets rebuild on row or measurement changes, while selection and scrolling reuse them. The selected keyed row remains in the same React parent when switching between the viewport and absolute pin; layout notifications let the existing viewport-reveal owner settle its position after measurement.
 
+Agenda flushes the viewport-range update synchronously when its native scroll listener runs, so a large scroll cannot paint the spacers before the newly visible rows mount. Layout-effect and resize updates retain their existing ordering. This changes commit timing without adding document writes, syncs or retained state. Scroll rendering stays bounded by the mounted window; existing offset rebuilds on new height measurements still scale with projected rows and remain covered by the Agenda scale performance suite.
+
 They should not implement core tree manipulation rules.
 
 For example, an `Enter` key handler should not directly manipulate the tree structure.
