@@ -147,7 +147,7 @@ export function runChecks({
   }
   for (const kind of ['src', 'e2e', 'perf']) walk(join(rootDirectory, kind), kind)
   walk(join(rootDirectory, 'scripts'), 'src')
-  walk(join(rootDirectory, 'prototypes/browser'), 'browser')
+  walk(join(rootDirectory, 'web'), 'browser')
   return checkCoverage({
     product: readFileSync(join(rootDirectory, 'docs/PRODUCT.md'), 'utf8'),
     files,

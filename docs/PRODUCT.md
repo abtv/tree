@@ -53,7 +53,7 @@ Every change to user-visible behavior is checked against the guidelines before i
 
 ### 1.4 Browser static-hosting checkpoint
 
-The owner-reviewed browser version under `prototypes/browser/` can be built as
+The owner-reviewed browser version under `web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
 behavior remain as accepted. This checkpoint adds no synchronization, accounts,
@@ -76,7 +76,7 @@ Existing browser notes must not be cleared or migrated by building or installing
 the package. Notes belong to the browser profile and exact origin: localhost and
 the permanent HTTPS address have separate storage. Before publication, explain
 that notes will not transfer automatically. The existing browser save and storage
-limitations are described in [Browser version](../prototypes/browser/README.md).
+limitations are described in [Browser version](../web/README.md).
 
 The browser Quit command flushes pending edits and requests window closure only
 after saving succeeds. It does not show a successful-save dialog. If the browser

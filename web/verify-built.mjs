@@ -7,7 +7,7 @@ import { createStaticServer } from './static-server.mjs'
 
 // @requirement PRODUCT.md §1.4
 await import('./build.mjs')
-const root = resolve(import.meta.dirname, '../../out/web')
+const root = resolve(import.meta.dirname, '../out/web')
 const html = await readFile(resolve(root, 'index.html'), 'utf8')
 assert(html.includes('Content-Security-Policy'))
 assert(!html.includes('main.tsx'))

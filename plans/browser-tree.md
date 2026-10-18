@@ -59,7 +59,7 @@ JavaScript/CSS/font assets and `.nojekyll`. `npm run test:web:built` passed the
 editor, theme, menu and storage checks in isolated Chrome 155 against the generated
 files, including full browser restart and write-failure paths. Accepted UI and
 the browser adapter/database are unchanged. Hosting and update instructions are
-in `prototypes/browser/README.md`; no deployment workflow or publication was added.
+in `web/README.md`; no deployment workflow or publication was added.
 Types, unit coverage, serial fast performance guards, desktop build, scoped lint
 and formatting, docs and requirement coverage pass. Full `npm run check` remains
 blocked by the unrelated untracked Docker verifier's lint/format errors;
@@ -72,14 +72,14 @@ publish; retain all existing Safari, physical-input, scale and release gates.
 Local implementation checkpoint (owner, 2026-10-17): after reviewing the browser
 editor, theme, compact menu and storage corrections, the owner explicitly asked
 to preserve the working code in ordinary project files and commit it. The scope
-is `prototypes/browser/`, named local run/check commands and supporting documentation.
+is `web/`, named local run/check commands and supporting documentation.
 Preserve the localhost origin/database so the existing browser document remains
 accessible. Synchronization, export/import, Docker setup and publication are
 excluded. This checkpoint does not authorize full P2–P8 delivery or waive remaining
 browser parity, scale and release validation. Reuse prior valid prototype evidence
 and check the tracked entry point after relocation.
 Checkpoint result: source and isolated Chrome checks are preserved in
-`prototypes/browser/`, with `npm run dev:web` and `npm run test:web`. Browser
+`web/`, with `npm run dev:web` and `npm run test:web`. Browser
 smoke, theme, menu and storage checks pass from the relocated source; types and
 desktop build also pass. Whole-project lint/format checks remain blocked by the
 unrelated untracked `scripts/browser-container/verify.mjs` from suspended Docker

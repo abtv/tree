@@ -28,13 +28,13 @@ The application uses:
 Do not change the core technology stack without explicit Product Owner approval.
 
 The owner-reviewed local browser implementation is preserved separately under
-`prototypes/browser/`. It reuses the React renderer, application store and domain
+`web/`. It reuses the React renderer, application store and domain
 through a browser `TreeApi` adapter, using IndexedDB and Web Locks. The existing
 Electron entry points remain unchanged. A separate Vite build writes a standalone
 static package to `out/web/`; the host serves files without a Node.js runtime.
 It preserves the same browser adapter and storage identity. This checkpoint is
 not final browser architecture or publication; its constraints are in
-[Browser version](../prototypes/browser/README.md).
+[Browser version](../web/README.md).
 
 The browser composition opts into `App.deferRichEditing`. App derives native
 editing availability from the Vim preference and mode and passes it to Tree,

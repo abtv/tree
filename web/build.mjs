@@ -2,7 +2,7 @@ import { build } from 'vite'
 import { resolve } from 'node:path'
 import { writeFile } from 'node:fs/promises'
 
-const outDir = resolve(import.meta.dirname, '../../out/web')
+const outDir = resolve(import.meta.dirname, '../out/web')
 await build({
   configFile: false,
   root: import.meta.dirname,

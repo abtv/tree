@@ -403,11 +403,11 @@ describe('scratch dependencies', () => {
 
   it('checks Markdown outside the central live-document list', () => {
     const root = createTemporaryRoot()
-    writeFile(root, 'prototypes/browser/README.md', 'Read `.scratch/task/evidence.md`.')
+    writeFile(root, 'web/README.md', 'Read `.scratch/task/evidence.md`.')
     writeFile(root, 'docs/notes/new.md', 'Read `.scratch/task/results.json`.')
     expect(runChecks({ rootDirectory: root }).issues).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('prototypes/browser/README.md:1:'),
+        expect.stringContaining('web/README.md:1:'),
         expect.stringContaining('docs/notes/new.md:1:'),
       ]),
     )

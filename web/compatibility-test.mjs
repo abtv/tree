@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { onePixelPng } from '../../src/main/png-test-utils.ts'
+import { onePixelPng } from '../src/main/png-test-utils.ts'
 import { checkNativeEditing } from './native-editing-test.mjs'
 
 // Shared by isolated Chrome checks and bounded WebKit analysis. Only headless

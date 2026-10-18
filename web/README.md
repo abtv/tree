@@ -22,7 +22,7 @@ new assets first and replace `index.html` last (or use an atomic deployment).
 
 The destination is `https://tree-editor.github.io`, from the separate
 `tree-editor/tree-editor.github.io` repository. Source pushes to main use the
-[automatic publication pipeline](../../deployment/github-pages/README.md) after
+[automatic publication pipeline](../deployment/github-pages/README.md) after
 one-time access setup. Local build/check commands do not publish. The source
 repository's existing demo Pages workflow remains a separate destination.
 
@@ -63,7 +63,7 @@ Another browser, profile, hostname or port has separate storage.
 The ellipsis button opens Tree, Agenda, Vim Editing and appearance controls.
 The menu also shows local save status. Only one tab may edit at a time.
 On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
-see [the browser requirements](../../docs/PRODUCT.md#14-browser-static-hosting-checkpoint).
+see [the browser requirements](../docs/PRODUCT.md#14-browser-static-hosting-checkpoint).
 
 Committed edits autosave after a short idle interval. Pending Vim Replace text
 remains marked unsaved until committed. Closing with pending work warns and

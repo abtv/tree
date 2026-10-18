@@ -1,9 +1,9 @@
 import { createRoot } from 'react-dom/client'
-import { App } from '../../src/renderer/App'
-import { ErrorBoundary } from '../../src/renderer/ErrorBoundary'
-import { EditorStore } from '../../src/application/editor-store'
+import { App } from '../src/renderer/App'
+import { ErrorBoundary } from '../src/renderer/ErrorBoundary'
+import { EditorStore } from '../src/application/editor-store'
 import { installBrowserPrototype } from './services'
-import '../../src/renderer/styles.css'
+import '../src/renderer/styles.css'
 import './prototype.css'
 
 try {
