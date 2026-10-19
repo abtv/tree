@@ -119,7 +119,7 @@ function rebuildApplicationMenu(): void {
   )
 }
 
-function createMainWindow(): void {
+function createMainWindow(quitWithoutSave: () => void): void {
   if (appQuitting) return
   const resolvedRenderer = renderer
   if (resolvedRenderer === null) throw new Error('Renderer URL was not resolved before creating the window.')
@@ -157,7 +157,7 @@ function createMainWindow(): void {
   void window.loadURL(resolvedRenderer.url).catch((error: unknown) => {
     reportMainProcessError('Could not load the renderer', error)
     appQuitting = true
-    app.quit()
+    quitWithoutSave()
   })
 }
 

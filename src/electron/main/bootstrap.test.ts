@@ -116,6 +116,20 @@ describe('bootstrapApplication', () => {
     expect(app.quit).toHaveBeenCalledOnce()
   })
 
+  it('quits without a renderer save when the main window fails to load', async () => {
+    const { app, listeners, window, dependencies } = createHarness()
+    dependencies.createMainWindow.mockImplementation((quitWithoutSave: () => void) => quitWithoutSave())
+
+    await Promise.resolve()
+    const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+    listeners.beforeQuit?.(event)
+
+    expect(app.quit).toHaveBeenCalledOnce()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(window.webContents.send).not.toHaveBeenCalled()
+    expect(dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+  })
+
   it('allows the window to close once quitting has been confirmed', async () => {
     const { app, windowListeners, registerReadyServices } = createHarness()
 

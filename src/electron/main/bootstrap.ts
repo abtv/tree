@@ -26,7 +26,8 @@ export interface ApplicationBootstrapDependencies {
   hasSingleInstanceLock: boolean
   getMainWindow: () => MainWindowReference | null
   setMainWindow: (window: MainWindowReference | null) => void
-  createMainWindow: () => void
+  // A window whose renderer never loaded has no document to save, so its failure quits directly.
+  createMainWindow: (quitWithoutSave: () => void) => void
   getWindowCount: () => number
   registerReadyServices: (quitHandshake: QuitHandshake, onQuitConfirmed: () => void) => void
   registerShortcut: (surfaceWindow: () => void) => boolean
@@ -60,6 +61,11 @@ export function bootstrapApplication({
     },
     () => app.quit(),
   )
+
+  const quitWithoutSave = (): void => {
+    appQuitting = true
+    app.quit()
+  }
 
   app.on('before-quit', (event) => {
     const mainWindow = getMainWindow()
@@ -97,11 +103,11 @@ export function bootstrapApplication({
         onStartupError(new Error('The accelerator is unavailable.'))
       }
       setApplicationMenu(() => app.quit())
-      createMainWindow()
+      createMainWindow(quitWithoutSave)
       watchMainWindowClose()
       app.on('activate', () => {
         if (!appQuitting && getWindowCount() === 0) {
-          createMainWindow()
+          createMainWindow(quitWithoutSave)
           watchMainWindowClose()
         }
       })

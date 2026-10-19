@@ -43,4 +43,24 @@ test.describe('unexpected renderer errors', () => {
     await expect(window.locator('main.tree-app')).toBeVisible()
     await expect(node(window, 1)).toHaveValue(savedText)
   })
+
+  test('quits when a new window cannot load the renderer document', async ({ userDataDir }) => {
+    const { app } = await launchTree(userDataDir)
+    const closed = new Promise<string>((resolve) => app.once('close', () => resolve('closed')))
+
+    // The renderer never loads, so no renderer can confirm a quit save; the application must not wait for one.
+    // This distinguishes the defect only on macOS, where destroying the last window does not quit by itself.
+    await app.evaluate(({ app, BrowserWindow, protocol }) => {
+      protocol.unhandle('app')
+      protocol.handle('app', () => Response.error())
+      BrowserWindow.getAllWindows()[0]?.destroy()
+      app.emit('activate')
+    })
+
+    const outcome = await Promise.race([
+      closed,
+      new Promise<string>((resolve) => setTimeout(() => resolve('still running'), 10_000)),
+    ])
+    expect(outcome).toBe('closed')
+  })
 })
