@@ -159,6 +159,19 @@ Local storage still permits disclosure through user-invoked features:
 * **macOS Look Up (desktop).** The native context menu passes selected text to the
   macOS lookup service, which may consult network sources depending on OS settings.
 
+**Accepted risk: renderer-initiated external URLs (desktop).** The main process opens
+every HTTP(S) URL that the renderer passes to `window.open`. It does not check that a
+user action caused the request, and it asks for no confirmation
+(`src/electron/main/window.ts`). JavaScript running in a compromised renderer could
+therefore put document content into a URL and open it in the system browser. The
+Product Owner accepted this risk on 2026-10-19: the security review found no
+renderer-injection path, and the renderer cannot read local files except through
+validated IPC. A destination allowlist would not reduce the risk, because the renderer
+controls the document's link destinations. A native confirmation before each external
+link would close this channel but add a step to every link. Reconsider that
+confirmation if a renderer-injection path is found or the renderer starts to display
+untrusted markup.
+
 The editor enables spellchecking in `src/renderer/NodeInput.tsx`. Browser-provided
 spelling, translation and similar services follow the user's browser settings.
 On macOS, the desktop operating system's spellchecker downloads no dictionaries.
