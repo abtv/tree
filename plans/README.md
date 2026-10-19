@@ -4,6 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
+| [Browser data durability](browser-data-durability.md) | Approved — ready | Probes P1–P3, then Task A if the icon files exist, otherwise Task B1 |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
