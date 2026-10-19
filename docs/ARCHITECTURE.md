@@ -662,9 +662,18 @@ the same resolved URL.
 
 The renderer uses Electron's default session. The main process denies permission requests, permission
 checks, and device permissions on that session, and blocks network requests except for `devtools:`,
-`blob:`, and `data:` URLs, `file:` URLs inside the packaged renderer document's directory, and the
-resolved development origin when running unpackaged. A `file:` document origin can otherwise read
-any local file the user can read, so the development renderer, served over HTTP, reads no `file:` URLs.
+`blob:`, and `data:` URLs and the resolved renderer origin. No `file:` URL is allowed.
+
+The packaged renderer is served from the privileged standard scheme `app://tree/` rather than from
+`file://`, because a `file:` document origin can read any local file the user can read. The main
+entry registers the scheme before the app is ready and installs its handler before the first window
+loads; both are defined in `src/electron/main/renderer-protocol.ts`. The handler maps a
+request path inside the built renderer directory to a known asset type and answers a network error
+for anything else, including dot or encoded-separator segments that would leave the directory. A
+network error, unlike an HTTP error page, makes a missing renderer document fail the window load, so
+startup reports the failure and quits. The request filter
+compares the renderer's scheme and host rather than its WHATWG origin, because a custom scheme's
+origin serializes as an opaque `null`.
 External HTTP(S) links are handed to the operating system through `shell.openExternal`; they do not
 use the renderer session.
 

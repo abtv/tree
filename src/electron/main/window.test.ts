@@ -192,6 +192,15 @@ describe('isAllowedRendererUrl', () => {
     expect(isAllowedRendererUrl('https://evil.example/', 'file:///app/renderer/index.html')).toBe(false)
   })
 
+  it('matches only the packaged app:// renderer document', () => {
+    expect(isAllowedRendererUrl('app://tree/index.html', 'app://tree/index.html')).toBe(true)
+    expect(isAllowedRendererUrl('app://tree/index.html#node', 'app://tree/index.html')).toBe(true)
+    expect(isAllowedRendererUrl('app://tree/assets/index.js', 'app://tree/index.html')).toBe(false)
+    expect(isAllowedRendererUrl('app://other/index.html', 'app://tree/index.html')).toBe(false)
+    expect(isAllowedRendererUrl('app://tree', 'app://tree/index.html')).toBe(false)
+    expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'app://tree/index.html')).toBe(false)
+  })
+
   it('rejects values that are not valid URLs', () => {
     expect(isAllowedRendererUrl('not a url', 'file:///app/renderer/index.html')).toBe(false)
     expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'not a url')).toBe(false)
@@ -265,10 +274,10 @@ describe('configureRendererSessionSecurity', () => {
     expect(deviceHandler?.({} as never)).toBe(false)
   })
 
-  it('allows local files only inside the packaged renderer directory', () => {
+  it('allows only the packaged renderer origin and no local files in packaged mode', () => {
     const { session, onBeforeRequest } = createSession()
     configureRendererSessionSecurity(session, {
-      url: 'file:///app/renderer/index.html',
+      url: 'app://tree/index.html',
       isDevelopment: false,
     })
 
@@ -277,33 +286,25 @@ describe('configureRendererSessionSecurity', () => {
 
     const decisions: Array<{ url: string; cancel?: boolean }> = []
     for (const url of [
+      'app://tree/index.html',
+      'app://tree/assets/index.js',
+      'blob:app://tree/1234',
+      'app://other/index.html',
+      'other-scheme://tree/index.html',
       'file:///app/renderer/index.html',
-      'file:///app/renderer/assets/index.js',
-      'file:///app/renderer/assets/font%20name.ttf',
       'file:///Users/someone/Library/Application%20Support/Tree/data/document.json',
-      'file:///etc/passwd',
-      'file:///app/renderer-other/index.js',
-      'file:///app/renderer/assets/..%2F..%2Fsecret',
-      'file:///app/renderer/assets/%2e%2e/%2e%2e/secret',
-      'file:///app/renderer/assets/..%5C..%5Csecret',
-      'file:///app/renderer/%E0%A4%A',
-      'file://server/app/renderer/index.html',
     ]) {
       listener({ url } as never, (response) => decisions.push({ url, cancel: response.cancel }))
     }
 
     expect(decisions).toEqual([
-      { url: 'file:///app/renderer/index.html', cancel: false },
-      { url: 'file:///app/renderer/assets/index.js', cancel: false },
-      { url: 'file:///app/renderer/assets/font%20name.ttf', cancel: false },
+      { url: 'app://tree/index.html', cancel: false },
+      { url: 'app://tree/assets/index.js', cancel: false },
+      { url: 'blob:app://tree/1234', cancel: false },
+      { url: 'app://other/index.html', cancel: true },
+      { url: 'other-scheme://tree/index.html', cancel: true },
+      { url: 'file:///app/renderer/index.html', cancel: true },
       { url: 'file:///Users/someone/Library/Application%20Support/Tree/data/document.json', cancel: true },
-      { url: 'file:///etc/passwd', cancel: true },
-      { url: 'file:///app/renderer-other/index.js', cancel: true },
-      { url: 'file:///app/renderer/assets/..%2F..%2Fsecret', cancel: true },
-      { url: 'file:///app/renderer/assets/%2e%2e/%2e%2e/secret', cancel: true },
-      { url: 'file:///app/renderer/assets/..%5C..%5Csecret', cancel: true },
-      { url: 'file:///app/renderer/%E0%A4%A', cancel: true },
-      { url: 'file://server/app/renderer/index.html', cancel: true },
     ])
   })
 
@@ -346,7 +347,7 @@ describe('configureRendererSessionSecurity', () => {
   it('does not allow a remote origin in packaged mode', () => {
     const { session, onBeforeRequest } = createSession()
     configureRendererSessionSecurity(session, {
-      url: 'file:///app/renderer/index.html',
+      url: 'app://tree/index.html',
       isDevelopment: false,
     })
 

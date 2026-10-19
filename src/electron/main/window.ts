@@ -129,39 +129,16 @@ function isAllowedRendererRequest(value: string, renderer: ResolvedRendererUrl):
     return false
   }
 
-  if (url.protocol === 'file:') return isWithinRendererDirectory(url, renderer)
   if (['devtools:', 'blob:', 'data:'].includes(url.protocol)) return true
-  if (!renderer.isDevelopment) return false
 
+  // Compare scheme and host rather than origin: a custom scheme's WHATWG origin is opaque ("null")
+  // and would match every other custom-scheme URL. No file: URL matches either renderer.
   try {
-    return url.origin === new URL(renderer.url).origin
+    const rendererUrl = new URL(renderer.url)
+    return url.protocol === rendererUrl.protocol && url.host === rendererUrl.host
   } catch {
     return false
   }
-}
-
-// A file: renderer origin can otherwise read any local file, so local reads stay inside the packaged
-// renderer's own directory. An unpackaged development renderer is served over HTTP and reads no files.
-function isWithinRendererDirectory(url: URL, renderer: ResolvedRendererUrl): boolean {
-  let rendererUrl: URL
-  try {
-    rendererUrl = new URL(renderer.url)
-  } catch {
-    return false
-  }
-  if (rendererUrl.protocol !== 'file:' || url.host !== rendererUrl.host) return false
-
-  let path: string
-  let directory: string
-  try {
-    path = decodeURIComponent(url.pathname)
-    directory = decodeURIComponent(rendererUrl.pathname.slice(0, rendererUrl.pathname.lastIndexOf('/') + 1))
-  } catch {
-    return false
-  }
-  // Reject segments that a decoded path could still use to leave the directory.
-  if (/[\\\0]/.test(path) || path.split('/').includes('..')) return false
-  return path.startsWith(directory)
 }
 
 export function surfaceWindow(window: WindowSurface | null): void {

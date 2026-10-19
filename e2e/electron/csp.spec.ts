@@ -50,7 +50,8 @@ test.describe('content security policy', () => {
       ])
     })
 
-    expect(blockedUri).toBe('https://example.com/')
+    // CSP reports strip a cross-origin blocked URL to its origin for the app:// renderer document.
+    expect(blockedUri).toBe('https://example.com')
     await expect(node(window, 1)).toBeVisible()
   })
 
@@ -83,6 +84,9 @@ test.describe('content security policy', () => {
 
   test('blocks renderer reads of local files outside the application bundle', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    // From the app:// origin Chromium refuses file: fetches itself; the session filter is a second
+    // layer covered by window.test.ts. This test pins the user-facing outcome on the real renderer.
+    expect(window.url()).toBe('app://tree/index.html')
     const documentFileUrl = pathToFileURL(join(userDataDir, 'data', 'document.json')).toString()
     expect(existsSync(fileURLToPath(documentFileUrl))).toBe(true)
 

@@ -130,7 +130,8 @@ validated preload/IPC surface. The structural boundaries are owned by
 * **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
 * **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
 * **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/electron/main/ipc-handlers.ts`, `src/electron/main/ipc-security.ts`).
-* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only `devtools:`, `blob:` and `data:` URLs, `file:` URLs inside the packaged renderer directory, and, for an unpackaged development renderer, requests to that renderer's own origin. Renderer code therefore cannot read documents, attachments or other local files outside the renderer bundle through `file:` URLs; it reaches them only through validated IPC. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only `devtools:`, `blob:` and `data:` URLs and requests to the resolved renderer origin; it allows no `file:` URL. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Renderer origin without file access.** The packaged renderer loads from `app://tree/index.html`, served by a main-process handler that returns only known asset types inside the built renderer directory (`src/electron/main/renderer-protocol.ts`). Renderer code therefore cannot read documents, attachments or other local files through URLs; it reaches them only through validated IPC.
 * **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/electron/main/ipc-security.ts`).
 * **Bounded attachments.** Attachment writes accept only PNG data within the shared byte, structure and decoded-dimension limits, and the image must decode through the platform decoder before bytes are stored (`src/electron/main/ipc-security.ts`, `src/electron/main/png-decoder.ts`).
 * **Bounded clipboard image reads.** PNG clipboard blobs exceeding the attachment byte limit are rejected before `arrayBuffer()` copies their bytes into application memory (`src/infrastructure/main/clipboard.ts`). This does not bound memory allocated internally by Electron or macOS while obtaining the clipboard blob.
@@ -174,6 +175,8 @@ output, not a distributable application. Before a build is handed to anyone, the
   `EnableNodeCliInspectArguments` Electron fuses, as well as any adjacent `EnableRunAsNode` fuse
   controls.
 * Enable `OnlyLoadAppFromAsar` and ASAR archive integrity validation.
+* Disable the `GrantFileProtocolExtraPrivileges` fuse. The renderer no longer loads from `file://`,
+  so the extra `file:` privileges only widen what a compromised renderer could reach.
 * Sign and notarize the macOS application with the hardened runtime. Keep entitlements minimal and
   do not grant `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or
   `disable-library-validation`.
@@ -217,6 +220,7 @@ local tests do not establish those controls.
 | Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
 | Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
 | Renderer session permissions and network egress | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
+| Renderer origin and local-file reads | `src/electron/main/renderer-protocol.test.ts`, `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts` |
 | Trusted IPC callers and payload validation | `src/electron/main/ipc-security.test.ts`, `src/electron/main/ipc-handlers.test.ts` | `e2e/electron/attachment-validation.spec.ts` |
 | Persisted-state validation on save | `src/domain/document.test.ts`, `src/electron/main/ipc-security.test.ts` | `e2e/electron/persistence.spec.ts`, `e2e/electron/persistence-reliability.spec.ts` |
 | Attachment validation and decoding | `src/electron/main/ipc-security.test.ts`, `src/electron/main/png-decoder.test.ts` | `e2e/electron/attachment-validation.spec.ts` |

@@ -6,7 +6,7 @@ import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
 import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 
-const rendererUrl = 'file:///app/out/renderer/index.html'
+const rendererUrl = 'app://tree/index.html'
 const validState = {
   version: 1,
   document: { roots: [{ id: 'root', text: '', children: [] }] },

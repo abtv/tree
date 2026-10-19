@@ -8,11 +8,12 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
+  protocol,
   session,
   shell,
 } from 'electron'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { NativeClipboard } from '../../infrastructure/main/clipboard'
 import { createFileServices } from '../../infrastructure/main/file-services'
 import { createCommandHistoryStore } from '../../infrastructure/main/command-history'
@@ -32,6 +33,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
 import { createPngDecoder } from './png-decoder'
+import { handleRendererProtocol, packagedRendererUrl, registerRendererScheme } from './renderer-protocol'
 import {
   configureSingleInstance,
   configureRendererSessionSecurity,
@@ -45,6 +47,8 @@ import {
 } from './window'
 
 app.setName('Tree')
+// Privileged schemes must be registered before the app is ready.
+registerRendererScheme(protocol)
 
 let mainWindow: BrowserWindow | null = null
 let appQuitting = false
@@ -52,7 +56,7 @@ let alwaysOnTopStore: BooleanPreferenceStore | null = null
 let vimEnabledStore: BooleanPreferenceStore | null = null
 let appearanceStore: AppearancePreferenceStore | null = null
 let requestQuitFromMenu: () => void = () => undefined
-const packagedRendererPath = join(__dirname, '../renderer/index.html')
+const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 
 const nativeClipboard: NativeClipboard = {
@@ -150,10 +154,7 @@ function createMainWindow(): void {
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
   })
-  const load = resolvedRenderer.isDevelopment
-    ? window.loadURL(resolvedRenderer.url)
-    : window.loadFile(fileURLToPath(resolvedRenderer.url))
-  void load.catch((error: unknown) => {
+  void window.loadURL(resolvedRenderer.url).catch((error: unknown) => {
     reportMainProcessError('Could not load the renderer', error)
     appQuitting = true
     app.quit()
@@ -175,9 +176,10 @@ bootstrapApplication({
     const resolvedRenderer = resolveRendererUrl(
       app.isPackaged,
       process.env['ELECTRON_RENDERER_URL'],
-      pathToFileURL(packagedRendererPath).toString(),
+      packagedRendererUrl,
     )
     renderer = resolvedRenderer
+    handleRendererProtocol(protocol, packagedRendererDirectory, (path) => readFile(path))
     configureRendererSessionSecurity(session.defaultSession, resolvedRenderer)
     configureWebContentsSecurity(app, resolvedRenderer.url, (url) => {
       void shell

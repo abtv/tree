@@ -22,12 +22,13 @@ const validIhdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 describe('IPC security validation', () => {
   it('accepts only the expected renderer URL', () => {
-    expect(isTrustedRendererUrl('file:///app/out/renderer/index.html', 'file:///app/out/renderer/index.html')).toBe(
-      true,
-    )
-    expect(isTrustedRendererUrl('https://evil.example/index.html', 'file:///app/out/renderer/index.html')).toBe(false)
-    expect(isTrustedRendererUrl(undefined, 'file:///app/out/renderer/index.html')).toBe(false)
-    expect(isTrustedRendererUrl('not a url', 'file:///app/out/renderer/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('app://tree/index.html', 'app://tree/index.html')).toBe(true)
+    expect(isTrustedRendererUrl('app://tree/assets/index.js', 'app://tree/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('app://other/index.html', 'app://tree/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('file:///app/out/renderer/index.html', 'app://tree/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('https://evil.example/index.html', 'app://tree/index.html')).toBe(false)
+    expect(isTrustedRendererUrl(undefined, 'app://tree/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('not a url', 'app://tree/index.html')).toBe(false)
   })
 
   it('validates persisted state without rebuilding it', () => {
