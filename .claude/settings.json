@@ -39,6 +39,8 @@
     "autoAllowBashIfSandboxed": true,
     "excludedCommands": [
       "ps -axo pid=,ppid=,command=",
+      "kill -INT *",
+      "kill -TERM *",
       "npm run test:e2e*",
       "npm run test:perf*",
       "TREE_E2E_VISIBLE=1 npm run test:e2e*",
@@ -85,6 +87,8 @@
       "Bash(wc*)",
       "Bash(rg *)",
       "Bash(ps -axo pid=,ppid=,command=)",
+      "Bash(kill -INT *)",
+      "Bash(kill -TERM *)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
