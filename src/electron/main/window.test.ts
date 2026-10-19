@@ -265,7 +265,49 @@ describe('configureRendererSessionSecurity', () => {
     expect(deviceHandler?.({} as never)).toBe(false)
   })
 
-  it('allows local renderer schemes and only allows the resolved development origin', () => {
+  it('allows local files only inside the packaged renderer directory', () => {
+    const { session, onBeforeRequest } = createSession()
+    configureRendererSessionSecurity(session, {
+      url: 'file:///app/renderer/index.html',
+      isDevelopment: false,
+    })
+
+    const listener = onBeforeRequest.mock.calls[0]?.[1]
+    if (listener === undefined) throw new Error('The request filter was not installed.')
+
+    const decisions: Array<{ url: string; cancel?: boolean }> = []
+    for (const url of [
+      'file:///app/renderer/index.html',
+      'file:///app/renderer/assets/index.js',
+      'file:///app/renderer/assets/font%20name.ttf',
+      'file:///Users/someone/Library/Application%20Support/Tree/data/document.json',
+      'file:///etc/passwd',
+      'file:///app/renderer-other/index.js',
+      'file:///app/renderer/assets/..%2F..%2Fsecret',
+      'file:///app/renderer/assets/%2e%2e/%2e%2e/secret',
+      'file:///app/renderer/assets/..%5C..%5Csecret',
+      'file:///app/renderer/%E0%A4%A',
+      'file://server/app/renderer/index.html',
+    ]) {
+      listener({ url } as never, (response) => decisions.push({ url, cancel: response.cancel }))
+    }
+
+    expect(decisions).toEqual([
+      { url: 'file:///app/renderer/index.html', cancel: false },
+      { url: 'file:///app/renderer/assets/index.js', cancel: false },
+      { url: 'file:///app/renderer/assets/font%20name.ttf', cancel: false },
+      { url: 'file:///Users/someone/Library/Application%20Support/Tree/data/document.json', cancel: true },
+      { url: 'file:///etc/passwd', cancel: true },
+      { url: 'file:///app/renderer-other/index.js', cancel: true },
+      { url: 'file:///app/renderer/assets/..%2F..%2Fsecret', cancel: true },
+      { url: 'file:///app/renderer/assets/%2e%2e/%2e%2e/secret', cancel: true },
+      { url: 'file:///app/renderer/assets/..%5C..%5Csecret', cancel: true },
+      { url: 'file:///app/renderer/%E0%A4%A', cancel: true },
+      { url: 'file://server/app/renderer/index.html', cancel: true },
+    ])
+  })
+
+  it('allows local renderer schemes except files and only allows the resolved development origin', () => {
     const { session, onBeforeRequest } = createSession()
     configureRendererSessionSecurity(session, {
       url: 'http://localhost:5173/',
@@ -291,7 +333,7 @@ describe('configureRendererSessionSecurity', () => {
     }
 
     expect(decisions).toEqual([
-      { url: 'file:///app/renderer/index.html', cancel: false },
+      { url: 'file:///app/renderer/index.html', cancel: true },
       { url: 'devtools://devtools/bundled/inspector.html', cancel: false },
       { url: 'blob:http://localhost:5173/1234', cancel: false },
       { url: 'data:text/plain,local', cancel: false },

@@ -661,8 +661,10 @@ development renderer. Window loading, navigation checks, and trusted IPC caller 
 the same resolved URL.
 
 The renderer uses Electron's default session. The main process denies permission requests, permission
-checks, and device permissions on that session, and blocks network requests except for `file:`,
-`devtools:`, `blob:`, and `data:` URLs plus the resolved development origin when running unpackaged.
+checks, and device permissions on that session, and blocks network requests except for `devtools:`,
+`blob:`, and `data:` URLs, `file:` URLs inside the packaged renderer document's directory, and the
+resolved development origin when running unpackaged. A `file:` document origin can otherwise read
+any local file the user can read, so the development renderer, served over HTTP, reads no `file:` URLs.
 External HTTP(S) links are handed to the operating system through `shell.openExternal`; they do not
 use the renderer session.
 

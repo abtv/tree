@@ -1,4 +1,7 @@
 // @editing-modes: independent
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, launchTree, node, test, typeInto } from './fixtures'
 
 test.describe('content security policy', () => {
@@ -76,6 +79,24 @@ test.describe('content security policy', () => {
       .toBe(true)
 
     expect(window.url()).toBe(initialUrl)
+  })
+
+  test('blocks renderer reads of local files outside the application bundle', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const documentFileUrl = pathToFileURL(join(userDataDir, 'data', 'document.json')).toString()
+    expect(existsSync(fileURLToPath(documentFileUrl))).toBe(true)
+
+    const result = await window.evaluate(
+      (url) =>
+        fetch(url).then(
+          (response) => response.text().then((text) => `read ${text.length} characters`),
+          () => 'rejected',
+        ),
+      documentFileUrl,
+    )
+
+    expect(result).toBe('rejected')
+    await expect(node(window, 1)).toBeVisible()
   })
 
   test('blocks external renderer requests while the editor remains usable', async ({ userDataDir }) => {
