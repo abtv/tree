@@ -19,3 +19,13 @@ prefix_rule(
     match = ["kill -TERM 12345"],
     not_match = ["kill -9 12345", "pkill Electron"],
 )
+
+# Prefix matching cannot limit later arguments, so only a first target that selects every process
+# or the current process group is forbidden; other negative process-group targets still match the allowances.
+prefix_rule(
+    pattern = ["kill", ["-INT", "-TERM"], ["-1", "0", "--"]],
+    decision = "forbidden",
+    justification = "Signal one owned process by its positive PID, never every process or a process group.",
+    match = ["kill -TERM -1", "kill -INT 0", "kill -TERM -- -1"],
+    not_match = ["kill -TERM 12345", "kill -INT 12345"],
+)

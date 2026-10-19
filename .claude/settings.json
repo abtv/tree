@@ -147,6 +147,14 @@
       "Bash(git reset --hard*)",
       "Bash(git push --force*)",
       "Bash(git push -f*)",
+      "Bash(kill -INT -*)",
+      "Bash(kill -INT * -*)",
+      "Bash(kill -INT 0*)",
+      "Bash(kill -INT * 0*)",
+      "Bash(kill -TERM -*)",
+      "Bash(kill -TERM * -*)",
+      "Bash(kill -TERM 0*)",
+      "Bash(kill -TERM * 0*)",
       "Edit(//tmp/**)"
     ]
   }
