@@ -8,6 +8,7 @@ import { extractClipboardLinks } from '../infrastructure/main/clipboard'
 import { validateAttachmentBytes, MAX_ATTACHMENT_BYTES } from '../electron/main/ipc-security'
 import { applyAppearance } from './appearance'
 import { isIPhoneOrIPad } from './device'
+import { openDatabase, readValue } from './storage-schema'
 
 const status = (text: string) => {
   document.getElementById('prototype-save-status')!.textContent = text
@@ -41,27 +42,11 @@ export async function installBrowserPrototype(): Promise<{
       })
       .catch(reject)
   })
-  const request = indexedDB.open('tree-browser-prototype', 1)
-  request.onupgradeneeded = () => {
-    request.result.createObjectStore('document')
-    request.result.createObjectStore('blobs')
-    request.result.createObjectStore('preferences')
-  }
-  const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-    request.onblocked = () => reject(new Error('Another tab is blocking local storage. Close it and reload.'))
-  })
+  const db = await openDatabase()
   const guard = () => {
     if (!active) throw new Error('This editing session is no longer active. Reload the page.')
   }
-  const read = <T>(store: string, key: string): Promise<T | undefined> =>
-    new Promise((resolve, reject) => {
-      const tx = db.transaction(store)
-      const value = tx.objectStore(store).get(key)
-      tx.oncomplete = () => resolve(value.result)
-      tx.onabort = () => reject(tx.error)
-    })
+  const read = <T>(store: string, key: string): Promise<T | undefined> => readValue<T>(db, store, key)
   const write = (store: string, key: string, value: unknown): Promise<void> =>
     new Promise((resolve, reject) => {
       guard()

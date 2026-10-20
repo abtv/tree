@@ -74,8 +74,8 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | A | Installable app (manifest, icons, publication allowlist, `theme-color`) and one `persist()` request; storage-protection status line. | Icon files from the Product Owner (O-Q4) | Blocked on icons |
-| B1 | ZIP archive core, `fflate@0.8.3`, export worker, "Export Notes…", Data menu block, CSP `worker-src 'self'`, archive ADR, export perf scenario. | — | Ready |
-| B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Planned |
+| B1 | ZIP archive core, `fflate@0.8.3`, export worker, "Export Notes…", Data menu block, CSP `worker-src 'self'`, archive ADR, export perf scenario. | — | Done |
+| B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Ready |
 | C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Planned |
 | C2 | "Restore from Folder…" through B2's pipeline with a folder source. | B2, C1 | Planned |
 
@@ -109,6 +109,19 @@ Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: 
 - **Tests:** unit and property with real fflate (entry order and names, deflate versus stored, limit refusal, round trip through `unzipSync` as a test-only oracle, Electron compatibility, random documents and attachment sets); worker protocol contract; E2E (seed notes and images, export, parse the download, compare with the IndexedDB head and blobs; a worker is created; cancel leaves no download; invalid head refused; typing works during a large export).
 - **Perf:** large profile (target 100,000 nodes and a few hundred images): main-thread long tasks and total blocking time, worker wall time, peak heap, output size; results through `perf/results.ts`; not part of the release gate.
 - **Acceptance:** tests above; full Chrome suite; audit clean; Electron-compatibility test passes; perf record in task evidence; Reviewer and Product Verifier report no meaningful issues.
+
+### Task B1 results (2026-10-20)
+
+- Delivered as specified; ADR 0022 records the format, fflate constraints, reader strategy and worker CSP. PRODUCT §24, §24.2 and §24.3 own the behavior and limits. §24.1 is intentionally absent until Task A adds it before §24.2.
+- D3 proven: `src/web/archive/zip-writer.test.ts` shows fflate `Unzip` misreads stored entries containing the local-header, data-descriptor or central-directory signature; central-directory reading is exact.
+- D11 adopted: `perf.config.ts` has projects `electron` and `web`; `npm run test:perf` builds both targets; `check:full`, `make perf-electron` and the Performance workflow select `--project=electron`. No new npm script.
+- Delegated choices (O-Q5): non-modal activity panel at the lower right above the status bar with Cancel or OK; success closes after six seconds; missing-image and failure results stay until OK; file name `Tree Notes YYYY-MM-DD.zip`; export disabled while locked or running; stored values that are not usable PNG byte arrays count as missing; limits 65,535 entries, 256 MiB document, 25 MiB image, 2,147,483,647-byte archive. PRODUCT §24.3 records the wording.
+- Review corrections: while the §16.2 save-failure banner is visible, the panel moves to the upper right below the menu button so both stay visible (an open menu can cover it until closed); `AsyncCompress` and `fflate/*` subpath imports added to the ESLint ban; a real-writer test pins `ArchiveBudget` to fflate's actual output size; E2E covers a crashing worker and Cancel while a worker sends chunks.
+- Observation for a later task (not scheduled): Escape does not dismiss the activity panel; its buttons are reachable with Tab from the menu button.
+- Deferred to C1: the over-limit export messages must add the folder-backup suggestion on Chromium once "Back Up to Folder…" exists.
+- For B2: reuse `ARCHIVE_LIMITS`, `attachmentEntryName`, `DOCUMENT_ENTRY_NAME` and `NotesArchiveError` from `src/application/notes-archive/archive-policy.ts`; the worker protocol in `src/web/workers/archive-protocol.ts` and the panel in `src/web/data-menu.ts` extend to import; `e2e/web/data-helpers.mjs` has IndexedDB, seeding and archive-reading helpers; the dev server needs no further `optimizeDeps` change for fflate `Inflate`.
+- Measured: large profile (100,000 nodes, 300 images, 259 MiB archive) exported in 0.9 s with no main-thread long task and 1.6 MiB main-thread heap growth.
+- Sandbox note: in Claude Code, `npm run test:web*` and `npm run test:mutation` need execution outside the sandbox, because the sandbox forbids binding local ports.
 
 ### Task B2 — import
 
@@ -207,10 +220,10 @@ Possible additional rounds: icon rework, optional Safari or Firefox checks (othe
 
 ## Next task
 
-Run probes P1 to P3. Then:
+Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). Then:
 
 - if `src/web/public/icon-512.png`, `icon-192.png` and `apple-touch-icon.png` exist, take **Task A**;
-- otherwise take **Task B1** (independent of A) and leave A blocked on the icons.
+- otherwise take **Task B2** and leave A blocked on the icons.
 
 ## Resume prompt
 

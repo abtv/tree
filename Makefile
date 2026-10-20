@@ -34,4 +34,4 @@ dev-web:
 	npm run dev:web
 
 perf-electron:
-	npm run test:perf
+	npm run test:perf -- --project=electron

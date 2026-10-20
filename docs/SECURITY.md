@@ -44,10 +44,19 @@ implemented in `src/web/services.ts`.
   transfer or synchronization. Reserve the hosting origin for trusted Tree code:
   different URL paths on the same origin do not isolate IndexedDB data.
 * **Content security policy.** The production build adds a meta CSP allowing
-  same-origin scripts, fonts and connections, inline styles, and local attachment
-  images. It blocks inline scripts, child frames, workers, objects, base URL changes
-  and form submissions (`scripts/web/build.mts`). Browser startup also rejects
-  execution inside a frame. The meta policy is not an HTTP `frame-ancestors` control.
+  same-origin scripts, workers, fonts and connections, inline styles, and local
+  attachment images. It blocks inline scripts, child frames, blob-URL and other
+  cross-origin workers, objects, base URL changes and form submissions
+  (`scripts/web/build.mts`). Browser startup also rejects execution inside a frame.
+  The meta policy is not an HTTP `frame-ancestors` control. A meta policy does not
+  apply inside a worker: the packaged archive worker is same-origin code from the
+  verified publication, makes no network requests and evaluates no received code
+  ([ADR 0022](decisions/0022-notes-archive-format-and-worker.md)).
+* **Notes export.** **Export Notes…** reads the stored document and referenced
+  images in a module worker and hands the archive to the browser as a download.
+  Nothing is uploaded. The downloaded archive is unencrypted: anyone who can read
+  that file can read the notes, and copying it to a synchronized folder sends it
+  to that service.
 * **Untrusted content.** Shared rendering escapes node text and link attributes;
   domain normalization accepts only HTTP(S) link destinations. Clipboard HTML is
   reduced to text and link ranges rather than inserted as arbitrary markup.
@@ -63,10 +72,11 @@ implemented in `src/web/services.ts`.
   consistency control, not a barrier against malicious same-origin code.
 
 The current package has no Service Worker, offline package, persistent-storage
-request, recovery generations, export or import. Adding the website to a browser's
+request, recovery generations or import. Adding the website to a browser's
 Dock or home screen does not add those protections. Clearing site data, deleting
 the profile or browser storage eviction can remove notes; force termination can
-lose uncommitted work. Browser storage is not a backup. Current compatibility and
+lose uncommitted work. Browser storage is not a backup; an exported archive kept
+outside the browser profile is. Current compatibility and
 save limitations are owned by [Browser version](../src/web/README.md) and
 [the browser requirements](PRODUCT.md#14-browser-static-hosting-checkpoint).
 
@@ -226,7 +236,8 @@ local tests do not establish those controls.
 
 | Control | Focused tests | Real-boundary tests |
 | --- | --- | --- |
-| Browser package and CSP presence | `scripts/web/build.mts` build policy | `e2e/web/package.spec.mjs` against the built package; this checks CSP presence, not every directive's enforcement |
+| Browser package and CSP presence | `scripts/web/build.mts` build policy | `e2e/web/package.spec.mjs` against the built package; this checks CSP presence and the worker directive, not every directive's enforcement |
+| Browser notes export | `src/application/notes-archive/export-notes.test.ts`, `src/web/archive/*.test.ts`, ESLint fflate import restrictions | `e2e/web/export.spec.mjs` against development and built packages |
 | Browser storage ownership and failed writes | Shared document validation tests | `e2e/web/storage.spec.mjs` |
 | Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mjs`, `e2e/web/compatibility.spec.mjs` |
 | Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |

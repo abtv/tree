@@ -566,6 +566,12 @@ The file-service `null` load result is reserved for missing document files. A pr
 
 Absolute filesystem paths must not be stored in the document.
 
+### Browser notes archive
+
+The browser export (`docs/PRODUCT.md` §24) follows [ADR 0022](decisions/0022-notes-archive-format-and-worker.md). `src/web/storage-schema.ts` owns the IndexedDB identity and the open and read helpers that the page adapter and the archive worker share. `src/application/notes-archive/` owns entry names, limits, the finished-size budget and export sequencing behind two ports: a source that reads the head and one image per call, and a writer that appends entries. `src/web/archive/zip-writer.ts` implements the writer with fflate's synchronous streams; `src/web/archive/export-job.ts` runs the export in `src/web/workers/archive.worker.ts`, combines small output chunks and transfers buffers to the page. `src/web/data-menu.ts` flushes pending edits through `EditorStore.flushPersistence`, starts one worker per export, appends chunks to a `Blob`, starts the download and reports progress; cancelling terminates the worker and ignores messages it queued earlier.
+
+Performance assessment (`docs/PRODUCT.md` §22.1): export adds no IndexedDB writes or syncs; its only write is the browser's download of the finished file. The worker reads the head in one transaction and each referenced image once, so its CPU is linear in document and image bytes, and it holds the encoded document, one image and a bounded block of pending output. The page's work per chunk is constant and independent of document size: it does not parse, copy or traverse the notes, and the Blob keeps archive bytes in browser-managed storage outside the page's JavaScript heap. The flush before export is the same save that quitting performs. `perf/web/export.spec.mjs` guards main-thread long tasks during a large export and records duration, heap growth and archive size.
+
 ---
 
 ## 14. Attachments

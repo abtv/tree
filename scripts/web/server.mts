@@ -5,6 +5,9 @@ const server = await createServer({
   configFile: false,
   root: resolve(import.meta.dirname, '../../src/web'),
   esbuild: { jsx: 'automatic' },
+  // The archive worker imports fflate after startup; discovering it then would reload the page.
+  optimizeDeps: { include: ['fflate'] },
+  worker: { format: 'es' },
   server: {
     host: '127.0.0.1',
     port: 5174,

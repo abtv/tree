@@ -14,4 +14,5 @@ Rules for performance suites and comparison runners in `perf/`. The root `AGENTS
 
 ## Commands
 
-* Select scope under root procedure §10. Run affected specs with `npm run test:perf -- <specs>`; use `npm run test:perf` for a required full run. `npm run check:full` includes the full suite when that all-suites command is selected.
+* Select scope under root procedure §10. Run affected specs with `npm run test:perf -- <specs>`; use `npm run test:perf -- --project=electron` for a required full Electron run. `npm run check:full` includes the full Electron suite when that all-suites command is selected.
+* `npm run test:perf` without a project also runs the browser scenarios in `perf/web/` (the `web` project) in visible Chrome. A `PERF_BASELINE` recorded before a scenario existed lacks it, so select the project the baseline covers or re-record the baseline.

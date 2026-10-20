@@ -21,7 +21,14 @@
       <button data-appearance="light" aria-label="Light" aria-pressed="false">Light</button>
       <button data-appearance="dark" aria-label="Dark" aria-pressed="false">Dark</button>
       <hr />
+      <span class="menu-label">Data</span>
+      <button id="data-export">Export Notes…</button>
+      <hr />
       <span id="prototype-save-status" role="status">Opening local document…</span>
+    </div>
+    <div id="data-activity" role="status" hidden>
+      <span id="data-activity-text"></span>
+      <button id="data-activity-action" type="button"></button>
     </div>
     <div id="prototype-problem" role="alert" hidden></div>
     <div id="root"></div>

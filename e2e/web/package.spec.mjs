@@ -8,6 +8,12 @@ test('serves the static package without development entry points', async ({ requ
   expect(response.ok()).toBe(true)
   const html = await response.text()
   expect(html).toContain('Content-Security-Policy')
+  // ADR 0022: archive work runs in a same-origin module worker; other worker sources stay blocked.
+  expect(html.replaceAll('&#39;', "'")).toContain("worker-src 'self';")
+  const script = html.match(/src="\.\/(assets\/index-[^"]+\.js)"/)[1]
+  const worker = (await (await request.get(`/${script}`)).text()).match(/archive\.worker-[\w-]+\.js/)
+  expect(worker, 'The application bundle must reference the hashed archive worker').not.toBeNull()
+  expect((await request.get(`/assets/${worker[0]}`)).ok()).toBe(true)
   expect(html).not.toContain('main.tsx')
   expect(html).not.toContain('/@vite/client')
   expect((await request.get('/.nojekyll')).ok()).toBe(true)

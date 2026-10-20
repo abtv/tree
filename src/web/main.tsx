@@ -5,6 +5,7 @@ import { EditorStore } from '../application/editor-store'
 import { installBrowserPrototype } from './services'
 import { capturePasteClipboard } from './paste'
 import { isApplePlatform } from './device'
+import { installDataMenu } from './data-menu'
 import '../renderer/styles.css'
 import './styles.css'
 
@@ -49,6 +50,7 @@ try {
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-appearance]')) {
     button.onclick = run(() => window.treeApi.setAppearance(button.dataset.appearance as 'system' | 'light' | 'dark'))
   }
+  installDataMenu(store, menu)
   Object.assign(window, { prototypeStore: store })
 } catch (error) {
   const problem = document.getElementById('prototype-problem')!

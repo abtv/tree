@@ -9,6 +9,8 @@ await build({
   base: './',
   esbuild: { jsx: 'automatic' },
   build: { outDir, emptyOutDir: true, target: 'es2022' },
+  // Same-origin module workers run archive work off the main thread (ADR 0022).
+  worker: { format: 'es' },
   plugins: [
     {
       name: 'static-browser-policy',
@@ -20,7 +22,7 @@ await build({
             attrs: {
               'http-equiv': 'Content-Security-Policy',
               content:
-                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; frame-src 'none'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'",
             },
             injectTo: 'head-prepend',
           },

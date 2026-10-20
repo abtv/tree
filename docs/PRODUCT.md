@@ -59,7 +59,7 @@ The owner-reviewed browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
 behavior remain as accepted. This checkpoint adds no synchronization, accounts,
-export/import or offline package. It does not claim full
+import or offline package; exporting notes is defined in §24. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
 While an image preview is open, the browser's ellipsis menu button is hidden.
@@ -1870,3 +1870,48 @@ Whole-node Visual `d` marks exactly the selected occurrences for the pending mov
 `Cmd+,` returns to the timeline; Vim Normal also supports `Ctrl+o`. Returning restores the timeline's selection, scroll position, folds, and revealed days instead of selecting Today. If edits removed the saved row, selection falls back to the nearest visible day, choosing the earlier day on a tie. Focused folds are independent of that saved timeline state. Presentation changes cancel pending moves and obsolete whole-node selections. `Cmd+.` or `gd` on a real node still opens Tree at that node.
 
 When a live edit removes the active occurrence's date but another date remains, the focused view follows the chronologically nearest remaining date under §23.7, preserving editing continuity. Creating on the preceding day likewise focuses the new node's day. Returning still restores the original timeline state. History does not change the focused presentation or its folds. Focused-day state is runtime only and creates no additional persistence writes.
+
+## 24. Browser Data Safety
+
+The browser version keeps notes in the storage of one browser profile and origin (§1.4). Clearing site data or deleting the profile removes them. This section defines how the user keeps an independent copy.
+
+The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They have no keyboard shortcuts and no command-panel entries, and Tree never prompts for them at startup.
+
+Nothing in this section sends notes over the network. Notes leave browser storage only as a file that the user chose to create.
+
+### 24.2 Notes Archive
+
+A notes archive is one ZIP file with the layout of the desktop data directory:
+
+* `document.json` is the first entry. It holds the saved document in the stored schema as compact JSON, compressed with Deflate.
+* Each referenced image follows as `attachments/<id>.png`, in ascending order of attachment ID, stored without further compression.
+* The archive contains no other entries, no directory entries and no preferences.
+
+Extracting an archive produces a folder that the desktop application opens as its data directory.
+
+An archive holds at most 65,535 entries (`document.json` and 65,534 images). `document.json` is at most 256 MiB, each image at most 25 MiB (the attachment limit of §17), and the complete archive at most 2,147,483,647 bytes. Archives never use ZIP64 records.
+
+### 24.3 Export
+
+**Export Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while another export runs.
+
+Choosing it closes the menu and first saves pending edits, as Quit does. It then exports the saved document and every referenced image in browser storage. Stored images that the document no longer references are not exported. Export never changes the stored notes.
+
+Export runs in the background, and editing remains available. Changes made after the export started are not part of the archive.
+
+While it runs, a panel at the lower right of the window, above the status bar, shows `Exporting Notes…`, then `Exporting Notes… 3 of 120 images`, with a **Cancel** button. Cancel stops the export immediately, closes the panel and produces no file.
+
+On success the browser downloads the archive as `Tree Notes YYYY-MM-DD.zip`, named with the local date, to its usual download location. The panel shows `Exported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with **OK**.
+
+A referenced image that is missing from browser storage, or stored there as empty or oversized data that an archive cannot hold, does not stop the export. The image is left out, the result adds `1 image could not be found and was not included.` (or the count of such images), and the panel stays until **OK**. This matches §16.1: a document opens with a missing image and shows the image error.
+
+Export produces no file and leaves the notes unchanged when:
+
+* pending edits cannot be saved: `Export failed. Your latest changes could not be saved: <reason>`;
+* browser storage holds no saved document, for example after site data was cleared while the page was open: `Export failed. There are no saved notes to export.`;
+* the stored document is invalid: `Export failed. The saved notes are invalid, so they cannot be exported.`;
+* the notes exceed a limit of §24.2: `Export failed. Your notes have too many images to export as one archive.`, `Export failed. Your notes are too large to export as one archive.` or `Export failed. Your notes and images are too large to export as one archive.`;
+* browser storage cannot be read: `Export failed. The notes could not be read: <reason>`;
+* the background export cannot start or stops for another reason: `Export failed. The export stopped unexpectedly.`
+
+A failure panel stays until **OK**. While the save-failure message of §16.2 is shown at the lower edge, the panel appears at the upper right below the menu button instead, so both stay visible.

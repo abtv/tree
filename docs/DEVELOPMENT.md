@@ -72,7 +72,7 @@ less frequent checks.
 | `make e2e-web` | Web end-to-end tests in offline Docker Chromium | `npm run test:web:chromium` |
 | `make dev-electron` | Electron development mode | `npm run dev` |
 | `make dev-web` | Web development server | `npm run dev:web` |
-| `make perf-electron` | Full Electron performance suite | `npm run test:perf` |
+| `make perf-electron` | Full Electron performance suite | `npm run test:perf -- --project=electron` |
 
 Test and development targets never run `setup` automatically. Agents continue
 using the named npm workflows and their existing permissions, including only
@@ -448,7 +448,7 @@ Use the highest applicable functional-validation tier. Select Electron performan
 
 When categories overlap or the tier is uncertain, use the higher tier. A suite that cannot execute its real boundary is blocked, not passed.
 
-For selected Electron performance scenarios, use `npm run test:perf -- <specs>` and optionally `--grep <pattern>`. Use `npm run test:perf` for the full performance suite. The serial runner and measurement mechanics are described in §12. Record the selected scope and performance rationale with the functional-validation evidence; no Electron performance run is needed when there is no concrete performance trigger under procedure §10. `npm run check` continues to include the fast `test:performance` guards in every tier that requires that command.
+For selected Electron performance scenarios, use `npm run test:perf -- <specs>` and optionally `--grep <pattern>`. Use `npm run test:perf -- --project=electron` for the full Electron performance suite; `npm run test:perf` also runs the browser scenarios of §12. The serial runner and measurement mechanics are described in §12. Record the selected scope and performance rationale with the functional-validation evidence; no Electron performance run is needed when there is no concrete performance trigger under procedure §10. `npm run check` continues to include the fast `test:performance` guards in every tier that requires that command.
 
 ### Local affected-spec E2E validation
 
@@ -769,11 +769,13 @@ would instead test `a || (b && c)`, a different program. A passing synthetic sea
 is evidence about its cases, not proof of equivalence; use the recorded invariants
 to justify an equivalent disposition and name unsupported inputs separately.
 
-Electron performance tests live in `perf/electron/`. Cross-platform comparison runners live in `perf/comparisons/`; shared result recording stays in `perf/results.ts`. Select their scope using procedure §10 and the commands in §9; a High Risk classification alone does not require a run. The full suite runs as part of an explicitly selected `npm run check:full`, or on its own with:
+Electron performance tests live in `perf/electron/` and form the `electron` project of `perf.config.ts`. Browser scenarios against the built static package live in `perf/web/` and form the `web` project. Cross-platform comparison runners live in `perf/comparisons/`; shared result recording stays in `perf/results.ts`. Select their scope using procedure §10 and the commands in §9; a High Risk classification alone does not require a run. `npm run test:perf` builds both targets and runs both projects; the full Electron suite runs as part of an explicitly selected `npm run check:full`, or on its own with:
 
 ```bash
-npm run test:perf
+npm run test:perf -- --project=electron
 ```
+
+The scheduled Performance workflow and `make perf-electron` run the Electron project only. Run the [browser export scenario](../src/web/README.md#browser-export-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.
@@ -862,7 +864,7 @@ Do not commit:
 
 Follow the repository's `.gitignore`.
 
-Agent-created temporary work belongs in `.scratch/<task>/` under the repository root, as required by `AGENTS.md` §4 for Codex, Claude Code, and OpenCode. Create task directories only when needed; no tracked placeholder is required. Use a unique task name and separate agent subdirectories for concurrent work. The folder is ignored by Git, ESLint, Prettier, and Vitest discovery, so saved diagnostic scripts and unfinished examples do not enter ordinary validation. A hidden name and `.gitignore` are not a confidentiality boundary or automatic cleanup mechanism.
+Agent-created temporary work belongs in `.scratch/<task>/` under the repository root, as required by `AGENTS.md` §4 for Codex, Claude Code, and OpenCode. Create task directories only when needed; no tracked placeholder is required. Use a unique task name and separate agent subdirectories for concurrent work. The folder is ignored by Git, ESLint, Prettier, and Vitest discovery and is not copied into Stryker's mutation sandbox, so saved diagnostic scripts, unfinished examples and browser profiles do not enter ordinary validation. A hidden name and `.gitignore` are not a confidentiality boundary or automatic cleanup mechanism.
 
 Keep reports needed across test runs here, rather than in system temporary directories or Playwright's cleared `test-results/` directory. Existing tool-managed outputs such as `test-results/`, `reports/`, and `out/`, library-managed temporary directories, and application test profiles retain their current locations. A diagnostic spec that needs the E2E or performance runner's discovery stays in its designated suite while in use; the existing permitted retirement workflow remains valid. Working and initiative plans retain the locations defined in `AGENTS.md` §8.
 

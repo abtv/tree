@@ -45,7 +45,8 @@ jobs:
           fi
 
       - name: Run performance tests
-        run: npm run test:perf
+        # Browser scenarios (the web project) are local measurements outside this budget.
+        run: npm run test:perf -- --project=electron
 
       - name: Report performance drift
         if: always()

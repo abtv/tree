@@ -77,6 +77,11 @@ body:has(.image-preview-overlay) #tree-menu-button {
   font: inherit;
   cursor: pointer;
 }
+#tree-menu button:disabled {
+  color: var(--color-secondary);
+  background: transparent;
+  cursor: default;
+}
 #tree-menu button[aria-pressed='true']::after {
   content: '✓';
   float: right;
@@ -92,6 +97,51 @@ body:has(.image-preview-overlay) #tree-menu-button {
   padding: 3px 10px;
   color: var(--color-secondary);
   font-size: 11px;
+}
+#data-activity {
+  position: fixed;
+  /* Above the status bar, which holds the Vim mode indicator at its right edge. */
+  inset: auto 16px 40px auto;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 6px 24px #0003;
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+#data-activity[hidden] {
+  display: none;
+}
+/* The problem banner occupies the same lower edge; keep both messages visible. */
+body:has(#prototype-problem:not([hidden])) #data-activity {
+  inset: 34px 10px auto auto;
+}
+#data-activity button {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 5px;
+  background: var(--color-background);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+#data-activity button:hover,
+#data-activity button:focus-visible {
+  background: var(--color-location-border);
+}
+#data-activity button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 1px;
 }
 #prototype-problem {
   position: fixed;

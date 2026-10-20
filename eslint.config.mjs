@@ -79,6 +79,57 @@ export default tseslint.config(
     },
   },
   {
+    // ADR 0022: async fflate APIs start blob-URL workers that the browser CSP blocks, and fflate's
+    // archive readers trust local headers or scan for signatures. Tests may use them as oracles.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.ts', 'src/**/*-test-utils.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'fflate',
+              importNames: [
+                'AsyncCompress',
+                'AsyncDecompress',
+                'AsyncDeflate',
+                'AsyncGunzip',
+                'AsyncGzip',
+                'AsyncInflate',
+                'AsyncUnzipInflate',
+                'AsyncUnzlib',
+                'AsyncZipDeflate',
+                'AsyncZlib',
+                'Unzip',
+                'UnzipInflate',
+                'UnzipPassThrough',
+                'compress',
+                'decompress',
+                'deflate',
+                'gunzip',
+                'gzip',
+                'inflate',
+                'unzip',
+                'unzipSync',
+                'unzlib',
+                'zip',
+                'zlib',
+              ],
+              message: 'Use only synchronous fflate streams and the own archive reader (ADR 0022).',
+            },
+          ],
+          patterns: [
+            {
+              group: ['fflate/*'],
+              message: 'Import fflate only through its package entry so the restricted names apply (ADR 0022).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/renderer/**/*.{ts,tsx}', 'src/infrastructure/renderer/**/*.ts'],
     languageOptions: {
       globals: globals.browser,
@@ -102,8 +153,8 @@ export default tseslint.config(
           ...platformImportRestrictions,
           patterns: [
             {
-              group: ['react', 'react/**', 'react-dom', 'react-dom/**', 'electron/**'],
-              message: 'The application layer must remain independent of React and platform APIs.',
+              group: ['react', 'react/**', 'react-dom', 'react-dom/**', 'electron/**', 'fflate', 'fflate/**'],
+              message: 'The application layer must remain independent of React, platform APIs and archive libraries.',
             },
           ],
         },
@@ -122,6 +173,8 @@ export default tseslint.config(
               group: [
                 'react',
                 'react/*',
+                'fflate',
+                'fflate/**',
                 '../application/**',
                 '../infrastructure/**',
                 '../electron/**',

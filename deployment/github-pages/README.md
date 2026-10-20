@@ -114,8 +114,9 @@ administration permission is granted to the publisher.
 
 **Before publishing:** localhost and the HTTPS destination have separate browser
 storage. Existing localhost notes stay there and do not move automatically. Do
-not clear that site's storage. There is no account, synchronization, export/import
-or migration in this version.
+not clear that site's storage. There is no account, synchronization, import or
+migration in this version. **Export Notes…** in the localhost menu downloads a
+copy of those notes as a ZIP archive; keep it before relying on the new site.
 
 After access setup, push the intended source commits to main. In source Actions,
 wait for **Browser release** and its **Release gate** and transfer job. In target

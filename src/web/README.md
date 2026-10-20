@@ -34,8 +34,9 @@ repository's existing demo Pages workflow remains a separate destination.
 Before publication, explain the storage boundary: the local development origin
 and `https://tree-editor.github.io` have separate browser storage. Existing localhost
 notes stay there and **do not move automatically**. The same applies to different
-browsers and profiles. There is no migration, synchronization, account, export or
-import in this package. Never clear the old site's data to install or update it.
+browsers and profiles. There is no migration, synchronization, account or import
+in this package; **Export Notes…** writes a copy that can be kept outside the
+browser. Never clear the old site's data to install or update it.
 Reserve the destination origin for trusted Tree code; other paths on that origin
 share its storage.
 
@@ -65,8 +66,16 @@ same browser-local document. The database name remains `tree-browser-prototype`;
 moving source files does not migrate, clear or upload the stored document.
 Another browser, profile, hostname or port has separate storage.
 
-The ellipsis button opens Tree, Agenda, Vim Editing and appearance controls.
+The ellipsis button opens Tree, Agenda, Vim Editing, appearance and Data controls.
 The menu also shows local save status. Only one tab may edit at a time.
+
+**Export Notes…** in the Data block downloads one ZIP archive with the saved
+document and its referenced images, in the layout of the desktop data directory.
+A module worker writes the archive, so editing continues meanwhile. The archive
+format, limits and messages are defined in
+[the browser data-safety requirements](../../docs/PRODUCT.md#24-browser-data-safety).
+Keep exported archives somewhere other than the browser profile: they are the
+only copy that survives clearing site data.
 
 Apple devices use Cmd shortcuts. Other platforms use Ctrl, with Alt for Option
 and Home/End for line boundaries. The command panel shows the matching labels.
@@ -93,8 +102,9 @@ Tree's Quit command saves pending edits and then requests window closure without
 a successful-save dialog. If the browser refuses scripted closure, close the
 saved page with the browser's own controls. A failed save keeps the editor open.
 
-Data stays in the browser. There is no device synchronization, export or import.
-Clearing site data or deleting the profile removes it. This version has no offline
+Data stays in the browser unless the user exports it. There is no device
+synchronization or import. Clearing site data or deleting the profile removes the
+notes stored in the browser. This version has no offline
 package, recovery generations or persistent-storage request. Browser/OS force
 termination can lose uncommitted work. Full Safari and Dock-app compatibility
 remains unverified; native Safari clipboard interaction still needs verification.
@@ -162,6 +172,21 @@ The storage spec covers full browser restart, writer handover, aborted writes,
 retries, dirty-close warnings, buffered editing, Insert undo grouping and invalid
 stored data. Generated reports and synthetic profiles remain ignored runner
 artifacts. The server binds only to the local loopback address.
+
+The export spec parses each downloaded archive and compares it with IndexedDB. It
+covers pending-edit flushing, missing and unreferenced images, cancellation,
+refusal of an invalid stored document, typing during a large export and the
+locked save-failure state. It cancels deterministically by holding the worker
+script request with `page.route`, without a production test hook.
+
+### Browser export performance
+
+`npm run test:perf -- --project=web` measures **Export Notes…** on a large
+synthetic profile in the built package (`perf/web/export.spec.mjs`). The script
+rebuilds both targets first. It records main-thread long tasks, total blocking
+time, export duration, main-thread heap growth and archive size through
+`perf/results.ts`. It runs locally in visible Chrome and is not part of the
+scheduled Performance workflow or the release gate.
 
 ### Local Safari performance comparisons
 

@@ -7,7 +7,7 @@ export default defineConfig({
     exclude: [
       ...configDefaults.exclude,
       'e2e/**',
-      'perf/**/*.spec.ts',
+      'perf/**/*.spec.{ts,mjs}',
       'test-results/**',
       '.scratch/**',
       '.stryker-tmp/**',
