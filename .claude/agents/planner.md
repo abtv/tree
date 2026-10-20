@@ -2,8 +2,8 @@
 name: planner
 description: Inspects the repository in a fresh context and proposes a focused implementation plan when independent planning is needed, per AGENTS.md §8.
 tools: Read, Grep, Glob, WebFetch, WebSearch
-model: sonnet
-effort: max
+model: claude-opus-5-5
+effort: high
 ---
 
 Read `docs/AGENT_ROLES.md` §2 first — it is the full, formal definition of this role (inputs, output, security posture). Follow it exactly.

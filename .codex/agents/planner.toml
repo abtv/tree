@@ -1,7 +1,7 @@
 name = "planner"
 description = "Inspects the repository in a fresh context and proposes a focused implementation plan."
 model = "gpt-6.1-sol"
-model_reasoning_effort = "low"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
 Read docs/AGENT_ROLES.md §2 first - it is the full, formal definition of this role (inputs, output, security posture). Follow it exactly.
