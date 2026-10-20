@@ -161,6 +161,34 @@ describe('archive worker import job', () => {
       message: 'The archive could not be imported: Storage is unavailable.',
     })
   })
+
+  // @requirement PRODUCT.md §24.6
+  it('restores from a folder source, reporting its size and storage failures', async () => {
+    const storage = memoryStorage(undefined)
+    const { importJob, messages } = job(storage)
+    const document = new TextEncoder().encode(JSON.stringify(headWithImages(['a'])))
+    await importJob.prepare({
+      size: document.byteLength + 1,
+      readDocument: async () => document,
+      readImage: async () => tricky,
+    })
+    expect(messages.at(-1)).toEqual({
+      type: 'prepared',
+      incoming: { nodeCount: 2, imageCount: 1, missingImageCount: 0 },
+      current: 'none',
+      sourceBytes: document.byteLength + 1,
+    })
+    const full = memoryStorage(undefined)
+    full.writeImage = async () => {
+      throw new DOMException('The quota was exceeded.', 'QuotaExceededError')
+    }
+    const failing = job(full)
+    await failing.importJob.prepare({ readDocument: async () => document, readImage: async () => tricky })
+    expect(failing.messages.at(-1)).toEqual({
+      type: 'error',
+      message: 'The notes could not be restored: The quota was exceeded.',
+    })
+  })
 })
 
 // @requirement PRODUCT.md §24.4

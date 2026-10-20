@@ -59,7 +59,7 @@ The owner-reviewed browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
 behavior remain as accepted. This checkpoint adds no synchronization, accounts
-or offline package; exporting and importing notes are defined in §24. It does not claim full
+or offline package; exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
 While an image preview is open, the browser's ellipsis menu button is hidden.
@@ -1962,7 +1962,7 @@ A new folder starts a backup after pending edits are saved and the folder choice
 
 If the chosen folder contains `document.json`, Tree opens **This Folder Already Contains Notes** with the folder name and an explanation of replacement. It offers **Restore from This Folder**, **Replace Backup with Current Notes**, **Choose Another Folder**, and default **Cancel**. Escape cancels. Nothing is overwritten before an explicit Replace choice. Unrelated folder content and existing image files are kept.
 
-Restore from This Folder reads only `document.json` and its referenced `attachments/<id>.png` files. It uses the validation, limits, staging, image-conflict checks and Replace Current Notes? confirmation of §24.4. The comparison names the folder and the total size of these files, and says `Restoring replaces them`. Missing images are reported as absent from the folder. Cancel and failure keep current notes unchanged. Restore does not enable automatic backup.
+Restore from This Folder restores the chosen folder as described in §24.6. It does not enable automatic backup.
 
 The worker makes one backup at startup, then coalesces successful browser saves. Runs start at least 10 seconds apart, with a deadline that continuous typing cannot postpone. A saved version waits at most 10 seconds for the next run when no run is in flight; folder I/O time adds to this delay. Closing the page stops the worker without waiting or warning; saved notes remain in IndexedDB and the next start copies them.
 
@@ -1975,3 +1975,17 @@ The menu footer shows muted backup status: `Folder backup is off.`, `Backing up 
 Startup checks permission without prompting. If access is not granted, the footer says `Backup paused — permission needed. Choose Resume Backing Up…`, and the command becomes **Resume Backing Up…**. Its dialog offers **Resume Backing Up**, **Stop Backing Up**, **Choose Another Folder**, and default **Cancel**. Only the Resume click requests write permission. Worker startup failures also offer Resume. A small dot and accessible attention label on the ellipsis button appear only for failure or permission-needed states and clear after success or stopping.
 
 Use one backup folder for one browser profile on one computer. Two computers writing the same folder, including through iCloud Drive, can overwrite each other's notes. Selecting a synchronized folder lets that service copy the unencrypted notes off the machine. Tree itself performs no network transfer. Browser folder writes do not provide desktop recovery generations or a power-loss guarantee.
+
+### 24.6 Restore from Folder
+
+**Restore from Folder…** follows Back Up to Folder… in the Data block and appears under the same browser condition (§24.5). It is disabled in the locked save-failure state (§16.2) and while an export, import or another restore runs. It stays available when the stored document cannot be opened and when browser storage was cleared, so a backup folder can recover the notes. Tree never offers it at startup.
+
+Choosing it closes the menu and opens a read-only folder picker, which starts where the backup picker was last used. Cancelling the picker changes nothing and shows nothing. Restoring needs no write permission and never writes to the chosen folder.
+
+Tree reads only `document.json` and the `attachments/<id>.png` files that it references. Other folder content is ignored; the reject-everything-else rule of §24.4 applies to archives only. Restore then uses the validation, limits, staging, image-conflict checks, progress panel and confirmation of §24.4, with these differences:
+
+* The panel shows `Restoring Notes…`, then `Restoring Notes… 3 of 120 images`, with **Cancel**.
+* The confirmation names the folder and the total size of the files read: `“Tree Backup” (2.5 MB) contains 1,234 nodes and 56 images.` It says `Restoring replaces them`, and missing images are reported as not in the folder.
+* A failure shows `Restore failed. <reason>` until **OK**. Besides the reasons of §24.4, a folder without `document.json` gives `“Tree Backup” does not contain document.json. Choose the folder that Tree backed up to.`; a folder that cannot be read gives `The folder could not be read: <reason>`; a browser storage failure gives `The notes could not be restored: <reason>`; a picker that fails gives `The folder could not be opened: <reason>`; and a stopped background check gives `The restore stopped unexpectedly.`
+
+Cancel and every failure keep the current notes unchanged and remove the images that the restore stored, as in §24.4. Restore does not change the backup choice. An active backup keeps running and, after the reload, copies the restored notes to its folder as its next version. An active backup trails the saved notes by seconds and keeps no earlier versions, so restoring from its own folder returns the latest saved notes, not an earlier state.

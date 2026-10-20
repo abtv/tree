@@ -39,7 +39,10 @@ scope.onmessage = async (event) => {
   } catch (error) {
     post({
       type: 'error',
-      message: request.type === 'export' ? exportFailureMessage(error) : importFailureMessage(error),
+      message:
+        request.type === 'export'
+          ? exportFailureMessage(error)
+          : importFailureMessage(error, request.type === 'restore'),
     })
     return
   }

@@ -166,11 +166,30 @@ export function installBackupPicker(context) {
   return context.addInitScript(() => {
     window.backupPickerCalls = 0
     window.backupFolderName = 'Tree Backup'
-    window.showDirectoryPicker = async () => {
+    window.showDirectoryPicker = async (options) => {
       window.backupPickerCalls += 1
+      window.backupPickerOptions = options
       return (await navigator.storage.getDirectory()).getDirectoryHandle(window.backupFolderName, { create: true })
     }
   })
+}
+
+/** Writes files into an OPFS folder; string values are text, arrays are bytes. */
+export function writeFolder(page, name, files) {
+  return page.evaluate(
+    async ({ name, files }) => {
+      const root = await (await navigator.storage.getDirectory()).getDirectoryHandle(name, { create: true })
+      for (const [path, content] of Object.entries(files)) {
+        const parts = path.split('/')
+        let folder = root
+        for (const part of parts.slice(0, -1)) folder = await folder.getDirectoryHandle(part, { create: true })
+        const stream = await (await folder.getFileHandle(parts.at(-1), { create: true })).createWritable()
+        await stream.write(typeof content === 'string' ? content : new Uint8Array(content))
+        await stream.close()
+      }
+    },
+    { name, files },
+  )
 }
 
 export function readBackup(page, name = 'Tree Backup') {

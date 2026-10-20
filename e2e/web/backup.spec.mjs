@@ -235,6 +235,7 @@ test('folder failure is visible and unsupported browsers hide the controls', asy
   await ready(other)
   await openMenu(other)
   await expect(other.locator('#data-backup')).toBeHidden()
+  await expect(other.locator('#data-restore')).toBeHidden()
   await expect(other.locator('#backup-status')).toBeHidden()
 })
 

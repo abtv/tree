@@ -124,7 +124,8 @@ copy of those notes as a ZIP archive; keep it before relying on the new site.
 **Import Notes…** on the new site replaces its notes with that archive.
 In Chromium, **Back Up to Folder…** can keep a separate folder copy; its handle
 and permissions belong to that profile and origin. Changing origins does not
-transfer the backup choice. Use one folder for one profile on one computer;
+transfer the backup choice; **Restore from Folder…** on the new site reads such
+a folder. Use one folder for one profile on one computer;
 sharing a writable backup through iCloud Drive can cause conflicting writers.
 
 After access setup, push the intended source commits to main. In source Actions,

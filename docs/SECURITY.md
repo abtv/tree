@@ -66,9 +66,12 @@ implemented in `src/web/services.ts`.
   scripts: the packaged backup worker makes no network requests and evaluates no
   received code. Folder contents are unencrypted; choosing a synchronized folder
   lets that service transfer them. Use one folder for one profile on one computer;
-  concurrent writers or external folder edits are unsupported. The Restore choice
-  treats the folder as hostile, reads only the document and referenced images,
-  and uses the import validation, staging and explicit replacement confirmation.
+  concurrent writers or external folder edits are unsupported.
+* **Folder restore.** **Restore from Folder…** and the Restore choice of an
+  occupied backup folder treat the folder as hostile, read only the document and
+  referenced images, and use the import validation, staging and explicit
+  replacement confirmation. The menu command requests read access only and never
+  writes to the folder.
 * **Notes import.** **Import Notes…** treats the chosen file as hostile input. A
   module worker reads it in slices through its own central-directory parser
   (`src/application/notes-archive/zip-reader.ts`); fflate only inflates Deflate

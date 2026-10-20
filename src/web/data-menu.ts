@@ -27,6 +27,8 @@ export const exportProgressText = (imagesDone: number, imageCount: number) =>
   progressText('Exporting', imagesDone, imageCount)
 export const importProgressText = (imagesDone: number, imageCount: number) =>
   progressText('Importing', imagesDone, imageCount)
+export const restoreProgressText = (imagesDone: number, imageCount: number) =>
+  progressText('Restoring', imagesDone, imageCount)
 
 export function exportResultText(fileName: string, summary: NotesArchiveSummary): string {
   const exported = `Exported “${fileName}”.`
@@ -200,12 +202,13 @@ interface ImportDialog {
 }
 
 /**
- * Wires the Data block of the browser menu (PRODUCT §24.3, §24.4). One export or import runs at a
- * time, and neither is available in the locked save-failure state.
+ * Wires the Data block of the browser menu (PRODUCT §24.3–§24.6). One export, import or restore
+ * runs at a time, and none is available in the locked save-failure state.
  */
 export function installDataMenu(store: EditorStore, menu: HTMLElement, session: DataSession): void {
   const exportButton = document.getElementById('data-export') as HTMLButtonElement
   const importButton = document.getElementById('data-import') as HTMLButtonElement
+  const restoreButton = document.getElementById('data-restore') as HTMLButtonElement
   const fileInput = document.getElementById('data-import-file') as HTMLInputElement
   const dialog = document.getElementById('import-confirm') as HTMLDialogElement
   const dialogExport = document.getElementById('import-confirm-export') as HTMLButtonElement
@@ -228,7 +231,9 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     if ((event as ToggleEvent).newState !== 'open') return
     exportButton.disabled = running || locked()
     importButton.disabled = running || locked()
+    restoreButton.disabled = running || locked()
   })
+  restoreButton.hidden = !supportsFolderBackup()
 
   exportButton.onclick = () => {
     menu.hidePopover()
@@ -265,6 +270,20 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     if (file !== undefined && !running && !locked()) void startImport(file)
   }
 
+  restoreButton.onclick = () => {
+    menu.hidePopover()
+    if (running || locked()) return
+    // Read access is enough; the picker must open from this click's user activation.
+    void (async () => window.showDirectoryPicker!({ mode: 'read', id: 'tree-backup' }))().then(
+      (folder) => startImport(folder),
+      (error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') return
+        clearTimeout(hideTimer)
+        panel.show(`Restore failed. The folder could not be opened: ${reason(error)}`, 'OK', () => panel.hide())
+      },
+    )
+  }
+
   let onDialogCancel = () => {}
   dialog.oncancel = (event) => {
     event.preventDefault()
@@ -298,6 +317,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
   async function startImport(file: File | FileSystemDirectoryHandle): Promise<void> {
     if (running || locked()) return
     const restoring = !(file instanceof File)
+    const progress = restoring ? restoreProgressText : importProgressText
     running = true
     clearTimeout(hideTimer)
     let active = true
@@ -359,7 +379,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
       })
     }
 
-    panel.show(importProgressText(0, 0), 'Cancel', cancel)
+    panel.show(progress(0, 0), 'Cancel', cancel)
     try {
       await store.flushPersistence()
     } catch (error) {
@@ -371,7 +391,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
       (message) => {
         if (!active) return
         if (message.type === 'progress') {
-          panel.show(importProgressText(message.imagesDone, message.imageCount), 'Cancel', cancel)
+          panel.show(progress(message.imagesDone, message.imageCount), 'Cancel', cancel)
         } else if (message.type === 'prepared') {
           panel.hide()
           importDialog.open(
@@ -396,7 +416,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         // opens whichever head is stored, and the startup sweep removes the images only when
         // the commit did not end the journal.
         if (committing) location.reload()
-        else fail('The import stopped unexpectedly.')
+        else fail(`The ${restoring ? 'restore' : 'import'} stopped unexpectedly.`)
       },
     )
     worker?.postMessage(

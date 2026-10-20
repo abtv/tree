@@ -90,6 +90,8 @@ the menu footer reports success, permission needs or failure. **Stop Backing Up*
 forgets the folder choice and leaves its files intact. An existing `document.json`
 requires an explicit choice to replace the backup, restore its notes through the
 import confirmation, or choose another folder. Restore does not enable backup.
+**Restore from Folder…** reads a backup folder, for example after site data was
+cleared, and replaces the notes after the same confirmation as import.
 Permission is checked without prompting at startup; a paused backup requires a
 **Resume Backing Up…** click. Native folder permission persistence across browser
 restarts remains an owner verification item; OPFS automation does not establish it.

@@ -24,9 +24,11 @@ export interface ImportJob {
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-export function importFailureMessage(error: unknown): string {
+export function importFailureMessage(error: unknown, fromFolder = false): string {
   if (error instanceof NotesArchiveError) return error.message
-  return `The archive could not be imported: ${reason(error)}`
+  return fromFolder
+    ? `The notes could not be restored: ${reason(error)}`
+    : `The archive could not be imported: ${reason(error)}`
 }
 
 /**
@@ -67,7 +69,7 @@ export function createImportJob(
           ...('readDocument' in file && file.size !== undefined ? { sourceBytes: file.size } : {}),
         })
       } catch (error) {
-        post({ type: 'error', message: importFailureMessage(error) })
+        post({ type: 'error', message: importFailureMessage(error, 'readDocument' in file) })
       }
     },
     async commit() {

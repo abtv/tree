@@ -1,6 +1,6 @@
 # Browser Data Durability
 
-Status: **Approved — ready** (initiative-wide approval for tasks A, B1, B2, C1 and C2).
+Status: **Approved — blocked on icons for Task A** (initiative-wide approval for tasks A, B1, B2, C1 and C2).
 
 ## Objective
 
@@ -20,7 +20,7 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 
 ## Authorization
 
-- Approval covers the whole initiative (tasks A, B1, B2, C1, C2) with the owner decisions below, recorded on 2026-10-20. Selected coding tool: Codex (explicitly authorized by the owner for continuation on 2026-10-20, superseding Claude Code).
+- Approval covers the whole initiative (tasks A, B1, B2, C1, C2) with the owner decisions below, recorded on 2026-10-20. Selected coding tool: Claude Code (the owner chose it again for Task C2 on 2026-10-20, after an earlier switch to Codex).
 - The Product Owner approved the delegated decision area below.
 - Reserved for the Product Owner: a new npm script that needs permission-configuration edits (`opencode.json`, `.codex/rules/*`, `.claude/settings.json`); changing the archive layout; scope expansion; publication.
 - Agents must not edit `.claude/settings.json`. If Chrome cannot start in the Claude Code sandbox, report the blocker and the owner's supported action.
@@ -77,7 +77,7 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 | B1 | ZIP archive core, `fflate@0.8.3`, export worker, "Export Notes…", Data menu block, CSP `worker-src 'self'`, archive ADR, export perf scenario. | — | Done |
 | B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Done |
 | C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Done |
-| C2 | "Restore from Folder…" through B2's pipeline with a folder source. | B2, C1 | Ready |
+| C2 | "Restore from Folder…" through B2's pipeline with a folder source. | B2, C1 | Done |
 
 Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: after all five tasks the initiative stays `Awaiting owner acceptance` until the Product Owner accepts the delivered result.
 
@@ -179,6 +179,13 @@ C1 already delivered `folder-source.ts`, its fake-handle tests, `prepareNotesFro
 - Standard checks, audit, full built-browser suite and affected final built/development backup cases pass. Scoped mutation run: 216 mutants, 211 killed, one timeout, four benign survivors (redundant stopped checks, unspecified sort order and clearing an absent timer). Independent Reviewer and Product Verifier found no meaningful issues. Electron baseline 856/856 at `857a783` remains valid: changed runtime modules are browser-only, confirmed by review.
 - Linux Chromium container validation remains blocked: the dependency image matching the current lockfile is absent. The owner must run `make setup` before that separately gated stage. Do not count this stage as passed. Native folder selection and browser-restart permission behavior remain O4 in owner round 2 after C2; they are not a pre-commit gate.
 
+### Task C2 results (2026-10-20)
+
+- Delivered "Restore from Folder…" after "Back Up to Folder…" in the Data block, shown under the same Chromium condition and disabled while locked or while another Data operation runs. It uses `showDirectoryPicker({ mode: 'read', id: 'tree-backup' })` from the click and the existing worker `restore` request, confirmation and commit pipeline. PRODUCT §24.6 owns the behavior; §24.5 now refers to it. No ADR: ADR 0022 and 0023 already cover the pipeline and folder access.
+- Delegated choices (O-Q5): progress `Restoring Notes…`; a folder without `document.json` names the folder and asks for the folder Tree backed up to; folder read errors say `The folder could not be read: <reason>` and browser storage errors `The notes could not be restored: <reason>` (review finding); picker errors other than cancel say `The folder could not be opened: <reason>`; a stopped worker says `The restore stopped unexpectedly.`; picker cancel shows nothing; the picker shares the backup picker's start location; restore leaves the backup choice unchanged.
+- Race trace: an active backup keeps running during a restore. It cannot observe the replaced head before the reload (the commit is a worker write, not a session save, and session writes are suspended); after the reload it backs up the restored notes, which replaces its folder's `document.json`. When the source is the active backup folder, `document.json` is replaced atomically on `close()` and completed images are never rewritten, so a read sees a complete version or fails closed. Recorded in ARCHITECTURE.
+- Observation (not scheduled): with an active backup, the Replace Current Notes? dialog does not mention that the backup folder will receive the restored notes; Import behaves the same.
+
 ## Minor gaps resolved by the planner
 
 | Task | Gap | Choice | Principle |
@@ -241,10 +248,7 @@ Possible additional rounds: icon rework, optional Safari or Firefox checks (othe
 
 ## Next task
 
-Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). B1, B2 and C1 are done; Codex also verified Chrome, built CSP, OPFS worker writes and handle persistence. Then:
-
-- if `src/web/public/icon-512.png`, `icon-192.png` and `apple-touch-icon.png` exist, take **Task A**;
-- otherwise take **Task C2** and leave A blocked on the icons.
+Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). B1, B2, C1 and C2 are done. The only remaining task is **Task A**, blocked until the Product Owner adds `src/web/public/icon-512.png`, `icon-192.png` and `apple-touch-icon.png` (O-Q4). Owner round 2 (O4, O5) can run now; round 1 waits for A only for O1.
 
 ## Resume prompt
 

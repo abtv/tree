@@ -63,6 +63,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Export Notes…',
     'Import Notes…',
     'Back Up to Folder…',
+    'Restore from Folder…',
     'Saved locally in this browser',
     'Folder backup is off.',
   ])

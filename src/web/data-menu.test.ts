@@ -6,6 +6,7 @@ import {
   fileSizeText,
   importConfirmationText,
   importProgressText,
+  restoreProgressText,
 } from './data-menu'
 
 describe('data menu wording', () => {
@@ -33,9 +34,24 @@ describe('data menu wording', () => {
     )
   })
 
-  it('reports import progress like export progress', () => {
+  it('reports import and restore progress like export progress', () => {
     expect(importProgressText(0, 0)).toBe('Importing Notes…')
     expect(importProgressText(2, 3000)).toBe('Importing Notes… 2 of 3,000 images')
+    expect(restoreProgressText(0, 0)).toBe('Restoring Notes…')
+    expect(restoreProgressText(1, 1)).toBe('Restoring Notes… 1 of 1 image')
+  })
+
+  // @requirement PRODUCT.md §24.6
+  it('names the folder and what restoring replaces', () => {
+    const incoming = { nodeCount: 2, imageCount: 0, missingImageCount: 2 }
+    expect(importConfirmationText('Tree Backup', 1500, incoming, { nodeCount: 1, imageCount: 0 }, true)).toEqual({
+      incoming: '“Tree Backup” (1.5 KB) contains 2 nodes and 0 images.',
+      current: 'Your current notes have 1 node and 0 images. Restoring replaces them, and this cannot be undone.',
+      missing: '2 images that the notes use are not in the folder. Their nodes will show “Image could not be loaded.”',
+    })
+    expect(importConfirmationText('Tree Backup', 1, incoming, 'invalid', true).current).toBe(
+      'The notes saved in this browser are invalid and cannot be opened. Restoring replaces them.',
+    )
   })
 
   it('formats file sizes in decimal units', () => {
