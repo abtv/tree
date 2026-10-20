@@ -143,6 +143,72 @@ body:has(#prototype-problem:not([hidden])) #data-activity {
   outline: 2px solid var(--color-text);
   outline-offset: 1px;
 }
+#import-confirm {
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 10px;
+  background: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 10px 40px #0004;
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+#import-confirm::backdrop {
+  background: var(--color-scrim);
+}
+#import-confirm h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+#import-confirm p {
+  margin: 0 0 8px;
+}
+#import-confirm-status:empty {
+  display: none;
+}
+.dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+/* The secondary action sits apart at the leading edge, as in a macOS alert. */
+#import-confirm-export {
+  margin-right: auto;
+}
+.dialog-buttons button {
+  padding: 4px 12px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 5px;
+  background: var(--color-background);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.dialog-buttons button[hidden] {
+  display: none;
+}
+.dialog-buttons button:disabled {
+  color: var(--color-secondary);
+  cursor: default;
+}
+.dialog-buttons .default-button {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-background);
+}
+.dialog-buttons .default-button:disabled {
+  color: var(--color-background);
+  opacity: 0.5;
+}
+.dialog-buttons button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 1px;
+}
 #prototype-problem {
   position: fixed;
   inset: auto 16px 40px;

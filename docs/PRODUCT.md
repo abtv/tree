@@ -58,8 +58,8 @@ Every change to user-visible behavior is checked against the guidelines before i
 The owner-reviewed browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
-behavior remain as accepted. This checkpoint adds no synchronization, accounts,
-import or offline package; exporting notes is defined in §24. It does not claim full
+behavior remain as accepted. This checkpoint adds no synchronization, accounts
+or offline package; exporting and importing notes are defined in §24. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
 While an image preview is open, the browser's ellipsis menu button is hidden.
@@ -1893,7 +1893,7 @@ An archive holds at most 65,535 entries (`document.json` and 65,534 images). `do
 
 ### 24.3 Export
 
-**Export Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while another export runs.
+**Export Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while another export or an import (§24.4) runs.
 
 Choosing it closes the menu and first saves pending edits, as Quit does. It then exports the saved document and every referenced image in browser storage. Stored images that the document no longer references are not exported. Export never changes the stored notes.
 
@@ -1915,3 +1915,39 @@ Export produces no file and leaves the notes unchanged when:
 * the background export cannot start or stops for another reason: `Export failed. The export stopped unexpectedly.`
 
 A failure panel stays until **OK**. While the save-failure message of §16.2 is shown at the lower edge, the panel appears at the upper right below the menu button instead, so both stay visible.
+
+### 24.4 Import
+
+**Import Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while an export or another import runs. It stays available when the stored document cannot be opened, so an archive can replace invalid stored notes.
+
+Choosing it closes the menu and opens the browser's file chooser. After a file is chosen, Tree saves pending edits, as Quit does, and checks the archive in the background while editing remains available. The panel of §24.3 shows `Importing Notes…`, then `Importing Notes… 3 of 120 images`, with **Cancel**.
+
+Tree accepts only an archive as export writes it (§24.2):
+
+* The ZIP end record is the last part of the file. Comments, extra fields, ZIP64 records, split archives and encryption reject the archive.
+* Each entry is Stored or Deflate and named exactly `document.json` or `attachments/<id>.png`, without a byte-order mark. The ID has at most 251 characters (the file-name limit of the desktop data directory) and uses only letters, digits, underscores and hyphens.
+* Any other name rejects the archive, as do directory entries and two names that differ only in letter case. An archive that the Finder or another tool re-packed, for example with an added folder level, `__MACOSX` or `.DS_Store`, is therefore rejected.
+* The limits of §24.2 apply to the declared sizes and to the bytes actually produced. Each entry must match its declared size and CRC-32, and its local header must repeat its central-directory record.
+* `document.json` must be a saved document, without a byte-order mark, that opens as described in §16.1.
+* Each image that the document references must be a PNG within the attachment limits of §17 that the browser can decode.
+
+Entries that the document does not reference are ignored and not stored. A referenced image that the archive does not contain does not reject it; its node shows the image error of §17.1. An image that is already stored under the same ID with equal bytes is kept; different bytes reject the archive. Import never replaces or deletes a stored image.
+
+Before anything is replaced, a dialog **Replace Current Notes?** compares the archive with the current notes:
+
+* `“Tree Notes 2026-10-20.zip” (2.5 MB) contains 1,234 nodes and 56 images.`
+* `Your current notes have 987 nodes and 40 images. Importing replaces them, and this cannot be undone.` The counts are those saved when the archive check ends. Without stored notes it says `There are no saved notes in this browser.`; with invalid stored notes, `The notes saved in this browser are invalid and cannot be opened. Importing replaces them.`
+* When images are missing: `3 images that the notes use are not in the archive. Their nodes will show “Image could not be loaded.”`
+
+The dialog's buttons are **Export Current Notes First**, **Replace Notes** and **Cancel**. Cancel is the default button, and Escape also cancels, because replacing the notes is destructive (§1.3). Export Current Notes First runs the export of §24.3 with the dialog still open and shows its progress and result in the dialog; it is hidden when there are no valid stored notes.
+
+**Replace Notes** shows `Replacing Notes…` in the dialog and disables its buttons and Escape. It saves pending edits, then replaces the stored document in one step and reloads the page, which opens the imported notes. The replaced document is not kept elsewhere; Export Current Notes First keeps a copy. Import does not change preferences.
+
+Cancel, at any point before Replace Notes, leaves the notes unchanged. A failure shows `Import failed. <reason>` in the panel until **OK** and leaves the notes unchanged. In both cases the images that the import already stored are removed. When the tab closes or reloads before the notes are replaced, those images are removed the next time Tree opens. The reason names the first problem found, for example:
+
+* `The file is not a Tree notes archive, or it is damaged.` or `The import stopped unexpectedly.`
+* `The archive contains “__MACOSX/._document.json”, which a Tree notes archive cannot contain. Import the original file that Tree exported.`
+* `“attachments/a1.png” is damaged.` or `“attachments/a1.png” is not a usable image. <reason>`
+* `document.json does not contain valid Tree notes. <reason>`
+* `“attachments/a1.png” differs from an image that is already stored with the same ID.`
+* `Your latest changes could not be saved: <reason>` or `Your notes could not be replaced: <reason>`

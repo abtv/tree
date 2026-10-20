@@ -5,10 +5,11 @@ import { requireNode, serializeState, validatePersistedState } from '../domain/d
 import { readEditableContent } from '../renderer/editor-dom'
 import { SAVE_IDLE_MILLISECONDS } from '../application/save-policy'
 import { extractClipboardLinks } from '../infrastructure/main/clipboard'
-import { validateAttachmentBytes, MAX_ATTACHMENT_BYTES } from '../electron/main/ipc-security'
+import { MAX_ATTACHMENT_BYTES } from '../electron/main/ipc-security'
 import { applyAppearance } from './appearance'
+import { validatePngAttachment } from './attachment-validation'
 import { isIPhoneOrIPad } from './device'
-import { openDatabase, readValue } from './storage-schema'
+import { discardStagedImages, openDatabase, readValue, sweepStagedImages } from './storage-schema'
 
 const status = (text: string) => {
   document.getElementById('prototype-save-status')!.textContent = text
@@ -17,10 +18,19 @@ const status = (text: string) => {
   problem.textContent = problem.hidden ? '' : text
 }
 
+/** Storage operations of the editing session that the Data menu needs (PRODUCT §24.4). */
+export interface DataSession {
+  /** Makes later saves and writes fail until the returned function resumes them. */
+  suspendWrites(): () => void
+  /** Removes the images that an unfinished import stored. */
+  discardStagedImages(): Promise<void>
+}
+
 export async function installBrowserPrototype(): Promise<{
   services: EditorServices
   clock: Clock
   vimAvailable: boolean
+  data: DataSession
   connect(store: EditorStore): void
 }> {
   if (window.top !== window.self) throw new Error('Open the prototype directly, outside a frame.')
@@ -43,8 +53,12 @@ export async function installBrowserPrototype(): Promise<{
       .catch(reject)
   })
   const db = await openDatabase()
+  // Only this writer tab may remove what an earlier, unfinished import stored (PRODUCT §24.4).
+  await sweepStagedImages(db).catch(() => {})
+  // While an import replaces the stored notes, this session must not write them (PRODUCT §24.4).
+  let suspended = false
   const guard = () => {
-    if (!active) throw new Error('This editing session is no longer active. Reload the page.')
+    if (!active || suspended) throw new Error('This editing session is no longer active. Reload the page.')
   }
   const read = <T>(store: string, key: string): Promise<T | undefined> => readValue<T>(db, store, key)
   const write = (store: string, key: string, value: unknown): Promise<void> =>
@@ -201,9 +215,7 @@ export async function installBrowserPrototype(): Promise<{
       }
     },
     async writeAttachment(id, bytes) {
-      validateAttachmentBytes(bytes, () => true)
-      const bitmap = await createImageBitmap(new Blob([bytes.slice()], { type: 'image/png' }))
-      bitmap.close()
+      await validatePngAttachment(bytes)
       await write('blobs', id, bytes)
     },
     async cleanupAttachments() {
@@ -280,6 +292,8 @@ export async function installBrowserPrototype(): Promise<{
     if (event.persisted) location.reload()
   })
   window.addEventListener('beforeunload', (event) => {
+    // An import flushed this session before suspending it, then replaced the notes and reloads.
+    if (suspended) return
     const pending = dirty || hasBufferedEdit()
     if (pending) {
       event.preventDefault()
@@ -296,6 +310,15 @@ export async function installBrowserPrototype(): Promise<{
   return {
     vimAvailable,
     services,
+    data: {
+      suspendWrites() {
+        suspended = true
+        return () => {
+          suspended = false
+        }
+      },
+      discardStagedImages: () => discardStagedImages(db),
+    },
     // Use the existing save scheduler without calling its shutdown edit finishers on
     // each autosave. Other editor timers keep their normal delays.
     clock: {

@@ -61,6 +61,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Dark',
     'Data',
     'Export Notes…',
+    'Import Notes…',
     'Saved locally in this browser',
   ])
   await capture(page, 'data-menu-light.png')
@@ -242,5 +243,7 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   })
   const menu = await openMenu(page)
   await expect(menu.getByRole('button', { name: 'Export Notes…', exact: true })).toBeDisabled()
+  // @requirement PRODUCT.md §24.4
+  await expect(menu.getByRole('button', { name: 'Import Notes…', exact: true })).toBeDisabled()
   expect(errors).toEqual([])
 })

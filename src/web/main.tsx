@@ -50,7 +50,7 @@ try {
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-appearance]')) {
     button.onclick = run(() => window.treeApi.setAppearance(button.dataset.appearance as 'system' | 'light' | 'dark'))
   }
-  installDataMenu(store, menu)
+  installDataMenu(store, menu, bridge.data)
   Object.assign(window, { prototypeStore: store })
 } catch (error) {
   const problem = document.getElementById('prototype-problem')!

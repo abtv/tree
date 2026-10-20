@@ -75,8 +75,8 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 | --- | --- | --- | --- |
 | A | Installable app (manifest, icons, publication allowlist, `theme-color`) and one `persist()` request; storage-protection status line. | Icon files from the Product Owner (O-Q4) | Blocked on icons |
 | B1 | ZIP archive core, `fflate@0.8.3`, export worker, "Export Notes…", Data menu block, CSP `worker-src 'self'`, archive ADR, export perf scenario. | — | Done |
-| B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Ready |
-| C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Planned |
+| B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Done |
+| C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Ready |
 | C2 | "Restore from Folder…" through B2's pipeline with a folder source. | B2, C1 | Planned |
 
 Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: after C2 the initiative stays `Awaiting owner acceptance` until the Product Owner accepts the delivered result.
@@ -140,6 +140,16 @@ Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: 
 - **Tests:** unit corpus of synthetic archives (zip bomb, size lies, many entries, traversal and absolute names, backslashes, NUL, mixed case, nested directories, directory entries, duplicates, encrypted, unsupported method, ZIP64 markers, truncation, missing end record, offsets past the end, overlap, local-header mismatch, CRC mismatch, huge comment, invalid UTF-8, invalid document JSON, schema, version or depth, bad or oversize image, missing referenced image, conflicting blob, Finder artifacts); property (export then import is identity; name classifier); seeded fuzz with a time bound; E2E (export in context A, import in context B with `setInputFiles`, confirm, reload, compare text, ids, expansion, location and image bytes; cancel leaves data unchanged; two hostile archives rejected with the head unchanged; injected `IDBObjectStore.prototype.put` failure leaves the head unchanged and staged blobs removed; recovery from an invalid head; real `filechooser` path once).
 - **PRODUCT §22 assessment:** streamed file read in the worker, no main-thread parsing, batched transactions; record measured import time and peak memory.
 - **Acceptance:** tests above; mutation run on the new `src/application` files with survivors reviewed; Reviewer (security focus) and Product Verifier clean.
+
+### Task B2 results (2026-10-20)
+
+- Delivered as specified. PRODUCT §24.4 owns the behavior, accepted archive form and messages; SECURITY records the hostile-archive model; ARCHITECTURE records the import flow and its §22.1 assessment. No ADR: ADR 0022 already decided the reader strategy.
+- Reader: `src/application/notes-archive/zip-reader.ts` (own central-directory parser, local-header check, 16 KiB Deflate slices, size and CRC-32 checks); `import-notes.ts` (document validation, staging, rollback); `crc32.ts`; test-only `src/application/test/zip-builder.ts`. Web: `src/web/archive/zip-inflate.ts`, `import-job.ts`, `src/web/attachment-validation.ts` (shared with `services.ts`), worker and `data-menu.ts`.
+- Delegated choices (O-Q5): the end record must be the last 22 bytes (any comment or trailing bytes reject the archive); extra fields, entry comments and version needed above 2.0 reject it; the image ID cap is 251 characters (the 255-byte file-name limit of the desktop data directory); the worker writes each image with a journal key `import-staged:<id>` in `preferences` (a new preferences key, within D1); the head replacement ends the journal in the same transaction; cancel and failure remove every journaled image, and the next start removes those of a closed tab (review finding); names and `document.json` keep a byte-order mark and are therefore rejected; the dialog's current-note counts are read when the archive check ends; the dialog title is "Replace Current Notes?", buttons Export Current Notes First (leading edge), Replace Notes, and Cancel (default, rightmost); Export Current Notes First keeps the dialog open and reports in it, and is hidden without valid current notes; no message after the reload. PRODUCT §24.4 records the wording.
+- Commit safety: the page flushes, then suspends its own writes (`DataSession.suspendWrites`) before the worker replaces the head, because a later autosave (for example from scrolling) would otherwise write the previous document over the import. A failed commit resumes writes; a worker that stops during the commit causes a reload instead.
+- Review corrections: the native `<dialog>` carries an explicit `role="dialog"`, because the editor's global key handlers (Vim command panel) leave keys only to `[role="dialog"]` targets; the staged-image journal above; BOM rejection; counts read at the end. Accepted as recorded rules or residual risk: a stored non-PNG value under an archive image ID rejects the archive (never overwrite); a worker that stops during the commit reloads without a message; `document.json` is allocated at its declared, limited size before inflation.
+- Measured (`perf/web/import.spec.mjs`, large profile, 259 MiB archive): preparation 2.9 s, replace and reload 0.14 s, no main-thread long task, 1.4 MiB main-thread heap growth. Worker memory is bounded by the central directory, the document and one image.
+- For C1: the folder source of C2 can reuse `prepareNotesImport` by adding a directory-handle `ArchiveFile`-like source; `prepareNotesImport` currently takes an `ArchiveFile`, so C2 needs either a second entry point that accepts a document and an image reader, or a folder adapter. Decide in C2.
 
 ### Task C1 — automatic folder backup (Chromium only)
 
@@ -220,10 +230,10 @@ Possible additional rounds: icon rework, optional Safari or Firefox checks (othe
 
 ## Next task
 
-Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). Then:
+Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). B1 and B2 are done. Then:
 
 - if `src/web/public/icon-512.png`, `icon-192.png` and `apple-touch-icon.png` exist, take **Task A**;
-- otherwise take **Task B2** and leave A blocked on the icons.
+- otherwise take **Task C1** and leave A blocked on the icons.
 
 ## Resume prompt
 

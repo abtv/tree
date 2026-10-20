@@ -26,6 +26,12 @@ export const ARCHIVE_LIMITS: ArchiveLimits = {
   archiveBytes: 2 ** 31 - 1,
 }
 
+/**
+ * The longest image ID an archive may name: `<id>.png` must fit the 255-byte file-name limit of the
+ * desktop data directory, so a longer ID could never come from a valid data directory.
+ */
+export const MAX_ARCHIVE_ATTACHMENT_ID_LENGTH = 251
+
 const LOCAL_HEADER_BYTES = 30
 const DATA_DESCRIPTOR_BYTES = 16
 const CENTRAL_HEADER_BYTES = 46

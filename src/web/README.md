@@ -34,9 +34,10 @@ repository's existing demo Pages workflow remains a separate destination.
 Before publication, explain the storage boundary: the local development origin
 and `https://tree-editor.github.io` have separate browser storage. Existing localhost
 notes stay there and **do not move automatically**. The same applies to different
-browsers and profiles. There is no migration, synchronization, account or import
-in this package; **Export Notes…** writes a copy that can be kept outside the
-browser. Never clear the old site's data to install or update it.
+browsers and profiles. There is no migration, synchronization or account in this
+package. **Export Notes…** writes a copy that can be kept outside the browser, and
+**Import Notes…** on another origin or profile replaces its notes with that copy.
+Never clear the old site's data to install or update it.
 Reserve the destination origin for trusted Tree code; other paths on that origin
 share its storage.
 
@@ -77,6 +78,12 @@ format, limits and messages are defined in
 Keep exported archives somewhere other than the browser profile: they are the
 only copy that survives clearing site data.
 
+**Import Notes…** replaces the notes in this browser with an exported archive,
+after a confirmation that compares both. It accepts only archives as Tree exports
+them; one that the Finder re-packed is rejected, so keep the original file.
+**Export Current Notes First** in the confirmation keeps a copy of the notes that
+will be replaced. Import also replaces stored notes that can no longer be opened.
+
 Apple devices use Cmd shortcuts. Other platforms use Ctrl, with Alt for Option
 and Home/End for line boundaries. The command panel shows the matching labels.
 See [keyboard mappings and exceptions](../../docs/PRODUCT.md#15-keyboard-modifiers-outside-apple-platforms).
@@ -103,7 +110,7 @@ a successful-save dialog. If the browser refuses scripted closure, close the
 saved page with the browser's own controls. A failed save keeps the editor open.
 
 Data stays in the browser unless the user exports it. There is no device
-synchronization or import. Clearing site data or deleting the profile removes the
+synchronization. Clearing site data or deleting the profile removes the
 notes stored in the browser. This version has no offline
 package, recovery generations or persistent-storage request. Browser/OS force
 termination can lose uncommitted work. Full Safari and Dock-app compatibility
@@ -179,13 +186,19 @@ refusal of an invalid stored document, typing during a large export and the
 locked save-failure state. It cancels deterministically by holding the worker
 script request with `page.route`, without a production test hook.
 
-### Browser export performance
+The import spec exports in one context and imports through the real file chooser
+in another, then compares the reloaded head and images. It covers the
+confirmation, Export Current Notes First, cancel and Escape, a Finder-re-packed
+and a damaged archive, a failed head write in the worker (injected by prefixing
+the worker script through `page.route`) and replacing an invalid stored document.
 
-`npm run test:perf -- --project=web` measures **Export Notes…** on a large
-synthetic profile in the built package (`perf/web/export.spec.mjs`). The script
-rebuilds both targets first. It records main-thread long tasks, total blocking
-time, export duration, main-thread heap growth and archive size through
-`perf/results.ts`. It runs locally in visible Chrome and is not part of the
+### Browser archive performance
+
+`npm run test:perf -- --project=web` measures **Export Notes…** and
+**Import Notes…** on a large synthetic profile in the built package
+(`perf/web/export.spec.mjs`, `perf/web/import.spec.mjs`). The script rebuilds
+both targets first. It records main-thread long tasks, total blocking time,
+duration, main-thread heap growth and archive size through `perf/results.ts`. It runs locally in visible Chrome and is not part of the
 scheduled Performance workflow or the release gate.
 
 ### Local Safari performance comparisons

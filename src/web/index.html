@@ -23,13 +23,33 @@
       <hr />
       <span class="menu-label">Data</span>
       <button id="data-export">Export Notes…</button>
+      <button id="data-import">Import Notes…</button>
       <hr />
       <span id="prototype-save-status" role="status">Opening local document…</span>
     </div>
+    <input id="data-import-file" type="file" accept=".zip,application/zip" hidden />
     <div id="data-activity" role="status" hidden>
       <span id="data-activity-text"></span>
       <button id="data-activity-action" type="button"></button>
     </div>
+    <!-- The explicit role lets the editor's global key handlers leave keys to the dialog, as for the menu. -->
+    <dialog
+      id="import-confirm"
+      role="dialog"
+      aria-labelledby="import-confirm-title"
+      aria-describedby="import-confirm-incoming import-confirm-current import-confirm-missing"
+    >
+      <h2 id="import-confirm-title">Replace Current Notes?</h2>
+      <p id="import-confirm-incoming"></p>
+      <p id="import-confirm-current"></p>
+      <p id="import-confirm-missing" hidden></p>
+      <p id="import-confirm-status" role="status"></p>
+      <div class="dialog-buttons">
+        <button id="import-confirm-export" type="button">Export Current Notes First</button>
+        <button id="import-confirm-replace" type="button">Replace Notes</button>
+        <button id="import-confirm-cancel" type="button" class="default-button">Cancel</button>
+      </div>
+    </dialog>
     <div id="prototype-problem" role="alert" hidden></div>
     <div id="root"></div>
     <script type="module" src="/main.tsx"></script>

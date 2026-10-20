@@ -775,7 +775,7 @@ Electron performance tests live in `perf/electron/` and form the `electron` proj
 npm run test:perf -- --project=electron
 ```
 
-The scheduled Performance workflow and `make perf-electron` run the Electron project only. Run the [browser export scenario](../src/web/README.md#browser-export-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
+The scheduled Performance workflow and `make perf-electron` run the Electron project only. Run the [browser archive scenarios](../src/web/README.md#browser-archive-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.

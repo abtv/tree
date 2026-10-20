@@ -57,6 +57,27 @@ implemented in `src/web/services.ts`.
   Nothing is uploaded. The downloaded archive is unencrypted: anyone who can read
   that file can read the notes, and copying it to a synchronized folder sends it
   to that service.
+* **Notes import.** **Import Notes…** treats the chosen file as hostile input. A
+  module worker reads it in slices through its own central-directory parser
+  (`src/application/notes-archive/zip-reader.ts`); fflate only inflates Deflate
+  data. Before any payload is read, the parser requires the end record at the end
+  of the file and rejects ZIP64, encryption, comments, extra fields, split
+  archives, unknown methods, names other than `document.json` and
+  `attachments/<id>.png` (so no traversal, absolute, nested, directory or
+  case-colliding names), sizes above the limits of PRODUCT §24.2, and entries
+  outside the file or overlapping each other or the central directory. Reading an
+  entry checks that its local header repeats the central record, feeds Deflate
+  data in 16 KiB slices, stops at the declared size and requires that size and the
+  CRC-32 to match, so a Deflate bomb allocates at most its declared, limited size.
+  The document must pass the same validation as loading; each referenced image
+  passes the PNG byte, structure and dimension limits and the browser decoder, one
+  image at a time. Names and `document.json` keep a byte-order mark, so it rejects
+  them. Import never overwrites a stored image, replaces the stored head in one
+  transaction only after the user confirms, and removes the images it staged on
+  cancel or failure; a journal written with each image lets the next start remove
+  those of a closed tab, so repeated abandoned imports cannot fill the storage
+  quota. The page suspends its own saves before the worker
+  replaces the head, so no older document is saved over it.
 * **Untrusted content.** Shared rendering escapes node text and link attributes;
   domain normalization accepts only HTTP(S) link destinations. Clipboard HTML is
   reduced to text and link ranges rather than inserted as arbitrary markup.
@@ -72,7 +93,7 @@ implemented in `src/web/services.ts`.
   consistency control, not a barrier against malicious same-origin code.
 
 The current package has no Service Worker, offline package, persistent-storage
-request, recovery generations or import. Adding the website to a browser's
+request or recovery generations. Adding the website to a browser's
 Dock or home screen does not add those protections. Clearing site data, deleting
 the profile or browser storage eviction can remove notes; force termination can
 lose uncommitted work. Browser storage is not a backup; an exported archive kept
@@ -238,6 +259,7 @@ local tests do not establish those controls.
 | --- | --- | --- |
 | Browser package and CSP presence | `scripts/web/build.mts` build policy | `e2e/web/package.spec.mjs` against the built package; this checks CSP presence and the worker directive, not every directive's enforcement |
 | Browser notes export | `src/application/notes-archive/export-notes.test.ts`, `src/web/archive/*.test.ts`, ESLint fflate import restrictions | `e2e/web/export.spec.mjs` against development and built packages |
+| Browser notes import of hostile archives | `src/application/notes-archive/zip-reader.test.ts` and `import-notes.test.ts` (malformed-archive corpus), `src/web/archive/import-job.test.ts` (real Deflate, Deflate bomb, seeded fuzzing), round-trip property | `e2e/web/import.spec.mjs` against development and built packages |
 | Browser storage ownership and failed writes | Shared document validation tests | `e2e/web/storage.spec.mjs` |
 | Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mjs`, `e2e/web/compatibility.spec.mjs` |
 | Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |
