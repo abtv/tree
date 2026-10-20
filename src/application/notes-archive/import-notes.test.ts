@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { serializeState, type TreeNode } from '../../domain/document'
 import { buildZip, memoryFile, passThroughInflater, type ZipBuildEntry } from '../test/zip-builder'
-import { NotesArchiveError } from './archive-policy'
+import { ARCHIVE_LIMITS, NotesArchiveError } from './archive-policy'
 import type { NotesArchiveProgress } from './export-notes'
 import {
   conflictingImageMessage,
@@ -9,6 +9,7 @@ import {
   invalidDocumentMessage,
   invalidImageMessage,
   prepareNotesImport,
+  prepareNotesFromSource,
   summarizeStoredNotes,
   type ImportImageStore,
 } from './import-notes'
@@ -80,6 +81,31 @@ async function rejection(promise: Promise<unknown>): Promise<string> {
 
 // @requirement PRODUCT.md §24.4
 describe('notes archive import preparation', () => {
+  it('applies document, image, count and aggregate limits to a folder byte source before committing', async () => {
+    const bytes = json(headWithImages(['a', 'b']))
+    const source = { readDocument: async () => bytes, readImage: async () => new Uint8Array([1, 2]) }
+    const prepareSource = (limits: Partial<typeof ARCHIVE_LIMITS>, images = memoryStore()) =>
+      prepareNotesFromSource(
+        source,
+        {
+          createInflater: passThroughInflater,
+          validateImage,
+          images,
+        },
+        { ...ARCHIVE_LIMITS, ...limits },
+      )
+    await expect(prepareSource({ documentBytes: bytes.length - 1 })).rejects.toThrow('document.json is larger')
+    await expect(prepareSource({ entries: 2 })).rejects.toThrow('more images')
+    await expect(prepareSource({ imageBytes: 1 })).rejects.toThrow('attachments/a.png')
+    const images = memoryStore()
+    await expect(prepareSource({ archiveBytes: bytes.length + 3 }, images)).rejects.toThrow('attachments/b.png')
+    expect(images.events).toEqual(['write a', 'remove a'])
+    // Exact limits are accepted, including the document entry in the entry count.
+    await expect(
+      prepareSource({ documentBytes: bytes.length, imageBytes: 2, archiveBytes: bytes.length + 4, entries: 3 }),
+    ).resolves.toMatchObject({ imageCount: 2 })
+  })
+
   it('validates the document and stores referenced images without replacing the head', async () => {
     const head = headWithImages(['c', 'a', 'missing', 'b', 'a'])
     const images = memoryStore({ b: new Uint8Array([2, 2]) })

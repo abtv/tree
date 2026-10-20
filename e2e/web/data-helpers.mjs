@@ -160,3 +160,31 @@ export async function readDownloadedArchive(download) {
   const bytes = new Uint8Array(await readFile(await download.path()))
   return { bytes, names: listCentralEntries(bytes).map((entry) => entry.name), entries: readArchive(bytes) }
 }
+
+/** Replaces only the native picker; directory handles, cloning, workers and writes stay real. */
+export function installBackupPicker(context) {
+  return context.addInitScript(() => {
+    window.backupPickerCalls = 0
+    window.backupFolderName = 'Tree Backup'
+    window.showDirectoryPicker = async () => {
+      window.backupPickerCalls += 1
+      return (await navigator.storage.getDirectory()).getDirectoryHandle(window.backupFolderName, { create: true })
+    }
+  })
+}
+
+export function readBackup(page, name = 'Tree Backup') {
+  return page.evaluate(async (name) => {
+    const folder = await (await navigator.storage.getDirectory()).getDirectoryHandle(name)
+    const files = {}
+    for await (const [fileName, handle] of folder.entries()) {
+      if (handle.kind === 'file') files[fileName] = await (await handle.getFile()).text()
+      else {
+        for await (const [imageName, image] of handle.entries()) {
+          files[`${fileName}/${imageName}`] = [...new Uint8Array(await (await image.getFile()).arrayBuffer())]
+        }
+      }
+    }
+    return files
+  }, name)
+}

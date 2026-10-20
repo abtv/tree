@@ -24,8 +24,10 @@
       <span class="menu-label">Data</span>
       <button id="data-export">Export Notes…</button>
       <button id="data-import">Import Notes…</button>
+      <button id="data-backup" hidden>Back Up to Folder…</button>
       <hr />
       <span id="prototype-save-status" role="status">Opening local document…</span>
+      <span id="backup-status" role="status" hidden></span>
     </div>
     <input id="data-import-file" type="file" accept=".zip,application/zip" hidden />
     <div id="data-activity" role="status" hidden>
@@ -51,6 +53,23 @@
       </div>
     </dialog>
     <div id="prototype-problem" role="alert" hidden></div>
+    <dialog
+      id="backup-confirm"
+      role="dialog"
+      aria-labelledby="backup-confirm-title"
+      aria-describedby="backup-confirm-text"
+    >
+      <h2 id="backup-confirm-title"></h2>
+      <p id="backup-confirm-text"></p>
+      <div class="dialog-buttons">
+        <button id="backup-confirm-restore" type="button">Restore from This Folder</button>
+        <button id="backup-confirm-replace" type="button">Replace Backup with Current Notes</button>
+        <button id="backup-confirm-resume" type="button" hidden>Resume Backing Up</button>
+        <button id="backup-confirm-stop" type="button" hidden>Stop Backing Up</button>
+        <button id="backup-confirm-choose" type="button">Choose Another Folder</button>
+        <button id="backup-confirm-cancel" type="button" class="default-button">Cancel</button>
+      </div>
+    </dialog>
     <div id="root"></div>
     <script type="module" src="/main.tsx"></script>
   </body>

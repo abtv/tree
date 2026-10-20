@@ -20,7 +20,7 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 
 ## Authorization
 
-- Approval covers the whole initiative (tasks A, B1, B2, C1, C2) with the owner decisions below, recorded on 2026-10-20. Selected coding tool: Claude Code.
+- Approval covers the whole initiative (tasks A, B1, B2, C1, C2) with the owner decisions below, recorded on 2026-10-20. Selected coding tool: Codex (explicitly authorized by the owner for continuation on 2026-10-20, superseding Claude Code).
 - The Product Owner approved the delegated decision area below.
 - Reserved for the Product Owner: a new npm script that needs permission-configuration edits (`opencode.json`, `.codex/rules/*`, `.claude/settings.json`); changing the archive layout; scope expansion; publication.
 - Agents must not edit `.claude/settings.json`. If Chrome cannot start in the Claude Code sandbox, report the blocker and the owner's supported action.
@@ -76,10 +76,10 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 | A | Installable app (manifest, icons, publication allowlist, `theme-color`) and one `persist()` request; storage-protection status line. | Icon files from the Product Owner (O-Q4) | Blocked on icons |
 | B1 | ZIP archive core, `fflate@0.8.3`, export worker, "Export Notes…", Data menu block, CSP `worker-src 'self'`, archive ADR, export perf scenario. | — | Done |
 | B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Done |
-| C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Ready |
-| C2 | "Restore from Folder…" through B2's pipeline with a folder source. | B2, C1 | Planned |
+| C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Done |
+| C2 | "Restore from Folder…" through B2's pipeline with a folder source. | B2, C1 | Ready |
 
-Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: after C2 the initiative stays `Awaiting owner acceptance` until the Product Owner accepts the delivered result.
+Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: after all five tasks the initiative stays `Awaiting owner acceptance` until the Product Owner accepts the delivered result.
 
 ### Common validation block (every task)
 
@@ -163,10 +163,21 @@ Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: 
 
 ### Task C2 — restore from folder (Chromium only)
 
+C1 already delivered `folder-source.ts`, its fake-handle tests, `prepareNotesFromSource`, the worker's `restore` request, source byte counts and the shared confirmation/commit pipeline, because C1's approved existing-folder dialog needs Restore from This Folder. Reuse those instead of implementing a second pipeline. C2 still owns the standalone menu command and clean-profile/invalid-head recovery and failure E2E. Trace active-backup/source-folder races during restore; C1's restore entry is reached only with backup off or paused.
+
 - **Files:** `src/web/archive/folder-source.ts` (reads `document.json` and referenced `attachments/<id>.png` from a read-only directory handle into the B2 pipeline) with fake-handle tests; `src/web/data-menu.ts`; `e2e/web/restore.spec.mjs`; docs (PRODUCT §24.6, README).
 - **Constraints:** same validation, limits and confirmation as import (PRODUCT §20.7, O-Q2a); `showDirectoryPicker({ mode: 'read' })`; other folder content is ignored (the reject-everything-else rule applies to archives only); no startup prompt (O-Q3b).
 - **Tests:** unit with fake handles (missing file, invalid document, bad image, conflicting blob); E2E (back up to OPFS, delete the IndexedDB database, reload, restore through the stubbed picker, compare; recovery from an invalid head; failure leaves notes untouched).
-- **Acceptance:** tests above; Reviewer and Product Verifier clean. Then move lasting knowledge into PRODUCT, ARCHITECTURE, SECURITY and README, set the initiative to `Awaiting owner acceptance`.
+- **Acceptance:** tests above; Reviewer and Product Verifier clean. Move lasting knowledge into PRODUCT, ARCHITECTURE, SECURITY and README. Once A is also done, set the initiative to `Awaiting owner acceptance`; missing icons do not waive A or final acceptance.
+
+### Task C1 results (2026-10-20)
+
+- Delivered automatic Chromium folder backup, saved notifications, worker sequencing, persisted handle, permission queries and click-only Resume, status and attention dot, occupied-folder choices, and ADR 0023. One primary implementation session used. No dependency, permission configuration, Electron or renderer runtime changes.
+- Delegated choices (O-Q5): fixed deadlines prevent ongoing typing from starving backup; runs start at least the PRODUCT §24.5 interval apart, with folder I/O adding to lag. Paused backup changes the existing control to Resume Backing Up… and offers Resume, Stop, Choose Another Folder and default Cancel. Stop forgets the handle and keeps files. Choosing another folder preserves the previous choice until the new one is confirmed; cancelling preserves it across reload. An existing-folder Restore uses the shared import validation, journal, confirmation and commit pipeline, and does not enable backup. PRODUCT §24.5 owns these behaviors and wording.
+- Durability edges: images close before document replacement; startup retries empty files left by failed image writes; case-colliding image names fail before overwriting a completed image. Missing stored images are skipped and counted. No filesystem delete operation exists in the worker destination. Existing completed images remain immutable by identity; external edits and concurrent writers are unsupported.
+- Measured on the large synthetic profile: p95 input-to-paint about 32 ms both off and on, no main-thread long tasks, backup lag 6.2–7.2 seconds after the final save, two compact document writes per typing sample, no image rewrites. OPFS establishes API wiring and main-thread cost, not physical disk speed or native permission persistence. The performance suite owns its numeric guards and artifacts.
+- Standard checks, audit, full built-browser suite and affected final built/development backup cases pass. Scoped mutation run: 216 mutants, 211 killed, one timeout, four benign survivors (redundant stopped checks, unspecified sort order and clearing an absent timer). Independent Reviewer and Product Verifier found no meaningful issues. Electron baseline 856/856 at `857a783` remains valid: changed runtime modules are browser-only, confirmed by review.
+- Linux Chromium container validation remains blocked: the dependency image matching the current lockfile is absent. The owner must run `make setup` before that separately gated stage. Do not count this stage as passed. Native folder selection and browser-restart permission behavior remain O4 in owner round 2 after C2; they are not a pre-commit gate.
 
 ## Minor gaps resolved by the planner
 
@@ -230,10 +241,10 @@ Possible additional rounds: icon rework, optional Safari or Firefox checks (othe
 
 ## Next task
 
-Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). B1 and B2 are done. Then:
+Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). B1, B2 and C1 are done; Codex also verified Chrome, built CSP, OPFS worker writes and handle persistence. Then:
 
 - if `src/web/public/icon-512.png`, `icon-192.png` and `apple-touch-icon.png` exist, take **Task A**;
-- otherwise take **Task C1** and leave A blocked on the icons.
+- otherwise take **Task C2** and leave A blocked on the icons.
 
 ## Resume prompt
 

@@ -115,24 +115,57 @@ export async function prepareNotesImport(
   const entries = await readArchiveDirectory(file, limits)
   const documentEntry = entries.find((entry) => entry.attachmentId === undefined)
   if (documentEntry === undefined) throw new NotesArchiveError(NO_DOCUMENT_MESSAGE)
-  const { head, document } = parseDocument(await readArchiveEntry(file, documentEntry, ports.createInflater))
   const imageEntries = new Map(entries.flatMap((entry) => (entry.attachmentId ? [[entry.attachmentId, entry]] : [])))
+  return prepareNotesFromSource(
+    {
+      readDocument: () => readArchiveEntry(file, documentEntry, ports.createInflater),
+      readImage: async (id) => {
+        const entry = imageEntries.get(id)
+        return entry === undefined ? undefined : readArchiveEntry(file, entry, ports.createInflater)
+      },
+    },
+    ports,
+    limits,
+  )
+}
+
+/** Validated byte source shared by ZIP import and explicitly chosen folder restore. */
+export interface NotesImportSource {
+  readDocument(): Promise<Uint8Array>
+  readImage(id: AttachmentId): Promise<Uint8Array | undefined>
+  /** Present for a folder: the total bytes read, available after preparation. */
+  readonly size?: number
+}
+
+export async function prepareNotesFromSource(
+  source: NotesImportSource,
+  ports: NotesImportPorts,
+  limits: ArchiveLimits = ARCHIVE_LIMITS,
+): Promise<PreparedNotesImport> {
+  const documentBytes = await source.readDocument()
+  if (documentBytes.byteLength > limits.documentBytes)
+    throw new NotesArchiveError('document.json is larger than Tree allows.')
+  const { head, document } = parseDocument(documentBytes)
   const ids = [...collectAttachmentIds(document)].sort()
+  if (ids.length >= limits.entries) throw new NotesArchiveError('The notes have more images than Tree allows.')
+  let totalBytes = documentBytes.byteLength
 
   const stagedIds: AttachmentId[] = []
   let imageCount = 0
   try {
     ports.onProgress?.({ imagesDone: 0, imageCount: ids.length })
     for (const [index, id] of ids.entries()) {
-      const entry = imageEntries.get(id)
-      if (entry !== undefined) {
-        const bytes = await readArchiveEntry(file, entry, ports.createInflater)
+      const bytes = await source.readImage(id)
+      const name = `attachments/${id}.png`
+      if (bytes !== undefined) {
+        totalBytes += bytes.byteLength
+        if (bytes.byteLength > limits.imageBytes || totalBytes > limits.archiveBytes) {
+          throw new NotesArchiveError(`“${name}” is larger than Tree allows.`)
+        }
         try {
           await ports.validateImage(bytes)
         } catch (error) {
-          throw new NotesArchiveError(
-            invalidImageMessage(entry.name, error instanceof Error ? error.message : String(error)),
-          )
+          throw new NotesArchiveError(invalidImageMessage(name, error instanceof Error ? error.message : String(error)))
         }
         const stored = await ports.images.readImage(id)
         if (stored === undefined) {
@@ -140,7 +173,7 @@ export async function prepareNotesImport(
           stagedIds.push(id)
           await ports.images.writeImage(id, bytes)
         } else if (!sameBytes(stored, bytes)) {
-          throw new NotesArchiveError(conflictingImageMessage(entry.name))
+          throw new NotesArchiveError(conflictingImageMessage(name))
         }
         imageCount += 1
       }

@@ -20,6 +20,8 @@ const status = (text: string) => {
 
 /** Storage operations of the editing session that the Data menu needs (PRODUCT §24.4). */
 export interface DataSession {
+  /** Fired only after a head transaction completes successfully; no document is copied. */
+  onSaved(listener: () => void): () => void
   /** Makes later saves and writes fail until the returned function resumes them. */
   suspendWrites(): () => void
   /** Removes the images that an unfinished import stored. */
@@ -57,6 +59,7 @@ export async function installBrowserPrototype(): Promise<{
   await sweepStagedImages(db).catch(() => {})
   // While an import replaces the stored notes, this session must not write them (PRODUCT §24.4).
   let suspended = false
+  const savedListeners = new Set<() => void>()
   const guard = () => {
     if (!active || suspended) throw new Error('This editing session is no longer active. Reload the page.')
   }
@@ -164,6 +167,7 @@ export async function installBrowserPrototype(): Promise<{
       status('Saving…')
       try {
         await write('document', 'head', value)
+        for (const listener of savedListeners) listener()
         savedDocument = value.document
         saveFailed = false
         updateStatus()
@@ -311,6 +315,12 @@ export async function installBrowserPrototype(): Promise<{
     vimAvailable,
     services,
     data: {
+      onSaved(listener) {
+        savedListeners.add(listener)
+        return () => {
+          savedListeners.delete(listener)
+        }
+      },
       suspendWrites() {
         suspended = true
         return () => {

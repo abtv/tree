@@ -1,9 +1,11 @@
 import { NotesArchiveError } from '../../application/notes-archive/archive-policy'
 import {
   prepareNotesImport,
+  prepareNotesFromSource,
   summarizeStoredNotes,
   type ImportImageStore,
   type PreparedNotesImport,
+  type NotesImportSource,
 } from '../../application/notes-archive/import-notes'
 import type { ArchiveFile } from '../../application/notes-archive/zip-reader'
 import type { ArchiveWorkerPost } from '../workers/archive-protocol'
@@ -16,7 +18,7 @@ export interface ImportJobStorage extends ImportImageStore {
 }
 
 export interface ImportJob {
-  prepare(file: ArchiveFile): Promise<void>
+  prepare(file: ArchiveFile | NotesImportSource): Promise<void>
   commit(): Promise<void>
 }
 
@@ -42,21 +44,28 @@ export function createImportJob(
     async prepare(file) {
       let reportedPercent = -1
       try {
-        prepared = await prepareNotesImport(file, {
+        const ports = {
           createInflater,
           validateImage,
           images: storage,
-          onProgress: ({ imagesDone, imageCount }) => {
+          onProgress: ({ imagesDone, imageCount }: { imagesDone: number; imageCount: number }) => {
             const percent = imageCount === 0 ? 100 : Math.floor((imagesDone * 100) / imageCount)
             if (percent === reportedPercent) return
             reportedPercent = percent
             post({ type: 'progress', imagesDone, imageCount })
           },
-        })
+        }
+        prepared =
+          'readDocument' in file ? await prepareNotesFromSource(file, ports) : await prepareNotesImport(file, ports)
         // Counted last, so the comparison includes edits saved while the archive was checked.
         const current = summarizeStoredNotes(await storage.readHead())
         const { nodeCount, imageCount, missingImageCount } = prepared
-        post({ type: 'prepared', incoming: { nodeCount, imageCount, missingImageCount }, current })
+        post({
+          type: 'prepared',
+          incoming: { nodeCount, imageCount, missingImageCount },
+          current,
+          ...('readDocument' in file && file.size !== undefined ? { sourceBytes: file.size } : {}),
+        })
       } catch (error) {
         post({ type: 'error', message: importFailureMessage(error) })
       }

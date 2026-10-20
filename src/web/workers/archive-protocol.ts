@@ -9,6 +9,7 @@ import type { NotesCounts } from '../../application/notes-archive/import-notes'
 export type ArchiveWorkerRequest =
   | { readonly type: 'export' }
   | { readonly type: 'import'; readonly file: Blob }
+  | { readonly type: 'restore'; readonly folder: FileSystemDirectoryHandle }
   /** Replaces the stored head with the prepared document; valid only after `prepared`. */
   | { readonly type: 'commit-import' }
 
@@ -21,7 +22,12 @@ export type ArchiveWorkerMessage =
   /** Archive bytes in order; the buffer is transferred, not copied. */
   | { readonly type: 'chunk'; readonly chunk: ArrayBuffer }
   | { readonly type: 'done'; readonly summary: NotesArchiveSummary }
-  | { readonly type: 'prepared'; readonly incoming: IncomingNotes; readonly current: NotesCounts | 'none' | 'invalid' }
+  | {
+      readonly type: 'prepared'
+      readonly incoming: IncomingNotes
+      readonly current: NotesCounts | 'none' | 'invalid'
+      readonly sourceBytes?: number
+    }
   | { readonly type: 'committed' }
   | { readonly type: 'error'; readonly message: string }
 

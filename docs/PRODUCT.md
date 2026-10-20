@@ -1877,7 +1877,7 @@ The browser version keeps notes in the storage of one browser profile and origin
 
 The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They have no keyboard shortcuts and no command-panel entries, and Tree never prompts for them at startup.
 
-Nothing in this section sends notes over the network. Notes leave browser storage only as a file that the user chose to create.
+Nothing in this section sends notes over the network. Notes leave browser storage only as a file or folder that the user chose.
 
 ### 24.2 Notes Archive
 
@@ -1916,6 +1916,8 @@ Export produces no file and leaves the notes unchanged when:
 
 A failure panel stays until **OK**. While the save-failure message of §16.2 is shown at the lower edge, the panel appears at the upper right below the menu button instead, so both stay visible.
 
+In a browser that supports folder backup (§24.5), an archive-limit refusal adds `Use Back Up to Folder… instead.`
+
 ### 24.4 Import
 
 **Import Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while an export or another import runs. It stays available when the stored document cannot be opened, so an archive can replace invalid stored notes.
@@ -1951,3 +1953,25 @@ Cancel, at any point before Replace Notes, leaves the notes unchanged. A failure
 * `document.json does not contain valid Tree notes. <reason>`
 * `“attachments/a1.png” differs from an image that is already stored with the same ID.`
 * `Your latest changes could not be saved: <reason>` or `Your notes could not be replaced: <reason>`
+
+### 24.5 Automatic Folder Backup
+
+**Back Up to Folder…** appears in the Data block only when the browser provides a directory picker and writable file handles (Chromium-based browsers). It has no shortcut or command-panel entry. Choosing it opens a read/write folder picker. Cancelling leaves the backup choice and all files unchanged. It is disabled while another Data operation runs or editing is locked (§16.2).
+
+A new folder starts a backup after pending edits are saved and the folder choice is stored. The choice belongs to this browser profile and origin, in the existing preferences store. An active backup changes the command to **Stop Backing Up**. Stopping removes the choice and stops the worker; it never removes files. Choose Back Up to Folder… again to change folders.
+
+If the chosen folder contains `document.json`, Tree opens **This Folder Already Contains Notes** with the folder name and an explanation of replacement. It offers **Restore from This Folder**, **Replace Backup with Current Notes**, **Choose Another Folder**, and default **Cancel**. Escape cancels. Nothing is overwritten before an explicit Replace choice. Unrelated folder content and existing image files are kept.
+
+Restore from This Folder reads only `document.json` and its referenced `attachments/<id>.png` files. It uses the validation, limits, staging, image-conflict checks and Replace Current Notes? confirmation of §24.4. The comparison names the folder and the total size of these files, and says `Restoring replaces them`. Missing images are reported as absent from the folder. Cancel and failure keep current notes unchanged. Restore does not enable automatic backup.
+
+The worker makes one backup at startup, then coalesces successful browser saves. Runs start at least 10 seconds apart, with a deadline that continuous typing cannot postpone. A saved version waits at most 10 seconds for the next run when no run is in flight; folder I/O time adds to this delay. Closing the page stops the worker without waiting or warning; saved notes remain in IndexedDB and the next start copies them.
+
+The folder uses the desktop data-directory layout (§24.2), without ZIP compression or preferences. Each run reads one saved head and writes compact `document.json`. The worker scans `attachments/` once at startup and writes each missing referenced image once, closing each file before writing the document. An image-write failure leaves the previous document intact. A referenced image missing from browser storage is skipped and counted, as in export. Backup never deletes files or rewrites known image files.
+
+An empty image file left by a failed write is not a completed image; the next startup retries it. An image name that differs only in letter case from an existing file rejects the run before overwriting it, with a message to choose a different folder. This protects case-insensitive destination filesystems.
+
+The menu footer shows muted backup status: `Folder backup is off.`, `Backing up to “Tree Backup”…`, or `Backed up to “Tree Backup”.` Missing images add their count and say they were not included. Failures say `Backup failed. <reason>`, distinguishing a missing folder or full destination. They retry at the same interval and on later saved versions. Failures affect backup only; browser editing and saving remain available.
+
+Startup checks permission without prompting. If access is not granted, the footer says `Backup paused — permission needed. Choose Resume Backing Up…`, and the command becomes **Resume Backing Up…**. Its dialog offers **Resume Backing Up**, **Stop Backing Up**, **Choose Another Folder**, and default **Cancel**. Only the Resume click requests write permission. Worker startup failures also offer Resume. A small dot and accessible attention label on the ellipsis button appear only for failure or permission-needed states and clear after success or stopping.
+
+Use one backup folder for one browser profile on one computer. Two computers writing the same folder, including through iCloud Drive, can overwrite each other's notes. Selecting a synchronized folder lets that service copy the unencrypted notes off the machine. Tree itself performs no network transfer. Browser folder writes do not provide desktop recovery generations or a power-loss guarantee.

@@ -62,7 +62,9 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Data',
     'Export Notes…',
     'Import Notes…',
+    'Back Up to Folder…',
     'Saved locally in this browser',
+    'Folder backup is off.',
   ])
   await capture(page, 'data-menu-light.png')
   await page.setViewportSize({ width: 390, height: 760 })

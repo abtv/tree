@@ -3,6 +3,7 @@ import type { NotesArchiveSummary } from '../application/notes-archive/export-no
 import type { NotesCounts } from '../application/notes-archive/import-notes'
 import type { DataSession } from './services'
 import type { ArchiveWorkerMessage, ArchiveWorkerRequest, IncomingNotes } from './workers/archive-protocol'
+import { installFolderBackup, supportsFolderBackup } from './backup/backup-controller'
 
 // Keep the object URL until the browser has taken the download.
 const DOWNLOAD_URL_LIFETIME_MILLISECONDS = 60_000
@@ -63,21 +64,23 @@ export function importConfirmationText(
   fileBytes: number,
   incoming: IncomingNotes,
   current: NotesCounts | 'none' | 'invalid',
+  restoring = false,
 ): ImportConfirmationText {
+  const action = restoring ? 'Restoring' : 'Importing'
   return {
     incoming: `“${fileName}” (${fileSizeText(fileBytes)}) contains ${notesText(incoming)}.`,
     current:
       current === 'none'
         ? 'There are no saved notes in this browser.'
         : current === 'invalid'
-          ? 'The notes saved in this browser are invalid and cannot be opened. Importing replaces them.'
-          : `Your current notes have ${notesText(current)}. Importing replaces them, and this cannot be undone.`,
+          ? `The notes saved in this browser are invalid and cannot be opened. ${action} replaces them.`
+          : `Your current notes have ${notesText(current)}. ${action} replaces them, and this cannot be undone.`,
     missing:
       incoming.missingImageCount === 0
         ? undefined
         : incoming.missingImageCount === 1
-          ? '1 image that the notes use is not in the archive. Its node will show “Image could not be loaded.”'
-          : `${incoming.missingImageCount.toLocaleString('en-US')} images that the notes use are not in the archive. Their nodes will show “Image could not be loaded.”`,
+          ? `1 image that the notes use is not in the ${restoring ? 'folder' : 'archive'}. Its node will show “Image could not be loaded.”`
+          : `${incoming.missingImageCount.toLocaleString('en-US')} images that the notes use are not in the ${restoring ? 'folder' : 'archive'}. Their nodes will show “Image could not be loaded.”`,
   }
 }
 
@@ -168,7 +171,12 @@ function startExport(store: EditorStore, update: (state: ExportUpdate) => void):
         } else if (message.type === 'progress') {
           update({ state: 'running', text: exportProgressText(message.imagesDone, message.imageCount) })
         } else if (message.type === 'error') {
-          fail(message.message)
+          fail(
+            message.message +
+              (message.message.endsWith('as one archive.') && supportsFolderBackup()
+                ? ' Use Back Up to Folder… instead.'
+                : ''),
+          )
         } else if (message.type === 'done') {
           stop()
           download(archive, fileName)
@@ -211,6 +219,11 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     const state = store.getSnapshot()
     return state.status === 'ready' && state.persistenceLocked === true
   }
+  installFolderBackup(session, menu, {
+    available: () => !running && !locked(),
+    restore: (folder) => startImport(folder),
+    flush: () => store.flushPersistence(),
+  })
   menu.addEventListener('beforetoggle', (event) => {
     if ((event as ToggleEvent).newState !== 'open') return
     exportButton.disabled = running || locked()
@@ -282,7 +295,9 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
    * the head is replaced, every failure or cancel removes the staged images, and the next start
    * removes those of a tab that closed (PRODUCT §24.4).
    */
-  async function startImport(file: File): Promise<void> {
+  async function startImport(file: File | FileSystemDirectoryHandle): Promise<void> {
+    if (running || locked()) return
+    const restoring = !(file instanceof File)
     running = true
     clearTimeout(hideTimer)
     let active = true
@@ -310,7 +325,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     const fail = (message: string) => {
       if (!active) return
       stop()
-      panel.show(`Import failed. ${message}`, 'OK', () => panel.hide())
+      panel.show(`${restoring ? 'Restore' : 'Import'} failed. ${message}`, 'OK', () => panel.hide())
     }
     const replace = async () => {
       if (!active) return
@@ -360,7 +375,13 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         } else if (message.type === 'prepared') {
           panel.hide()
           importDialog.open(
-            importConfirmationText(file.name, file.size, message.incoming, message.current),
+            importConfirmationText(
+              file.name,
+              file instanceof File ? file.size : (message.sourceBytes ?? 0),
+              message.incoming,
+              message.current,
+              restoring,
+            ),
             typeof message.current === 'object',
           )
         } else if (message.type === 'committed') {
@@ -378,7 +399,11 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         else fail('The import stopped unexpectedly.')
       },
     )
-    worker?.postMessage({ type: 'import', file } satisfies ArchiveWorkerRequest)
+    worker?.postMessage(
+      file instanceof File
+        ? ({ type: 'import', file } satisfies ArchiveWorkerRequest)
+        : ({ type: 'restore', folder: file } satisfies ArchiveWorkerRequest),
+    )
   }
 }
 

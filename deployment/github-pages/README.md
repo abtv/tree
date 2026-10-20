@@ -122,6 +122,10 @@ not clear that site's storage. There is no account, synchronization or automatic
 migration in this version. **Export Notes…** in the localhost menu downloads a
 copy of those notes as a ZIP archive; keep it before relying on the new site.
 **Import Notes…** on the new site replaces its notes with that archive.
+In Chromium, **Back Up to Folder…** can keep a separate folder copy; its handle
+and permissions belong to that profile and origin. Changing origins does not
+transfer the backup choice. Use one folder for one profile on one computer;
+sharing a writable backup through iCloud Drive can cause conflicting writers.
 
 After access setup, push the intended source commits to main. In source Actions,
 wait for **Browser release** and its **Release gate** and transfer job. In target

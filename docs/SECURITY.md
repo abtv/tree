@@ -57,6 +57,18 @@ implemented in `src/web/services.ts`.
   Nothing is uploaded. The downloaded archive is unencrypted: anyone who can read
   that file can read the notes, and copying it to a synchronized folder sends it
   to that service.
+* **Folder backup.** In Chromium, an explicit picker grants a directory handle,
+  saved under `backup-folder` in the existing preferences store. Startup queries
+  permission without prompting; only a Resume click requests it again. The
+  same-origin backup worker reads IndexedDB and writes missing images before
+  replacing `document.json`; it never deletes files. Stopping forgets the handle
+  and terminates the worker. The page meta CSP does not apply inside worker
+  scripts: the packaged backup worker makes no network requests and evaluates no
+  received code. Folder contents are unencrypted; choosing a synchronized folder
+  lets that service transfer them. Use one folder for one profile on one computer;
+  concurrent writers or external folder edits are unsupported. The Restore choice
+  treats the folder as hostile, reads only the document and referenced images,
+  and uses the import validation, staging and explicit replacement confirmation.
 * **Notes import.** **Import Notes…** treats the chosen file as hostile input. A
   module worker reads it in slices through its own central-directory parser
   (`src/application/notes-archive/zip-reader.ts`); fflate only inflates Deflate
@@ -97,7 +109,8 @@ request or recovery generations. Adding the website to a browser's
 Dock or home screen does not add those protections. Clearing site data, deleting
 the profile or browser storage eviction can remove notes; force termination can
 lose uncommitted work. Browser storage is not a backup; an exported archive kept
-outside the browser profile is. Current compatibility and
+outside the browser profile is; Chromium folder backup provides another copy,
+subject to its reported permission and write status. Current compatibility and
 save limitations are owned by [Browser version](../src/web/README.md) and
 [the browser requirements](PRODUCT.md#14-browser-static-hosting-checkpoint).
 

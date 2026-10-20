@@ -578,6 +578,18 @@ Import performance assessment (`docs/PRODUCT.md` §22.1): import writes each new
 
 ---
 
+### Browser folder backup
+
+Folder backup follows [ADR 0023](decisions/0023-browser-folder-backup.md) and PRODUCT §24.5. `src/application/folder-backup.ts` owns sequencing, fixed-deadline coalescing, retries and status behind source, destination and clock ports. The destination has no delete operation. `src/web/backup/folder-destination.ts` implements writes with `createWritable` and `close`, aborting a failed stream; images close before the document is opened. The worker scans image names once, excludes empty files left by failed writes, and adds a name only after its successful write. A folded-name set rejects case collisions before overwriting an image on macOS. Attachment IDs remain immutable; external edits of an active backup folder are unsupported.
+
+`src/web/backup/backup-controller.ts` owns the picker, the `backup-folder` preference handle, permission queries and click-only permission requests, worker lifecycle and status UI. `DataSession.onSaved` in `services.ts` fires after a successful head transaction. It sends only `{ type: 'saved' }` to the long-lived same-origin module worker. The worker reads the latest head in one short read-only IndexedDB transaction, with one subsequent read per image. Page shutdown terminates it. Browser storage identity, schema and editing ownership do not change.
+
+The nonempty-folder Restore choice reuses the import journal and commit pipeline. `prepareNotesFromSource` owns the shared validation and staging; the ZIP reader remains responsible for ZIP structure and CRC checks. `src/web/archive/folder-source.ts` checks sizes before allocation, reads only referenced files, and treats only NotFound as a missing image. The page receives counts and byte size, never document content. Restoring a folder does not enable backup.
+
+Performance assessment (PRODUCT §22.1): each successful save adds one constant-size worker message; the editor never serializes or traverses content for backup. A run costs O(document bytes) and O(new image bytes), with one document write per interval and one write per missing image. Memory is the startup image-name set, one document, and one image, with no per-edit growth. Handle persistence writes once on enable and deletes one preference on stop. `perf/web/backup.spec.mjs` compares alternating backup-off/on typing in a large profile and records paint latency, long tasks, save time, backup lag, bytes per minute and heap growth. OPFS tests establish API wiring and main-thread cost, not physical disk speed or native permission persistence.
+
+---
+
 ## 14. Attachments
 
 Image attachments are stored separately from the document JSON.

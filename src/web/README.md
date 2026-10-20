@@ -75,14 +75,31 @@ document and its referenced images, in the layout of the desktop data directory.
 A module worker writes the archive, so editing continues meanwhile. The archive
 format, limits and messages are defined in
 [the browser data-safety requirements](../../docs/PRODUCT.md#24-browser-data-safety).
-Keep exported archives somewhere other than the browser profile: they are the
-only copy that survives clearing site data.
+Keep exported archives somewhere other than the browser profile so they survive
+clearing site data.
 
 **Import Notes…** replaces the notes in this browser with an exported archive,
 after a confirmation that compares both. It accepts only archives as Tree exports
 them; one that the Finder re-packed is rejected, so keep the original file.
 **Export Current Notes First** in the confirmation keeps a copy of the notes that
 will be replaced. Import also replaces stored notes that can no longer be opened.
+
+In Chromium-based browsers, **Back Up to Folder…** copies saved notes and images
+to a chosen folder in the desktop data-directory layout. It runs in a worker;
+the menu footer reports success, permission needs or failure. **Stop Backing Up**
+forgets the folder choice and leaves its files intact. An existing `document.json`
+requires an explicit choice to replace the backup, restore its notes through the
+import confirmation, or choose another folder. Restore does not enable backup.
+Permission is checked without prompting at startup; a paused backup requires a
+**Resume Backing Up…** click. Native folder permission persistence across browser
+restarts remains an owner verification item; OPFS automation does not establish it.
+
+Use a separate backup folder for each profile and computer. Two Macs writing the
+same folder, including through iCloud Drive, can overwrite each other's notes.
+Choosing a synchronized folder lets that service copy the unencrypted notes.
+Tree never deletes backup files or sends them over the network. Files left in a
+backup folder can accumulate as images are removed from notes. Do not edit an
+active backup folder externally. See PRODUCT §24.5 for timing and failure rules.
 
 Apple devices use Cmd shortcuts. Other platforms use Ctrl, with Alt for Option
 and Home/End for line boundaries. The command panel shows the matching labels.
@@ -109,7 +126,7 @@ Tree's Quit command saves pending edits and then requests window closure without
 a successful-save dialog. If the browser refuses scripted closure, close the
 saved page with the browser's own controls. A failed save keeps the editor open.
 
-Data stays in the browser unless the user exports it. There is no device
+Data stays in the browser unless the user exports it or chooses a backup folder. There is no device
 synchronization. Clearing site data or deleting the profile removes the
 notes stored in the browser. This version has no offline
 package, recovery generations or persistent-storage request. Browser/OS force
@@ -200,6 +217,13 @@ the worker script through `page.route`) and replacing an invalid stored document
 both targets first. It records main-thread long tasks, total blocking time,
 duration, main-thread heap growth and archive size through `perf/results.ts`. It runs locally in visible Chrome and is not part of the
 scheduled Performance workflow or the release gate.
+
+`npm run test:perf -- --project=web backup.spec.mjs` compares alternating
+backup-off/on typing with a large synthetic profile. It records input-to-paint
+latency, main-thread long tasks and heap, autosave transaction completion, backup
+lag and bytes written per minute. The relative comparison is the regression
+guard. OPFS uses real writable handles and workers but does not measure the speed
+or durability of a physical backup disk.
 
 ### Local Safari performance comparisons
 

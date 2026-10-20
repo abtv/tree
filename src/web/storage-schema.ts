@@ -25,7 +25,7 @@ export function openDatabase(): Promise<IDBDatabase> {
 // transaction as the image, until the import replaces the head or its images are removed. A
 // journal left by a closed tab or a crash names images that no stored head references.
 const STAGED_IMAGE_PREFIX = 'import-staged:'
-const stagedImageKeys = IDBKeyRange.bound(STAGED_IMAGE_PREFIX, `${STAGED_IMAGE_PREFIX}￿`)
+const stagedImageKeys = () => IDBKeyRange.bound(STAGED_IMAGE_PREFIX, `${STAGED_IMAGE_PREFIX}￿`)
 
 function complete(tx: IDBTransaction, failure: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -46,7 +46,7 @@ export function stageImage(db: IDBDatabase, id: string, bytes: Uint8Array): Prom
 export function commitImportedHead(db: IDBDatabase, head: unknown): Promise<void> {
   const tx = db.transaction([DOCUMENT_STORE, PREFERENCE_STORE], 'readwrite', { durability: 'strict' })
   tx.objectStore(DOCUMENT_STORE).put(head, HEAD_KEY)
-  tx.objectStore(PREFERENCE_STORE).delete(stagedImageKeys)
+  tx.objectStore(PREFERENCE_STORE).delete(stagedImageKeys())
   return complete(tx, 'Local save failed.')
 }
 
@@ -54,10 +54,10 @@ export function commitImportedHead(db: IDBDatabase, head: unknown): Promise<void
 export function discardStagedImages(db: IDBDatabase): Promise<void> {
   const tx = db.transaction([BLOB_STORE, PREFERENCE_STORE], 'readwrite', { durability: 'strict' })
   const journal = tx.objectStore(PREFERENCE_STORE)
-  const keys = journal.getAllKeys(stagedImageKeys)
+  const keys = journal.getAllKeys(stagedImageKeys())
   keys.onsuccess = () => {
     for (const key of keys.result) tx.objectStore(BLOB_STORE).delete(String(key).slice(STAGED_IMAGE_PREFIX.length))
-    journal.delete(stagedImageKeys)
+    journal.delete(stagedImageKeys())
   }
   return complete(tx, 'Local storage could not be changed.')
 }
@@ -65,7 +65,7 @@ export function discardStagedImages(db: IDBDatabase): Promise<void> {
 /** Discards the images of an import that a closed tab or crash left unfinished; reads only when there are none. */
 export async function sweepStagedImages(db: IDBDatabase): Promise<void> {
   const count = await new Promise<number>((resolve, reject) => {
-    const request = db.transaction(PREFERENCE_STORE).objectStore(PREFERENCE_STORE).count(stagedImageKeys)
+    const request = db.transaction(PREFERENCE_STORE).objectStore(PREFERENCE_STORE).count(stagedImageKeys())
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })

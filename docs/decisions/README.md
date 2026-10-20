@@ -26,5 +26,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0020](0020-agenda-derived-projection-and-runtime-view-state.md) | Agenda Derived Projection and Runtime View State | Accepted | 2026-10-09 |
 | [0021](0021-worker-owned-e2e-application-reuse.md) | Worker-Owned E2E Application Reuse | Accepted | 2026-10-11 |
 | [0022](0022-notes-archive-format-and-worker.md) | Notes Archive Format, fflate and Archive Worker | Accepted | 2026-10-20 |
+| [0023](0023-browser-folder-backup.md) | Browser Folder Backup | Accepted | 2026-10-20 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

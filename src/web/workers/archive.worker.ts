@@ -1,6 +1,7 @@
 import { exportFailureMessage, runExportJob } from '../archive/export-job'
 import { createImportJob, importFailureMessage, type ImportJob } from '../archive/import-job'
 import { blobArchiveFile } from '../archive/zip-inflate'
+import { folderSource } from '../archive/folder-source'
 import { validatePngAttachment } from '../attachment-validation'
 import {
   BLOB_STORE,
@@ -31,7 +32,7 @@ scope.onmessage = async (event) => {
     await importJob?.commit()
     return
   }
-  if (request?.type !== 'export' && request?.type !== 'import') return
+  if (request?.type !== 'export' && request?.type !== 'import' && request?.type !== 'restore') return
   let db: IDBDatabase
   try {
     db = await openDatabase()
@@ -42,7 +43,7 @@ scope.onmessage = async (event) => {
     })
     return
   }
-  if (request.type === 'import') {
+  if (request.type === 'import' || request.type === 'restore') {
     // The connection stays open until the page commits the import or terminates the worker.
     importJob = createImportJob(
       {
@@ -56,7 +57,7 @@ scope.onmessage = async (event) => {
       validatePngAttachment,
       post,
     )
-    await importJob.prepare(blobArchiveFile(request.file))
+    await importJob.prepare(request.type === 'import' ? blobArchiveFile(request.file) : folderSource(request.folder))
     return
   }
   try {
