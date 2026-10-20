@@ -27,6 +27,10 @@ Playwright's Chromium on Linux arm64 is the current browser gate; Google Chrome,
 Safari and full browser parity remain later work. The source demo workflow keeps
 publishing to its existing media site.
 
+Signing and transfer explicitly override GitHub Actions' default status check so
+an optional ancestor's skip does not suppress publication after a successful gate.
+Both jobs reject cancellation and require their direct prerequisite to succeed.
+
 The browser job builds and tests `out/web/` once. An artifact named with source
 SHA and run attempt contains exactly those files and a per-file SHA256 manifest. After the
 gate succeeds, a separate signing job authenticates retained old assets and

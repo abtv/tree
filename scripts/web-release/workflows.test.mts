@@ -23,6 +23,21 @@ function concurrencyGroup(workflow: string, context: { workflow: string; ref: st
 
 // @requirement PRODUCT.md §1.4
 describe('automatic publication wiring', () => {
+  it.each([
+    ['sign', 'gate'],
+    ['publish', 'sign'],
+  ])('lets %s follow a successful %s despite skipped optional ancestors', async (job, prerequisite) => {
+    const release = await read('.github/workflows/release.yml')
+    const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+    expect(section).toContain(`needs: [${prerequisite}]`)
+    // An explicit status function overrides GitHub's implicit success(), which
+    // propagates optional ancestor skips even through a successful release gate.
+    // Keep the direct prerequisite and source identity checks fail-closed.
+    expect(section.match(/^ {4}if: (.+)$/m)?.[1]).toBe(
+      `\${{ !cancelled() && needs.${prerequisite}.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}`,
+    )
+  })
+
   it('isolates release checks from standalone manual/scheduled runs and from each other', async () => {
     const release = await read('.github/workflows/release.yml')
     const context = { workflow: 'Browser release', ref: 'refs/heads/main' }

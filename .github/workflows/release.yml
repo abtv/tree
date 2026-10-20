@@ -87,7 +87,7 @@ jobs:
   sign:
     name: Sign authenticated package
     needs: [gate]
-    if: github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && needs.gate.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     permissions:
@@ -134,7 +134,7 @@ jobs:
   publish:
     name: Transfer verified browser package
     needs: [sign]
-    if: github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && needs.sign.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: web-publication
