@@ -255,7 +255,9 @@ Possible additional rounds: icon rework, optional Safari or Firefox checks (othe
 
 ## Next task
 
-All five tasks are done (A on 2026-10-21). No implementation task remains. The initiative waits for the Product Owner: verification rounds 1 and 2 (O1–O5 in "Owner involvement") and then final acceptance or rejection of the delivered commit set. On acceptance, move any remaining lasting knowledge to its owner, then remove this plan and its index row in the closing commit. On rejection, record the issues here and repair them within the closure allowance. Linux Chromium container validation still needs the owner's `make setup`.
+All five tasks are done (A on 2026-10-21). No implementation task remains. The initiative waits for the Product Owner: verification rounds 1 and 2 (O1–O5 in "Owner involvement") and then final acceptance or rejection of the delivered commit set. On acceptance, move any remaining lasting knowledge to its owner, then remove this plan and its index row in the closing commit. On rejection, record the issues here and repair them within the closure allowance.
+
+Open validation failure (2026-10-21, after the owner's `make setup`): `npm run test:web:chromium` at `13623a1` passes 36/39. Three C1 tests in `e2e/web/backup.spec.mjs` fail the same way, reproduced in two runs: the backup at lines 69, 123 and 323. Each fails at the first `ready(page)` after `page.reload()` while a backup is active, with `Target page, context or browser has been closed`. The same tests pass in macOS Chrome (`npm run test:web:built`), and backup tests without such a reload pass in the container. Inference, not verified: Linux arm64 Playwright Chromium (chromium-1243, headless, `--no-sandbox`) crashes when a page with a live backup worker holding OPFS handles is reloaded. The container runner returns no traces or crash logs, so diagnosis first needs a way to get them out. Before owner acceptance, investigate this as a C1 defect: decide whether it is a product crash, a Chromium bug or a test-environment limit; fix it, or record a justified workaround with the owner. The Task A specs pass in the container.
 
 ## Resume prompt
 
