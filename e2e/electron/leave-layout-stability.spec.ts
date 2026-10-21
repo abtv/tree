@@ -90,4 +90,45 @@ test.describe('Layout stability when leaving a node', () => {
     })
     expect(tops).toEqual([Math.round(settledTop ?? -1)])
   })
+
+  // @requirement PRODUCT.md §17.1
+  test('shows a previously displayed image in the first render after Agenda closes', async ({ userDataDir }) => {
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    writeFileSync(attachmentPath(userDataDir, 'img1'), solidPng(1600, 1000))
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First', children: [] },
+          { id: 'image', text: '', attachment: { id: 'img1', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+
+    await window.keyboard.press('Meta+p')
+    await expect(window.locator('[data-node-id="image"]')).toHaveCount(0)
+    // Mutation callbacks run before the browser paints the remounted row, so a decoded image here
+    // is already part of its first frame.
+    await window.evaluate(() => {
+      const observed = globalThis as unknown as { __imageFirstRender: string | undefined }
+      observed.__imageFirstRender = undefined
+      const observer = new MutationObserver(() => {
+        const row = document.querySelector('[data-node-id="image"]')
+        if (row === null) return
+        const image = row.querySelector<HTMLImageElement>('img.attachment-image')
+        observed.__imageFirstRender =
+          image === null ? 'missing' : image.complete && image.naturalWidth > 0 ? 'decoded' : 'loading'
+        observer.disconnect()
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+    })
+    await window.keyboard.press('Meta+p')
+    await expect(window.getByAltText('Attached image')).toBeVisible()
+
+    expect(
+      await window.evaluate(() => (globalThis as unknown as { __imageFirstRender?: string }).__imageFirstRender),
+    ).toBe('decoded')
+  })
 })

@@ -4,6 +4,8 @@ import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/
 import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../application/expansion-state'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
+import type { AttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
+import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 import type { VimFoldCommand } from './vim-keyboard-types'
 import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
 import { LocationBar } from './LocationBar'
@@ -43,6 +45,8 @@ interface AppProps {
   capturePasteClipboard?: (data: DataTransfer) => EditorServices['readClipboard']
   /** The platform whose primary-modifier convention shortcuts follow (`docs/ARCHITECTURE.md` §8). */
   shortcutPlatform?: ShortcutPlatform
+  /** Decoded attachment images; the browser adapter supplies a smaller memory budget. */
+  attachmentImages?: AttachmentImageCache
 }
 
 export function App({
@@ -52,6 +56,7 @@ export function App({
   deferRichEditing = false,
   capturePasteClipboard,
   shortcutPlatform = 'apple',
+  attachmentImages = attachmentImageCache,
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
@@ -280,12 +285,13 @@ export function App({
           <AttachmentImage
             attachmentId={node.attachment.id}
             imageCaretActive={isImageCaretActive(node)}
+            images={attachmentImages}
             onOpen={setPreviewAttachmentId}
           />
         )}
       </>
     ),
-    [isImageCaretActive, nodeInputBindings, richEditingEnabled],
+    [attachmentImages, isImageCaretActive, nodeInputBindings, richEditingEnabled],
   )
   const renderAgendaAttachment = useCallback(
     (node: TreeNode, editable: boolean): React.JSX.Element | null =>
@@ -293,10 +299,11 @@ export function App({
         <AttachmentImage
           attachmentId={node.attachment.id}
           imageCaretActive={editable && isImageCaretActive(node)}
+          images={attachmentImages}
           onOpen={setPreviewAttachmentId}
         />
       ),
-    [isImageCaretActive],
+    [attachmentImages, isImageCaretActive],
   )
 
   const renderAgendaInput = useCallback(
@@ -445,6 +452,7 @@ export function App({
                     <AttachmentImage
                       attachmentId={currentParent.attachment.id}
                       imageCaretActive={isImageCaretActive(currentParent)}
+                      images={attachmentImages}
                       onOpen={setPreviewAttachmentId}
                     />
                   )}
@@ -545,7 +553,11 @@ export function App({
         <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />
       ) : null}
       {previewAttachmentId === undefined ? null : (
-        <ImagePreview attachmentId={previewAttachmentId} onClose={() => setPreviewAttachmentId(undefined)} />
+        <ImagePreview
+          attachmentId={previewAttachmentId}
+          images={attachmentImages}
+          onClose={() => setPreviewAttachmentId(undefined)}
+        />
       )}
     </main>
   )

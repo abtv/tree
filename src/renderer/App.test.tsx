@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
 import type { Document } from '../domain/document'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
-import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
+import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { App } from './App'
 import { HOLD_ACTIVATION_MS } from './node-drag'
@@ -27,7 +27,9 @@ const changeVimEditingFromMenu = (enabled: boolean): void => act(() => notifyVim
 beforeEach(() => {
   // jsdom has no layout scrolling; real panel scrolling is exercised by Electron coverage.
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
-  attachmentByteCache.clear()
+  attachmentImageCache.clear()
+  // jsdom does not decode images.
+  Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => undefined })
   window.treeApi = {
     onVimEnabledChanged: (listener) => {
       notifyVimPreference = listener

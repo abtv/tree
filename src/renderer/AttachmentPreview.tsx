@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { IMAGE_LOAD_ERROR } from '../domain/product-messages'
-import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
+import type { AttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
+import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 
 type AttachmentState =
   | { attachmentId: string; status: 'loading' }
@@ -25,49 +26,59 @@ function rememberRenderedSize(attachmentId: string, image: HTMLImageElement): vo
   if (renderedSizes.size > MAX_REMEMBERED_SIZES) renderedSizes.delete(renderedSizes.keys().next().value!)
 }
 
-function useAttachmentImage(attachmentId: string): {
+function cachedState(cache: AttachmentImageCache, attachmentId: string): AttachmentState {
+  const url = cache.peek(attachmentId)?.url
+  return url === undefined ? { attachmentId, status: 'loading' } : { attachmentId, status: 'ready', url }
+}
+
+function useAttachmentImage(
+  cache: AttachmentImageCache,
+  attachmentId: string,
+): {
   state: AttachmentState
   onImageError: () => void
 } {
-  const [state, setState] = useState<AttachmentState>({ attachmentId, status: 'loading' })
+  // A decoded image already in the cache renders in the first frame, without a placeholder.
+  const [state, setState] = useState<AttachmentState>(() => cachedState(cache, attachmentId))
   if (state.attachmentId !== attachmentId) {
-    setState({ attachmentId, status: 'loading' })
+    setState(cachedState(cache, attachmentId))
   }
-  const objectUrl = useRef<string | undefined>(undefined)
+  const [request, setRequest] = useState(0)
 
   useEffect(() => {
     let disposed = false
-    void attachmentByteCache
+    void cache
       .get(attachmentId)
-      .then((bytes) => {
+      .then((image) => {
         if (disposed) return
-        if (bytes === null) {
+        if (image === null) {
           setState({ attachmentId, status: 'error' })
           return
         }
-        const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: 'image/png' }))
-        objectUrl.current = url
-        setState({ attachmentId, status: 'ready', url })
+        setState((current) =>
+          current.attachmentId === attachmentId && current.status === 'ready' && current.url === image.url
+            ? current
+            : { attachmentId, status: 'ready', url: image.url },
+        )
       })
       .catch(() => {
         if (!disposed) setState({ attachmentId, status: 'error' })
       })
     return () => {
       disposed = true
-      if (objectUrl.current !== undefined) {
-        URL.revokeObjectURL(objectUrl.current)
-        objectUrl.current = undefined
-      }
     }
-  }, [attachmentId])
+  }, [cache, attachmentId, request])
 
+  const failedUrl = state.status === 'ready' ? state.url : undefined
   const onImageError = useCallback(() => {
-    if (objectUrl.current !== undefined) {
-      URL.revokeObjectURL(objectUrl.current)
-      objectUrl.current = undefined
+    if (failedUrl !== undefined && !cache.discard(attachmentId, failedUrl)) {
+      // The cache evicted this URL before the image loaded; the attachment itself may be fine.
+      setState({ attachmentId, status: 'loading' })
+      setRequest((current) => current + 1)
+      return
     }
     setState((current) => (current.attachmentId === attachmentId ? { attachmentId, status: 'error' } : current))
-  }, [attachmentId])
+  }, [cache, attachmentId, failedUrl])
 
   return { state, onImageError }
 }
@@ -84,12 +95,14 @@ export function AttachmentImage({
   attachmentId,
   onOpen,
   imageCaretActive = false,
+  images = attachmentImageCache,
 }: {
   attachmentId: string
   onOpen: (attachmentId: string) => void
   imageCaretActive?: boolean
+  images?: AttachmentImageCache
 }): React.JSX.Element | null {
-  const { state, onImageError } = useAttachmentImage(attachmentId)
+  const { state, onImageError } = useAttachmentImage(images, attachmentId)
   const size = renderedSizes.get(attachmentId)
   if (state.status === 'loading') {
     // Leaving a node remounts its rows. Reserving the size the image had last time keeps the rows
@@ -126,11 +139,13 @@ export function AttachmentImage({
 export function ImagePreview({
   attachmentId,
   onClose,
+  images = attachmentImageCache,
 }: {
   attachmentId: string
   onClose: () => void
+  images?: AttachmentImageCache
 }): React.JSX.Element {
-  const { state, onImageError } = useAttachmentImage(attachmentId)
+  const { state, onImageError } = useAttachmentImage(images, attachmentId)
   const closeButton = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<Element | null>(null)

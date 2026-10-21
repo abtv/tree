@@ -7,8 +7,12 @@ import { capturePasteClipboard } from './paste'
 import { isApplePlatform } from './device'
 import { installDataMenu } from './data-menu'
 import { requestPersistentStorage, storageProtectionText } from './storage-persistence'
+import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
 import './styles.css'
+
+// Mobile browsers discard a tab under memory pressure well before a desktop Electron renderer would.
+const WEB_ATTACHMENT_IMAGE_CACHE_LIMIT = 128 * 1024 * 1024
 
 try {
   const bridge = await installBrowserPrototype()
@@ -24,6 +28,11 @@ try {
         store={store}
         deferRichEditing
         capturePasteClipboard={capturePasteClipboard}
+        attachmentImages={createAttachmentImageCache(
+          (id) => window.treeApi.readAttachment(id),
+          decodeAttachmentImage,
+          WEB_ATTACHMENT_IMAGE_CACHE_LIMIT,
+        )}
       />
     </ErrorBoundary>,
   )

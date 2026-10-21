@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { attachmentByteCache } from '../infrastructure/renderer/electron-services'
+import { createAttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
+import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
 
@@ -37,13 +38,15 @@ function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
 
 beforeEach(() => {
   mockTreeApi()
-  attachmentByteCache.clear()
+  attachmentImageCache.clear()
+  // jsdom does not decode images.
+  Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => undefined })
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => createdObjectUrl })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined })
 })
 
 describe('AttachmentImage', () => {
-  it('renders the image button once the attachment loads and revokes the URL on unmount', async () => {
+  it('renders the image button once the attachment loads and keeps the URL cached on unmount', async () => {
     const revoke = vi.fn()
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
     const onOpen = vi.fn()
@@ -54,16 +57,27 @@ describe('AttachmentImage', () => {
     expect(onOpen).toHaveBeenCalledWith('image')
 
     unmount()
-    expect(revoke).toHaveBeenCalledWith(createdObjectUrl)
+    expect(revoke).not.toHaveBeenCalled()
   })
 
-  it('reserves the rendered size of a loaded image from the first render of a remount', async () => {
+  it('renders a cached image in the first render of a remount', async () => {
+    const first = render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
+    await screen.findByAltText('Attached image')
+    first.unmount()
+
+    render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
+
+    expect(screen.getByAltText('Attached image')).toHaveAttribute('src', createdObjectUrl)
+  })
+
+  it('reserves the rendered size of an image that is no longer cached from the first render of a remount', async () => {
     const first = render(<AttachmentImage attachmentId="sized-image" onOpen={() => undefined} />)
     const image = await screen.findByAltText('Attached image')
     Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 400 })
     Object.defineProperty(image, 'naturalHeight', { configurable: true, value: 300 })
     fireEvent.load(image)
     first.unmount()
+    attachmentImageCache.clear()
 
     const { container } = render(<AttachmentImage attachmentId="sized-image" onOpen={() => undefined} />)
     const placeholder = container.querySelector<HTMLElement>('.attachment-placeholder')
@@ -100,7 +114,7 @@ describe('AttachmentImage', () => {
     expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
   })
 
-  it('reports a browser decode error and releases the object URL', async () => {
+  it('reports a browser display error and releases the cached object URL', async () => {
     const revoke = vi.fn()
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
     render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
@@ -110,6 +124,41 @@ describe('AttachmentImage', () => {
 
     expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
     expect(revoke).toHaveBeenCalledWith(createdObjectUrl)
+    expect(attachmentImageCache.peek('image')).toBeUndefined()
+  })
+
+  it('requests the image again when its URL was evicted before it loaded', async () => {
+    const read = vi.fn(async () => attachmentBytes)
+    let next = 0
+    const decode = async () => {
+      next += 1
+      return { url: `blob:${next}`, width: 10, height: 10, release: () => undefined }
+    }
+    // Each entry costs 404 bytes, so the budget holds one image.
+    const images = createAttachmentImageCache(read, decode, 500)
+    render(<AttachmentImage attachmentId="evicted" images={images} onOpen={() => undefined} />)
+    const image = await screen.findByAltText('Attached image')
+    expect(image).toHaveAttribute('src', 'blob:1')
+
+    await images.get('other')
+    fireEvent.error(image)
+
+    await waitFor(() => expect(screen.getByAltText('Attached image')).toHaveAttribute('src', 'blob:3'))
+    expect(screen.queryByText('Image could not be loaded.')).not.toBeInTheDocument()
+    expect(read).toHaveBeenCalledTimes(3)
+  })
+
+  it('reports bytes the browser cannot decode', async () => {
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+      configurable: true,
+      value: async () => {
+        throw new Error('invalid image')
+      },
+    })
+    render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)
+
+    expect(await screen.findByText('Image could not be loaded.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open image preview' })).not.toBeInTheDocument()
   })
 
   it('clears a failure after switching to a valid attachment', async () => {

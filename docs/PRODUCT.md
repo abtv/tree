@@ -1053,6 +1053,8 @@ An attached image is displayed inline beneath its node's text.
 
 Inline images are constrained to a 200×200 CSS-pixel bounding box while preserving their aspect ratio. An image whose natural size exceeds the box is scaled down to fit. An image whose natural size is smaller than the box is displayed at its natural size; it is not enlarged.
 
+A recently displayed image appears in the first frame when its row is displayed again, for example after Agenda closes or after leaving a node, without an empty placeholder. This holds while the image is in the bounded in-memory image cache; an image no longer in the cache loads again.
+
 Clicking an attached image opens an image preview.
 
 `Cmd+Y` opens the image preview for the selected node or the editable current parent when that node has an attached image, in every Vim mode and whether or not Vim mode is enabled. When neither the selected node nor the current parent has an image, `Cmd+Y` does nothing. `Cmd+Y` is not part of Apple's standard keyboard shortcuts, so it conflicts with none of them (§1.3).

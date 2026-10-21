@@ -1,8 +1,8 @@
 import type { EditorServices } from '../../application/editor-store'
-import { createAttachmentBytesCache } from './attachment-bytes-cache'
+import { createAttachmentImageCache, decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 
-export const ATTACHMENT_BYTES_CACHE_LIMIT = 64 * 1024 * 1024
+export const ATTACHMENT_IMAGE_CACHE_LIMIT = 512 * 1024 * 1024
 
 export function createElectronEditorServices(): EditorServices {
   return {
@@ -24,4 +24,8 @@ export function readAttachment(id: string): Promise<Uint8Array | null> {
   return window.treeApi.readAttachment(id)
 }
 
-export const attachmentByteCache = createAttachmentBytesCache(readAttachment, ATTACHMENT_BYTES_CACHE_LIMIT)
+export const attachmentImageCache = createAttachmentImageCache(
+  readAttachment,
+  decodeAttachmentImage,
+  ATTACHMENT_IMAGE_CACHE_LIMIT,
+)

@@ -2,7 +2,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ClipboardPayload, TreeApi } from '../../shared/ipc'
-import { attachmentByteCache, createElectronEditorServices, readAttachment } from './electron-services'
+import { attachmentImageCache, createElectronEditorServices, readAttachment } from './electron-services'
+import { decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 
 describe('renderer Electron services', () => {
@@ -43,8 +44,12 @@ describe('renderer Electron services', () => {
 
   beforeEach(() => {
     window.treeApi = api
-    attachmentByteCache.clear()
+    attachmentImageCache.clear()
     vi.clearAllMocks()
+    // jsdom does not decode images.
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => undefined })
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:attachment' })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
   })
 
   it('forwards every editor service call and preserves return values', async () => {
@@ -106,12 +111,13 @@ describe('renderer Electron services', () => {
     expect(writeClipboard).not.toHaveBeenCalled()
   })
 
-  it('caches attachment reads for repeated access', async () => {
+  it('caches decoded attachment images for repeated access', async () => {
     api.readAttachment = vi.fn(async () => new Uint8Array([1, 2, 3]))
     window.treeApi = api
 
-    await expect(attachmentByteCache.get('attachment-1')).resolves.toEqual(new Uint8Array([1, 2, 3]))
-    await expect(attachmentByteCache.get('attachment-1')).resolves.toEqual(new Uint8Array([1, 2, 3]))
+    const first = await attachmentImageCache.get('attachment-1')
+    expect(first).toMatchObject({ url: 'blob:attachment' })
+    await expect(attachmentImageCache.get('attachment-1')).resolves.toBe(first)
 
     expect(api.readAttachment).toHaveBeenCalledTimes(1)
   })
@@ -123,6 +129,27 @@ describe('renderer Electron services', () => {
     })
     window.treeApi = api
 
-    await expect(attachmentByteCache.get('attachment-1')).rejects.toBe(failure)
+    await expect(attachmentImageCache.get('attachment-1')).rejects.toBe(failure)
+  })
+
+  it('revokes the object URL when an image cannot be decoded', async () => {
+    const failure = new Error('invalid image')
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+      configurable: true,
+      value: async () => {
+        throw failure
+      },
+    })
+
+    await expect(decodeAttachmentImage(new Uint8Array([1]))).rejects.toBe(failure)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:attachment')
+  })
+
+  it('keeps a decoded image until it is released', async () => {
+    const image = await decodeAttachmentImage(new Uint8Array([1]))
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+
+    image.release()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:attachment')
   })
 })
