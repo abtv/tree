@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Browser data durability](browser-data-durability.md) | Awaiting owner acceptance | Owner checks O1–O5, then acceptance |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
