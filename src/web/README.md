@@ -98,8 +98,9 @@ import confirmation, or choose another folder. Restore does not enable backup.
 **Restore from Folder…** reads a backup folder, for example after site data was
 cleared, and replaces the notes after the same confirmation as import.
 Permission is checked without prompting at startup; a paused backup requires a
-**Resume Backing Up…** click. Native folder permission persistence across browser
-restarts remains an owner verification item; OPFS automation does not establish it.
+**Resume Backing Up…** click. In Chrome on macOS, a natively chosen folder kept its
+write permission across a full browser restart and backup resumed without a click
+(owner check, 2026-10-22). Other browsers and platforms may ask for Resume.
 
 Use a separate backup folder for each profile and computer. Two Macs writing the
 same folder, including through iCloud Drive, can overwrite each other's notes.
