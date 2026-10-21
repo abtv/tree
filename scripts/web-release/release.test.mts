@@ -53,6 +53,39 @@ describe('release manifest and package', () => {
     }
   })
 
+  it('accepts the exact installable-app root files and rejects other root names', async () => {
+    const dir = await fixture()
+    await writeFile(
+      join(dir, 'index.html'),
+      '<script src="./assets/app.js"></script><link rel="manifest" href="./manifest.webmanifest">' +
+        '<link rel="apple-touch-icon" href="./apple-touch-icon.png">',
+    )
+    for (const name of ['manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png']) {
+      await writeFile(join(dir, name), name)
+    }
+    const manifest = await createManifest(dir, identity)
+    expect(manifest.assetGenerations[0]!.some((path) => !path.startsWith('assets/'))).toBe(false)
+    await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
+    for (const name of ['other.html', 'icon.svg', 'icon-256.png', 'manifest.json', 'Icon-192.png']) {
+      const other = await fixture()
+      await writeFile(join(other, name), name)
+      await expect(createManifest(other, identity)).rejects.toThrow('Unexpected')
+    }
+    const nested = await fixture()
+    await mkdir(join(nested, 'icons'))
+    await writeFile(join(nested, 'icons/icon-192.png'), 'icon')
+    await expect(createManifest(nested, identity)).rejects.toThrow('Unexpected')
+    const missing = await fixture()
+    await writeFile(join(missing, 'index.html'), '<link rel="manifest" href="./manifest.webmanifest">')
+    await expect(createManifest(missing, identity)).rejects.toThrow('asset reference')
+    for (const ref of ['/manifest.webmanifest', 'manifest.webmanifest', './icons/icon-192.png']) {
+      const dir = await fixture()
+      await writeFile(join(dir, 'manifest.webmanifest'), '{}')
+      await writeFile(join(dir, 'index.html'), `<link href="${ref}">`)
+      await expect(createManifest(dir, identity)).rejects.toThrow('asset reference')
+    }
+  })
+
   it('rejects untrusted identities, duplicate/traversing paths and oversized manifests', async () => {
     const manifest = await createManifest(await fixture(), identity)
     for (const replacement of [

@@ -148,6 +148,9 @@ hashed assets remain available only after authenticating the old manifest/bundle
 and verifying their bytes before the new manifest is signed. Unlisted target files
 are removed by the whole-tree replacement, and target verification rejects extras.
 Only JavaScript, CSS and font assets are accepted; HTML/SVG assets are rejected.
+At the root, besides `index.html` and `.nojekyll`, only the exact installable-app
+names `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and
+`apple-touch-icon.png` are accepted; they are current-only, like `index.html`.
 No archive is extracted, and no transferred JavaScript is executed in CI.
 Schema 2 manifests record up to three asset sets, newest first: the current build
 and two previous distinct builds transferred to the target repository. Repeating

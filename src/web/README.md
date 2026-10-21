@@ -17,7 +17,9 @@ npm run build:web
 ```
 
 The complete package is `out/web/`: `index.html`, hashed JavaScript, CSS and font
-assets, and `.nojekyll`. Upload **the contents** of this directory to the hosting
+assets, `.nojekyll`, and the installable-app files copied from `src/web/public/`
+(`manifest.webmanifest`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`).
+Publication accepts only these exact root names. Upload **the contents** of this directory to the hosting
 root. No Node.js process, Vite server, API or application server is needed on the
 host or the user's computer. Use HTTPS: IndexedDB, Web Locks and clipboard paths
 depend on browser capabilities and secure contexts. Opening `index.html` with
@@ -51,8 +53,10 @@ Open <http://127.0.0.1:5175/>. This is a testing convenience, not a requirement 
 using the hosted site. It uses a separate origin from the development server.
 The build includes a meta CSP; framed startup is rejected by the existing adapter.
 The preview serves files directly without Vite transforms or a development client.
-No Service Worker, offline package, recovery generations or persistent-storage
-request is added. Existing storage and save limitations below still apply.
+Chrome can install the preview or hosted site as **Tree** from its menu; see
+[installation and storage protection](../../docs/PRODUCT.md#241-installation-and-storage-protection).
+No Service Worker, offline package or recovery generations are added. Existing
+storage and save limitations below still apply.
 
 ## Local development
 
@@ -68,7 +72,8 @@ moving source files does not migrate, clear or upload the stored document.
 Another browser, profile, hostname or port has separate storage.
 
 The ellipsis button opens Tree, Agenda, Vim Editing, appearance and Data controls.
-The menu also shows local save status. Only one tab may edit at a time.
+The menu also shows local save status and whether the browser granted persistent
+storage. Only one tab may edit at a time.
 
 **Export Notes…** in the Data block downloads one ZIP archive with the saved
 document and its referenced images, in the layout of the desktop data directory.
@@ -131,7 +136,8 @@ saved page with the browser's own controls. A failed save keeps the editor open.
 Data stays in the browser unless the user exports it or chooses a backup folder. There is no device
 synchronization. Clearing site data or deleting the profile removes the
 notes stored in the browser. This version has no offline
-package, recovery generations or persistent-storage request. Browser/OS force
+package or recovery generations. It requests persistent storage once per page
+load, which only reduces eviction under storage pressure. Browser/OS force
 termination can lose uncommitted work. Full Safari and Dock-app compatibility
 remains unverified; native Safari clipboard interaction still needs verification.
 

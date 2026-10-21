@@ -1,6 +1,6 @@
 # Browser Data Durability
 
-Status: **Approved — blocked on icons for Task A** (initiative-wide approval for tasks A, B1, B2, C1 and C2).
+Status: **Awaiting owner acceptance** (initiative-wide approval for tasks A, B1, B2, C1 and C2; all five are done).
 
 ## Objective
 
@@ -37,7 +37,7 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 | O-Q3a | Choosing a backup folder that already contains `document.json` never overwrites silently: the user chooses "Restore from This Folder", "Replace Backup with Current Notes" or "Choose Another Folder". |
 | O-Q3b | Restore from a folder is available only through the menu command; no prompt on an empty start. |
 | O-Q3c | The backup trails saved notes by at most N seconds. The agent chooses N from measurements between 5 and 30 seconds (start at 10, trailing-edge coalescing) and records it in PRODUCT §24.5. |
-| O-Q4 | The Product Owner exports the icons from `assets/icons/tree-icon-source.png`, cropped to the tile with transparent corners, as `src/web/public/icon-512.png` (512×512), `icon-192.png` (192×192) and `apple-touch-icon.png` (180×180). Agents do not generate icons. |
+| O-Q4 | Icons come from `assets/icons/tree-icon-source.png`, cropped to the tile with transparent corners, as `src/web/public/icon-512.png` (512×512), `icon-192.png` (192×192) and `apple-touch-icon.png` (180×180). Revised 2026-10-21: the Product Owner authorized the agent to generate them, with inspection before commit (originally owner-exported). |
 | O-Q5 | Delegated area (Procedures §5): wording, dialog layout, status text, progress and cancel behavior, and edge states of export, import, backup and restore, within the O-Q1 controls; plus tuning values (backup interval within O-Q3c, archive limits) chosen from measurements. Principles: (1) durability first — never replace or hide notes without an explicit confirmation that names the effect; fail closed and leave current notes unchanged; (2) privacy — nothing leaves the machine except to a file or folder the user chose, no network; (3) responsiveness — no main-thread work proportional to document or image size; (4) minimal surface — only the listed controls; (5) HIG wording (PRODUCT §1.3: Title Case, ellipsis before a dialog or picker, safe default for destructive dialogs); (6) strict input handling; (7) browser storage identity unchanged. Boundary: no new capabilities, no format changes, no Electron changes, no service worker, no change to existing behavior. Record each delegated choice in this plan and in `docs/PRODUCT.md`. |
 
 ## Sources of truth
@@ -73,7 +73,7 @@ Out of scope: service worker or offline support (declined by the Product Owner),
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| A | Installable app (manifest, icons, publication allowlist, `theme-color`) and one `persist()` request; storage-protection status line. | Icon files from the Product Owner (O-Q4) | Blocked on icons |
+| A | Installable app (manifest, icons, publication allowlist, `theme-color`) and one `persist()` request; storage-protection status line. | Icon files (O-Q4) | Done |
 | B1 | ZIP archive core, `fflate@0.8.3`, export worker, "Export Notes…", Data menu block, CSP `worker-src 'self'`, archive ADR, export perf scenario. | — | Done |
 | B2 | Import: central-directory reader, hostile-archive hardening, confirmation, replace and reload, recovery from an invalid stored head. | B1 | Done |
 | C1 | Chromium folder backup: picker, handle storage, backup worker, status and attention dot, permission handling, folder-backup ADR, backup perf scenario. | B1 | Done |
@@ -96,7 +96,7 @@ Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: 
 
 ### Task A — installable app and persistent-storage request
 
-- **Files:** `src/web/index.html`; `src/web/public/manifest.webmanifest` and the three owner-supplied PNGs (flat names); `src/web/storage-persistence.ts` and test; `src/web/main.tsx`; `src/web/appearance.ts`; `scripts/web-release/policy.mts`, `package.mts`, `release.test.mts`; `scripts/web/static-server.mts` (`.webmanifest` MIME); `scripts/web/manifest.test.mts`; `e2e/web/installability.spec.mjs`, `e2e/web/package.spec.mjs`; `assets/icons/README.md`; docs; `scripts/check-requirement-coverage.mts`; this plan.
+- **Files:** `src/web/index.html`; `src/web/public/manifest.webmanifest` and the three icon PNGs (flat names, O-Q4); `src/web/storage-persistence.ts` and test; `src/web/main.tsx`; `src/web/appearance.ts`; `scripts/web-release/policy.mts`, `package.mts`, `release.test.mts`; `scripts/web/static-server.mts` (`.webmanifest` MIME); `scripts/web/manifest.test.mts`; `e2e/web/installability.spec.mjs`, `e2e/web/package.spec.mjs`; `assets/icons/README.md`; docs; `scripts/check-requirement-coverage.mts`; this plan.
 - **Constraints:** manifest `name` and `short_name` "Tree", `id`, `start_url` and `scope` at the origin root, `display` `standalone`, icons 192 and 512 (`purpose: any`), `theme_color` and `background_color` `#fbf8f1`; `<meta name="theme-color">` for light (`#fbf8f1`) and dark (`#3f3f3f`) with `prefers-color-scheme`, updated when the Appearance choice changes (report the unavoidable light launch flash in dark mode). Allowlist exact root names only; still no HTML, SVG or directories; these files are current-only. `persist()`: once per load after the editor is ready, only when `navigator.storage?.persisted()` is not true; ignore the result and errors; never block startup. Storage-protection status line in the menu footer (O-Q1). No service worker, no IndexedDB change.
 - **Tests:** unit for `storage-persistence.ts` (skip when persisted, one call otherwise, missing API, rejection, throw); manifest contract (members, icon files, PNG dimensions from IHDR, flat names); release tests (new files pass; HTML, SVG, nested and unlisted names fail); E2E dev and built (manifest and icons fetched; CDP `Page.getAppManifest` without errors; `Page.getInstallabilityErrors` recorded, only manifest-field errors fail; `persist` stub called once and not when persisted; rejecting stub causes no page error; `theme-color` follows Appearance); built CSP otherwise unchanged.
 - **PRODUCT §22 assessment:** one `persisted()` read and at most one `persist()` call per page load; no writes, no interactive CPU, no memory growth.
@@ -109,6 +109,13 @@ Working-task count: 5. The final owner acceptance rule (AGENTS.md §8) applies: 
 - **Tests:** unit and property with real fflate (entry order and names, deflate versus stored, limit refusal, round trip through `unzipSync` as a test-only oracle, Electron compatibility, random documents and attachment sets); worker protocol contract; E2E (seed notes and images, export, parse the download, compare with the IndexedDB head and blobs; a worker is created; cancel leaves no download; invalid head refused; typing works during a large export).
 - **Perf:** large profile (target 100,000 nodes and a few hundred images): main-thread long tasks and total blocking time, worker wall time, peak heap, output size; results through `perf/results.ts`; not part of the release gate.
 - **Acceptance:** tests above; full Chrome suite; audit clean; Electron-compatibility test passes; perf record in task evidence; Reviewer and Product Verifier report no meaningful issues.
+
+### Task A results (2026-10-21)
+
+- Icons generated by the agent under revised O-Q4 from `assets/icons/tree-icon-source.png`: the tile edge was measured along rays from its center (outermost sharp luminance drop between rim and dark outline), the corners fitted as a superellipse (r 249 px, n 2.5, RMS 0.8 px on a 1,022 px tile), the mask inset by 1 source pixel, and box-filtered to 512, 192 and 180 px RGBA. Previews on light and dark surfaces showed no outline fringe or background remnant. The generator script stayed in task scratch; `assets/icons/README.md` records the export rule.
+- Delivered: `src/web/public/` manifest and icons copied by Vite to the package root; `ROOT_PUBLIC_FILES` exact-name allowlist in `scripts/web-release/policy.mts`, with HTML root references limited to those names in `inspectPackage` and `verifyPackage`; `.webmanifest` MIME in the preview server; `theme-color` meta pair switched by `applyAppearance`; `src/web/storage-persistence.ts`; storage line in the menu footer. PRODUCT §24.1 owns the behavior.
+- Minor choices (principle PRODUCT §1.3 wording and O-Q1 minimal surface): status text `Storage is protected from automatic clearing.` / `Storage is not protected from automatic clearing.`, shown below the save status and hidden when the storage API is missing; the line reports the `persist()` result. The installed dark-mode launch flash is reported in §24.1 as a browser limit.
+- Validation: `npm run check` (4,338 unit tests); full `npm run test:web:built` 38/39, the remaining export menu-inventory assertion updated for the new line and rerun with the affected specs in dev and built modes; `npm run audit` reports 5 moderate advisories in dev-only `vitest` (no fix available, unrelated, CI gate is `--audit-level=high`). No `src/application` change, so no mutation run. Electron baseline 856/856 at `857a783` reused: no changed file is imported by Electron or the shared renderer. CDP `Page.getAppManifest` reports no errors; installability errors other than manifest fields are recorded only. Independent Reviewer and Product Verifier found no meaningful issues; the export menu assertion now accepts either storage text. Observation for the owner: the icons fill the canvas as O-Q4 specifies, so the installed Dock icon may look slightly larger than icons with a margin; the owner chose to keep it.
 
 ### Task B1 results (2026-10-20)
 
@@ -223,7 +230,7 @@ C1 already delivered `folder-source.ts`, its fake-handle tests, `prepareNotesFro
 ## Owner involvement
 
 - Working tasks: 5; final owner acceptance required.
-- Blocking owner actions: icon files (O-Q4, blocks A only); approval of `npm install --save-exact fflate@0.8.3` (B1); optional `make setup` before container runs.
+- Blocking owner actions: icon files (O-Q4; resolved 2026-10-21 by agent-generated icons); approval of `npm install --save-exact fflate@0.8.3` (B1); optional `make setup` before container runs.
 - Confirmed verification rounds: 2 plus the final acceptance round. None is a pre-commit gate.
 
 | Round | When | Check | Owner action and expected result |
@@ -248,11 +255,11 @@ Possible additional rounds: icon rework, optional Safari or Firefox checks (othe
 
 ## Next task
 
-Probes P1 to P3 passed on 2026-10-20 (Chrome starts outside the Claude Code sandbox; audit clean; Electron E2E 856/856 at `857a783`). B1, B2, C1 and C2 are done. The only remaining task is **Task A**, blocked until the Product Owner adds `src/web/public/icon-512.png`, `icon-192.png` and `apple-touch-icon.png` (O-Q4). Owner round 2 (O4, O5) can run now; round 1 waits for A only for O1.
+All five tasks are done (A on 2026-10-21). No implementation task remains. The initiative waits for the Product Owner: verification rounds 1 and 2 (O1–O5 in "Owner involvement") and then final acceptance or rejection of the delivered commit set. On acceptance, move any remaining lasting knowledge to its owner, then remove this plan and its index row in the closing commit. On rejection, record the issues here and repair them within the closure allowance. Linux Chromium container validation still needs the owner's `make setup`.
 
 ## Resume prompt
 
-Continue the browser data durability initiative from `plans/browser-data-durability.md`. Take the next task named in its "Next task" section, state it first, and follow its files, constraints, tests and the common validation block. Do not push or publish.
+Continue the browser data durability initiative from `plans/browser-data-durability.md`. It is awaiting owner acceptance: report the owner's verification results or acceptance decision against the "Next task" section, repair rejected items within the closure allowance, or close the plan after explicit acceptance. Do not push or publish.
 
 ## Sources
 

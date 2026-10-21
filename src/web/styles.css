@@ -106,12 +106,14 @@ body:has(.image-preview-overlay) #tree-menu-button {
 }
 .menu-label,
 #prototype-save-status,
+#storage-status,
 #backup-status {
   display: block;
   padding: 3px 10px;
   color: var(--color-secondary);
   font-size: 11px;
 }
+#storage-status[hidden],
 #backup-status[hidden] {
   display: none;
 }

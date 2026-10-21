@@ -14,6 +14,9 @@ test('serves the static package without development entry points', async ({ requ
   const worker = (await (await request.get(`/${script}`)).text()).match(/archive\.worker-[\w-]+\.js/)
   expect(worker, 'The application bundle must reference the hashed archive worker').not.toBeNull()
   expect((await request.get(`/assets/${worker[0]}`)).ok()).toBe(true)
+  // PRODUCT §24.1: the installable-app files are package-relative root files.
+  expect(html).toContain('<link rel="manifest" href="./manifest.webmanifest"')
+  expect(html).toContain('<link rel="apple-touch-icon" href="./apple-touch-icon.png"')
   expect(html).not.toContain('main.tsx')
   expect(html).not.toContain('/@vite/client')
   expect((await request.get('/.nojekyll')).ok()).toBe(true)

@@ -47,6 +47,10 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   // @requirement PRODUCT.md §24
   const menu = await openMenu(page)
   await expect(menu.getByText('Data', { exact: true })).toBeVisible()
+  // PRODUCT §24.1: the browser decides the storage line; installability.spec.mjs covers both texts.
+  const storage = page.locator('#storage-status')
+  await expect(storage).toHaveText(/^Storage is (?:not )?protected from automatic clearing\.$/)
+  const storageText = await storage.textContent()
   expect(
     await menu.evaluate((element) =>
       [...element.querySelectorAll('button, .menu-label, [role="status"]')].map((item) => item.textContent),
@@ -65,6 +69,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Back Up to Folder…',
     'Restore from Folder…',
     'Saved locally in this browser',
+    storageText,
     'Folder backup is off.',
   ])
   await capture(page, 'data-menu-light.png')

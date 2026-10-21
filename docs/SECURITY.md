@@ -107,10 +107,13 @@ implemented in `src/web/services.ts`.
   transactions preserve the last committed value when a write aborts. This is a
   consistency control, not a barrier against malicious same-origin code.
 
-The current package has no Service Worker, offline package, persistent-storage
-request or recovery generations. Adding the website to a browser's
-Dock or home screen does not add those protections. Clearing site data, deleting
-the profile or browser storage eviction can remove notes; force termination can
+The current package has no Service Worker, offline package or recovery
+generations. It has a web app manifest and requests persistent storage once per
+page load (PRODUCT §24.1). Installing the app or adding the website to a
+browser's Dock or home screen does not add offline support or recovery.
+Persistent storage, when granted, protects only against eviction under storage
+pressure. Clearing site data, deleting the profile or, without persistent
+storage, browser storage eviction can remove notes; force termination can
 lose uncommitted work. Browser storage is not a backup; an exported archive kept
 outside the browser profile is; Chromium folder backup provides another copy,
 subject to its reported permission and write status. Current compatibility and
@@ -141,7 +144,10 @@ bounds apply before fetching retained assets. The target independently verifies
 the signature's repository, workflow, main ref, source digest and hosted runner,
 plus current source run/attempt/gate and every package byte. The publisher replaces
 the whole site tree, and the verifier rejects all unlisted files. Approved static
-asset extensions exclude HTML/SVG. No archive extraction is used.
+asset extensions exclude HTML/SVG. Root files other than `index.html` and
+`.nojekyll` are limited to four exact installable-app names (manifest and three
+PNG icons); HTML may reference only those root names and current assets. No
+archive extraction is used.
 
 Read-only verification uploads the authenticated artifact. A separate job with
 Pages/OIDC write executes only SHA-pinned Actions and protected inline head checks;

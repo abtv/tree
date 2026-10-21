@@ -2,7 +2,15 @@ import type { CurrentManifest, ReleaseFile, ReleaseIdentity } from './types.mts'
 import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { allowedPath, assetPaths, MAX_FILE_BYTES, MAX_FILES, MAX_PACKAGE_BYTES, validateManifest } from './policy.mts'
+import {
+  allowedPath,
+  assetPaths,
+  MAX_FILE_BYTES,
+  MAX_FILES,
+  MAX_PACKAGE_BYTES,
+  ROOT_PUBLIC_FILES,
+  validateManifest,
+} from './policy.mts'
 
 export async function inspectPackage(directory: string) {
   const files: ReleaseFile[] = []
@@ -32,11 +40,16 @@ export async function inspectPackage(directory: string) {
   const html = await readFile(join(directory, 'index.html'), 'utf8')
   const paths = new Set(files.map((file) => file.path))
   for (const match of html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/gi)) {
-    if (!match[1]!.startsWith('./assets/') || !paths.has(match[1]!.slice(2))) {
+    const reference = match[1]!
+    if (!(reference.startsWith('./assets/') || isRootPublicReference(reference)) || !paths.has(reference.slice(2))) {
       throw new Error('HTML contains a non-package asset reference')
     }
   }
   return files
+}
+
+function isRootPublicReference(reference: string) {
+  return reference.startsWith('./') && ROOT_PUBLIC_FILES.includes(reference.slice(2))
 }
 
 export async function createManifest(
@@ -66,7 +79,9 @@ export async function verifyPackage(directory: string, input: unknown) {
     const current = new Set(manifest.assetGenerations[0])
     const html = await readFile(join(directory, 'index.html'), 'utf8')
     for (const match of html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/gi)) {
-      if (!current.has(match[1]!.slice(2))) throw new Error('HTML references a non-current asset')
+      if (!current.has(match[1]!.slice(2)) && !isRootPublicReference(match[1]!)) {
+        throw new Error('HTML references a non-current asset')
+      }
     }
   }
   return manifest

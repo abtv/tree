@@ -59,7 +59,7 @@ The owner-reviewed browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
 behavior remain as accepted. This checkpoint adds no synchronization, accounts
-or offline package; exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
+or offline package; installation, storage protection, exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
 While an image preview is open, the browser's ellipsis menu button is hidden.
@@ -1878,6 +1878,16 @@ The browser version keeps notes in the storage of one browser profile and origin
 The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They have no keyboard shortcuts and no command-panel entries, and Tree never prompts for them at startup.
 
 Nothing in this section sends notes over the network. Notes leave browser storage only as a file or folder that the user chose.
+
+### 24.1 Installation and Storage Protection
+
+The browser version provides a web app manifest, so browsers that offer installation, such as Chrome on macOS, can install it as **Tree** in its own window. The installed app uses the same origin, storage and notes as the browser tab. It has a 192- and 512-pixel icon and an Apple touch icon taken from the Tree icon artwork, with transparent corners. Installation adds no offline support: Tree registers no service worker, and opening the installed app still loads the site.
+
+The browser's window color follows the Appearance choice (§20.5): the light or dark document surface color, including after the choice changes. An installed window launched in dark appearance can briefly show the light surface color from the manifest before the page applies its appearance. Browsers do not offer a per-appearance manifest color.
+
+After the editor opens, Tree asks the browser once per page load to keep its storage when space runs low, unless the browser already reports persistent storage. The request never delays startup and shows no prompt of Tree's own. A refusal or an error changes nothing else. Persistent storage does not protect against clearing site data or deleting the profile, so export and folder backup remain the independent copies.
+
+The menu footer shows the result below the save status: `Storage is protected from automatic clearing.` or `Storage is not protected from automatic clearing.` Browsers without the storage API show no line.
 
 ### 24.2 Notes Archive
 

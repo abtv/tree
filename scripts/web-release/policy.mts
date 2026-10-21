@@ -13,10 +13,20 @@ export function assetPaths(manifest: { files: { path: string }[] }) {
     .sort()
 }
 
+// Installable-app files copied from src/web/public. Exact names only: never HTML,
+// SVG or directories. They are current-only and never retained across releases.
+export const ROOT_PUBLIC_FILES: readonly string[] = [
+  'manifest.webmanifest',
+  'icon-192.png',
+  'icon-512.png',
+  'apple-touch-icon.png',
+]
+
 export function allowedPath(path: unknown) {
   return (
     path === 'index.html' ||
     path === '.nojekyll' ||
+    (typeof path === 'string' && ROOT_PUBLIC_FILES.includes(path)) ||
     (typeof path === 'string' && /^assets\/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:js|css|ttf|otf|woff2?)$/.test(path))
   )
 }

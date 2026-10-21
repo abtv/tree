@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbf8f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#3f3f3f" media="(prefers-color-scheme: dark)" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Tree</title>
   </head>
   <body>
@@ -28,6 +32,7 @@
       <button id="data-restore" hidden>Restore from Folder…</button>
       <hr />
       <span id="prototype-save-status" role="status">Opening local document…</span>
+      <span id="storage-status" role="status" hidden></span>
       <span id="backup-status" role="status" hidden></span>
     </div>
     <input id="data-import-file" type="file" accept=".zip,application/zip" hidden />

@@ -6,6 +6,7 @@ import { installBrowserPrototype } from './services'
 import { capturePasteClipboard } from './paste'
 import { isApplePlatform } from './device'
 import { installDataMenu } from './data-menu'
+import { requestPersistentStorage, storageProtectionText } from './storage-persistence'
 import '../renderer/styles.css'
 import './styles.css'
 
@@ -52,6 +53,12 @@ try {
   }
   installDataMenu(store, menu, bridge.data)
   Object.assign(window, { prototypeStore: store })
+  void requestPersistentStorage(navigator.storage).then((protection) => {
+    const status = document.getElementById('storage-status')!
+    const text = storageProtectionText(protection)
+    status.textContent = text ?? ''
+    status.hidden = text === undefined
+  })
 } catch (error) {
   const problem = document.getElementById('prototype-problem')!
   problem.textContent = error instanceof Error ? error.message : String(error)
