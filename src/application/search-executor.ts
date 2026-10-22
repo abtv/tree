@@ -1,4 +1,5 @@
 import type { Document } from '../domain/document'
+import type { DayNumber } from '../domain/calendar-date'
 import { sameOccurrence, searchScope, type SearchOccurrence, type SearchScope } from '../domain/search-scope'
 import { prepareSearch, searchText, type TextMatch } from '../domain/text-search'
 
@@ -9,9 +10,9 @@ export interface SearchContext {
   readonly scope: SearchScope
 }
 
-export interface SearchPosition extends SearchOccurrence {
-  readonly offset: number
-}
+export type SearchPosition =
+  | (SearchOccurrence & { readonly offset: number; readonly beforeDay?: never })
+  | { readonly beforeDay: DayNumber; readonly offset: number; readonly nodeId?: never; readonly day?: never }
 
 export interface SearchDestination extends SearchOccurrence, TextMatch {
   readonly caret: number
@@ -67,11 +68,15 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
   let total = 0
   let before = 0
   let through = 0
-  let foundOrigin = false
+  const boundary = operation.kind === 'navigate' ? operation.origin.beforeDay : undefined
+  let foundOrigin = boundary !== undefined && request.scope.kind === 'agenda'
   for (const occurrence of searchScope(request.document, request.scope)) {
     yield undefined
     if (occurrence === undefined) continue
-    const atOrigin = operation.kind === 'navigate' && sameOccurrence(occurrence, operation.origin)
+    const atOrigin =
+      operation.kind === 'navigate' &&
+      operation.origin.nodeId !== undefined &&
+      sameOccurrence(occurrence, operation.origin)
     if (atOrigin) foundOrigin = true
     for (const match of searchText(occurrence.text, pattern)) {
       yield undefined
@@ -79,6 +84,11 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       total++
       if (operation.kind === 'count') {
         if (total === 101) return { kind: 'count', total: 100, capped: true }
+      } else if (boundary !== undefined) {
+        if (occurrence.day !== undefined && occurrence.day < boundary) {
+          before++
+          through++
+        }
       } else if (!foundOrigin) {
         before++
         through++

@@ -65,7 +65,7 @@ export const AgendaRow = memo(function AgendaRow({
   onToggle: (key: string) => void
   renderInput?: ((node: TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: TreeNode, editable: boolean) => ReactNode) | undefined
-  renderText?: ((node: TreeNode, day: number, marks: readonly CaretMark[]) => ReactNode) | undefined
+  renderText?: ((node: TreeNode, day: number, marks: readonly CaretMark[], context: boolean) => ReactNode) | undefined
 }): React.JSX.Element {
   const depth = row.kind === 'node' ? row.depth + 1 : 0
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
@@ -115,8 +115,8 @@ export const AgendaRow = memo(function AgendaRow({
             className={`node-enter-control${node!.children.length > 0 ? ' node-enter-control-has-children' : ''}`}
           />
           {renderInput === undefined ? (
-            row.role === 'match' && renderText !== undefined ? (
-              renderText(node!, row.day, marks)
+            renderText !== undefined ? (
+              renderText(node!, row.day, marks, row.role === 'context')
             ) : (
               <span className={`agenda-text${node!.struckThrough ? ' agenda-text-struck' : ''}`}>
                 {datedText(node!, row.day, marks)}

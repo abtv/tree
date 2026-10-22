@@ -11,12 +11,11 @@ import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
 import { LocationBar } from './LocationBar'
 import { AgendaLocationBar } from './AgendaLocationBar'
 import { AgendaView } from './AgendaView'
+import { AgendaSearchText } from './AgendaSearchText'
 import { CompletionPopup } from './CompletionPopup'
 import { CommandPanel } from './CommandPanel'
 import { useCommandPanel } from './use-command-panel'
 import { agendaDecorations, treeDecorations } from './date-decorations'
-import { richTextHtml } from './editor-dom'
-import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
@@ -340,25 +339,36 @@ export function App({
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           imageCaretActive={isImageCaretActive(node)}
           decorations={agendaDecorations(node, day)}
+          searchQuery={searchQuery}
+          currentMatch={
+            searchResult?.destination?.nodeId === node.id && searchResult.destination.day === day
+              ? searchResult.destination
+              : undefined
+          }
           richEditingEnabled={richEditingEnabled}
           {...nodeInputBindings(node)}
         />
       </>
     ),
-    [isImageCaretActive, nodeInputBindings, richEditingEnabled],
+    [isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult],
   )
   const renderAgendaText = useCallback(
-    (node: TreeNode, day: number, marks: readonly CaretMark[]): React.JSX.Element => (
-      <span
-        className={`agenda-text${node.struckThrough ? ' agenda-text-struck' : ''}`}
+    (node: TreeNode, day: number, marks: readonly CaretMark[], context: boolean): React.JSX.Element => (
+      <AgendaSearchText
+        node={node}
+        day={day}
+        marks={marks}
+        context={context}
+        query={searchQuery}
+        currentMatch={
+          searchResult?.destination?.nodeId === node.id && searchResult.destination.day === day
+            ? searchResult.destination
+            : undefined
+        }
         onClick={nodeInputBindings(node).onClick}
-        onMouseDown={preventReadOnlyLinkFocus}
-        dangerouslySetInnerHTML={{
-          __html: richTextHtml(node, agendaDecorations(node, day), marks),
-        }}
       />
     ),
-    [nodeInputBindings],
+    [nodeInputBindings, searchQuery, searchResult],
   )
 
   if (state.status === 'loading')
@@ -560,6 +570,11 @@ export function App({
         ) : commandPanel.message !== undefined ? (
           <span className="command-error" role="status">
             {commandPanel.message}
+          </span>
+        ) : null}
+        {search.visible && !commandPanel.open && statusMessage !== undefined ? (
+          <span className="status-bar-message search-status-message" role="status">
+            {statusMessage}
           </span>
         ) : null}
         {commandPanel.open ? (

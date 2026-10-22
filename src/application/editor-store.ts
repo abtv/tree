@@ -82,7 +82,7 @@ import {
   type NodeFoldCommand,
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
-import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { agendaAncestorKeys, AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { applyAgendaCommand, openAgendaState, type AgendaCommand, type AgendaState } from './agenda-state'
 import {
   createDayNodeTransition,
@@ -111,7 +111,10 @@ export class EditorStore {
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
-  public readonly search = new EditorSearch((destination) => this.revealSearchDestination(destination))
+  public readonly search = new EditorSearch(
+    (destination) => this.revealSearchDestination(destination),
+    this.agendaRowsCache,
+  )
   private readonly runtime = new EditorRuntimeState(
     () => this.agendaRowsCache.clear(),
     this.agendaRowsCache,
@@ -209,6 +212,31 @@ export class EditorStore {
       command.kind === 'fold'
         ? this.agendaRowsCache.get(state.document, { ...state.agenda, collapsed: new Set() })
         : this.getAgendaRows()
+    if (command.kind === 'select') this.search.cancelDraft()
+    if (command.kind === 'toggle-fold' || command.kind === 'fold') {
+      const all = command.kind === 'fold' && command.operation.endsWith('all')
+      const recursive = command.kind === 'fold' && command.operation.endsWith('recursive')
+      if (all) this.search.opened.clear()
+      else {
+        this.search.opened.delete(command.key)
+        if (recursive && this.search.opened.size > 0) {
+          const index = rows.findIndex((row) => row.key === command.key)
+          const parent = rows[index]
+          if (parent !== undefined && parent.kind !== 'gap') {
+            for (let cursor = index + 1; cursor < rows.length; cursor++) {
+              const row = rows[cursor]!
+              if (
+                row.kind !== 'node' ||
+                row.day !== parent.day ||
+                (parent.kind === 'node' && row.depth <= parent.depth)
+              )
+                break
+              this.search.opened.delete(row.key)
+            }
+          }
+        }
+      }
+    }
     const changed = applyAgendaCommand(state.agenda, command, rows)
     const nextRows = command.kind === 'return-timeline' ? this.agendaRowsCache.get(state.document, changed) : rows
     const agenda = command.kind === 'return-timeline' ? reconcileAgendaSelection(changed, nextRows) : changed
@@ -576,6 +604,18 @@ export class EditorStore {
   public hideSearch(): void {
     if (this.runtime.snapshot.status !== 'ready') return
     const state = this.runtime.ready()
+    if (state.agenda !== undefined) {
+      const agenda = state.agenda
+      const selected = this.getAgendaRows().find((row) => row.key === agenda.selectedKey)
+      const projection = this.agendaRowsCache.getProjection(state.document, agenda)
+      const keep = new Set(selected?.kind === 'node' ? agendaAncestorKeys(projection, selected) : [])
+      const collapsed = new Set(agenda.collapsed)
+      for (const key of this.search.opened) if (!keep.has(key)) collapsed.add(key)
+      this.search.opened.clear()
+      this.search.hide()
+      this.runtime.replaceReady({ ...state, agenda: { ...agenda, collapsed } })
+      return
+    }
     const keep = new Set(requireNode(state.document, state.location.selectedNodeId).ancestors.map((node) => node.id))
     const expandedIds = new Set(state.expansion.expandedIds)
     for (const id of this.search.opened) if (!keep.has(id)) expandedIds.delete(id)
@@ -589,6 +629,36 @@ export class EditorStore {
 
   private revealSearchDestination(destination: SearchDestination): void {
     const state = this.runtime.ready()
+    if (state.agenda !== undefined && destination.day !== undefined) {
+      const agenda = state.agenda
+      const occurrence = { nodeId: destination.nodeId, day: destination.day }
+      const projection = this.agendaRowsCache.getProjection(state.document, agenda)
+      const path = agendaAncestorKeys(projection, occurrence)
+      if (path === undefined) return
+      const collapsed = new Set(agenda.collapsed)
+      for (const key of path) {
+        if (collapsed.delete(key)) this.search.opened.add(key)
+      }
+      const revealed = { ...agenda, collapsed }
+      const rows = this.agendaRowsCache.get(state.document, revealed)
+      const next = applyAgendaCommand(
+        revealed,
+        {
+          kind: 'select',
+          key: `node:${destination.day}:${destination.nodeId}`,
+          cursor: destination.caret,
+        },
+        rows,
+      )
+      this.endTextSession()
+      this.runtime.replaceReady({
+        ...state,
+        agenda: next,
+        location: { ...state.location, selectedNodeId: destination.nodeId },
+        focus: { ...this.runtime.newFocus(destination.nodeId, destination.caret), revealLine: true },
+      })
+      return
+    }
     const found = locateNode(state.document, destination.nodeId)
     if (found === undefined || state.agenda !== undefined) return
     let expansion = state.expansion

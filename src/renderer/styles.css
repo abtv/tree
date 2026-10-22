@@ -970,9 +970,16 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 .search-count,
 .command-count {
+  flex-shrink: 0;
   color: var(--color-secondary);
   margin: 0 12px;
   font-size: 11px;
+}
+.search-status-message {
+  margin-left: 12px;
+}
+.search-input-line:has(~ .search-status-message) {
+  flex: 1 1 120px;
 }
 .search-match {
   background: color-mix(in srgb, var(--highlight-background) 50%, transparent);

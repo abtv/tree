@@ -2,7 +2,27 @@ import type { DayNumber } from '../domain/calendar-date'
 import { locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
 import { projectAgenda, type AgendaProjectionDay, type AgendaProjectionRow } from '../domain/agenda-projection'
 import { buildTimeline, type TimelineDay, type TimelineGap } from '../domain/agenda-timeline'
-import { dayKey, type AgendaState } from './agenda-state'
+import { dayKey, type AgendaState, type AgendaOccurrence } from './agenda-state'
+
+/** The projected ancestor path, excluding the destination itself. */
+export function agendaAncestorKeys(
+  projection: readonly AgendaProjectionDay[],
+  occurrence: AgendaOccurrence,
+): readonly string[] | undefined {
+  const rows = projection.find((entry) => entry.day === occurrence.day)?.rows
+  const index = rows?.findIndex((row) => row.nodeId === occurrence.nodeId) ?? -1
+  if (rows === undefined || index < 0) return undefined
+  const path = [dayKey(occurrence.day)]
+  let depth = rows[index]!.depth
+  for (let cursor = index - 1; cursor >= 0 && depth > 0; cursor--) {
+    const row = rows[cursor]!
+    if (row.depth < depth) {
+      path.push(`node:${occurrence.day}:${row.nodeId}`)
+      depth = row.depth
+    }
+  }
+  return path
+}
 
 export type AgendaRow =
   | (TimelineDay & { readonly key: string })
@@ -139,6 +159,11 @@ export class AgendaRowsCache {
   private state: AgendaState | undefined
   private rows: readonly AgendaRow[] = []
   private readonly dayRows = new Map<DayNumber, DayRows>()
+
+  public getProjection(document: Document, state: AgendaState): readonly AgendaProjectionDay[] {
+    this.get(document, state)
+    return this.projection
+  }
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
     let changed = false

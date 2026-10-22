@@ -23,6 +23,8 @@ export interface Clock {
 }
 
 export interface FocusIntent {
+  /** Reveal the caret line when arriving at a read-only projected row. */
+  readonly revealLine?: boolean
   nodeId: NodeId
   cursor: number
   token: number

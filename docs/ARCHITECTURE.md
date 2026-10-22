@@ -161,7 +161,7 @@ the previous destination, and retry canceled navigation only against a fresh con
 match offsets and grapheme caret offsets are separate; subsequent navigation can preserve
 the raw match anchor while the caret remains at its containing grapheme.
 
-`editor-search.ts` connects Tree input through `EditorStore`. Runtime publication updates
+`editor-search.ts` connects Tree and Agenda input through `EditorStore`. Runtime publication updates
 its monotonic document revision, including Undo/Redo, before notifying subscribers.
 Scope identity stays stable across ordinary selection and folds. The controller serializes
 navigation and retains the raw match anchor separately from the grapheme caret. Store
@@ -169,9 +169,16 @@ commands reveal ancestors and track search-owned expansion; manual fold commands
 ownership away from search. Query entry suppresses document focus projection while keeping
 ordinary selection authority current underneath. Mounted inputs scan their own text in
 bounded asynchronous slices and compose highlights with link/date/caret intervals.
-Agenda UI integration remains pending. Inactive search adds no corpus scans. Query entry,
+Agenda reuses the store-owned full projection cache before fold filtering. Scope keys
+include the Agenda root and focused day. Projection changes, including leaving a pinned
+item without a document edit, invalidate results. Origins and anchors retain occurrence
+day; synthetic headers use a position before their day. Read-only rows consume the
+existing focus token for same-row caret arrivals and its optional line-reveal hint
+to reveal a search destination within wrapped text. Agenda reveal/cleanup uses occurrence
+fold keys without changing Tree expansion. Inactive search adds no corpus scans. Query entry,
 counting and highlighting perform zero writes or syncs; navigation and revealed folds use
-existing view-state persistence. Per execution, memory scales with query length and traversal depth;
+existing view-state persistence in Tree; Agenda search navigation and folds remain runtime-only
+and add no writes or syncs. Per execution, memory scales with query length and traversal depth;
 Agenda additionally holds one temporary node-reference map proportional to document size.
 Session replacement and cancellation release obsolete work; memory does not grow with edit
 history or completed request count. No persistence fields, IPC, Worker or dependency are added.

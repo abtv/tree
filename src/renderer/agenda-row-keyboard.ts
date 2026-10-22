@@ -52,6 +52,8 @@ export function createAgendaKeyDownHandler({
     const index = rows.findIndex((row) => row.key === state.agenda!.selectedKey)
     const row = rows[index]
     if (row === undefined) return
+    const countDigit = /^[1-9]$/u.test(event.key) || (event.key === '0' && !!vim?.commandState.pending?.count)
+    if (!countDigit && event.key !== 'n' && event.key !== 'N') store.search.interruptNavigation()
     const finishClickReplace = (): void => {
       if (vim?.mode === 'replace') vim.setMode('normal')
     }
@@ -241,6 +243,7 @@ export function createAgendaKeyDownHandler({
     event.preventDefault()
     if (event.key === 'Escape') {
       store.cancelAgendaMove()
+      if (vim?.mode === 'normal' && store.search.session.getSnapshot().visible) store.hideSearch()
       if (rowText !== undefined && vim?.mode === 'visual') {
         // Leaving Visual keeps its active endpoint, as in Tree.
         const caret = rowText.caret()
@@ -259,6 +262,23 @@ export function createAgendaKeyDownHandler({
     const textMode = normal || vim?.mode === 'visual'
     // The character after `f`, `F`, `t`, `T` or `r` is data, never a count or a prefix.
     if (pending?.awaiting !== undefined && rowTextKey()) return
+    if (
+      normal &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      pending?.operator === undefined &&
+      pending?.prefix === undefined &&
+      ['/', 'n', 'N'].includes(event.key)
+    ) {
+      const origin =
+        row.kind === 'node'
+          ? { nodeId: row.nodeId, day: row.day, offset: sourceCursor() }
+          : { beforeDay: row.kind === 'day' ? row.day : row.startDay, offset: 0 }
+      clearCommandAssembly(vim.commandState)
+      if (event.key === '/') store.search.begin(origin)
+      else store.search.navigate(origin, event.key === 'n' ? 1 : -1, Math.max(1, Number(pending?.count || '1')))
+      return
+    }
     if (textMode && !event.ctrlKey && !event.altKey && /^[0-9]$/u.test(event.key)) {
       if (event.key !== '0' || pending?.count) {
         vim.commandState.pending =

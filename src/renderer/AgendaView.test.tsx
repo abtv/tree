@@ -7,6 +7,7 @@ import { createRealStoreHarness } from './test/real-store-harness'
 import { AgendaView } from './AgendaView'
 import type { EditorStore } from '../application/editor-store'
 import { dayNumberOf } from '../domain/calendar-date'
+import { AgendaSearchText } from './AgendaSearchText'
 
 afterEach(cleanup)
 
@@ -39,7 +40,16 @@ it('renders attachments on inactive direct matches and excludes contextual ances
       document={state.document}
       dragFreeze={{ begin: vi.fn(), end: vi.fn() }}
       renderInput={() => <span className="test-editor" />}
-      renderText={(node) => <a href="https://example.com">{node.text}</a>}
+      renderText={(node, day, marks, context) => (
+        <AgendaSearchText
+          node={{ ...node, links: [{ start: 0, end: node.text.length, url: 'https://example.com' }] }}
+          day={day}
+          marks={marks}
+          context={context}
+          query=""
+          onClick={() => undefined}
+        />
+      )}
       renderAttachment={(node, editable) => <span data-attachment={node.id} data-editable={editable} />}
     />,
   )

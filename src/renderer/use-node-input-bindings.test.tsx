@@ -126,6 +126,44 @@ async function fixture(
 }
 
 describe('useNodeInputBindings', () => {
+  it('restores search focus to the selected Agenda header, context or editor instead of a stale Tree input', async () => {
+    // jsdom omits CSS.escape; these fixture keys contain only selector-safe characters.
+    vi.stubGlobal('CSS', { escape: (value: string) => value })
+    const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
+    const f = await fixture({
+      document: { roots: [node('parent', 'apple context', [node('child', 'apple 2026-10-14')])] },
+      services: { today: () => day },
+    })
+    const stale = f.input('parent')
+    const editor = f.input('child')
+    act(() => f.store.openAgenda())
+    const mounted = new Map<string, HTMLElement>()
+    for (const row of f.store.getAgendaRows()) {
+      const element = document.createElement('div')
+      element.className = 'agenda-row'
+      element.dataset.agendaKey = row.key
+      element.tabIndex = 0
+      document.body.append(element)
+      mounted.set(row.key, element)
+    }
+    const childKey = `node:${day}:child`
+    editor.classList.add('node-input')
+    mounted.get(childKey)!.append(editor)
+    const prompt = document.createElement('input')
+    document.body.append(prompt)
+    for (const key of [`day:${day}`, `node:${day}:parent`, childKey]) {
+      act(() => f.store.applyAgenda({ kind: 'select', key, cursor: 2 }))
+      prompt.focus()
+      act(() => f.result.current.restoreSearchFocus())
+      expect(document.activeElement).toBe(key === childKey ? editor : mounted.get(key))
+      expect(document.activeElement).not.toBe(stale)
+    }
+    mounted.get(childKey)!.removeAttribute('data-agenda-key')
+    prompt.focus()
+    act(() => f.result.current.restoreSearchFocus())
+    expect(document.activeElement).toBe(editor)
+  })
+
   it('restores the saved image caret after search cancellation without a new selection owner', async () => {
     const f = await fixture({ document: { roots: [image('apple text')] } })
     const input = f.input()

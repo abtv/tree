@@ -14,6 +14,28 @@ const base: SearchRequest = {
 }
 
 describe('incremental executor', () => {
+  it.each([
+    [2, 1, 2, 0, false],
+    [2, -1, 1, 6, false],
+    [3, 1, 4, 0, false],
+    [3, -1, 2, 6, false],
+    [5, 1, 1, 0, true],
+    [0, -1, 4, 6, true],
+  ] as const)('navigates from synthetic boundary %i in direction %i', (boundary, direction, day, start, wrapped) => {
+    expect(
+      searchHarness().run({
+        ...base,
+        scope: {
+          kind: 'agenda',
+          projection: [1, 2, 4].map((value) => ({
+            day: value as DayNumber,
+            rows: [{ nodeId: 'a', depth: 0, role: 'match' }],
+          })),
+        },
+        operation: { kind: 'navigate', origin: { beforeDay: boundary as DayNumber, offset: 0 }, direction, count: 1 },
+      }),
+    ).toMatchObject({ destination: { day, start }, wrapped, missingOrigin: false })
+  })
   it('keeps 100 exact and never matches across node boundaries', () => {
     const harness = searchHarness()
     expect(harness.run({ ...base, document: { roots: [{ id: 'a', text: 'aa '.repeat(100), children: [] }] } })).toEqual(

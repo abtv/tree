@@ -68,15 +68,28 @@ export function AgendaView({
   renderInput?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: import('../domain/document').TreeNode, editable: boolean) => ReactNode) | undefined
   renderText?:
-    ((node: import('../domain/document').TreeNode, day: number, marks: readonly CaretMark[]) => ReactNode) | undefined
+    | ((
+        node: import('../domain/document').TreeNode,
+        day: number,
+        marks: readonly CaretMark[],
+        context: boolean,
+      ) => ReactNode)
+    | undefined
 }): React.JSX.Element {
   const elements = useRef(new Map<string, HTMLDivElement>())
   // The caret of a row without an editor is renderer state: it changes on every motion key, so it
   // stays out of the store and the document. Navigation supplies the arrival offset.
   const arrival = { key: agenda.selectedKey, anchor: agenda.selectionCursor ?? 0, focus: agenda.selectionCursor ?? 0 }
   const [caretState, setCaretState] = useState<RowCaret>(() => arrival)
-  if (caretState.key !== agenda.selectedKey) setCaretState(arrival)
-  const caret = caretState.key === agenda.selectedKey ? caretState : arrival
+  const snapshot = store.getSnapshot()
+  const focus = snapshot.status === 'ready' ? snapshot.focus : undefined
+  const [lastFocus, setLastFocus] = useState(focus)
+  const arrived = caretState.key !== agenda.selectedKey || lastFocus !== focus
+  if (arrived) {
+    setLastFocus(focus)
+    setCaretState(arrival)
+  }
+  const caret = arrived ? arrival : caretState
   // Key handlers read the caret between renders, so a ref mirrors it and every write updates both.
   const caretRef = useRef(caret)
   useLayoutEffect(() => {
@@ -298,6 +311,8 @@ export function AgendaView({
   const select = useCallback(
     (key: string): void => {
       reveal.current = 'pointer'
+      store.search.cancelDraft()
+      store.search.interruptNavigation()
       if (vim !== undefined) clearCommandAssembly(vim.commandState)
       store.applyAgenda({ kind: 'select', key })
     },
@@ -314,6 +329,7 @@ export function AgendaView({
     [store, vim],
   )
   useLayoutEffect(() => {
+    if (store.search.session.getSnapshot().draft !== undefined) return
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
     if (element.querySelector('.node-input') === null) {
@@ -321,14 +337,23 @@ export function AgendaView({
       // The editor that lost focus keeps its native selection, which would paint a second caret.
       globalThis.getSelection()?.removeAllRanges()
     }
-    if (skipReveal.current) viewportReveal.cancel()
+    if (focus?.revealLine && element.dataset.nodeId === focus.nodeId) {
+      const caretElement = element.querySelector('.agenda-caret')
+      // Editable rows use the input owner's existing line-reveal intent.
+      if (caretElement === null) viewportReveal.cancel()
+      else
+        viewportReveal.begin(caretElement, true, () => {
+          const state = store.getSnapshot()
+          return state.status === 'ready' && state.focus === focus
+        })
+    } else if (skipReveal.current) viewportReveal.cancel()
     else if (reveal.current !== 'none')
       viewportReveal.begin(element, reveal.current === 'keyboard', () => {
         const state = store.getSnapshot()
         return state.status === 'ready' && state.agenda?.selectedKey === agenda.selectedKey
       })
     else viewportReveal.cancel()
-  }, [agenda.selectedKey, agenda.focusedDay, store, viewportReveal])
+  }, [agenda.selectedKey, agenda.focusedDay, focus, store, viewportReveal])
   const drag = useAgendaDrag({
     rows,
     locked,

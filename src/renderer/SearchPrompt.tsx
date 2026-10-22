@@ -51,9 +51,12 @@ export function SearchPrompt({
             store.search.cancelDraft()
             restoreEditor()
             const active = document.activeElement
-            store.openAgenda(active instanceof HTMLElement ? getCaret(active) : undefined)
+            const state = store.getSnapshot()
+            if (state.status === 'ready' && state.agenda !== undefined) store.closeAgenda()
+            else store.openAgenda(active instanceof HTMLElement ? getCaret(active) : undefined)
           } else if (event.key === 'Escape') {
             event.preventDefault()
+            store.cancelAgendaMove()
             store.search.cancelDraft()
             restoreEditor()
           } else if (event.key === 'Enter') {

@@ -3,6 +3,7 @@ import type { SearchScope } from '../domain/search-scope'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { SearchSession } from './search-session'
 import type { SearchDestination, SearchPosition, SearchResult } from './search-executor'
+import { AgendaRowsCache } from './agenda-rows'
 
 type Navigation = Extract<SearchResult, { kind: 'navigate' }>
 
@@ -22,7 +23,10 @@ export class EditorSearch {
   private result: Navigation | undefined
   private readonly listeners = new Set<() => void>()
 
-  public constructor(private readonly apply: (destination: SearchDestination) => void) {
+  public constructor(
+    private readonly apply: (destination: SearchDestination) => void,
+    private readonly agendaRows: AgendaRowsCache,
+  ) {
     this.session.subscribe(() => this.listeners.forEach((listener) => listener()))
   }
 
@@ -35,24 +39,40 @@ export class EditorSearch {
   public update(state: ReadySnapshot): void {
     const previous = this.state
     this.state = state
-    const key = state.agenda === undefined ? `tree:${state.location.currentParentId ?? ''}` : 'agenda'
+    const agenda = state.agenda
+    const key =
+      agenda === undefined
+        ? `tree:${state.location.currentParentId ?? ''}`
+        : `agenda:${agenda.scopeParentId ?? ''}:${agenda.focusedDay ?? 'timeline'}`
+    const projection = agenda === undefined ? undefined : this.agendaRows.getProjection(state.document, agenda)
+    const changedProjection = this.scope.kind === 'agenda' && this.scope.projection !== projection
     const changedScope = key !== this.scopeKey
     const changedDocument = previous?.document !== state.document
-    if (!this.applying && previous?.focus !== state.focus && this.session.getSnapshot().draft === undefined)
+    if (
+      !this.applying &&
+      (previous?.focus !== state.focus || previous?.agenda?.selectedKey !== agenda?.selectedKey) &&
+      this.session.getSnapshot().draft === undefined
+    )
       this.interruptNavigation()
-    if (!changedScope && !changedDocument) return
+    if (!changedScope && !changedDocument && !changedProjection) return
     this.cancelNavigation()
     if (changedDocument) this.revision++
     if (changedScope) {
       this.scopeKey = key
-      this.scope = { kind: 'tree', parentId: state.location.currentParentId }
       this.opened.clear()
     }
+    this.scope =
+      agenda === undefined
+        ? { kind: 'tree', parentId: state.location.currentParentId }
+        : {
+            kind: 'agenda',
+            projection: projection!,
+            ...(agenda.focusedDay === undefined ? {} : { focusedDay: agenda.focusedDay }),
+          }
     this.session.replaceContext({ document: state.document, revision: this.revision, scopeKey: key, scope: this.scope })
   }
 
   public begin(origin: SearchPosition): void {
-    if (this.state?.agenda !== undefined) return
     this.cancelNavigation()
     this.session.begin(origin)
   }
@@ -91,7 +111,7 @@ export class EditorSearch {
   }
 
   public navigate(origin: SearchPosition, direction: -1 | 1, count: number): void {
-    if (this.state?.agenda !== undefined || !this.session.getSnapshot().confirmed) return
+    if (!this.session.getSnapshot().confirmed) return
     if (this.busy) {
       const last = this.queued.at(-1)
       if (last?.direction === direction && last.count === count) last.repeats++
@@ -100,8 +120,11 @@ export class EditorSearch {
     }
     const anchor = this.anchor
     const position =
-      anchor?.nodeId === origin.nodeId && anchor.caret === origin.offset
-        ? { nodeId: anchor.nodeId, offset: anchor.start }
+      anchor !== undefined &&
+      anchor.nodeId === origin.nodeId &&
+      anchor.day === origin.day &&
+      anchor.caret === origin.offset
+        ? { ...anchor, offset: anchor.start }
         : origin
     this.busy = true
     const generation = this.generation
@@ -140,18 +163,15 @@ export class EditorSearch {
         this.applying = false
       }
     }
+    if (generation !== this.generation) return
     this.result = result
     this.busy = false
     this.listeners.forEach((listener) => listener())
     const next = this.queued[0]
     if (next !== undefined && --next.repeats === 0) this.queued.shift()
     const state = this.state
-    if (next !== undefined && state !== undefined) {
-      this.navigate(
-        { nodeId: state.location.selectedNodeId, offset: state.focus?.cursor ?? 0 },
-        next.direction,
-        next.count,
-      )
+    if (next !== undefined && state !== undefined && result.destination !== undefined) {
+      this.navigate({ ...result.destination, offset: result.destination.caret }, next.direction, next.count)
     }
   }
 }

@@ -1,6 +1,6 @@
 # Vim Text Search
 
-Status: In progress — T1 and T2 complete; T3 Ready.
+Status: In progress — T1–T3 complete; T4 ready.
 
 ## Objective and authorization
 
@@ -10,7 +10,7 @@ The owner approved the behavior recorded below in conversation and then asked to
 
 Priority: prompt visible feedback for typing, scrolling, folding and navigation; correct results after edits and structural changes; ordinary Vim conventions except the explicitly agreed differences. Do not trade correctness for a stale count or stale navigation target.
 
-Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–20.2, 20.7–20.8, 22 and 23; [ARCHITECTURE](../docs/ARCHITECTURE.md); [VIM_CONFORMANCE](../docs/VIM_CONFORMANCE.md); [DEVELOPMENT](../docs/DEVELOPMENT.md) §§8–12; [workflow procedures](../docs/AGENT_WORKFLOW.md) §§5, 8–14. PRODUCT §20.2.26 describes delivered Tree search. Agenda integration and the integrated assessment remain future scope in this plan. Update the owning requirements and conformance evidence as implementation lands.
+Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–20.2, 20.7–20.8, 22 and 23; [ARCHITECTURE](../docs/ARCHITECTURE.md); [VIM_CONFORMANCE](../docs/VIM_CONFORMANCE.md); [DEVELOPMENT](../docs/DEVELOPMENT.md) §§8–12; [workflow procedures](../docs/AGENT_WORKFLOW.md) §§5, 8–14. PRODUCT §20.2.26 describes delivered Tree and Agenda search. The integrated assessment remains future scope. Update the owning requirements and conformance evidence as implementation lands.
 
 ## Agreed behavior
 
@@ -64,6 +64,8 @@ The owner approved D1–D5 in the follow-up discussion and requested that they b
 | D3 | Ordinary text click during query entry, and collapsing the ancestor containing the captured origin | A text click cancels the draft and performs ordinary selection. A chevron keeps query entry active and retains the logical node/offset origin even if hidden, while ordinary fold selection rules still apply underneath. |
 | D4 | Recall, empty-query confirmation and a match beginning exactly at the origin | `/` prefills and selects the last confirmed query. Typing replaces it; `Enter` repeats it. Empty confirmation reuses the last query if present, otherwise does nothing. A forward jump starts strictly after the caret and may wrap. |
 | D5 | Count prefixes, overlapping matches and Unicode position rules | Support numeric prefixes for `n`/`N`, nonoverlapping matches and caret positions at grapheme boundaries. This does not add regex support. |
+| D6 | Search origins on Agenda day and gap labels | The owner accepted the examples: forward search starts after the synthetic row, including a day header's contents; reverse search starts before it. Gap origins lie between surrounding days. Wrap at scope boundaries. |
+| D7 | Search entry alongside Agenda status | The owner accepted simultaneous display: query field at the left, existing move/date-removal message beside it, and count at the right. Search navigation retains pending moves; Escape retains its existing cancellation rule. |
 
 Other implementation details are delegated only within existing recorded requirements. New capabilities, persistence, architecture boundaries, or competing user-visible interpretations remain reserved under AGENTS §§5–6. The implementation must inventory prompt blur, application commands, IME composition, pending Agenda moves, overlays, Vim disable, scope deletion and read-only contextual rows, and raise any material conflict not settled by existing requirements.
 
@@ -77,8 +79,8 @@ All runtime tasks provisionally use **High Risk** functional validation because 
 | --- | --- | --- | --- | --- |
 | T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Authorized | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Complete |
 | T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Complete |
-| T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Ready |
-| T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Planned |
+| T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Complete |
+| T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Ready |
 
 ### T1 — Search foundation
 
@@ -112,6 +114,25 @@ Acceptance: timeline and focused-day scope; chronological/depth-first ordering; 
 
 Inspect actual light/dark contextual/mirror highlighting and focused-result caret geometry. Verify search feedback alongside Agenda's existing date-removal status message. Measure repeated-occurrence scaling and scrolling during search. Independent reviewer and product verifier are required before commit.
 
+T3 delivered occurrence-aware Agenda search, contextual/mirror highlighting, independent
+fold reveal/cleanup, focused-day recall, and concurrent status messages. Independent
+reviewer and product verifier found no meaningful issues. The owner reported "it works"
+after the prepared native-keyboard round, satisfying the T3 pre-commit gate.
+
+All required validation stages passed through composed evidence, including 4452 unit
+tests with coverage floors, affected Electron/browser transitions and inspected visuals.
+The full Electron attempt had one clipboard mouse-selection failure; its unchanged
+isolated rerun passed in both modes. Later affected Agenda tests passed after the wrapped
+context reveal correction. No unresolved functional failure remains.
+
+T4 must investigate narrow performance headroom: repeated Agenda search navigation
+exceeded its existing ceiling in some runs, then passed three serial instrumented runs
+without production or limit changes. The variation's cause is unproven. Reuse temporary
+T3 evidence at `.scratch/agenda-search/t3-evidence.md`, the same-machine baseline in
+`.scratch/agenda-search/baseline/test-results/perf-results.json`, and the comparison in
+`.scratch/agenda-search/after-performance.json`. These remain only while T4 needs them;
+retire the task scratch directory before initiative closure.
+
 ### T4 — Integrated assessment and delivery
 
 Expected files: focused domain/application state tests, `e2e/electron/vim-search.spec.ts`, `agenda-search.spec.ts`, affected history/structural specs, focused `perf/electron/` scenarios and owning requirements/conformance documents. Production fixes remain within the approved feature; index/Worker changes are not implicitly authorized by a failed measurement.
@@ -137,17 +158,17 @@ DEVELOPMENT §9, Validation Evidence and Reuse, explicitly requires changed inpu
 - Current authorization: implement the initiative, starting with T1, as explicitly approved on 2026-10-22. D1–D5 remain approved.
 - Implementation allowance: the four working tasks, their required checks and in-scope review corrections, at most four task commits per primary session. Use the workflow limit of two unsuccessful recovery attempts at the same blocker without new evidence before escalation. No token or elapsed-time allowance has been approved or invented.
 - Proposed separate closure allowance: one documentation retirement commit after explicit acceptance of the unchanged delivered result. Waiting for acceptance does not consume implementation allowance.
-- Expected remaining owner involvement: one planned pre-commit native-keyboard verification round at T3, and one final acceptance round after T4. T2's owner check is complete. D1–D5 and implementation are settled and do not need renewed approval. The owner updated Electron to 44.9.3; validation resolved the audit blocker. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
+- Expected remaining owner involvement: one final acceptance round after T4. T2 and T3 native-keyboard checks are complete. D1–D7 and implementation are settled and do not need renewed approval. The owner updated Electron to 44.9.3; validation resolved the audit blocker. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
 
 | Gate | Owner action | Reason and timing |
 | --- | --- | --- |
 | Before T2 commit — complete | Owner checked the prepared Tree instance and reported “it works” | Selected recall retained after owner comparison; the prepared steps covered search, cancellation, held keys and applicable native input. |
-| Before T3 commit | Repeat the distinct Agenda input paths, including contextual/mirror destinations and editing the active occurrence | The separate Agenda handlers and read-only row paths require their own real-keyboard verification before commit. |
+| Before T3 commit — complete | Owner checked the prepared Agenda instance and reported "it works" | The prepared round covered contextual/mirror destinations, editing, recall, repeated keys, focused days and pending moves. |
 | After T4 | Inspect the delivered result using concrete commit-bound instructions and accept or report issues | Four substantive tasks trigger workflow §8 final acceptance. This is distinct from automated verification. |
 
 ## Exact next action and continuation
 
-Next action: implement T3 Agenda integration in a fresh session. T2 crossed multiple interaction owners and required review correction, so keep its completed work as the session boundary. The whole initiative remains authorized; do not ask for D1–D5 or implementation approval again. Reuse the Tree session/controller contracts while supplying occurrence-aware Agenda scope and reveal behavior. Prepare the separate owner native-keyboard check before T3's commit. T4 remains dependent on T3.
+Next action: start T4 integrated assessment in a fresh session. T3 crossed multiple interaction owners, required a wrapped-context reveal correction and exposed performance variation; T4 is a substantial assessment rather than a small follow-up. Its scope remains authorized. Recover the retained T3 evidence above, inventory remaining acceptance gaps, and investigate performance variation without weakening existing ceilings. Do not repeat implementation approval or the passed T2/T3 owner checks unless new changes invalidate them.
 
 Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
 

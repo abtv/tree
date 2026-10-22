@@ -942,6 +942,15 @@ export function useNodeInputBindings({
     restoreSearchFocus: () => {
       const state = store.getSnapshot()
       if (state.status !== 'ready') return
+      if (state.agenda !== undefined) {
+        const row = document.querySelector<HTMLElement>(
+          `.agenda-row[data-agenda-key="${CSS.escape(state.agenda.selectedKey)}"]`,
+        )
+        if (row !== null && row.querySelector('.node-input') === null) {
+          row.focus({ preventScroll: true })
+          return
+        }
+      }
       const id = state.location.selectedNodeId
       const input = inputs.current.get(id)
       if (input === undefined) return

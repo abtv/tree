@@ -16,7 +16,7 @@ Agenda direct matches reuse Tree text commands. Normal `Enter` opens the hyperli
 
 ## Mode and command families
 
-Tree `/`, `n` and `N` follow PRODUCT §20.2.26. **Vim divergence:** the approved
+Tree and Agenda `/`, `n` and `N` follow PRODUCT §20.2.26. **Vim divergence:** the approved
 search is literal, preselects the recalled query, highlights without moving during
 entry, and uses Normal Escape to hide feedback and clean up search-owned folds.
 Tree scope includes folded descendants and its heading; search does not cross node
@@ -24,6 +24,11 @@ boundaries. `src/application/editor-search.test.ts` covers current-data navigati
 and fold ownership; T1 matcher/session suites cover matching and cancellation;
 `e2e/electron/vim-search.spec.ts` covers prompt input, navigation, recall, manual
 folding, counts beyond the cap, scrolling, link/date rendering and Insert editing.
+Agenda searches chronological projected occurrences, including contextual text and
+folded days, with synthetic headers as origins. `src/application/editor-search-agenda.test.ts`
+covers occurrence identity, independent folds, pinned-item invalidation and recall;
+`e2e/electron/agenda-search.spec.ts` covers contextual caret arrival, mirrors, draft
+focus, focused-day transitions and concurrent status messages.
 
 Tree Normal `o` follows PRODUCT §20.2.10 and §20.2.19; Insert `Enter` at text end follows the same placement under §5.1. **Vim divergence:** an expanded node with children receives a first child; a collapsed node receives a sibling after its subtree. This follows the visible outline without opening closed branches. Dot replay of `o` uses the destination node's current expansion; Enter retains its Insert-session interruption behavior. The application transition unit/property tests and store tests cover placement, subtree preservation, focus, expansion and history; `e2e/electron/inline-expansion.spec.ts` covers real keyboard dispatch, replay, mode, caret and rendered placement in standard editing and Vim Insert. `e2e/electron/editing.spec.ts` retains beginning/middle/leaf Enter coverage.
 

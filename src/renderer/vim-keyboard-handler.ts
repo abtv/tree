@@ -625,11 +625,27 @@ export function handleVimKey(
   clearPending(commandState)
 
   if (!visual && event.key === '/' && store.getSnapshot().status === 'ready') {
-    store.search.begin({ nodeId: node.id, offset: cursor })
+    store.search.begin({
+      nodeId: node.id,
+      offset: cursor,
+      ...(snapshot.status === 'ready' && snapshot.agenda?.activeOccurrence !== undefined
+        ? { day: snapshot.agenda.activeOccurrence.day }
+        : {}),
+    })
     return handled()
   }
   if (!visual && (event.key === 'n' || event.key === 'N')) {
-    store.search.navigate({ nodeId: node.id, offset: cursor }, event.key === 'n' ? 1 : -1, count)
+    store.search.navigate(
+      {
+        nodeId: node.id,
+        offset: cursor,
+        ...(snapshot.status === 'ready' && snapshot.agenda?.activeOccurrence !== undefined
+          ? { day: snapshot.agenda.activeOccurrence.day }
+          : {}),
+      },
+      event.key === 'n' ? 1 : -1,
+      count,
+    )
     return handled()
   }
 
