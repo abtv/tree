@@ -374,7 +374,9 @@ describe('notes archive entries', () => {
     })
     const archive = buildZip([{ ...documentEntry, method: 8, data }], {})
     const result = await readArchiveEntry(memoryFile(archive), await entryOf(archive), recording)
-    expect(result).toEqual(data)
+    // A deep equality matcher walks a megabyte element by element and times out under coverage.
+    expect(result.byteLength).toBe(data.byteLength)
+    expect(result.every((byte, index) => byte === data[index])).toBe(true)
     expect(pushes.every((push) => push.length <= 16 * 1024)).toBe(true)
     expect(pushes.filter((push) => push.final)).toHaveLength(1)
     expect(pushes.at(-1)).toEqual({ length: (1024 * 1024 + 20_000) % (16 * 1024), final: true })
