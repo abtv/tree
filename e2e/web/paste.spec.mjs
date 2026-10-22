@@ -1,6 +1,42 @@
 // @editing-modes: independent
 import { test, expect, capture, pressPaste, primaryKey } from './fixtures.mjs'
 
+for (const vimEnabled of [false, true]) {
+  // @requirement PRODUCT.md §13
+  test(`recognizes a plain URL immediately after native paste (${vimEnabled ? 'Vim Insert' : 'standard'})`, async ({
+    newContext,
+    baseURL,
+  }) => {
+    const context = await newContext()
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    const page = await context.newPage()
+    await page.goto(baseURL)
+    await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+    await page.evaluate(async (enabled) => {
+      await window.treeApi.setVimEnabled(enabled)
+    }, vimEnabled)
+    await page.reload()
+    const input = page.locator('.node-row[data-node-id="welcome"] .node-input')
+    if (vimEnabled) {
+      await input.click()
+      await page.keyboard.press('i')
+    }
+    await input.fill('')
+    const url = 'https://example.com/settings/data-controls'
+    await page.evaluate(async (text) => navigator.clipboard.writeText(text), url)
+    await pressPaste(page)
+    const link = input.locator('a')
+    await expect(link).toHaveText(url)
+    await expect(link).toHaveAttribute('href', url)
+    await expect(input).toBeFocused()
+    const opened = page.waitForEvent('popup')
+    await link.click({ modifiers: [primaryKey] })
+    const popup = await opened
+    await popup.close()
+    await capture(page, `native-url-paste-${vimEnabled ? 'vim' : 'standard'}.png`)
+  })
+}
+
 // @requirement PRODUCT.md §1.4
 test('uses native text paste in every Vim mode and editor location', async ({ newContext, baseURL }) => {
   const context = await newContext()

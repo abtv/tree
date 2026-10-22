@@ -7,6 +7,16 @@ function data(files: File[] = [], text = '', html = ''): DataTransfer {
 }
 
 describe('browser paste event clipboard', () => {
+  it.each(['', '<span>https://example.com/path</span>'])(
+    'leaves URL recognition to the store when clipboard HTML has no anchors: %s',
+    async (html) => {
+      await expect(capturePasteClipboard(data([], 'https://example.com/path', html))()).resolves.toEqual({
+        kind: 'text',
+        text: 'https://example.com/path',
+      })
+    },
+  )
+
   it('captures text and hyperlinks before the event data becomes unavailable', async () => {
     const transfer = data([], 'Example', '<a href="https://example.com">Example</a>')
     const read = capturePasteClipboard(transfer)

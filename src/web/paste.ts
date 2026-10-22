@@ -12,6 +12,7 @@ export function capturePasteClipboard(data: DataTransfer): () => Promise<Clipboa
       if (image.size > MAX_ATTACHMENT_BYTES) throw new Error('Clipboard image is too large (maximum 25 MiB).')
       return { kind: 'image', png: new Uint8Array(await image.arrayBuffer()) }
     }
-    return { kind: 'text', text, links: extractClipboardLinks(html, text) }
+    const links = extractClipboardLinks(html, text)
+    return links.length === 0 ? { kind: 'text', text } : { kind: 'text', text, links }
   }
 }
