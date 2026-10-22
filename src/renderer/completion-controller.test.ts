@@ -80,7 +80,7 @@ it('shares dismissal, selection and hyperlink exclusion with emoji completion', 
     description: ':rocket:',
   })
   assist.move(-1)
-  expect(assist.popup?.selected).toBe(1)
+  expect(assist.popup?.selected).toBe(assist.popup!.suggestions.length - 1)
   assist.observe('n', ':roc', 0, 4, true)
   expect(assist.popup).toBeUndefined()
   assist.edit('n', ':roc', 4, today, [{ start: 0, end: 4 }])

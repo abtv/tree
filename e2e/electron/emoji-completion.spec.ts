@@ -12,6 +12,10 @@ import {
 } from './fixtures'
 import catalog from '../../src/domain/emoji-catalog.json'
 
+function matchingShortcodes(query: string): string[] {
+  return Object.keys(catalog).filter((shortcode) => new RegExp([...query].join('.*')).test(shortcode))
+}
+
 describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.12
   test('keeps all keyboard-selected suggestions visible in a small window', async ({ userDataDir }, testInfo) => {
@@ -29,7 +33,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await setCursor(input, 5)
     await window.keyboard.type(':ma')
     const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
-    const matches = Object.keys(catalog).filter((shortcode) => shortcode.startsWith('ma'))
+    const matches = matchingShortcodes('ma')
     await expect(popup.getByRole('option')).toHaveCount(matches.length)
     for (let index = 1; index <= matches.length; index++) {
       await window.keyboard.press('ArrowDown')
@@ -72,7 +76,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.12
   test('accepts plain-editor emoji and restores literal text', async ({ userDataDir }, testInfo) => {
     seedDocument(userDataDir, {
-      document: { roots: [{ id: 'n', text: 'Plan :rocke suffix', children: [] }] },
+      document: { roots: [{ id: 'n', text: 'Plan :rkt suffix', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'n' },
     })
     const { window } = await launchTree(userDataDir)
@@ -83,25 +87,29 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await window.keyboard.press('Escape')
       await window.keyboard.press('i')
     }
-    await setCursor(input, 11)
+    await setCursor(input, 9)
     await window.keyboard.press('Backspace')
-    await window.keyboard.type('e')
+    await window.keyboard.type('t')
     await expect(popup).toBeVisible()
-    await window.keyboard.press('Enter')
+    const rocket = popup.getByRole('option').filter({ hasText: ':rocket:' })
+    await expect(rocket).toBeVisible()
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-fuzzy-rkt.png')) })
+    await rocket.click()
     await expect(input).toHaveValue('Plan 🚀 suffix')
     await window.keyboard.type('!')
     await expect(input).toHaveValue('Plan 🚀! suffix')
     await expect(input).toBeFocused()
     await window.keyboard.press('Meta+z')
     await window.keyboard.press('Meta+z')
-    await expect(input).toHaveValue('Plan :rocke suffix')
+    await expect(input).toHaveValue('Plan :rkt suffix')
     await expect(popup).toHaveCount(0)
     await window.keyboard.press('Meta+a')
     await window.keyboard.type(':1')
     await expect(popup.getByRole('option').first()).toContainText(':100:')
     await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-numeric-prefix.png')) })
     await window.keyboard.type('00')
-    await expect(popup.getByRole('option')).toHaveCount(1)
+    await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('100').length)
+    await expect(popup.getByRole('option', { selected: true })).toContainText(':100:')
     await window.keyboard.press('Enter')
     await expect(input).toHaveValue('💯')
     await expect(input).toBeFocused()
@@ -216,11 +224,9 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await expect(popup.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
       await window.screenshot({ path: testInfo.outputPath(screenshotName(`emoji-${view}-colon.png`)) })
       await window.keyboard.type('r')
-      await expect(popup.getByRole('option')).toHaveCount(
-        Object.keys(catalog).filter((shortcode) => shortcode.startsWith('r')).length,
-      )
+      await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('r').length)
       await window.keyboard.type('oc')
-      await expect(popup.getByRole('option')).toHaveCount(2)
+      await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('roc').length)
       await expect(popup.getByRole('option').nth(1)).toContainText('🚀')
       await window.keyboard.down('Meta')
       await expect(popup).toBeVisible()
@@ -262,9 +268,8 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await expect.poll(readText).toBe('2026-10-08 Plan 🚀')
       await expect(popup).toHaveCount(0)
       await window.keyboard.press('Meta+a')
-      await window.keyboard.type('2026-10-08 Plan :woman_techn')
-      await expect(popup.getByRole('option')).toHaveCount(1)
-      await popup.getByRole('option').click()
+      await window.keyboard.type('2026-10-08 Plan :wtech')
+      await popup.getByRole('option').filter({ hasText: ':woman_technologist:' }).click()
       await expect.poll(readText).toBe('2026-10-08 Plan 👩‍💻')
       await expect(input).toBeFocused()
       await window.keyboard.type('!')
@@ -303,6 +308,12 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await expect.poll(readText).toBe('2026-10-08 Plan 🚀')
       await expect(popup).toHaveCount(0)
       await expect(window.getByRole('listbox', { name: 'Date suggestions' })).toHaveCount(0)
+      await window.keyboard.press('Meta+a')
+      await window.keyboard.type('2026-10-08 Plan :cat')
+      await expect(popup.getByRole('option', { selected: true })).toContainText(':cat:')
+      await expect(popup.getByRole('option').nth(1)).toContainText(':cat2:')
+      await window.keyboard.press('Enter')
+      await expect.poll(readText).toBe('2026-10-08 Plan 🐱')
     })
   }
 })

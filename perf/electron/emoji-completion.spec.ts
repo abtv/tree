@@ -20,7 +20,7 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
     globalThis.addEventListener(
       'keydown',
       (event) => {
-        if (event.key !== ':' && event.key !== 'ArrowDown') return
+        if (event.key !== ':' && event.key !== 'ArrowDown' && event.key !== 't') return
         requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
       },
       { capture: true },
@@ -33,14 +33,20 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
     await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
     await window.waitForFunction(
       (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,
-      index * 2 + 1,
+      index * 3 + 1,
     )
     await window.keyboard.press('ArrowDown')
     await window.waitForFunction(
       (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,
-      index * 2 + 2,
+      index * 3 + 2,
     )
-    await window.keyboard.press('Backspace')
+    await window.keyboard.type('rkt')
+    await expect(popup.getByRole('option').filter({ hasText: ':rocket:' })).toBeVisible()
+    await window.waitForFunction(
+      (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,
+      index * 3 + 3,
+    )
+    for (let key = 0; key < 4; key++) await window.keyboard.press('Backspace')
     await expect(popup).toHaveCount(0)
   }
   const samples = await window.evaluate(() => (window as unknown as { emojiPaints: number[] }).emojiPaints)
@@ -51,12 +57,12 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
     samples: samples.length,
     metrics: {
       firstPopupPaintMs: round(samples[0]!),
-      paintP95Ms: round(sorted[37]!),
-      paintMaxMs: round(sorted[39]!),
+      paintP95Ms: round(sorted[Math.floor(sorted.length * 0.95)]!),
+      paintMaxMs: round(sorted.at(-1)!),
     },
   })
-  expect(sorted[37]).toBeLessThan(50)
-  expect(sorted[39]).toBeLessThan(100)
+  expect(sorted[Math.floor(sorted.length * 0.95)]).toBeLessThan(50)
+  expect(sorted.at(-1)).toBeLessThan(100)
   await expect(input).toHaveValue('Plan ')
   await expect(input).toBeFocused()
   await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Root')
