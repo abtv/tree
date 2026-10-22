@@ -1,6 +1,6 @@
 # Vim Text Search
 
-Status: In progress — T1–T3 complete; T4 ready.
+Status: Awaiting owner acceptance — T1–T4 complete.
 
 ## Objective and authorization
 
@@ -10,7 +10,7 @@ The owner approved the behavior recorded below in conversation and then asked to
 
 Priority: prompt visible feedback for typing, scrolling, folding and navigation; correct results after edits and structural changes; ordinary Vim conventions except the explicitly agreed differences. Do not trade correctness for a stale count or stale navigation target.
 
-Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–20.2, 20.7–20.8, 22 and 23; [ARCHITECTURE](../docs/ARCHITECTURE.md); [VIM_CONFORMANCE](../docs/VIM_CONFORMANCE.md); [DEVELOPMENT](../docs/DEVELOPMENT.md) §§8–12; [workflow procedures](../docs/AGENT_WORKFLOW.md) §§5, 8–14. PRODUCT §20.2.26 describes delivered Tree and Agenda search. The integrated assessment remains future scope. Update the owning requirements and conformance evidence as implementation lands.
+Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–20.2, 20.7–20.8, 22 and 23; [ARCHITECTURE](../docs/ARCHITECTURE.md); [VIM_CONFORMANCE](../docs/VIM_CONFORMANCE.md); [DEVELOPMENT](../docs/DEVELOPMENT.md) §§8–12; [workflow procedures](../docs/AGENT_WORKFLOW.md) §§5, 8–14. PRODUCT §20.2.26 describes delivered Tree and Agenda search. Integrated assessment is complete; final owner acceptance remains.
 
 ## Agreed behavior
 
@@ -80,7 +80,7 @@ All runtime tasks provisionally use **High Risk** functional validation because 
 | T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Authorized | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Complete |
 | T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Complete |
 | T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Complete |
-| T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Ready |
+| T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Complete |
 
 ### T1 — Search foundation
 
@@ -125,13 +125,13 @@ The full Electron attempt had one clipboard mouse-selection failure; its unchang
 isolated rerun passed in both modes. Later affected Agenda tests passed after the wrapped
 context reveal correction. No unresolved functional failure remains.
 
-T4 must investigate narrow performance headroom: repeated Agenda search navigation
+T3 identified narrow performance headroom: repeated Agenda search navigation
 exceeded its existing ceiling in some runs, then passed three serial instrumented runs
-without production or limit changes. The variation's cause is unproven. Reuse temporary
-T3 evidence at `.scratch/agenda-search/t3-evidence.md`, the same-machine baseline in
-`.scratch/agenda-search/baseline/test-results/perf-results.json`, and the comparison in
-`.scratch/agenda-search/after-performance.json`. These remain only while T4 needs them;
-retire the task scratch directory before initiative closure.
+without production or limit changes. T4 reproduced a repeat-navigation failure and
+resolved the dominant scheduler-wait cost within the existing bounded executor.
+The retained `.scratch/agenda-search/` directory contains T3 synthetic manual-check
+data and the baseline worktree. Retire it through the guarded workflow before closure;
+lasting conclusions are in ARCHITECTURE and the maintained performance suite.
 
 ### T4 — Integrated assessment and delivery
 
@@ -140,6 +140,16 @@ Expected files: focused domain/application state tests, `e2e/electron/vim-search
 Acceptance: query refinement while prior work is pending; rapid next/previous navigation; large branch removal and movement into/out of scope; Undo/Redo; date/projection changes; same-node and image-caret transitions; cancellation, scope switches and application restart without persisted history. Verify query entry, counting and highlighting add no persistence writes/syncs; confirmed navigation and retained Tree folds follow existing view-state persistence. Check for no accumulating abandoned results and no slowdown of ordinary typing as off-screen corpus size grows. Benchmark deep and wide trees, repeated Agenda occurrences, long node text, common single characters, rare/absent phrases, scrolling, unfolding and active-search edits.
 
 Use same-machine before/after baselines. Derive and encode budgets in the owning automated guards; record meaningful measured conclusions in durable owning docs rather than a validation archive. Reuse valid prior evidence and repeat only invalidated checks. Resolve findings before delivery. Then mark this plan and its index `Awaiting owner acceptance`, with delivered commit and concise inspection instructions, rather than retiring them.
+
+Delivered: integrated store tests for structural changes, scope movement, large folded
+branch removal, pending query/navigation invalidation and history; real Electron
+query-only persistence, restart and Tree/Agenda history coverage; repeated navigation,
+deep/long text and cancellation-retention performance guards. Increasing the bounded
+executor slice removed the reproduced repeated-navigation budget failure without
+changing limits, scheduling architecture or input handling. Ordinary typing remained
+responsive across the existing document-scale controls. All required functional,
+performance, mutation and audit checks passed. Independent reviewer and product
+verifier found no meaningful issues. T2/T3 native-keyboard and HIG evidence remains valid.
 
 ## Validation and capability inventory
 
@@ -168,10 +178,22 @@ DEVELOPMENT §9, Validation Evidence and Reuse, explicitly requires changed inpu
 
 ## Exact next action and continuation
 
-Next action: start T4 integrated assessment in a fresh session. T3 crossed multiple interaction owners, required a wrapped-context reveal correction and exposed performance variation; T4 is a substantial assessment rather than a small follow-up. Its scope remains authorized. Recover the retained T3 evidence above, inventory remaining acceptance gaps, and investigate performance variation without weakening existing ceilings. Do not repeat implementation approval or the passed T2/T3 owner checks unless new changes invalidate them.
+Next action: await explicit owner acceptance of the T4 delivery commit containing this
+status update. The conversation delivery report identifies that commit. Do not infer
+acceptance from another generic continuation. After acceptance, retire the retained
+task scratch directory and this plan/index entry in the authorized closure commit.
+
+For final inspection, use the delivered revision in Tree and Agenda: enter a literal
+query with `/`, navigate with `n` and `N`, and confirm that folded results are revealed.
+Edit a matching node and use Undo/Redo; check that counts reflect current content.
+Cancel a draft and reopen `/` to check confirmed-query recall. The prior isolated
+synthetic profile remains available through
+`npm run dev -- -- --user-data-dir=/Users/andrew/work/tree/.scratch/agenda-search/manual-profile`.
+This is final acceptance of the delivered feature, not a repeat of the passed native
+keyboard gate. Report acceptance or concrete remaining issues.
 
 Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
 
 Copyable continuation prompt:
 
-> Continue the authorized Vim text-search initiative in `plans/vim-text-search.md`. Recover repository state and the current task first. D1–D5 and implementation are approved; do not ask for them again. Speak simple Russian with the owner and write repository content in English.
+> Continue the Vim text-search initiative in `plans/vim-text-search.md`. Implementation T1–T4 is complete and awaits explicit owner acceptance. Recover any later acceptance or issue report before taking the next action. Speak simple Russian with the owner and write repository content in English.

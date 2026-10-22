@@ -110,6 +110,76 @@ describe('incremental executor', () => {
     ).toEqual({ kind: 'navigate', total: 3, wrapped: false, missingOrigin: true })
   })
 
+  it.each(['', 'absent'])('finishes navigation without a destination for query %j', (query) => {
+    expect(
+      searchHarness().run({
+        ...base,
+        query,
+        operation: { kind: 'navigate', origin: { nodeId: 'a', offset: 0 }, direction: 1, count: 1 },
+      }),
+    ).toEqual({ kind: 'navigate', total: 0, wrapped: false, missingOrigin: false })
+  })
+
+  it('allows cancellation after completion and repeated cancellation without retaining jobs', () => {
+    const harness = searchHarness()
+    const publish = vi.fn()
+    const cancel = harness.executor.execute(base, publish)
+    harness.flush()
+    expect(publish).toHaveBeenCalledOnce()
+    expect(() => {
+      cancel()
+      cancel()
+    }).not.toThrow()
+    expect(harness.pending()).toBe(0)
+    harness.flush()
+    expect(publish).toHaveBeenCalledOnce()
+  })
+
+  it('returns an empty count without enumerating the document', () => {
+    const roots = vi.fn(() => base.document.roots)
+    expect(
+      searchHarness().run({
+        ...base,
+        query: '',
+        document: {
+          get roots() {
+            return roots()
+          },
+        },
+      }),
+    ).toEqual({
+      kind: 'count',
+      total: 0,
+      capped: false,
+    })
+    expect(roots).not.toHaveBeenCalled()
+  })
+
+  it('refuses a synthetic day origin in a Tree scope', () => {
+    expect(
+      searchHarness().run({
+        ...base,
+        operation: { kind: 'navigate', origin: { beforeDay: 1 as DayNumber, offset: 0 }, direction: 1, count: 1 },
+      }),
+    ).toEqual({ kind: 'navigate', total: 3, wrapped: false, missingOrigin: true })
+  })
+
+  it('ignores an already queued callback when a scheduler cannot retract it', () => {
+    const callbacks: (() => void)[] = []
+    const publish = vi.fn()
+    const executor = createSearchExecutor({
+      schedule(callback) {
+        callbacks.push(callback)
+        return () => undefined
+      },
+    })
+    executor.execute(base, publish)()
+    expect(callbacks).toHaveLength(1)
+    expect(() => callbacks[0]!()).not.toThrow()
+    expect(callbacks).toHaveLength(1)
+    expect(publish).not.toHaveBeenCalled()
+  })
+
   it('counts occurrences independently and navigates across node/day boundaries', () => {
     const request: SearchRequest = {
       ...base,
@@ -171,6 +241,7 @@ describe('incremental executor', () => {
     harness.flush()
     expect(publish).not.toHaveBeenCalled()
     expect(() => createSearchExecutor(harness.scheduler, 0)).toThrow('Invalid search slice budget')
+    expect(searchHarness(1).run(base)).toEqual({ kind: 'count', total: 3, capped: false })
   })
 
   it('uses cancellable macrotasks in the default scheduler', () => {

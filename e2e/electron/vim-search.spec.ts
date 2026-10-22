@@ -5,7 +5,9 @@ import {
   clickApplicationMenuItem,
   closeApp,
   expect,
+  fireIdleSave,
   launchTree,
+  lockSystemClipboard,
   node,
   pressShifted,
   seedDocument,
@@ -13,6 +15,81 @@ import {
   screenshotContentSize,
   test,
 } from './fixtures'
+
+test('keeps draft feedback out of persistence and forgets confirmed recall after restart', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: { roots: [{ id: 'one', text: 'apple apple', children: [] }] },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const first = await launchTree(userDataDir, { initialMode: 'normal' })
+  await first.window.clock.install()
+  await first.app.evaluate(() => {
+    const probe = globalThis as typeof globalThis & { searchSaves: number }
+    probe.searchSaves = 0
+    globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+      probe.searchSaves++
+      return original(...args)
+    })
+  })
+  const before = await first.window.evaluate(() =>
+    (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+  )
+  await first.window.keyboard.press('/')
+  const prompt = first.window.getByRole('textbox', { name: 'Search', exact: true })
+  await prompt.fill('apple')
+  await expect(first.window.locator('.search-count')).toHaveText('2')
+  await expect(first.window.locator('.search-match')).toHaveCount(2)
+  await fireIdleSave(first.window)
+  expect(
+    await first.window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    ),
+  ).toEqual(before)
+  expect(await first.app.evaluate(() => (globalThis as typeof globalThis & { searchSaves: number }).searchSaves)).toBe(
+    0,
+  )
+  await first.window.keyboard.press('Enter')
+  await expect(first.window.locator('.search-count')).toHaveText('2 / 2')
+  await closeApp(first.app)
+  const second = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: 'saved' })
+  await second.window.keyboard.press('/')
+  await expect(second.window.getByRole('textbox', { name: 'Search', exact: true })).toHaveValue('')
+  await closeApp(second.app)
+})
+
+test('refreshes active search through subtree deletion and Vim Undo and Redo commands', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'one', text: 'apple apple', children: [{ id: 'child', text: 'apple', children: [] }] },
+        { id: 'two', text: 'apple', children: [] },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await window.keyboard.press('/')
+  await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
+  await window.keyboard.press('Enter')
+  await expect(window.locator('.search-count')).toHaveText('2 / 4')
+  await lockSystemClipboard()
+  await window.keyboard.press('d')
+  await window.keyboard.press('d')
+  await expect(window.locator('.search-count')).toHaveText('1')
+  await expect(window.locator('[data-node-id="two"] .node-input')).toBeFocused()
+  await window.keyboard.press('u')
+  await expect(window.locator('.search-count')).toHaveText('4')
+  await window.keyboard.press('Control+r')
+  await expect(window.locator('.search-count')).toHaveText('1')
+  await window.keyboard.press('u')
+  await expect(window.locator('.search-count')).toHaveText('4')
+  await window.keyboard.press('n')
+  await expect(window.locator('.search-count')).toHaveText('2 / 4')
+  await window.keyboard.press('n')
+  await expect(window.locator('.search-count')).toHaveText('3 / 4')
+  await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
+  await closeApp(app)
+})
 
 test('lets newer Insert and pointer actions cancel a pending search destination', async ({ userDataDir }) => {
   seedDocument(userDataDir, {

@@ -151,6 +151,13 @@ destination invokes native grapheme segmentation. JavaScript matching and traver
 explicit checkpoints; a native ICU segmentation call is indivisible, so oversized ordinary,
 combining and emoji text have measured performance guards rather than a claimed universal
 time bound. Cancellation releases its generator, captured document and queued callback.
+The default slice amortizes nested timer delays while keeping a fixed checkpoint limit.
+Integrated Electron measurements found scheduler waiting dominated repeated Agenda
+navigation; increasing the bounded slice reduced result latency without increasing measured
+input-to-paint latency. `perf/electron/search.spec.ts` guards repeated navigation, deep and
+wide scopes, long mounted text, cancellation retention and current-result latency separately
+from paint latency. Its timer probe includes all zero-delay callbacks in the measured phase,
+so it supports cost attribution without claiming every callback belongs to search.
 
 `search-session.ts` owns memory-only query recall, draft entry, feedback and request validity.
 Count and navigation have separate request IDs and share context invalidation. The caller

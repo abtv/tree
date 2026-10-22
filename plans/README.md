@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim Text Search](vim-text-search.md) | T1–T3 complete; T4 ready | Integrated mutation, lifecycle and performance assessment, then owner acceptance |
+| [Vim Text Search](vim-text-search.md) | Awaiting owner acceptance | Accept the delivered Tree/Agenda search result, then retire the plan |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

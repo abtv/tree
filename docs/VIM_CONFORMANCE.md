@@ -21,12 +21,15 @@ search is literal, preselects the recalled query, highlights without moving duri
 entry, and uses Normal Escape to hide feedback and clean up search-owned folds.
 Tree scope includes folded descendants and its heading; search does not cross node
 boundaries. `src/application/editor-search.test.ts` covers current-data navigation
-and fold ownership; T1 matcher/session suites cover matching and cancellation;
+and fold ownership, large-branch deletion, scoped moves, split/join, mixed navigation
+queues and Undo/Redo; matcher/session suites cover matching and cancellation;
 `e2e/electron/vim-search.spec.ts` covers prompt input, navigation, recall, manual
-folding, counts beyond the cap, scrolling, link/date rendering and Insert editing.
+folding, counts beyond the cap, scrolling, link/date rendering, Insert editing,
+structural history, query-only persistence and empty recall after application restart.
 Agenda searches chronological projected occurrences, including contextual text and
 folded days, with synthetic headers as origins. `src/application/editor-search-agenda.test.ts`
-covers occurrence identity, independent folds, pinned-item invalidation and recall;
+covers occurrence identity, independent folds, pinned-item invalidation, dated-history
+recounts and recall;
 `e2e/electron/agenda-search.spec.ts` covers contextual caret arrival, mirrors, draft
 focus, focused-day transitions and concurrent status messages.
 

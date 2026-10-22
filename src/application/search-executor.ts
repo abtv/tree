@@ -75,6 +75,7 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
     if (occurrence === undefined) continue
     const atOrigin =
       operation.kind === 'navigate' &&
+      // Stryker disable next-line ConditionalExpression: real occurrences always have an ID, so sameOccurrence also rejects synthetic origins.
       operation.origin.nodeId !== undefined &&
       sameOccurrence(occurrence, operation.origin)
     if (atOrigin) foundOrigin = true
@@ -85,6 +86,7 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       if (operation.kind === 'count') {
         if (total === 101) return { kind: 'count', total: 100, capped: true }
       } else if (boundary !== undefined) {
+        // Stryker disable next-line ConditionalExpression: the undefined-day check is defensive; undefined < boundary is already false.
         if (occurrence.day !== undefined && occurrence.day < boundary) {
           before++
           through++
@@ -121,6 +123,7 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
           kind: 'navigate',
           destination: {
             nodeId: occurrence.nodeId,
+            // Stryker disable next-line ConditionalExpression: an omitted day and day: undefined have identical search and serialized semantics.
             ...(occurrence.day === undefined ? {} : { day: occurrence.day }),
             ...match,
             caret: searchCaret(occurrence.text, match.start),
@@ -133,13 +136,14 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       }
     }
   }
+  // Stryker disable next-line StringLiteral,CallExpression: defensive diagnostic after two immutable traversals; valid requests cannot reach it.
   throw new Error('An immutable search scope changed during execution.')
 }
 
 /** Each scheduled slice has bounded JS work, including scope enumeration and query preparation. */
 export function createSearchExecutor(
   scheduler: SearchScheduler = searchScheduler,
-  workPerSlice = 2048,
+  workPerSlice = 8192,
 ): SearchExecutor {
   if (!Number.isSafeInteger(workPerSlice) || workPerSlice < 1) throw new Error('Invalid search slice budget.')
   return {
@@ -147,6 +151,7 @@ export function createSearchExecutor(
       let work: ReturnType<typeof executeSearch> | undefined = executeSearch(request)
       let cancelScheduled: (() => void) | undefined
       const run = (): void => {
+        // Stryker disable next-line EqualityOperator: one additional checkpoint remains bounded and does not change results; real latency has separate guards.
         for (let step = 0; step < workPerSlice && work !== undefined; step++) {
           const result = work.next()
           if (result.done) {
