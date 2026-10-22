@@ -1,12 +1,12 @@
 # Vim Text Search
 
-Status: Planned — behavior decisions approved; plan recording authorized; implementation not yet authorized.
+Status: In progress — T1 complete; T2 Ready.
 
 ## Objective and authorization
 
 Deliver literal text search in Vim Normal mode across Tree and Agenda, with live highlighting and bounded counts, explicit navigation, and responsive editing on large documents.
 
-The owner approved the behavior recorded below in conversation and then asked to record a multi-task initiative plan. In the follow-up discussion, the owner settled D1–D5 and authorized saving those decisions to Git. These requests authorize this plan and its index entry, not runtime implementation. The selected coding tool is Codex. No prototype or implementation has been made. Planning started from clean commit `f5b911f` with no working plan or other indexed initiative.
+The owner approved the behavior recorded below in conversation and then asked to record a multi-task initiative plan. In the follow-up discussion, the owner settled D1–D5 and authorized saving those decisions to Git. On 2026-10-22, the owner explicitly authorized implementation of the initiative, starting with T1. Continue its ready tasks within the recorded scope and workflow limits. The selected coding tool is Codex. Planning started from clean commit `f5b911f` with no working plan or other indexed initiative.
 
 Priority: prompt visible feedback for typing, scrolling, folding and navigation; correct results after edits and structural changes; ordinary Vim conventions except the explicitly agreed differences. Do not trade correctness for a stale count or stale navigation target.
 
@@ -53,7 +53,7 @@ Future indexing and Worker execution are separate optimizations, not deliverable
 
 ## Approved decisions
 
-The owner approved D1–D5 in the follow-up discussion and requested that they be saved to Git. The agreed behavior above incorporates them. Implementation authorization remains separate. Update PRODUCT and conformance documentation with each implemented stage in the same commit, rather than waiting until the initiative ends or describing unimplemented behavior as available now.
+The owner approved D1–D5 in the follow-up discussion and requested that they be saved to Git. The agreed behavior above incorporates them. Implementation was subsequently authorized on 2026-10-22. Update PRODUCT and conformance documentation with each implemented stage in the same commit, rather than waiting until the initiative ends or describing unimplemented behavior as available now.
 
 | ID | Decision | Approved resolution |
 | --- | --- | --- |
@@ -73,8 +73,8 @@ All runtime tasks provisionally use **High Risk** functional validation because 
 
 | Task | Outcome | Dependency | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Implementation authorization | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Planned |
-| T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Planned |
+| T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Authorized | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Complete |
+| T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Ready |
 | T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Planned |
 | T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Planned |
 
@@ -85,6 +85,10 @@ Expected files: new `src/domain/text-search.ts` and focused unit/property tests;
 Acceptance: literal punctuation, smart case, Unicode offsets and agreed overlap behavior; deterministic forward/reverse traversal; collapsed descendants; exact/capped counts; cancellation before and during a scan; old query/document/scope responses rejected; single oversized text cannot monopolize the thread; no search persistence; no normal-edit corpus work without active search. Property tests cover traversal order, stable identities and mutation invalidation. Define how queued navigation resolves against current data without stale jumps.
 
 Document delivered contracts in ARCHITECTURE and the relevant implemented requirement boundaries in PRODUCT. Do not advertise a usable search UI before T2/T3. Independent review checks ownership, cancellation and state lifetime. Establish executor-level scale guards during this task.
+
+Delivered: `src/domain/text-search.ts`, `search-scope.ts`, and application `search-executor.ts`/`search-session.ts`, with focused rule, property, cancellation and performance guards. The foundation is intentionally unwired: T2 must connect monotonic document revision invalidation at `EditorRuntimeState.replaceReady`, serialize repeated navigation intents after applying each destination, and preserve the raw match anchor separately from its grapheme caret. T3 must supply the full immutable Agenda projection. Current contracts and performance limits are recorded in ARCHITECTURE.
+
+T1 and the separate owner-performed Electron update passed independent review. Electron 44.9.3 is committed in `638afb1`; audit reports zero vulnerabilities. Validation covered all `npm run check` stages, 857 Electron E2E tests and all 64 Electron performance scenarios. The full performance invocation had one Agenda opening-time failure (164.9 ms against 150 ms); three focused repeats passed at 137.6, 139.7 and 139.2 ms without code or threshold changes. This is absolute-guard evidence, not a pre/post-upgrade speed comparison. No unresolved validation failure remains.
 
 ### T2 — Tree interaction
 
@@ -114,36 +118,35 @@ Use same-machine before/after baselines. Derive and encode budgets in the owning
 
 ## Validation and capability inventory
 
-This plan-only change is Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, and primary diff review. It does not require runtime tests or an independent implementation review.
+The original plan-only change was Minimal Risk. T1 retains the planned High Risk validation tier even though its foundation is not wired to runtime input yet.
 
 For each High Risk runtime task, use focused tests during development, then `npm run check`, `npm run test:e2e`, and `npm run audit`. Electron E2E must use host execution from its first invocation under the supported permission mechanism. The primary selects affected real browser coverage when shared renderer changes reach browser-specific input paths. Do not infer a pass from an empty selection. Use `npm run test:perf -- <specs>` for the selected changed costs, not the full performance suite solely because the functional tier is High Risk.
 
 Automated verification must cover each implemented requirement at its fastest reliable level, with real Electron tests for focus/caret/keyboard/pointer/rendering risks. Follow DEVELOPMENT §8's navigation matrix and workflow §9's screenshot inspection rules. Keep ephemeral logs and screenshots under task-owned scratch or suite-owned paths, and retire them through the documented workflow after their final use.
 
-Planning capabilities: repository read/search, clean Git inspection, native file editing and the fresh-context configured planner's read access were verified in this session. Runtime builds, Electron launch, screenshot capture/inspection, performance workflows and separate implementation review/verifier access are not established by this plan. Verify them at implementation startup and first required use; report a missing mandatory capability promptly.
+Planning established repository inspection, native file editing and planner read access. T1 additionally verified production build, full host Electron E2E, unit performance guards and independent reviewer access. Screenshot inspection, Electron performance workflows and separate product-verifier access remain to be established when needed by T2/T3.
 
 DEVELOPMENT §9, Validation Evidence and Reuse, explicitly requires changed input handling to be checked by hand in `npm run dev` with a real keyboard. Available session tools do not provide that physical input capability; Playwright or synthetic system events do not substitute. Plan owner checks before T2 and T3 commits. The primary prepares isolated synthetic data and concrete steps first. Only demonstrated access satisfying the same requirement can remove this owner dependency.
 
-## Owner involvement and proposed budget
+## Owner involvement and budget
 
-- Current authorization: record and validate this plan and the approved D1–D5 decisions only. Initiative implementation and its proposed budget still require authorization; a status label is never approval.
-- Proposed implementation allowance: the four working tasks, their required checks and in-scope review corrections, at most four task commits per primary session. Use the workflow limit of two unsuccessful recovery attempts at the same blocker without new evidence before escalation. No token or elapsed-time allowance has been approved or invented.
+- Current authorization: implement the initiative, starting with T1, as explicitly approved on 2026-10-22. D1–D5 remain approved.
+- Implementation allowance: the four working tasks, their required checks and in-scope review corrections, at most four task commits per primary session. Use the workflow limit of two unsuccessful recovery attempts at the same blocker without new evidence before escalation. No token or elapsed-time allowance has been approved or invented.
 - Proposed separate closure allowance: one documentation retirement commit after explicit acceptance of the unchanged delivered result. Waiting for acceptance does not consume implementation allowance.
-- Expected remaining owner involvement: implementation authorization before T1, two planned pre-commit native-keyboard verification rounds at T2 and T3, and one final acceptance round after T4. D1–D5 are settled and do not need renewed approval. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
+- Expected remaining owner involvement: two planned pre-commit native-keyboard verification rounds at T2 and T3, and one final acceptance round after T4. D1–D5 and implementation are settled and do not need renewed approval. The owner updated Electron to 44.9.3; validation resolved the audit blocker. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
 
 | Gate | Owner action | Reason and timing |
 | --- | --- | --- |
-| Before T1 | Authorize the initiative with its proposed budget | The behavior decisions are approved, but plan-recording approval does not authorize implementation. |
 | Before T2 commit | In the prepared Tree instance, type/refine a query, cancel/recall it, hold navigation keys, and exercise applicable native composition/autocorrection while editing | DEVELOPMENT §9 requires real-keyboard evidence; expect literal input, responsive repeats, stable prompt/caret and no composition loss. |
 | Before T3 commit | Repeat the distinct Agenda input paths, including contextual/mirror destinations and editing the active occurrence | The separate Agenda handlers and read-only row paths require their own real-keyboard verification before commit. |
 | After T4 | Inspect the delivered result using concrete commit-bound instructions and accept or report issues | Four substantive tasks trigger workflow §8 final acceptance. This is distinct from automated verification. |
 
 ## Exact next action and continuation
 
-Next action: obtain initiative implementation authorization. D1–D5 are already approved. **No implementation task is Ready yet.** Do not select another initiative or an open question as a substitute.
+Next action: implement T2's complete Tree search interaction in a fresh session. T1 is complete, and the whole initiative remains authorized. T2 crosses prompt, renderer decoration, caret and fold owners; use a new working plan and inventory its transitions before edits. Do not ask for D1–D5 or implementation approval again. Prepare the recorded owner native-keyboard check before T2's commit. T3 and T4 remain dependent on their preceding tasks.
 
-After that approval, record implementation authorization, mark T1 Ready, verify required capabilities and execute T1. Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
+Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
 
 Copyable continuation prompt:
 
-> Continue the Vim text-search initiative in `plans/vim-text-search.md`. Recover repository state and recorded authorization first. D1–D5 are approved; do not ask for those decisions again. Only plan recording is authorized so far; obtain initiative implementation approval before starting T1. Speak simple Russian with the owner and write repository content in English.
+> Continue the authorized Vim text-search initiative in `plans/vim-text-search.md`. Recover repository state and the current task first. D1–D5 and implementation are approved; do not ask for them again. Speak simple Russian with the owner and write repository content in English.

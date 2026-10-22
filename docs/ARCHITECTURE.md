@@ -135,6 +135,41 @@ Product rules that determine how the tree behaves belong in the domain or applic
 
 `agenda-projection.ts` derives day groups of node identifiers, scoped depths, and match/context roles from the immutable document. It is a domain foundation without a runtime entry point. Direct and subtree date sets are memoized in a weak map keyed by `TreeNode`; path copying invalidates only replaced nodes, so date recognition after an edit reuses unchanged branch summaries. A subtree shares its direct set until a descendant contributes a new day, at which point it copies before adding that day. Row generation visits relevant branches once for all days that need fresh rows, and a day whose branches are unchanged from the previous projection keeps its previous row array. The cache stores day sets rather than flattened row copies, permits collection with its node keys, and adds no persisted fields or disk operations.
 
+`text-search.ts` provides incremental literal matching and query preparation. Unicode simple
+case equivalence preserves original UTF-16 spans without text normalization or full-text
+case conversion. A streaming prefix matcher emits a forward, nonoverlapping match stream;
+reverse navigation selects from that same stream. `search-scope.ts` traverses Tree with a
+depth-sized stack, including the current-parent heading. Agenda traversal consumes an
+immutable projection supplied before fold filtering and keeps day/node occurrence identity.
+It builds a temporary node-reference map incrementally; it neither copies node text nor
+retains a text index. Projection derivation remains the Agenda owner's responsibility.
+
+`search-executor.ts` schedules bounded work slices through an injected macrotask scheduler.
+Count stops at match 101. Navigation uses a full rank pass and a second destination pass,
+including modular count prefixes, rather than storing all matches. Only the selected
+destination invokes native grapheme segmentation. JavaScript matching and traversal have
+explicit checkpoints; a native ICU segmentation call is indivisible, so oversized ordinary,
+combining and emoji text have measured performance guards rather than a claimed universal
+time bound. Cancellation releases its generator, captured document and queued callback.
+
+`search-session.ts` owns memory-only query recall, draft entry, feedback and request validity.
+Count and navigation have separate request IDs and share context invalidation. The caller
+must replace context before publishing a new document revision or presentation scope.
+Late callbacks are rejected even if an executor ignores cancellation. A pending navigation
+can be superseded; the future input owner must serialize repeated user intents after applying
+the previous destination, and retry canceled navigation only against a fresh context. Raw
+match offsets and grapheme caret offsets are separate; subsequent navigation can preserve
+the raw match anchor while the caret remains at its containing grapheme.
+
+This foundation is not wired to `EditorStore` or renderer input yet. The integration must
+use a monotonic document revision at `EditorRuntimeState.replaceReady`, including Undo/Redo,
+instead of the structure-only version, and supply Agenda projection without visible-row
+filtering. Ordinary editing therefore adds no search work at this stage. Search performs
+zero writes or syncs. Per execution, memory scales with query length and traversal depth;
+Agenda additionally holds one temporary node-reference map proportional to document size.
+Session replacement and cancellation release obsolete work; memory does not grow with edit
+history or completed request count. No persistence fields, IPC, Worker or dependency are added.
+
 ---
 
 ## 5. Domain Model

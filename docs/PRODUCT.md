@@ -1430,6 +1430,17 @@ Normal mode also supports:
 * The local Vim register is held only for the running renderer session and does not persist across application restarts. It is separate from the system clipboard; character-wise Visual `y`, Normal `yy` and `dd`, and whole-node Visual `y` also copy content to the system clipboard under the rules above, while other register-producing Vim commands do not modify the system clipboard. It holds either one plain-text value, one structured node subtree, or an ordered set of sibling subtrees, with only the most recent register-producing action retained.
 * Document search, named registers, macros, and marks are not supported.
 
+The internal search foundation is implemented, but no search command or prompt is enabled yet.
+Its rules are literal, Unicode smart-case matching with nonoverlapping occurrences and UTF-16
+text spans; navigation destinations also identify the containing visible-character boundary.
+
+Tree scope includes the current-parent heading before all descendants, regardless of folds.
+Agenda scope consumes its full projection, includes contextual and repeated day occurrences,
+and respects focused-day scope. Counting stops at the 101st match and reports `100+`;
+navigation is independent of that cap. Search session data is memory-only. Query, document
+revision and presentation changes invalidate pending results. Runtime input and rendering
+remain a later stage; these internal contracts do not make `/`, `n` or `N` available.
+
 #### 20.2.27 Unsupported Keys, Composition and Selection Offsets
 
 * Unsupported unmodified keys do not edit text in Normal or Visual mode.
