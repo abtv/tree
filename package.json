@@ -22,6 +22,7 @@
     "test:web:built": "TREE_WEB_BUILT=1 playwright test -c playwright.web.config.ts",
     "test:web:chromium": "node scripts/web/chromium.mts",
     "test:web": "playwright test -c playwright.web.config.ts",
+    "test:safari": "npm run build:web && node scripts/web/safari.mts",
     "prestart": "node scripts/rename-dev-app.mts",
     "start": "electron-vite preview",
     "build": "electron-vite build",

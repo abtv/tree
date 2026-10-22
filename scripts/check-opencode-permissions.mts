@@ -398,6 +398,7 @@ for (const name of Object.keys(packageJson.scripts)) {
       'test:web:chromium',
       'test:e2e:memory',
       'test:perf:safari',
+      'test:safari',
     ].includes(name)
   ) {
     assert.notEqual(
@@ -416,6 +417,31 @@ for (const name of Object.keys(packageJson.scripts)) {
 // boundary (Claude Code's also rely on its Bash sandbox, see docs/DEVELOPMENT.md §10).
 const claudeSettings = JSON.parse(await readFile(new URL('../.claude/settings.json', import.meta.url), 'utf8'))
 const claudeDeny: string[] = claudeSettings.permissions?.deny ?? []
+
+// Named host checks need both a Bash allowance and a sandbox exclusion in Claude.
+// Matching declarations is configuration evidence; a restarted client verifies live prompts.
+for (const name of ['test:mutation', 'test:safari']) {
+  for (const suffix of ['', ' -- --help']) {
+    const command = `npm run ${name}${suffix}`
+    assert.ok(
+      claudeSettings.permissions.allow.some((entry: string) => {
+        const pattern = /^Bash\((.*)\)$/su.exec(entry)?.[1]
+        return pattern !== undefined && globMatches(pattern, command)
+      }),
+      `Claude must allow ${command}`,
+    )
+    assert.ok(
+      claudeSettings.sandbox.excludedCommands.some((pattern: string) => globMatches(pattern, command)),
+      `Claude must run ${command} outside the sandbox`,
+    )
+    checked += 2
+  }
+  assert.ok(
+    !claudeSettings.sandbox.excludedCommands.some((pattern: string) => globMatches(pattern, `npm run ${name}-extra`)),
+    `Claude sandbox exclusion must not include ${name}-extra`,
+  )
+  checked += 1
+}
 
 // Claude Code matches a whole Bash command against the pattern inside `Bash(...)`, treating `*` as
 // a wildcard. It has no trailing-" *" leniency, so this matcher deliberately omits the OpenCode

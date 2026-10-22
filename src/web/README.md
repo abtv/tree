@@ -242,11 +242,14 @@ Agenda opening/navigation/scrolling, and typing while an automatic save is pendi
 It builds both versions, starts an ephemeral loopback server and SafariDriver on
 port 7056, and runs the same scenarios serially in visible Safari and Electron.
 Enable Safari remote automation before the first run (`safaridriver --enable`);
-the runner does not change that system setting. This optional local command is
-not added to agent permission allowlists: use the normal approval mechanism,
-outside the sandbox in Codex. Do not interact with the test windows while it runs.
+the runner does not change that system setting. This named local command is
+allowed by the agent configurations and runs outside the sandbox in Codex.
+Do not interact with the test windows while it runs.
 Safari uses isolated WebDriver sessions and a fresh origin; Electron uses
 synthetic profiles under `.scratch/safari-perf/`.
+
+For functional Safari smoke checks without performance measurements, use
+`npm run test:safari`; see [Development Guide](../../docs/DEVELOPMENT.md#shared-agent-instructions).
 
 Results are written to `test-results/safari-perf-results.json`. They measure the
 time from a captured input/keyboard event to two animation frames, using the same
