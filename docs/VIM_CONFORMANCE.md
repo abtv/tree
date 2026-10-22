@@ -16,6 +16,15 @@ Agenda direct matches reuse Tree text commands. Normal `Enter` opens the hyperli
 
 ## Mode and command families
 
+Tree `/`, `n` and `N` follow PRODUCT §20.2.26. **Vim divergence:** the approved
+search is literal, preselects the recalled query, highlights without moving during
+entry, and uses Normal Escape to hide feedback and clean up search-owned folds.
+Tree scope includes folded descendants and its heading; search does not cross node
+boundaries. `src/application/editor-search.test.ts` covers current-data navigation
+and fold ownership; T1 matcher/session suites cover matching and cancellation;
+`e2e/electron/vim-search.spec.ts` covers prompt input, navigation, recall, manual
+folding, counts beyond the cap, scrolling, link/date rendering and Insert editing.
+
 Tree Normal `o` follows PRODUCT §20.2.10 and §20.2.19; Insert `Enter` at text end follows the same placement under §5.1. **Vim divergence:** an expanded node with children receives a first child; a collapsed node receives a sibling after its subtree. This follows the visible outline without opening closed branches. Dot replay of `o` uses the destination node's current expansion; Enter retains its Insert-session interruption behavior. The application transition unit/property tests and store tests cover placement, subtree preservation, focus, expansion and history; `e2e/electron/inline-expansion.spec.ts` covers real keyboard dispatch, replay, mode, caret and rendered placement in standard editing and Vim Insert. `e2e/electron/editing.spec.ts` retains beginning/middle/leaf Enter coverage.
 
 Tree empty-node creation with Normal `o` and Insert `Enter` follows PRODUCT §5.1 and §20.2.10. **Vim divergence:** an empty inline leaf is preserved. With a following sibling, creation stays at its level immediately after it; only a last empty leaf creates after its parent, one level left, stopping at the focused location boundary. This is the owner's requested tree-creation behavior. `src/application/editor-command-transitions.test.ts` and `editor-command-transitions.property.test.ts` cover destination and preservation; `e2e/electron/inline-expansion.spec.ts` covers repeated creation, dot replay, focus, mode, boundary, geometry, and undo/redo.

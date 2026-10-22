@@ -126,6 +126,49 @@ async function fixture(
 }
 
 describe('useNodeInputBindings', () => {
+  it('restores the saved image caret after search cancellation without a new selection owner', async () => {
+    const f = await fixture({ document: { roots: [image('apple text')] } })
+    const input = f.input()
+    input.focus()
+    input.setSelectionRange(1, 1)
+    f.press('j')
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    f.press('/')
+    const prompt = document.createElement('input')
+    document.body.append(prompt)
+    prompt.focus()
+    act(() => f.store.search.cancelDraft())
+    act(() => f.result.current.restoreSearchFocus())
+    expect(document.activeElement).toBe(input)
+    expect(f.result.current.imageCaretNodeId).toBe('node')
+    f.press('k')
+    expect(input.selectionStart).toBe(1)
+  })
+
+  it('updates underlying fold selection without projecting focus into a draft search', async () => {
+    const f = await fixture({ document: { roots: [node('parent', 'parent', [node('child', 'apple')])] } })
+    const parent = f.input('parent')
+    const child = f.input('child')
+    act(() => {
+      f.store.toggleExpansion('parent')
+      f.store.selectNode('child', 2)
+    })
+    child.focus()
+    f.press('/')
+    const prompt = document.createElement('input')
+    document.body.append(prompt)
+    prompt.focus()
+    act(() => f.store.toggleExpansion('parent'))
+    expect(f.snapshot().location.selectedNodeId).toBe('parent')
+    expect(document.activeElement).toBe(prompt)
+    act(() => {
+      f.store.search.cancelDraft()
+      f.result.current.restoreSearchFocus()
+    })
+    expect(document.activeElement).toBe(parent)
+    expect(parent.selectionStart).toBe(0)
+  })
+
   // @requirement PRODUCT.md §20.9
   // @requirement PRODUCT.md §20.12
   it.each([

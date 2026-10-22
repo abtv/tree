@@ -4,6 +4,7 @@ import type { Document, Location } from '../../domain/document'
 import { displayedNodes } from '../../domain/document'
 import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../../application/expansion-state'
 import { buildVisibleRows } from '../../application/visible-rows'
+import { EditorSearch } from '../../application/editor-search'
 
 /** The public surface of `EditorStore`, without the class's private branding. */
 export type EditorStorePublic = { [K in keyof EditorStore]: EditorStore[K] }
@@ -64,6 +65,8 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
   )
 
   const double: EditorStorePublic = {
+    search: new EditorSearch(() => undefined),
+    hideSearch: vi.fn(),
     openAgenda: vi.fn(),
     closeAgenda: vi.fn(),
     applyAgenda: vi.fn(),

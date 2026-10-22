@@ -1,6 +1,6 @@
 # Vim Text Search
 
-Status: In progress — T1 complete; T2 Ready.
+Status: In progress — T1 and T2 complete; T3 Ready.
 
 ## Objective and authorization
 
@@ -10,7 +10,7 @@ The owner approved the behavior recorded below in conversation and then asked to
 
 Priority: prompt visible feedback for typing, scrolling, folding and navigation; correct results after edits and structural changes; ordinary Vim conventions except the explicitly agreed differences. Do not trade correctness for a stale count or stale navigation target.
 
-Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–20.2, 20.7–20.8, 22 and 23; [ARCHITECTURE](../docs/ARCHITECTURE.md); [VIM_CONFORMANCE](../docs/VIM_CONFORMANCE.md); [DEVELOPMENT](../docs/DEVELOPMENT.md) §§8–12; [workflow procedures](../docs/AGENT_WORKFLOW.md) §§5, 8–14. This plan records agreed future scope; it does not claim that current product requirements already support search. PRODUCT §20.2.26 currently excludes document search. Update the owning requirements and conformance evidence as implementation lands.
+Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–20.2, 20.7–20.8, 22 and 23; [ARCHITECTURE](../docs/ARCHITECTURE.md); [VIM_CONFORMANCE](../docs/VIM_CONFORMANCE.md); [DEVELOPMENT](../docs/DEVELOPMENT.md) §§8–12; [workflow procedures](../docs/AGENT_WORKFLOW.md) §§5, 8–14. PRODUCT §20.2.26 describes delivered Tree search. Agenda integration and the integrated assessment remain future scope in this plan. Update the owning requirements and conformance evidence as implementation lands.
 
 ## Agreed behavior
 
@@ -33,6 +33,8 @@ Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–2
 - Scrolling during query entry preserves prompt focus, query, count and search origin. Confirmation may scroll back to the match reached from that origin.
 - Clicking a disclosure chevron while entering a query keeps the prompt active and the logical node/offset origin unchanged, even when the origin becomes hidden; ordinary fold selection rules still apply underneath. Manual fold choices survive query cancellation. Folding alone does not change the search corpus or count. Clicking ordinary node text cancels the draft and performs ordinary selection.
 - `Esc` during entry cancels the draft and restores the prior confirmed query. Canceled drafts never replace it. Automatic selected prefill on `/` replaces the earlier proposal to require `Up` for recall.
+- Owner-approved interruption policy: losing prompt focus, deactivating the window, or opening the command panel cancels the unconfirmed draft and restores the previous confirmed search. Scrolling and disclosure controls retain the explicitly agreed exceptions above.
+- Disabling Vim closes search entry and hides search feedback, while retaining the last confirmed query for recall when Vim is enabled again.
 - After confirmation, Normal `Esc` hides search highlighting and count but remembers the query. `n` or `N` restores search feedback. Entering Insert retains highlights; text input is immediate, local highlights update, and asynchronous recount shows a pending indicator instead of a stale number.
 - Changing Tree location, switching Tree/Agenda, or entering/leaving a focused day closes active search and retains the last confirmed query for recall.
 - Retain only the last confirmed query in memory for the running application session, shared by Tree and Agenda. Do not persist search history or add search fields to saved documents, view state, preferences or backups.
@@ -74,8 +76,8 @@ All runtime tasks provisionally use **High Risk** functional validation because 
 | Task | Outcome | Dependency | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Authorized | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Complete |
-| T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Ready |
-| T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Planned |
+| T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Complete |
+| T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Ready |
 | T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Planned |
 
 ### T1 — Search foundation
@@ -99,6 +101,8 @@ Repository finding: `editor-dom.ts` currently drops decorations overlapping link
 Acceptance: entry from all supported Tree row/caret contexts; prompt input with literal `n`/`N`; live counts/highlights without scroll or expansion; scrolling and manual folds; confirmation, reverse navigation and wrap; more than the count cap remains reachable; cancellation and recall; Insert editing with pending recount; links and decorated text; no link activation when Enter confirms the prompt; standard editing unaffected. Inventory caret/image-return state, same-node jumps, empty nodes and current-parent behavior before implementation.
 
 Inspect real Electron light/dark screenshots of prompt, current and other matches, link/date decoration, folded-result navigation and windowed scrolling. Verify focus remains in the prompt after chevron use. Compare typing without search, draft entry and editing with confirmed search active. Independent reviewer and product verifier are required before commit. Apply PRODUCT §1.3 HIG checks, including keyboard focus, status feedback and unchanged row geometry.
+
+T2 delivered the Tree prompt, live mounted highlights and capped counts, serialized navigation, fold reveal/cleanup and cancellation when newer input takes focus. Independent reviewer and product verifier passed after the stale-navigation correction. All check stages, 863 Electron tests, focused Chrome search and 30 selected Electron performance scenarios passed; the six search cases also passed after restoring selected recall. Light/dark and folded/windowed screenshots were inspected. The owner reported “it works” after the prepared native-keyboard check and retained selected prefill. No unresolved T2 validation failure remains.
 
 ### T3 — Agenda integration
 
@@ -124,7 +128,7 @@ For each High Risk runtime task, use focused tests during development, then `npm
 
 Automated verification must cover each implemented requirement at its fastest reliable level, with real Electron tests for focus/caret/keyboard/pointer/rendering risks. Follow DEVELOPMENT §8's navigation matrix and workflow §9's screenshot inspection rules. Keep ephemeral logs and screenshots under task-owned scratch or suite-owned paths, and retire them through the documented workflow after their final use.
 
-Planning established repository inspection, native file editing and planner read access. T1 additionally verified production build, full host Electron E2E, unit performance guards and independent reviewer access. Screenshot inspection, Electron performance workflows and separate product-verifier access remain to be established when needed by T2/T3.
+Planning established repository inspection, native file editing and planner read access. T1 additionally verified production build, full host Electron E2E, unit performance guards and independent reviewer access. T2 verified screenshot inspection, Electron performance workflows and separate product-verifier access. Reuse successful capabilities within a session; check T3-specific runtime needs as they arise.
 
 DEVELOPMENT §9, Validation Evidence and Reuse, explicitly requires changed input handling to be checked by hand in `npm run dev` with a real keyboard. Available session tools do not provide that physical input capability; Playwright or synthetic system events do not substitute. Plan owner checks before T2 and T3 commits. The primary prepares isolated synthetic data and concrete steps first. Only demonstrated access satisfying the same requirement can remove this owner dependency.
 
@@ -133,17 +137,17 @@ DEVELOPMENT §9, Validation Evidence and Reuse, explicitly requires changed inpu
 - Current authorization: implement the initiative, starting with T1, as explicitly approved on 2026-10-22. D1–D5 remain approved.
 - Implementation allowance: the four working tasks, their required checks and in-scope review corrections, at most four task commits per primary session. Use the workflow limit of two unsuccessful recovery attempts at the same blocker without new evidence before escalation. No token or elapsed-time allowance has been approved or invented.
 - Proposed separate closure allowance: one documentation retirement commit after explicit acceptance of the unchanged delivered result. Waiting for acceptance does not consume implementation allowance.
-- Expected remaining owner involvement: two planned pre-commit native-keyboard verification rounds at T2 and T3, and one final acceptance round after T4. D1–D5 and implementation are settled and do not need renewed approval. The owner updated Electron to 44.9.3; validation resolved the audit blocker. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
+- Expected remaining owner involvement: one planned pre-commit native-keyboard verification round at T3, and one final acceptance round after T4. T2's owner check is complete. D1–D5 and implementation are settled and do not need renewed approval. The owner updated Electron to 44.9.3; validation resolved the audit blocker. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
 
 | Gate | Owner action | Reason and timing |
 | --- | --- | --- |
-| Before T2 commit | In the prepared Tree instance, type/refine a query, cancel/recall it, hold navigation keys, and exercise applicable native composition/autocorrection while editing | DEVELOPMENT §9 requires real-keyboard evidence; expect literal input, responsive repeats, stable prompt/caret and no composition loss. |
+| Before T2 commit — complete | Owner checked the prepared Tree instance and reported “it works” | Selected recall retained after owner comparison; the prepared steps covered search, cancellation, held keys and applicable native input. |
 | Before T3 commit | Repeat the distinct Agenda input paths, including contextual/mirror destinations and editing the active occurrence | The separate Agenda handlers and read-only row paths require their own real-keyboard verification before commit. |
 | After T4 | Inspect the delivered result using concrete commit-bound instructions and accept or report issues | Four substantive tasks trigger workflow §8 final acceptance. This is distinct from automated verification. |
 
 ## Exact next action and continuation
 
-Next action: implement T2's complete Tree search interaction in a fresh session. T1 is complete, and the whole initiative remains authorized. T2 crosses prompt, renderer decoration, caret and fold owners; use a new working plan and inventory its transitions before edits. Do not ask for D1–D5 or implementation approval again. Prepare the recorded owner native-keyboard check before T2's commit. T3 and T4 remain dependent on their preceding tasks.
+Next action: implement T3 Agenda integration in a fresh session. T2 crossed multiple interaction owners and required review correction, so keep its completed work as the session boundary. The whole initiative remains authorized; do not ask for D1–D5 or implementation approval again. Reuse the Tree session/controller contracts while supplying occurrence-aware Agenda scope and reveal behavior. Prepare the separate owner native-keyboard check before T3's commit. T4 remains dependent on T3.
 
 Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
 

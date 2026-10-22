@@ -68,6 +68,7 @@ interface UseNodeInputBindingsOptions {
 }
 
 export interface NodeInputBindingsResult {
+  restoreSearchFocus: () => void
   completionPopup: CompletionPopupPresentation | undefined
   acceptCompletion: (index: number) => void
   vimTextCommandState: VimTextCommandState
@@ -245,7 +246,8 @@ export function useNodeInputBindings({
       })
       setImageCaretNodeId(caret.imageActive ? nodeId : undefined)
       if (timing === 'preserve-selection') return
-      if (timing !== 'after-edit' && input?.isConnected) setNormalCaret(input, caret.cursor)
+      if (store.search.session.getSnapshot().draft === undefined && timing !== 'after-edit' && input?.isConnected)
+        setNormalCaret(input, caret.cursor)
     },
     [store, setImageCaretNodeId],
   )
@@ -551,7 +553,7 @@ export function useNodeInputBindings({
     // pending placement, decoration, then completion. Unrelated commits skip focus/mode work.
     if (focus !== undefined && focus.token !== projection.syncedFocusToken) syncImageCaretToFocus()
     const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
-    if (changes.modeChanged && focusedInput !== undefined) {
+    if (store.search.session.getSnapshot().draft === undefined && changes.modeChanged && focusedInput !== undefined) {
       if (vimMode === 'normal') {
         // Cmd+A's deliberate selection survives the transition to Normal.
         if (!hasMultiCharacterSelection(focusedInput)) setNormalCaret(focusedInput, getCaret(focusedInput))
@@ -573,6 +575,7 @@ export function useNodeInputBindings({
       }
       if (!viewportReveal.hasLine()) viewportReveal.cancel()
       const applyFocus = (firstPass = false): void => {
+        if (store.search.session.getSnapshot().draft !== undefined) return
         const input = inputs.current.get(focus.nodeId)
         if (input === undefined) return
         // Suppress native scrolling; the reveal policy decides how far to scroll.
@@ -621,7 +624,7 @@ export function useNodeInputBindings({
       const state = store.getSnapshot()
       const registeredInput = inputs.current.get(pending.nodeId)
       const input = currentPendingCaretInput(pending, state, projection.currentRevision, registeredInput)
-      if (input !== undefined) {
+      if (input !== undefined && store.search.session.getSnapshot().draft === undefined) {
         if (pending.refocus === true && input.ownerDocument.activeElement !== input) input.focus()
         if (pending.restoredCaret !== undefined) {
           projection.restoreDrag(
@@ -936,6 +939,16 @@ export function useNodeInputBindings({
   )
 
   return {
+    restoreSearchFocus: () => {
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      const id = state.location.selectedNodeId
+      const input = inputs.current.get(id)
+      if (input === undefined) return
+      input.focus({ preventScroll: true })
+      const authority = caretProjection.current.authority
+      if (authority.nodeId === id) applyCaretState(id, authority.caret)
+    },
     bindings,
     dragFreeze,
     setVimEditing,

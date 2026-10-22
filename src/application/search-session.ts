@@ -53,6 +53,7 @@ export class SearchSession {
       this.set({ confirmed: this.snapshot.confirmed, visible: false, pending: false })
     } else {
       const { confirmed, draft, visible } = this.snapshot
+      if (!visible && draft === undefined) return
       this.set({ confirmed, ...(draft === undefined ? {} : { draft }), visible, pending: visible })
       if (visible) this.recount()
     }
@@ -98,6 +99,12 @@ export class SearchSession {
     this.invalidate()
     this.origin = undefined
     this.set({ confirmed: this.snapshot.confirmed, visible: false, pending: false })
+  }
+
+  public interruptNavigation(): void {
+    this.navigationId++
+    this.cancelNavigation?.()
+    this.cancelNavigation = undefined
   }
 
   /** One pending jump. Repeated UI intents must await application of the preceding destination. */

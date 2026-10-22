@@ -23,6 +23,7 @@ import type { CaretMark } from './agenda-row-caret'
 import { clearCommandAssembly } from './vim-command-state'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
+import { SearchPrompt } from './SearchPrompt'
 import { NodeList } from './NodeList'
 import type { DropTarget } from '../application/drop-targets'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
@@ -60,6 +61,17 @@ export function App({
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const search = useSyncExternalStore(store.search.subscribe, store.search.session.getSnapshot)
+  const searchResult = useSyncExternalStore(store.search.subscribe, store.search.getResult)
+  const searchQuery = search.visible ? (search.draft ?? search.confirmed) : ''
+  useEffect(() => () => store.search.hide(), [store])
+  const [expiredWrap, setExpiredWrap] = useState<typeof searchResult>()
+  const wrapNotice = searchResult?.wrapped === true && searchResult !== expiredWrap
+  useEffect(() => {
+    if (!searchResult?.wrapped) return
+    const timer = window.setTimeout(() => setExpiredWrap(searchResult), 2000)
+    return () => window.clearTimeout(timer)
+  }, [searchResult])
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
   const readyDocument = state.status === 'ready' ? state.document : undefined
@@ -122,6 +134,7 @@ export function App({
     vimTextCommandState,
     completionPopup,
     acceptCompletion,
+    restoreSearchFocus,
   } = useNodeInputBindings({
     store,
     selectedNodeId,
@@ -140,12 +153,13 @@ export function App({
   })
   const applyVimEnabled = useCallback(
     async (nextValue: boolean): Promise<void> => {
+      if (!nextValue) store.hideSearch()
       setVimEditing(nextValue)
       setVimEnabled(nextValue)
       // The editing mode already changed for this session; a failed write only loses the saved choice.
       await window.treeApi.setVimEnabled(nextValue)
     },
-    [setVimEditing],
+    [setVimEditing, store],
   )
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     vimAvailable,
@@ -157,6 +171,13 @@ export function App({
     alwaysOnTop,
     setAlwaysOnTop,
     applyVimEnabled,
+    beforeOpen: () => {
+      store.search.interruptNavigation()
+      if (store.search.session.getSnapshot().draft !== undefined) {
+        store.search.cancelDraft()
+        restoreSearchFocus()
+      }
+    },
     beforeViewChange: () => {
       const active = document.activeElement
       if (active instanceof HTMLElement && active.matches('.node-input')) {
@@ -178,6 +199,7 @@ export function App({
   useEffect(() => {
     const stopAlwaysOnTop = window.treeApi.onAlwaysOnTopChanged?.(setAlwaysOnTop)
     const stopVimEnabled = window.treeApi.onVimEnabledChanged?.((nextValue) => {
+      if (!nextValue) store.hideSearch()
       setVimEditing(nextValue)
       setVimEnabled(nextValue)
     })
@@ -185,7 +207,7 @@ export function App({
       stopAlwaysOnTop?.()
       stopVimEnabled?.()
     }
-  }, [setVimEditing])
+  }, [setVimEditing, store])
   // Called after the input bindings so the restore aligns the selected row after their initial focus.
   useScrollRestoration(store, state.status === 'ready' && agenda === undefined)
   const enterNode = useCallback(
@@ -240,7 +262,8 @@ export function App({
       const hidesSelection = before.status === 'ready' && isHiddenByCollapse(before.location.selectedNodeId)
       // Finish a pending edit session before it is hidden, the same way entering or leaving a node
       // does; an unrelated collapse must not blur the currently focused row.
-      if (hidesSelection && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      if (hidesSelection && search.draft === undefined && document.activeElement instanceof HTMLElement)
+        document.activeElement.blur()
       store.toggleExpansion(node.id)
       if (
         nodeVisualSelection !== undefined &&
@@ -250,7 +273,7 @@ export function App({
         setVimMode('normal')
       }
     },
-    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode],
+    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode, search.draft],
   )
   const navigateToAncestor = useCallback(
     (parentId: string | null): void => {
@@ -278,6 +301,8 @@ export function App({
           node={node}
           label={label}
           decorations={treeDecorations(node)}
+          searchQuery={searchQuery}
+          currentMatch={searchResult?.destination?.nodeId === node.id ? searchResult.destination : undefined}
           richEditingEnabled={richEditingEnabled}
           {...nodeInputBindings(node)}
         />
@@ -291,7 +316,7 @@ export function App({
         )}
       </>
     ),
-    [attachmentImages, isImageCaretActive, nodeInputBindings, richEditingEnabled],
+    [attachmentImages, isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult],
   )
   const renderAgendaAttachment = useCallback(
     (node: TreeNode, editable: boolean): React.JSX.Element | null =>
@@ -445,6 +470,10 @@ export function App({
                     label="Current parent"
                     parent
                     decorations={treeDecorations(currentParent)}
+                    searchQuery={searchQuery}
+                    currentMatch={
+                      searchResult?.destination?.nodeId === currentParent.id ? searchResult.destination : undefined
+                    }
                     richEditingEnabled={richEditingEnabled}
                     {...nodeInputBindings(currentParent)}
                   />
@@ -505,7 +534,9 @@ export function App({
         />
       ) : null}
       <footer className="status-bar">
-        {commandPanel.open ? (
+        {search.draft !== undefined && !commandPanel.open ? (
+          <SearchPrompt store={store} snapshot={search} restoreEditor={restoreSearchFocus} shortcuts={shortcuts} />
+        ) : commandPanel.open ? (
           <label className="command-input-line">
             <span>:</span>
             <input
@@ -534,6 +565,17 @@ export function App({
         {commandPanel.open ? (
           <span className="command-count">
             {commandPanel.matches.length} of {commandPanel.total}
+          </span>
+        ) : search.visible ? (
+          <span className="search-count" role="status">
+            {wrapNotice ? 'Wrapped · ' : ''}
+            {search.pending
+              ? 'Searching…'
+              : search.count?.capped
+                ? '100+'
+                : searchResult?.ordinal === undefined
+                  ? `${search.count?.total ?? 0}`
+                  : `${searchResult.ordinal} / ${search.count?.total ?? 0}`}
           </span>
         ) : commandPanel.message !== undefined ? null : statusMessage === undefined ? (
           <span aria-hidden="true" className="status-bar-spacer" />

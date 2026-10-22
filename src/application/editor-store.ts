@@ -50,6 +50,8 @@ import {
 import { clipboardIntroducesLink, nodeContent, sameNodeContent } from './editor-content-changes'
 import { EditorHistory } from './editor-history'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
+import { EditorSearch } from './editor-search'
+import type { SearchDestination } from './search-executor'
 import {
   forwardJoinTransition,
   isPasteIntoSourceDescendant,
@@ -109,7 +111,12 @@ export class EditorStore {
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
-  private readonly runtime = new EditorRuntimeState(() => this.agendaRowsCache.clear(), this.agendaRowsCache)
+  public readonly search = new EditorSearch((destination) => this.revealSearchDestination(destination))
+  private readonly runtime = new EditorRuntimeState(
+    () => this.agendaRowsCache.clear(),
+    this.agendaRowsCache,
+    (state) => this.search.update(state),
+  )
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly textSession: EditorTextSession
@@ -405,6 +412,7 @@ export class EditorStore {
   }
 
   public toggleExpansion(nodeId: NodeId): void {
+    this.search.manualFold(nodeId)
     const state = this.runtime.ready()
     if (nodeId === state.location.currentParentId) return
     const collapsing = isNodeExpanded(state.expansion, nodeId)
@@ -426,6 +434,7 @@ export class EditorStore {
   }
 
   public applyFold(command: NodeFoldCommand | 'close-all' | 'open-all', nodeId?: NodeId): void {
+    this.search.manualFold(command.endsWith('-all') ? undefined : nodeId, command.endsWith('-recursive'))
     const state = this.runtime.ready()
     if (command === 'close-all') {
       // At the root level the location holds every node, so closing its folds forgets every choice
@@ -562,6 +571,45 @@ export class EditorStore {
       this.runtime.snapshot = { status: 'error', message: messageOf(error) }
       this.runtime.emit()
     }
+  }
+
+  public hideSearch(): void {
+    if (this.runtime.snapshot.status !== 'ready') return
+    const state = this.runtime.ready()
+    const keep = new Set(requireNode(state.document, state.location.selectedNodeId).ancestors.map((node) => node.id))
+    const expandedIds = new Set(state.expansion.expandedIds)
+    for (const id of this.search.opened) if (!keep.has(id)) expandedIds.delete(id)
+    this.search.opened.clear()
+    this.search.hide()
+    if (expandedIds.size !== state.expansion.expandedIds.size) {
+      this.runtime.replaceReady({ ...state, expansion: { expandedIds } })
+      this.markPersistedChange()
+    }
+  }
+
+  private revealSearchDestination(destination: SearchDestination): void {
+    const state = this.runtime.ready()
+    const found = locateNode(state.document, destination.nodeId)
+    if (found === undefined || state.agenda !== undefined) return
+    let expansion = state.expansion
+    let inScope = state.location.currentParentId === null
+    for (const ancestor of found.ancestors) {
+      if (ancestor.id === state.location.currentParentId) {
+        inScope = true
+        continue
+      }
+      if (inScope && !isNodeExpanded(expansion, ancestor.id)) {
+        this.search.opened.add(ancestor.id)
+        expansion = expandNode(expansion, ancestor.id)
+      }
+    }
+    this.runtime.replaceReady({
+      ...state,
+      expansion,
+      location: { ...state.location, selectedNodeId: destination.nodeId },
+      focus: this.runtime.newFocus(destination.nodeId, destination.caret),
+    })
+    this.markPersistedChange()
   }
 
   public selectNode(nodeId: NodeId, cursor: number): void {

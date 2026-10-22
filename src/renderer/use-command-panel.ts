@@ -25,11 +25,13 @@ export function useCommandPanel(options: {
   setAlwaysOnTop(value: boolean): void
   applyVimEnabled(value: boolean): Promise<void>
   beforeViewChange(): void
+  beforeOpen?: () => void
   shortcuts?: ShortcutProfile
 }) {
   const { store, vimEnabled, vimMode, commandState, alwaysOnTop, setAlwaysOnTop, applyVimEnabled, beforeViewChange } =
     options
   const shortcuts = options.shortcuts ?? APPLE_SHORTCUTS
+  const beforeOpen = options.beforeOpen
   const [open, setOpen] = useState(false)
   const vimAvailable = options.vimAvailable ?? true
   const [input, setInput] = useState('')
@@ -167,7 +169,13 @@ export function useCommandPanel(options: {
         !shortcuts.hasNonPrimaryCtrl(event) &&
         !event.altKey
       const colon =
-        event.key === ':' && !event.metaKey && !event.ctrlKey && !event.altKey && vimEnabled && vimMode === 'normal'
+        event.key === ':' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        vimEnabled &&
+        vimMode === 'normal' &&
+        !(target instanceof Element && target.closest('.search-input-line'))
       if (
         (!shortcut && !colon) ||
         event.isComposing ||
@@ -179,6 +187,7 @@ export function useCommandPanel(options: {
       event.preventDefault()
       event.stopImmediatePropagation()
       clearPending(commandState)
+      beforeOpen?.()
       const active = document.activeElement
       const selection = window.getSelection()
       const endpoints =
@@ -208,7 +217,21 @@ export function useCommandPanel(options: {
     }
     document.addEventListener('keydown', keydown, true)
     return () => document.removeEventListener('keydown', keydown, true)
-  }, [open, input, selected, matches, run, close, message, vimEnabled, vimMode, commandState, store, shortcuts])
+  }, [
+    open,
+    input,
+    selected,
+    matches,
+    run,
+    close,
+    message,
+    vimEnabled,
+    vimMode,
+    commandState,
+    store,
+    shortcuts,
+    beforeOpen,
+  ])
 
   useEffect(() => {
     if (!open) return

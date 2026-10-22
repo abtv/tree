@@ -1428,18 +1428,50 @@ Normal mode also supports:
 #### 20.2.26 Local Vim Register
 
 * The local Vim register is held only for the running renderer session and does not persist across application restarts. It is separate from the system clipboard; character-wise Visual `y`, Normal `yy` and `dd`, and whole-node Visual `y` also copy content to the system clipboard under the rules above, while other register-producing Vim commands do not modify the system clipboard. It holds either one plain-text value, one structured node subtree, or an ordered set of sibling subtrees, with only the most recent register-producing action retained.
-* Document search, named registers, macros, and marks are not supported.
+* Named registers, macros, and marks are not supported.
 
-The internal search foundation is implemented, but no search command or prompt is enabled yet.
-Its rules are literal, Unicode smart-case matching with nonoverlapping occurrences and UTF-16
-text spans; navigation destinations also identify the containing visible-character boundary.
+Tree supports literal text search in Vim Normal mode. `/` opens a bottom-status-area
+input without moving the document layout. It selects the last confirmed query for
+replacement, or starts empty. Smart case ignores case unless the query contains an
+uppercase character. Matches do not overlap and do not cross node boundaries.
+Displayed link text participates, including phrases crossing a link boundary.
 
 Tree scope includes the current-parent heading before all descendants, regardless of folds.
-Agenda scope consumes its full projection, includes contextual and repeated day occurrences,
-and respects focused-day scope. Counting stops at the 101st match and reports `100+`;
-navigation is independent of that cap. Search session data is memory-only. Query, document
-revision and presentation changes invalidate pending results. Runtime input and rendering
-remain a later stage; these internal contracts do not make `/`, `n` or `N` available.
+Counting stops at the 101st match and reports `100+` without an ordinal. Navigation
+and mounted-text highlighting are independent of that cap. Query entry updates
+counts and highlights without moving the document caret, scrolling or unfolding.
+Scrolling and disclosure clicks retain the prompt and its captured logical origin,
+even if folding hides that origin; ordinary fold selection still applies underneath.
+Ordinary node-text clicks cancel the draft and perform ordinary selection.
+
+Enter confirms and moves strictly after the captured origin, wrapping if necessary.
+An empty confirmation reuses the last confirmed query, or does nothing if none exists.
+`n` and `N` navigate forward/backward from the current position, with numeric prefixes.
+Destinations place the text caret at a grapheme boundary. Exact totals show the current
+ordinal after navigation; wrapping shows a brief notice. Reveal only the destination's
+ancestor path. Successive jumps keep earlier search reveals open. Normal Escape hides
+feedback and closes search-opened branches except the current path, preserving
+pre-existing expansion and explicit manual fold choices. `n`/`N` restore feedback.
+
+A newer manual selection, non-search command or command-panel opening cancels
+pending search jumps and queued repeats. A delayed result must not replace the
+newer caret or focus choice. Search feedback remains available.
+
+Escape during entry restores the prior confirmed search. Losing prompt focus,
+deactivating the window, or opening the command panel also cancels the unconfirmed
+draft; scrolling and disclosure controls retain the exceptions above. Prompt text,
+including `n`, `N` and `:`, remains literal. Native composition owns its input.
+
+Insert retains highlights; edits update local matches and show pending recount
+instead of a stale count. Document revisions invalidate obsolete destinations.
+Changing Tree location or presentation closes active search. Disabling Vim closes
+entry and hides search feedback. Both retain the last confirmed query for recall.
+Only that query is remembered in application-session memory; no search state is
+persisted in documents, view state, preferences or backups.
+
+Agenda search has an internal projection/traversal foundation but no input UI yet.
+Visual-mode search entry, backward `?` entry, regex and operator search motions are
+outside this version.
 
 #### 20.2.27 Unsupported Keys, Composition and Selection Offsets
 

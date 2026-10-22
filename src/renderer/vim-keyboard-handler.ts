@@ -122,6 +122,7 @@ export function handleVimKey(
     return true
   }
   const countDigit = /^[1-9]$/u.test(event.key) || (event.key === '0' && (commandState.pending?.count ?? '') !== '')
+  if (!countDigit && event.key !== 'n' && event.key !== 'N') store.search.interruptNavigation()
   if (!['j', 'k', 'J', 'K'].includes(event.key) && !countDigit) commandState.verticalGoal = undefined
   if (vim.mode === 'visual-node') {
     const handled = (): true => {
@@ -231,6 +232,7 @@ export function handleVimKey(
   }
 
   if (event.key === 'Escape') {
+    if (!visual && store.search.session.getSnapshot().visible) store.hideSearch()
     const exitCursor = visual ? motionCursor : selection.start
     clearCommandAssembly(commandState)
     store.cancelAgendaMove()
@@ -621,6 +623,15 @@ export function handleVimKey(
     return handled()
   }
   clearPending(commandState)
+
+  if (!visual && event.key === '/' && store.getSnapshot().status === 'ready') {
+    store.search.begin({ nodeId: node.id, offset: cursor })
+    return handled()
+  }
+  if (!visual && (event.key === 'n' || event.key === 'N')) {
+    store.search.navigate({ nodeId: node.id, offset: cursor }, event.key === 'n' ? 1 : -1, count)
+    return handled()
+  }
 
   if (!visual && (event.key === 'h' || event.key === 'l')) {
     const next = horizontalCaretTransition(

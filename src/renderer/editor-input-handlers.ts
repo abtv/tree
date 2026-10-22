@@ -180,6 +180,8 @@ export function createEditorKeyDownHandler({
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
     if (isComposing() || event.nativeEvent?.isComposing) return
     const primary = shortcuts.isPrimary(event)
+    if ((primary || event.ctrlKey) && !['Control', 'Meta', 'Shift', 'Alt'].includes(event.key))
+      store.search.interruptNavigation()
     // Meta is only ever the primary modifier (Cmd); where it is not, the combination has no command.
     if (event.metaKey && !primary) return
     const snapshot = store.getSnapshot()

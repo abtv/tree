@@ -950,12 +950,14 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   width: 34px;
   text-align: right;
 }
+.search-input-line,
 .command-input-line {
   display: flex;
   flex: 1;
   min-width: 0;
   font-size: 12px;
 }
+.search-input-line input,
 .command-input-line input {
   flex: 1;
   min-width: 0;
@@ -966,10 +968,18 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   color: inherit;
   font: inherit;
 }
+.search-count,
 .command-count {
   color: var(--color-secondary);
   margin: 0 12px;
   font-size: 11px;
+}
+.search-match {
+  background: color-mix(in srgb, var(--highlight-background) 50%, transparent);
+  color: var(--highlight-foreground);
+}
+.search-match-current {
+  background: var(--highlight-background);
 }
 .command-error {
   min-width: 0;

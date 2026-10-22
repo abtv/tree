@@ -324,29 +324,50 @@ export function richTextHtml(
           : `<span class="${piece.className}">${escapeHtml(piece.text)}</span>`,
       )
       .join('')
-  const ranges = [
-    ...links.map((link) => ({
-      ...link,
-      html: (label: string) => `<a href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${label}</a>`,
-    })),
-    ...decorations
-      .filter((range) => !links.some((link) => range.start < link.end && range.end > link.start))
-      .map((range) => ({
-        ...range,
-        html: (label: string) => `<span class="${escapeHtml(range.className)}">${label}</span>`,
-      })),
-  ].sort((left, right) => left.start - right.start)
-  for (const range of ranges) {
-    if (range.start > position) parts.push(markedHtml(position, range.start, false))
-    parts.push(range.html(markedHtml(range.start, range.end, false)))
-    position = range.end
+  const events = decorations
+    .flatMap((range, id) => [
+      { offset: range.start, id, open: true, className: range.className },
+      { offset: range.end, id, open: false, className: range.className },
+    ])
+    .sort((a, b) => a.offset - b.offset)
+  const active = new Map<number, string>()
+  let eventIndex = 0
+  const decoratedHtml = (start: number, end: number, includeEnd: boolean): string => {
+    const result: string[] = []
+    let cursor = start
+    while (cursor < end) {
+      while (eventIndex < events.length && events[eventIndex]!.offset <= cursor) {
+        const event = events[eventIndex++]!
+        if (event.open) active.set(event.id, event.className)
+        else active.delete(event.id)
+      }
+      const next = Math.min(end, events[eventIndex]?.offset ?? end)
+      const html = markedHtml(cursor, next, false)
+      const classes = [...active.values()].join(' ')
+      result.push(classes ? `<span class="${escapeHtml(classes)}">${html}</span>` : html)
+      cursor = next
+    }
+    if (start === end && includeEnd) result.push(markedHtml(start, end, true))
+    return result.join('')
+  }
+  for (const link of links) {
+    if (link.start > position) parts.push(decoratedHtml(position, link.start, false))
+    parts.push(
+      `<a href="${escapeHtml(link.url)}" rel="noreferrer" target="_blank">${decoratedHtml(link.start, link.end, false)}</a>`,
+    )
+    position = link.end
   }
   if (
     position < node.text.length ||
     parts.length === 0 ||
     marks.some((mark) => mark.start === node.text.length && mark.end === node.text.length)
   )
-    parts.push(markedHtml(position, node.text.length, true))
+    parts.push(decoratedHtml(position, node.text.length, true))
+  if (
+    position < node.text.length &&
+    marks.some((mark) => mark.start === node.text.length && mark.end === node.text.length)
+  )
+    parts.push(markedHtml(node.text.length, node.text.length, true))
   return parts.join('')
 }
 
@@ -409,6 +430,20 @@ export function getSelectionRange(element: HTMLElement): { start: number; end: n
   if (range.collapsed) return { start, end: start }
   const end = textOffsetAtBoundary(element, range.endContainer, range.endOffset)
   return { start: Math.min(start, end), end: Math.max(start, end) }
+}
+
+export function getSelectionEndpoints(element: HTMLElement): { anchor: number; focus: number } {
+  if (element instanceof HTMLTextAreaElement) {
+    return element.selectionDirection === 'backward'
+      ? { anchor: element.selectionEnd, focus: element.selectionStart }
+      : { anchor: element.selectionStart, focus: element.selectionEnd }
+  }
+  const selection = globalThis.getSelection()
+  if (!selection?.anchorNode || !selection.focusNode) return { anchor: 0, focus: 0 }
+  return {
+    anchor: textOffsetAtBoundary(element, selection.anchorNode, selection.anchorOffset),
+    focus: textOffsetAtBoundary(element, selection.focusNode, selection.focusOffset),
+  }
 }
 
 export function selectAll(element: HTMLElement): void {

@@ -157,6 +157,7 @@ export function createPointerHandlers(
         setNormalCaret(event.currentTarget, node.text.length)
     },
     onMouseDown: (event: MouseEvent<HTMLElement>) => {
+      store.search.interruptNavigation()
       applyCaretState(
         node.id,
         pointerCaretTransition(

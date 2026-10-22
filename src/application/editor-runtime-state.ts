@@ -15,6 +15,7 @@ export class EditorRuntimeState {
   public constructor(
     private readonly onAgendaClosed: () => void = () => undefined,
     private readonly agendaRowsCache?: AgendaRowsCache,
+    private readonly beforePublish: (state: ReadySnapshot) => void = () => undefined,
   ) {}
 
   public getSnapshot = (): EditorSnapshot => this.snapshot
@@ -93,6 +94,7 @@ export class EditorRuntimeState {
   }
 
   public emit(): void {
+    if (this.snapshot.status === 'ready') this.beforePublish(this.snapshot)
     this.listeners.forEach((listener) => listener())
   }
 }

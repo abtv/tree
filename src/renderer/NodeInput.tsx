@@ -10,7 +10,8 @@ import type {
 } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { TreeNode } from '../domain/document'
-import { richTextHtml, setSelectionRange, type TextDecoration } from './editor-dom'
+import { getSelectionEndpoints, richTextHtml, setSelectionRange, type TextDecoration } from './editor-dom'
+import { useSearchDecorations } from './search-decorations'
 
 export interface NodeInputBindings {
   selectedAll: boolean
@@ -41,6 +42,8 @@ interface NodeInputProps extends NodeInputBindings {
   imageCaretActive?: boolean
   decorations?: readonly TextDecoration[] | undefined
   richEditingEnabled?: boolean
+  searchQuery?: string
+  currentMatch?: { start: number; end: number } | undefined
 }
 
 export function NodeInput({
@@ -49,7 +52,9 @@ export function NodeInput({
   parent = false,
   imageOnly = false,
   imageCaretActive = false,
-  decorations,
+  decorations: baseDecorations,
+  searchQuery = '',
+  currentMatch,
   richEditingEnabled = true,
   selectedAll,
   disabled,
@@ -70,6 +75,18 @@ export function NodeInput({
   onPaste,
   onSelect,
 }: NodeInputProps): React.JSX.Element {
+  const matches = useSearchDecorations(node.text, searchQuery)
+  const decorations =
+    matches.length === 0
+      ? baseDecorations
+      : [
+          ...(baseDecorations ?? []),
+          ...matches.map((match) =>
+            currentMatch?.start === match.start && currentMatch.end === match.end
+              ? { ...match, className: 'search-match search-match-current' }
+              : match,
+          ),
+        ]
   const hasLinks = (node.links?.length ?? 0) > 0
   const [compositionHtml, setCompositionHtml] = useState<string>()
   const [richEditor, setRichEditor] = useState<{ nodeId: string; enabled: boolean }>({
@@ -82,6 +99,7 @@ export function NodeInput({
     setRichEditor({ nodeId: node.id, enabled: true })
   const plain = decorations === undefined && !hasLinks && !(richEditor.nodeId === node.id && richEditor.enabled)
   const element = useRef<HTMLElement | null>(null)
+  const retainedSelection = useRef<{ anchor: number; focus: number } | undefined>(undefined)
   const wasPlain = useRef(plain)
   // The textarea's focus and selection, kept from its events: replacing it with the rich element
   // unmounts it, which would otherwise drop both.
@@ -92,6 +110,11 @@ export function NodeInput({
   }
   useLayoutEffect(() => {
     const input = element.current
+    if (input !== null && retainedSelection.current !== undefined) {
+      const { anchor, focus } = retainedSelection.current
+      retainedSelection.current = undefined
+      if (input.ownerDocument.activeElement === input) setSelectionRange(input, anchor, focus)
+    }
     if (wasPlain.current && !plain && textarea.current.focused && input !== null) {
       input.focus({ preventScroll: true })
       setSelectionRange(input, textarea.current.start, textarea.current.end)
@@ -99,6 +122,10 @@ export function NodeInput({
     wasPlain.current = plain
   })
   const attach = (input: HTMLElement | null): void => {
+    const previous = element.current
+    if (searchQuery && input === null && previous !== null && previous.ownerDocument.activeElement === previous) {
+      retainedSelection.current = getSelectionEndpoints(previous)
+    }
     element.current = input
     inputRef(input)
   }

@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim Text Search](vim-text-search.md) | T1 complete; T2 Ready | Implement Tree search interaction |
+| [Vim Text Search](vim-text-search.md) | T1 and T2 complete; T3 Ready | Implement Agenda search integration |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

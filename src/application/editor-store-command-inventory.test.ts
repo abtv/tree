@@ -6,6 +6,8 @@ import generatorSource from './test/editor-store-arbitraries.ts?raw'
 
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
+  hideSearch:
+    'Search-owned folds require an active asynchronous search; editor-search.test.ts covers cleanup and manual ownership.',
   openAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
   closeAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
   applyAgenda: 'Agenda selection and presentation commands have dedicated property coverage.',
