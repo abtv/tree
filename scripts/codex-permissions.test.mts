@@ -71,7 +71,6 @@ const sandbox = [
   'audit',
   'test:watch',
   'test:property:soak',
-  'test:mutation',
 ]
 
 it('covers every package workflow with repository approval or an explicit exemption', () => {

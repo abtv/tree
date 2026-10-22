@@ -16,17 +16,19 @@ prefix_rule(
     not_match = ["npm install", "npm exec node", "node arbitrary-script.mjs", "npm testing"],
 )
 prefix_rule(
-    pattern = ["npm", "run", ["test", "test:coverage", "test:performance", "check", "check:full"]],
+    pattern = ["npm", "run", ["test", "test:coverage", "test:performance", "test:mutation", "check", "check:full"]],
     decision = "allow",
     justification = "Run the trusted repository's named validation workflows outside the sandbox without repeated approval",
     match = [
         "npm run test -- scripts/retire-scratch.test.mts",
         "npm run test:coverage",
         "npm run test:performance",
+        "npm run test:mutation",
+        "npm run test:mutation -- --mutate src/domain/emoji-completion.ts --concurrency 4",
         "npm run check",
         "npm run check:full",
     ],
-    not_match = ["npm run unknown", "npm install", "npm run check:full-extra", "npm exec node"],
+    not_match = ["npm run unknown", "npm install", "npm run check:full-extra", "npm run test:mutation-extra", "npm exec node"],
 )
 
 # Named Electron workflows accept spec paths and Playwright flags without shell env prefixes.
