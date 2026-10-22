@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Vim Text Search](vim-text-search.md) | Planned; implementation not authorized | Resolve recorded decisions and authorize implementation before T1 |
+| [Vim Text Search](vim-text-search.md) | Decisions approved; implementation not authorized | Authorize implementation before T1 |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

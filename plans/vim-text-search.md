@@ -1,12 +1,12 @@
 # Vim Text Search
 
-Status: Planned — plan recording authorized; implementation not yet authorized.
+Status: Planned — behavior decisions approved; plan recording authorized; implementation not yet authorized.
 
 ## Objective and authorization
 
 Deliver literal text search in Vim Normal mode across Tree and Agenda, with live highlighting and bounded counts, explicit navigation, and responsive editing on large documents.
 
-The owner approved the behavior recorded below in conversation and then asked to record a multi-task initiative plan. That request authorizes this plan and its index entry, not runtime implementation. The selected coding tool is Codex. No prototype or implementation has been made. Planning started from clean commit `f5b911f` with no working plan or other indexed initiative.
+The owner approved the behavior recorded below in conversation and then asked to record a multi-task initiative plan. In the follow-up discussion, the owner settled D1–D5 and authorized saving those decisions to Git. These requests authorize this plan and its index entry, not runtime implementation. The selected coding tool is Codex. No prototype or implementation has been made. Planning started from clean commit `f5b911f` with no working plan or other indexed initiative.
 
 Priority: prompt visible feedback for typing, scrolling, folding and navigation; correct results after edits and structural changes; ordinary Vim conventions except the explicitly agreed differences. Do not trade correctness for a stale count or stale navigation target.
 
@@ -18,20 +18,21 @@ Sources of truth: [PRODUCT](../docs/PRODUCT.md) §§1.1–1.3, 2.4, 13, 20.1–2
 
 - Search is literal, with no regular expressions. Smart case ignores case for a query without uppercase letters and respects case when it contains uppercase letters.
 - Search node text, including displayed HTTP(S) URL text and phrases crossing a link boundary within one node. Do not search linked websites or match across node boundaries.
-- Tree searches the current location, including descendants hidden by folds. Resolve the current-parent heading detail below before implementing its adapter.
+- Tree searches the editable current-parent heading before its descendants, including descendants hidden by folds.
 - Agenda searches its current projection, including collapsed days and branches. Focused-day presentation limits search to that day. Include real-node text in contextual ancestors; exclude synthetic day and gap labels. Count each displayed occurrence separately when a node appears on several days.
 - Traverse depth-first in display order: node, descendants, next sibling. Agenda visits days in timeline order and their projected hierarchies in depth-first order. Within text, navigate in text order; reverse navigation reverses this order.
+- Matches do not overlap: searching `aa` in `aaa` yields the match at positions 1–2, not an additional match at positions 2–3. Search navigation keeps the caret on visible-character (grapheme) boundaries, never inside a combined emoji or a letter with combining marks.
 
 ### Query entry and navigation
 
-- `/` in Normal opens a search field in the bottom status area without moving the tree layout. Opening search from Visual, backward entry with `?`, and search as an operator motion are outside this version.
+- `/` in Normal opens a search field in the bottom status area without moving the tree layout. Prefill the last confirmed query and select all its text: `Enter` repeats it, while typing replaces it. With no confirmed query, the field is empty. Opening search from Visual, backward entry with `?`, and search as an operator motion are outside this version.
 - While typing, update the count and highlight matches in mounted text, including rows that become visible through scrolling or manual expansion. Do not move the document caret, scroll to a match, or automatically unfold anything.
 - Stop exact counting when the 101st match is found and show `100+` without a current ordinal. This cap never limits navigation or visible highlighting. At most 100 matches have an exact total; after navigation show the current ordinal and total, such as `3 / 8`.
-- `Enter` confirms the query and navigates forward from the origin captured at query entry. `n` and `N` then navigate to the next and previous match from the current position. Wrap at scope boundaries with a brief notice. Resolve exact origin inclusion and empty-query behavior below.
-- Reveal only the ancestor path needed for the selected result, including an Agenda day when necessary. Keep unrelated folds unchanged. The earlier temporary-reveal proposal requires the lifecycle clarification below now that typing itself never reveals results.
+- `Enter` confirms the query and navigates forward strictly after the origin captured at query entry, skipping a match that begins exactly at the caret until wrapping. An empty confirmed query reuses the last confirmed query if present, otherwise does nothing. `n` and `N` then navigate to the next and previous match from the current position. Support numeric prefixes, such as `3n` for the third next match. Wrap at scope boundaries with a brief notice.
+- Reveal only the ancestor path needed for the selected result, including an Agenda day when necessary. Keep unrelated folds unchanged. Successive `n`/`N` jumps leave previous search reveals open. On Normal `Esc` after confirmation, close branches opened by search except the path needed to keep the current match visible. Stay at that match. Preserve branches already open before search and manual fold choices.
 - Scrolling during query entry preserves prompt focus, query, count and search origin. Confirmation may scroll back to the match reached from that origin.
-- Clicking a disclosure chevron while entering a query keeps the prompt active and the origin unchanged. Manual fold choices survive query cancellation. Folding alone does not change the search corpus or count. Resolve selected-origin collapse and ordinary text clicks below.
-- `/` followed by `Up` recalls the last confirmed query for editing. `Esc` during entry cancels the draft and restores the prior confirmed query. Canceled drafts never replace it.
+- Clicking a disclosure chevron while entering a query keeps the prompt active and the logical node/offset origin unchanged, even when the origin becomes hidden; ordinary fold selection rules still apply underneath. Manual fold choices survive query cancellation. Folding alone does not change the search corpus or count. Clicking ordinary node text cancels the draft and performs ordinary selection.
+- `Esc` during entry cancels the draft and restores the prior confirmed query. Canceled drafts never replace it. Automatic selected prefill on `/` replaces the earlier proposal to require `Up` for recall.
 - After confirmation, Normal `Esc` hides search highlighting and count but remembers the query. `n` or `N` restores search feedback. Entering Insert retains highlights; text input is immediate, local highlights update, and asynchronous recount shows a pending indicator instead of a stale number.
 - Changing Tree location, switching Tree/Agenda, or entering/leaving a focused day closes active search and retains the last confirmed query for recall.
 - Retain only the last confirmed query in memory for the running application session, shared by Tree and Agenda. Do not persist search history or add search fields to saved documents, view state, preferences or backups.
@@ -50,17 +51,17 @@ Without active search, ordinary editing must not incur a corpus scan. With activ
 
 Future indexing and Worker execution are separate optimizations, not deliverables. Keep the executor replaceable and results serializable; do not build unused worker synchronization or index infrastructure. A future text index would use node IDs independently of ordering and scope. Moving a subtree must not require reindexing unchanged text. Introducing a Worker or index requires measured justification and review of any reserved architecture choice before implementation.
 
-## Decisions to settle before implementation
+## Approved decisions
 
-No new product decisions are silently approved by this plan. The following are material ambiguities or interactions to consolidate in the implementation-start discussion. Recommendations are proposals only.
+The owner approved D1–D5 in the follow-up discussion and requested that they be saved to Git. The agreed behavior above incorporates them. Implementation authorization remains separate. Update PRODUCT and conformance documentation with each implemented stage in the same commit, rather than waiting until the initiative ends or describing unimplemented behavior as available now.
 
-| ID | Decision | Proposed resolution and reason |
+| ID | Decision | Approved resolution |
 | --- | --- | --- |
-| D1 | Include the editable current-parent heading in Tree search? | Include its text before descendants, since it is visible editable content of the current location. Agenda retains its independently specified descendant scope. |
-| D2 | What happens to folds opened by successive confirmed `n`/`N` jumps? | Keep paths opened by confirmed navigation. No draft-time automatic reveals exist to restore; manual folds always survive. This needs explicit resolution against the earlier temporary-reveal suggestion. |
+| D1 | Include the editable current-parent heading in Tree search? | Include its text before descendants. Agenda retains its independently specified descendant scope. |
+| D2 | What happens to folds opened by successive confirmed `n`/`N` jumps? | Leave them open during navigation. On Normal `Esc`, close search-opened branches except the current match's ancestor path, and stay at that match. Preserve pre-existing expansion and manual fold choices. |
 | D3 | Ordinary text click during query entry, and collapsing the ancestor containing the captured origin | A text click cancels the draft and performs ordinary selection. A chevron keeps query entry active and retains the logical node/offset origin even if hidden, while ordinary fold selection rules still apply underneath. |
-| D4 | Empty-query confirmation and a match beginning exactly at the origin | Follow ordinary forward Vim search: an empty confirmed query reuses the last confirmed query if present, otherwise does nothing; a forward jump starts strictly after the caret and may wrap. Confirm this before defining exact ordinal tests. |
-| D5 | Count prefixes, overlapping matches and Unicode position rules | Resolve against current Vim fidelity and visible-character requirements before coding. Do not silently turn this into regex support or broaden the command family. |
+| D4 | Recall, empty-query confirmation and a match beginning exactly at the origin | `/` prefills and selects the last confirmed query. Typing replaces it; `Enter` repeats it. Empty confirmation reuses the last query if present, otherwise does nothing. A forward jump starts strictly after the caret and may wrap. |
+| D5 | Count prefixes, overlapping matches and Unicode position rules | Support numeric prefixes for `n`/`N`, nonoverlapping matches and caret positions at grapheme boundaries. This does not add regex support. |
 
 Other implementation details are delegated only within existing recorded requirements. New capabilities, persistence, architecture boundaries, or competing user-visible interpretations remain reserved under AGENTS §§5–6. The implementation must inventory prompt blur, application commands, IME composition, pending Agenda moves, overlays, Vim disable, scope deletion and read-only contextual rows, and raise any material conflict not settled by existing requirements.
 
@@ -72,7 +73,7 @@ All runtime tasks provisionally use **High Risk** functional validation because 
 
 | Task | Outcome | Dependency | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
-| T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Implementation authorization and decisions above | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Planned |
+| T1 | Pure matching, scope traversal and asynchronous session/executor contracts | Implementation authorization | Rule/property tests, cancellation and revision tests, bounded-work scale guards | Planned |
 | T2 | Complete Tree search interaction and rendering | T1 | Real keyboard/pointer/caret flows, inspected screenshots, typing and navigation measurements | Planned |
 | T3 | Agenda search using the same session and matching rules | T2 | Projection/occurrence tests, real Agenda transitions and independent folds, visual and scale evidence | Planned |
 | T4 | Integrated mutation, lifecycle and performance assessment; delivery for owner acceptance | T3 | Cross-feature stress cases, measured latency/results/memory, consolidated conformance and independent passes | Planned |
@@ -125,24 +126,24 @@ DEVELOPMENT §9, Validation Evidence and Reuse, explicitly requires changed inpu
 
 ## Owner involvement and proposed budget
 
-- Current authorization: record and validate this plan only. Implementation-start approval must cover the final settled decisions and initiative scope; a status label is never approval.
+- Current authorization: record and validate this plan and the approved D1–D5 decisions only. Initiative implementation and its proposed budget still require authorization; a status label is never approval.
 - Proposed implementation allowance: the four working tasks, their required checks and in-scope review corrections, at most four task commits per primary session. Use the workflow limit of two unsuccessful recovery attempts at the same blocker without new evidence before escalation. No token or elapsed-time allowance has been approved or invented.
 - Proposed separate closure allowance: one documentation retirement commit after explicit acceptance of the unchanged delivered result. Waiting for acceptance does not consume implementation allowance.
-- Expected owner involvement: one consolidated decision/implementation-authorization round before T1, two planned pre-commit native-keyboard verification rounds at T2 and T3, and one final acceptance round after T4. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
+- Expected remaining owner involvement: implementation authorization before T1, two planned pre-commit native-keyboard verification rounds at T2 and T3, and one final acceptance round after T4. D1–D5 are settled and do not need renewed approval. Missing runtime capabilities or material newly discovered conflicts may add rounds. Reuse valid checks unless later changes invalidate their input paths.
 
 | Gate | Owner action | Reason and timing |
 | --- | --- | --- |
-| Before T1 | Resolve D1–D5 and authorize the initiative with its proposed budget | These determine behavior or execution scope not settled by plan-recording approval. |
+| Before T1 | Authorize the initiative with its proposed budget | The behavior decisions are approved, but plan-recording approval does not authorize implementation. |
 | Before T2 commit | In the prepared Tree instance, type/refine a query, cancel/recall it, hold navigation keys, and exercise applicable native composition/autocorrection while editing | DEVELOPMENT §9 requires real-keyboard evidence; expect literal input, responsive repeats, stable prompt/caret and no composition loss. |
 | Before T3 commit | Repeat the distinct Agenda input paths, including contextual/mirror destinations and editing the active occurrence | The separate Agenda handlers and read-only row paths require their own real-keyboard verification before commit. |
 | After T4 | Inspect the delivered result using concrete commit-bound instructions and accept or report issues | Four substantive tasks trigger workflow §8 final acceptance. This is distinct from automated verification. |
 
 ## Exact next action and continuation
 
-Next action: consolidate D1–D5 with the owner and obtain implementation authorization. **No implementation task is Ready yet.** Do not select another initiative or an open question as a substitute.
+Next action: obtain initiative implementation authorization. D1–D5 are already approved. **No implementation task is Ready yet.** Do not select another initiative or an open question as a substitute.
 
-After that approval, record the answers, mark T1 Ready, verify required capabilities and execute T1. Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
+After that approval, record implementation authorization, mark T1 Ready, verify required capabilities and execute T1. Preserve the four-task acceptance gate even if engineering boundaries later combine tasks.
 
 Copyable continuation prompt:
 
-> Continue planning the Vim text-search initiative in `plans/vim-text-search.md`. Recover repository state and recorded authorization first. The plan was authorized for recording only; resolve its pending behavior decisions and obtain initiative implementation approval before starting T1. Speak simple Russian with the owner and write repository content in English.
+> Continue the Vim text-search initiative in `plans/vim-text-search.md`. Recover repository state and recorded authorization first. D1–D5 are approved; do not ask for those decisions again. Only plan recording is authorized so far; obtain initiative implementation approval before starting T1. Speak simple Russian with the owner and write repository content in English.
