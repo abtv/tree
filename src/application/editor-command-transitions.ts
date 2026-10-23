@@ -115,8 +115,8 @@ export function openBelowTransition(
   expanded = false,
 ): StructuralTransition & { expandId?: NodeId } {
   const selected = requireNode(document, location.selectedNodeId)
-  const outside = createAfterEmptyParentTransition(document, location, selected, createId)
-  if (outside !== undefined) return outside
+  const outdented = outdentEmptyLeafTransition(document, location, selected)
+  if (outdented !== undefined) return outdented
   if (!expanded || selected.node.children.length === 0 || location.currentParentId === location.selectedNodeId) {
     return createSiblingTransition(document, location, 'after', createId)
   }
@@ -143,18 +143,7 @@ function isLastEmptyInlineLeaf(location: Location, selected: ReturnType<typeof r
   )
 }
 
-/** Preserve a last empty inline leaf and create after its parent, within the current location. */
-function createAfterEmptyParentTransition(
-  document: Document,
-  location: Location,
-  selected: ReturnType<typeof requireNode>,
-  createId: () => NodeId,
-): StructuralTransition | undefined {
-  if (!isLastEmptyInlineLeaf(location, selected)) return undefined
-  return createSiblingTransition(document, { ...location, selectedNodeId: selected.parent!.id }, 'after', createId)
-}
-
-/** Enter on a last empty inline leaf moves that leaf one level left, directly after its parent. */
+/** Enter and Vim `o` on a last empty inline leaf move that leaf one level left, directly after its parent. */
 function outdentEmptyLeafTransition(
   document: Document,
   location: Location,
@@ -180,8 +169,6 @@ export function createSiblingOrFirstChildTransition(
   expanded = false,
 ): StructuralTransition | RejectedTransition {
   const current = requireNode(document, location.selectedNodeId)
-  const outdented = outdentEmptyLeafTransition(document, location, current)
-  if (outdented !== undefined) return outdented
   if (location.currentParentId === location.selectedNodeId) {
     const parent = current
     if (parent.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) {

@@ -596,44 +596,38 @@ describe('editor command transitions', () => {
     },
   )
 
-  it('creates outside an empty inline child with o, preserving it', () => {
-    const input: Document = {
-      roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'empty', text: '', children: [] }] }],
-    }
-    const location = { currentParentId: null, selectedNodeId: 'empty' }
-    const result = openBelowTransition(input, location, () => 'created')
-    expect(result.document.roots.map((node) => node.id)).toEqual(['parent', 'created'])
-    expect(result.document.roots[0]).toEqual(input.roots[0])
-    expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'created' })
-    expect(result.focus).toEqual({ nodeId: 'created', cursor: 0 })
-  })
+  it.each(['o', 'Enter'] as const)(
+    'moves a last empty inline child one level left after its parent with %s, creating nothing',
+    (command) => {
+      const input: Document = {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Parent',
+            children: [
+              { id: 'text', text: 'Some text', children: [] },
+              { id: 'empty', text: '', children: [] },
+            ],
+          },
+          { id: 'after', text: 'After', children: [] },
+        ],
+      }
+      const location = { currentParentId: null, selectedNodeId: 'empty' }
+      const createId = vi.fn(() => 'unused')
+      const result =
+        command === 'o'
+          ? openBelowTransition(input, location, createId)
+          : createSiblingOrFirstChildTransition(input, location, 0, createId)
+      if (!('document' in result)) throw new Error('Expected a move.')
+      expect(createId).not.toHaveBeenCalled()
+      expect(result.document.roots.map((node) => node.id)).toEqual(['parent', 'empty', 'after'])
+      expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['text'])
+      expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'empty' })
+      expect(result.focus).toEqual({ nodeId: 'empty', cursor: 0 })
+    },
+  )
 
-  it('moves a last empty inline child one level left after its parent with Enter, creating nothing', () => {
-    const input: Document = {
-      roots: [
-        {
-          id: 'parent',
-          text: 'Parent',
-          children: [
-            { id: 'text', text: 'Some text', children: [] },
-            { id: 'empty', text: '', children: [] },
-          ],
-        },
-        { id: 'after', text: 'After', children: [] },
-      ],
-    }
-    const location = { currentParentId: null, selectedNodeId: 'empty' }
-    const createId = vi.fn(() => 'unused')
-    const result = createSiblingOrFirstChildTransition(input, location, 0, createId)
-    if (!('document' in result)) throw new Error('Expected a move.')
-    expect(createId).not.toHaveBeenCalled()
-    expect(result.document.roots.map((node) => node.id)).toEqual(['parent', 'empty', 'after'])
-    expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['text'])
-    expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'empty' })
-    expect(result.focus).toEqual({ nodeId: 'empty', cursor: 0 })
-  })
-
-  it('moves a last empty grandchild to its parent level with Enter, keeping the next sibling order', () => {
+  it('moves a last empty grandchild to its parent level, keeping the next sibling order', () => {
     const input: Document = {
       roots: [
         {
@@ -651,8 +645,7 @@ describe('editor command transitions', () => {
       ],
     }
     const location = { currentParentId: null, selectedNodeId: 'empty' }
-    const result = createSiblingOrFirstChildTransition(input, location, 0, () => 'unused')
-    if (!('document' in result)) throw new Error('Expected a move.')
+    const result = openBelowTransition(input, location, () => 'unused')
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'empty', 'next'])
     expect(result.document.roots[0]!.children[0]!.children).toEqual([])
   })
