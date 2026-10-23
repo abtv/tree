@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ClipboardPayload, TreeApi } from '../../shared/ipc'
-import { attachmentImageCache, createElectronEditorServices, readAttachment } from './electron-services'
+import { NOTES_REPLACED_MESSAGE, type ClipboardPayload, type TreeApi } from '../../shared/ipc'
+import {
+  attachmentImageCache,
+  createElectronEditorServices,
+  readAttachment,
+  resumeNotesWrites,
+  suspendNotesWrites,
+} from './electron-services'
 import { decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 
@@ -101,6 +107,63 @@ describe('renderer Electron services', () => {
     await expect(createElectronEditorServices().writeClipboardContent?.({ kind: 'text', text: 'plain' })).rejects.toBe(
       failure,
     )
+  })
+
+  it('drops document and image writes while an import replaces the notes, then forwards them again', async () => {
+    api.load = vi.fn(async () => null)
+    window.treeApi = api
+    const services = createElectronEditorServices()
+    const state = {
+      version: 2 as const,
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    }
+    suspendNotesWrites()
+    try {
+      await expect(services.save(state)).resolves.toBeUndefined()
+      await expect(services.writeAttachment('attachment-1', new Uint8Array([1]))).resolves.toBeUndefined()
+      await expect(services.cleanupAttachments([])).resolves.toBeUndefined()
+      // Reads still reach the main process.
+      await services.load()
+      expect(api.save).not.toHaveBeenCalled()
+      expect(api.writeAttachment).not.toHaveBeenCalled()
+      expect(api.cleanupAttachments).not.toHaveBeenCalled()
+      expect(api.load).toHaveBeenCalledOnce()
+    } finally {
+      resumeNotesWrites()
+    }
+
+    await services.save(state)
+    expect(api.save).toHaveBeenCalledExactlyOnceWith(state)
+  })
+
+  it('suspends writes when the main process reports that the notes were replaced', async () => {
+    const services = createElectronEditorServices()
+    const state = {
+      version: 2 as const,
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    }
+    const replaced = new Error(`Error invoking remote method 'tree:save': Error: ${NOTES_REPLACED_MESSAGE}`)
+    const other = new Error('disk full')
+    api.save = vi.fn(async () => {
+      throw replaced
+    })
+    api.writeAttachment = vi.fn(async () => {
+      throw other
+    })
+    window.treeApi = api
+    try {
+      await expect(services.writeAttachment('attachment-1', new Uint8Array([1]))).rejects.toBe(other)
+      await expect(services.save(state)).resolves.toBeUndefined()
+      await expect(services.writeAttachment('attachment-1', new Uint8Array([1]))).resolves.toBeUndefined()
+      expect(api.save).toHaveBeenCalledOnce()
+      expect(api.writeAttachment).toHaveBeenCalledOnce()
+    } finally {
+      resumeNotesWrites()
+      api.save = vi.fn(async () => undefined)
+      api.writeAttachment = vi.fn(async () => undefined)
+    }
   })
 
   it('provides a no-op optional clipboard writer when the bridge omits it', async () => {

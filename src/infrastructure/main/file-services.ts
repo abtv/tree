@@ -9,6 +9,7 @@ import {
   type AttachmentId,
   type PersistedEditorState,
 } from '../../domain/document'
+import { NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
 import {
   commitReplacement,
   isDocumentFileName,
@@ -35,16 +36,21 @@ export interface NotesArchiveFileServices {
   /**
    * Replaces the notes with a staging directory's `document.json` and `attachments/`. Returns the
    * Replaced Notes folder, or null when there were no previous notes. Afterwards saves and image
-   * writes are rejected until the next load.
+   * writes are rejected until the next load. The archive name is recorded for recovery to report.
    */
-  replaceNotes(stagingPath: string): Promise<string | null>
-  /** The Replaced Notes folder of a replacement that the last load completed, once. */
-  takeRecoveredReplacement(): { readonly replacedFolder: string | null } | undefined
+  replaceNotes(stagingPath: string, archive?: string): Promise<string | null>
+  /** The Replaced Notes folder and archive name of a replacement that the last load completed, once. */
+  takeRecoveredReplacement(): RecoveredNotesReplacement | undefined
   /** Hard-links the current document files into a new directory that saves cannot change. */
   snapshotDocuments(): Promise<string>
   releaseSnapshot(path: string): Promise<void>
   /** Keeps the images from attachment cleanup until the returned function runs. */
   pinAttachments(ids: Iterable<string>): () => void
+}
+
+export interface RecoveredNotesReplacement {
+  readonly replacedFolder: string | null
+  readonly archive?: string
 }
 
 export interface FileServicesOptions {
@@ -61,8 +67,7 @@ export interface FileOperationEvent {
   error?: string
 }
 
-/** Thrown by saves and image writes after the notes were replaced, until the window reloads them. */
-export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
+export { NOTES_REPLACED_MESSAGE }
 
 const GENERATION_PATTERN = /^document\.(\d+)\.json$/
 const LEGACY_BACKUP_NAME = 'document.json.bak'
@@ -91,7 +96,7 @@ export function createFileServices(
   let nextGeneration: number | undefined
   // Set once a replacement reached its journal: the old session must not write over the new notes.
   let replaced = false
-  let recovered: { readonly replacedFolder: string | null } | undefined
+  let recovered: RecoveredNotesReplacement | undefined
   // Staging and snapshot directory names that recovery must not sweep.
   const active = new Set<string>()
   const pinned = new Set<ReadonlySet<string>>()
@@ -113,7 +118,12 @@ export function createFileServices(
         if (layout !== undefined) {
           try {
             const recovery = await recoverReplacement(nodeReplacementFileSystem, layout, active)
-            if (recovery.completed) recovered = { replacedFolder: recovery.replacedFolder }
+            if (recovery.completed) {
+              recovered = {
+                replacedFolder: recovery.replacedFolder,
+                ...(recovery.archive === undefined ? {} : { archive: recovery.archive }),
+              }
+            }
           } catch (error) {
             throw new Error(`The notes import could not be completed: ${messageOf(error)}`, { cause: error })
           }
@@ -198,13 +208,13 @@ export function createFileServices(
     async discardStagingDirectory(path) {
       await removeOwnedDirectory(archiveLayout().importDirectory, path)
     },
-    replaceNotes(stagingPath) {
+    replaceNotes(stagingPath, archiveName) {
       return enqueue('replaceNotes', [dataDirectory, stagingPath], async () => {
         const archive = archiveLayout()
         const staging = ownedName(archive.importDirectory, stagingPath)
         rejectAfterReplacement()
         try {
-          const folder = await commitReplacement(nodeReplacementFileSystem, archive, staging, now())
+          const folder = await commitReplacement(nodeReplacementFileSystem, archive, staging, now(), archiveName)
           // Set inside the queued operation, so no save queued behind it can write the old notes.
           replaced = true
           nextGeneration = undefined

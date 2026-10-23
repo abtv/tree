@@ -45,6 +45,21 @@ function createHarness() {
   const setAppearance = vi.fn()
   const getCommandHistory = vi.fn(() => ['set-theme-dark'])
   const setCommandHistory = vi.fn()
+  const notesArchive = {
+    chooseExportDestination: vi.fn(async () => ({ ok: true as const, fileName: 'Tree Notes 2026-10-23.zip' })),
+    startExport: vi.fn(async () => ({
+      ok: true as const,
+      fileName: 'Tree Notes 2026-10-23.zip',
+      summary: { imageCount: 1, missingImageCount: 0, archiveBytes: 10 },
+    })),
+    chooseImportArchive: vi.fn(async () => ({ ok: false as const, canceled: true as const })),
+    prepareImport: vi.fn(async () => ({ ok: false as const, message: 'The archive is encrypted.' })),
+    commitImport: vi.fn(async () => ({ ok: true as const })),
+    cancel: vi.fn(async () => undefined),
+    takeImportNotice: vi.fn(() => ({ fileName: 'a.zip', replacedFolder: '~/Library/Application Support/Tree/x' })),
+    showReplacedFolder: vi.fn(),
+    shutdown: vi.fn(() => null),
+  }
   registerIpcHandlers({
     getAppearance,
     setAppearance,
@@ -62,8 +77,10 @@ function createHarness() {
     setAlwaysOnTop,
     getVimEnabled,
     setVimEnabled,
+    notesArchive,
   })
   return {
+    notesArchive,
     getAppearance,
     setAppearance,
     getCommandHistory,
@@ -312,6 +329,73 @@ describe('main IPC handlers', () => {
       ),
     ).rejects.toThrow('Editor context menu request')
     expect(showEditorContextMenu).toHaveBeenCalledTimes(2)
+  })
+
+  it('forwards argument-free notes export and import requests and their results', async () => {
+    const { handlers, notesArchive } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    expect(ipcChannels.chooseNotesExportDestination).toBe('tree:notes-choose-export-destination')
+    expect(ipcChannels.startNotesExport).toBe('tree:notes-start-export')
+    expect(ipcChannels.chooseNotesImportArchive).toBe('tree:notes-choose-import-archive')
+    expect(ipcChannels.prepareNotesImport).toBe('tree:notes-prepare-import')
+    expect(ipcChannels.commitNotesImport).toBe('tree:notes-commit-import')
+    expect(ipcChannels.cancelNotesOperation).toBe('tree:notes-cancel')
+    expect(ipcChannels.takeNotesImportNotice).toBe('tree:notes-take-import-notice')
+    expect(ipcChannels.showReplacedNotesFolder).toBe('tree:notes-show-replaced-folder')
+
+    await expect(handlers.get(ipcChannels.chooseNotesExportDestination)!(event)).resolves.toEqual({
+      ok: true,
+      fileName: 'Tree Notes 2026-10-23.zip',
+    })
+    await expect(handlers.get(ipcChannels.startNotesExport)!(event)).resolves.toMatchObject({ ok: true })
+    await expect(handlers.get(ipcChannels.chooseNotesImportArchive)!(event)).resolves.toEqual({
+      ok: false,
+      canceled: true,
+    })
+    await expect(handlers.get(ipcChannels.prepareNotesImport)!(event)).resolves.toEqual({
+      ok: false,
+      message: 'The archive is encrypted.',
+    })
+    await expect(handlers.get(ipcChannels.commitNotesImport)!(event)).resolves.toEqual({ ok: true })
+    await expect(handlers.get(ipcChannels.cancelNotesOperation)!(event)).resolves.toBeUndefined()
+    expect(handlers.get(ipcChannels.takeNotesImportNotice)!(event)).toEqual({
+      fileName: 'a.zip',
+      replacedFolder: '~/Library/Application Support/Tree/x',
+    })
+    handlers.get(ipcChannels.showReplacedNotesFolder)!(event)
+    for (const method of Object.values(notesArchive).filter((method) => method !== notesArchive.shutdown)) {
+      expect(method).toHaveBeenCalledExactlyOnceWith()
+    }
+  })
+
+  it('rejects any argument to a notes request, so the renderer cannot name a path', async () => {
+    const { handlers, notesArchive } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const notesChannels = Object.values(ipcChannels).filter((channel) => channel.startsWith('tree:notes-'))
+    expect(notesChannels).toHaveLength(8)
+
+    for (const channel of notesChannels) {
+      for (const args of [['/Users/someone/Desktop/notes.zip'], [undefined], [{ path: '/' }]]) {
+        expect(() => handlers.get(channel)!(event, ...args)).toThrow('This request takes no arguments.')
+      }
+    }
+    for (const method of Object.values(notesArchive)) expect(method).not.toHaveBeenCalled()
+  })
+
+  it('propagates notes controller failures to the renderer', async () => {
+    const { handlers, notesArchive } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    notesArchive.startExport.mockRejectedValueOnce(new Error('No export destination was chosen.'))
+    notesArchive.showReplacedFolder.mockImplementationOnce(() => {
+      throw new Error('There is no Replaced Notes folder to show.')
+    })
+
+    await expect(handlers.get(ipcChannels.startNotesExport)!(event)).rejects.toThrow(
+      'No export destination was chosen.',
+    )
+    expect(() => handlers.get(ipcChannels.showReplacedNotesFolder)!(event)).toThrow(
+      'There is no Replaced Notes folder to show.',
+    )
   })
 
   it('rejects every channel from an untrusted renderer', async () => {

@@ -1,4 +1,4 @@
-import { NotesArchiveError } from '../../application/notes-archive/archive-policy'
+import { exportFailureMessage } from '../../application/notes-archive/archive-messages'
 import { exportNotesArchive, type NotesArchiveSource } from '../../application/notes-archive/export-notes'
 import { createZipWriter } from '../../infrastructure/archive/zip-writer'
 import type { ArchiveWorkerPost } from '../workers/archive-protocol'
@@ -50,9 +50,4 @@ export async function runExportJob(source: NotesArchiveSource, post: ArchiveWork
   } catch (error) {
     post({ type: 'error', message: exportFailureMessage(error) })
   }
-}
-
-export function exportFailureMessage(error: unknown): string {
-  if (error instanceof NotesArchiveError) return error.message
-  return `The notes could not be read: ${error instanceof Error ? error.message : String(error)}`
 }

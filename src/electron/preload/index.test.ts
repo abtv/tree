@@ -69,6 +69,14 @@ describe('preload bridge', () => {
     await treeApi.setAppearance('dark')
     await treeApi.getCommandHistory()
     await treeApi.setCommandHistory(['set-theme-dark'])
+    await treeApi.chooseNotesExportDestination?.()
+    await treeApi.startNotesExport?.()
+    await treeApi.chooseNotesImportArchive?.()
+    await treeApi.prepareNotesImport?.()
+    await treeApi.commitNotesImport?.()
+    await treeApi.cancelNotesOperation?.()
+    await treeApi.takeNotesImportNotice?.()
+    await treeApi.showReplacedNotesFolder?.()
 
     expect(mocks.invoke.mock.calls).toEqual([
       [ipcChannels.load],
@@ -88,6 +96,15 @@ describe('preload bridge', () => {
       [ipcChannels.setAppearance, 'dark'],
       [ipcChannels.getCommandHistory],
       [ipcChannels.setCommandHistory, ['set-theme-dark']],
+      // Notes requests carry no arguments: the main process keeps every path.
+      [ipcChannels.chooseNotesExportDestination],
+      [ipcChannels.startNotesExport],
+      [ipcChannels.chooseNotesImportArchive],
+      [ipcChannels.prepareNotesImport],
+      [ipcChannels.commitNotesImport],
+      [ipcChannels.cancelNotesOperation],
+      [ipcChannels.takeNotesImportNotice],
+      [ipcChannels.showReplacedNotesFolder],
     ])
   })
 
@@ -166,4 +183,20 @@ it('delivers appearance notifications and removes the listener', async () => {
   expect(listener).toHaveBeenCalledExactlyOnceWith('dark')
   remove?.()
   expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appearanceChanged, handler)
+})
+
+it('delivers notes progress and removes the listener', async () => {
+  const { treeApi } = await import('./index')
+  const listener = vi.fn()
+  mocks.on.mockClear()
+
+  const remove = treeApi.onNotesProgress?.(listener)
+  expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.notesProgress)
+  expect(ipcEvents.notesProgress).toBe('tree:notes-progress')
+  const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: unknown) => void
+  handler({}, { imagesDone: 2, imageCount: 5 })
+  remove?.()
+
+  expect(listener).toHaveBeenCalledExactlyOnceWith({ imagesDone: 2, imageCount: 5 })
+  expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.notesProgress, handler)
 })

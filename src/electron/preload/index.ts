@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { ipcChannels, ipcEvents, type TreeApi } from '../../shared/ipc'
+import { ipcChannels, ipcEvents, type NotesArchiveProgress, type TreeApi } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
   getAppearance: () => ipcRenderer.invoke(ipcChannels.getAppearance),
@@ -45,6 +45,19 @@ export const treeApi: TreeApi = {
     const handler = (_event: Electron.IpcRendererEvent, value: boolean): void => listener(value)
     ipcRenderer.on(ipcEvents.vimEnabledChanged, handler)
     return () => ipcRenderer.removeListener(ipcEvents.vimEnabledChanged, handler)
+  },
+  chooseNotesExportDestination: () => ipcRenderer.invoke(ipcChannels.chooseNotesExportDestination),
+  startNotesExport: () => ipcRenderer.invoke(ipcChannels.startNotesExport),
+  chooseNotesImportArchive: () => ipcRenderer.invoke(ipcChannels.chooseNotesImportArchive),
+  prepareNotesImport: () => ipcRenderer.invoke(ipcChannels.prepareNotesImport),
+  commitNotesImport: () => ipcRenderer.invoke(ipcChannels.commitNotesImport),
+  cancelNotesOperation: () => ipcRenderer.invoke(ipcChannels.cancelNotesOperation),
+  takeNotesImportNotice: () => ipcRenderer.invoke(ipcChannels.takeNotesImportNotice),
+  showReplacedNotesFolder: () => ipcRenderer.invoke(ipcChannels.showReplacedNotesFolder),
+  onNotesProgress: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: NotesArchiveProgress): void => listener(progress)
+    ipcRenderer.on(ipcEvents.notesProgress, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.notesProgress, handler)
   },
 }
 

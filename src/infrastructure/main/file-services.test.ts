@@ -1040,7 +1040,7 @@ describe('notes export and import support', () => {
       return real.rename(from, to)
     })
 
-    await expect(services.replaceNotes(staging)).rejects.toThrow('interrupted')
+    await expect(services.replaceNotes(staging, 'Tree Notes 2026-10-20.zip')).rejects.toThrow('interrupted')
     vi.mocked(rename).mockImplementation(real.rename)
 
     await expect(services.save(stateWithoutImage('Stale'))).rejects.toThrow('The notes were replaced.')
@@ -1056,8 +1056,9 @@ describe('notes export and import support', () => {
     )
 
     await expect(services.load()).resolves.toEqual(imported)
-    expect(services.takeRecoveredReplacement()).toEqual({
+    expect(services.takeRecoveredReplacement()).toStrictEqual({
       replacedFolder: join(dirname(directory), 'Replaced Notes', '2026-10-23 14-05-09'),
+      archive: 'Tree Notes 2026-10-20.zip',
     })
     await services.save(imported)
   })

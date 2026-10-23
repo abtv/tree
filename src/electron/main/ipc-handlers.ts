@@ -8,10 +8,12 @@ import {
   validateClipboardContent,
   validateEditorContextMenuRequest,
   validatePersistedEditorState,
+  requireNoArguments,
   isTrustedRendererUrl,
   type PngDecoder,
 } from './ipc-security'
 import { ipcChannels } from '../../shared/ipc'
+import type { NotesArchiveController } from './notes-archive-controller'
 import type { FileServices } from '../../infrastructure/main/file-services'
 import { readClipboard, writeClipboard, type NativeClipboard } from '../../infrastructure/main/clipboard'
 import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../../shared/ipc'
@@ -43,6 +45,7 @@ export interface IpcHandlerDependencies {
   setAlwaysOnTop: (alwaysOnTop: boolean) => void
   getVimEnabled: () => boolean
   setVimEnabled: (vimEnabled: boolean) => void
+  notesArchive: NotesArchiveController
 }
 
 export function registerIpcHandlers({
@@ -62,6 +65,7 @@ export function registerIpcHandlers({
   setAlwaysOnTop,
   getVimEnabled,
   setVimEnabled,
+  notesArchive,
 }: IpcHandlerDependencies): void {
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
@@ -179,4 +183,23 @@ export function registerIpcHandlers({
     if (typeof value !== 'boolean') throw new Error('Invalid Vim editing setting.')
     setVimEnabled(value)
   })
+
+  // Notes export and import (PRODUCT §25): the renderer sends commands only, never a path.
+  const notesRequests: ReadonlyArray<readonly [string, () => unknown]> = [
+    [ipcChannels.chooseNotesExportDestination, () => notesArchive.chooseExportDestination()],
+    [ipcChannels.startNotesExport, () => notesArchive.startExport()],
+    [ipcChannels.chooseNotesImportArchive, () => notesArchive.chooseImportArchive()],
+    [ipcChannels.prepareNotesImport, () => notesArchive.prepareImport()],
+    [ipcChannels.commitNotesImport, () => notesArchive.commitImport()],
+    [ipcChannels.cancelNotesOperation, () => notesArchive.cancel()],
+    [ipcChannels.takeNotesImportNotice, () => notesArchive.takeImportNotice()],
+    [ipcChannels.showReplacedNotesFolder, () => notesArchive.showReplacedFolder()],
+  ]
+  for (const [channel, request] of notesRequests) {
+    ipcMain.handle(channel, (event, ...args) => {
+      requireTrustedRenderer(event)
+      requireNoArguments(args)
+      return request()
+    })
+  }
 }

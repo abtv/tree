@@ -68,6 +68,11 @@ export function validateEditorContextMenuRequest(value: unknown): EditorContextM
   }
 }
 
+/** Notes export and import requests carry no arguments: paths come only from native panels. */
+export function requireNoArguments(args: readonly unknown[]): void {
+  if (args.length > 0) throw new Error('This request takes no arguments.')
+}
+
 function truncateContextMenuSelection(value: string): string {
   let index = 0
   let codePoints = 0

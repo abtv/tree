@@ -35,6 +35,11 @@ export interface ApplicationBootstrapDependencies {
   setApplicationMenu: (requestQuit: () => void) => void
   unregisterShortcut: () => void
   onStartupError: (error: unknown) => void
+  /**
+   * Ends background work before the process exits: returns a promise while work must finish or be
+   * cleaned up first (PRODUCT §25), or null when nothing is running.
+   */
+  settleBeforeQuit: () => Promise<void> | null
 }
 
 export function bootstrapApplication({
@@ -50,6 +55,7 @@ export function bootstrapApplication({
   setApplicationMenu,
   unregisterShortcut,
   onStartupError,
+  settleBeforeQuit,
 }: ApplicationBootstrapDependencies): void {
   let appQuitting = false
   const quitHandshake = new QuitHandshake(
@@ -75,6 +81,13 @@ export function bootstrapApplication({
       return
     }
     appQuitting = true
+    const pending = settleBeforeQuit()
+    if (pending !== null) {
+      // Quit again once the work has ended; the next call returns null.
+      event.preventDefault()
+      void pending.catch(() => undefined).then(() => app.quit())
+      return
+    }
     setMainWindow(null)
     unregisterShortcut()
   })

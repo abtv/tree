@@ -1,4 +1,4 @@
-import { NotesArchiveError } from '../../application/notes-archive/archive-policy'
+import { importFailureMessage } from '../../application/notes-archive/archive-messages'
 import {
   prepareNotesImport,
   prepareNotesFromSource,
@@ -23,13 +23,6 @@ export interface ImportJob {
 }
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
-export function importFailureMessage(error: unknown, fromFolder = false): string {
-  if (error instanceof NotesArchiveError) return error.message
-  return fromFolder
-    ? `The notes could not be restored: ${reason(error)}`
-    : `The archive could not be imported: ${reason(error)}`
-}
 
 /**
  * Runs one import inside the archive worker (PRODUCT §24.4): `prepare` validates the archive and

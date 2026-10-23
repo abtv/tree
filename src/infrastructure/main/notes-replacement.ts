@@ -83,6 +83,8 @@ export class ReplacementIncompleteError extends Error {
 interface ReplacementJournal {
   readonly staging: string
   readonly replaced: string
+  /** The imported archive's file name, so a completed recovery can report it. */
+  readonly archive?: string
 }
 
 const JOURNAL_NAME = 'commit.json'
@@ -125,6 +127,7 @@ export async function commitReplacement(
   layout: NotesLayout,
   staging: string,
   now: Date,
+  archive?: string,
 ): Promise<string | null> {
   const stagingDirectory = join(layout.importDirectory, staging)
   if (
@@ -136,7 +139,11 @@ export async function commitReplacement(
   // A durable journal must never name staged entries that a power loss could still drop.
   await fs.syncDirectory(join(stagingDirectory, ATTACHMENTS_NAME))
   await fs.syncDirectory(stagingDirectory)
-  const journal: ReplacementJournal = { staging, replaced: await chooseReplacedFolder(fs, layout, now) }
+  const journal: ReplacementJournal = {
+    staging,
+    replaced: await chooseReplacedFolder(fs, layout, now),
+    ...(archive === undefined ? {} : { archive }),
+  }
   const journalPath = join(layout.importDirectory, JOURNAL_NAME)
   const pendingJournalPath = `${journalPath}.tmp`
   try {
@@ -207,6 +214,8 @@ export interface RecoveredReplacement {
   /** True when a journal was found and its replacement completed. */
   readonly completed: boolean
   readonly replacedFolder: string | null
+  /** The archive file name that the journal recorded. */
+  readonly archive?: string
 }
 
 /**
@@ -220,7 +229,8 @@ export async function recoverReplacement(
 ): Promise<RecoveredReplacement> {
   const journal = await readJournal(fs, layout)
   if (journal !== undefined) {
-    return { completed: true, replacedFolder: await completeReplacement(fs, layout, journal) }
+    const replacedFolder = await completeReplacement(fs, layout, journal)
+    return { completed: true, replacedFolder, ...(journal.archive === undefined ? {} : { archive: journal.archive }) }
   }
   for (const directory of [layout.importDirectory, layout.exportDirectory]) {
     for (const name of await readdirOrEmpty(fs, directory)) {
@@ -252,11 +262,13 @@ async function readJournal(fs: ReplacementFileSystem, layout: NotesLayout): Prom
     typeof value.staging !== 'string' ||
     typeof value.replaced !== 'string' ||
     !SEGMENT_PATTERN.test(value.staging) ||
-    !SEGMENT_PATTERN.test(value.replaced)
+    !SEGMENT_PATTERN.test(value.replaced) ||
+    ('archive' in value && typeof value.archive !== 'string')
   ) {
     throw new Error('The import journal is damaged.')
   }
-  return { staging: value.staging, replaced: value.replaced }
+  const archive = 'archive' in value ? (value.archive as string) : undefined
+  return { staging: value.staging, replaced: value.replaced, ...(archive === undefined ? {} : { archive }) }
 }
 
 async function readdirOrEmpty(fs: ReplacementFileSystem, path: string): Promise<string[]> {

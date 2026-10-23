@@ -43,6 +43,7 @@ function createHarness(locked = true) {
     setApplicationMenu: vi.fn(),
     unregisterShortcut: vi.fn(),
     onStartupError: vi.fn(),
+    settleBeforeQuit: vi.fn<() => Promise<void> | null>(() => null),
   }
   bootstrapApplication(dependencies)
   return { app, window, windowListeners, listeners, dependencies, registerReadyServices }
@@ -130,6 +131,47 @@ describe('bootstrapApplication', () => {
     expect(dependencies.unregisterShortcut).toHaveBeenCalledOnce()
   })
 
+  it('defers the confirmed quit until background notes work has ended, then quits again', async () => {
+    const { app, listeners, dependencies, registerReadyServices } = createHarness()
+    let finish: () => void = () => undefined
+    dependencies.settleBeforeQuit.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    await Promise.resolve()
+    registerReadyServices.mock.calls[0]![1]()
+    const deferred: BeforeQuitEvent = { preventDefault: vi.fn() }
+    listeners.beforeQuit?.(deferred)
+
+    expect(deferred.preventDefault).toHaveBeenCalledOnce()
+    expect(dependencies.unregisterShortcut).not.toHaveBeenCalled()
+    expect(app.quit).not.toHaveBeenCalled()
+    finish()
+    await vi.waitFor(() => expect(app.quit).toHaveBeenCalledOnce())
+
+    const final: BeforeQuitEvent = { preventDefault: vi.fn() }
+    listeners.beforeQuit?.(final)
+    expect(final.preventDefault).not.toHaveBeenCalled()
+    expect(dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+    // A window must not be recreated while the work finishes.
+    dependencies.getWindowCount.mockReturnValue(0)
+    listeners.activate?.()
+    expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
+  })
+
+  it('still quits when background notes work fails to settle', async () => {
+    const { app, listeners, dependencies, registerReadyServices } = createHarness()
+    dependencies.settleBeforeQuit.mockReturnValueOnce(Promise.reject(new Error('cleanup failed')))
+
+    await Promise.resolve()
+    registerReadyServices.mock.calls[0]![1]()
+    listeners.beforeQuit?.({ preventDefault: vi.fn() })
+
+    await vi.waitFor(() => expect(app.quit).toHaveBeenCalledOnce())
+  })
+
   it('allows the window to close once quitting has been confirmed', async () => {
     const { app, windowListeners, registerReadyServices } = createHarness()
 
@@ -175,6 +217,7 @@ describe('bootstrapApplication', () => {
       setApplicationMenu: vi.fn(),
       unregisterShortcut: vi.fn(),
       onStartupError,
+      settleBeforeQuit: () => null,
     })
 
     await Promise.resolve()

@@ -1,5 +1,25 @@
+import { NotesArchiveError } from './archive-policy'
 import type { NotesArchiveSummary } from './export-notes'
 import type { IncomingNotes, NotesCounts } from './import-notes'
+
+const reason = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+/** The reason an export failed: an archive rule's own message, otherwise the read failure. */
+export function exportFailureMessage(error: unknown): string {
+  if (error instanceof NotesArchiveError) return error.message
+  return `The notes could not be read: ${reason(error)}`
+}
+
+/** A desktop export that could not write its file, as opposed to reading the notes (PRODUCT §25.2). */
+export const archiveNotSavedMessage = (error: unknown) => `The archive could not be saved: ${reason(error)}`
+
+/** The reason an import or folder restore failed: an archive rule's own message, otherwise the cause. */
+export function importFailureMessage(error: unknown, fromFolder = false): string {
+  if (error instanceof NotesArchiveError) return error.message
+  return fromFolder
+    ? `The notes could not be restored: ${reason(error)}`
+    : `The archive could not be imported: ${reason(error)}`
+}
 
 const count = (value: number, singular: string, plural: string) =>
   `${value.toLocaleString('en-US')} ${value === 1 ? singular : plural}`

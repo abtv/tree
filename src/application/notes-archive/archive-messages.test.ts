@@ -1,15 +1,31 @@
 import { describe, expect, it } from 'vitest'
+import { NotesArchiveError } from './archive-policy'
 import {
   archiveFileName,
+  archiveNotSavedMessage,
+  exportFailureMessage,
   exportProgressText,
   exportResultText,
   fileSizeText,
   importConfirmationText,
+  importFailureMessage,
   importProgressText,
   restoreProgressText,
 } from './archive-messages'
 
 describe('notes archive wording', () => {
+  it('keeps an archive rule message and names the failed step otherwise', () => {
+    const rule = new NotesArchiveError('The archive is encrypted.')
+    expect(exportFailureMessage(rule)).toBe('The archive is encrypted.')
+    expect(importFailureMessage(rule, true)).toBe('The archive is encrypted.')
+    expect(exportFailureMessage(new Error('EACCES'))).toBe('The notes could not be read: EACCES')
+    expect(importFailureMessage('lost')).toBe('The archive could not be imported: lost')
+    expect(importFailureMessage(new Error('EIO'), true)).toBe('The notes could not be restored: EIO')
+    expect(archiveNotSavedMessage(new Error('ENOSPC: no space left'))).toBe(
+      'The archive could not be saved: ENOSPC: no space left',
+    )
+  })
+
   it('names the archive after the local date', () => {
     expect(archiveFileName(new Date(2026, 0, 5, 23, 59))).toBe('Tree Notes 2026-01-05.zip')
     expect(archiveFileName(new Date(2026, 11, 31, 0, 0))).toBe('Tree Notes 2026-12-31.zip')

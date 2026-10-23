@@ -1,5 +1,10 @@
 import type { PersistedEditorState } from '../domain/document'
 import type { LinkRange } from '../domain/document'
+import type { NotesArchiveProgress, NotesArchiveSummary } from '../application/notes-archive/export-notes'
+import type { IncomingNotes, NotesCounts } from '../application/notes-archive/import-notes'
+
+/** Rejects saves and image writes after the notes were replaced, until the window reloads them. */
+export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
 
 export const ipcChannels = {
   quit: 'tree:quit',
@@ -21,14 +26,73 @@ export const ipcChannels = {
   setAppearance: 'tree:set-appearance',
   getCommandHistory: 'tree:get-command-history',
   setCommandHistory: 'tree:set-command-history',
+  chooseNotesExportDestination: 'tree:notes-choose-export-destination',
+  startNotesExport: 'tree:notes-start-export',
+  chooseNotesImportArchive: 'tree:notes-choose-import-archive',
+  prepareNotesImport: 'tree:notes-prepare-import',
+  commitNotesImport: 'tree:notes-commit-import',
+  cancelNotesOperation: 'tree:notes-cancel',
+  takeNotesImportNotice: 'tree:notes-take-import-notice',
+  showReplacedNotesFolder: 'tree:notes-show-replaced-folder',
 } as const
 
-/** Main-to-renderer notifications that the application menu changed a preference. */
+/** Main-to-renderer notifications: menu preference changes and notes export or import progress. */
 export const ipcEvents = {
   alwaysOnTopChanged: 'tree:always-on-top-changed',
   vimEnabledChanged: 'tree:vim-enabled-changed',
   appearanceChanged: 'tree:appearance-changed',
+  notesProgress: 'tree:notes-progress',
 } as const
+
+/** A notes operation that ended without a result: the user cancelled it or Tree quit. */
+export interface NotesOperationCanceled {
+  readonly ok: false
+  readonly canceled: true
+}
+
+export interface NotesOperationFailed {
+  readonly ok: false
+  readonly canceled?: false
+  /** The reason, without the `Export failed.` or `Import failed.` prefix. */
+  readonly message: string
+}
+
+/** Only the chosen file's name crosses IPC; the main process keeps its path (ADR 0024). */
+export type NotesFileChoice = { readonly ok: true; readonly fileName: string } | NotesOperationCanceled
+
+export type NotesExportResult =
+  | { readonly ok: true; readonly fileName: string; readonly summary: NotesArchiveSummary }
+  | NotesOperationCanceled
+  | NotesOperationFailed
+
+export type NotesImportPreparation =
+  | {
+      readonly ok: true
+      readonly fileName: string
+      readonly fileBytes: number
+      readonly incoming: IncomingNotes
+      readonly current: NotesCounts | 'none' | 'invalid'
+    }
+  | NotesOperationCanceled
+  | NotesOperationFailed
+
+export type NotesImportCommit =
+  | { readonly ok: true }
+  | NotesOperationCanceled
+  | (NotesOperationFailed & {
+      /** The replacement passed its journal: only a restart can complete it (ADR 0024). */
+      readonly restartRequired: boolean
+    })
+
+/** The result of a replacement that finished, shown once after the window reloads. */
+export interface NotesImportNotice {
+  /** Absent when the replacement was completed from an older journal that did not record it. */
+  readonly fileName?: string
+  /** The Replaced Notes folder as display text, or null when there were no previous notes. */
+  readonly replacedFolder: string | null
+}
+
+export type { NotesArchiveProgress }
 
 export type ClipboardPayload =
   { kind: 'text'; text: string; links?: readonly LinkRange[] } | { kind: 'image'; png: Uint8Array }
@@ -78,4 +142,15 @@ export interface TreeApi {
   /** Fires when the application menu changes the setting, so the renderer can follow it. */
   onAlwaysOnTopChanged?: (listener: (alwaysOnTop: boolean) => void) => () => void
   onVimEnabledChanged?: (listener: (vimEnabled: boolean) => void) => () => void
+  /** Notes export and import (PRODUCT §25); one operation runs at a time. */
+  chooseNotesExportDestination?: () => Promise<NotesFileChoice>
+  startNotesExport?: () => Promise<NotesExportResult>
+  chooseNotesImportArchive?: () => Promise<NotesFileChoice>
+  prepareNotesImport?: () => Promise<NotesImportPreparation>
+  commitNotesImport?: () => Promise<NotesImportCommit>
+  /** Ends the running or prepared operation; its pending request resolves as cancelled. */
+  cancelNotesOperation?: () => Promise<void>
+  takeNotesImportNotice?: () => Promise<NotesImportNotice | null>
+  showReplacedNotesFolder?: () => Promise<void>
+  onNotesProgress?: (listener: (progress: NotesArchiveProgress) => void) => () => void
 }

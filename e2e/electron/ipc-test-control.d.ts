@@ -9,6 +9,13 @@ declare global {
   }
 
   var __treeIpc: TreeIpcTestControl
+  var __treeArchiveWorkers: {
+    /** Worker message types that are queued instead of delivered. */
+    hold: string[]
+    started: number
+    held: Array<() => void>
+    release(): void
+  }
   var __treeDrainIpc: (() => Promise<void>) | undefined
   var __treeSharedTest:
     | {

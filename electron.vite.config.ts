@@ -36,7 +36,15 @@ function contentSecurityPolicyPlugin(): Plugin {
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
-    build: { rollupOptions: { input: resolve('src/electron/main/index.ts') } },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/electron/main/index.ts'),
+          // Started by the notes archive controller as `out/main/notes-archive-worker.js` (ADR 0024).
+          'notes-archive-worker': resolve('src/infrastructure/main/notes-archive/archive-worker.ts'),
+        },
+      },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],

@@ -91,6 +91,33 @@ if (sharedReset) {
   }
 }
 
+// Notes archive workers (ADR 0024): messages whose type is listed in `hold` are queued instead of
+// delivered to the main process, so a test can cancel or quit while an export or import is in
+// progress, for example after the worker finished its file but before the main process used it.
+// `release()` delivers the queued messages in order.
+const workerThreads = require('node:worker_threads')
+const OriginalWorker = workerThreads.Worker
+const archiveWorkers = { hold: [], started: 0, held: [] }
+archiveWorkers.release = () => {
+  archiveWorkers.hold = []
+  for (const deliver of archiveWorkers.held.splice(0)) deliver()
+}
+globalThis.__treeArchiveWorkers = archiveWorkers
+workerThreads.Worker = class extends OriginalWorker {
+  constructor(...args) {
+    super(...args)
+    archiveWorkers.started += 1
+  }
+
+  on(event, listener) {
+    if (event !== 'message') return super.on(event, listener)
+    return super.on(event, (message) => {
+      if (archiveWorkers.hold.includes(message?.type)) archiveWorkers.held.push(() => listener(message))
+      else listener(message)
+    })
+  }
+}
+
 // Hidden windows are opt-in at the entry level: the e2e fixtures always pass the selected
 // mode explicitly, while the performance fixtures keep the application visible for
 // presented-window measurements. `e2e/electron/fixtures.ts` asserts the selected mode after launch.

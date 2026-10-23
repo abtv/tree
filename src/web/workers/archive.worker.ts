@@ -1,5 +1,6 @@
-import { exportFailureMessage, runExportJob } from '../archive/export-job'
-import { createImportJob, importFailureMessage, type ImportJob } from '../archive/import-job'
+import { exportFailureMessage, importFailureMessage } from '../../application/notes-archive/archive-messages'
+import { runExportJob } from '../archive/export-job'
+import { createImportJob, type ImportJob } from '../archive/import-job'
 import { blobArchiveFile } from '../archive/blob-archive-file'
 import { folderSource } from '../archive/folder-source'
 import { validatePngAttachment } from '../attachment-validation'

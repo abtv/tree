@@ -192,10 +192,17 @@ describe('notes replacement', () => {
       },
     }
 
-    await expect(commitReplacement(failing, layout, staged, NOW)).rejects.toBeInstanceOf(ReplacementIncompleteError)
+    await expect(commitReplacement(failing, layout, staged, NOW, 'Tree Notes 2026-10-20.zip')).rejects.toBeInstanceOf(
+      ReplacementIncompleteError,
+    )
     const recovery = await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
 
-    expect(recovery).toEqual({ completed: true, replacedFolder: join(layout.replacedNotesDirectory, FOLDER) })
+    // The journal keeps the archive name, so the completed import can still report it.
+    expect(recovery).toStrictEqual({
+      completed: true,
+      replacedFolder: join(layout.replacedNotesDirectory, FOLDER),
+      archive: 'Tree Notes 2026-10-20.zip',
+    })
     expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('new document')
     expect(await readdir(layout.importDirectory)).toEqual([])
   })
@@ -223,7 +230,12 @@ describe('notes replacement', () => {
     const layout = await userData()
     await seedOldNotes(layout)
     await stage(layout)
-    for (const journal of ['{', '{"staging":"../data","replaced":"x"}', '{"staging":"staged"}']) {
+    for (const journal of [
+      '{',
+      '{"staging":"../data","replaced":"x"}',
+      '{"staging":"staged"}',
+      '{"staging":"staged","replaced":"x","archive":7}',
+    ]) {
       await writeFile(join(layout.importDirectory, 'commit.json'), journal)
       await expect(recoverReplacement(nodeReplacementFileSystem, layout, new Set())).rejects.toThrow(
         'The import journal is damaged.',

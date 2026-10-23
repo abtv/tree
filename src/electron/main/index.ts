@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   ClipboardItem,
   clipboard,
+  dialog,
   globalShortcut,
   ipcMain,
   Menu,
@@ -14,6 +15,7 @@ import {
 } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
 import type { NativeClipboard } from '../../infrastructure/main/clipboard'
 import { createFileServices } from '../../infrastructure/main/file-services'
 import { createCommandHistoryStore } from '../../infrastructure/main/command-history'
@@ -32,6 +34,7 @@ import { applicationMenuTemplate } from './application-menu'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
+import { createNotesArchiveController, type NotesArchiveController } from './notes-archive-controller'
 import { createPngDecoder } from './png-decoder'
 import { handleRendererProtocol, packagedRendererUrl, registerRendererScheme } from './renderer-protocol'
 import {
@@ -56,6 +59,7 @@ let alwaysOnTopStore: BooleanPreferenceStore | null = null
 let vimEnabledStore: BooleanPreferenceStore | null = null
 let appearanceStore: AppearancePreferenceStore | null = null
 let requestQuitFromMenu: () => void = () => undefined
+let notesArchive: NotesArchiveController | null = null
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 
@@ -186,8 +190,26 @@ bootstrapApplication({
         .openExternal(url)
         .catch((error: unknown) => reportMainProcessError('Could not open external link', error))
     })
-    const fileServices = createFileServices(join(app.getPath('userData'), 'data'), undefined, {
+    const dataDirectory = join(app.getPath('userData'), 'data')
+    const fileServices = createFileServices(dataDirectory, undefined, {
       userDataDirectory: app.getPath('userData'),
+    })
+    const decodePng = createPngDecoder(nativeImage)
+    notesArchive = createNotesArchiveController({
+      fileServices,
+      attachmentsDirectory: join(dataDirectory, 'attachments'),
+      // Attached to the window, the panels open as sheets.
+      dialogs: {
+        showSaveDialog: (options) =>
+          mainWindow === null ? dialog.showSaveDialog(options) : dialog.showSaveDialog(mainWindow, options),
+        showOpenDialog: (options) =>
+          mainWindow === null ? dialog.showOpenDialog(options) : dialog.showOpenDialog(mainWindow, options),
+      },
+      startWorker: (task) => new Worker(join(__dirname, 'notes-archive-worker.js'), { workerData: task }),
+      decodePng,
+      sendProgress: (progress) => mainWindow?.webContents.send(ipcEvents.notesProgress, progress),
+      showItemInFolder: (path) => shell.showItemInFolder(path),
+      homeDirectory: app.getPath('home'),
     })
     const commandHistory = createCommandHistoryStore(join(app.getPath('userData'), 'data', 'command-history.json'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
@@ -206,7 +228,7 @@ bootstrapApplication({
       fileServices,
       nativeClipboard,
       quitHandshake,
-      decodePng: createPngDecoder(nativeImage),
+      decodePng,
       onQuitConfirmed: () => {
         appQuitting = true
         onQuitConfirmed()
@@ -234,6 +256,7 @@ bootstrapApplication({
         vimEnabledStore?.save(value)
         rebuildApplicationMenu()
       },
+      notesArchive,
     })
   },
   registerShortcut: (surface) => globalShortcut.register('CommandOrControl+0', surface),
@@ -248,4 +271,5 @@ bootstrapApplication({
     appQuitting = true
     app.quit()
   },
+  settleBeforeQuit: () => notesArchive?.shutdown() ?? null,
 })
