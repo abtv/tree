@@ -91,6 +91,7 @@ const STAGES: ReadonlyArray<{ name: string; apply: (userDataDir: string, staging
   },
 ]
 
+// @requirement PRODUCT.md §25.4
 test.describe('interrupted notes replacement', () => {
   configureHiddenParallelTests()
 

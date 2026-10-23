@@ -58,6 +58,7 @@ async function sortedEntries(path: string): Promise<string[]> {
   return (await readdir(path)).sort()
 }
 
+// @requirement PRODUCT.md §25.4
 describe('notes replacement', () => {
   it('recognizes every document file and names the folder in local time', () => {
     for (const name of ['document.json', 'document.json.tmp', 'document.json.bak', 'document.12.json']) {

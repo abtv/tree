@@ -162,6 +162,8 @@ test.describe('desktop notes archive boundary', () => {
     await closeApp(app)
   })
 
+  // @requirement PRODUCT.md §25.3
+  // @requirement PRODUCT.md §25.4
   test('imports a browser archive into another profile and opens it after the window reloads', async ({
     userDataDir,
   }) => {
@@ -204,9 +206,12 @@ test.describe('desktop notes archive boundary', () => {
     expect(readFileSync(vimPreferencePath(userDataDir))).toEqual(preference)
     expect(entries(join(userDataDir, '.notes-import'))).toEqual([])
 
-    const notice = await callNotes(window, 'takeNotesImportNotice')
-    expect(notice).toEqual({ fileName: 'Tree Notes 2026-10-20.zip', replacedFolder: expect.any(String) })
-    expect(notice?.replacedFolder?.endsWith(join('Replaced Notes', folderName!))).toBe(true)
+    await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText(
+      'Imported “Tree Notes 2026-10-20.zip”.',
+    )
+    await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText(
+      join('Replaced Notes', folderName!),
+    )
     await expect(callNotes(window, 'takeNotesImportNotice')).resolves.toBeNull()
     await callNotes(window, 'showReplacedNotesFolder')
     const shown = await app.evaluate(() => (globalThis as typeof globalThis & { shownFolders?: string[] }).shownFolders)

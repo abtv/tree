@@ -387,6 +387,7 @@ export function App({
         <h1>Tree could not open this document</h1>
         <p>{state.message}</p>
         <p>The existing data was left unchanged.</p>
+        {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
       </main>
     )
   }

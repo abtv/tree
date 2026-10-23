@@ -115,6 +115,7 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
   const { fileServices, dialogs } = dependencies
   const now = dependencies.now ?? (() => new Date())
   let state: State = { kind: 'idle' }
+  let waitingImport: Extract<State, { kind: 'prepared' }> | undefined
   let closing = false
   let restartRequired = false
   let notice: { fileName?: string; folder: string | null } | undefined
@@ -202,7 +203,10 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
         terminate = stop
       },
     ).finally(() => {
-      if (state.kind === 'running' && state.operation === operation) state = { kind: 'idle' }
+      if (state.kind === 'running' && state.operation === operation) {
+        state = waitingImport ?? { kind: 'idle' }
+        waitingImport = undefined
+      }
     })
     state = {
       kind: 'running',
@@ -217,6 +221,9 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
   }
 
   const cancel = async (): Promise<void> => {
+    const waiting = waitingImport
+    waitingImport = undefined
+    if (waiting !== undefined) await fileServices.discardStagingDirectory(waiting.staging).catch(ignore)
     const current = state
     switch (current.kind) {
       case 'export-chosen':
@@ -238,17 +245,23 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
 
   return {
     async chooseExportDestination() {
+      if (state.kind === 'prepared' && !closing && !restartRequired) {
+        waitingImport = state
+        state = { kind: 'idle' }
+      }
       beginChoice()
       try {
         const result = await dialogs.showSaveDialog({ defaultPath: archiveFileName(now()), filters: ZIP_FILTERS })
         if (closing || result.canceled || result.filePath === undefined || result.filePath === '') {
-          state = { kind: 'idle' }
+          state = waitingImport ?? { kind: 'idle' }
+          waitingImport = undefined
           return CANCELED
         }
         state = { kind: 'export-chosen', path: result.filePath }
         return { ok: true, fileName: basename(result.filePath) }
       } catch (error) {
-        state = { kind: 'idle' }
+        state = waitingImport ?? { kind: 'idle' }
+        waitingImport = undefined
         throw error
       }
     },
@@ -453,7 +466,7 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
       closing = true
       const current = state
       if (current.kind === 'committing') return current.done.then(ignore)
-      if (current.kind === 'running' || current.kind === 'prepared') return cancel()
+      if (current.kind === 'running' || current.kind === 'prepared' || waitingImport !== undefined) return cancel()
       if (current.kind === 'export-chosen' || current.kind === 'import-chosen') state = { kind: 'idle' }
       return null
     },

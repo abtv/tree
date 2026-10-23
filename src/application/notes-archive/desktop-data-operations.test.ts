@@ -16,7 +16,7 @@ const success: NotesExportResult = {
   summary: { imageCount: 2, missingImageCount: 0, archiveBytes: 100 },
 }
 
-function harness() {
+function harness(notice: import('../../shared/ipc').NotesImportNotice | null = null) {
   let snapshot: { status: string; persistenceLocked?: boolean } = { status: 'ready' }
   let changed = () => {}
   let progress: (value: NotesArchiveProgress) => void = () => {}
@@ -32,6 +32,20 @@ function harness() {
     reportError: vi.fn(),
   }
   const api = {
+    chooseNotesImportArchive: vi.fn(async (): Promise<NotesFileChoice> => ({ ok: true, fileName: 'Import.zip' })),
+    prepareNotesImport: vi.fn(async () => ({
+      ok: true as const,
+      fileName: 'Import.zip',
+      fileBytes: 100,
+      incoming: { nodeCount: 3, imageCount: 0, missingImageCount: 0 },
+      current: 'none' as const,
+    })),
+    commitNotesImport: vi.fn(async (): Promise<import('../../shared/ipc').NotesImportCommit> => ({ ok: true })),
+    takeNotesImportNotice: vi.fn(async () => notice),
+    showReplacedNotesFolder: vi.fn(async () => undefined),
+    suspendWrites: vi.fn(),
+    resumeWrites: vi.fn(),
+    reload: vi.fn(),
     chooseNotesExportDestination: vi.fn(async (): Promise<NotesFileChoice> => ({ ok: true, fileName: 'Notes.zip' })),
     startNotesExport: vi.fn(async (): Promise<NotesExportResult> => success),
     cancelNotesOperation: vi.fn(async (): Promise<void> => undefined),
@@ -64,10 +78,120 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('desktop notes operations', () => {
+  // @requirement PRODUCT.md §25.3
+  it.each([null, '~/Tree/Replaced Notes/2026-10-23 14-05-09'])(
+    'shows a one-shot import result with folder=%s',
+    async (replacedFolder) => {
+      vi.useFakeTimers()
+      const { operations, api } = harness({ fileName: 'Browser.zip', replacedFolder })
+      await Promise.resolve()
+      expect(operations.getSnapshot()).toMatchObject({ phase: 'done', showFolder: replacedFolder !== null })
+      await vi.advanceTimersByTimeAsync(6000)
+      expect(operations.getSnapshot().phase).toBe(replacedFolder === null ? 'idle' : 'done')
+      if (replacedFolder !== null) {
+        operations.showReplacedFolder()
+        expect(api.showReplacedNotesFolder).toHaveBeenCalledOnce()
+      }
+      operations.dispose()
+    },
+  )
+
+  it('reports an import flush failure with its saved-changes reason', async () => {
+    const { operations, api, store } = harness()
+    store.flushPersistence.mockRejectedValueOnce(new Error('Disk full'))
+    await operations.importNotes()
+    expect(operations.getSnapshot()).toEqual({
+      phase: 'failed',
+      text: 'Import failed. Your latest changes could not be saved: Disk full',
+    })
+    expect(api.prepareNotesImport).not.toHaveBeenCalled()
+    expect(api.cancelNotesOperation).toHaveBeenCalledOnce()
+    operations.dispose()
+  })
+  // @requirement PRODUCT.md §25.3
+  it('prepares, exports from confirmation, flushes before suspension and reloads after commit', async () => {
+    const { operations, api, store } = harness()
+    await operations.importNotes()
+    expect(operations.getSnapshot().phase).toBe('confirming')
+    await operations.exportNotes(true)
+    expect(operations.getSnapshot()).toEqual({ phase: 'confirming', text: 'Exported “Notes.zip”.' })
+    expect(operations.getConfirmation()).toBeDefined()
+    const flush = deferred<void>()
+    store.flushPersistence.mockReturnValueOnce(flush.promise)
+    const replace = operations.replaceNotes()
+    expect(operations.getSnapshot().phase).toBe('replacing')
+    expect(api.suspendWrites).not.toHaveBeenCalled()
+    flush.resolve()
+    await replace
+    expect(api.suspendWrites).toHaveBeenCalledOnce()
+    expect(api.commitNotesImport).toHaveBeenCalledOnce()
+    expect(api.reload).toHaveBeenCalledOnce()
+    expect(api.resumeWrites).not.toHaveBeenCalled()
+    operations.dispose()
+  })
+
+  // @requirement PRODUCT.md §25.3
+  it('allows import in the load-error state without flushing and cancels confirmation', async () => {
+    const { operations, api, store, change } = harness()
+    change({ status: 'error' })
+    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: true })
+    await operations.importNotes()
+    expect(store.flushPersistence).not.toHaveBeenCalled()
+    await operations.cancel()
+    expect(operations.getConfirmation()).toBeUndefined()
+    expect(api.cancelNotesOperation).toHaveBeenCalledOnce()
+    expect(operations.getSnapshot().phase).toBe('idle')
+    operations.dispose()
+  })
+
+  // @requirement PRODUCT.md §25.3
+  it.each([false, true])(
+    'resumes only before the replacement journal (restartRequired=%s)',
+    async (restartRequired) => {
+      const { operations, api } = harness()
+      await operations.importNotes()
+      api.commitNotesImport.mockResolvedValueOnce({ ok: false, restartRequired, message: 'Disk full' })
+      await operations.replaceNotes()
+      expect(operations.getSnapshot().phase).toBe(restartRequired ? 'restart' : 'failed')
+      expect(api.resumeWrites).toHaveBeenCalledTimes(restartRequired ? 0 : 1)
+      expect(api.reload).not.toHaveBeenCalled()
+      await operations.importNotes()
+      expect(api.chooseNotesImportArchive).toHaveBeenCalledTimes(restartRequired ? 1 : 2)
+      operations.dispose()
+    },
+  )
+
+  it('keeps writes suspended and blocks interaction when the commit IPC response is lost', async () => {
+    const { operations, api } = harness()
+    await operations.importNotes()
+    api.commitNotesImport.mockRejectedValueOnce(new Error('IPC lost'))
+    await operations.replaceNotes()
+    expect(operations.getSnapshot().phase).toBe('restart')
+    expect(operations.getConfirmation()).toBeDefined()
+    expect(api.resumeWrites).not.toHaveBeenCalled()
+    operations.dismiss()
+    expect(operations.getSnapshot().phase).toBe('restart')
+    operations.dispose()
+  })
+
+  it('does not commit after the final flush fails and clears prepared staging', async () => {
+    const { operations, api, store } = harness()
+    await operations.importNotes()
+    store.flushPersistence.mockRejectedValueOnce(new Error('Disk full'))
+    await operations.replaceNotes()
+    expect(api.commitNotesImport).not.toHaveBeenCalled()
+    expect(api.suspendWrites).not.toHaveBeenCalled()
+    expect(api.cancelNotesOperation).toHaveBeenCalledOnce()
+    expect(operations.getSnapshot()).toEqual({
+      phase: 'failed',
+      text: 'Import failed. Your latest changes could not be saved: Disk full',
+    })
+    operations.dispose()
+  })
   // @requirement PRODUCT.md §25.1
   it('updates menu availability only when it changes, and rejects unavailable exports', async () => {
     const { operations, api, change } = harness()
-    expect(api.setNotesMenuState).toHaveBeenCalledExactlyOnceWith({ canExport: true, canImport: false })
+    expect(api.setNotesMenuState).toHaveBeenCalledExactlyOnceWith({ canExport: true, canImport: true })
     change({ status: 'ready' })
     expect(api.setNotesMenuState).toHaveBeenCalledTimes(1)
     for (const state of [{ status: 'loading' }, { status: 'error' }, { status: 'ready', persistenceLocked: true }]) {

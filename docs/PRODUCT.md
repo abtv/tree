@@ -2000,6 +2000,8 @@ In a browser that supports folder backup (§24.5), an archive-limit refusal adds
 
 ### 24.4 Import
 
+Desktop import uses the same archive validation with the replacement behavior of §25.
+
 **Import Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while an export or another import runs. It stays available when the stored document cannot be opened, so an archive can replace invalid stored notes.
 
 Choosing it closes the menu and opens the browser's file chooser. After a file is chosen, Tree saves pending edits, as Quit does, and checks the archive in the background while editing remains available. The panel of §24.3 shows `Importing Notes…`, then `Importing Notes… 3 of 120 images`, with **Cancel**.
@@ -2072,11 +2074,11 @@ Cancel and every failure keep the current notes unchanged and remove the images 
 
 ## 25. Desktop Notes Export and Import
 
-The desktop application exports the notes archive of §24.2, which the browser version (§1.4) can import.
+The desktop application exports and imports the notes archive of §24.2, so notes move between the desktop application and the browser version (§1.4) in both directions: an archive exported by either imports in the other.
 
 ### 25.1 Menu Commands
 
-**Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no keyboard shortcuts and no command-panel entries. Export Notes… is disabled while the window is starting, when the stored notes cannot be opened, in the locked save-failure state (§16.2), and while an export or an import runs. Import Notes… remains disabled until the desktop import flow is implemented.
+**Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no keyboard shortcuts and no command-panel entries. Both are disabled while the window is starting, in the locked save-failure state (§16.2), and while an export or an import runs. Export is disabled when the stored notes cannot be opened. Import Notes… stays available when the stored notes cannot be opened, so an archive can replace them.
 
 ### 25.2 Export
 
@@ -2085,3 +2087,20 @@ Export Notes… opens a save panel named `Tree Notes YYYY-MM-DD.zip` with the lo
 Export otherwise follows §24.3: it runs in the background while editing remains available, shows its progress, Cancel and result in a panel at the lower right above the status bar, leaves out and counts missing or unusable images, and produces no file in the listed failure cases. The archive takes its name only when it is complete: Cancel, a failure or quitting leaves no archive and leaves an existing file of that name unchanged. A file that cannot be written gives `Export failed. The archive could not be saved: <reason>`.
 
 The desktop panel moves to the upper right below the location bar while a save or operation error is shown, so both messages remain visible. Dismissing a focused panel returns focus to the previously focused editor or control. An archive-limit refusal has no folder-backup suffix because desktop folder backup is not available.
+
+### 25.3 Import
+
+Import Notes… opens an open panel for ZIP files. Cancelling it changes nothing. After a file is chosen, Tree saves pending edits and checks the archive in the background with the panel and Cancel of §24.4. Tree accepts exactly the archives that §24.4 accepts and reports the same reasons; older schema versions open after migration, and notes from a newer version of Tree are rejected. Because import moves every current image away (§25.4), images already stored under the same ID cannot conflict. Quitting during the check cancels it.
+
+The **Replace Current Notes?** dialog of §24.4 says `Your current notes have 987 nodes and 40 images. Importing replaces them and moves them to the Replaced Notes folder.` Without stored notes it says `There are no saved notes.`; with notes that cannot be opened, `The saved notes cannot be opened. Importing replaces them and moves their files to the Replaced Notes folder.` Buttons, default, Escape and Export Current Notes First behave as in §24.4; Export Current Notes First opens the save panel of §25.2. Closing the dialog returns focus to where it was.
+
+* **Replace Notes** shows `Replacing Notes…`, disables the dialog, saves pending edits, replaces the notes (§25.4) and reloads the window, which opens the imported notes. Import does not change preferences.
+* The panel then shows `Imported “Tree Notes 2026-10-20.zip”. Your previous notes are in “~/Library/Application Support/Tree/Replaced Notes/2026-10-23 14-05-09”.` with **Show in Finder** and **OK** until OK; Show in Finder selects that folder in the Finder.
+* Without previous notes it shows `Imported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with OK.
+* Cancel and every failure before the replacement leave the notes unchanged and remove what the import prepared; failures show `Import failed. <reason>` until OK.
+
+### 25.4 Replaced Notes
+
+Replace Notes moves the current `document.json`, its retained generations, any interrupted-save and legacy backup files, and the `attachments` folder into a new folder `Replaced Notes/YYYY-MM-DD HH-MM-SS` (local time) in `~/Library/Application Support/Tree/`, keeping the data-directory layout. Files are moved, not copied. When that name exists, ` 2`, ` 3`, … is appended; nothing is moved and no folder is created when there were no stored notes. Preferences stay in place. Tree never changes or deletes a Replaced Notes folder; the user removes old ones in the Finder.
+
+The replacement is one unit. The imported notes start without retained generations, and a replaced document or generation is never opened again after the replacement begins. If Tree stops during the replacement, the next start completes it before opening the notes and shows the result of §25.3. Quitting during the replacement waits for it. If it cannot be completed, loading fails with `The notes import could not be completed: <reason>` and changes no files.

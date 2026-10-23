@@ -62,6 +62,8 @@ export const BOUNDARY_SECTIONS = new Set([
   '25',
   '25.1',
   '25.2',
+  '25.3',
+  '25.4',
 ])
 
 export function parseSections(content: string) {

@@ -8,12 +8,24 @@ import {
   exportResultText,
   fileSizeText,
   importConfirmationText,
+  desktopImportConfirmationText,
   importFailureMessage,
   importProgressText,
   restoreProgressText,
 } from './archive-messages'
 
 describe('notes archive wording', () => {
+  // @requirement PRODUCT.md §25.3
+  it('describes preserved desktop notes for valid, empty and unreadable current data', () => {
+    const incoming = { nodeCount: 1, imageCount: 0, missingImageCount: 0 }
+    expect(desktopImportConfirmationText('Notes.zip', 10, incoming, 'none').current).toBe('There are no saved notes.')
+    expect(desktopImportConfirmationText('Notes.zip', 10, incoming, 'invalid').current).toBe(
+      'The saved notes cannot be opened. Importing replaces them and moves their files to the Replaced Notes folder.',
+    )
+    expect(desktopImportConfirmationText('Notes.zip', 10, incoming, { nodeCount: 1, imageCount: 2 }).current).toBe(
+      'Your current notes have 1 node and 2 images. Importing replaces them and moves them to the Replaced Notes folder.',
+    )
+  })
   it('keeps an archive rule message and names the failed step otherwise', () => {
     const rule = new NotesArchiveError('The archive is encrypted.')
     expect(exportFailureMessage(rule)).toBe('The archive is encrypted.')

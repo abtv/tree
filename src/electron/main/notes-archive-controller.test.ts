@@ -339,6 +339,59 @@ describe('notes archive controller: export', () => {
 })
 
 describe('notes archive controller: import', () => {
+  it('cancels both the export worker and the import retained behind it', async () => {
+    const { controller, destinations, userData, dependencies } = await setup()
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
+    await controller.chooseImportArchive()
+    await controller.prepareImport()
+    const worker = new ScriptedWorker({
+      type: 'export',
+      snapshotDirectory: '',
+      attachmentsDirectory: '',
+      temporaryPath: '',
+    })
+    dependencies.startWorker.mockReturnValueOnce(worker)
+    await controller.chooseExportDestination()
+    const exportJob = controller.startExport()
+    await vi.waitFor(() => expect(dependencies.startWorker).toHaveBeenCalledTimes(2))
+    await controller.cancel()
+    await expect(exportJob).resolves.toEqual({ ok: false, canceled: true })
+    expect(worker.terminated).toBe(true)
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+    await expect(controller.commitImport()).rejects.toThrow('No import is prepared.')
+  })
+  // @requirement PRODUCT.md §25.3
+  it('exports current notes from confirmation, retains preparation after native cancel and permits replacement', async () => {
+    const { controller, destinations, dialogs, fileServices } = await setup()
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([], 'Incoming'), {})
+    await controller.chooseImportArchive()
+    await controller.prepareImport()
+    dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: true, filePath: '' })
+    await controller.chooseExportDestination()
+    await controller.chooseExportDestination()
+    await expect(controller.startExport()).resolves.toMatchObject({ ok: true })
+    await expect(controller.commitImport()).resolves.toEqual({ ok: true })
+    await expect(fileServices.load()).resolves.toEqual(headWithImages([], 'Incoming'))
+  })
+
+  it('discards the retained import when cancellation interrupts its export choice', async () => {
+    const { controller, destinations, dialogs, userData } = await setup()
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
+    await controller.chooseImportArchive()
+    await controller.prepareImport()
+    let release!: (value: { canceled: boolean; filePath: string }) => void
+    dialogs.showSaveDialog.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve
+        }),
+    )
+    const choosing = controller.chooseExportDestination()
+    await controller.shutdown()
+    release({ canceled: true, filePath: '' })
+    await choosing
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+  })
   it('prepares a browser archive, replaces the notes and reports the Replaced Notes folder once', async () => {
     const { controller, destinations, data, userData, dependencies, fileServices } = await setup()
     const incoming = headWithImages(['b', 'missing'], 'Imported')

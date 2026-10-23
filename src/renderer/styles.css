@@ -43,6 +43,7 @@
 :root {
   --color-popup-shadow: rgba(0, 0, 0, 0.12);
   --color-data-activity-shadow: rgba(0, 0, 0, 0.2);
+  --color-import-backdrop: rgba(0, 0, 0, 0.3);
   /* Every color is defined once here or in the single dark override. The selection highlight is
      one background/foreground pair per appearance, shared by the Visual row, Visual text
      selection, selected hyperlinks, and the Vim mode badge. */
@@ -1285,7 +1286,8 @@ body.node-drag-invalid * {
   inset: calc(var(--title-bar-height) + var(--location-bar-height) + 12px) 16px auto auto;
 }
 
-.data-activity button {
+.data-activity button,
+.import-confirmation button {
   flex: none;
   padding: 3px 10px;
   border: 1px solid var(--color-location-border);
@@ -1299,6 +1301,42 @@ body.node-drag-invalid * {
 .data-activity button:hover,
 .data-activity button:focus-visible {
   background: var(--color-location-border);
+}
+
+.import-confirmation {
+  max-width: min(560px, calc(100vw - 64px));
+  box-sizing: border-box;
+  padding: 24px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 12px;
+  background: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 6px 24px var(--color-data-activity-shadow);
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.import-confirmation::backdrop {
+  background: var(--color-import-backdrop);
+}
+.import-confirmation h2 {
+  margin-top: 0;
+  font-size: 17px;
+}
+.import-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.import-confirmation button:disabled {
+  opacity: 0.5;
+}
+.import-confirmation button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
 }
 
 .data-activity button:focus-visible {

@@ -2,7 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorStore } from '../application/editor-store'
 import { DesktopDataOperations } from '../application/notes-archive/desktop-data-operations'
-import { createElectronEditorServices } from '../infrastructure/renderer/electron-services'
+import {
+  createElectronEditorServices,
+  suspendNotesWrites,
+  resumeNotesWrites,
+} from '../infrastructure/renderer/electron-services'
 import { App } from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
@@ -23,6 +27,14 @@ const dataOperations = new DesktopDataOperations(
     setNotesMenuState: (state) => window.treeApi.setNotesMenuState!(state),
     onNotesProgress: (listener) => window.treeApi.onNotesProgress!(listener),
     onNotesMenuCommand: (listener) => window.treeApi.onNotesMenuCommand!(listener),
+    chooseNotesImportArchive: () => window.treeApi.chooseNotesImportArchive!(),
+    prepareNotesImport: () => window.treeApi.prepareNotesImport!(),
+    commitNotesImport: () => window.treeApi.commitNotesImport!(),
+    takeNotesImportNotice: () => window.treeApi.takeNotesImportNotice!(),
+    showReplacedNotesFolder: () => window.treeApi.showReplacedNotesFolder!(),
+    suspendWrites: suspendNotesWrites,
+    resumeWrites: resumeNotesWrites,
+    reload: () => window.location.reload(),
   },
   store,
 )

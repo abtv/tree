@@ -117,6 +117,7 @@ const oldNotes = fc.oneof(
   fc.constant({ newProfile: true, documents: [], images: 0 }),
 )
 
+// @requirement PRODUCT.md §25.4
 describe('notes replacement after a crash', () => {
   it('opens either the untouched previous notes or the complete imported notes', async () => {
     await fc.assert(

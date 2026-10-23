@@ -96,3 +96,21 @@ export function importConfirmationText(
           : `${incoming.missingImageCount.toLocaleString('en-US')} images that the notes use are not in the ${restoring ? 'folder' : 'archive'}. Their nodes will show “Image could not be loaded.”`,
   }
 }
+
+/** Desktop replacement preserves the old files rather than deleting them (§25.3). */
+export function desktopImportConfirmationText(
+  fileName: string,
+  fileBytes: number,
+  incoming: IncomingNotes,
+  current: NotesCounts | 'none' | 'invalid',
+): ImportConfirmationText {
+  return {
+    ...importConfirmationText(fileName, fileBytes, incoming, current),
+    current:
+      current === 'none'
+        ? 'There are no saved notes.'
+        : current === 'invalid'
+          ? 'The saved notes cannot be opened. Importing replaces them and moves their files to the Replaced Notes folder.'
+          : `Your current notes have ${notesText(current)}. Importing replaces them and moves them to the Replaced Notes folder.`,
+  }
+}

@@ -872,6 +872,7 @@ describe('save interruption recovery', () => {
   })
 })
 
+// @requirement PRODUCT.md §25.4
 describe('notes export and import support', () => {
   const NOW = new Date(2026, 9, 23, 14, 5, 9)
 

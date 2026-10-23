@@ -46,7 +46,7 @@ async function availability(app: ElectronApplication): Promise<boolean[]> {
 }
 
 async function startExport(app: ElectronApplication): Promise<void> {
-  await expect.poll(() => availability(app)).toEqual([true, false])
+  await expect.poll(() => availability(app)).toEqual([true, true])
   await clickApplicationMenuItem(app, 'File', 'Export Notes…')
 }
 
@@ -119,9 +119,10 @@ test.describe('desktop Export Notes', () => {
       // The worker already took its snapshot. Later editing remains usable and is saved separately.
       await node(window, 1).fill('Editing continues during export')
       await fireIdleSave(window)
-      await expect
-        .poll(() => readPersisted(userDataDir).document.roots[0]?.text, idleSavePoll)
-        .toBe('Editing continues during export')
+      // A save briefly renames the primary away; retry the read as well as its assertion.
+      await expect(async () => {
+        expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Editing continues during export')
+      }).toPass(idleSavePoll)
       await app.evaluate(() => globalThis.__treeArchiveWorkers.release())
       await expect(panel).toContainText('Exported “Notes.zip”.')
       expect(exportedText(destination)).toBe('The latest notes before export')
@@ -159,7 +160,7 @@ test.describe('desktop Export Notes', () => {
     const before = readPersisted(userDataDir)
     await choosePath(app, null)
     await startExport(app)
-    await expect.poll(() => availability(app)).toEqual([true, false])
+    await expect.poll(() => availability(app)).toEqual([true, true])
     await fireIdleSave(window)
     await window.evaluate(() => (globalThis as typeof globalThis & { treeApi: TreeApi }).treeApi.load())
     expect(readPersisted(userDataDir)).toEqual(before)
@@ -171,7 +172,7 @@ test.describe('desktop Export Notes', () => {
     await waitForExport(app)
     await window.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(window.locator('.data-activity')).toHaveCount(0)
-    await expect.poll(() => availability(app)).toEqual([true, false])
+    await expect.poll(() => availability(app)).toEqual([true, true])
     expect(readFileSync(destination, 'utf8')).toBe('Previous archive')
     expect(readdirSync(userDataDir).filter((name) => name.startsWith('.Notes.zip.'))).toEqual([])
     await expect(node(window, 1)).toBeFocused()
@@ -218,7 +219,7 @@ test.describe('desktop Export Notes', () => {
     await waitForExport(app)
     await window.reload()
     await expect(node(window, 1)).toBeVisible()
-    await expect.poll(() => availability(app)).toEqual([true, false])
+    await expect.poll(() => availability(app)).toEqual([true, true])
     expect(readFileSync(destination, 'utf8')).toBe('Previous archive')
     await expect.poll(() => readdirSync(userDataDir).filter((name) => name.startsWith('.Notes.zip.'))).toEqual([])
     await app.evaluate(() => globalThis.__treeArchiveWorkers.release())
@@ -242,11 +243,11 @@ test.describe('desktop Export Notes', () => {
   })
 
   // @requirement PRODUCT.md §25.1
-  test('keeps notes commands disabled in the load-error state', async ({ userDataDir }) => {
+  test('disables export and keeps import available in the load-error state', async ({ userDataDir }) => {
     mkdirSync(join(userDataDir, 'data'), { recursive: true })
     writeFileSync(join(userDataDir, 'data', 'document.json'), 'invalid notes')
     const { app, window } = await launchTree(userDataDir, { expectReady: false })
     await expect(window.getByText('Tree could not open this document')).toBeVisible()
-    expect(await availability(app)).toEqual([false, false])
+    expect(await availability(app)).toEqual([false, true])
   })
 })

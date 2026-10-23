@@ -1,13 +1,15 @@
 import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import type { DesktopDataOperations } from '../application/notes-archive/desktop-data-operations'
+import { ImportConfirmationDialog } from './ImportConfirmationDialog'
 
 interface Props {
   text: string
   action: 'Cancel' | 'OK'
   onAction(): void
+  onShowFolder?(): void
 }
 
-export function DataActivityPanel({ text, action, onAction }: Props): React.JSX.Element {
+export function DataActivityPanel({ text, action, onAction, onShowFolder }: Props): React.JSX.Element {
   const panel = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const element = panel.current
@@ -24,6 +26,11 @@ export function DataActivityPanel({ text, action, onAction }: Props): React.JSX.
   return (
     <aside className="data-activity" aria-label="Notes activity" ref={panel}>
       <span role="status">{text}</span>
+      {onShowFolder === undefined ? null : (
+        <button type="button" onClick={onShowFolder}>
+          Show in Finder
+        </button>
+      )}
       <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={onAction}>
         {action}
       </button>
@@ -34,10 +41,19 @@ export function DataActivityPanel({ text, action, onAction }: Props): React.JSX.
 /** Keep archive progress subscriptions out of the editor's render path. */
 export function DesktopDataActivity({ operations }: { operations: DesktopDataOperations }): React.JSX.Element | null {
   const state = useSyncExternalStore(operations.subscribe, operations.getSnapshot, operations.getSnapshot)
+  if (operations.getConfirmation() !== undefined)
+    return <ImportConfirmationDialog operations={operations} state={state} />
+  if (state.phase === 'restart')
+    return (
+      <aside className="data-activity" role="alert">
+        {state.text}
+      </aside>
+    )
   if (state.phase !== 'running' && state.phase !== 'done' && state.phase !== 'failed') return null
   return (
     <DataActivityPanel
       text={state.text}
+      {...(state.phase === 'done' && state.showFolder ? { onShowFolder: operations.showReplacedFolder } : {})}
       action={state.phase === 'running' ? 'Cancel' : 'OK'}
       onAction={
         state.phase === 'running'

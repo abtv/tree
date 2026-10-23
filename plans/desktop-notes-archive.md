@@ -1,6 +1,6 @@
 # Desktop Notes Export and Import
 
-Status: In progress
+Status: Awaiting owner acceptance
 
 ## Objective
 
@@ -64,7 +64,7 @@ Out of scope: folder backup or restore on desktop, Show in Finder after export, 
 | T3 | Desktop archive worker, main controller and IPC | T2 | Done |
 | T4 | Electron performance guard for archive operations | T3 | Done |
 | T5 | Export Notes… user flow | T4 | Done |
-| T6 | Import Notes… user flow | T5 | Ready |
+| T6 | Import Notes… user flow | T5 | Done |
 
 `WORKING_PLAN.md` is required for T2, T3, T5 and T6.
 
@@ -163,7 +163,11 @@ The replacement is one unit. The imported notes start without retained generatio
 
 ## Next Task
 
-T6 — Import Notes… user flow.
+Final owner acceptance of the completed desktop export/import initiative.
+
+T6 is implemented and validated. The owner confirmed the native open-panel/Cancel, real browser archive, Finder and light/dark reload checks with “it's fine” on 2026-10-24. Independent review and separate product verification found no meaningful issues. All required automated checks passed after focused test corrections and reducing unit-suite worker concurrency; the previously owner-deferred zod audit advisory remains. Temporary acceptance evidence is in `.scratch/desktop-notes-import/validation.md`; retain it until final acceptance.
+
+For final acceptance, confirm the complete round trip both ways with a real browser profile and inspect the previous notes in Replaced Notes. No implementation task remains. After explicit final acceptance, retire this plan and its index entry under the one-commit closure allowance. The two-commit repair allowance remains unused.
 
 State after T5 (see ARCHITECTURE "Desktop notes replacement" and "Desktop notes archive"):
 
@@ -180,4 +184,4 @@ State after T5 (see ARCHITECTURE "Desktop notes replacement" and "Desktop notes 
 
 Next-session prompt:
 
-> Continue initiative `plans/desktop-notes-archive.md`, task T6 (Import Notes… user flow). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.
+> Finish acceptance of initiative `plans/desktop-notes-archive.md`. T1–T6 and both pre-commit native verification rounds are complete; final initiative acceptance remains pending.
