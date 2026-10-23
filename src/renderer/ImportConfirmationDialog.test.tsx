@@ -41,4 +41,8 @@ it('presents desktop preservation and missing-image text, with Cancel focused an
   fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
   expect(replace).not.toHaveBeenCalled()
   expect(cancel).not.toHaveBeenCalled()
+  view.rerender(
+    <ImportConfirmationDialog operations={operations} state={{ phase: 'confirming', text: 'Exported “Notes.zip”.' }} />,
+  )
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }))
 })

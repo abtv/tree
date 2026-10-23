@@ -1299,7 +1299,7 @@ body.node-drag-invalid * {
 }
 
 .data-activity button:hover,
-.data-activity button:focus-visible {
+.data-activity button:focus {
   background: var(--color-location-border);
 }
 
@@ -1334,12 +1334,12 @@ body.node-drag-invalid * {
 .import-confirmation button:disabled {
   opacity: 0.5;
 }
-.import-confirmation button:focus-visible {
+.import-confirmation button:focus {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-.data-activity button:focus-visible {
+.data-activity button:focus {
   outline: 2px solid var(--color-text);
   outline-offset: 1px;
 }

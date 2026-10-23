@@ -36,7 +36,12 @@ interface NotesStore {
 
 export type DataActivity =
   | { readonly phase: 'idle' | 'choosing' | 'canceling' }
-  | { readonly phase: 'running' | 'done' | 'failed'; readonly text: string; readonly showFolder?: boolean }
+  | {
+      readonly phase: 'running' | 'done' | 'failed'
+      readonly text: string
+      readonly showFolder?: boolean
+      readonly focusAction?: boolean
+    }
   | { readonly phase: 'confirming' | 'replacing' | 'restart'; readonly text: string }
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
@@ -289,6 +294,7 @@ export class DesktopDataOperations {
         phase: 'done',
         text: notice.replacedFolder === null ? text : `${text} Your previous notes are in “${notice.replacedFolder}”.`,
         showFolder: notice.replacedFolder !== null,
+        focusAction: true,
       })
       if (notice.replacedFolder === null) this.timer = setTimeout(this.dismiss, 6000)
     } catch (error) {

@@ -17,12 +17,14 @@ export function ImportConfirmationDialog({
     if (dialog === null || confirmation === undefined) return
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
     dialog.showModal()
-    cancel.current?.focus()
     return () => {
       dialog.close()
       if (previous?.isConnected) previous.focus({ preventScroll: true })
     }
   }, [confirmation])
+  useLayoutEffect(() => {
+    if (state.phase === 'confirming') cancel.current?.focus()
+  }, [state.phase])
   if (confirmation === undefined) return null
   const text = desktopImportConfirmationText(
     confirmation.fileName,

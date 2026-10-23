@@ -21,6 +21,7 @@ describeForEachEditingMode('desktop import confirmation input', () => {
   // @requirement PRODUCT.md §25.3
   test('preserves editor focus on Cancel and Escape, and exports before replacement with the dialog open', async ({
     userDataDir,
+    editingMode,
   }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'old', text: 'Current synthetic note', children: [] }] },
@@ -74,6 +75,18 @@ describeForEachEditingMode('desktop import confirmation input', () => {
       await expect(dialog).toContainText('1 image that the notes use is not in the archive.')
       const cancelButton = dialog.getByRole('button', { name: 'Cancel', exact: true })
       await expect(cancelButton).toBeFocused()
+      await window.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeFocused()
+      await window.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', { name: 'Replace Notes', exact: true })).toBeFocused()
+      await window.keyboard.press('Tab')
+      await expect(cancelButton).toBeFocused()
+      await window.keyboard.press('Shift+Tab')
+      await expect(dialog.getByRole('button', { name: 'Replace Notes', exact: true })).toBeFocused()
+      await window.keyboard.press('Shift+Tab')
+      await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeFocused()
+      await window.keyboard.press('Shift+Tab')
+      await expect(cancelButton).toBeFocused()
       // Enter on the default button cancels, never replaces.
       if (cancel === 'button') await window.keyboard.press('Enter')
       else await window.keyboard.press('Escape')
@@ -86,12 +99,57 @@ describeForEachEditingMode('desktop import confirmation input', () => {
     }
     await clickApplicationMenuItem(app, 'File', 'Import Notes…')
     const dialog = window.getByRole('dialog')
-    await dialog.getByRole('button', { name: 'Export Current Notes First' }).click()
+    await app.evaluate(({ dialog }) => {
+      dialog.showSaveDialog = (async () => ({ canceled: true, filePath: '' })) as typeof dialog.showSaveDialog
+    })
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await app.evaluate(
+      ({ dialog }, destination) => {
+        dialog.showSaveDialog = (async () => ({
+          canceled: false,
+          filePath: destination,
+        })) as typeof dialog.showSaveDialog
+      },
+      join(userDataDir, 'missing-folder', 'Export.zip'),
+    )
+    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
+    await expect(dialog).toContainText('Export failed.')
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await app.evaluate(({ dialog }, destination) => {
+      dialog.showSaveDialog = (async () => ({ canceled: false, filePath: destination })) as typeof dialog.showSaveDialog
+    }, destination)
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await window.keyboard.press('Tab')
+    await window.keyboard.press('Enter')
     await expect(dialog).toContainText('Exported “Export.zip”.')
     expect(readFileSync(destination).byteLength).toBeGreaterThan(100)
-    await dialog.getByRole('button', { name: 'Replace Notes', exact: true }).click()
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await window.keyboard.press('Shift+Tab')
+    await window.keyboard.press('Enter')
     await expect(node(window, 1)).toHaveValue('Incoming note')
     await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText('Imported “Import.zip”.')
+    await expect(window.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
+    await app.evaluate(({ shell }) => {
+      shell.showItemInFolder = () => {
+        ;(globalThis as typeof globalThis & { keyboardFinder?: boolean }).keyboardFinder = true
+      }
+    })
+    await window.keyboard.press('Shift+Tab')
+    await expect(window.getByRole('button', { name: 'Show in Finder' })).toBeFocused()
+    await window.keyboard.press('Enter')
+    expect(
+      await app.evaluate(() => (globalThis as typeof globalThis & { keyboardFinder?: boolean }).keyboardFinder),
+    ).toBe(true)
+    await window.keyboard.press('Tab')
+    await expect(window.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
+    await window.keyboard.press(editingMode === 'vim' ? 'Space' : 'Enter')
+    await expect(window.getByRole('complementary', { name: 'Notes activity' })).toHaveCount(0)
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveValue('Incoming note')
     await closeApp(app)
   })
 })

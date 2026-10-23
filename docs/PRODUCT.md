@@ -2094,9 +2094,12 @@ Import Notes… opens an open panel for ZIP files. Cancelling it changes nothing
 
 The **Replace Current Notes?** dialog of §24.4 says `Your current notes have 987 nodes and 40 images. Importing replaces them and moves them to the Replaced Notes folder.` Without stored notes it says `There are no saved notes.`; with notes that cannot be opened, `The saved notes cannot be opened. Importing replaces them and moves their files to the Replaced Notes folder.` Buttons, default, Escape and Export Current Notes First behave as in §24.4; Export Current Notes First opens the save panel of §25.2. Closing the dialog returns focus to where it was.
 
+Tab and Shift+Tab move between the confirmation buttons and stay inside the dialog. When Export Current Notes First finishes or its save panel is cancelled, focus returns to Cancel, so Enter safely cancels until another button is selected.
+
 * **Replace Notes** shows `Replacing Notes…`, disables the dialog, saves pending edits, replaces the notes (§25.4) and reloads the window, which opens the imported notes. Import does not change preferences.
 * The panel then shows `Imported “Tree Notes 2026-10-20.zip”. Your previous notes are in “~/Library/Application Support/Tree/Replaced Notes/2026-10-23 14-05-09”.` with **Show in Finder** and **OK** until OK; Show in Finder selects that folder in the Finder.
 * Without previous notes it shows `Imported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with OK.
+* After import, OK receives keyboard focus. Enter or Space closes the result; with previous notes, Shift+Tab reaches Show in Finder, and Tab returns to OK. Closing the focused result returns focus to the editor.
 * Cancel and every failure before the replacement leave the notes unchanged and remove what the import prepared; failures show `Import failed. <reason>` until OK.
 
 ### 25.4 Replaced Notes

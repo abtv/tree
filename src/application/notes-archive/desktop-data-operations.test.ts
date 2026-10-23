@@ -85,7 +85,11 @@ describe('desktop notes operations', () => {
       vi.useFakeTimers()
       const { operations, api } = harness({ fileName: 'Browser.zip', replacedFolder })
       await Promise.resolve()
-      expect(operations.getSnapshot()).toMatchObject({ phase: 'done', showFolder: replacedFolder !== null })
+      expect(operations.getSnapshot()).toMatchObject({
+        phase: 'done',
+        showFolder: replacedFolder !== null,
+        focusAction: true,
+      })
       await vi.advanceTimersByTimeAsync(6000)
       expect(operations.getSnapshot().phase).toBe(replacedFolder === null ? 'idle' : 'done')
       if (replacedFolder !== null) {

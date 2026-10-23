@@ -7,10 +7,18 @@ interface Props {
   action: 'Cancel' | 'OK'
   onAction(): void
   onShowFolder?(): void
+  focusAction?: boolean
 }
 
-export function DataActivityPanel({ text, action, onAction, onShowFolder }: Props): React.JSX.Element {
+export function DataActivityPanel({
+  text,
+  action,
+  onAction,
+  onShowFolder,
+  focusAction = false,
+}: Props): React.JSX.Element {
   const panel = useRef<HTMLElement>(null)
+  const actionButton = useRef<HTMLButtonElement>(null)
   useLayoutEffect(() => {
     const element = panel.current
     let previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
@@ -18,11 +26,12 @@ export function DataActivityPanel({ text, action, onAction, onShowFolder }: Prop
       if (event.target instanceof HTMLElement && !element?.contains(event.target)) previous = event.target
     }
     document.addEventListener('focusin', rememberFocus)
+    if (focusAction) actionButton.current?.focus({ preventScroll: true })
     return () => {
       document.removeEventListener('focusin', rememberFocus)
       if (element?.contains(document.activeElement) && previous?.isConnected) previous.focus({ preventScroll: true })
     }
-  }, [])
+  }, [focusAction])
   return (
     <aside className="data-activity" aria-label="Notes activity" ref={panel}>
       <span role="status">{text}</span>
@@ -31,7 +40,7 @@ export function DataActivityPanel({ text, action, onAction, onShowFolder }: Prop
           Show in Finder
         </button>
       )}
-      <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={onAction}>
+      <button type="button" ref={actionButton} onMouseDown={(event) => event.preventDefault()} onClick={onAction}>
         {action}
       </button>
     </aside>
@@ -53,6 +62,7 @@ export function DesktopDataActivity({ operations }: { operations: DesktopDataOpe
   return (
     <DataActivityPanel
       text={state.text}
+      focusAction={state.focusAction ?? false}
       {...(state.phase === 'done' && state.showFolder ? { onShowFolder: operations.showReplacedFolder } : {})}
       action={state.phase === 'running' ? 'Cancel' : 'OK'}
       onAction={

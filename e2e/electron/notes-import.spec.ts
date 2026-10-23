@@ -108,6 +108,9 @@ test.describe('desktop Import Notes', () => {
       await expect(node(window, 1)).toHaveValue('Imported synthetic notes')
       const panel = window.getByRole('complementary', { name: 'Notes activity' })
       await expect(panel).toContainText('Imported “Browser Notes.zip”. Your previous notes are in')
+      await expect(panel.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
+      await expect(panel.getByRole('button', { name: 'OK', exact: true })).toHaveCSS('outline-width', '2px')
+      await expect(panel.getByRole('button', { name: 'OK', exact: true })).toHaveCSS('outline-style', 'solid')
       expect(
         await panel.evaluate((element) => {
           const panel = element.getBoundingClientRect()
