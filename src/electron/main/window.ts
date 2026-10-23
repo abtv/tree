@@ -24,7 +24,7 @@ export interface WindowSurface {
 }
 
 export function createWindowWebPreferences(preload: string): WebPreferences {
-  return { preload, contextIsolation: true, nodeIntegration: false, sandbox: true }
+  return { preload, contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false }
 }
 
 export interface SingleInstanceApp {
