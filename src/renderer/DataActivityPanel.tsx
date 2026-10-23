@@ -33,14 +33,20 @@ export function DataActivityPanel({
     }
   }, [focusAction])
   return (
-    <aside className="data-activity" aria-label="Notes activity" ref={panel}>
+    <aside className="data-activity" aria-label="Notes activity" ref={panel} data-popup-navigation="horizontal">
       <span role="status">{text}</span>
       {onShowFolder === undefined ? null : (
         <button type="button" onClick={onShowFolder}>
           Show in Finder
         </button>
       )}
-      <button type="button" ref={actionButton} onMouseDown={(event) => event.preventDefault()} onClick={onAction}>
+      <button
+        type="button"
+        ref={actionButton}
+        data-popup-dismiss
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onAction}
+      >
         {action}
       </button>
     </aside>

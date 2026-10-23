@@ -12,7 +12,7 @@
   </head>
   <body>
     <button id="tree-menu-button" popovertarget="tree-menu" aria-label="Tree menu" title="Menu">⋯</button>
-    <div id="tree-menu" popover role="dialog" aria-label="Tree menu">
+    <div id="tree-menu" popover role="dialog" aria-label="Tree menu" data-popup-navigation="vertical">
       <button id="prototype-tree">Tree</button>
       <button id="prototype-agenda">Agenda</button>
       <hr />
@@ -36,13 +36,14 @@
       <span id="backup-status" role="status" hidden></span>
     </div>
     <input id="data-import-file" type="file" accept=".zip,application/zip" hidden />
-    <div id="data-activity" role="status" hidden>
+    <div id="data-activity" role="status" data-popup-navigation="horizontal" hidden>
       <span id="data-activity-text"></span>
-      <button id="data-activity-action" type="button"></button>
+      <button id="data-activity-action" type="button" data-popup-dismiss></button>
     </div>
     <!-- The explicit role lets the editor's global key handlers leave keys to the dialog, as for the menu. -->
     <dialog
       id="import-confirm"
+      data-popup-navigation="horizontal"
       role="dialog"
       aria-labelledby="import-confirm-title"
       aria-describedby="import-confirm-incoming import-confirm-current import-confirm-missing"
@@ -61,6 +62,7 @@
     <div id="prototype-problem" role="alert" hidden></div>
     <dialog
       id="backup-confirm"
+      data-popup-navigation="horizontal"
       role="dialog"
       aria-labelledby="backup-confirm-title"
       aria-describedby="backup-confirm-text"

@@ -86,6 +86,7 @@ test.describe('save failure lock', () => {
 
   test('confirms quitting without saving while locked and opens the previous version on restart', async ({
     userDataDir,
+    editingMode,
   }) => {
     const { app, window } = await launchTree(userDataDir)
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
@@ -103,8 +104,26 @@ test.describe('save failure lock', () => {
 
     await clickApplicationMenuQuit(app)
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
+    await expect(window.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await window.keyboard.press(editingMode === 'vim' ? 'l' : 'Tab')
+    await expect(window.getByRole('button', { name: 'Quit without saving' })).toBeFocused()
+    await window.keyboard.press(editingMode === 'vim' ? 'h' : 'Shift+Tab')
+    await expect(window.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await window.keyboard.press('Escape')
+    await expect(window.getByRole('alertdialog')).toHaveCount(0)
+    // The existing main-process save handshake releases a rejected quit on its timeout.
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toBeVisible()
+    await clickApplicationMenuQuit(app)
+    await expect(window.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
+    await window.keyboard.press(editingMode === 'vim' ? 'l' : 'Tab')
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
-    await window.getByRole('button', { name: 'Quit without saving' }).click()
+    await window.keyboard.press('Enter').catch((error: unknown) => {
+      // Immediate quit can close the CDP target before Playwright sends Enter's keyup.
+      if (!(error instanceof Error) || !error.message.includes('Target page, context or browser has been closed'))
+        throw error
+    })
     await closed
 
     const relaunched = await launchTree(userDataDir)

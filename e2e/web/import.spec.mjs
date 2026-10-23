@@ -145,6 +145,15 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
   expect(await blobKeys(page)).toEqual(['kept', 'new-a', 'new-b'])
   await page.keyboard.press(':')
   await expect(page.locator('#command-panel')).toHaveCount(0)
+  await page.keyboard.press('h')
+  await expect(dialog.getByRole('button', { name: 'Replace Notes', exact: true })).toBeFocused()
+  await page.keyboard.press('h')
+  await page.keyboard.press('h')
+  await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeFocused()
+  await page.keyboard.press('l')
+  await page.keyboard.press('l')
+  await page.keyboard.press('l')
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(dialog).toBeHidden()
   await unchanged()
@@ -188,7 +197,9 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
     'Import failed. The archive contains “__MACOSX/._document.json”, which a Tree notes archive cannot contain. Import the original file that Tree exported.',
   )
   await capture(page, 'data-import-failed.png')
-  await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
+  await activity(page).getByRole('button', { name: 'OK', exact: true }).focus()
+  await page.keyboard.press('Escape')
+  await expect(activity(page)).toBeHidden()
   await unchanged()
 
   // A damaged image after a staged one removes the staged image.

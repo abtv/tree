@@ -53,7 +53,11 @@ describeForEachEditingMode('image preview', () => {
     const dialog = window.getByRole('dialog', { name: 'Image preview' })
     await expect(dialog).toBeVisible()
 
-    await window.getByRole('button', { name: 'Close image preview' }).click()
+    const close = window.getByRole('button', { name: 'Close image preview' })
+    await window.keyboard.press('h')
+    await window.keyboard.press('l')
+    await expect(close).toBeFocused()
+    await window.keyboard.press('Enter')
     await expect(dialog).toBeHidden()
   })
 

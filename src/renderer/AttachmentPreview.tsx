@@ -207,7 +207,14 @@ export function ImagePreview({
 
   return (
     <div className="image-preview-overlay" onClick={onClose}>
-      <div ref={dialog} aria-label="Image preview" aria-modal="true" className="image-preview" role="dialog">
+      <div
+        ref={dialog}
+        aria-label="Image preview"
+        aria-modal="true"
+        className="image-preview"
+        role="dialog"
+        data-popup-navigation="horizontal"
+      >
         <button
           ref={closeButton}
           aria-label="Close image preview"

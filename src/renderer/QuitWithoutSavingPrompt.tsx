@@ -46,6 +46,7 @@ export function QuitWithoutSavingPrompt({ onCancel, onQuit }: QuitWithoutSavingP
       aria-modal="true"
       className="quit-without-saving-overlay"
       role="alertdialog"
+      data-popup-navigation="horizontal"
     >
       <div className="quit-without-saving" ref={dialog}>
         <p>{QUIT_WITHOUT_SAVING_PROMPT}</p>

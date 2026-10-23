@@ -35,6 +35,7 @@ import type { EditorServices } from '../application/editor-store-types'
 import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 import type { DesktopDataOperations } from '../application/notes-archive/desktop-data-operations'
 import { DesktopDataActivity } from './DataActivityPanel'
+import { usePopupNavigation } from './use-popup-navigation'
 
 interface AppProps {
   store: EditorStore
@@ -86,6 +87,7 @@ export function App({
   const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled)
+  usePopupNavigation(vimEnabled)
   const [vimMode, setVimMode] = useState<VimMode>(initialVimEnabled ? 'normal' : 'insert')
   const richEditingEnabled = !deferRichEditing || !vimEnabled || vimMode === 'insert' || vimMode === 'replace'
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()

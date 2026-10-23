@@ -36,6 +36,7 @@ export function ImportConfirmationDialog({
   const cancelable = state.phase === 'confirming' || state.phase === 'running'
   return (
     <dialog
+      data-popup-navigation="horizontal"
       className="import-confirmation"
       ref={ref}
       role="dialog"

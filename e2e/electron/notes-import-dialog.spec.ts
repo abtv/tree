@@ -19,6 +19,7 @@ describeForEachEditingMode('desktop import confirmation input', () => {
   configureHiddenParallelTests()
 
   // @requirement PRODUCT.md §25.3
+  // @requirement PRODUCT.md §20.2.29
   test('preserves editor focus on Cancel and Escape, and exports before replacement with the dialog open', async ({
     userDataDir,
     editingMode,
@@ -75,6 +76,20 @@ describeForEachEditingMode('desktop import confirmation input', () => {
       await expect(dialog).toContainText('1 image that the notes use is not in the archive.')
       const cancelButton = dialog.getByRole('button', { name: 'Cancel', exact: true })
       await expect(cancelButton).toBeFocused()
+      await window.keyboard.press('l')
+      await expect(cancelButton).toBeFocused()
+      await window.keyboard.press('h')
+      if (editingMode === 'vim') {
+        await expect(dialog.getByRole('button', { name: 'Replace Notes', exact: true })).toBeFocused()
+        if (cancel === 'button') await window.screenshot({ path: test.info().outputPath('vim-popup-replace.png') })
+        await window.keyboard.press('h')
+        await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeFocused()
+        await window.keyboard.press('h')
+        await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeFocused()
+        await window.keyboard.press('l')
+        await window.keyboard.press('l')
+      }
+      await expect(cancelButton).toBeFocused()
       await window.keyboard.press('Tab')
       await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeFocused()
       await window.keyboard.press('Tab')
@@ -128,7 +143,7 @@ describeForEachEditingMode('desktop import confirmation input', () => {
     await expect(dialog).toContainText('Exported “Export.zip”.')
     expect(readFileSync(destination).byteLength).toBeGreaterThan(100)
     await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
-    await window.keyboard.press('Shift+Tab')
+    await window.keyboard.press(editingMode === 'vim' ? 'h' : 'Shift+Tab')
     await window.keyboard.press('Enter')
     await expect(node(window, 1)).toHaveValue('Incoming note')
     await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText('Imported “Import.zip”.')
@@ -138,15 +153,15 @@ describeForEachEditingMode('desktop import confirmation input', () => {
         ;(globalThis as typeof globalThis & { keyboardFinder?: boolean }).keyboardFinder = true
       }
     })
-    await window.keyboard.press('Shift+Tab')
+    await window.keyboard.press(editingMode === 'vim' ? 'h' : 'Shift+Tab')
     await expect(window.getByRole('button', { name: 'Show in Finder' })).toBeFocused()
     await window.keyboard.press('Enter')
     expect(
       await app.evaluate(() => (globalThis as typeof globalThis & { keyboardFinder?: boolean }).keyboardFinder),
     ).toBe(true)
-    await window.keyboard.press('Tab')
+    await window.keyboard.press(editingMode === 'vim' ? 'l' : 'Tab')
     await expect(window.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
-    await window.keyboard.press(editingMode === 'vim' ? 'Space' : 'Enter')
+    await window.keyboard.press(editingMode === 'vim' ? 'Escape' : 'Enter')
     await expect(window.getByRole('complementary', { name: 'Notes activity' })).toHaveCount(0)
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveValue('Incoming note')

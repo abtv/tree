@@ -1544,6 +1544,18 @@ Every successfully run command except `quit` moves to the front of history, with
 
 **Vim divergence.** At the Product Owner's request, this panel lists application commands and runs the selected row, whereas Vim runs typed command-line text. Up/Down select rows rather than recalling history; history instead orders the list. This keyboard-first model is the deliberate platform difference under §1.3.
 
+#### 20.2.29 Popup Navigation
+
+While Vim editing is enabled, application-owned dialogs and activity messages support `h` and `l` to focus the previous and next visible, enabled button in their horizontal action row. Movement stops at either end without wrapping or activating a button. This applies independently of the editor's current Vim mode, only while focus is inside the popup. Import/restore confirmation, backup conflict/permission confirmation, quit confirmation, image preview and activity messages share this rule in desktop and browser versions where available.
+
+`Enter` activates the focused button; `Escape` cancels or dismisses the popup through its existing action. Busy operations retain their existing cancellation restrictions. In a focused activity message, Escape invokes its Cancel or OK action. Existing initial focus, Tab/Shift+Tab navigation and focus restoration remain unchanged. Moving focus must not edit notes or execute an editor command.
+
+The browser's vertical Tree menu uses `j` for the next button and `k` for the previous button, with the same visibility, enabled-state and non-wrapping rules. Opening this menu with Vim enabled focuses its first available button. Enter activates the focused item and Escape closes the menu. The horizontal `h/l` bindings do not apply to this vertical menu.
+
+Text-entry surfaces, including the command panel, search and date/emoji completions, retain literal letters and their existing navigation keys. Modified keys and native text composition retain their existing behavior. With Vim editing disabled, these extra letter bindings are inactive. System-owned menus, file pickers and permission prompts retain platform keyboard behavior.
+
+These application-control bindings extend the keyboard-first model (§1.3); they do not change Vim text editing.
+
 ### 20.3 Typography
 
 The application uses the bundled JetBrains Mono typeface for all user-interface text. The bundled
