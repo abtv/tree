@@ -73,7 +73,7 @@ Everything written to the repository must be English, including documentation, p
 
 ## 4. General Working Rules
 
-Read procedure §4 before edits or command execution. Keep work focused, simple, and maintainable. Preserve existing behavior and user data/changes unless explicitly authorized otherwise. Never bypass a denied or canceled action, weaken role restrictions, or broaden permissions to complete a task.
+Read procedure §4 before edits or command execution. Keep work focused, simple, and maintainable. Preserve existing behavior and user data/changes unless explicitly authorized otherwise. Prefer existing approved workflows for routine checks and review launches; follow procedure §4 to avoid unnecessary permission prompts. Never bypass a denied or canceled action, weaken role restrictions, or broaden permissions to complete a task.
 
 Use native file-editing tools for repository changes; no shell edit scripts or interpreter-based writes. Use native read/search tools when available; configured roles may use the limited read-only shell fallback in `docs/AGENT_ROLES.md`. Run separate shell commands, without chains or shell loops. Use named workflows and their documented arguments. In Codex, Electron E2E runs outside the sandbox from the first invocation through the supported approval mechanism.
 
