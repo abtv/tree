@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Desktop notes export and import](desktop-notes-archive.md) | Awaiting owner acceptance | Final round trip both ways and Replaced Notes inspection |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
