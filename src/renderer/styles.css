@@ -42,6 +42,7 @@
 
 :root {
   --color-popup-shadow: rgba(0, 0, 0, 0.12);
+  --color-data-activity-shadow: rgba(0, 0, 0, 0.2);
   /* Every color is defined once here or in the single dark override. The selection highlight is
      one background/foreground pair per appearance, shared by the Visual row, Visual text
      selection, selected hyperlinks, and the Vim mode badge. */
@@ -1256,6 +1257,53 @@ body.node-drag-invalid * {
   margin: 0 auto;
   padding: 48px;
   text-align: center;
+}
+
+.data-activity {
+  position: fixed;
+  inset: auto 16px calc(var(--status-bar-height) + 12px) auto;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 6px 24px var(--color-data-activity-shadow);
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+
+/* Save failures remain visible in the editor; put archive activity below the toolbar. */
+.tree-app:has(.save-error) .data-activity {
+  inset: calc(var(--title-bar-height) + var(--location-bar-height) + 12px) 16px auto auto;
+}
+
+.data-activity button {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 5px;
+  background: var(--color-background);
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.data-activity button:hover,
+.data-activity button:focus-visible {
+  background: var(--color-location-border);
+}
+
+.data-activity button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 1px;
 }
 
 .save-error {

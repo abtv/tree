@@ -664,9 +664,10 @@ Closing the main window quits the application on macOS, including when the appli
 
 The Vim Normal-mode command panel (§20.2.28) also runs Quit, Always on Top, Vim Editing, and the three Appearance choices through the same application services as these menu items.
 
-The menu bar has four menus, laid out as macOS applications do (§1.3):
+The menu bar has five menus, laid out as macOS applications do (§1.3):
 
 * **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
+* **File** holds **Export Notes…** and **Import Notes…** (§25).
 * **Edit** holds a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
 * **View** holds an **Appearance** submenu with three mutually exclusive items: **Automatic**, **Light**, and **Dark**. The item for the current choice is checked (§20.5).
 * **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
@@ -2068,3 +2069,19 @@ Tree reads only `document.json` and the `attachments/<id>.png` files that it ref
 * A failure shows `Restore failed. <reason>` until **OK**. Besides the reasons of §24.4, a folder without `document.json` gives `“Tree Backup” does not contain document.json. Choose the folder that Tree backed up to.`; a folder that cannot be read gives `The folder could not be read: <reason>`; a browser storage failure gives `The notes could not be restored: <reason>`; a picker that fails gives `The folder could not be opened: <reason>`; and a stopped background check gives `The restore stopped unexpectedly.`
 
 Cancel and every failure keep the current notes unchanged and remove the images that the restore stored, as in §24.4. Restore does not change the backup choice. An active backup keeps running and, after the reload, copies the restored notes to its folder as its next version. An active backup trails the saved notes by seconds and keeps no earlier versions, so restoring from its own folder returns the latest saved notes, not an earlier state.
+
+## 25. Desktop Notes Export and Import
+
+The desktop application exports the notes archive of §24.2, which the browser version (§1.4) can import.
+
+### 25.1 Menu Commands
+
+**Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no keyboard shortcuts and no command-panel entries. Export Notes… is disabled while the window is starting, when the stored notes cannot be opened, in the locked save-failure state (§16.2), and while an export or an import runs. Import Notes… remains disabled until the desktop import flow is implemented.
+
+### 25.2 Export
+
+Export Notes… opens a save panel named `Tree Notes YYYY-MM-DD.zip` with the local date. Cancelling the panel changes nothing. After a location is chosen, Tree saves pending edits, as Quit does, and exports the newest stored version that opens (§16.1) with every referenced image. Export never changes the stored notes.
+
+Export otherwise follows §24.3: it runs in the background while editing remains available, shows its progress, Cancel and result in a panel at the lower right above the status bar, leaves out and counts missing or unusable images, and produces no file in the listed failure cases. The archive takes its name only when it is complete: Cancel, a failure or quitting leaves no archive and leaves an existing file of that name unchanged. A file that cannot be written gives `Export failed. The archive could not be saved: <reason>`.
+
+The desktop panel moves to the upper right below the location bar while a save or operation error is shown, so both messages remain visible. Dismissing a focused panel returns focus to the previously focused editor or control. An archive-limit refusal has no folder-backup suffix because desktop folder backup is not available.

@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Desktop notes export and import](desktop-notes-archive.md) | In progress | T5 — Export Notes… user flow |
+| [Desktop notes export and import](desktop-notes-archive.md) | In progress | T6 — Import Notes… user flow |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

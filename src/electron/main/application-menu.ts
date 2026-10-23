@@ -1,10 +1,12 @@
 import type { MenuItemConstructorOptions } from 'electron'
 import type { AppearancePreference } from '../../infrastructure/main/window-state'
+import type { NotesMenuCommand, NotesMenuState } from '../../shared/ipc'
 
 export interface ApplicationMenuState {
   vimEnabled: boolean
   alwaysOnTop: boolean
   appearance: AppearancePreference
+  notes: NotesMenuState
 }
 
 export interface ApplicationMenuActions {
@@ -12,6 +14,7 @@ export interface ApplicationMenuActions {
   setVimEnabled: (vimEnabled: boolean) => void
   setAlwaysOnTop: (alwaysOnTop: boolean) => void
   setAppearance: (appearance: AppearancePreference) => void
+  notesCommand: (command: NotesMenuCommand) => void
 }
 
 const appearanceItems: ReadonlyArray<{ label: string; value: AppearancePreference }> = [
@@ -31,6 +34,13 @@ export function applicationMenuTemplate(
     {
       label: 'Tree',
       submenu: [{ label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: actions.requestQuit }],
+    },
+    {
+      label: 'File',
+      submenu: [
+        { label: 'Export Notes…', enabled: state.notes.canExport, click: () => actions.notesCommand('export') },
+        { label: 'Import Notes…', enabled: state.notes.canImport, click: () => actions.notesCommand('import') },
+      ],
     },
     {
       label: 'Edit',

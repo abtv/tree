@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { ipcChannels, ipcEvents, type NotesArchiveProgress, type TreeApi } from '../../shared/ipc'
+import {
+  ipcChannels,
+  ipcEvents,
+  type NotesArchiveProgress,
+  type NotesMenuCommand,
+  type TreeApi,
+} from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
   getAppearance: () => ipcRenderer.invoke(ipcChannels.getAppearance),
@@ -54,6 +60,12 @@ export const treeApi: TreeApi = {
   cancelNotesOperation: () => ipcRenderer.invoke(ipcChannels.cancelNotesOperation),
   takeNotesImportNotice: () => ipcRenderer.invoke(ipcChannels.takeNotesImportNotice),
   showReplacedNotesFolder: () => ipcRenderer.invoke(ipcChannels.showReplacedNotesFolder),
+  setNotesMenuState: (state) => ipcRenderer.invoke(ipcChannels.setNotesMenuState, state),
+  onNotesMenuCommand: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, command: NotesMenuCommand): void => listener(command)
+    ipcRenderer.on(ipcEvents.notesMenuCommand, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.notesMenuCommand, handler)
+  },
   onNotesProgress: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, progress: NotesArchiveProgress): void => listener(progress)
     ipcRenderer.on(ipcEvents.notesProgress, handler)

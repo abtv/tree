@@ -34,6 +34,7 @@ export const ipcChannels = {
   cancelNotesOperation: 'tree:notes-cancel',
   takeNotesImportNotice: 'tree:notes-take-import-notice',
   showReplacedNotesFolder: 'tree:notes-show-replaced-folder',
+  setNotesMenuState: 'tree:notes-set-menu-state',
 } as const
 
 /** Main-to-renderer notifications: menu preference changes and notes export or import progress. */
@@ -42,6 +43,7 @@ export const ipcEvents = {
   vimEnabledChanged: 'tree:vim-enabled-changed',
   appearanceChanged: 'tree:appearance-changed',
   notesProgress: 'tree:notes-progress',
+  notesMenuCommand: 'tree:notes-menu-command',
 } as const
 
 /** A notes operation that ended without a result: the user cancelled it or Tree quit. */
@@ -93,6 +95,12 @@ export interface NotesImportNotice {
 }
 
 export type { NotesArchiveProgress }
+
+export interface NotesMenuState {
+  readonly canExport: boolean
+  readonly canImport: boolean
+}
+export type NotesMenuCommand = 'export' | 'import'
 
 export type ClipboardPayload =
   { kind: 'text'; text: string; links?: readonly LinkRange[] } | { kind: 'image'; png: Uint8Array }
@@ -153,4 +161,6 @@ export interface TreeApi {
   takeNotesImportNotice?: () => Promise<NotesImportNotice | null>
   showReplacedNotesFolder?: () => Promise<void>
   onNotesProgress?: (listener: (progress: NotesArchiveProgress) => void) => () => void
+  setNotesMenuState?: (state: NotesMenuState) => Promise<void>
+  onNotesMenuCommand?: (listener: (command: NotesMenuCommand) => void) => () => void
 }

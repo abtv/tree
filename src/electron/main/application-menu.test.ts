@@ -4,13 +4,25 @@ import type { AppearancePreference } from '../../infrastructure/main/window-stat
 import { applicationMenuTemplate } from './application-menu'
 
 function createActions() {
-  return { requestQuit: vi.fn(), setVimEnabled: vi.fn(), setAlwaysOnTop: vi.fn(), setAppearance: vi.fn() }
+  return {
+    requestQuit: vi.fn(),
+    setVimEnabled: vi.fn(),
+    setAlwaysOnTop: vi.fn(),
+    setAppearance: vi.fn(),
+    notesCommand: vi.fn(),
+  }
 }
 
 function state(
   overrides: Partial<{ vimEnabled: boolean; alwaysOnTop: boolean; appearance: AppearancePreference }> = {},
 ) {
-  return { vimEnabled: false, alwaysOnTop: false, appearance: 'system' as AppearancePreference, ...overrides }
+  return {
+    vimEnabled: false,
+    alwaysOnTop: false,
+    appearance: 'system' as AppearancePreference,
+    notes: { canExport: false, canImport: false },
+    ...overrides,
+  }
 }
 
 function submenuItems(template: MenuItemConstructorOptions[], label: string): MenuItemConstructorOptions[] {
@@ -28,11 +40,24 @@ function clickWithChecked(item: MenuItemConstructorOptions, checked: boolean): v
 }
 
 describe('application menu template', () => {
+  // @requirement PRODUCT.md §25.1
+  it('orders notes commands, applies availability and dispatches without shortcuts', () => {
+    const actions = createActions()
+    const template = applicationMenuTemplate({ ...state(), notes: { canExport: true, canImport: false } }, actions)
+    const items = submenuItems(template, 'File')
+    expect(items.map((item) => [item.label, item.enabled, item.accelerator])).toEqual([
+      ['Export Notes…', true, undefined],
+      ['Import Notes…', false, undefined],
+    ])
+    clickWithChecked(items[0]!, false)
+    clickWithChecked(items[1]!, false)
+    expect(actions.notesCommand.mock.calls).toEqual([['export'], ['import']])
+  })
   // @requirement PRODUCT.md §9.3
   it('follows the macOS layout: Quit in the app menu, Vim in Edit, Appearance in View, Always on Top in Window', () => {
     const template = applicationMenuTemplate(state(), createActions())
 
-    expect(template.map((entry) => entry.label)).toEqual(['Tree', 'Edit', 'View', 'Window'])
+    expect(template.map((entry) => entry.label)).toEqual(['Tree', 'File', 'Edit', 'View', 'Window'])
     expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual(['Quit Tree'])
     expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual(['Vim Editing'])
     expect(submenuItems(template, 'View').map((item) => item.label)).toEqual(['Appearance'])

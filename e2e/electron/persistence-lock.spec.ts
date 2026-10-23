@@ -56,6 +56,14 @@ test.describe('save failure lock', () => {
     }
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible(idleSavePoll)
     await expect(node(window, 1)).not.toBeEditable()
+    // @requirement PRODUCT.md §25.1
+    expect(
+      await app.evaluate(({ Menu }) =>
+        Menu.getApplicationMenu()!
+          .items.find((item) => item.label === 'File')!
+          .submenu!.items.map((item) => item.enabled),
+      ),
+    ).toEqual([false, false])
     const frozen = await node(window, 1).inputValue()
     const attempts = await readSaveAttempts(app)
     expect(attempts).toBe(3)

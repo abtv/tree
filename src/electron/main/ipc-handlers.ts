@@ -12,7 +12,7 @@ import {
   isTrustedRendererUrl,
   type PngDecoder,
 } from './ipc-security'
-import { ipcChannels } from '../../shared/ipc'
+import { ipcChannels, type NotesMenuState } from '../../shared/ipc'
 import type { NotesArchiveController } from './notes-archive-controller'
 import type { FileServices } from '../../infrastructure/main/file-services'
 import { readClipboard, writeClipboard, type NativeClipboard } from '../../infrastructure/main/clipboard'
@@ -46,6 +46,7 @@ export interface IpcHandlerDependencies {
   getVimEnabled: () => boolean
   setVimEnabled: (vimEnabled: boolean) => void
   notesArchive: NotesArchiveController
+  setNotesMenuState: (state: NotesMenuState) => void
 }
 
 export function registerIpcHandlers({
@@ -66,6 +67,7 @@ export function registerIpcHandlers({
   getVimEnabled,
   setVimEnabled,
   notesArchive,
+  setNotesMenuState,
 }: IpcHandlerDependencies): void {
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
@@ -182,6 +184,24 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     if (typeof value !== 'boolean') throw new Error('Invalid Vim editing setting.')
     setVimEnabled(value)
+  })
+
+  ipcMain.handle(ipcChannels.setNotesMenuState, (event, value, ...extra) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(extra)
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      Array.isArray(value) ||
+      !('canExport' in value) ||
+      typeof value.canExport !== 'boolean' ||
+      !('canImport' in value) ||
+      typeof value.canImport !== 'boolean' ||
+      Object.keys(value).some((key) => key !== 'canExport' && key !== 'canImport')
+    ) {
+      throw new Error('Invalid notes menu state.')
+    }
+    setNotesMenuState({ canExport: value.canExport, canImport: value.canImport })
   })
 
   // Notes export and import (PRODUCT §25): the renderer sends commands only, never a path.

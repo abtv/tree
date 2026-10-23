@@ -29,7 +29,7 @@ import {
   type BooleanPreferenceStore,
   type WindowBounds,
 } from '../../infrastructure/main/window-state'
-import { ipcEvents } from '../../shared/ipc'
+import { ipcEvents, type NotesMenuState } from '../../shared/ipc'
 import { applicationMenuTemplate } from './application-menu'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
@@ -60,6 +60,7 @@ let vimEnabledStore: BooleanPreferenceStore | null = null
 let appearanceStore: AppearancePreferenceStore | null = null
 let requestQuitFromMenu: () => void = () => undefined
 let notesArchive: NotesArchiveController | null = null
+let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 
@@ -104,9 +105,19 @@ function rebuildApplicationMenu(): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       applicationMenuTemplate(
-        { vimEnabled: isVimEnabled(), alwaysOnTop: isAlwaysOnTop(), appearance: currentAppearance() },
+        {
+          vimEnabled: isVimEnabled(),
+          alwaysOnTop: isAlwaysOnTop(),
+          appearance: currentAppearance(),
+          notes: notesMenuState,
+        },
         {
           requestQuit: requestQuitFromMenu,
+          notesCommand: (command) => {
+            if (command === 'export' ? notesMenuState.canExport : notesMenuState.canImport) {
+              mainWindow?.webContents.send(ipcEvents.notesMenuCommand, command)
+            }
+          },
           setAppearance,
           setVimEnabled: (value) => {
             vimEnabledStore?.save(value)
@@ -144,6 +155,17 @@ function createMainWindow(quitWithoutSave: () => void): void {
   window.setAlwaysOnTop(windowAlwaysOnTopStore.load())
   followWindowAppearance(window, nativeTheme)
   mainWindow = window
+  const resetNotesMenu = (): void => {
+    notesMenuState = { canExport: false, canImport: false }
+    rebuildApplicationMenu()
+    void notesArchive
+      ?.cancel()
+      .catch((error: unknown) => reportMainProcessError('Could not cancel notes operation', error))
+  }
+  window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+    if (isMainFrame && !isInPlace) resetNotesMenu()
+  })
+  window.webContents.on('render-process-gone', resetNotesMenu)
   const saveWindowBounds = (): void => {
     const { x, y, width, height } = window.getBounds()
     const bounds: WindowBounds = { x, y, width, height }
@@ -257,6 +279,11 @@ bootstrapApplication({
         rebuildApplicationMenu()
       },
       notesArchive,
+      setNotesMenuState: (value) => {
+        if (notesMenuState.canExport === value.canExport && notesMenuState.canImport === value.canImport) return
+        notesMenuState = value
+        rebuildApplicationMenu()
+      },
     })
   },
   registerShortcut: (surface) => globalShortcut.register('CommandOrControl+0', surface),

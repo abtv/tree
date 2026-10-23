@@ -102,6 +102,8 @@ const entries = (directory: string) => (existsSync(directory) ? readdirSync(dire
 test.describe('desktop notes archive boundary', () => {
   configureHiddenParallelTests()
 
+  // @requirement PRODUCT.md §25
+  // @requirement PRODUCT.md §25.2
   test('exports through the save panel, keeps an existing file on cancel and replaces it once complete', async ({
     userDataDir,
   }) => {
@@ -213,6 +215,7 @@ test.describe('desktop notes archive boundary', () => {
     await closeApp(app)
   })
 
+  // @requirement PRODUCT.md §25.2
   test('quitting during an export cancels it and leaves no file', async ({ userDataDir }) => {
     seedNotesWithImage(userDataDir, 'Exported notes', 'picture')
     const exports = join(userDataDir, 'Exports')

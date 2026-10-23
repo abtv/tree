@@ -33,6 +33,8 @@ import { useLeftCommandKey } from './use-left-command-key'
 import type { VimMode } from './vim-editing'
 import type { EditorServices } from '../application/editor-store-types'
 import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
+import type { DesktopDataOperations } from '../application/notes-archive/desktop-data-operations'
+import { DesktopDataActivity } from './DataActivityPanel'
 
 interface AppProps {
   store: EditorStore
@@ -47,6 +49,7 @@ interface AppProps {
   shortcutPlatform?: ShortcutPlatform
   /** Decoded attachment images; the browser adapter supplies a smaller memory budget. */
   attachmentImages?: AttachmentImageCache
+  dataOperations?: DesktopDataOperations
 }
 
 export function App({
@@ -57,6 +60,7 @@ export function App({
   capturePasteClipboard,
   shortcutPlatform = 'apple',
   attachmentImages = attachmentImageCache,
+  dataOperations,
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
@@ -533,6 +537,7 @@ export function App({
           ) : null}
         </section>
       </div>
+      {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
       {commandPanel.open ? (
         <CommandPanel

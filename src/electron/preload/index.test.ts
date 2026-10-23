@@ -77,6 +77,7 @@ describe('preload bridge', () => {
     await treeApi.cancelNotesOperation?.()
     await treeApi.takeNotesImportNotice?.()
     await treeApi.showReplacedNotesFolder?.()
+    await treeApi.setNotesMenuState?.({ canExport: true, canImport: false })
 
     expect(mocks.invoke.mock.calls).toEqual([
       [ipcChannels.load],
@@ -105,6 +106,7 @@ describe('preload bridge', () => {
       [ipcChannels.cancelNotesOperation],
       [ipcChannels.takeNotesImportNotice],
       [ipcChannels.showReplacedNotesFolder],
+      [ipcChannels.setNotesMenuState, { canExport: true, canImport: false }],
     ])
   })
 
@@ -199,4 +201,21 @@ it('delivers notes progress and removes the listener', async () => {
 
   expect(listener).toHaveBeenCalledExactlyOnceWith({ imagesDone: 2, imageCount: 5 })
   expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.notesProgress, handler)
+})
+
+// @requirement PRODUCT.md §25.1
+it('delivers notes menu commands and preserves menu-state errors', async () => {
+  const { treeApi } = await import('./index')
+  const listener = vi.fn()
+  mocks.on.mockClear()
+  const remove = treeApi.onNotesMenuCommand?.(listener)
+  expect(ipcEvents.notesMenuCommand).toBe('tree:notes-menu-command')
+  expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.notesMenuCommand)
+  const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: string) => void
+  handler({}, 'export')
+  remove?.()
+  expect(listener).toHaveBeenCalledExactlyOnceWith('export')
+  expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.notesMenuCommand, handler)
+  mocks.invoke.mockRejectedValueOnce(new Error('Menu failed'))
+  await expect(treeApi.setNotesMenuState?.({ canExport: false, canImport: false })).rejects.toThrow('Menu failed')
 })
