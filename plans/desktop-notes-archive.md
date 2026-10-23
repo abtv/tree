@@ -62,8 +62,8 @@ Out of scope: folder backup or restore on desktop, Show in Finder after export, 
 | T1 | Shared archive infrastructure and the desktop archive ADR | — | Done |
 | T2 | Crash-safe replacement, recovery and export snapshot | T1 | Done |
 | T3 | Desktop archive worker, main controller and IPC | T2 | Done |
-| T4 | Electron performance guard for archive operations | T3 | Ready |
-| T5 | Export Notes… user flow | T4 | Planned |
+| T4 | Electron performance guard for archive operations | T3 | Done |
+| T5 | Export Notes… user flow | T4 | Ready |
 | T6 | Import Notes… user flow | T5 | Planned |
 
 `WORKING_PLAN.md` is required for T2, T3, T5 and T6.
@@ -163,18 +163,19 @@ The replacement is one unit. The imported notes start without retained generatio
 
 ## Next Task
 
-T4 — Electron performance guard for archive operations.
+T5 — Export Notes… user flow.
 
-State after T3 (see ARCHITECTURE "Desktop notes replacement" and "Desktop notes archive"):
+State after T4 (see ARCHITECTURE "Desktop notes replacement" and "Desktop notes archive"):
 
 - [ADR 0024](../docs/decisions/0024-desktop-notes-archive.md) records D1–D3. The shared writer and inflater are in `src/infrastructure/archive/`; wording and failure-reason helpers in `src/application/notes-archive/archive-messages.ts`.
 - The worker entry `src/infrastructure/main/notes-archive/archive-worker.ts` builds to `out/main/notes-archive-worker.js`; `createNotesArchiveController` in `src/electron/main/notes-archive-controller.ts` is wired in `index.ts` and exposed through argument-free `TreeApi` members (`chooseNotesExportDestination`, `startNotesExport`, `chooseNotesImportArchive`, `prepareNotesImport`, `commitNotesImport`, `cancelNotesOperation`, `takeNotesImportNotice`, `showReplacedNotesFolder`, `onNotesProgress`). Results are `{ok: true, …}`, `{ok: false, canceled: true}` or `{ok: false, message}`; a commit failure adds `restartRequired`. Messages carry no `Export failed.`/`Import failed.` prefix; the panels add it.
 - The main process does not reload after a commit; the renderer must call `suspendNotesWrites()` (`src/infrastructure/renderer/electron-services.ts`) before `commitNotesImport`, `resumeNotesWrites()` when it fails before the journal, and reload the window when it succeeds, then call `takeNotesImportNotice` after `load`.
 - `e2e/electron/notes-archive-boundary.spec.ts` drives the bridge directly; T5 and T6 add the menu, panels and their `@requirement PRODUCT.md §25…` markers on the T3 tests. The test entry's `__treeArchiveWorkers.hold` lists worker message types to hold.
 - `npm run audit` fails on GHSA-mrhx-c7xc-m3w5 (`zod`, no fix available), reached only through the dev dependencies `eslint-plugin-react-hooks` and `@stryker-mutator/*`. On 2026-10-23 the Product Owner chose to commit T3 anyway and to handle the advisory as a separate dependency task. Later tasks report the audit result the same way until that task resolves it.
-- Unverified after T3: that Node closes a terminated worker's open `FileHandle`s (a local probe was not permitted). T4's large-profile runs can check open descriptors after a cancel.
-- T4 measures typing latency, main event-loop delay and heap growth during export and import preparation; the main thread's per-image cost is one `nativeImage` decode (D1 fallback if over budget).
+- T4 added `perf/electron/notes-archive.spec.ts` and `seedNotesArchiveProfile` in the performance fixtures. The guard measures key-to-frame latency, actual operation duration, main event-loop delay and sampled main JavaScript heap growth during idle, export and import preparation. It uses real workers, IPC and files; only the native panels are stubbed. The native decoder stayed within the guard, so D1's fallback was not needed. Scenario parameters, measured baseline and ceilings belong to the spec and result artifacts.
+- T4 verified active preparation cancellation removes staging and leaves no archive, staging or snapshot file descriptor in the main PID (including worker threads). The check uses `lsof` on macOS and `/proc` on Linux. Main JavaScript heap measurements exclude native image allocations and worker heaps, and timer samples can miss short-lived allocations.
+- T5 needs the recorded native-save-panel owner check before its commit; no new owner decision is needed to start it. Keep the activity UI/menu integration in T5 and the import flow in T6. Product requirements and screenshot coverage for these flows are still pending.
 
 Next-session prompt:
 
-> Continue initiative `plans/desktop-notes-archive.md`, task T4 (Electron performance guard for archive operations). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.
+> Continue initiative `plans/desktop-notes-archive.md`, task T5 (Export Notes… user flow). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.

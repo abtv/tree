@@ -2,6 +2,9 @@ import { _electron as electron, expect, test as base, type ElectronApplication, 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { deflateSync } from 'node:zlib'
+import { crc32 } from '../../src/application/notes-archive/crc32'
+import { MAX_ATTACHMENT_BYTES } from '../../src/shared/attachment-limits'
 import { cleanupStaleElectronProcesses } from '../../e2e/electron/electron-process'
 
 export interface Launched {
@@ -302,6 +305,64 @@ export function seedAttachmentFiles(userDataDir: string, ids: string[]): void {
   const directory = join(userDataDir, 'data', 'attachments')
   mkdirSync(directory, { recursive: true })
   for (const id of ids) writeFileSync(join(directory, `${id}.png`), ONE_PIXEL_PNG)
+}
+
+/** Large images stay in hidden branches; the visible branch has only a small image. */
+export function seedNotesArchiveProfile(userDataDir: string): {
+  nodeCount: number
+  imageCount: number
+  imageBytes: number
+} {
+  const seed = largeAttachmentSeed(256, 195)
+  seed.location = { currentParentId: 'r0', selectedNodeId: 'r0c1' }
+  seedDocument(userDataDir, seed)
+  const directory = join(userDataDir, 'data', 'attachments')
+  mkdirSync(directory, { recursive: true })
+  const small = syntheticPng(128, 128)
+  const nearLimit = syntheticPng(2496, 2496)
+  expect(nearLimit.byteLength).toBeGreaterThan(MAX_ATTACHMENT_BYTES * 0.9)
+  expect(nearLimit.byteLength).toBeLessThan(MAX_ATTACHMENT_BYTES)
+  let imageBytes = 0
+  for (let index = 0; index < 256; index += 1) {
+    const bytes = index >= 254 ? nearLimit : small
+    writeFileSync(join(directory, `child-image-${index}.png`), bytes)
+    imageBytes += bytes.byteLength
+  }
+  return { nodeCount: 256 * 196, imageCount: 256, imageBytes }
+}
+
+/** Deterministic incompressible RGBA pixels; file size reflects decode work, without padding chunks. */
+function syntheticPng(width: number, height: number): Buffer {
+  const scanlines = Buffer.alloc((width * 4 + 1) * height)
+  let random = 0x12345678
+  for (let row = 0; row < height; row += 1) {
+    const start = row * (width * 4 + 1) + 1
+    for (let offset = start; offset < start + width * 4; offset += 1) {
+      random ^= random << 13
+      random ^= random >>> 17
+      random ^= random << 5
+      scanlines[offset] = random & 255
+    }
+  }
+  const chunk = (name: string, bytes: Buffer): Buffer => {
+    const result = Buffer.alloc(bytes.length + 12)
+    result.writeUInt32BE(bytes.length)
+    result.write(name, 4, 'ascii')
+    bytes.copy(result, 8)
+    result.writeUInt32BE(crc32(result.subarray(4, -4)), result.length - 4)
+    return result
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width)
+  header.writeUInt32BE(height, 4)
+  header[8] = 8
+  header[9] = 6
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(scanlines, { level: 1 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
 }
 
 export async function writeClipboardImageSized(app: ElectronApplication, width: number, height: number): Promise<void> {
