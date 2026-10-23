@@ -61,6 +61,17 @@ describe('native rich editing', () => {
     expect(input.readOnly).toBe(false)
   })
 
+  it('disables spellcheck in both the plain and the rich field', () => {
+    const { rerender } = render(view('Plain text'))
+    const plain = screen.getByLabelText('Node 1')
+    expect(plain.tagName).toBe('TEXTAREA')
+    expect(plain).toHaveAttribute('spellcheck', 'false')
+    rerender(view('due 2026-10-14'))
+    const rich = screen.getByLabelText('Node 1')
+    expect(rich.tagName).not.toBe('TEXTAREA')
+    expect(rich).toHaveAttribute('spellcheck', 'false')
+  })
+
   it('keeps the same focused rich field when native editing changes', () => {
     const value = node('2026-10-18 Review the details')
     const field = (enabled: boolean) => (
