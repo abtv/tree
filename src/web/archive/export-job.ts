@@ -1,7 +1,7 @@
 import { NotesArchiveError } from '../../application/notes-archive/archive-policy'
 import { exportNotesArchive, type NotesArchiveSource } from '../../application/notes-archive/export-notes'
+import { createZipWriter } from '../../infrastructure/archive/zip-writer'
 import type { ArchiveWorkerPost } from '../workers/archive-protocol'
-import { createZipWriter } from './zip-writer'
 
 // Small chunks (headers, descriptors, deflate blocks) are combined to limit messages and Blob parts.
 export const CHUNK_FLUSH_BYTES = 1024 * 1024

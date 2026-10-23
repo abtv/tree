@@ -1,5 +1,5 @@
 import type { NotesArchiveSummary } from '../../application/notes-archive/export-notes'
-import type { NotesCounts } from '../../application/notes-archive/import-notes'
+import type { IncomingNotes, NotesCounts } from '../../application/notes-archive/import-notes'
 
 /**
  * Messages between the page and the archive worker. The page sends only commands and the chosen
@@ -12,10 +12,6 @@ export type ArchiveWorkerRequest =
   | { readonly type: 'restore'; readonly folder: FileSystemDirectoryHandle }
   /** Replaces the stored head with the prepared document; valid only after `prepared`. */
   | { readonly type: 'commit-import' }
-
-export interface IncomingNotes extends NotesCounts {
-  readonly missingImageCount: number
-}
 
 export type ArchiveWorkerMessage =
   | { readonly type: 'progress'; readonly imagesDone: number; readonly imageCount: number }

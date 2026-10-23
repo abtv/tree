@@ -3,8 +3,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { exportNotesArchive } from '../../src/application/notes-archive/export-notes.ts'
 import { buildZip } from '../../src/application/test/zip-builder.ts'
-import { createZipWriter } from '../../src/web/archive/zip-writer.ts'
-import { concat, listCentralEntries, readArchive } from '../../src/web/archive/zip-test-utils.ts'
+import { createZipWriter } from '../../src/infrastructure/archive/zip-writer.ts'
+import { concat, listCentralEntries, readArchive } from '../../src/infrastructure/archive/zip-test-utils.ts'
 
 export const ready = (page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
 

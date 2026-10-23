@@ -8,8 +8,8 @@ import {
   type NotesImportSource,
 } from '../../application/notes-archive/import-notes'
 import type { ArchiveFile } from '../../application/notes-archive/zip-reader'
+import { createInflater } from '../../infrastructure/archive/zip-inflate'
 import type { ArchiveWorkerPost } from '../workers/archive-protocol'
-import { createInflater } from './zip-inflate'
 
 export interface ImportJobStorage extends ImportImageStore {
   readHead(): Promise<unknown>

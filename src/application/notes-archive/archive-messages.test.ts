@@ -7,9 +7,9 @@ import {
   importConfirmationText,
   importProgressText,
   restoreProgressText,
-} from './data-menu'
+} from './archive-messages'
 
-describe('data menu wording', () => {
+describe('notes archive wording', () => {
   it('names the archive after the local date', () => {
     expect(archiveFileName(new Date(2026, 0, 5, 23, 59))).toBe('Tree Notes 2026-01-05.zip')
     expect(archiveFileName(new Date(2026, 11, 31, 0, 0))).toBe('Tree Notes 2026-12-31.zip')

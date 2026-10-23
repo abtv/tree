@@ -6,8 +6,8 @@ import { unzipSync } from 'fflate'
 import { serializeState } from '../../domain/document'
 import { exportNotesArchive } from '../../application/notes-archive/export-notes'
 import { onePixelPng } from '../../electron/main/png-test-utils'
-import { createZipWriter } from '../../web/archive/zip-writer'
-import { concat } from '../../web/archive/zip-test-utils'
+import { createZipWriter } from '../archive/zip-writer'
+import { concat } from '../archive/zip-test-utils'
 import { createFileServices } from './file-services'
 
 const directories: string[] = []

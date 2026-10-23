@@ -38,11 +38,15 @@ export interface NotesCounts {
   readonly imageCount: number
 }
 
-export interface PreparedNotesImport extends NotesCounts {
-  /** The archive's `document.json`, validated; it becomes the stored head unchanged. */
-  readonly head: PersistedEditorState
+/** What a checked archive or folder holds, as the confirmation reports it. */
+export interface IncomingNotes extends NotesCounts {
   /** Referenced images that the archive does not contain (PRODUCT §24.4). */
   readonly missingImageCount: number
+}
+
+export interface PreparedNotesImport extends IncomingNotes {
+  /** The archive's `document.json`, validated; it becomes the stored head unchanged. */
+  readonly head: PersistedEditorState
   /** Images this import wrote; they are removed when it does not finish. */
   readonly stagedIds: readonly AttachmentId[]
 }

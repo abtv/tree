@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { serializeState, type TreeNode } from '../../domain/document'
 import { INVALID_NOTES_MESSAGE } from '../../application/notes-archive/export-notes'
+import { concat, readArchive, sameBytes } from '../../infrastructure/archive/zip-test-utils'
 import type { ArchiveWorkerMessage } from '../workers/archive-protocol'
 import { CHUNK_FLUSH_BYTES, runExportJob } from './export-job'
-import { concat, readArchive, sameBytes } from './zip-test-utils'
 
 function headWithImages(ids: string[]) {
   const roots: TreeNode[] = [

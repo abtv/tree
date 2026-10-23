@@ -59,8 +59,8 @@ Out of scope: folder backup or restore on desktop, Show in Finder after export, 
 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| T1 | Shared archive infrastructure and the desktop archive ADR | — | Ready |
-| T2 | Crash-safe replacement, recovery and export snapshot | T1 | Planned |
+| T1 | Shared archive infrastructure and the desktop archive ADR | — | Done |
+| T2 | Crash-safe replacement, recovery and export snapshot | T1 | Ready |
 | T3 | Desktop archive worker, main controller and IPC | T2 | Planned |
 | T4 | Electron performance guard for archive operations | T3 | Planned |
 | T5 | Export Notes… user flow | T4 | Planned |
@@ -162,8 +162,8 @@ The replacement is one unit. The imported notes start without retained generatio
 
 ## Next Task
 
-T1 — Shared archive infrastructure and the desktop archive ADR.
+T2 — Crash-safe replacement, recovery and export snapshot. T1 recorded the decisions in [ADR 0024](../docs/decisions/0024-desktop-notes-archive.md); the shared writer and inflater are in `src/infrastructure/archive/`, and the wording helpers in `src/application/notes-archive/archive-messages.ts`.
 
 Next-session prompt:
 
-> Continue initiative `plans/desktop-notes-archive.md`, task T1 (shared archive infrastructure and the desktop archive ADR). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.
+> Continue initiative `plans/desktop-notes-archive.md`, task T2 (crash-safe replacement, recovery and export snapshot). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.

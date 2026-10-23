@@ -6,9 +6,9 @@ import { prepareNotesImport } from '../../application/notes-archive/import-notes
 import { deepForest, firstLocation, materialize } from '../../application/test/editor-store-arbitraries'
 import { memoryFile } from '../../application/test/zip-builder'
 import { propertyRuns } from '../../test/property-runs'
-import { createInflater } from './zip-inflate'
-import { createZipWriter } from './zip-writer'
-import { concat, listCentralEntries, readArchive } from './zip-test-utils'
+import { createInflater } from '../../infrastructure/archive/zip-inflate'
+import { createZipWriter } from '../../infrastructure/archive/zip-writer'
+import { concat, listCentralEntries, readArchive } from '../../infrastructure/archive/zip-test-utils'
 
 describe('notes archive export properties', () => {
   it('contains exactly the saved head and each available referenced image, in id order', async () => {

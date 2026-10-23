@@ -8,11 +8,11 @@ import { exportNotesArchive } from '../../application/notes-archive/export-notes
 import { prepareNotesImport } from '../../application/notes-archive/import-notes'
 import { buildZip, memoryFile } from '../../application/test/zip-builder'
 import { damagedEntryMessage } from '../../application/notes-archive/zip-reader'
+import { createInflater } from '../../infrastructure/archive/zip-inflate'
+import { createZipWriter } from '../../infrastructure/archive/zip-writer'
+import { concat } from '../../infrastructure/archive/zip-test-utils'
 import type { ArchiveWorkerMessage } from '../workers/archive-protocol'
 import { createImportJob, type ImportJobStorage } from './import-job'
-import { createInflater } from './zip-inflate'
-import { createZipWriter } from './zip-writer'
-import { concat } from './zip-test-utils'
 
 function headWithImages(ids: string[], text = 'Root') {
   const roots: TreeNode[] = [

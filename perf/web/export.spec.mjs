@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
-import { listCentralEntries } from '../../src/web/archive/zip-test-utils.ts'
+import { listCentralEntries } from '../../src/infrastructure/archive/zip-test-utils.ts'
 import { recordPerfResult } from '../results.ts'
 import {
   IMAGE_COUNT,
