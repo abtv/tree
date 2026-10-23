@@ -225,10 +225,9 @@ link would close this channel but add a step to every link. Reconsider that
 confirmation if a renderer-injection path is found or the renderer starts to display
 untrusted markup.
 
-The editor enables spellchecking in `src/renderer/NodeInput.tsx`. Browser-provided
-spelling, translation and similar services follow the user's browser settings.
-On macOS, the desktop operating system's spellchecker downloads no dictionaries.
-A future Windows or Linux desktop build must disable Electron's Hunspell dictionary
+The editor disables spellchecking in `src/renderer/NodeInput.tsx`. Browser-provided
+translation and similar services follow the user's browser settings.
+A future Windows or Linux desktop build must still disable Electron's Hunspell dictionary
 download before shipping, because Electron may otherwise download dictionaries
 from a Google-hosted CDN on first use.
 

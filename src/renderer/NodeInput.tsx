@@ -173,7 +173,7 @@ export function NodeInput({
       remember(event.target)
       onSelect(event)
     },
-    spellCheck: true,
+    spellCheck: false,
   }
 
   if (plain) {
