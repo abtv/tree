@@ -1,5 +1,5 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { assertDocument, displayedNodes, locateNode, type Document, type TreeNode } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE, expandNode } from './expansion-state'
 import {
@@ -12,6 +12,10 @@ import {
   deletePreviousEmptyTransition,
 } from './editor-command-transitions'
 import { buildVisibleRows } from './visible-rows'
+
+function countNodes(nodes: readonly TreeNode[]): number {
+  return nodes.reduce((total, node) => total + 1 + countNodes(node.children), 0)
+}
 
 describe('editor command transition properties', () => {
   it('opens below at the visible level while preserving existing subtrees and identities', () => {
@@ -161,36 +165,68 @@ describe('editor command transition properties', () => {
         }
         const original: Document = { roots: [branch] }
         const currentParentId = focused ? branch.id : null
-        for (const command of ['o', 'Enter'] as const) {
-          let document = original
-          let selectedNodeId = 'empty'
-          for (let index = 0; index < texts.length + 2; index++) {
-            const before = document
-            const selected = locateNode(before, selectedNodeId)!
-            const expectedParent =
-              selected.parent !== null && selected.parent.id !== currentParentId
-                ? (locateNode(before, selected.parent.id)!.parent?.id ?? null)
-                : (selected.parent?.id ?? null)
-            const id = `created-${index}`
-            const location = { currentParentId, selectedNodeId }
-            const result =
-              command === 'o'
-                ? openBelowTransition(before, location, () => id)
-                : createSiblingOrFirstChildTransition(before, location, 0, () => id)
-            if (!('document' in result)) throw new Error('Expected creation.')
-            document = result.document
-            selectedNodeId = id
-            assertDocument(document)
-            const created = locateNode(document, id)!
-            expect(created.parent?.id ?? null).toBe(expectedParent)
-            expect(result.location).toEqual({ currentParentId, selectedNodeId: id })
-            expect(result.focus).toEqual({ nodeId: id, cursor: 0 })
-            const withoutCreated = created.siblings.filter((node) => node.id !== id)
-            const priorSiblings =
-              expectedParent === null ? before.roots : locateNode(before, expectedParent)!.node.children
-            expect(withoutCreated).toEqual(priorSiblings)
-            expect(locateNode(document, 'empty')!.node).toEqual({ id: 'empty', text: '', children: [] })
+        let document = original
+        let selectedNodeId = 'empty'
+        for (let index = 0; index < texts.length + 2; index++) {
+          const before = document
+          const selected = locateNode(before, selectedNodeId)!
+          const expectedParent =
+            selected.parent !== null && selected.parent.id !== currentParentId
+              ? (locateNode(before, selected.parent.id)!.parent?.id ?? null)
+              : (selected.parent?.id ?? null)
+          const id = `created-${index}`
+          const location = { currentParentId, selectedNodeId }
+          const result = openBelowTransition(before, location, () => id)
+          document = result.document
+          selectedNodeId = id
+          assertDocument(document)
+          const created = locateNode(document, id)!
+          expect(created.parent?.id ?? null).toBe(expectedParent)
+          expect(result.location).toEqual({ currentParentId, selectedNodeId: id })
+          expect(result.focus).toEqual({ nodeId: id, cursor: 0 })
+          const withoutCreated = created.siblings.filter((node) => node.id !== id)
+          const priorSiblings =
+            expectedParent === null ? before.roots : locateNode(before, expectedParent)!.node.children
+          expect(withoutCreated).toEqual(priorSiblings)
+          expect(locateNode(document, 'empty')!.node).toEqual({ id: 'empty', text: '', children: [] })
+        }
+      }),
+    )
+  })
+
+  it('moves a last empty leaf left with repeated Enter without creating nodes, up to the location boundary', () => {
+    fc.assert(
+      fc.property(fc.array(fc.string(), { minLength: 1, maxLength: 10 }), fc.boolean(), (texts, focused) => {
+        let branch: TreeNode = { id: 'empty', text: '', children: [] }
+        for (const [index, text] of texts.entries()) {
+          branch = { id: `parent-${index}`, text, children: [branch] }
+        }
+        let document: Document = { roots: [branch] }
+        const currentParentId = focused ? branch.id : null
+        const nodeCount = texts.length + 1
+        for (let index = 0; index < texts.length + 2; index++) {
+          const before = document
+          const selected = locateNode(before, 'empty')!
+          const movesLeft = selected.parent !== null && selected.parent.id !== currentParentId
+          const createId = vi.fn(() => 'created')
+          const location = { currentParentId, selectedNodeId: 'empty' }
+          const result = createSiblingOrFirstChildTransition(before, location, 0, createId)
+          if (!('document' in result)) throw new Error('Expected a transition.')
+          assertDocument(result.document)
+          const after = locateNode(result.document, 'empty')!
+          if (movesLeft) {
+            expect(createId).not.toHaveBeenCalled()
+            const parent = locateNode(before, selected.parent!.id)!
+            expect(after.parent?.id ?? null).toBe(parent.parent?.id ?? null)
+            expect(after.index).toBe(parent.index + 1)
+          } else {
+            expect(createId).toHaveBeenCalledTimes(1)
           }
+          expect(result.location).toEqual({ currentParentId, selectedNodeId: movesLeft ? 'empty' : 'created' })
+          if (!movesLeft) break
+          document = result.document
+          expect(locateNode(document, 'empty')!.node).toEqual({ id: 'empty', text: '', children: [] })
+          expect(countNodes(document.roots)).toBe(nodeCount)
         }
       }),
     )

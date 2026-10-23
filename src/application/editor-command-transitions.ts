@@ -130,6 +130,19 @@ export function openBelowTransition(
   }
 }
 
+/** A last empty inline leaf whose parent is a displayed row inside the current location. */
+function isLastEmptyInlineLeaf(location: Location, selected: ReturnType<typeof requireNode>): boolean {
+  return (
+    selected.node.text === '' &&
+    selected.node.attachment === undefined &&
+    selected.node.children.length === 0 &&
+    selected.index === selected.siblings.length - 1 &&
+    selected.parent !== null &&
+    selected.parent.id !== location.currentParentId &&
+    selected.node.id !== location.currentParentId
+  )
+}
+
 /** Preserve a last empty inline leaf and create after its parent, within the current location. */
 function createAfterEmptyParentTransition(
   document: Document,
@@ -137,17 +150,26 @@ function createAfterEmptyParentTransition(
   selected: ReturnType<typeof requireNode>,
   createId: () => NodeId,
 ): StructuralTransition | undefined {
-  if (
-    selected.node.text !== '' ||
-    selected.node.attachment !== undefined ||
-    selected.node.children.length !== 0 ||
-    selected.index < selected.siblings.length - 1 ||
-    selected.parent === null ||
-    selected.parent.id === location.currentParentId ||
-    selected.node.id === location.currentParentId
+  if (!isLastEmptyInlineLeaf(location, selected)) return undefined
+  return createSiblingTransition(document, { ...location, selectedNodeId: selected.parent!.id }, 'after', createId)
+}
+
+/** Enter on a last empty inline leaf moves that leaf one level left, directly after its parent. */
+function outdentEmptyLeafTransition(
+  document: Document,
+  location: Location,
+  selected: ReturnType<typeof requireNode>,
+): StructuralTransition | undefined {
+  if (!isLastEmptyInlineLeaf(location, selected)) return undefined
+  const parent = requireNode(document, selected.parent!.id)
+  const moved = moveNodeToParentTransition(
+    document,
+    location,
+    selected.node.id,
+    parent.parent?.id ?? null,
+    parent.index + 1,
   )
-    return undefined
-  return createSiblingTransition(document, { ...location, selectedNodeId: selected.parent.id }, 'after', createId)
+  return moved.kind === 'moved' ? moved.transition : undefined
 }
 
 export function createSiblingOrFirstChildTransition(
@@ -158,8 +180,8 @@ export function createSiblingOrFirstChildTransition(
   expanded = false,
 ): StructuralTransition | RejectedTransition {
   const current = requireNode(document, location.selectedNodeId)
-  const outside = createAfterEmptyParentTransition(document, location, current, createId)
-  if (outside !== undefined) return outside
+  const outdented = outdentEmptyLeafTransition(document, location, current)
+  if (outdented !== undefined) return outdented
   if (location.currentParentId === location.selectedNodeId) {
     const parent = current
     if (parent.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) {

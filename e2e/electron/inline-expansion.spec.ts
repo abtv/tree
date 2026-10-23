@@ -181,7 +181,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
   })
 
   // @requirement PRODUCT.md §5.1
-  test('creates one empty child then one empty node to the left with Enter', async ({ userDataDir }) => {
+  test('creates one empty child then moves that empty node one level left with Enter', async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(false))
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
     await window.getByRole('button', { name: 'Expand node 1' }).click()
@@ -190,20 +190,23 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await window.keyboard.press('Enter')
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
     await expect(node(window, 3)).toBeFocused()
+    const childX = (await node(window, 3).boundingBox())!.x
     await window.keyboard.press('Enter')
-    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', '', ''])
-    await expect(node(window, 4)).toBeFocused()
-    const bounds = await Promise.all([1, 3, 4].map((index) => node(window, index).boundingBox()))
-    expect(bounds[2]!.x).toBe(bounds[0]!.x)
-    expect(bounds[1]!.x).toBeGreaterThan(bounds[2]!.x)
+    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+    const bounds = await Promise.all([1, 3].map((index) => node(window, index).boundingBox()))
+    expect(bounds[1]!.x).toBe(bounds[0]!.x)
+    expect(bounds[1]!.x).toBeLessThan(childX)
     await window.screenshot({ path: test.info().outputPath(`empty-node-enter-${mode}.png`) })
     await window.keyboard.press('Meta+z')
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+    await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(childX)
     await window.keyboard.press('Meta+Shift+z')
-    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', '', ''])
-    await expect(node(window, 4)).toBeFocused()
+    await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(bounds[0]!.x)
+    await expect(node(window, 3)).toBeFocused()
     await window.keyboard.type('new sibling')
-    await expect(node(window, 4)).toHaveValue('new sibling')
+    await expect(node(window, 3)).toHaveValue('new sibling')
   })
 
   test('keeps repeated Enter creation within the focused parent', async ({ userDataDir }) => {

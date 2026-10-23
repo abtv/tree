@@ -396,10 +396,10 @@ At the end of text, `Enter` follows the same placement rule as Vim `o` (§20.2.1
 
 At the beginning of nonempty text, the new empty sibling is inserted immediately before the current node. In the middle of text, the suffix becomes a new sibling after the current node's entire subtree. These two rules do not depend on expansion.
 
-* On an empty leaf (no text, attachment, or children) shown inside an inline-expanded branch, `Enter` preserves that leaf. If it has a following sibling, `Enter` creates another empty sibling immediately after it at the same level, before the following sibling. Only when the empty leaf is the last sibling does `Enter` create immediately after its parent, one level left.
-* This never creates outside the current location: on a root or a direct child of the focused current parent, it creates the next sibling at the same level.
-* Thus the first press at the end of nonempty text creates an empty child or sibling as specified above; the next press on that empty leaf creates one level left only if it is the last sibling and that level is available.
-* Each press creates one node and one undoable change, selects the new node at text position zero, and keeps standard editing or Vim Insert active.
+* On an empty leaf (no text, attachment, or children) shown inside an inline-expanded branch, `Enter` preserves that leaf. If it has a following sibling, `Enter` creates another empty sibling immediately after it at the same level, before the following sibling. Only when the empty leaf is the last sibling does `Enter` move that leaf immediately after its parent, one level left. It creates no node: the leaf keeps its identity, stays selected with the caret at text position zero, and the parent keeps its other children.
+* This never leaves the current location: on a root or a direct child of the focused current parent, `Enter` creates the next sibling at the same level.
+* Thus the first press at the end of nonempty text creates an empty child or sibling as specified above; the next press on that empty leaf moves it one level left only if it is the last sibling and that level is available. Vim `o` keeps creating a node in the same situation (§20.2.10).
+* Each press creates one node, or moves one empty leaf, as one undoable change, selects that node at text position zero, and keeps standard editing or Vim Insert active.
 
 ### Cursor at the end
 
@@ -1238,7 +1238,7 @@ Normal mode also supports:
 
 * `i` to enter Insert mode at the current character, `a` to enter Insert mode after it, `I` to enter Insert mode at the first non-whitespace character, and `A` to enter Insert mode at the end of the current node.
 * `o` to create an empty first child of the current parent when its heading is selected, an empty first child of the selected node when that node is expanded and has at least one child, or otherwise an empty sibling after the selected node's entire subtree, and enter Insert mode. The displayed location and existing folds stay unchanged. This follows the visible outline: an expanded branch receives a child, while a collapsed branch stays together as a sibling is added; `O` creates an empty sibling above the selected node, but does nothing when the editable current-parent heading is selected.
-* On an empty inline leaf, `o` uses the same creation rule and current-parent boundary as `Enter` (§5.1), preserving the empty leaf and selecting the new empty node at text position zero in Insert mode. A following sibling keeps creation at the same level, immediately after the empty leaf. Only a last empty sibling creates one level left; repeating from successive last empty nodes continues until the current location boundary, where creation stays at the same level.
+* On an empty inline leaf, `o` always creates a node and uses the same current-parent boundary as `Enter` (§5.1); unlike `Enter` on a last empty leaf, it never moves the leaf. It preserves the empty leaf and selecting the new empty node at text position zero in Insert mode. A following sibling keeps creation at the same level, immediately after the empty leaf. Only a last empty sibling creates one level left; repeating from successive last empty nodes continues until the current location boundary, where creation stays at the same level.
 * `x` to delete the current character, `X` to delete the character before it, `r{character}` to replace it without entering Insert mode, and `s` to delete it and enter Insert mode; when deleting the final text character before an attached image, the Normal caret lands on the image, including when that was the node's only text character.
 
 #### 20.2.11 Operators
