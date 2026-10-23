@@ -109,10 +109,16 @@ export function resolveRendererUrl(
 export function configureRendererSessionSecurity(
   session: Pick<
     Session,
-    'setPermissionRequestHandler' | 'setPermissionCheckHandler' | 'setDevicePermissionHandler' | 'webRequest'
+    | 'setPermissionRequestHandler'
+    | 'setPermissionCheckHandler'
+    | 'setDevicePermissionHandler'
+    | 'setSpellCheckerEnabled'
+    | 'webRequest'
   >,
   renderer: ResolvedRendererUrl,
 ): void {
+  // Also stops Electron from downloading Hunspell dictionaries on Windows and Linux.
+  session.setSpellCheckerEnabled(false)
   session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
   session.setPermissionCheckHandler(() => false)
   session.setDevicePermissionHandler(() => false)

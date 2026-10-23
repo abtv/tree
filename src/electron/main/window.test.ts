@@ -239,7 +239,11 @@ describe('configureRendererSessionSecurity', () => {
   function createSession(): {
     session: Pick<
       Session,
-      'setPermissionRequestHandler' | 'setPermissionCheckHandler' | 'setDevicePermissionHandler' | 'webRequest'
+      | 'setPermissionRequestHandler'
+      | 'setPermissionCheckHandler'
+      | 'setDevicePermissionHandler'
+      | 'setSpellCheckerEnabled'
+      | 'webRequest'
     >
     onBeforeRequest: ReturnType<typeof vi.fn<(filter: { urls: string[] }, listener: RequestFilterListener) => void>>
   } {
@@ -248,13 +252,24 @@ describe('configureRendererSessionSecurity', () => {
       setPermissionRequestHandler: vi.fn(),
       setPermissionCheckHandler: vi.fn(),
       setDevicePermissionHandler: vi.fn(),
+      setSpellCheckerEnabled: vi.fn(),
       webRequest: { onBeforeRequest },
     } as unknown as Pick<
       Session,
-      'setPermissionRequestHandler' | 'setPermissionCheckHandler' | 'setDevicePermissionHandler' | 'webRequest'
+      | 'setPermissionRequestHandler'
+      | 'setPermissionCheckHandler'
+      | 'setDevicePermissionHandler'
+      | 'setSpellCheckerEnabled'
+      | 'webRequest'
     >
     return { session, onBeforeRequest }
   }
+
+  it('disables the spellchecker', () => {
+    const { session } = createSession()
+    configureRendererSessionSecurity(session, { url: 'file:///app/renderer/index.html', isDevelopment: false })
+    expect(session.setSpellCheckerEnabled).toHaveBeenCalledWith(false)
+  })
 
   it('denies permission requests, checks, and device permission', () => {
     const { session } = createSession()

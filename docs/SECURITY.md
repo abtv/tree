@@ -225,9 +225,9 @@ link would close this channel but add a step to every link. Reconsider that
 confirmation if a renderer-injection path is found or the renderer starts to display
 untrusted markup.
 
-The editor disables spellchecking in `src/renderer/NodeInput.tsx`, and the main window
-sets `spellcheck: false` in its web preferences (`src/electron/main/window.ts`). With the
-spellchecker off, Electron on Windows and Linux does not download Hunspell dictionaries
+The editor disables spellchecking in `src/renderer/NodeInput.tsx`, and the main
+process calls `setSpellCheckerEnabled(false)` on the renderer session
+(`src/electron/main/window.ts`). With the spellchecker off, Electron on Windows and Linux does not download Hunspell dictionaries
 from its Google-hosted CDN. Browser-provided translation and similar services follow the
 user's browser settings.
 
