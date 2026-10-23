@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Desktop notes export and import](desktop-notes-archive.md) | In progress | T2 — Crash-safe replacement, recovery and export snapshot |
+| [Desktop notes export and import](desktop-notes-archive.md) | In progress | T3 — Desktop archive worker, main controller and IPC |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

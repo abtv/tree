@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, utimes, writeFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createFileServices } from './file-services'
+import { createFileServices, findNewestValidDocument } from './file-services'
 
 const mocks = vi.hoisted(() => ({
   readdir: vi.fn<(path: string) => Promise<string[]>>(),
@@ -869,5 +869,266 @@ describe('save interruption recovery', () => {
     const restarted = createFileServices(directory)
     await expect(restarted.load()).resolves.toEqual(final)
     await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+})
+
+describe('notes export and import support', () => {
+  const NOW = new Date(2026, 9, 23, 14, 5, 9)
+
+  async function archiveServicesForTest() {
+    const userData = await mkdtemp(join(tmpdir(), 'tree-file-services-archive-'))
+    temporaryDirectories.push(userData)
+    const directory = join(userData, 'data')
+    const create = () => createFileServices(directory, () => {}, { userDataDirectory: userData, now: () => NOW })
+    return { userData, directory, services: create(), create }
+  }
+
+  async function stageImport(
+    services: ReturnType<typeof createFileServices>,
+    state: ReturnType<typeof stateWithImage>,
+    imageId: string,
+  ) {
+    const staging = await services.createStagingDirectory()
+    await writeFile(join(staging, 'document.json'), JSON.stringify(state))
+    await writeFile(join(staging, 'attachments', `${imageId}.png`), 'imported image')
+    return staging
+  }
+
+  it('replaces the notes and blocks the old session until the next load', async () => {
+    const { userData, directory, services, create } = await archiveServicesForTest()
+    await services.load()
+    await services.writeAttachment('old', new Uint8Array([1]))
+    await services.save(stateWithImage('old'))
+    await services.save(stateWithImage('old'))
+    const imported = stateWithImage('new')
+    const staging = await stageImport(services, imported, 'new')
+
+    const folder = await services.replaceNotes(staging)
+
+    expect(folder).toBe(join(userData, 'Replaced Notes', '2026-10-23 14-05-09'))
+    expect((await readdir(folder!)).sort()).toEqual(['attachments', 'document.1.json', 'document.json'])
+    await expect(services.save(stateWithoutImage('stale'))).rejects.toThrow(
+      'The notes were replaced. Reload the window to continue.',
+    )
+    await expect(services.writeAttachment('stale', new Uint8Array([1]))).rejects.toThrow('The notes were replaced.')
+    await services.cleanupAttachments([])
+    expect(await readdir(join(directory, 'attachments'))).toEqual(['new.png'])
+
+    const reloaded = create()
+    await expect(reloaded.load()).resolves.toEqual(imported)
+    await services.load()
+    await services.save(imported)
+    // The imported notes start without the replaced generations.
+    expect(await generationFiles(directory)).toEqual(['document.1.json'])
+    expect(services.takeRecoveredReplacement()).toBeUndefined()
+  })
+
+  it('completes an interrupted replacement on load and reports it once', async () => {
+    const { userData, directory, services, create } = await archiveServicesForTest()
+    await services.load()
+    await services.save(stateWithoutImage('Old'))
+    const imported = stateWithImage('new')
+    const staging = await stageImport(services, imported, 'new')
+    await writeFile(
+      join(userData, '.notes-import', 'commit.json'),
+      JSON.stringify({ staging: basename(staging), replaced: 'interrupted' }),
+    )
+
+    const restarted = create()
+    await expect(restarted.load()).resolves.toEqual(imported)
+
+    expect(restarted.takeRecoveredReplacement()).toEqual({
+      replacedFolder: join(userData, 'Replaced Notes', 'interrupted'),
+    })
+    expect(restarted.takeRecoveredReplacement()).toBeUndefined()
+    expect(await readdir(join(directory, 'attachments'))).toEqual(['new.png'])
+  })
+
+  it('never opens the replaced notes when the imported document is damaged', async () => {
+    const { userData, services, create } = await archiveServicesForTest()
+    await services.load()
+    await services.save(stateWithoutImage('Old'))
+    await services.save(stateWithoutImage('Older generation exists'))
+    const staging = await services.createStagingDirectory()
+    await writeFile(join(staging, 'document.json'), '{"version":2,"document":')
+    await writeFile(
+      join(userData, '.notes-import', 'commit.json'),
+      JSON.stringify({ staging: basename(staging), replaced: 'damaged' }),
+    )
+
+    await expect(create().load()).rejects.toThrow(SyntaxError)
+  })
+
+  it('fails the load without changing files when the journal is damaged', async () => {
+    const { userData, directory, services, create } = await archiveServicesForTest()
+    await services.load()
+    const saved = stateWithoutImage('Kept')
+    await services.save(saved)
+    await mkdir(join(userData, '.notes-import'), { recursive: true })
+    await writeFile(join(userData, '.notes-import', 'commit.json'), '{')
+
+    await expect(create().load()).rejects.toThrow(
+      'The notes import could not be completed: The import journal is damaged.',
+    )
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(saved)
+  })
+
+  it('keeps a staging directory that the session still uses and removes abandoned ones', async () => {
+    const { userData, services, create } = await archiveServicesForTest()
+    const running = await services.createStagingDirectory()
+    const abandoned = await create().createStagingDirectory()
+
+    await services.load()
+
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([basename(running)])
+    await expect(stat(abandoned)).rejects.toMatchObject({ code: 'ENOENT' })
+    await services.discardStagingDirectory(running)
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+    await expect(services.discardStagingDirectory(abandoned)).rejects.toThrow(
+      'The directory was not created by this application session.',
+    )
+  })
+
+  it('leaves the notes unchanged and staging in place when replacement fails before its journal', async () => {
+    const { directory, services } = await archiveServicesForTest()
+    await services.load()
+    const saved = stateWithoutImage('Kept')
+    await services.save(saved)
+    const staging = await services.createStagingDirectory()
+    await writeFile(join(staging, 'document.json'), JSON.stringify(stateWithoutImage('New')))
+    vi.mocked(rename).mockImplementationOnce(async () => {
+      throw new Error('disk full')
+    })
+
+    await expect(services.replaceNotes(staging)).rejects.toThrow('disk full')
+
+    await services.save(saved)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(saved)
+    await expect(stat(join(staging, 'document.json'))).resolves.toBeDefined()
+  })
+
+  it('snapshots the document files so a later save cannot change what export reads', async () => {
+    const { userData, directory, services } = await archiveServicesForTest()
+    await services.load()
+    const exported = stateWithoutImage('Exported')
+    await services.save(stateWithoutImage('Earlier'))
+    await services.save(exported)
+
+    const snapshot = await services.snapshotDocuments()
+    await services.save(stateWithoutImage('After the snapshot'))
+
+    expect((await readdir(snapshot)).sort()).toEqual(['document.1.json', 'document.json'])
+    expect(await findNewestValidDocument(snapshot)).toEqual({ path: join(snapshot, 'document.json'), value: exported })
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8')).document.roots[0].text).toBe(
+      'After the snapshot',
+    )
+    await services.load()
+    expect(await readdir(join(userData, '.notes-export'))).toEqual([basename(snapshot)])
+    await services.releaseSnapshot(snapshot)
+    expect(await readdir(join(userData, '.notes-export'))).toEqual([])
+  })
+
+  it('blocks the old session after a failure past the journal until a load completes the replacement', async () => {
+    const { directory, services } = await archiveServicesForTest()
+    await services.load()
+    await services.save(stateWithoutImage('Old'))
+    const imported = stateWithImage('new')
+    const staging = await stageImport(services, imported, 'new')
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    vi.mocked(rename).mockImplementation(async (from, to) => {
+      if (String(from) === join(staging, 'document.json')) throw new Error('interrupted')
+      return real.rename(from, to)
+    })
+
+    await expect(services.replaceNotes(staging)).rejects.toThrow('interrupted')
+    vi.mocked(rename).mockImplementation(real.rename)
+
+    await expect(services.save(stateWithoutImage('Stale'))).rejects.toThrow('The notes were replaced.')
+    await expect(services.writeAttachment('stale', new Uint8Array([1]))).rejects.toThrow('The notes were replaced.')
+    await services.cleanupAttachments([])
+    expect(await readdir(join(directory, 'attachments'))).toEqual(['new.png'])
+    await expect(services.replaceNotes(staging)).rejects.toThrow(
+      'The directory was not created by this application session.',
+    )
+    // The staging directory is what the next load completes from, so it cannot be discarded.
+    await expect(services.discardStagingDirectory(staging)).rejects.toThrow(
+      'The directory was not created by this application session.',
+    )
+
+    await expect(services.load()).resolves.toEqual(imported)
+    expect(services.takeRecoveredReplacement()).toEqual({
+      replacedFolder: join(dirname(directory), 'Replaced Notes', '2026-10-23 14-05-09'),
+    })
+    await services.save(imported)
+  })
+
+  it('rejects a staging path that this session did not create', async () => {
+    const { userData, services } = await archiveServicesForTest()
+    await services.createStagingDirectory()
+
+    for (const path of [join(userData, '.notes-import', 'other'), join(userData, 'data'), '/']) {
+      await expect(services.replaceNotes(path)).rejects.toThrow(
+        'The directory was not created by this application session.',
+      )
+    }
+  })
+
+  it('copies an interrupted save into the snapshot, because the next save rewrites it in place', async () => {
+    const { directory, services } = await archiveServicesForTest()
+    await services.load()
+    await services.save(stateWithoutImage('Saved'))
+    const leftover = JSON.stringify(stateWithoutImage('Interrupted save'))
+    await writeFile(join(directory, 'document.json.tmp'), leftover)
+
+    const snapshot = await services.snapshotDocuments()
+    await services.save(stateWithoutImage('Next save'))
+
+    expect(await readFile(join(snapshot, 'document.json.tmp'), 'utf8')).toBe(leftover)
+  })
+
+  it('takes an empty snapshot of a new profile', async () => {
+    const { services } = await archiveServicesForTest()
+
+    const snapshot = await services.snapshotDocuments()
+
+    expect(await readdir(snapshot)).toEqual([])
+    expect(await findNewestValidDocument(snapshot)).toBeNull()
+  })
+
+  it('refuses export and import operations when no user-data directory is configured', async () => {
+    const { services } = await servicesForTest()
+
+    await expect(services.createStagingDirectory()).rejects.toThrow('Notes export and import are not configured.')
+    await expect(services.snapshotDocuments()).rejects.toThrow('Notes export and import are not configured.')
+  })
+
+  it('removes a partial snapshot when the document files cannot be listed', async () => {
+    const { userData, directory, services } = await archiveServicesForTest()
+    await services.load()
+    await services.save(stateWithoutImage('Saved'))
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    mocks.readdir.mockImplementation(async (path) => {
+      if (path === directory) throw new Error('listing failed')
+      return real.readdir(path)
+    })
+
+    await expect(services.snapshotDocuments()).rejects.toThrow('listing failed')
+
+    mocks.readdir.mockImplementation((path) => real.readdir(path))
+    expect(await readdir(join(userData, '.notes-export'))).toEqual([])
+  })
+
+  it('keeps pinned images during cleanup until they are released', async () => {
+    const { directory, services } = await archiveServicesForTest()
+    await services.load()
+    await services.writeAttachment('pinned', new Uint8Array([1]))
+    const unpin = services.pinAttachments(['pinned'])
+
+    await services.cleanupAttachments([])
+    expect(await readdir(join(directory, 'attachments'))).toEqual(['pinned.png'])
+
+    unpin()
+    await services.cleanupAttachments([])
+    expect(await readdir(join(directory, 'attachments'))).toEqual([])
   })
 })

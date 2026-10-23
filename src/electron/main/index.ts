@@ -186,7 +186,9 @@ bootstrapApplication({
         .openExternal(url)
         .catch((error: unknown) => reportMainProcessError('Could not open external link', error))
     })
-    const fileServices = createFileServices(join(app.getPath('userData'), 'data'))
+    const fileServices = createFileServices(join(app.getPath('userData'), 'data'), undefined, {
+      userDataDirectory: app.getPath('userData'),
+    })
     const commandHistory = createCommandHistoryStore(join(app.getPath('userData'), 'data', 'command-history.json'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))

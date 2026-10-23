@@ -60,8 +60,8 @@ Out of scope: folder backup or restore on desktop, Show in Finder after export, 
 | ID | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | T1 | Shared archive infrastructure and the desktop archive ADR | — | Done |
-| T2 | Crash-safe replacement, recovery and export snapshot | T1 | Ready |
-| T3 | Desktop archive worker, main controller and IPC | T2 | Planned |
+| T2 | Crash-safe replacement, recovery and export snapshot | T1 | Done |
+| T3 | Desktop archive worker, main controller and IPC | T2 | Ready |
 | T4 | Electron performance guard for archive operations | T3 | Planned |
 | T5 | Export Notes… user flow | T4 | Planned |
 | T6 | Import Notes… user flow | T5 | Planned |
@@ -106,7 +106,7 @@ Out of scope: folder backup or restore on desktop, Show in Finder after export, 
 
 ### T6 — Import Notes… user flow
 
-- Files: `application-menu.ts` (+ test); `desktop-data-operations.ts` (+ test) import states; new `src/renderer/ImportConfirmationDialog.tsx` (+ test); `DataActivityPanel.tsx` (result with Show in Finder); `App.tsx`, `main.tsx`, `styles.css`; `archive-messages.ts` desktop wording; `docs/PRODUCT.md` §25.3, §25.4 and a §24 cross-reference; ARCHITECTURE desktop archive subsection; `docs/SECURITY.md`; requirement coverage list; new `e2e/electron/notes-import.spec.ts` (independent) and `e2e/electron/notes-import-dialog.spec.ts` (`both`).
+- Files: `application-menu.ts` (+ test); `desktop-data-operations.ts` (+ test) import states; new `src/renderer/ImportConfirmationDialog.tsx` (+ test); `DataActivityPanel.tsx` (result with Show in Finder); `App.tsx`, `main.tsx`, `styles.css`; `archive-messages.ts` desktop wording; `docs/PRODUCT.md` §25.3, §25.4 and a §24 cross-reference; ARCHITECTURE desktop archive subsection; `docs/SECURITY.md`; requirement coverage list and `@requirement PRODUCT.md §25.4` markers on the T2 tests in `src/infrastructure/main/notes-replacement*.test.ts`, `file-services.test.ts` and `e2e/electron/notes-replacement-recovery.spec.ts`; new `e2e/electron/notes-import.spec.ts` (independent) and `e2e/electron/notes-import-dialog.spec.ts` (`both`).
 - Acceptance: confirmation counts, size and missing-image line; cancel and Escape leave notes unchanged and remove staging; Export Current Notes First works with the dialog open; Replace Notes reloads into the imported notes with the result panel; Show in Finder calls the stubbed `shell.showItemInFolder`; `Replaced Notes` contents and byte-identical preferences; no old generations in `data/`; one hostile archive and a newer schema rejected; a version 1 document imports and migrates; Import available in the load-error state and disabled when locked; quit during replace completes it; dialog and result panel inspected in light and dark; §20.5 reload lifecycle observed in light and dark; HIG check recorded.
 - Validation: High Risk. `npm run check`, `npm run test:e2e`, `npm run audit`, rerun the T4 performance spec.
 - Roles: independent reviewer, separate product verifier.
@@ -162,8 +162,16 @@ The replacement is one unit. The imported notes start without retained generatio
 
 ## Next Task
 
-T2 — Crash-safe replacement, recovery and export snapshot. T1 recorded the decisions in [ADR 0024](../docs/decisions/0024-desktop-notes-archive.md); the shared writer and inflater are in `src/infrastructure/archive/`, and the wording helpers in `src/application/notes-archive/archive-messages.ts`.
+T3 — Desktop archive worker, main controller and IPC.
+
+State after T2 (see ARCHITECTURE "Desktop notes replacement"):
+
+- [ADR 0024](../docs/decisions/0024-desktop-notes-archive.md) records D1–D3. The shared writer and inflater are in `src/infrastructure/archive/`; wording helpers in `src/application/notes-archive/archive-messages.ts`.
+- `createFileServices(data, logger, { userDataDirectory })` (wired in `src/electron/main/index.ts`) returns `FileServices & NotesArchiveFileServices`: `createStagingDirectory()` (returns a path with `attachments/`), `discardStagingDirectory(path)`, `replaceNotes(stagingPath)` (Replaced Notes folder or null; throws `ReplacementIncompleteError` after the journal, which the controller must treat as "restart needed", D4c), `takeRecoveredReplacement()` (D4d notice after load), `snapshotDocuments()`/`releaseSnapshot(path)`, `pinAttachments(ids)`. `findNewestValidDocument(directory)` selects the export source from a snapshot.
+- Recovery runs inside `load`, not separately at window creation; a failure fails the load with `The notes import could not be completed: <reason>`.
+- The T3 desktop import job must write the staged `document.json` and images durably into the staging path; `commitReplacement` flushes the staging directories before its journal.
+- The renderer write suspension and the `NOTES_REPLACED_MESSAGE` rejection after a commit still need the renderer-side handling in T3 so no `.save-error` appears.
 
 Next-session prompt:
 
-> Continue initiative `plans/desktop-notes-archive.md`, task T2 (crash-safe replacement, recovery and export snapshot). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.
+> Continue initiative `plans/desktop-notes-archive.md`, task T3 (desktop archive worker, main controller and IPC). Initiative-wide authorization and decisions D1–D4 are recorded in the plan.

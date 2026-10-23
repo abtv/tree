@@ -559,7 +559,7 @@ The E2E and performance `launchTree` helpers write the Vim editing preference as
 
 If Electron shows a macOS crash dialog or a full suite fails during application launch, first treat it as a process-lifecycle failure. The E2E fixtures clean up stale applications per worker through their own `tree-e2e-p<pid>-` marker, and `e2e/electron/global-setup.ts` removes leftovers from earlier runs before any worker starts. The performance fixtures clean up only stale Electron processes carrying their own temporary `tree-perf-*` user-data marker. Cleanup retries after launch failure and the launch error is included in the test failure. Do not use an unrestricted Electron process kill because it may terminate unrelated applications. After cleanup, rerun the isolated failing test and then the complete suite.
 
-File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttachment`, and `cleanupAttachments` operations, their phase, and the paths involved. Failures are logged with the original error message.
+File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttachment`, `cleanupAttachments`, `replaceNotes`, and `snapshotDocuments` operations, their phase, and the paths involved. Failures are logged with the original error message.
 
 ---
 
