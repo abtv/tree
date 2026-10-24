@@ -13,6 +13,9 @@ import { requestPersistentStorage, storageProtectionText } from './storage-persi
 import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
 import './styles.css'
+import { blockExternalDrops } from '../renderer/external-drop'
+
+blockExternalDrops(window)
 
 // Mobile browsers discard a tab under memory pressure well before a desktop Electron renderer would.
 const WEB_ATTACHMENT_IMAGE_CACHE_LIMIT = 128 * 1024 * 1024

@@ -337,7 +337,9 @@ describeForEachEditingMode('node editor Tab structure commands', ({ mode }) => {
         await window.keyboard.press('Meta+.')
         const input = node(window, 1)
         await expect(parent(window)).toHaveValue('Alpha')
-        await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(5, 5))
+        await expect(input).toBeFocused()
+        // Reach the last text character through real input, then step onto the image.
+        await window.keyboard.press('$')
         await window.keyboard.press('l')
         await expect(input).toHaveClass(/node-input-image-caret/)
 

@@ -12,6 +12,9 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import type { CommandServices } from '../application/command-registry'
 import './styles.css'
+import { blockExternalDrops } from './external-drop'
+
+blockExternalDrops(window)
 
 const rootElement = document.getElementById('root')
 

@@ -122,8 +122,11 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
             await window.screenshot({ path: testInfo.outputPath(`emoji-${view}-joined-normal-dark.png`) })
             await window.emulateMedia({ colorScheme: 'light' })
           }
-          await window.keyboard.press('2')
-          await window.keyboard.press('l')
+          // Advance only to another emoji; after the final one, 2l leaves the Agenda node.
+          if (emoji !== emojis.at(-1)) {
+            await window.keyboard.press('2')
+            await window.keyboard.press('l')
+          }
           start += emoji.length + 1
         }
         await window.keyboard.press('0')

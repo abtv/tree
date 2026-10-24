@@ -98,6 +98,10 @@ implemented in `src/web/services.ts`.
   reduced to text and link ranges rather than inserted as arbitrary markup.
   Stored documents are validated when loaded; invalid stored data is not replaced
   with a new sample document.
+  Both entry points install the shared `src/renderer/external-drop.ts` window-capture
+  guard before initialization: native drops and `insertFromDrop` edits are rejected
+  before browser insertion, including outside the editor. Tree's internal node
+  movement uses pointer events and does not pass through this native drop path.
 * **Clipboard and attachments.** Browser permission and user-activation rules
   govern clipboard APIs. Native paste uses the event's clipboard data. PNG input
   passes shared byte, structure and decoded-dimension limits, then the browser
