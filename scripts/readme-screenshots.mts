@@ -6,6 +6,13 @@ import { _electron as electron, expect } from '@playwright/test'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const output = join(root, 'reports/readme')
+const imageNames = [
+  'tree-overview.png',
+  'tree-focus-dark.png',
+  'agenda-light.png',
+  'tree-search.png',
+  'tree-commands.png',
+]
 
 async function capture() {
   if (process.platform !== 'darwin') throw new Error('README capture requires macOS.')
@@ -22,7 +29,7 @@ async function capture() {
   try {
     app = await electron.launch({
       args: [
-        '--force-device-scale-factor=1',
+        '--force-device-scale-factor=2',
         `--user-data-dir=${dataDirectory}`,
         join(root, 'e2e/electron/electron-entry.cjs'),
         // CI runners have no trackpad, so macOS would draw classic scrollbars that narrow the outline.
@@ -38,6 +45,12 @@ async function capture() {
     child = app.process()
     const page = await app.firstWindow()
     page.setDefaultTimeout(10_000)
+    expect(await page.evaluate(() => window.devicePixelRatio)).toBe(2)
+    const screenshot = async (name: string) => {
+      await page.mouse.move(0, 0)
+      await page.locator('main.tree-app').evaluate((element) => element.ownerDocument.fonts.ready)
+      await page.screenshot({ path: join(staging, name), animations: 'disabled', scale: 'device' })
+    }
     await expect(page.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveText(demo.document.roots[0].text)
     await expect(page.getByLabel('Vim mode')).toHaveCount(0)
     // Expand only synthetic branches; their numbering follows the fixed demo resource.
@@ -48,7 +61,7 @@ async function capture() {
     await page.emulateMedia({ colorScheme: 'light' })
     await page.locator('main.tree-app').evaluate((element) => element.ownerDocument.fonts.ready)
     const overviewText = await page.locator('[aria-label^="Node "]').allTextContents()
-    await page.screenshot({ path: join(staging, 'tree-overview.png'), animations: 'disabled' })
+    await screenshot('tree-overview.png')
     await page.getByRole('button', { name: 'Enter node 4', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Current parent' })).toHaveText('Plan the first meetup')
     const focusedText = await page.locator('[aria-label^="Node "]').allTextContents()
@@ -69,7 +82,18 @@ async function capture() {
     await expect(page.getByLabel('Vim mode')).toHaveText('NORMAL')
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(860, 520))
     await page.emulateMedia({ colorScheme: 'dark' })
-    await page.screenshot({ path: join(staging, 'tree-focus-dark.png'), animations: 'disabled' })
+    await screenshot('tree-focus-dark.png')
+    await page.keyboard.press('/')
+    await page.getByRole('textbox', { name: 'Search', exact: true }).fill('book')
+    await expect(page.locator('.search-match')).toHaveCount(2)
+    await expect(page.locator('.search-count')).toHaveText('2')
+    await screenshot('tree-search.png')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press(':')
+    await expect(page.getByRole('combobox', { name: 'Command', exact: true })).toBeFocused()
+    await expect(page.getByRole('listbox', { name: 'Application commands' })).toBeVisible()
+    await screenshot('tree-commands.png')
+    await page.keyboard.press('Escape')
     // Fix only Date so the demo's dated nodes fall around a stable Today (Thursday 2026-10-08).
     await page.clock.setFixedTime(new Date(2026, 9, 8, 12))
     await page.emulateMedia({ colorScheme: 'light' })
@@ -79,15 +103,15 @@ async function capture() {
     await page.keyboard.press('Meta+p')
     await expect(page.locator('.agenda-row').first()).toBeVisible()
     await page.locator('main.tree-app').evaluate((element) => element.ownerDocument.fonts.ready)
-    await page.screenshot({ path: join(staging, 'agenda-light.png'), animations: 'disabled' })
+    await screenshot('agenda-light.png')
     const persisted = JSON.parse(readFileSync(join(dataDirectory, 'data/document.json'), 'utf8'))
     if (JSON.stringify(persisted.document) !== JSON.stringify(demo.document)) {
       throw new Error('Capture changed the synthetic document; refusing to publish images.')
     }
-    // Clean only this command's fixed, ignored output directory, and only after both captures succeed.
+    // Replace only this command's fixed, ignored output directory after every capture succeeds.
     rmSync(output, { recursive: true, force: true })
     mkdirSync(output, { recursive: true })
-    for (const name of ['tree-overview.png', 'tree-focus-dark.png', 'agenda-light.png']) {
+    for (const name of imageNames) {
       writeFileSync(join(output, name), readFileSync(join(staging, name)))
     }
     console.log(`Captured the README screenshots from isolated synthetic data into ${output}.`)

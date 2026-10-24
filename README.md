@@ -4,17 +4,25 @@ Tree is a keyboard-first outliner for macOS. Write notes, break ideas into branc
 
 [Watch the demo video](https://abtv.github.io/tree/tree-demo.webm)
 
-![Tree in the light appearance, showing reading club, work, learning, and ideas branches, with some branches expanded and others folded.](https://abtv.github.io/tree/tree-overview.png)
+<img src="https://abtv.github.io/tree/tree-overview.png" width="860" alt="Tree in the light appearance, showing reading club, work, learning, and ideas branches, with some branches expanded and others folded.">
 
 Keep projects, notes, and ideas in one outline. Expand the branches you are working on and keep other details folded away.
 
-![Tree in the dark appearance, focused on the first meetup branch with its breadcrumb path and Vim Normal mode indicator visible.](https://abtv.github.io/tree/tree-focus-dark.png)
+<img src="https://abtv.github.io/tree/tree-focus-dark.png" width="860" alt="Tree in the dark appearance, focused on the first meetup branch with its breadcrumb path and Vim Normal mode indicator visible.">
 
 The same outline, focused on “Plan the first meetup”: the node text and expanded branches are unchanged. The breadcrumb path keeps its place in the larger project visible. Here, the dark appearance and Vim Normal mode are enabled.
 
-![Agenda in the light appearance, showing the same outline's dated nodes grouped under days from Monday October 5 to Thursday October 15, with Thursday October 8 marked as today.](https://abtv.github.io/tree/agenda-light.png)
+<img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing the same outline's dated nodes grouped under days from Monday October 5 to Thursday October 15, with Thursday October 8 marked as today.">
 
 The Agenda gathers the dated nodes of the same outline into a timeline of days. Each occurrence keeps its place in the outline through its ancestors, and Today is marked.
+
+<img src="https://abtv.github.io/tree/tree-search.png" width="860" alt="Tree search in the dark appearance, with two matches for book highlighted in the meetup branch.">
+
+Search highlights matching text and shows the match count. In Vim Normal mode, press `/` to search, then use `n` and `N` to move between matches.
+
+<img src="https://abtv.github.io/tree/tree-commands.png" width="860" alt="Tree command panel in the dark appearance, showing application commands and their keyboard shortcuts.">
+
+The command panel keeps application commands and their shortcuts within reach. Press `:` in Vim Normal mode to open it, then type to filter the list.
 
 ## Features
 
