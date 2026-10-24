@@ -2092,7 +2092,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(node(window, 1)).toHaveValue('Grandchild')
     })
 
-    test('does nothing when p or P puts a subtree on the current-parent heading', async ({ userDataDir }) => {
+    test('puts first children with p on a clicked current-parent heading and keeps P inactive', async ({
+      userDataDir,
+    }, testInfo) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -2114,12 +2116,10 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await lockSystemClipboard()
       await window.keyboard.press('y')
       await window.keyboard.press('y')
-      await window.keyboard.press('g')
-      await window.keyboard.press('g')
       const heading = window.getByRole('textbox', { name: 'Current parent' })
+      await heading.click()
       await expect(heading).toBeFocused()
 
-      await window.keyboard.press('p')
       await window.keyboard.press('P')
       await expect(heading).toBeFocused()
       await expect(heading).toHaveValue('Root')
@@ -2127,7 +2127,24 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(node(window, 2)).toHaveValue('Sibling')
       await expect(node(window, 3)).toHaveCount(0)
 
-      // A sibling of the heading would be invisible here, so leave the location and look for it.
+      await window.keyboard.press('p')
+      await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Child', 'Sibling'])
+      await expect(node(window, 1)).toBeFocused()
+      await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+      await expect(heading).toHaveValue('Root')
+      await window.screenshot({ path: testInfo.outputPath('heading-first-child-put.png') })
+      await window.keyboard.press('u')
+      await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Sibling'])
+      await heading.click()
+      await window.keyboard.type('2gp')
+      await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Child', 'Child', 'Sibling'])
+      await expect(node(window, 3)).toBeFocused()
+      await window.keyboard.press('u')
+      await heading.click()
+      await window.keyboard.press('.')
+      await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Child', 'Child', 'Sibling'])
+      await expect(node(window, 3)).toBeFocused()
+
       await window.keyboard.press('Meta+,')
       await expect.poll(() => nodeTexts(window)).toEqual(['Root'])
     })

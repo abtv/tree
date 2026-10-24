@@ -6,12 +6,14 @@ import {
   JOIN_ATTACHMENTS_ERROR,
   joinSiblingRange,
   locateNode,
+  MAX_DOCUMENT_DEPTH,
   MAX_DOCUMENT_DEPTH_ERROR,
   nodePath,
   normalizeLinks,
   replaceSiblingRange,
   requireNode,
   shiftSiblingRange,
+  subtreeHeight,
   wouldExceedMaximumDepth,
   type Document,
   type Location,
@@ -46,6 +48,35 @@ export function pasteNodeForestTransition(
   repeat = 1,
   selectAfter = false,
 ): StructuralTransition | RejectedTransition {
+  if (nodeId === location.currentParentId && position === 'after') {
+    const located = requireNode(document, nodeId)
+    const firstChild = located.node.children[0]
+    if (firstChild !== undefined) {
+      return pasteNodeForestTransition(
+        document,
+        location,
+        firstChild.id,
+        'before',
+        source,
+        createId,
+        repeat,
+        selectAfter,
+      )
+    }
+    // An empty heading has no sibling target; validate child depth before allocating IDs.
+    if (source.nodes.some((node) => located.ancestors.length + 1 + subtreeHeight(node) > MAX_DOCUMENT_DEPTH)) {
+      return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
+    }
+    const copies = Array.from({ length: repeat }, () =>
+      source.nodes.map((node) => cloneNodeWithNewIds(node, createId)),
+    ).flat()
+    const selectedId = (selectAfter ? copies[copies.length - 1]! : copies[0]!).id
+    return {
+      document: replaceSiblingRange(document, nodeId, 1, [{ ...located.node, children: copies }]),
+      location: { ...location, selectedNodeId: selectedId },
+      focus: { nodeId: selectedId, cursor: 0 },
+    }
+  }
   if (wouldExceedMaximumDepth(document, nodeId, source.nodes)) {
     return { kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }
   }

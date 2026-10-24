@@ -1094,8 +1094,9 @@ export class EditorStore {
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
-    // A sibling of the current-parent heading would sit outside the displayed location.
-    if (requestedId === state.location.currentParentId) return false
+    if (requestedId === state.location.currentParentId) {
+      return this.pasteNodeForest(requestedId, requestedPosition, { nodes: [source], sourceIds })
+    }
     const { nodeId, position, expandId } = this.putTarget(state.document, requestedId, requestedPosition)
     if (isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
@@ -1131,9 +1132,15 @@ export class EditorStore {
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked() || source.nodes.length === 0) return false
-    if (requestedId === state.location.currentParentId) return false
-    const { nodeId, position, expandId } = this.putTarget(state.document, requestedId, requestedPosition)
-    if (isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)) {
+    const heading = requestedId === state.location.currentParentId
+    if (heading && requestedPosition === 'before') return false
+    const { nodeId, position, expandId } = heading
+      ? { nodeId: requestedId, position: requestedPosition, expandId: undefined }
+      : this.putTarget(state.document, requestedId, requestedPosition)
+    if (
+      (heading && source.sourceIds.includes(requestedId)) ||
+      isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)
+    ) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
     }

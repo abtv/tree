@@ -12,12 +12,63 @@ import {
   deletePreviousEmptyTransition,
 } from './editor-command-transitions'
 import { buildVisibleRows } from './visible-rows'
+import { pasteNodeForestTransition } from './editor-node-visual-transitions'
 
 function countNodes(nodes: readonly TreeNode[]): number {
   return nodes.reduce((total, node) => total + 1 + countNodes(node.children), 0)
 }
 
 describe('editor command transition properties', () => {
+  it('puts ordered fresh copies under a heading while preserving its children and location', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.string(), { maxLength: 5 }),
+        fc.array(fc.string(), { minLength: 1, maxLength: 5 }),
+        fc.integer({ min: 1, max: 4 }),
+        fc.boolean(),
+        (existing, incoming, repeat, past) => {
+          const children = existing.map((text, index) => ({ id: `child-${index}`, text, children: [] }))
+          const parent = { id: 'parent', text: 'Parent', children }
+          const document = { roots: [parent] }
+          const source = incoming.map((text, index) => ({
+            id: `source-${index}`,
+            text,
+            children: [{ id: `nested-${index}`, text: 'Nested', children: [] }],
+          }))
+          let sequence = 0
+          const result = pasteNodeForestTransition(
+            document,
+            {
+              currentParentId: 'parent',
+              selectedNodeId: 'parent',
+            },
+            'parent',
+            'after',
+            { nodes: source, sourceIds: [] },
+            () => `copy-${++sequence}`,
+            repeat,
+            past,
+          )
+          if (result.kind === 'rejected') throw new Error(result.message)
+          assertDocument(result.document)
+          const copies = result.document.roots[0]!.children
+          expect(copies.map((node) => node.text)).toEqual([
+            ...Array.from({ length: repeat }, () => incoming).flat(),
+            ...existing,
+          ])
+          expect(copies.slice(incoming.length * repeat)).toEqual(children)
+          expect(sequence).toBe(incoming.length * repeat * 2)
+          expect(result.location).toEqual({
+            currentParentId: 'parent',
+            selectedNodeId: past ? (children[0] ?? copies[incoming.length * repeat - 1]!).id : copies[0]!.id,
+          })
+          expect(result.focus).toEqual({ nodeId: result.location.selectedNodeId, cursor: 0 })
+          expect(document.roots[0]).toBe(parent)
+          expect(document.roots[0]!.children).toBe(children)
+        },
+      ),
+    )
+  })
   it('opens below at the visible level while preserving existing subtrees and identities', () => {
     fc.assert(
       fc.property(

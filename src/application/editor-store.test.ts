@@ -1671,7 +1671,7 @@ describe('EditorStore', () => {
       expect(store.getSnapshot()).toMatchObject(atRoot('copy'))
     })
 
-    it('does nothing when a subtree or forest is put on the current-parent heading', async () => {
+    it('does nothing when P puts a subtree or forest on the current-parent heading', async () => {
       const store = new EditorStore(
         loadedState(nestedDocument, { currentParentId: 'child', selectedNodeId: 'child' }),
         ids('copy'),
@@ -1680,10 +1680,9 @@ describe('EditorStore', () => {
       await store.initialize()
       const before = store.getSnapshot()
 
-      expect(store.pasteSubtree('child', 'after', { id: 'src', text: 'Src', children: [] })).toBe(false)
       expect(store.pasteSubtree('child', 'before', { id: 'src', text: 'Src', children: [] })).toBe(false)
       expect(
-        store.pasteNodeForest('child', 'after', {
+        store.pasteNodeForest('child', 'before', {
           nodes: [{ id: 'src', text: 'Src', children: [] }],
           sourceIds: [],
         }),
@@ -1693,6 +1692,51 @@ describe('EditorStore', () => {
       expect(after).toMatchObject({ document: (before as { document: unknown }).document })
       expect(after).toMatchObject({ location: { currentParentId: 'child', selectedNodeId: 'child' } })
     })
+
+    it.each(['subtree', 'forest'] as const)(
+      'puts a %s as first children of a populated or empty heading',
+      async (kind) => {
+        for (const children of [[], [{ id: 'existing', text: 'Existing', children: [] }]]) {
+          const store = new EditorStore(
+            loadedState(
+              { roots: [{ id: 'parent', text: 'Parent', children }] },
+              {
+                currentParentId: 'parent',
+                selectedNodeId: 'parent',
+              },
+            ),
+            ids('copy', 'copy-2'),
+            new FakeClock(),
+          )
+          await store.initialize()
+          const before = store.getSnapshot()
+          const source = { id: 'source', text: 'Source', children: [] }
+          expect(
+            kind === 'subtree'
+              ? store.pasteSubtree('parent', 'after', source)
+              : store.pasteNodeForest('parent', 'after', { nodes: [source], sourceIds: [] }, 2, true),
+          ).toBe(true)
+          const state = store.getSnapshot() as ReadySnapshot
+          expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual([
+            'copy',
+            ...(kind === 'forest' ? ['copy-2'] : []),
+            ...children.map((node) => node.id),
+          ])
+          expect(state.location).toEqual({
+            currentParentId: 'parent',
+            selectedNodeId: kind === 'subtree' ? 'copy' : (children[0]?.id ?? 'copy-2'),
+          })
+          expect(state.focus).toMatchObject({ nodeId: state.location.selectedNodeId, cursor: 0 })
+          store.undo()
+          expect(store.getSnapshot()).toMatchObject({ document: (before as ReadySnapshot).document })
+          store.redo()
+          expect(store.getSnapshot()).toMatchObject({
+            document: state.document,
+            location: { currentParentId: 'parent' },
+          })
+        }
+      },
+    )
 
     it('keeps the location for Backspace on an empty visible descendant and for undoing a visible text edit', async () => {
       const store = new EditorStore(
@@ -1914,7 +1958,7 @@ describe('EditorStore', () => {
       expect(ready(store).document.roots.map((node) => node.id)).toEqual(['c1', 'a', 'b', 'c3'])
     })
 
-    it('does nothing for the current-parent heading', async () => {
+    it('keeps P inactive for the current-parent heading', async () => {
       const store = new EditorStore(
         loadedState(
           { roots: [{ id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1', children: [] }] }] },
@@ -1925,9 +1969,38 @@ describe('EditorStore', () => {
       )
       await store.initialize()
       const before = store.getSnapshot()
-      expect(store.pasteSubtree('a', 'after', source, ['x'])).toBe(false)
-      expect(store.pasteNodeForest('a', 'after', forest)).toBe(false)
+      expect(store.pasteSubtree('a', 'before', source, ['x'])).toBe(false)
+      expect(store.pasteNodeForest('a', 'before', forest)).toBe(false)
       expect(store.getSnapshot()).toBe(before)
+    })
+
+    it.each([false, true])('rejects putting the heading into its own children (empty: %s)', async (empty) => {
+      const own: TreeNode = {
+        id: 'parent',
+        text: 'Parent',
+        children: empty ? [] : [{ id: 'child', text: '', children: [] }],
+      }
+      const createId = vi.fn(() => 'unused')
+      const store = new EditorStore(
+        loadedState(
+          { roots: [own] },
+          {
+            currentParentId: 'parent',
+            selectedNodeId: 'parent',
+          },
+        ),
+        createId,
+        new FakeClock(),
+      )
+      await store.initialize()
+      const before = store.getSnapshot() as ReadySnapshot
+      expect(store.pasteSubtree('parent', 'after', own, ['parent'])).toBe(false)
+      expect(store.pasteNodeForest('parent', 'after', { nodes: [own], sourceIds: ['parent'] }, 2)).toBe(false)
+      expect((store.getSnapshot() as ReadySnapshot).document).toBe(before.document)
+      expect((store.getSnapshot() as ReadySnapshot).operationError).toBe(
+        'Cannot paste a node into one of its descendants.',
+      )
+      expect(createId).not.toHaveBeenCalled()
     })
 
     it.each(['subtree', 'forest'] as const)('rejects a %s put of the node into its own children', async (kind) => {

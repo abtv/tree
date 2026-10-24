@@ -10,6 +10,27 @@ import {
 const location: Location = { currentParentId: null, selectedNodeId: 'a' }
 
 describe('whole-node Visual transitions', () => {
+  it('rejects a child put on an empty heading at maximum depth before consuming IDs', () => {
+    let root: TreeNode = { id: 'heading', text: '', children: [] }
+    for (let depth = 1; depth < MAX_DOCUMENT_DEPTH; depth++) {
+      root = { id: `ancestor-${depth}`, text: '', children: [root] }
+    }
+    let nextId = 0
+    const result = pasteNodeForestTransition(
+      { roots: [root] },
+      {
+        currentParentId: 'heading',
+        selectedNodeId: 'heading',
+      },
+      'heading',
+      'after',
+      { nodes: [{ id: 'source', text: '', children: [] }], sourceIds: [] },
+      () => `new-${++nextId}`,
+      3,
+    )
+    expect(result).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(nextId).toBe(0)
+  })
   it('yanks without mutation and rejects a put into a source descendant', () => {
     const document: Document = { roots: [{ id: 'a', text: 'A', children: [{ id: 'child', text: 'C', children: [] }] }] }
     let nextId = 0

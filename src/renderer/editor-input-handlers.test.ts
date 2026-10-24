@@ -3142,7 +3142,7 @@ describe('editor keyboard handler', () => {
     expect(caretRequests).toEqual([])
   })
 
-  it('does nothing for gp on the editable current-parent heading', async () => {
+  it('puts first children with gp on the editable current-parent heading and selects the former first child', async () => {
     const treeDocument = {
       roots: [{ id: 'root', text: 'Root', children: [{ id: 'child', text: 'Child', children: [] }] }],
     }
@@ -3152,8 +3152,8 @@ describe('editor keyboard handler', () => {
     })
     vim.register.current = { kind: 'node', value: { id: 'src', text: 'Put', children: [] }, sourceIds: ['src'] }
     press('g', 'p')
-    expect(snapshot().document).toEqual(treeDocument)
-    expect(snapshot().location.selectedNodeId).toBe('root')
+    expect(snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual(['Put', 'Child'])
+    expect(snapshot().location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
   })
 
   describe('fast vertical motions', () => {
