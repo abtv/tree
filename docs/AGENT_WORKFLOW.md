@@ -323,7 +323,7 @@ Directory locations, placeholders, and documented command examples may mention s
 
 ### README Screenshots
 
-README screenshots are generated and published by the `Generate demo` workflow on every push to `main`, weekly, or manually; they are not committed. Keep the capture script working: when a change alters a label, control, or flow the script relies on, update `scripts/readme-screenshots.mts` in the same change, run `npm run screenshots:readme`, and inspect its output. Improvements within an already illustrated interface keep the existing images rather than add images.
+README screenshots are generated and published by the `Generate demo` workflow on every push to `main` or manually; they are not committed. Keep the capture script working: when a change alters a label, control, or flow the script relies on, update `scripts/readme-screenshots.mts` in the same change, run `npm run screenshots:readme`, and inspect its output. Improvements within an already illustrated interface keep the existing images rather than add images.
 
 For a major new capability or a separate screen, such as an Agenda module, ask the Product Owner during initial task discussion whether it should appear in the README. Do not ask this for ordinary interface changes or expand the screenshot gallery without authorization.
 

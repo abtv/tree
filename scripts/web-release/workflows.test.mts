@@ -151,13 +151,14 @@ describe('automatic publication wiring', () => {
       const text = await read(`.github/workflows/${name}.yml`)
       expect(text).toContain('runs-on: macos-15')
       const triggers = text.split('\non:\n')[1]!.split('\npermissions:')[0]!
-      expect(triggers).toContain('schedule:')
-      expect(triggers).toMatch(/cron: '0 [2-5] \* \* 0'/)
       expect(triggers).toContain('workflow_dispatch:')
       expect(triggers).not.toMatch(/^ {2}(?:pull_request|workflow_call):/m)
       if (name === 'demo') {
         expect(triggers).toMatch(/^ {2}push:\n {4}branches: \[main\]\n/m)
+        expect(triggers).not.toMatch(/^ {2}schedule:/m)
       } else {
+        expect(triggers).toContain('schedule:')
+        expect(triggers).toMatch(/cron: '0 [2-4] \* \* 0'/)
         expect(triggers).not.toMatch(/^ {2}push:/m)
       }
     }
