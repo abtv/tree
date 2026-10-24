@@ -447,6 +447,77 @@ The Attribution workflow runs `scripts/check-attribution.mts` on every pull requ
 Release checks are isolated from standalone manual and scheduled check cancellation;
 the concurrency rules are described in [Browser publication](../deployment/github-pages/README.md#failures-and-ordering).
 
+#### Workflow and job naming policy
+
+Name GitHub Actions workflows by the work they perform, using an imperative verb
+and its object in English sentence case. Use the same principle for job display
+names. A reader should understand the purpose without opening the YAML.
+
+* Use direct actions such as `Release web app`, `Audit dependencies`, and
+  `Publish demo`. Use `Run` with established test names, including
+  `Run mutation testing` and `Run property tests`; preserve those terms rather
+  than inventing synonyms for grammatical uniformity.
+* Distinguish a release pipeline from its individual suites. `Release web app`
+  calls code validation and web E2E testing before signing and transferring the
+  tested package. It does not represent another web test suite. PR validation
+  and release validation reuse the same suites for their respective commits.
+  Deployment in the hosting repository is a separate workflow.
+* Keep names concise. Do not add category prefixes, local jargon such as
+  `property soak`, or execution settings merely to describe implementation.
+  Increased property-test counts and memory-report thresholds belong in suite
+  documentation. Use `memory tests` for the memory suite; that name does not
+  promise an automated memory-growth threshold.
+* Add a platform, browser, tool, or build-mode qualifier when it distinguishes
+  the work. Use the actual implementation: the Linux web job uses Chromium,
+  not Google Chrome. Put execution-specific detail in job names and descriptions
+  when the workflow's broader purpose is already clear.
+* Derive YAML filenames from the workflow display name: lowercase, remove
+  punctuation, replace spaces with hyphens, and append `.yml`. Keep the same
+  words and order; do not introduce a second vocabulary of abbreviations.
+
+The following names are the agreed targets. Existing workflows have not yet
+been renamed; this policy records the naming decision, not a completed migration.
+Source filenames below are relative to `.github/workflows/`, except for the
+hosting template.
+
+| Existing file | Target workflow name | Target filename |
+| --- | --- | --- |
+| `release.yml` | Release web app | `release-web-app.yml` |
+| `ci.yml` | Check code, test and build | `check-code-test-and-build.yml` |
+| `browser.yml` | Run web E2E tests | `run-web-e2e-tests.yml` |
+| `e2e.yml` | Run Electron E2E tests | `run-electron-e2e-tests.yml` |
+| `e2e-memory.yml` | Run Electron memory tests | `run-electron-memory-tests.yml` |
+| `performance.yml` | Run Electron performance tests | `run-electron-performance-tests.yml` |
+| `mutation.yml` | Run mutation testing | `run-mutation-testing.yml` |
+| `property-soak.yml` | Run property tests | `run-property-tests.yml` |
+| `audit.yml` | Audit dependencies | `audit-dependencies.yml` |
+| `codeql.yml` | Scan code with CodeQL | `scan-code-with-codeql.yml` |
+| `attribution.yml` | Enforce agent attribution policy | `enforce-agent-attribution-policy.yml` |
+| `demo.yml` | Publish demo | `publish-demo.yml` |
+| `deployment/github-pages/pages.yml` (hosting template) | Deploy web app | `deploy-web-app.yml` |
+
+Give every job an explicit display name. Name reusable-workflow calling jobs by
+the work they invoke, and execution jobs by the stage they perform. For example,
+`Run web E2E tests / Test production build (Chromium)` explains both the suite
+and the execution stage. Avoid generic names such as `Check`, `generate`, or
+`chrome`, and avoid repeating the entire workflow name at every nesting level.
+Matrix jobs include the distinguishing shard or layer, such as
+`Run Electron E2E tests (shard 1/6)` or `Run mutation testing (domain)`; aggregate
+jobs state their role, such as `Require all Electron E2E shards to pass`.
+
+Review the complete set of names together, including PR checks and nested
+release jobs. Keep check names unambiguous across workflows; repeated audit
+calls need caller context in their composed names. Technical job IDs may remain
+stable when display names change. Playwright project names are test-report
+identifiers, not workflow or job names.
+
+When applying a rename, update reusable-workflow paths, scripts, tests, and
+documentation that consume the old names or paths. Check required status-check
+settings before changing their names. In particular, release verification
+currently matches the job name `Release gate` and references `release.yml`;
+those are functional contracts, not cosmetic labels. A naming change must
+preserve the release verification contract and existing triggers and dependencies.
+
 ### Risk-Based Validation
 
 Use the highest applicable functional-validation tier. Select Electron performance scope separately under [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#selecting-performance-checks). Focused checks may be run during implementation, but they do not substitute for a broader required functional tier.
