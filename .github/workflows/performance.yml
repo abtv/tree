@@ -14,7 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audit:
+    uses: ./.github/workflows/audit.yml
+    with:
+      caller: performance
   performance:
+    needs: audit
     name: Performance
     runs-on: macos-15
     timeout-minutes: 5

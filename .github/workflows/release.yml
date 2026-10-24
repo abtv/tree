@@ -38,25 +38,28 @@ jobs:
         run: node scripts/web-release/cli.mts changes "$BEFORE_SHA" "$GITHUB_SHA"
 
   check:
+    needs: audit
     name: Standard checks
     uses: ./.github/workflows/ci.yml
   electron:
+    needs: audit
     name: Desktop integration
     uses: ./.github/workflows/e2e.yml
   audit:
     name: Dependency audit
     uses: ./.github/workflows/audit.yml
   chrome:
+    needs: audit
     name: Browser integration
     uses: ./.github/workflows/browser.yml
   memory:
     name: Memory checks
-    needs: changes
+    needs: [changes, audit]
     if: needs.changes.outputs.memory == 'true'
     uses: ./.github/workflows/e2e-memory.yml
   demo:
     name: Demo checks
-    needs: changes
+    needs: [changes, audit]
     if: needs.changes.outputs.demo == 'true'
     permissions:
       contents: read

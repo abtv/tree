@@ -12,7 +12,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audit:
+    uses: ./.github/workflows/audit.yml
+    with:
+      caller: demo
   generate:
+    needs: audit
     runs-on: macos-15
     timeout-minutes: 8
     steps:

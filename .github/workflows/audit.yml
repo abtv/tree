@@ -5,12 +5,16 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      caller:
+        type: string
+        default: audit
 
 permissions:
   contents: read
 
 concurrency:
-  group: audit-${{ github.workflow }}
+  group: audit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.caller || 'audit' }}
   cancel-in-progress: true
 
 jobs:

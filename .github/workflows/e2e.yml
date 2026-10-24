@@ -13,7 +13,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audit:
+    uses: ./.github/workflows/audit.yml
+    with:
+      caller: e2e
   shard:
+    needs: audit
     name: Electron E2E shard ${{ matrix.shard }}/6
     runs-on: macos-15
     timeout-minutes: 12

@@ -8,7 +8,12 @@ permissions:
   contents: read
 
 jobs:
+  audit:
+    uses: ./.github/workflows/audit.yml
+    with:
+      caller: browser
   chrome:
+    needs: audit
     name: Chrome static package
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8

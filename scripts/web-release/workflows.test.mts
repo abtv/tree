@@ -5,13 +5,17 @@ const read = (path: string) => readFile(new URL(`../../${path}`, import.meta.url
 
 // Evaluate only the context references used by these workflow group templates.
 // The reusable-workflow context belongs to its caller, as GitHub documents.
-function concurrencyGroup(workflow: string, context: { workflow: string; ref: string; pr?: number; runId?: number }) {
+function concurrencyGroup(
+  workflow: string,
+  context: { workflow: string; ref: string; pr?: number; runId?: number; caller?: string },
+) {
   const template = workflow.match(/^ {2}group: (.+)$/m)?.[1]
   if (!template) throw new Error('Missing workflow concurrency group')
   const values: Record<string, string | number> = {
     'github.workflow': context.workflow,
     'github.ref': context.ref,
     'github.event.pull_request.number || github.ref': context.pr || context.ref,
+    "inputs.caller || 'audit'": context.caller || 'audit',
   }
   return template
     .replace(/\$\{\{\s*(.*?)\s*\}\}/g, (_: string, expression: string) => {
@@ -23,6 +27,45 @@ function concurrencyGroup(workflow: string, context: { workflow: string; ref: st
 
 // @requirement PRODUCT.md §1.4
 describe('automatic publication wiring', () => {
+  it('requires a successful audit before starting tests or allocating macOS runners', async () => {
+    for (const [file, job] of [
+      ['ci', 'check'],
+      ['e2e', 'shard'],
+      ['browser', 'chrome'],
+      ['e2e-memory', 'memory'],
+      ['performance', 'performance'],
+      ['property-soak', 'soak'],
+      ['mutation', 'mutation'],
+      ['demo', 'generate'],
+    ]) {
+      const workflow = await read(`.github/workflows/${file}.yml`)
+      const audit = workflow.split('\n  audit:')[1]!.split(/\n {2}\w+:/)[0]!
+      expect(audit).toContain('uses: ./.github/workflows/audit.yml')
+      expect(audit).toContain(`caller: ${file}`)
+      const section = workflow.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+      expect(section).toContain('needs: audit')
+      expect(section).not.toMatch(/^ {4}if:/m) // Retain GitHub's default success() gate.
+    }
+    const release = await read('.github/workflows/release.yml')
+    for (const job of ['check', 'electron', 'chrome', 'memory', 'demo']) {
+      const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+      expect(section).toMatch(/needs: (?:audit|\[changes, audit\])/)
+      expect(section).not.toMatch(/if:.*(?:always\(|!cancelled\()/)
+    }
+    const audit = await read('.github/workflows/audit.yml')
+    expect(audit).toContain('runs-on: ubuntu-24.04')
+    expect(audit).toContain('npm audit --audit-level=high')
+    expect(audit).toContain("-${{ inputs.caller || 'audit' }}")
+    expect(audit).not.toContain('continue-on-error:')
+    const context = { workflow: 'CI and browser release', ref: 'refs/heads/main' }
+    const callers = ['audit', 'ci', 'e2e', 'browser', 'e2e-memory', 'demo']
+    const groups = callers.map((caller) => concurrencyGroup(audit, { ...context, caller }))
+    expect(new Set(groups).size).toBe(callers.length)
+    const firstPr = concurrencyGroup(audit, { ...context, pr: 1 })
+    const secondPr = concurrencyGroup(audit, { ...context, pr: 2 })
+    expect(firstPr).not.toBe(secondPr)
+  })
+
   it.each([
     ['sign', 'gate'],
     ['publish', 'sign'],
