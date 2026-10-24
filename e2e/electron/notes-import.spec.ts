@@ -204,6 +204,7 @@ test.describe('desktop Import Notes', () => {
     await clickApplicationMenuItem(app, 'File', 'Import Notes…')
     await expect(window.getByRole('dialog')).toBeVisible()
     await window.reload()
+    await expect(node(window, 1)).toHaveValue('Previous synthetic notes')
     await expect.poll(() => readdirSync(join(userDataDir, '.notes-import'))).toEqual([])
     await clickApplicationMenuItem(app, 'File', 'Import Notes…')
     await expect(window.getByRole('dialog')).toBeVisible()

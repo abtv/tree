@@ -101,9 +101,12 @@ test.describe('interrupted notes replacement', () => {
       const previous = readFileSync(documentPath(userDataDir), 'utf8')
       stage.apply(userDataDir, stageImport(userDataDir, importedDocument))
 
-      const { app, window } = await launchTree(userDataDir)
+      // Recovery focuses the import result panel, so no editing session is needed.
+      const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
       await expect(node(window, 1)).toHaveValue('Imported notes')
+      const result = window.getByRole('complementary', { name: 'Notes activity' })
+      await expect(result.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
       await closeApp(app)
       const folder = join(userDataDir, 'Replaced Notes', FOLDER)
       expect(readdirSync(folder).sort()).toEqual(['attachments', ...OLD_DOCUMENT_FILES].sort())
