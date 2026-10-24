@@ -14,7 +14,6 @@ it('loads script libraries with native Node type stripping and no transpilation 
     './scripts/web/static-server.mts',
     './scripts/web-release/prepare.mts',
     './scripts/web-release/publish.mts',
-    './scripts/web-release/selection.mts',
     './scripts/web-release/verify-target.mts',
   ]
   const result = spawnSync(

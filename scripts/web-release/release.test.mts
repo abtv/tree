@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createManifest, verifyPackage } from './package.mts'
-import { MAX_PACKAGE_BYTES, selectChecks, validateGate, validateManifest } from './policy.mts'
+import { MAX_PACKAGE_BYTES, validateGate, validateManifest } from './policy.mts'
 
 const identity = {
   sourceRepository: 'abtv/tree',
@@ -104,47 +104,16 @@ describe('release manifest and package', () => {
 })
 
 describe('release gates', () => {
-  const success = Object.fromEntries(
-    ['changes', 'check', 'electron', 'audit', 'chrome', 'memory', 'demo'].map((key) => [key, { result: 'success' }]),
-  )
-  it('requires every mandatory check and every selected optional check to succeed', () => {
-    expect(() => validateGate(success, { memoryRequired: true, demoRequired: true })).not.toThrow()
+  const success = Object.fromEntries(['check', 'audit', 'chrome'].map((key) => [key, { result: 'success' }]))
+  it('requires every Linux publication check to succeed', () => {
+    expect(() => validateGate(success)).not.toThrow()
     for (const key of Object.keys(success)) {
       for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
-        expect(() =>
-          validateGate({ ...success, [key]: { result } }, { memoryRequired: true, demoRequired: true }),
-        ).toThrow()
+        expect(() => validateGate({ ...success, [key]: { result } })).toThrow()
       }
-    }
-  })
-  it('permits optional skipped jobs only when their path selector excludes them', () => {
-    const skipped = { ...success, memory: { result: 'skipped' }, demo: { result: 'skipped' } }
-    expect(() => validateGate(skipped, { memoryRequired: false, demoRequired: false })).not.toThrow()
-    expect(() => validateGate(skipped, { memoryRequired: undefined, demoRequired: false })).toThrow()
-    expect(() =>
-      validateGate({ ...skipped, demo: { result: 'failure' } }, { memoryRequired: false, demoRequired: false }),
-    ).toThrow()
-  })
-  it('matches the conditional workflow paths without making unrelated documentation run them', () => {
-    expect(selectChecks(['docs/PRODUCT.md', '.github/workflows/web-release.yml'])).toEqual({
-      memory: false,
-      demo: false,
-    })
-    expect(selectChecks(['src/renderer/main.tsx'])).toEqual({ memory: false, demo: true })
-    expect(selectChecks(['src/electron/main/index.ts'])).toEqual({ memory: false, demo: true })
-    expect(selectChecks(['src/web/main.tsx', 'scripts/web/build.mts'])).toEqual({ memory: false, demo: false })
-    expect(selectChecks(['e2e/electron/shared-application-memory.spec.ts'])).toEqual({ memory: true, demo: false })
-    expect(selectChecks(['.github/workflows/e2e.yml'])).toEqual({ memory: true, demo: false })
-    expect(selectChecks(['package-lock.json'])).toEqual({ memory: true, demo: true })
-    expect(selectChecks(['e2e/electron/electron-entry.cjs'])).toEqual({ memory: true, demo: true })
-  })
-  it('revalidates both suites when publication policy changes, including migration from push-only selection', () => {
-    for (const path of [
-      '.github/workflows/release.yml',
-      'scripts/web-release/selection.mts',
-      'scripts/web-release/policy.mts',
-    ]) {
-      expect(selectChecks([path])).toEqual({ memory: true, demo: true })
+      const missing = { ...success }
+      delete missing[key]
+      expect(() => validateGate(missing)).toThrow()
     }
   })
 })

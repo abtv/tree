@@ -101,59 +101,8 @@ export function validateManifest(input: unknown): Manifest {
   return manifest
 }
 
-export function validateGate(
-  results: Record<string, { result: string | undefined }>,
-  { memoryRequired, demoRequired }: { memoryRequired: unknown; demoRequired: unknown },
-) {
-  for (const key of ['changes', 'check', 'electron', 'audit', 'chrome']) {
+export function validateGate(results: Record<string, { result: string | undefined }>) {
+  for (const key of ['check', 'audit', 'chrome']) {
     if (results[key]?.result !== 'success') throw new Error(`Release check ${key} did not succeed`)
-  }
-  for (const [key, required] of [
-    ['memory', memoryRequired],
-    ['demo', demoRequired],
-  ] as const) {
-    if (typeof required !== 'boolean') throw new Error(`Missing release selector for ${key}`)
-    const result = results[key]?.result
-    if (result !== 'success' && !(result === 'skipped' && !required)) {
-      throw new Error(`Release check ${key} did not succeed`)
-    }
-  }
-}
-
-// Keep suite inputs aligned with demo.yml and e2e-memory.yml. Release-policy
-// changes require both suites, including migration from the old push-only gate.
-export function selectChecks(paths: string[]) {
-  const shared = /^(?:package(?:-lock)?\.json$|\.nvmrc$|\.github\/workflows\/release\.yml$|scripts\/web-release\/)/
-  return {
-    demo: paths.some(
-      (path) =>
-        shared.test(path) ||
-        /^src\/(?!web\/)/.test(path) ||
-        [
-          'scripts/record-demo.mts',
-          'scripts/readme-screenshots.mts',
-          'docs/images/demo-document.json',
-          'e2e/electron/electron-entry.cjs',
-          'e2e/electron/hidden-windows.cjs',
-          'e2e/electron/shortcut-stub.cjs',
-          'electron.vite.config.ts',
-          '.github/workflows/demo.yml',
-        ].includes(path),
-    ),
-    memory: paths.some(
-      (path) =>
-        shared.test(path) ||
-        /^e2e\/electron\/(?:shared-application[^/]*\.spec\.ts|[^/]+\.cjs)$/.test(path) ||
-        /^playwright[^/]*\.config\.ts$/.test(path) ||
-        /^\.github\/workflows\/e2e[^/]*\.yml$/.test(path) ||
-        [
-          'e2e/electron/fixtures.ts',
-          'e2e/electron/global-setup.ts',
-          'e2e/electron/electron-process.ts',
-          'e2e/electron/clipboard-lock.ts',
-          'tsconfig.e2e.json',
-          'scripts/e2e-diagnose.mts',
-        ].includes(path),
-    ),
   }
 }

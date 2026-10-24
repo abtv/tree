@@ -47,9 +47,9 @@ describe('automatic publication wiring', () => {
       expect(section).not.toMatch(/^ {4}if:/m) // Retain GitHub's default success() gate.
     }
     const release = await read('.github/workflows/release.yml')
-    for (const job of ['check', 'electron', 'chrome', 'memory', 'demo']) {
+    for (const job of ['check', 'chrome']) {
       const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
-      expect(section).toMatch(/needs: (?:audit|\[changes, audit\])/)
+      expect(section).toContain('needs: audit')
       expect(section).not.toMatch(/if:.*(?:always\(|!cancelled\()/)
     }
     const audit = await read('.github/workflows/audit.yml')
@@ -69,13 +69,11 @@ describe('automatic publication wiring', () => {
   it.each([
     ['sign', 'gate'],
     ['publish', 'sign'],
-  ])('lets %s follow a successful %s despite skipped optional ancestors', async (job, prerequisite) => {
+  ])('lets %s follow a successful %s with source identity guards', async (job, prerequisite) => {
     const release = await read('.github/workflows/release.yml')
     const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
     expect(section).toContain(`needs: [${prerequisite}]`)
-    // An explicit status function overrides GitHub's implicit success(), which
-    // propagates optional ancestor skips even through a successful release gate.
-    // Keep the direct prerequisite and source identity checks fail-closed.
+    // Keep cancellation, direct prerequisite and source identity checks fail-closed.
     expect(section.match(/^ {4}if: (.+)$/m)?.[1]).toBe(
       `\${{ !cancelled() && needs.${prerequisite}.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}`,
     )
@@ -126,7 +124,7 @@ describe('automatic publication wiring', () => {
     expect(release).toContain('branches: [main]')
     expect(release).not.toContain('pull_request_target')
     expect(release).not.toContain('workflow_run:')
-    expect(release).toContain('needs: [changes, check, electron, audit, chrome, memory, demo]')
+    expect(release).toContain('needs: [check, audit, chrome]')
     expect(release).toMatch(/gate:\n\s+name: Release gate\n\s+if: always\(\)/)
     expect(release).toMatch(/sign:\n[\s\S]*?needs: \[gate\]/)
     expect(release).toMatch(/publish:\n[\s\S]*?needs: \[sign\]/)
@@ -134,11 +132,11 @@ describe('automatic publication wiring', () => {
     expect(release).toContain('name: browser-${{ github.sha }}-${{ github.run_attempt }}')
     expect(release).toContain('permission-contents: write')
     expect(release).toContain('repositories: tree-editor.github.io')
-    const selection = release.split('\n  changes:')[1]!.split('\n  check:')[0]
-    expect(selection).toContain('actions: read')
-    expect(selection).toContain('GH_TOKEN: ${{ github.token }}')
-    expect(selection).toContain('fetch-depth: 0')
-    expect(selection).toContain('cli.mts changes "$BEFORE_SHA" "$GITHUB_SHA"')
+    expect(release).not.toMatch(/\n {2}(?:changes|electron|memory|demo):/)
+    expect(release).not.toMatch(/uses: .*workflows\/(?:e2e|e2e-memory|demo)\.yml/)
+    expect(release).not.toContain('RELEASE_MEMORY_REQUIRED')
+    expect(release).not.toContain('RELEASE_DEMO_REQUIRED')
+    expect(release).not.toContain('runs-on: macos')
     const checks = release.split('\n  publish:')[0]
     expect(checks).not.toContain('secrets.')
     expect(checks).not.toContain('secrets: inherit')
@@ -148,14 +146,21 @@ describe('automatic publication wiring', () => {
     expect(browser).not.toContain('npm run build:web') // No rebuilding after Chrome passes.
   })
 
-  it('preserves PR, scheduled/manual and six-shard coverage without duplicate main triggers', async () => {
-    for (const name of ['ci', 'e2e', 'audit', 'demo', 'e2e-memory']) {
+  it('keeps all macOS workflows weekly/manual and Linux validation on PRs and main', async () => {
+    for (const name of ['e2e', 'e2e-memory', 'performance', 'demo']) {
       const text = await read(`.github/workflows/${name}.yml`)
+      expect(text).toContain('runs-on: macos-15')
+      const triggers = text.split('\non:\n')[1]!.split('\npermissions:')[0]!
+      expect(triggers).toContain('schedule:')
+      expect(triggers).toMatch(/cron: '0 [2-5] \* \* 0'/)
+      expect(triggers).toContain('workflow_dispatch:')
+      expect(triggers).not.toMatch(/^ {2}(?:push|pull_request|workflow_call):/m)
+    }
+    for (const name of ['ci', 'browser']) {
+      const text = await read(`.github/workflows/${name}.yml`)
+      expect(text).toContain('pull_request:')
       expect(text).toContain('workflow_call:')
       expect(text).not.toMatch(/^ {2}push:/m)
-      if (['ci', 'e2e', 'e2e-memory'].includes(name)) expect(text).toContain('pull_request:')
-      if (['audit', 'e2e-memory'].includes(name)) expect(text).toContain('schedule:')
-      if (name !== 'ci') expect(text).toContain('workflow_dispatch:')
     }
     const electron = await read('.github/workflows/e2e.yml')
     expect(electron).toContain('shard: [1, 2, 3, 4, 5, 6]')

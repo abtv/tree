@@ -13,38 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  changes:
-    name: Select conditional checks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 2
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      memory: ${{ steps.changes.outputs.memory }}
-      demo: ${{ steps.changes.outputs.demo }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
-        with:
-          node-version-file: .nvmrc
-      - id: changes
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/web-release/cli.mts changes "$BEFORE_SHA" "$GITHUB_SHA"
-
   check:
     needs: audit
     name: Standard checks
     uses: ./.github/workflows/ci.yml
-  electron:
-    needs: audit
-    name: Desktop integration
-    uses: ./.github/workflows/e2e.yml
   audit:
     name: Dependency audit
     uses: ./.github/workflows/audit.yml
@@ -52,25 +24,10 @@ jobs:
     needs: audit
     name: Browser integration
     uses: ./.github/workflows/browser.yml
-  memory:
-    name: Memory checks
-    needs: [changes, audit]
-    if: needs.changes.outputs.memory == 'true'
-    uses: ./.github/workflows/e2e-memory.yml
-  demo:
-    name: Demo checks
-    needs: [changes, audit]
-    if: needs.changes.outputs.demo == 'true'
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/demo.yml
-
   gate:
     name: Release gate
     if: always()
-    needs: [changes, check, electron, audit, chrome, memory, demo]
+    needs: [check, audit, chrome]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -83,8 +40,6 @@ jobs:
       - name: Require all applicable checks of this commit
         env:
           RELEASE_RESULTS: ${{ toJSON(needs) }}
-          RELEASE_MEMORY_REQUIRED: ${{ needs.changes.outputs.memory }}
-          RELEASE_DEMO_REQUIRED: ${{ needs.changes.outputs.demo }}
         run: node scripts/web-release/cli.mts gate
 
   sign:

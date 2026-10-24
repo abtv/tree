@@ -114,16 +114,12 @@ without requesting separate clipboard-read confirmation. Tree handles that data
 through its existing text/image paste, size-limit, undo and save rules.
 
 A push to source `main` publishes to `https://tree-editor.github.io` only after
-the same commit passes standard validation, Electron integration, dependency
-audit and Chromium checks of the built package, plus applicable memory/demo checks.
-Scheduled/manual suites are separate. Safari is outside this current publication
+the same commit passes standard validation, dependency audit and Chromium checks
+of the built package. macOS Electron integration, memory, performance and demo
+workflows run weekly or manually, independently of publication. Safari is outside this current publication
 gate. Publication transfers the tested package without rebuilding it. Failed
 checks, transfer or pre-deployment verification leave the active release intact.
 
-Conditional checks cover both the current push and changes since an ancestral,
-fully successful source release, so a documentation-only push cannot hide a
-previously failed relevant change. Without a suitable successful baseline, both
-checks run. Changes to publication policy also require both checks.
 Scheduled or manual check runs must not cancel checks belonging to a publication.
 
 Publication independently authenticates a source-signed manifest and every file

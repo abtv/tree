@@ -7,29 +7,19 @@ push to main. PRs check code but cannot publish or receive publishing secrets.
 
 ## Release checks
 
-The release workflow calls standard validation, all six Electron E2E shards and
-their aggregate, the high-severity dependency audit, and the Chrome static-package
-check. It also calls the existing memory and demo workflows when their suite-input
-path selectors apply to the current push or to the changes since a fully successful
-source release. Selection reads the latest page of successful `release.yml` pushes
-to source main and uses the first ancestral commit, excluding the current run.
-A failed or canceled release cannot advance that baseline, so a later
-documentation-only push retains checks required by unpublished changes. If the
-bounded history has no suitable baseline, both checks run. Changes to
-`scripts/web-release/` or `release.yml` also require both checks; this establishes
-a checked baseline when migrating from the old last-push-only selector.
-Failed, missing or canceled checks block publication.
-Only a deliberately unselected memory/demo job may be skipped. The gate also
-requires successful change selection, so unavailable API history or a required
-Git revision fails closed. History is unnecessary when the current push already
-requires both checks. Nightly/manual performance, property soak and mutation runs remain separate.
+The release workflow calls standard validation, the high-severity dependency
+audit, and the Chrome static-package check on Linux for the same source commit.
+Failed, missing, skipped or canceled checks block publication.
+macOS workflows run weekly or manually: all six Electron E2E shards and their
+aggregate, memory measurements, performance checks and demo capture. They do not
+run on pull requests or source pushes and do not gate browser publication.
+Property soak and mutation runs also remain separate.
 Playwright's Chromium on Linux arm64 is the current browser gate; Google Chrome,
 Safari and full browser parity remain later work. The source demo workflow keeps
 publishing to its existing media site.
 
-Signing and transfer explicitly override GitHub Actions' default status check so
-an optional ancestor's skip does not suppress publication after a successful gate.
-Both jobs reject cancellation and require their direct prerequisite to succeed.
+Signing and transfer both reject cancellation and require their direct
+prerequisite to succeed.
 
 The browser job builds and tests `out/web/` once. An artifact named with source
 SHA and run attempt contains exactly those files and a per-file SHA256 manifest. After the

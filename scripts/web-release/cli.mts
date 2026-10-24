@@ -1,14 +1,8 @@
-import { appendFile, readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { createManifest, verifyPackage } from './package.mts'
 import { validateGate } from './policy.mts'
-import { selectReleaseChecks } from './selection.mts'
 import { preparePackage } from './prepare.mts'
 import { verifyIdentity } from './publish.mts'
-
-function flag(value: string | undefined) {
-  if (value !== 'true' && value !== 'false') throw new Error('Release selector must be true or false')
-  return value === 'true'
-}
 
 try {
   const [command, first, second, ...extra] = process.argv.slice(2)
@@ -27,19 +21,8 @@ try {
   } else if (command === 'verify' && first && second) {
     await verifyPackage(first, JSON.parse(await readFile(second, 'utf8')))
   } else if (command === 'gate' && !first) {
-    validateGate(JSON.parse(process.env.RELEASE_RESULTS!), {
-      memoryRequired: flag(process.env.RELEASE_MEMORY_REQUIRED),
-      demoRequired: flag(process.env.RELEASE_DEMO_REQUIRED),
-    })
-  } else if (command === 'changes' && /^[a-f0-9]{40}$/.test(first!) && /^[a-f0-9]{40}$/.test(second!)) {
-    const checks = await selectReleaseChecks(first, second, {
-      currentRunId: process.env.GITHUB_RUN_ID,
-      token: process.env.GH_TOKEN,
-    })
-    const output = `demo=${checks.demo}\nmemory=${checks.memory}\n`
-    if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required')
-    await appendFile(process.env.GITHUB_OUTPUT, output)
-  } else throw new Error('Usage: cli.mts manifest|verify <directory> <manifest> | gate | changes <before> <after>')
+    validateGate(JSON.parse(process.env.RELEASE_RESULTS!))
+  } else throw new Error('Usage: cli.mts manifest|prepare|verify <directory> <manifest> | gate')
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
   process.exitCode = 1
