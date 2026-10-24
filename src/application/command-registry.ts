@@ -1,3 +1,5 @@
+import { dataMenuCommands } from './menu-commands'
+
 export type CommandAppearance = 'system' | 'light' | 'dark'
 
 export interface CommandCapabilities {
@@ -33,6 +35,7 @@ export interface ApplicationCommand {
   description: string
   shortcut?: CommandShortcut
   requires?: keyof CommandCapabilities
+  enabled?: boolean
   active(context: CommandContext): boolean
   run(services: CommandServices, context: CommandContext): Promise<void>
 }
@@ -94,6 +97,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
 export function normalizeCommandHistory(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   const names = new Set(commandRegistry.filter((command) => command.name !== 'quit').map((command) => command.name))
+  for (const name of Object.keys(dataMenuCommands)) names.add(name)
   return [...new Set(value.filter((name): name is string => typeof name === 'string' && names.has(name)))].slice(0, 100)
 }
 

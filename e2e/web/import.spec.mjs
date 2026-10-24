@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 import { serializeState } from '../../src/domain/document.ts'
 import {
@@ -67,7 +67,11 @@ test('imports an exported archive into another browser profile after confirmatio
   await saved(target)
   const targetHead = await readStored(target, 'document', 'head')
 
-  await chooseImportFile(target, archivePath)
+  await target.keyboard.press(`${primaryKey}+Shift+p`)
+  await target.getByRole('combobox', { name: 'Command' }).fill('import-notes')
+  const choosing = target.waitForEvent('filechooser')
+  await target.keyboard.press('Enter')
+  await (await choosing).setFiles(archivePath)
   const dialog = confirmation(target)
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()

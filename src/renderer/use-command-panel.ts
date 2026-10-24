@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { emptyMenuCommands, type MenuCommandSource } from '../application/menu-commands'
 import {
   availableCommands,
   matchCommands,
@@ -28,11 +29,14 @@ export function useCommandPanel(options: {
   beforeViewChange(): void
   beforeOpen?: () => void
   shortcuts?: ShortcutProfile
+  menuCommands?: MenuCommandSource | undefined
 }) {
   const { store, vimEnabled, vimMode, commandState, alwaysOnTop, setAlwaysOnTop, applyVimEnabled, beforeViewChange } =
     options
   const shortcuts = options.shortcuts ?? APPLE_SHORTCUTS
   const beforeOpen = options.beforeOpen
+  const menuCommands = options.menuCommands ?? emptyMenuCommands
+  const menuEntries = useSyncExternalStore(menuCommands.subscribe, menuCommands.getSnapshot)
   const [open, setOpen] = useState(false)
   const vimAvailable = options.vimAvailable ?? true
   const alwaysOnTopAvailable = options.alwaysOnTopAvailable ?? true
@@ -50,8 +54,11 @@ export function useCommandPanel(options: {
   const snapshot = store.getSnapshot()
   const view: 'agenda' | 'tree' = snapshot.status === 'ready' && snapshot.agenda !== undefined ? 'agenda' : 'tree'
   const commands = useMemo(
-    () => availableCommands({ vim: vimAvailable, alwaysOnTop: alwaysOnTopAvailable }),
-    [vimAvailable, alwaysOnTopAvailable],
+    () =>
+      [...availableCommands({ vim: vimAvailable, alwaysOnTop: alwaysOnTopAvailable }), ...menuEntries].sort((a, b) =>
+        a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+      ),
+    [vimAvailable, alwaysOnTopAvailable, menuEntries],
   )
   const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
@@ -79,6 +86,12 @@ export function useCommandPanel(options: {
   const run = useCallback(
     async (command: ApplicationCommand | undefined) => {
       if (running.current) return
+      if (command?.enabled === false) return
+      if (menuEntries.includes(command!)) {
+        const current = menuCommands.getSnapshot().find((entry) => entry.name === command?.name)
+        if (current === undefined || current.enabled === false) return
+        command = current
+      }
       close()
       if (command === undefined) {
         setMessage(`Not a command: ${input.trim()}`)
@@ -137,6 +150,8 @@ export function useCommandPanel(options: {
       vimEnabled,
       view,
       beforeViewChange,
+      menuCommands,
+      menuEntries,
     ],
   )
 
@@ -182,7 +197,7 @@ export function useCommandPanel(options: {
       if (
         (!shortcut && !colon) ||
         event.isComposing ||
-        store.getSnapshot().status !== 'ready' ||
+        store.getSnapshot().status === 'loading' ||
         !(target instanceof Element) ||
         target.closest('[role="dialog"]')
       )

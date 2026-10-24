@@ -154,28 +154,36 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     const state = store.getSnapshot()
     return state.status === 'ready' && state.persistenceLocked === true
   }
-  installFolderBackup(session, menu, {
+  const refreshBackup = installFolderBackup(session, menu, {
     available: () => !running && !locked(),
     restore: (folder) => startImport(folder),
     flush: () => store.flushPersistence(),
   })
-  menu.addEventListener('beforetoggle', (event) => {
-    if ((event as ToggleEvent).newState !== 'open') return
-    exportButton.disabled = running || locked()
-    importButton.disabled = running || locked()
-    restoreButton.disabled = running || locked()
-  })
+  const refresh = () => {
+    const disabled = running || locked()
+    for (const button of [exportButton, importButton, restoreButton]) {
+      if (button.disabled !== disabled) button.disabled = disabled
+    }
+    refreshBackup()
+  }
+  const setRunning = (value: boolean) => {
+    running = value
+    refresh()
+  }
+  store.subscribe(refresh)
+  menu.addEventListener('beforetoggle', refresh)
+  refresh()
   restoreButton.hidden = !supportsFolderBackup()
 
   exportButton.onclick = () => {
     menu.hidePopover()
     if (running || locked()) return
-    running = true
+    setRunning(true)
     clearTimeout(hideTimer)
     let cancel = () => {}
     const cancelExport = () => {
       cancel()
-      running = false
+      setRunning(false)
       panel.hide()
     }
     cancel = startExport(store, (update) => {
@@ -183,7 +191,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         panel.show(update.text, 'Cancel', cancelExport)
         return
       }
-      running = false
+      setRunning(false)
       panel.show(update.text, 'OK', () => panel.hide())
       if (update.state === 'done' && update.complete) {
         hideTimer = setTimeout(() => panel.hide(), SUCCESS_MESSAGE_MILLISECONDS)
@@ -250,7 +258,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     if (running || locked()) return
     const restoring = !(file instanceof File)
     const progress = restoring ? restoreProgressText : importProgressText
-    running = true
+    setRunning(true)
     clearTimeout(hideTimer)
     let active = true
     let committing = false
@@ -260,7 +268,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     let resumeWrites: (() => void) | undefined
     const stop = () => {
       active = false
-      running = false
+      setRunning(false)
       // A terminated worker's last image transaction was created before this one, so the
       // journal sweep also removes it.
       worker?.terminate()

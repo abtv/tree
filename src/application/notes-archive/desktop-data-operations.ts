@@ -9,6 +9,7 @@ import type {
   NotesImportNotice,
 } from '../../shared/ipc'
 import { exportProgressText, exportResultText, importProgressText } from './archive-messages'
+import { MenuCommands } from '../menu-commands'
 
 export interface DesktopNotesApi {
   chooseNotesExportDestination(): Promise<NotesFileChoice>
@@ -48,6 +49,7 @@ const messageOf = (error: unknown) => (error instanceof Error ? error.message : 
 
 /** Coordinates the desktop archive commands without DOM, React or platform dependencies. */
 export class DesktopDataOperations {
+  readonly menuCommands = new MenuCommands()
   private state: DataActivity = { phase: 'idle' }
   private listeners = new Set<() => void>()
   private stops: (() => void)[] = []
@@ -107,6 +109,22 @@ export class DesktopDataOperations {
       canExport: state.status === 'ready' && available,
       canImport: (state.status === 'ready' || state.status === 'error') && available,
     }
+    this.menuCommands.update([
+      {
+        name: 'export-notes',
+        enabled: next.canExport,
+        run: () => {
+          void this.exportNotes()
+        },
+      },
+      {
+        name: 'import-notes',
+        enabled: next.canImport,
+        run: () => {
+          void this.importNotes()
+        },
+      },
+    ])
     if (!this.noticeTaken && (state.status === 'ready' || state.status === 'error')) {
       this.noticeTaken = true
       void this.showImportNotice()

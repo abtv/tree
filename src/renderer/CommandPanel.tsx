@@ -27,6 +27,7 @@ export function CommandPanel({
           id={`command-${command.name}`}
           role="option"
           aria-selected={index === selected}
+          aria-disabled={command.enabled === false || undefined}
           className={`command-row${index === selected ? ' command-row-selected' : ''}`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => run(command)}

@@ -38,6 +38,7 @@ import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 
 interface AppProps {
+  menuCommands?: import('../application/menu-commands').MenuCommandSource
   store: EditorStore
   /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
   initialVimEnabled: boolean
@@ -65,6 +66,7 @@ export function App({
   shortcutPlatform = 'apple',
   attachmentImages = attachmentImageCache,
   dataOperations,
+  menuCommands,
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
@@ -170,6 +172,7 @@ export function App({
     [setVimEditing, store],
   )
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+    menuCommands: menuCommands ?? dataOperations?.menuCommands,
     vimAvailable,
     alwaysOnTopAvailable,
     shortcuts,
@@ -381,6 +384,38 @@ export function App({
     [nodeInputBindings, searchQuery, searchResult],
   )
 
+  const commandList = commandPanel.open ? (
+    <CommandPanel
+      matches={commandPanel.matches}
+      selected={commandPanel.selected}
+      context={commandPanel.context}
+      run={commandPanel.run}
+      shortcuts={shortcuts}
+    />
+  ) : null
+  const commandInput = (
+    <label className="command-input-line">
+      <span>:</span>
+      <input
+        ref={bindCommandInput}
+        value={commandPanel.input}
+        onChange={(event) => commandPanel.changeInput(event.target.value)}
+        aria-label="Command"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="command-panel"
+        aria-autocomplete="list"
+        autoComplete="off"
+        spellCheck={false}
+        aria-activedescendant={
+          commandPanel.matches[commandPanel.selected] === undefined
+            ? undefined
+            : `command-${commandPanel.matches[commandPanel.selected]?.name}`
+        }
+      />
+    </label>
+  )
+
   if (state.status === 'loading')
     return (
       <main className="app-shell">
@@ -389,12 +424,23 @@ export function App({
     )
   if (state.status === 'error') {
     return (
-      <main className="app-shell error-state" role="alert">
-        <h1>Tree could not open this document</h1>
-        <p>{state.message}</p>
-        <p>The existing data was left unchanged.</p>
+      <div className="tree-app">
+        <main className="app-shell error-state" role="alert">
+          <h1>Tree could not open this document</h1>
+          <p>{state.message}</p>
+          <p>The existing data was left unchanged.</p>
+        </main>
         {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
-      </main>
+        {commandList}
+        <footer className="status-bar">
+          {commandPanel.open ? commandInput : commandPanel.message}
+          {commandPanel.open ? (
+            <span className="command-count">
+              {commandPanel.matches.length} of {commandPanel.total}
+            </span>
+          ) : null}
+        </footer>
+      </div>
     )
   }
 
@@ -546,39 +592,12 @@ export function App({
       </div>
       {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
-      {commandPanel.open ? (
-        <CommandPanel
-          matches={commandPanel.matches}
-          selected={commandPanel.selected}
-          context={commandPanel.context}
-          run={commandPanel.run}
-          shortcuts={shortcuts}
-        />
-      ) : null}
+      {commandList}
       <footer className="status-bar">
         {search.draft !== undefined && !commandPanel.open ? (
           <SearchPrompt store={store} snapshot={search} restoreEditor={restoreSearchFocus} shortcuts={shortcuts} />
         ) : commandPanel.open ? (
-          <label className="command-input-line">
-            <span>:</span>
-            <input
-              ref={bindCommandInput}
-              value={commandPanel.input}
-              onChange={(event) => commandPanel.changeInput(event.target.value)}
-              aria-label="Command"
-              role="combobox"
-              aria-expanded="true"
-              aria-controls="command-panel"
-              aria-autocomplete="list"
-              autoComplete="off"
-              spellCheck={false}
-              aria-activedescendant={
-                commandPanel.matches[commandPanel.selected] === undefined
-                  ? undefined
-                  : `command-${commandPanel.matches[commandPanel.selected]?.name}`
-              }
-            />
-          </label>
+          commandInput
         ) : commandPanel.message !== undefined ? (
           <span className="command-error" role="status">
             {commandPanel.message}

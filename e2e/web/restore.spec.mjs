@@ -1,6 +1,6 @@
 // @editing-modes: independent
 // @requirement PRODUCT.md §24.6
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 import { serializeState } from '../../src/domain/document.ts'
 import {
@@ -71,7 +71,9 @@ test('restores a backup folder into a browser profile whose storage was cleared'
   await expect(page.locator('#backup-status')).toHaveText('Folder backup is off.')
   const cleanHead = await readStored(page, 'document', 'head')
 
-  await chooseMenuItem(page, 'Restore from Folder…')
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
+  await page.getByRole('combobox', { name: 'Command' }).fill('restore-from-folder')
+  await page.keyboard.press('Enter')
   const dialog = confirmation(page)
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
   expect(await page.evaluate(() => window.backupPickerOptions)).toEqual({ mode: 'read', id: 'tree-backup' })

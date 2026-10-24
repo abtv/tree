@@ -101,7 +101,11 @@ for (const [profile, modifier, otherModifier, label] of [
     const panel = page.getByRole('listbox', { name: 'Application commands' })
     await expect(panel).toBeVisible()
     await expect(panel.locator('.command-name')).toHaveText([
+      'back-up-to-folder',
+      'export-notes',
+      'import-notes',
       'quit',
+      'restore-from-folder',
       'set-theme-auto',
       'set-theme-dark',
       'set-theme-light',
@@ -109,7 +113,7 @@ for (const [profile, modifier, otherModifier, label] of [
       'show-tree',
       'toggle-vim-mode',
     ])
-    await expect(page.locator('.command-count')).toHaveText('7 of 7')
+    await expect(page.locator('.command-count')).toHaveText('11 of 11')
     await capture(page, `${profile}-available-commands.png`)
     const selected = () => panel.locator('[aria-selected="true"]').getAttribute('id')
     const first = await selected()
@@ -132,10 +136,10 @@ for (const [profile, modifier, otherModifier, label] of [
     await rowInput(page, 'parent').focus()
     await page.keyboard.press('Escape')
     await page.keyboard.press(':')
-    await expect(panel.locator('.command-name')).toHaveCount(7)
+    await expect(panel.locator('.command-name')).toHaveCount(11)
     await page.getByRole('combobox', { name: 'Command', exact: true }).fill('toggle-always-on-top')
     await expect(panel.getByRole('option')).toHaveCount(0)
-    await expect(page.locator('.command-count')).toHaveText('0 of 7')
+    await expect(page.locator('.command-count')).toHaveText('0 of 11')
     await page.keyboard.press('Enter')
     await expect(page.locator('.command-error')).toHaveText('Not a command: toggle-always-on-top')
     expect(await page.evaluate(() => window.treeApi.getCommandHistory())).toEqual(['toggle-always-on-top'])

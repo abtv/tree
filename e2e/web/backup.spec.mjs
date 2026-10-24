@@ -1,7 +1,7 @@
 // @editing-modes: independent
 // @requirement PRODUCT.md §24.5
 import { chromium } from '@playwright/test'
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 import {
   chooseMenuItem,
   installBackupPicker,
@@ -371,17 +371,26 @@ test('a stopped backup worker can be resumed without affecting browser saves', a
     const response = await route.fetch()
     await route.fulfill({ response, body: `throw new Error('Synthetic worker failure');\n${await response.text()}` })
   })
-  await chooseMenuItem(page, 'Back Up to Folder…')
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
+  await page.getByRole('combobox', { name: 'Command' }).fill('back-up-to-folder')
+  await page.keyboard.press('Enter')
   await expect(page.locator('#backup-status')).toContainText('The backup stopped unexpectedly.')
   await expect(page.locator('#tree-menu-button')).toHaveClass('backup-attention')
   await page.locator('[data-node-id="welcome"] .node-input').pressSequentially('Saved despite backup failure ')
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   await saved(page)
   await page.unroute(/backup\.worker/)
-  await page.locator('#tree-menu-button').click()
-  await page.getByRole('button', { name: 'Resume Backing Up…', exact: true }).click()
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
+  await page.getByRole('combobox', { name: 'Command' }).fill('resume-backing-up')
+  await expect(page.locator('#command-back-up-to-folder')).toHaveCount(0)
+  await page.keyboard.press('Enter')
   await page.getByRole('button', { name: 'Resume Backing Up', exact: true }).click()
   await expect(page.locator('#backup-status')).toContainText('Backed up')
+  expect((await readBackup(page))['document.json']).toContain('Saved despite backup failure ')
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
+  await page.getByRole('combobox', { name: 'Command' }).fill('stop-backing-up')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#backup-status')).toHaveText('Folder backup is off.')
   expect((await readBackup(page))['document.json']).toContain('Saved despite backup failure ')
 })
 

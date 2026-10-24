@@ -6,6 +6,7 @@ import { installBrowserPrototype } from './services'
 import { capturePasteClipboard } from './paste'
 import { isApplePlatform } from './device'
 import { installDataMenu } from './data-menu'
+import { browserMenuCommands } from './menu-commands'
 import { requestPersistentStorage, storageProtectionText } from './storage-persistence'
 import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
@@ -19,9 +20,13 @@ try {
   const store = new EditorStore(bridge.services, () => crypto.randomUUID(), bridge.clock)
   bridge.connect(store)
   await store.initialize()
+  const menu = document.getElementById('tree-menu')!
+  installDataMenu(store, menu, bridge.data)
+  const menuCommands = browserMenuCommands(menu)
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <App
+        menuCommands={menuCommands}
         initialVimEnabled={await window.treeApi.getVimEnabled()}
         vimAvailable={bridge.vimAvailable}
         alwaysOnTopAvailable={false}
@@ -37,7 +42,6 @@ try {
       />
     </ErrorBoundary>,
   )
-  const menu = document.getElementById('tree-menu')!
   const run = (action: () => void | Promise<unknown>) => async () => {
     menu.hidePopover()
     try {
@@ -61,7 +65,6 @@ try {
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-appearance]')) {
     button.onclick = run(() => window.treeApi.setAppearance(button.dataset.appearance as 'system' | 'light' | 'dark'))
   }
-  installDataMenu(store, menu, bridge.data)
   Object.assign(window, { prototypeStore: store })
   void requestPersistentStorage(navigator.storage).then((protection) => {
     const status = document.getElementById('storage-status')!

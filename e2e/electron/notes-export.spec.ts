@@ -87,6 +87,32 @@ async function inspectGeometry(page: Page, error = false): Promise<void> {
 test.describe('desktop Export Notes', () => {
   configureHiddenParallelTests()
 
+  // @requirement PRODUCT.md §20.2.28
+  test('exports through the command panel and blocks data commands while running', async ({ userDataDir }) => {
+    seed(userDataDir)
+    const destination = join(userDataDir, 'Panel Notes.zip')
+    const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+    await choosePath(app, destination)
+    await holdExport(app)
+    await node(window, 1).focus()
+    await window.keyboard.press('Meta+Shift+p')
+    await window.getByRole('combobox', { name: 'Command' }).fill('export-notes')
+    await window.keyboard.press('Enter')
+    await waitForExport(app)
+    await window.keyboard.press('Meta+Shift+p')
+    await window.getByRole('combobox', { name: 'Command' }).fill('import-notes')
+    await expect(window.locator('#command-import-notes')).toHaveAttribute('aria-disabled', 'true')
+    await window.screenshot({ path: '.scratch/menu-command-parity/disabled-data-command.png' })
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('combobox', { name: 'Command' })).toBeFocused()
+    await window.keyboard.press('Escape')
+    await app.evaluate(() => {
+      globalThis.__treeArchiveWorkers.release()
+    })
+    await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText('Exported')
+    expect(exportedText(destination)).toBe('Synthetic export notes')
+  })
+
   for (const appearance of ['light', 'dark'] as const) {
     // @requirement PRODUCT.md §25
     // @requirement PRODUCT.md §25.1

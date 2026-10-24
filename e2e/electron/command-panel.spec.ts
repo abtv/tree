@@ -66,14 +66,14 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('3')
     await window.keyboard.press('d')
     await open(window)
-    await expect(window.locator('.command-count')).toHaveText('8 of 8')
+    await expect(window.locator('.command-count')).toHaveText('10 of 10')
     await window.keyboard.press('ArrowUp')
     await expect(window.getByRole('option', { selected: true })).toContainText('toggle-vim-mode')
     await window.keyboard.press('Control+n')
-    await expect(window.getByRole('option', { selected: true })).toContainText('quit')
+    await expect(window.getByRole('option', { selected: true })).toContainText('export-notes')
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('Control+p')
-    await expect(window.getByRole('option', { selected: true })).toContainText('quit')
+    await expect(window.getByRole('option', { selected: true })).toContainText('export-notes')
     await window.getByRole('combobox').pressSequentially('theme')
     expect(await names(window)).toEqual(['set-theme-auto', 'set-theme-dark', 'set-theme-light'])
     await window.keyboard.press('Escape')
@@ -159,6 +159,8 @@ test.describe('Normal command panel', () => {
       'set-theme-auto',
       'set-theme-light',
       'set-theme-dark',
+      'export-notes',
+      'import-notes',
       'quit',
       'show-agenda',
       'show-tree',

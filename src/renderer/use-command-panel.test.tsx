@@ -6,6 +6,7 @@ import { createVimCommandState } from './vim-command-state'
 import type { VimMode } from './vim-editing'
 import { useCommandPanel } from './use-command-panel'
 import { APPLE_SHORTCUTS, OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
+import { MenuCommands, type MenuCommandSource } from '../application/menu-commands'
 
 afterEach(() => {
   cleanup()
@@ -18,6 +19,7 @@ async function setup(
   enabled = true,
   rich = false,
   shortcuts: ShortcutProfile = APPLE_SHORTCUTS,
+  menuCommands?: MenuCommandSource,
 ) {
   const historyWrite = vi.fn(async () => undefined)
   const appearanceWrite = vi.fn<(value: 'system' | 'light' | 'dark') => Promise<void>>(async () => undefined)
@@ -66,6 +68,7 @@ async function setup(
       applyVimEnabled: async () => undefined,
       beforeViewChange: () => undefined,
       shortcuts,
+      menuCommands,
     })
     return (
       <>
@@ -78,6 +81,9 @@ async function setup(
         )}
         {panel.message === undefined ? null : <span role="status">{panel.message}</span>}
         {panel.open ? <output aria-label="Selected row">{panel.selected}</output> : null}
+        {panel.open ? (
+          <output aria-label="Commands">{panel.matches.map((command) => command.name).join(',')}</output>
+        ) : null}
         {panel.open ? (
           <input
             className="command-input-line"
@@ -99,6 +105,29 @@ async function setup(
 }
 
 describe('command panel owner', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it('updates menu availability live, blocks disabled commands and launches supported actions with restored focus', async () => {
+    const source = new MenuCommands()
+    const launch = vi.fn(() => {
+      expect(document.activeElement).toBe(editor)
+    })
+    source.update([{ name: 'export-notes', enabled: false, run: launch }])
+    const { editor, historyWrite } = await setup('normal', true, false, APPLE_SHORTCUTS, source)
+    fireEvent.keyDown(editor, { key: ':' })
+    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'export-notes' } })
+    fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
+    expect(launch).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Command')).toBe(document.activeElement)
+    expect(historyWrite).not.toHaveBeenCalled()
+    act(() => source.update([{ name: 'export-notes', enabled: true, run: launch }]))
+    fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
+    await waitFor(() => expect(historyWrite).toHaveBeenCalledExactlyOnceWith(['export-notes']))
+    expect(launch).toHaveBeenCalledOnce()
+    fireEvent.keyDown(editor, { key: ':' })
+    act(() => source.update([{ name: 'resume-backing-up', enabled: true, run: launch }]))
+    expect(screen.getByLabelText('Commands').textContent).toContain('resume-backing-up')
+    expect(screen.getByLabelText('Commands').textContent).not.toContain('export-notes')
+  })
   // @requirement PRODUCT.md §20.2.28
   it('restores backward rich selection endpoints on cancellation', async () => {
     const { editor } = await setup('visual', true, true)

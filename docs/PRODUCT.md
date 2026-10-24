@@ -1521,9 +1521,9 @@ Input is case-sensitive; leading and trailing spaces are ignored. A command matc
 
 Both opening keys use the same platform-specific command list. Only commands supported by the current platform appear or contribute to the matching and total counts. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
 
-Every action offered by the application's desktop menu bar or browser Tree menu must also be available through this panel. This includes Export Notes, Import Notes, and, on browsers that support them, Back Up to Folder, Stop Backing Up, Resume Backing Up and Restore from Folder (§24–25). Menu headings, separators and status text are not actions. Platform support, current-state availability, confirmations, cancellation and results must match the corresponding menu action. A command must not execute while its menu action is disabled. State-dependent actions must follow the current menu action, including backup start, stop and resume. This requirement also applies to future menu actions.
+Every action in the desktop menu bar or browser Tree menu, including future actions, must also be available in this panel. Headings, separators and status text are not actions. Platform support, availability, confirmations, cancellation and results must match the menu. State-dependent commands follow the current menu action, including backup start, stop and resume (§24–25).
 
-**Implementation gap:** the data actions listed above are not yet registered in the command panel; the requirement is approved, but their panel integration remains to be implemented.
+Temporarily disabled menu actions remain listed, visibly dimmed and marked disabled for assistive technology; Enter or clicking them does nothing and leaves the panel open. Availability updates while the panel is open. Opening the panel is also possible when the document cannot be opened, so Import Notes remains reachable; loading still prevents opening it.
 
 An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select the next/previous row with wrapping, as in completion lists (§20.9). `Enter` or clicking a row runs the listed selection, even for a partial query such as `qui`; there is no separate prefix-abbreviation execution. With no matches, `Enter` closes the panel and displays `Not a command: <input>` at the left of the status bar for two seconds, or until the next key press if sooner. Expiry restores the ordinary status-bar content without changing editor focus, selection or mode.
 
@@ -1537,6 +1537,12 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 | `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
 | `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
 | `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
+| `export-notes` | — | Export Notes… | — | — | Same as Export Notes in the desktop File menu or browser Data block (§24–25) |
+| `import-notes` | — | Import Notes… | — | — | Same as Import Notes in the desktop File menu or browser Data block (§24–25) |
+| `back-up-to-folder` | — | Back Up to Folder… | — | — | Same as the browser Data action when folder backup is off (§24.5) |
+| `stop-backing-up` | — | Stop Backing Up | — | — | Same as the browser Data action when folder backup is active (§24.5) |
+| `resume-backing-up` | — | Resume Backing Up… | — | — | Same as the browser Data action when folder backup is paused (§24.5) |
+| `restore-from-folder` | — | Restore from Folder… | — | — | Same as the supported browser Data action (§24.6) |
 
 Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
 
@@ -1544,7 +1550,7 @@ Results match the corresponding menu item or toggle, including saved preferences
 
 The view commands have no aliases or dedicated shortcuts. A real view change resolves editing sessions and selection exactly as `Cmd+P` does; an already-active destination preserves them. They create no document edit or undo entry. Successful execution still updates command history, including when the requested view is already active.
 
-Command names use lowercase ASCII words joined by hyphens, with the verb first: `toggle-<object>` switches an on/off state; `set-<object>-<value>` selects a value; `show-<view>` selects a named view; a bare verb acts on the whole application. New verbs require an update to this rule. `q` is the only short alias; new aliases require an owner decision. `theme` names the Appearance choice, and `auto` names Automatic.
+Command names use lowercase ASCII words joined by hyphens, with the verb first: `toggle-<object>` switches an on/off state; `set-<object>-<value>` selects a value; `show-<view>` selects a named view; `export`, `import`, `back-up`, `stop`, `resume` and `restore` name their corresponding data-menu actions; a bare verb acts on the whole application. New verbs require an update to this rule. `q` is the only short alias; new aliases require an owner decision. `theme` names the Appearance choice, and `auto` names Automatic.
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 

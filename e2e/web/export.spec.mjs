@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mjs'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 import {
   chooseMenuItem,
@@ -86,7 +86,9 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   // An edit that has not been saved yet must be in the archive.
   await page.locator('[data-node-id="welcome"] .node-input').pressSequentially('Typed just before exporting ')
   const downloading = page.waitForEvent('download')
-  await chooseMenuItem(page, 'Export Notes…')
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
+  await page.getByRole('combobox', { name: 'Command' }).fill('export-notes')
+  await page.keyboard.press('Enter')
   const download = await downloading
   expect(download.suggestedFilename()).toBe(`Tree Notes ${today()}.zip`)
   await expect(activityText(page)).toHaveText(

@@ -49,7 +49,7 @@ export function supportsFolderBackup(): boolean {
 }
 
 /** Main-thread permission/picker UI. Saved messages and status carry no notes (PRODUCT §24.5). */
-export function installFolderBackup(session: DataSession, menu: HTMLElement, actions: BackupActions): void {
+export function installFolderBackup(session: DataSession, menu: HTMLElement, actions: BackupActions): () => void {
   const button = document.getElementById('data-backup') as HTMLButtonElement
   const status = document.getElementById('backup-status')!
   const menuButton = document.getElementById('tree-menu-button')!
@@ -62,7 +62,7 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
   const stop = document.getElementById('backup-confirm-stop') as HTMLButtonElement
   const choose = document.getElementById('backup-confirm-choose') as HTMLButtonElement
   const cancel = document.getElementById('backup-confirm-cancel') as HTMLButtonElement
-  if (!supportsFolderBackup()) return
+  if (!supportsFolderBackup()) return () => undefined
   button.hidden = false
   status.hidden = false
   let folder: FileSystemDirectoryHandle | undefined
@@ -76,8 +76,10 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
     menuButton.setAttribute('aria-label', attention ? 'Tree menu — backup needs attention' : 'Tree menu')
   }
   const refresh = () => {
-    button.textContent = !folder ? 'Back Up to Folder…' : paused ? 'Resume Backing Up…' : 'Stop Backing Up'
-    button.disabled = busy || !actions.available()
+    const label = !folder ? 'Back Up to Folder…' : paused ? 'Resume Backing Up…' : 'Stop Backing Up'
+    if (button.textContent !== label) button.textContent = label
+    const disabled = busy || !actions.available()
+    if (button.disabled !== disabled) button.disabled = disabled
   }
   const stopWorker = () => {
     worker?.terminate()
@@ -289,4 +291,5 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
       update('Backup paused — permission needed. Choose Resume Backing Up…', true)
     }
   })
+  return refresh
 }

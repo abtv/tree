@@ -932,6 +932,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   cursor: default;
 }
 
+.command-row[aria-disabled='true'] {
+  opacity: 0.5;
+}
+
 .command-row-selected {
   background: var(--highlight-background);
   color: var(--highlight-foreground);
@@ -1258,6 +1262,13 @@ body.node-drag-invalid * {
   margin: 0 auto;
   padding: 48px;
   text-align: center;
+}
+
+.tree-app > .error-state {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .data-activity {
