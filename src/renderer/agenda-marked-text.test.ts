@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import { caretMarks } from './agenda-row-caret'
@@ -25,7 +26,9 @@ describe('Agenda row text marks in rich text', () => {
     expect(html).toContain(
       '<a href="https://x.test" rel="noreferrer" target="_blank"> <span class="agenda-caret">h</span>ttp</a>',
     )
-    expect(html.replace(/<[^>]+>/gu, '')).toBe('go! https then')
+    const container = document.createElement('div')
+    container.innerHTML = html
+    expect(container.textContent).toBe(node.text)
   })
 
   // @requirement PRODUCT.md §23.4
