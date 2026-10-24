@@ -49,7 +49,7 @@ const smallCounts = [
   'nineteen',
 ]
 const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
-// Expanding the unit alternatives is output-equivalent: relativeDaysFor still
+// Expanding the unit alternatives is output-equivalent: relativeSuggestionsFor still
 // rejects compound units above nine.
 const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
 const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
@@ -116,7 +116,7 @@ const expressions = new RegExp(
 const minimumDay = dayNumberOf({ year: 0, month: 1, day: 1 })
 const maximumDay = dayNumberOf({ year: 9999, month: 12, day: 31 })
 
-function relativeDaysFor(expression: string, today: DayNumber): DayNumber[] | undefined {
+function relativeSuggestionsFor(expression: string, today: DayNumber): NaturalDateSuggestion[] | undefined {
   const relative = relativeExpression.exec(expression)
   // Require the whole expression. With the anchored recognizer this check is
   // redundant; it also keeps anchor-removal mutants output-equivalent.
@@ -135,8 +135,16 @@ function relativeDaysFor(expression: string, today: DayNumber): DayNumber[] | un
   else if (tens >= 0 && extra === undefined && (second === undefined || unit >= 0))
     count = (tens + 2) * 10 + (second === undefined ? 0 : unit + 1)
   else return undefined
-  const offset = count * ((relative[2] ?? relative[4]!).startsWith('week') ? 7 : 1)
-  return [today + (relative[1] === undefined ? -offset : offset)]
+  const unitName = (relative[2] ?? relative[4]!).startsWith('week') ? 'week' : 'day'
+  const offset = count * (unitName === 'week' ? 7 : 1)
+  const agreedUnit = `${unitName}${count === 1 ? '' : 's'}`
+  const past = relative[1] === undefined
+  return [
+    {
+      day: today + (past ? -offset : offset),
+      expression: past ? `${value} ${agreedUnit} ago` : `in ${value} ${agreedUnit}`,
+    },
+  ]
 }
 
 function monthDays(month: number, date: number, today: DayNumber): DayNumber[] {
@@ -213,8 +221,8 @@ function daysFor(expression: string, today: DayNumber): DayNumber[] {
     return current >= today ? [current, current + 7] : [current + 7, current]
   }
   // The same outer-recognizer invariant makes anchor mutations equivalent.
-  const relative = relativeDaysFor(expression, today)
-  if (relative !== undefined) return relative
+  const relative = relativeSuggestionsFor(expression, today)
+  if (relative !== undefined) return relative.map(({ day }) => day)
   const [month, date] = expression.split(' ')
   // Month/day descriptions are normalized to full names by the caller, so
   // removing the abbreviation alternative is output-equivalent.
@@ -236,14 +244,14 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
   // its predicate fail) preserve results through the general fallback. The
   // uninstrumented performance guard checks the optimization separately.
   const completeExpression = text.toLowerCase().replace(/ +/g, ' ')
-  const completeDays = relativeDaysFor(completeExpression, today)
-  if (completeDays !== undefined) {
-    const days = completeDays.filter((day) => day >= minimumDay && day <= maximumDay)
-    if (days.length === 0) return undefined
+  const completeSuggestions = relativeSuggestionsFor(completeExpression, today)
+  if (completeSuggestions !== undefined) {
+    const suggestions = completeSuggestions.filter(({ day }) => day >= minimumDay && day <= maximumDay)
+    if (suggestions.length === 0) return undefined
     return {
       start: 0,
       end: text.length,
-      suggestions: days.map((day) => ({ day, expression: completeExpression })),
+      suggestions,
     }
   }
   for (const match of text.matchAll(expressions)) {
@@ -268,9 +276,9 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
     const ambiguous = /^(next|last) mon$/.exec(normalized)
     const interpretations = ambiguous ? [`${ambiguous[1]} monday`, `${ambiguous[1]} month`] : [expression]
     const suggestions = interpretations.flatMap((expression) =>
-      daysFor(expression, today)
-        .filter((day) => day >= minimumDay && day <= maximumDay)
-        .map((day) => ({ day, expression })),
+      (
+        relativeSuggestionsFor(expression, today) ?? daysFor(expression, today).map((day) => ({ day, expression }))
+      ).filter(({ day }) => day >= minimumDay && day <= maximumDay),
     )
     // Stable ties keep the preexisting Monday interpretation first. Distinct
     // labels remain available even when both meanings resolve to the same date.

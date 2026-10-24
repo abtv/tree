@@ -16,6 +16,41 @@ import {
 } from './fixtures'
 
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.9.1
+  // @requirement PRODUCT.md §20.9.2
+  test('shows agreed relative units while preserving literal input until acceptance', async ({
+    userDataDir,
+  }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'n', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'n' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.clock.setFixedTime(new Date(2026, 9, 25, 12))
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('i')
+    }
+    await setCursor(input, 0)
+    await window.keyboard.type('in 2 week')
+    const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+    await expect(popup.getByRole('option')).toHaveCount(1)
+    await expect(popup.getByRole('option')).toContainText('2026-11-08')
+    await expect(popup.getByRole('option')).toContainText('Sun · in 2 weeks')
+    const text = (): Promise<string> =>
+      input.evaluate((element) =>
+        element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+      )
+    await expect.poll(text).toBe('in 2 week')
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('relative-unit-agreement.png')) })
+    await window.keyboard.type('s')
+    await expect(popup.getByRole('option', { selected: true })).toContainText('in 2 weeks')
+    await window.keyboard.press('Enter')
+    await expect.poll(text).toBe('2026-11-08')
+    await expect(popup).toHaveCount(0)
+  })
+
   // @requirement PRODUCT.md §20.9
   test('keeps plain-editor arrows in the popup until dismissal, then resumes node navigation', async ({
     userDataDir,
@@ -57,6 +92,8 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       await window.keyboard.press('Escape')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await window.keyboard.press('ArrowDown')
+      await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toBeFocused()
+      await window.keyboard.press('ArrowUp')
       await expect(input).toBeFocused()
       await window.keyboard.press('i')
     }

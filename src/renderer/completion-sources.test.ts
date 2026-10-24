@@ -68,9 +68,10 @@ it('sorts dates chronologically without changing the preferred candidate', () =>
 it('describes each date with its weekday', () => {
   for (let offset = 1; offset <= 7; offset += 1) {
     const day = today + offset
+    const expression = `in ${offset} ${offset === 1 ? 'day' : 'days'}`
     const description = recognizeCompletion(`in ${offset} days`, `in ${offset} days`.length, today)?.suggestions.find(
-      (suggestion) => suggestion.id === `date:${day}:in ${offset} days`,
+      (suggestion) => suggestion.id === `date:${day}:${expression}`,
     )?.description
-    expect(description).toBe(`${['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'][offset - 1]} · in ${offset} days`)
+    expect(description).toBe(`${['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'][offset - 1]} · ${expression}`)
   }
 })

@@ -12,6 +12,37 @@ const dates = (text: string, reference = today, caret = text.length): string[] |
     formatCanonicalDate(calendarDateOf(suggestion.day)),
   )
 
+// @requirement PRODUCT.md §20.9.1
+it('agrees relative day and week descriptions with numeric and written counts', () => {
+  for (const [count, singular] of [
+    ['0', false],
+    ['1', true],
+    ['01', true],
+    ['2', false],
+    ['one', true],
+    ['two', false],
+    ['twenty-one', false],
+    ['one hundred', false],
+  ] as const) {
+    for (const unit of ['day', 'week']) {
+      for (const suffix of ['', 's']) {
+        for (const past of [false, true]) {
+          const input = past ? `${count} ${unit}${suffix} ago` : `in ${count} ${unit}${suffix}`
+          const agreedUnit = `${unit}${singular ? '' : 's'}`
+          const expected = past ? `${count} ${agreedUnit} ago` : `in ${count} ${agreedUnit}`
+          for (const prefix of ['', 'Plan ']) {
+            const text = prefix + input
+            const result = suggestDates(text, text.length, today)!
+            expect(result.suggestions[0]!.expression, text).toBe(expected)
+            expect(text.slice(result.start, result.end)).toBe(input)
+            expect(dates(text)).toEqual(dates(expected))
+          }
+        }
+      }
+    }
+  }
+})
+
 // @requirement PRODUCT.md §20.9.2
 describe('adjacent calendar months', () => {
   // @requirement PRODUCT.md §20.9.1
