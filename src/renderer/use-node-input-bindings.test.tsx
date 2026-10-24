@@ -126,6 +126,27 @@ async function fixture(
 }
 
 describe('useNodeInputBindings', () => {
+  // @requirement PRODUCT.md §20.2.9
+  it('moves with Normal arrows, including counts and outer boundaries', async () => {
+    const f = await fixture({
+      document: { roots: [node('first', 'Alpha'), node('second', 'Bravo'), node('third', 'Charlie')] },
+    })
+    f.input().focus()
+    f.press('ArrowDown')
+    expect(f.snapshot().location.selectedNodeId).toBe('second')
+    f.press('ArrowUp')
+    expect(f.snapshot().location.selectedNodeId).toBe('first')
+    f.press('ArrowUp')
+    expect(f.snapshot().location.selectedNodeId).toBe('first')
+    f.press('2')
+    f.press('ArrowDown')
+    expect(f.snapshot().location.selectedNodeId).toBe('third')
+    f.press('ArrowDown')
+    expect(f.snapshot().location.selectedNodeId).toBe('third')
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['Alpha', 'Bravo', 'Charlie'])
+  })
+
   it('restores search focus to the selected Agenda header, context or editor instead of a stale Tree input', async () => {
     // jsdom omits CSS.escape; these fixture keys contain only selector-safe characters.
     vi.stubGlobal('CSS', { escape: (value: string) => value })

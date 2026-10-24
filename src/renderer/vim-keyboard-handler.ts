@@ -124,7 +124,8 @@ export function handleVimKey(
   }
   const countDigit = /^[1-9]$/u.test(event.key) || (event.key === '0' && (commandState.pending?.count ?? '') !== '')
   if (!countDigit && event.key !== 'n' && event.key !== 'N') store.search.interruptNavigation()
-  if (!['j', 'k', 'J', 'K'].includes(event.key) && !countDigit) commandState.verticalGoal = undefined
+  const normalArrow = vim.mode === 'normal' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')
+  if (!['j', 'k', 'J', 'K'].includes(event.key) && !normalArrow && !countDigit) commandState.verticalGoal = undefined
   if (vim.mode === 'visual-node') {
     const handled = (): true => {
       event.preventDefault()
@@ -729,8 +730,8 @@ export function handleVimKey(
       setSelectionRange(input, cursor, cursor)
       vim.setMode('visual-node')
     }
-  } else if (!visual && ['j', 'k', 'J', 'K'].includes(event.key)) {
-    const direction = event.key.toLowerCase() === 'j' ? 'down' : 'up'
+  } else if (!visual && (['j', 'k', 'J', 'K'].includes(event.key) || normalArrow)) {
+    const direction = event.key.toLowerCase() === 'j' || event.key === 'ArrowDown' ? 'down' : 'up'
     const geometries = new Map<string, ReturnType<typeof visualTextGeometry>>()
     const geometry = (target: TreeNode): ReturnType<typeof visualTextGeometry> | undefined => {
       const existing = geometries.get(target.id)
