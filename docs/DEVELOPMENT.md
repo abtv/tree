@@ -490,6 +490,8 @@ Run `npm run demo:video` on macOS to build the app, install Playwright's recordi
 
 `npm install` or `npm ci` installs Playwright. The command downloads Playwright's recording encoder when needed; no Homebrew installation or additional conversion encoder is required. Dependency installation and the first recording-encoder download require network access.
 
+After inline editing, the demo opens search with `/`, types `book`, and shows two highlighted matches and their count. Escape cancels search. It then opens the command panel with `:`, shows the command list, types `show` to filter it to the Tree and Agenda commands, and cancels with Escape before continuing the editing walkthrough. Representative frames include `search.png`, `commands.png`, and `commands-filtered.png`.
+
 After the move and undo/redo sequence, `gv` restores the two-node Visual selection and `d` cuts the selected discussion topics from the meetup's conversation outline. `Ctrl+o` returns to the overview, `zc` folds the meetup, `2j` selects “Ideas for later”, and `gd` enters that different branch. The destination is shown before `P` pastes the topics above its existing ideas. The capture verifies that the topics disappear from the source and appear together in the destination, with its existing children preserved.
 
 Recording begins after the renderer and fonts are ready. Playwright's screencast captures at maximum frame quality, with a rendering scale of 1.5 and a 1500-by-1080 recording of the 1000-by-720 window. This improves source text clarity without enlarging the logical interface. The output remains a WebM video with standard playback controls.
