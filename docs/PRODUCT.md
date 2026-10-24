@@ -1521,6 +1521,10 @@ Input is case-sensitive; leading and trailing spaces are ignored. A command matc
 
 Both opening keys use the same platform-specific command list. Only commands supported by the current platform appear or contribute to the matching and total counts. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
 
+Every action offered by the application's desktop menu bar or browser Tree menu must also be available through this panel. This includes Export Notes, Import Notes, and, on browsers that support them, Back Up to Folder, Stop Backing Up, Resume Backing Up and Restore from Folder (§24–25). Menu headings, separators and status text are not actions. Platform support, current-state availability, confirmations, cancellation and results must match the corresponding menu action. A command must not execute while its menu action is disabled. State-dependent actions must follow the current menu action, including backup start, stop and resume. This requirement also applies to future menu actions.
+
+**Implementation gap:** the data actions listed above are not yet registered in the command panel; the requirement is approved, but their panel integration remains to be implemented.
+
 An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select the next/previous row with wrapping, as in completion lists (§20.9). `Enter` or clicking a row runs the listed selection, even for a partial query such as `qui`; there is no separate prefix-abbreviation execution. With no matches, `Enter` closes the panel and displays `Not a command: <input>` at the left of the status bar for two seconds, or until the next key press if sooner. Expiry restores the ordinary status-bar content without changing editor focus, selection or mode.
 
 | Name | Alias | Description | Active state | Shortcut | Effect |
@@ -1959,7 +1963,7 @@ When a live edit removes the active occurrence's date but another date remains, 
 
 The browser version keeps notes in the storage of one browser profile and origin (§1.4). Clearing site data or deleting the profile removes them. This section defines how the user keeps an independent copy.
 
-The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They have no keyboard shortcuts and no command-panel entries, and Tree never prompts for them at startup.
+The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They have no dedicated keyboard shortcuts and must also be available in the command panel (§20.2.28). Tree never prompts for them at startup.
 
 Nothing in this section sends notes over the network. Notes leave browser storage only as a file or folder that the user chose.
 
@@ -2052,7 +2056,7 @@ Cancel, at any point before Replace Notes, leaves the notes unchanged. A failure
 
 ### 24.5 Automatic Folder Backup
 
-**Back Up to Folder…** appears in the Data block only when the browser provides a directory picker and writable file handles (Chromium-based browsers). It has no shortcut or command-panel entry. Choosing it opens a read/write folder picker. Cancelling leaves the backup choice and all files unchanged. It is disabled while another Data operation runs or editing is locked (§16.2).
+**Back Up to Folder…** appears in the Data block only when the browser provides a directory picker and writable file handles (Chromium-based browsers). It has no dedicated shortcut and must also be available in the command panel (§20.2.28). Choosing it opens a read/write folder picker. Cancelling leaves the backup choice and all files unchanged. It is disabled while another Data operation runs or editing is locked (§16.2).
 
 A new folder starts a backup after pending edits are saved and the folder choice is stored. The choice belongs to this browser profile and origin, in the existing preferences store. An active backup changes the command to **Stop Backing Up**. Stopping removes the choice and stops the worker; it never removes files. Choose Back Up to Folder… again to change folders.
 
@@ -2092,7 +2096,7 @@ The desktop application exports and imports the notes archive of §24.2, so note
 
 ### 25.1 Menu Commands
 
-**Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no keyboard shortcuts and no command-panel entries. Both are disabled while the window is starting, in the locked save-failure state (§16.2), and while an export or an import runs. Export is disabled when the stored notes cannot be opened. Import Notes… stays available when the stored notes cannot be opened, so an archive can replace them.
+**Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no dedicated keyboard shortcuts and must also be available in the command panel (§20.2.28). Both are disabled while the window is starting, in the locked save-failure state (§16.2), and while an export or an import runs. Export is disabled when the stored notes cannot be opened. Import Notes… stays available when the stored notes cannot be opened, so an archive can replace them.
 
 ### 25.2 Export
 
