@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  commandRegistry,
+  availableCommands,
   matchCommands,
   normalizeCommandHistory,
   rememberCommand,
@@ -19,6 +19,7 @@ export function useCommandPanel(options: {
   store: EditorStore
   vimEnabled: boolean
   vimAvailable?: boolean
+  alwaysOnTopAvailable?: boolean
   vimMode: VimMode
   commandState: VimCommandState
   alwaysOnTop: boolean
@@ -34,6 +35,7 @@ export function useCommandPanel(options: {
   const beforeOpen = options.beforeOpen
   const [open, setOpen] = useState(false)
   const vimAvailable = options.vimAvailable ?? true
+  const alwaysOnTopAvailable = options.alwaysOnTopAvailable ?? true
   const [input, setInput] = useState('')
   const [selected, setSelected] = useState(0)
   const [message, setMessage] = useState<string>()
@@ -47,10 +49,11 @@ export function useCommandPanel(options: {
   const running = useRef(false)
   const snapshot = store.getSnapshot()
   const view: 'agenda' | 'tree' = snapshot.status === 'ready' && snapshot.agenda !== undefined ? 'agenda' : 'tree'
-  const matches = useMemo(
-    () => matchCommands(input, history).filter((command) => vimAvailable || command.name !== 'toggle-vim-mode'),
-    [input, history, vimAvailable],
+  const commands = useMemo(
+    () => availableCommands({ vim: vimAvailable, alwaysOnTop: alwaysOnTopAvailable }),
+    [vimAvailable, alwaysOnTopAvailable],
   )
+  const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
     if (message === undefined) return
     const timer = window.setTimeout(() => setMessage(undefined), 2000)
@@ -282,7 +285,7 @@ export function useCommandPanel(options: {
     message,
     bindInput,
     matches,
-    total: commandRegistry.length - (vimAvailable ? 0 : 1),
+    total: commands.length,
     context: { alwaysOnTop, appearance, vimEnabled, view },
     changeInput: (value: string) => {
       setInput(value)

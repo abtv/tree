@@ -43,6 +43,8 @@ interface AppProps {
   initialVimEnabled: boolean
   /** Platforms that do not offer Vim also omit its command-panel entry. */
   vimAvailable?: boolean
+  /** Whether the host can float its window above other applications. */
+  alwaysOnTopAvailable?: boolean
   /** Enable native rich editing only in text-entry modes in the browser adapter. */
   deferRichEditing?: boolean
   capturePasteClipboard?: (data: DataTransfer) => EditorServices['readClipboard']
@@ -57,6 +59,7 @@ export function App({
   store,
   initialVimEnabled,
   vimAvailable = true,
+  alwaysOnTopAvailable = true,
   deferRichEditing = false,
   capturePasteClipboard,
   shortcutPlatform = 'apple',
@@ -168,6 +171,7 @@ export function App({
   )
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     vimAvailable,
+    alwaysOnTopAvailable,
     shortcuts,
     store,
     vimEnabled,

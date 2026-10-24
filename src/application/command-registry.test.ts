@@ -1,10 +1,43 @@
 import { describe, expect, it, vi } from 'vitest'
-import { commandRegistry, matchCommands, normalizeCommandHistory, rememberCommand } from './command-registry'
+import {
+  availableCommands,
+  commandRegistry,
+  matchCommands,
+  normalizeCommandHistory,
+  rememberCommand,
+} from './command-registry'
 
 const names = (query: string, history: readonly string[] = []): string[] =>
   matchCommands(query, history).map((command) => command.name)
 
 describe('command registry', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it.each([
+    [true, true, 8],
+    [false, true, 7],
+    [false, false, 6],
+    [true, false, 7],
+  ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
+    const commands = availableCommands({ alwaysOnTop, vim })
+    expect(commands).toHaveLength(count)
+    const history = ['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark']
+    const matches = (query: string) => matchCommands(query, history, commands).map((command) => command.name)
+    expect(matches('toggle-always-on-top')).toEqual(alwaysOnTop ? ['toggle-always-on-top'] : [])
+    expect(matches('top')).toEqual(alwaysOnTop ? ['toggle-always-on-top'] : [])
+    expect(matches('vim')).toEqual(vim ? ['toggle-vim-mode'] : [])
+    expect(matches('')).toEqual([
+      ...(alwaysOnTop ? ['toggle-always-on-top'] : []),
+      ...(vim ? ['toggle-vim-mode'] : []),
+      'set-theme-dark',
+      'quit',
+      'set-theme-auto',
+      'set-theme-light',
+      'show-agenda',
+      'show-tree',
+    ])
+    expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
+  })
+
   // @requirement PRODUCT.md §20.2.28
   it('records only the quit shortcut, as data without a platform label', () => {
     const shortcuts = commandRegistry.filter((command) => command.shortcut !== undefined)

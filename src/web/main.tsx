@@ -24,6 +24,7 @@ try {
       <App
         initialVimEnabled={await window.treeApi.getVimEnabled()}
         vimAvailable={bridge.vimAvailable}
+        alwaysOnTopAvailable={false}
         shortcutPlatform={isApplePlatform(navigator) ? 'apple' : 'other'}
         store={store}
         deferRichEditing

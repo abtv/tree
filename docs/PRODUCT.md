@@ -1519,6 +1519,8 @@ outside this version.
 
 Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `theme`, `dark`, and `set-th` match `set-theme-dark`. Aliases match only exactly. Text after an internal space is reserved for future arguments and matches nothing in this version. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
 
+Both opening keys use the same platform-specific command list. Only commands supported by the current platform appear or contribute to the matching and total counts. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
+
 An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select the next/previous row with wrapping, as in completion lists (§20.9). `Enter` or clicking a row runs the listed selection, even for a partial query such as `qui`; there is no separate prefix-abbreviation execution. With no matches, `Enter` closes the panel and displays `Not a command: <input>` at the left of the status bar for two seconds, or until the next key press if sooner. Expiry restores the ordinary status-bar content without changing editor focus, selection or mode.
 
 | Name | Alias | Description | Active state | Shortcut | Effect |

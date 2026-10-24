@@ -1,5 +1,10 @@
 export type CommandAppearance = 'system' | 'light' | 'dark'
 
+export interface CommandCapabilities {
+  alwaysOnTop: boolean
+  vim: boolean
+}
+
 export interface CommandServices {
   quit(): Promise<void>
   setAlwaysOnTop(value: boolean): Promise<void>
@@ -27,6 +32,7 @@ export interface ApplicationCommand {
   aliases: readonly string[]
   description: string
   shortcut?: CommandShortcut
+  requires?: keyof CommandCapabilities
   active(context: CommandContext): boolean
   run(services: CommandServices, context: CommandContext): Promise<void>
 }
@@ -56,6 +62,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
   },
   {
     name: 'toggle-always-on-top',
+    requires: 'alwaysOnTop',
     aliases: [],
     description: 'Keep the window above other windows',
     active: (context) => context.alwaysOnTop,
@@ -63,6 +70,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
   },
   {
     name: 'toggle-vim-mode',
+    requires: 'vim',
     aliases: [],
     description: 'Use Vim editing',
     active: (context) => context.vimEnabled,
@@ -96,11 +104,19 @@ export function rememberCommand(history: readonly string[], name: string): strin
 // Sort the registry once; each keystroke then scans commands/history without sorting or document work.
 const alphabeticalCommands = [...commandRegistry].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 
-export function matchCommands(input: string, history: readonly string[]): readonly ApplicationCommand[] {
+export function availableCommands(capabilities: CommandCapabilities): readonly ApplicationCommand[] {
+  return alphabeticalCommands.filter((command) => command.requires === undefined || capabilities[command.requires])
+}
+
+export function matchCommands(
+  input: string,
+  history: readonly string[],
+  commands: readonly ApplicationCommand[] = alphabeticalCommands,
+): readonly ApplicationCommand[] {
   const query = input.trim()
   if (/\s/.test(query)) return []
   const exact = (command: ApplicationCommand): boolean => command.name === query || command.aliases.includes(query)
-  const matches = alphabeticalCommands.filter(
+  const matches = commands.filter(
     (command) =>
       exact(command) ||
       command.name.split('-').some((_segment, index, segments) => segments.slice(index).join('-').startsWith(query)),

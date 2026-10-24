@@ -26,6 +26,7 @@ async function seed(page, baseURL) {
       },
       location: { currentParentId: null, selectedNodeId: 'parent' },
     })
+    await window.treeApi.setCommandHistory(['toggle-always-on-top'])
   })
   await page.reload()
   await ready(page)
@@ -99,6 +100,17 @@ for (const [profile, modifier, otherModifier, label] of [
     await press('Shift+p')
     const panel = page.getByRole('listbox', { name: 'Application commands' })
     await expect(panel).toBeVisible()
+    await expect(panel.locator('.command-name')).toHaveText([
+      'quit',
+      'set-theme-auto',
+      'set-theme-dark',
+      'set-theme-light',
+      'show-agenda',
+      'show-tree',
+      'toggle-vim-mode',
+    ])
+    await expect(page.locator('.command-count')).toHaveText('7 of 7')
+    await capture(page, `${profile}-available-commands.png`)
     const selected = () => panel.locator('[aria-selected="true"]').getAttribute('id')
     const first = await selected()
     await page.keyboard.press('Control+n')
@@ -116,6 +128,17 @@ for (const [profile, modifier, otherModifier, label] of [
     expect(geometry.x).toBeGreaterThanOrEqual(0)
     expect(geometry.x + geometry.width).toBeLessThanOrEqual(390)
     await page.keyboard.press('Escape')
+    await page.evaluate(() => window.treeApi.setVimEnabled(true))
+    await rowInput(page, 'parent').focus()
+    await page.keyboard.press('Escape')
+    await page.keyboard.press(':')
+    await expect(panel.locator('.command-name')).toHaveCount(7)
+    await page.getByRole('combobox', { name: 'Command', exact: true }).fill('toggle-always-on-top')
+    await expect(panel.getByRole('option')).toHaveCount(0)
+    await expect(page.locator('.command-count')).toHaveText('0 of 7')
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.command-error')).toHaveText('Not a command: toggle-always-on-top')
+    expect(await page.evaluate(() => window.treeApi.getCommandHistory())).toEqual(['toggle-always-on-top'])
     for (const key of ['p', 'e', '.', ',', 'enter', 'z', '0', 'y', 'backspace']) {
       await expect
         .poll(
