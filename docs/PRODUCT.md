@@ -1782,6 +1782,10 @@ The assessment must consider how the cost scales with document size and the numb
 
 Concrete budgets are not fixed here. When a change can affect performance at scale, the implementation must add or update an automated performance guard at the appropriate level (unit, boundary, or performance suite). Budgets are derived from measured baselines and recorded by the owning automated guard and its result artifacts.
 
+### 22.3 Browser Startup
+
+The browser version makes the Tree editor available without waiting for code used only by a secondary screen. It loads the Agenda screen's code when the user first opens Agenda. While that module loads, the Agenda area shows a brief loading status. If the request fails, the user can return to Tree without losing the editor. This must not delay the initial Tree editor or change its editing behavior.
+
 ### 22.2 Perceived Vim Editing Responsiveness
 
 An idle Vim Normal editor must not continuously mutate its selection or generate a self-sustaining selection-change event loop in Tree or Agenda.

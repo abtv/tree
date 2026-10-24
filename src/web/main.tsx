@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from '../renderer/App'
 import { ErrorBoundary } from '../renderer/ErrorBoundary'
@@ -13,6 +14,79 @@ import { requestPersistentStorage, storageProtectionText } from './storage-persi
 import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
 import './styles.css'
+import type { AgendaViewProps } from '../renderer/AgendaView'
+
+function AgendaView(props: AgendaViewProps): React.JSX.Element {
+  const status = useRef<HTMLDivElement>(null)
+  const [component, setComponent] = useState<React.ComponentType<AgendaViewProps>>()
+  const [failed, setFailed] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [otherFocusOwner, setOtherFocusOwner] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setFailed(false)
+    void import('../renderer/AgendaView').then(
+      (module) => {
+        if (active) setComponent(() => module.AgendaView)
+      },
+      () => {
+        if (active) setFailed(true)
+      },
+    )
+    return () => {
+      active = false
+    }
+  }, [])
+  useEffect(() => {
+    const menu = document.getElementById('tree-menu')
+    if (menu === null) return
+    const onToggle = (event: Event): void => {
+      setMenuOpen((event as ToggleEvent).newState === 'open')
+    }
+    menu.addEventListener('beforetoggle', onToggle)
+    return () => menu.removeEventListener('beforetoggle', onToggle)
+  }, [])
+  useEffect(() => {
+    const updateFocusOwner = (): void => {
+      const active = document.activeElement
+      const inAgenda = active instanceof Element && active.closest('.agenda-shell') !== null
+      setOtherFocusOwner(
+        !inAgenda && active !== status.current && active !== document.body && active !== document.documentElement,
+      )
+    }
+    const updateFocusOwnerAfterBlur = (): void => queueMicrotask(updateFocusOwner)
+    document.addEventListener('focusin', updateFocusOwner, true)
+    document.addEventListener('focusout', updateFocusOwnerAfterBlur, true)
+    return () => {
+      document.removeEventListener('focusin', updateFocusOwner, true)
+      document.removeEventListener('focusout', updateFocusOwnerAfterBlur, true)
+    }
+  }, [])
+  useLayoutEffect(() => {
+    if (!menuOpen && component === undefined && !failed) status.current?.focus({ preventScroll: true })
+  }, [component, failed, menuOpen])
+
+  if (component !== undefined) {
+    const Agenda = component
+    return <Agenda {...props} suppressInitialFocus={menuOpen || otherFocusOwner} />
+  }
+  if (failed) {
+    return (
+      <div className="agenda-loading" role="alert" tabIndex={-1}>
+        Agenda could not load.{' '}
+        <button type="button" onClick={() => props.store.closeAgenda()}>
+          Return to Tree
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div ref={status} className="agenda-loading" role="status" tabIndex={-1}>
+      Loading Agenda…
+    </div>
+  )
+}
 
 // Mobile browsers discard a tab under memory pressure well before a desktop Electron renderer would.
 const WEB_ATTACHMENT_IMAGE_CACHE_LIMIT = 128 * 1024 * 1024
@@ -48,6 +122,7 @@ try {
         alwaysOnTopAvailable={false}
         shortcutPlatform={isApplePlatform(navigator) ? 'apple' : 'other'}
         store={store}
+        agendaView={AgendaView}
         deferRichEditing
         capturePasteClipboard={capturePasteClipboard}
         attachmentImages={createAttachmentImageCache(

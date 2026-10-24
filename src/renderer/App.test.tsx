@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render as renderReact, screen } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type EditorServices } from '../application/editor-store'
 import type { Document } from '../domain/document'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
-import { App } from './App'
+import { App as AppBase } from './App'
+import { AgendaView } from './AgendaView'
 import { HOLD_ACTIVATION_MS } from './node-drag'
+
+function App(props: Omit<ComponentProps<typeof AppBase>, 'agendaView'>): React.JSX.Element {
+  return <AppBase {...props} agendaView={AgendaView} />
+}
 
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
 
