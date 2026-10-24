@@ -18,7 +18,7 @@ function matchingShortcodes(query: string): string[] {
 
 describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.12
-  test('keeps all keyboard-selected suggestions visible in a small window', async ({ userDataDir }, testInfo) => {
+  test('keeps all keyboard-selected suggestions visible in a small window', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'n', text: 'Plan ', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'n' },
@@ -53,7 +53,6 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       expect(geometry.boxBottom).toBeLessThanOrEqual(geometry.height)
     }
     await window.keyboard.press('Control+p')
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-scrolled-small-window.png')) })
     await window.keyboard.press('Enter')
     await expect(input).toBeFocused()
     await expect(input).not.toHaveValue('Plan :ma')
@@ -67,7 +66,6 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+a')
     await window.keyboard.type(':')
     await popup.getByRole('option').last().scrollIntoViewIfNeeded()
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-catalog-end.png')) })
     await popup.getByRole('option').last().click()
     await expect(input).toHaveValue(catalog.zzz)
     await expect(input).toBeFocused()
