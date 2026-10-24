@@ -210,8 +210,8 @@ export function App({
   })
   // `p` and `Esc` of a pending Agenda move are Vim commands, so standard editing cannot keep one.
   useLayoutEffect(
-    () => registerViewCommands?.({ showAgenda: commandPanel.showAgenda, showTree: commandPanel.showTree }),
-    [registerViewCommands, commandPanel.showAgenda, commandPanel.showTree],
+    () => registerViewCommands?.(commandPanel.menuViewCommands),
+    [registerViewCommands, commandPanel.menuViewCommands],
   )
   useEffect(() => {
     if (!vimEnabled) store.cancelAgendaMove()

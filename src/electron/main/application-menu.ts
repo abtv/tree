@@ -1,6 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron'
 import type { AppearancePreference } from '../../infrastructure/main/window-state'
-import type { NotesMenuCommand, NotesMenuState } from '../../shared/ipc'
+import type { NotesMenuCommand, NotesMenuState, ViewMenuCommand } from '../../shared/ipc'
+import type { MenuIcons } from './menu-icons'
 
 export interface ApplicationMenuState {
   vimEnabled: boolean
@@ -15,6 +16,7 @@ export interface ApplicationMenuActions {
   setAlwaysOnTop: (alwaysOnTop: boolean) => void
   setAppearance: (appearance: AppearancePreference) => void
   notesCommand: (command: NotesMenuCommand) => void
+  viewCommand: (command: ViewMenuCommand) => void
 }
 
 const appearanceItems: ReadonlyArray<{ label: string; value: AppearancePreference }> = [
@@ -29,6 +31,7 @@ const appearanceItems: ReadonlyArray<{ label: string; value: AppearancePreferenc
 export function applicationMenuTemplate(
   state: ApplicationMenuState,
   actions: ApplicationMenuActions,
+  icons: MenuIcons,
 ): MenuItemConstructorOptions[] {
   return [
     {
@@ -38,8 +41,18 @@ export function applicationMenuTemplate(
     {
       label: 'File',
       submenu: [
-        { label: 'Export Notes…', enabled: state.notes.canExport, click: () => actions.notesCommand('export') },
-        { label: 'Import Notes…', enabled: state.notes.canImport, click: () => actions.notesCommand('import') },
+        {
+          label: 'Export Notes…',
+          icon: icons.export,
+          enabled: state.notes.canExport,
+          click: () => actions.notesCommand('export'),
+        },
+        {
+          label: 'Import Notes…',
+          icon: icons.import,
+          enabled: state.notes.canImport,
+          click: () => actions.notesCommand('import'),
+        },
       ],
     },
     {
@@ -56,6 +69,9 @@ export function applicationMenuTemplate(
     {
       label: 'View',
       submenu: [
+        { label: 'Tree', icon: icons.tree, click: () => actions.viewCommand('tree') },
+        { label: 'Agenda', icon: icons.agenda, click: () => actions.viewCommand('agenda') },
+        { type: 'separator' },
         {
           label: 'Appearance',
           submenu: appearanceItems.map(({ label, value }) => ({

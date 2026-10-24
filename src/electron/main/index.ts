@@ -31,6 +31,7 @@ import {
 } from '../../infrastructure/main/window-state'
 import { ipcEvents, type NotesMenuState } from '../../shared/ipc'
 import { applicationMenuTemplate } from './application-menu'
+import { createMenuIcons, type MenuIcons } from './menu-icons'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
@@ -101,7 +102,10 @@ function setAppearance(value: AppearancePreference): void {
   rebuildApplicationMenu()
 }
 
+let menuIcons: MenuIcons | undefined
+
 function rebuildApplicationMenu(): void {
+  menuIcons ??= createMenuIcons((name) => nativeImage.createMenuSymbol(name))
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       applicationMenuTemplate(
@@ -113,6 +117,11 @@ function rebuildApplicationMenu(): void {
         },
         {
           requestQuit: requestQuitFromMenu,
+          viewCommand: (command) => {
+            if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
+              mainWindow.webContents.send(ipcEvents.viewMenuCommand, command)
+            }
+          },
           notesCommand: (command) => {
             if (command === 'export' ? notesMenuState.canExport : notesMenuState.canImport) {
               mainWindow?.webContents.send(ipcEvents.notesMenuCommand, command)
@@ -129,6 +138,7 @@ function rebuildApplicationMenu(): void {
             mainWindow?.webContents.send(ipcEvents.alwaysOnTopChanged, value)
           },
         },
+        menuIcons,
       ),
     ),
   )

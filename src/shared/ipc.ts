@@ -37,13 +37,14 @@ export const ipcChannels = {
   setNotesMenuState: 'tree:notes-set-menu-state',
 } as const
 
-/** Main-to-renderer notifications: menu preference changes and notes export or import progress. */
+/** Main-to-renderer notifications: menu commands, preference changes and notes archive progress. */
 export const ipcEvents = {
   alwaysOnTopChanged: 'tree:always-on-top-changed',
   vimEnabledChanged: 'tree:vim-enabled-changed',
   appearanceChanged: 'tree:appearance-changed',
   notesProgress: 'tree:notes-progress',
   notesMenuCommand: 'tree:notes-menu-command',
+  viewMenuCommand: 'tree:view-menu-command',
 } as const
 
 /** A notes operation that ended without a result: the user cancelled it or Tree quit. */
@@ -101,6 +102,7 @@ export interface NotesMenuState {
   readonly canImport: boolean
 }
 export type NotesMenuCommand = 'export' | 'import'
+export type ViewMenuCommand = 'tree' | 'agenda'
 
 export type ClipboardPayload =
   { kind: 'text'; text: string; links?: readonly LinkRange[] } | { kind: 'image'; png: Uint8Array }
@@ -150,6 +152,7 @@ export interface TreeApi {
   /** Fires when the application menu changes the setting, so the renderer can follow it. */
   onAlwaysOnTopChanged?: (listener: (alwaysOnTop: boolean) => void) => () => void
   onVimEnabledChanged?: (listener: (vimEnabled: boolean) => void) => () => void
+  onViewMenuCommand?: (listener: (command: ViewMenuCommand) => void) => () => void
   /** Notes export and import (PRODUCT §25); one operation runs at a time. */
   chooseNotesExportDestination?: () => Promise<NotesFileChoice>
   startNotesExport?: () => Promise<NotesExportResult>

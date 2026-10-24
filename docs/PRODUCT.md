@@ -71,6 +71,8 @@ its trigger, or a setting action returns focus to the previous connected Tree or
 Agenda editor/row, keeping the caret, selection direction and editing mode/session.
 View changes and Vim toggles apply their own documented result.
 
+The browser menu shows decorative icons beside Tree, Agenda, Export Notes… and Import Notes…, retaining their text labels and accessible names. Tree and Agenda reuse their location glyphs; export and import use arrows pointing out of and into a tray. All menu labels share a text column, with a separate icon column. Icons inherit the item's normal, focused or disabled color; check marks remain at the trailing edge. Other actions remain text-only. When folder actions are available, a separator places them in their own text-only group below export/import, keeping each group's icon treatment consistent (§1.3).
+
 An action that opens a dialog or file picker returns editing focus before opening it; the dialog then
 owns focus, and cancellation/dismissal returns to the editor. A focused activity
 message also returns editing focus when dismissed. No extra Tab is required.
@@ -681,10 +683,14 @@ The menu bar has five menus, laid out as macOS applications do (§1.3):
 * **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
 * **File** holds **Export Notes…** and **Import Notes…** (§25).
 * **Edit** holds a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
-* **View** holds an **Appearance** submenu with three mutually exclusive items: **Automatic**, **Light**, and **Dark**. The item for the current choice is checked (§20.5).
+* **View** holds **Tree** and **Agenda**, then a separator and an **Appearance** submenu with three mutually exclusive items: **Automatic**, **Light**, and **Dark**. The item for the current appearance choice is checked (§20.5).
 * **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
 
 The Appearance and Vim Editing items have no status-bar toggles. Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Always on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup.
+
+Tree and Agenda invoke the same named view commands as the command panel (§20.2.28), without additional shortcuts. Selecting the already open view does nothing. Switching views finishes buffered editing and preserves the existing origin/caret behavior (§23). These commands do nothing while no renderer is available or while its main frame is loading. The native Tree, Agenda, Export Notes… and Import Notes… items retain text labels and show macOS symbols for connected nodes, a calendar, export and import. Other native items retain their standard text/check-mark presentation.
+
+If the command panel is open, a menu view command first closes it and restores the editing surface before applying the named command. While a modal dialog or image preview is open, menu view commands do nothing and leave the modal's focus and return target intact. Browser view actions use the same preparation.
 
 ---
 
@@ -1798,7 +1804,7 @@ Performance guards must exercise representative sequences in the running applica
 
 `Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected and revealed. `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
 
-This deliberately assigns Apple's standard Print shortcut to Agenda, as approved by the Product Owner: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no menu item or global shortcut.
+This deliberately assigns Apple's standard Print shortcut to Agenda, as approved by the Product Owner: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no global shortcut. View > Agenda opens Agenda through the same named command as the command panel; View > Tree returns to Tree (§9.3).
 
 The location toolbar displays a calendar glyph, with no visible `Agenda` text or outline-root control. The glyph is a noninteractive location indicator. Agenda selection and scrolling do not change the persisted Tree view or create files; restarting opens Tree. Agenda uses the same document, without copying nodes.
 
@@ -2115,6 +2121,8 @@ The desktop application exports and imports the notes archive of §24.2, so note
 ### 25.1 Menu Commands
 
 **Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no dedicated keyboard shortcuts and must also be available in the command panel (§20.2.28). Both are disabled while the window is starting, in the locked save-failure state (§16.2), and while an export or an import runs. Export is disabled when the stored notes cannot be opened. Import Notes… stays available when the stored notes cannot be opened, so an archive can replace them.
+
+Both native items show the corresponding export/import symbols (§9.3), including the system's disabled appearance when unavailable.
 
 ### 25.2 Export
 

@@ -95,6 +95,18 @@ export function useCommandPanel(options: {
     store.closeAgenda()
   }, [view, beforeViewChange, store])
 
+  const menuViewCommands = useMemo(() => {
+    const runViewCommand = async (command: () => Promise<void>): Promise<void> => {
+      if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]') !== null) return
+      if (open) close()
+      await command()
+    }
+    return {
+      showAgenda: () => runViewCommand(showAgenda),
+      showTree: () => runViewCommand(showTree),
+    }
+  }, [open, close, showAgenda, showTree])
+
   const run = useCallback(
     async (command: ApplicationCommand | undefined) => {
       if (running.current) return
@@ -296,6 +308,7 @@ export function useCommandPanel(options: {
   }, [open, close])
 
   return {
+    menuViewCommands,
     showAgenda,
     showTree,
     open,

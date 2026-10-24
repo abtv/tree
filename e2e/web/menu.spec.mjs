@@ -51,6 +51,30 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   await capture(page, 'menu-closed-light.png')
   await open()
   await page.getByRole('dialog', { name: 'Tree menu' }).waitFor()
+  await expect(page.locator('#tree-menu .folder-actions-separator')).toBeVisible()
+  const iconLayout = await page.locator('#tree-menu').evaluate((menu) => {
+    const ids = ['prototype-tree', 'prototype-agenda', 'data-export', 'data-import']
+    return ids.map((id) => {
+      const button = menu.querySelector(`#${id}`)
+      const icon = getComputedStyle(button, '::before')
+      const range = document.createRange()
+      range.selectNodeContents(button)
+      return {
+        textLeft: range.getBoundingClientRect().left,
+        mask: icon.maskImage,
+        width: icon.width,
+        height: icon.height,
+        color: icon.backgroundColor,
+        textColor: getComputedStyle(button).color,
+      }
+    })
+  })
+  expect(new Set(iconLayout.map((item) => item.textLeft)).size).toBe(1)
+  for (const item of iconLayout) {
+    expect(item.mask).toContain('data:image/svg+xml')
+    expect([item.width, item.height]).toEqual(['18px', '18px'])
+    expect(item.color).toBe(item.textColor)
+  }
   await capture(page, 'menu-open-light.png')
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))

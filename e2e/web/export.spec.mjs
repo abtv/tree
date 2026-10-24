@@ -47,6 +47,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   // @requirement PRODUCT.md §24
   const menu = await openMenu(page)
   await expect(menu.getByText('Data', { exact: true })).toBeVisible()
+  await expect(menu.locator('.folder-actions-separator')).toBeVisible()
   // PRODUCT §24.1: the browser decides the storage line; installability.spec.mjs covers both texts.
   const storage = page.locator('#storage-status')
   await expect(storage).toHaveText(/^Storage is (?:not )?protected from automatic clearing\.$/)

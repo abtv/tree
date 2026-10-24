@@ -286,6 +286,10 @@ The renderer command-panel owner captures the application shortcut before editor
 
 The browser's `menu-focus.ts` owns the ellipsis menu's temporary focus transfer. It remembers one connected editing surface and directional selection, restores it synchronously before menu actions open dialogs, and defers native-dismissal restoration until the browser finishes restoring its trigger. Explicit pointer/Tab destinations and action-owned view changes retain focus. Menu surfaces declare `data-editor-focus-borrow`, which shares the input owner's temporary-blur exemption with the command panel. Data dialogs and activity messages return through the same focus owner on dismissal. The shared renderer registers its existing view commands with the browser menu so both menu and panel finish buffered edits before changing Tree/Agenda, without adding a save. Registration is released on unmount; menu view controls remain disabled until the renderer supplies its handlers. This adds bounded session-only DOM state, no document-scale work or writes beyond the existing edit-commit behavior.
 
+The desktop renderer registers the same view commands through `App.registerViewCommands`. Native View menu actions send the `tree:view-menu-command` main-to-renderer event; preload accepts only `tree` and `agenda` and returns a listener disposer. Registration follows the existing effect lifecycle, including Strict Mode and renderer reload. The main process caches the four native menu symbols once and reuses them across menu rebuilds. Browser menu icons are decorative CSS masks, so labels, picker activation and menu-command discovery retain their existing text and event paths.
+
+The command-panel owner exposes menu view adapters that restore its borrowed editing focus before invoking a named view command and ignore menu view requests while a modal is open. Both desktop and browser registration use these adapters; the domain's view operations and the panel's own command execution remain unchanged.
+
 The application layer coordinates user intentions with domain operations and infrastructure.
 
 It is responsible for use cases such as:

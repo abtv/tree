@@ -219,3 +219,21 @@ it('delivers notes menu commands and preserves menu-state errors', async () => {
   mocks.invoke.mockRejectedValueOnce(new Error('Menu failed'))
   await expect(treeApi.setNotesMenuState?.({ canExport: false, canImport: false })).rejects.toThrow('Menu failed')
 })
+
+// @requirement PRODUCT.md §9.3
+it('delivers only supported view commands and removes the exact menu listener', async () => {
+  const { treeApi } = await import('./index')
+  const listener = vi.fn()
+  mocks.on.mockClear()
+  mocks.removeListener.mockClear()
+  const remove = treeApi.onViewMenuCommand?.(listener)
+  expect(ipcEvents.viewMenuCommand).toBe('tree:view-menu-command')
+  expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.viewMenuCommand)
+  const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: unknown) => void
+  handler({}, 'tree')
+  handler({}, 'agenda')
+  for (const value of ['export', '', undefined, null, {}, ['tree']]) handler({}, value)
+  expect(listener.mock.calls).toEqual([['tree'], ['agenda']])
+  remove?.()
+  expect(mocks.removeListener).toHaveBeenCalledExactlyOnceWith(ipcEvents.viewMenuCommand, handler)
+})

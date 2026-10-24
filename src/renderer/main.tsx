@@ -10,6 +10,7 @@ import {
 import { App } from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
+import type { CommandServices } from '../application/command-registry'
 import './styles.css'
 
 const rootElement = document.getElementById('root')
@@ -42,6 +43,12 @@ dataOperations.start()
 window.addEventListener('pagehide', () => dataOperations.dispose(), { once: true })
 startRendererLifecycle(store, window.treeApi)
 
+const registerViewCommands = (commands: Pick<CommandServices, 'showTree' | 'showAgenda'>) =>
+  window.treeApi.onViewMenuCommand!((command) => {
+    const run = command === 'tree' ? commands.showTree : commands.showAgenda
+    void run().catch((error: unknown) => store.reportError(error))
+  })
+
 // An unreadable preference falls back to the first-run default, standard (non-Vim) editing.
 void window.treeApi
   .getVimEnabled()
@@ -50,7 +57,12 @@ void window.treeApi
     createRoot(rootElement).render(
       <StrictMode>
         <ErrorBoundary>
-          <App initialVimEnabled={initialVimEnabled} store={store} dataOperations={dataOperations} />
+          <App
+            initialVimEnabled={initialVimEnabled}
+            store={store}
+            dataOperations={dataOperations}
+            registerViewCommands={registerViewCommands}
+          />
         </ErrorBoundary>
       </StrictMode>,
     )

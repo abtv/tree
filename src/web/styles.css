@@ -66,9 +66,10 @@ body:has(.image-preview-overlay) #tree-menu-button {
     sans-serif;
 }
 #tree-menu button {
+  position: relative;
   display: block;
   width: 100%;
-  padding: 5px 10px;
+  padding: 5px 10px 5px 36px;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -76,6 +77,30 @@ body:has(.image-preview-overlay) #tree-menu-button {
   text-align: left;
   font: inherit;
   cursor: pointer;
+}
+#tree-menu :is(#prototype-tree, #prototype-agenda, #data-export, #data-import)::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+  background: currentColor;
+  mask: var(--menu-icon) center / contain no-repeat;
+  pointer-events: none;
+}
+#prototype-tree {
+  --menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' stroke='black' stroke-width='1.4'%3E%3Cpath d='M12 6v5m0 0-5 5m5-5 5 5'/%3E%3Ccircle cx='12' cy='5' r='2'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E");
+}
+#prototype-agenda {
+  --menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2'/%3E%3Cpath d='M8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 3h2'/%3E%3C/svg%3E");
+}
+#data-export {
+  --menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='M5 10v10h14V10M12 15V3m-4 4 4-4 4 4'/%3E%3C/svg%3E");
+}
+#data-import {
+  --menu-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='M5 10v10h14V10M12 3v12m-4-4 4 4 4-4'/%3E%3C/svg%3E");
 }
 #tree-menu button:disabled {
   color: var(--color-secondary);
@@ -104,6 +129,12 @@ body:has(.image-preview-overlay) #tree-menu-button {
   border-top: 1px solid var(--color-location-border);
   margin: 5px 0;
 }
+#tree-menu .folder-actions-separator {
+  display: none;
+}
+#tree-menu:has(:is(#data-backup, #data-restore):not([hidden])) .folder-actions-separator {
+  display: block;
+}
 .menu-label,
 #prototype-save-status,
 #storage-status,
@@ -112,6 +143,9 @@ body:has(.image-preview-overlay) #tree-menu-button {
   padding: 3px 10px;
   color: var(--color-secondary);
   font-size: 11px;
+}
+.menu-label {
+  padding-left: 36px;
 }
 #storage-status[hidden],
 #backup-status[hidden] {

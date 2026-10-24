@@ -1,7 +1,20 @@
-import type { MenuItem, MenuItemConstructorOptions } from 'electron'
+import type { MenuItem, MenuItemConstructorOptions, NativeImage } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
 import type { AppearancePreference } from '../../infrastructure/main/window-state'
-import { applicationMenuTemplate } from './application-menu'
+import {
+  applicationMenuTemplate as createTemplate,
+  type ApplicationMenuActions,
+  type ApplicationMenuState,
+} from './application-menu'
+import { createMenuIcons } from './menu-icons'
+
+function applicationMenuTemplate(
+  state: ApplicationMenuState,
+  actions: ApplicationMenuActions,
+  icons = createMenuIcons((name) => ({ name }) as unknown as NativeImage),
+) {
+  return createTemplate(state, actions, icons)
+}
 
 function createActions() {
   return {
@@ -10,6 +23,7 @@ function createActions() {
     setAlwaysOnTop: vi.fn(),
     setAppearance: vi.fn(),
     notesCommand: vi.fn(),
+    viewCommand: vi.fn(),
   }
 }
 
@@ -60,9 +74,38 @@ describe('application menu template', () => {
     expect(template.map((entry) => entry.label)).toEqual(['Tree', 'File', 'Edit', 'View', 'Window'])
     expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual(['Quit Tree'])
     expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual(['Vim Editing'])
-    expect(submenuItems(template, 'View').map((item) => item.label)).toEqual(['Appearance'])
+    expect(submenuItems(template, 'View').map((item) => item.label ?? item.type)).toEqual([
+      'Tree',
+      'Agenda',
+      'separator',
+      'Appearance',
+    ])
     expect(appearanceItems(template).map((item) => item.label)).toEqual(['Automatic', 'Light', 'Dark'])
     expect(submenuItems(template, 'Window').map((item) => item.label)).toEqual(['Always on Top'])
+  })
+
+  // @requirement PRODUCT.md §9.3
+  // @requirement PRODUCT.md §25.1
+  it('uses native symbols for views and notes actions while retaining text and command routing', () => {
+    const createSymbol = vi.fn((name: string) => ({ name }) as unknown as NativeImage)
+    const icons = createMenuIcons(createSymbol)
+    expect(createSymbol.mock.calls).toEqual([
+      ['point.3.connected.trianglepath.dotted'],
+      ['calendar'],
+      ['square.and.arrow.up'],
+      ['square.and.arrow.down'],
+    ])
+    const actions = createActions()
+    const template = applicationMenuTemplate(state(), actions, icons)
+    const views = submenuItems(template, 'View')
+    expect(views.slice(0, 2).map((item) => [item.label, item.icon, item.accelerator])).toEqual([
+      ['Tree', icons.tree, undefined],
+      ['Agenda', icons.agenda, undefined],
+    ])
+    expect(submenuItems(template, 'File').map((item) => item.icon)).toEqual([icons.export, icons.import])
+    clickWithChecked(views[0]!, false)
+    clickWithChecked(views[1]!, false)
+    expect(actions.viewCommand.mock.calls).toEqual([['tree'], ['agenda']])
   })
 
   // @requirement PRODUCT.md §9.3

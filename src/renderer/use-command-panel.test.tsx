@@ -57,6 +57,7 @@ async function setup(
   await store.initialize()
   save.mockClear()
   const commandState = createVimCommandState()
+  let menuViewCommands: ReturnType<typeof useCommandPanel>['menuViewCommands']
   function Harness() {
     const panel = useCommandPanel({
       store,
@@ -70,6 +71,7 @@ async function setup(
       shortcuts,
       menuCommands,
     })
+    menuViewCommands = panel.menuViewCommands
     return (
       <>
         {rich ? (
@@ -101,10 +103,39 @@ async function setup(
   })
   const editor = screen.getByLabelText('Editor')
   editor.focus()
-  return { editor, store, commandState, historyWrite, appearanceWrite, save }
+  return {
+    editor,
+    store,
+    commandState,
+    historyWrite,
+    appearanceWrite,
+    save,
+    getMenuViewCommands: () => menuViewCommands,
+  }
 }
 
 describe('command panel owner', () => {
+  // @requirement PRODUCT.md §9.3
+  it.each(['native-dialog', 'aria-dialog'])('ignores menu view commands while a %s owns focus', async (kind) => {
+    const { store, getMenuViewCommands } = await setup()
+    const modal = document.createElement(kind === 'native-dialog' ? 'dialog' : 'div')
+    if (kind === 'native-dialog') modal.setAttribute('open', '')
+    else {
+      modal.setAttribute('role', 'dialog')
+      modal.setAttribute('aria-modal', 'true')
+    }
+    document.body.append(modal)
+    const before = store.getSnapshot()
+    try {
+      await act(async () => getMenuViewCommands().showAgenda())
+      expect(store.getSnapshot()).toBe(before)
+    } finally {
+      modal.remove()
+    }
+    await act(async () => getMenuViewCommands().showAgenda())
+    expect(store.getSnapshot()).toHaveProperty('agenda.today')
+  })
+
   // @requirement PRODUCT.md §20.2.28
   it('updates menu availability live, blocks disabled commands and launches supported actions with restored focus', async () => {
     const source = new MenuCommands()

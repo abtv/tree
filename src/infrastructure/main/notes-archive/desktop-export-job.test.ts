@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { serializeState, type TreeNode } from '../../../domain/document'
 import { exportNotesArchive } from '../../../application/notes-archive/export-notes'
 import { prepareNotesImport } from '../../../application/notes-archive/import-notes'
@@ -17,6 +17,7 @@ import { runDesktopExport } from './desktop-export-job'
 const directories: string[] = []
 
 afterEach(async () => {
+  vi.useRealTimers()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -69,6 +70,9 @@ async function savedNotes(head: ReturnType<typeof headWithImages>, images: Recor
 // @requirement PRODUCT.md §24.3
 describe('desktop export job', () => {
   it('writes the snapshot head and available images as the archive the browser writes', async () => {
+    // ZIP headers include wall-clock timestamps; both exports must use the same instant.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-14T12:00:00Z'))
     const head = headWithImages(['a', 'missing'], 'Exported')
     const { userData, data, snapshot } = await savedNotes(head, { a: onePixelPng })
     const temporaryPath = join(userData, '.archive.tmp')

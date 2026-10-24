@@ -5,9 +5,17 @@ import {
   type NotesArchiveProgress,
   type NotesMenuCommand,
   type TreeApi,
+  type ViewMenuCommand,
 } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
+  onViewMenuCommand: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, command: ViewMenuCommand): void => {
+      if (command === 'tree' || command === 'agenda') listener(command)
+    }
+    ipcRenderer.on(ipcEvents.viewMenuCommand, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.viewMenuCommand, handler)
+  },
   getAppearance: () => ipcRenderer.invoke(ipcChannels.getAppearance),
   setAppearance: (value) => ipcRenderer.invoke(ipcChannels.setAppearance, value),
   getCommandHistory: () => ipcRenderer.invoke(ipcChannels.getCommandHistory),
