@@ -146,7 +146,7 @@ describe('automatic publication wiring', () => {
     expect(browser).not.toContain('npm run build:web') // No rebuilding after Chrome passes.
   })
 
-  it('keeps all macOS workflows weekly/manual and Linux validation on PRs and main', async () => {
+  it('keeps macOS tests weekly/manual, demo on main pushes, and Linux validation on PRs and main', async () => {
     for (const name of ['e2e', 'e2e-memory', 'performance', 'demo']) {
       const text = await read(`.github/workflows/${name}.yml`)
       expect(text).toContain('runs-on: macos-15')
@@ -154,7 +154,12 @@ describe('automatic publication wiring', () => {
       expect(triggers).toContain('schedule:')
       expect(triggers).toMatch(/cron: '0 [2-5] \* \* 0'/)
       expect(triggers).toContain('workflow_dispatch:')
-      expect(triggers).not.toMatch(/^ {2}(?:push|pull_request|workflow_call):/m)
+      expect(triggers).not.toMatch(/^ {2}(?:pull_request|workflow_call):/m)
+      if (name === 'demo') {
+        expect(triggers).toMatch(/^ {2}push:\n {4}branches: \[main\]\n/m)
+      } else {
+        expect(triggers).not.toMatch(/^ {2}push:/m)
+      }
     }
     for (const name of ['ci', 'browser']) {
       const text = await read(`.github/workflows/${name}.yml`)
