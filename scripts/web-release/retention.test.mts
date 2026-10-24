@@ -58,26 +58,31 @@ async function previous(fixture: { dir: string; manifest: Manifest }) {
 
 // @requirement PRODUCT.md §1.4
 describe('bounded authenticated build retention', () => {
-  it('keeps exactly three distinct asset sets through 100 publications and deduplicates the shared font', async () => {
-    let last = await build(0)
-    for (let version = 1; version < 100; version++) {
-      const next = await build(version)
-      const remote = await previous(last)
-      next.manifest = await preparePackage(next.dir, next.manifestFile, remote)
-      const versions = Array.from({ length: Math.min(3, version + 1) }, (_, i) => version - i)
-      expect(next.manifest.files.map((file) => file.path).sort()).toEqual(
-        [
-          '.nojekyll',
-          'index.html',
-          'assets/font.ttf',
-          ...versions.flatMap((n) => [`assets/app-${n}.js`, `assets/app-${n}.css`]),
-        ].sort(),
-      )
-      await expect(verifyPackage(next.dir, next.manifest)).resolves.toEqual(next.manifest)
-      last = next
-    }
-    expect(last.manifest.assetGenerations).toHaveLength(3)
-  })
+  // This filesystem integration test performs 100 publications under the parallel CI suite.
+  it(
+    'keeps exactly three distinct asset sets through 100 publications and deduplicates the shared font',
+    { timeout: 30_000 },
+    async () => {
+      let last = await build(0)
+      for (let version = 1; version < 100; version++) {
+        const next = await build(version)
+        const remote = await previous(last)
+        next.manifest = await preparePackage(next.dir, next.manifestFile, remote)
+        const versions = Array.from({ length: Math.min(3, version + 1) }, (_, i) => version - i)
+        expect(next.manifest.files.map((file) => file.path).sort()).toEqual(
+          [
+            '.nojekyll',
+            'index.html',
+            'assets/font.ttf',
+            ...versions.flatMap((n) => [`assets/app-${n}.js`, `assets/app-${n}.css`]),
+          ].sort(),
+        )
+        await expect(verifyPackage(next.dir, next.manifest)).resolves.toEqual(next.manifest)
+        last = next
+      }
+      expect(last.manifest.assetGenerations).toHaveLength(3)
+    },
+  )
 
   it('does not consume a slot for identical assets and refreshes a returning build only once', async () => {
     let last = await build(1)
