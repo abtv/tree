@@ -420,6 +420,8 @@ This runs `npm run check`, the end-to-end suite, the full Electron performance s
 
 Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
 
+Browser tests run files across four workers locally and in CI, with tests inside each file remaining sequential. Each worker owns its browser and virtual clipboard; persistent profiles use test-specific output paths. The local container is limited to four CPUs, 4 GiB of memory, and 2048 processes/threads; the former 512-task limit exhausted Chromium's thread budget with four workers. OrbStack's global resource limits must allow those resources.
+
 Docker must be running. The Product Owner prepares dependencies manually from the repository root:
 
 ```bash

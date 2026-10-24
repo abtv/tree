@@ -21,7 +21,7 @@ export function containerArguments(imageID: string) {
     '--security-opt',
     'no-new-privileges',
     '--pids-limit',
-    '512',
+    '2048',
     '--memory',
     '4g',
     '--cpus',

@@ -11,8 +11,8 @@ export default defineConfig({
   testMatch: '**/*.spec.mts',
   outputDir: 'test-results/web',
   fullyParallel: false,
-  // Restart and clipboard scenarios remain serial, matching the previous runner.
-  workers: 1,
+  // Each worker owns its browser; tests within each file remain sequential.
+  workers: 4,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   timeout: 90_000,

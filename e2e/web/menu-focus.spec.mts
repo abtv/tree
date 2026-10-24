@@ -258,6 +258,8 @@ test('Tab leaving the menu commits the borrowed editor before another editing de
   await page.keyboard.press('R')
   await page.keyboard.type('X')
   await page.locator('#tree-menu-button').click()
+  // The asynchronous popover toggle focuses the first item before we move to the last.
+  await expect(page.locator('#prototype-tree')).toBeFocused()
   await page.getByRole('button', { name: 'Restore from Folder…', exact: true }).focus()
   await page.keyboard.press('Tab')
   await expect(page.locator('#tree-menu')).toBeHidden()

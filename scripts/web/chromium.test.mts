@@ -29,7 +29,7 @@ it('runs only a local immutable image with the fixed isolation settings', () => 
     '--security-opt',
     'no-new-privileges',
     '--pids-limit',
-    '512',
+    '2048',
     '--memory',
     '4g',
     '--cpus',
