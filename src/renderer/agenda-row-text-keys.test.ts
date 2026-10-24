@@ -82,7 +82,7 @@ async function fixture(vimEnabled: boolean, mode: VimTextCommandState['mode'] = 
 
 describe('Agenda row text keys', () => {
   // @requirement PRODUCT.md §23.4
-  it('moves the Normal caret over a day label with counts, word and find motions, clamping at both ends', async () => {
+  it('moves the Normal caret over a day label and crosses its horizontal boundary', async () => {
     const f = await fixture(true)
     f.selectKind('day')
     const label = f.selectedText()
@@ -96,7 +96,12 @@ describe('Agenda row text keys', () => {
     expect(f.caret().focus).toBe(0)
     f.press('$')
     expect(f.caret().focus).toBe(label.length - 1)
+    const day = f.snapshot().agenda!.selectedKey
     f.press('l')
+    expect(f.snapshot().agenda!.selectedKey).not.toBe(day)
+    expect(f.caret().focus).toBe(0)
+    f.press('h')
+    expect(f.snapshot().agenda!.selectedKey).toBe(day)
     expect(f.caret().focus).toBe(label.length - 1)
     f.press('h')
     expect(f.caret().focus).toBe(label.length - 2)

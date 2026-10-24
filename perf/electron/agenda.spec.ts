@@ -20,51 +20,59 @@ async function readSaves(app: LaunchedApp): Promise<number> {
   return app.evaluate(() => (globalThis as typeof globalThis & { __agendaSaves?: number }).__agendaSaves ?? 0)
 }
 
-// @requirement PRODUCT.md §22.1
-// @requirement PRODUCT.md §23.14
-test('Agenda Visual navigation stays responsive with bounded mounted rows and no saves', async ({ userDataDir }) => {
-  seedDocument(userDataDir, agendaSeed(3000))
-  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
-  await installSaveProbe(app)
-  await window.keyboard.press('Meta+p')
-  await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
-  await window.keyboard.press('V')
-  await window.evaluate(() => {
-    const probe = { motion: [] as number[] }
-    ;(window as unknown as { agendaVisualProbe: typeof probe }).agendaVisualProbe = probe
-    document.addEventListener(
-      'keydown',
-      (event) => {
-        if (['j', 'k'].includes(event.key))
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => probe.motion.push(performance.now() - event.timeStamp)),
-          )
-      },
-      { capture: true },
+for (const navigation of ['Visual', 'horizontal'] as const) {
+  // @requirement PRODUCT.md §22.1
+  // @requirement PRODUCT.md §23.14
+  test(`Agenda ${navigation} navigation stays responsive with bounded mounted rows and no saves`, async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, agendaSeed(3000))
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await installSaveProbe(app)
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
+    await window.keyboard.press(navigation === 'Visual' ? 'V' : '$')
+    const keys = navigation === 'Visual' ? ['j', 'k'] : ['l', 'h']
+    await window.evaluate((keys) => {
+      const probe = { motion: [] as number[] }
+      ;(window as unknown as { agendaVisualProbe: typeof probe }).agendaVisualProbe = probe
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          if (keys.includes(event.key))
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => probe.motion.push(performance.now() - event.timeStamp)),
+            )
+        },
+        { capture: true },
+      )
+    }, keys)
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press(keys[0]!)
+    for (let index = 0; index < 20; index += 1) await window.keyboard.press(keys[1]!)
+    await window.waitForFunction(
+      () => (window as unknown as { agendaVisualProbe: { motion: number[] } }).agendaVisualProbe.motion.length === 40,
     )
+    const probe = await window.evaluate(
+      () => (window as unknown as { agendaVisualProbe: { motion: number[] } }).agendaVisualProbe,
+    )
+    const saves = await readSaves(app)
+    const sorted = probe.motion.toSorted((a, b) => a - b)
+    recordPerfResult({
+      kind: 'state',
+      scenario:
+        navigation === 'Visual'
+          ? 'agenda-6000-occurrences-visual-navigation'
+          : 'agenda-6000-occurrences-horizontal-navigation',
+      samples: sorted.length,
+      metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
+    })
+    expect(sorted[38]).toBeLessThan(50)
+    expect(sorted[39]).toBeLessThan(100)
+    expect(saves).toBe(0)
+    expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+    await expect(window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })).toBeFocused()
   })
-  for (let index = 0; index < 20; index += 1) await window.keyboard.press('j')
-  for (let index = 0; index < 20; index += 1) await window.keyboard.press('k')
-  await window.waitForFunction(
-    () => (window as unknown as { agendaVisualProbe: { motion: number[] } }).agendaVisualProbe.motion.length === 40,
-  )
-  const probe = await window.evaluate(
-    () => (window as unknown as { agendaVisualProbe: { motion: number[] } }).agendaVisualProbe,
-  )
-  const saves = await readSaves(app)
-  const sorted = probe.motion.toSorted((a, b) => a - b)
-  recordPerfResult({
-    kind: 'state',
-    scenario: 'agenda-6000-occurrences-visual-navigation',
-    samples: sorted.length,
-    metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
-  })
-  expect(sorted[38]).toBeLessThan(50)
-  expect(sorted[39]).toBeLessThan(100)
-  expect(saves).toBe(0)
-  expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
-  await expect(window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })).toBeFocused()
-})
+}
 
 // @requirement PRODUCT.md §22.1
 test('Agenda Replace row clicks stay responsive with bounded mounted rows and no saves', async ({ userDataDir }) => {

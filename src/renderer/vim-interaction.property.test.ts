@@ -226,6 +226,20 @@ function assertSiblingMotionSequence(
   }
   inputAt(selectedNodeId).focus()
 
+  const selectNode = (nodeId: string, cursor = 0): void => {
+    selectedNodeId = nodeId
+    focus = { nodeId, cursor, token: focus.token + 1 }
+    const targetNode = nodes.find((node) => node.id === nodeId)!
+    setNormalCaret(inputAt(nodeId), cursor)
+    inputAt(nodeId).focus()
+    authority.nodeId = nodeId
+    authority.caret = {
+      cursor,
+      imageActive: targetNode.attachment !== undefined && cursor === targetNode.text.length,
+    }
+    projectImageCaret()
+  }
+
   const store = createEditorStoreDouble({
     snapshot: () => ({
       status: 'ready',
@@ -233,6 +247,7 @@ function assertSiblingMotionSequence(
       location: { currentParentId: null, selectedNodeId },
       focus,
     }),
+    selectNode: vi.fn(selectNode),
     moveSelection: vi.fn((direction: 'up' | 'down', cursor: number) => {
       const selectedIndex = nodes.findIndex((node) => node.id === selectedNodeId)
       const target = moveSelectionTransition(
@@ -244,17 +259,7 @@ function assertSiblingMotionSequence(
       )
       expect(target).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
       if (target === undefined) return
-      selectedNodeId = target.nodeId
-      focus = { ...target, token: focus.token + 1 }
-      const targetNode = nodes.find((node) => node.id === target.nodeId)!
-      setNormalCaret(inputAt(target.nodeId), target.cursor)
-      inputAt(target.nodeId).focus()
-      authority.nodeId = targetNode.id
-      authority.caret = {
-        cursor: target.cursor,
-        imageActive: targetNode.attachment !== undefined && target.cursor === targetNode.text.length,
-      }
-      projectImageCaret()
+      selectNode(target.nodeId, target.cursor)
     }),
   })
 

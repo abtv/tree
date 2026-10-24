@@ -41,8 +41,9 @@ import {
   rememberTextVisual,
   setVisualRange,
 } from './vim-command-state'
-import { editCaretTransition, horizontalCaretTransition } from './vim-caret-transition'
+import { editCaretTransition } from './vim-caret-transition'
 import { navigateVertically } from './vim-vertical-navigation'
+import { horizontalNavigation } from './vim-horizontal-navigation'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import type { ShortcutProfile } from './shortcut-profile'
@@ -360,7 +361,7 @@ export function handleVimKey(
     if (
       !visual &&
       pending.operator === undefined &&
-      ((['j', 'k', 'J', 'K', 'G', 'H', 'M', 'L'].includes(event.key) && pending.prefix === undefined) ||
+      ((['h', 'l', 'j', 'k', 'J', 'K', 'G', 'H', 'M', 'L'].includes(event.key) && pending.prefix === undefined) ||
         (event.key === 'g' && pending.prefix === 'g') ||
         pending.prefix === 'z')
     ) {
@@ -650,14 +651,31 @@ export function handleVimKey(
   }
 
   if (!visual && (event.key === 'h' || event.key === 'l')) {
-    const next = horizontalCaretTransition(
-      vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')),
-      event.key === 'h' ? 'left' : 'right',
+    const caret = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))
+    const direction = event.key === 'h' ? 'left' : 'right'
+    let rows: readonly TreeNode[] | undefined
+    let index = 0
+    const next = horizontalNavigation({
+      node,
+      caret,
+      direction,
       count,
-      node.text,
-      node.attachment !== undefined,
-    )
-    vim.applyCaretState(node.id, next)
+      adjacent: () => {
+        if (snapshot.status !== 'ready') return undefined
+        if (rows === undefined) {
+          rows = store.getVisibleRows().map((row) => row.node)
+          if (snapshot.location.currentParentId !== null)
+            rows = [requireNode(snapshot.document, snapshot.location.currentParentId).node, ...rows]
+          index = rows.findIndex((row) => row.id === node.id)
+        }
+        if (index < 0) return undefined
+        index += direction === 'left' ? -1 : 1
+        return rows[index]
+      },
+    })
+    const crossed = next.node.id !== node.id
+    if (crossed) store.selectNode(next.node.id, next.caret.cursor)
+    vim.applyCaretState(next.node.id, next.caret, crossed)
   } else if (isTextMotion(event.key)) {
     const range = textMotion(node.text, motionCursor, event.key, count)
     if (range !== undefined) move(range.target)

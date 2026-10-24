@@ -34,6 +34,56 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: image caret', () => {
+  // @requirement PRODUCT.md §4.3
+  // @requirement PRODUCT.md §20.2.9
+  test('crosses text, empty and image-only nodes with counted h and l', async ({ userDataDir }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'a👩🏽‍🚀', attachment: { id: 'first-image', mimeType: 'image/png' }, children: [] },
+          { id: 'empty', text: '', children: [] },
+          { id: 'image', text: '', attachment: { id: 'only-image', mimeType: 'image/png' }, children: [] },
+          { id: 'last', text: 'cd', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    seedAttachmentImage(userDataDir, 'first-image')
+    seedAttachmentImage(userDataDir, 'only-image')
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+    await window.keyboard.press('$')
+    await window.keyboard.press('l')
+    await expect(first).toHaveClass(/node-input-image-caret/u)
+    await window.keyboard.press('l')
+    await expect(node(window, 2)).toBeFocused()
+    await window.keyboard.press('l')
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveClass(/node-input-image-caret/u)
+    await window.screenshot({ path: testInfo.outputPath('horizontal-image-arrival.png') })
+    await window.keyboard.press('l')
+    await expect(node(window, 4)).toBeFocused()
+    await expect(node(window, 4)).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.type('3h')
+    await expect(first).toBeFocused()
+    await expect(first).toHaveClass(/node-input-image-caret/u)
+    await window.keyboard.press('h')
+    await expect(first).toHaveJSProperty('selectionStart', 1)
+    await expect(first).not.toHaveClass(/node-input-image-caret/u)
+    await window.keyboard.type('99l')
+    await expect(node(window, 4)).toBeFocused()
+    await expect(node(window, 4)).toHaveJSProperty('selectionStart', 1)
+    await window.keyboard.press('l')
+    await expect(node(window, 4)).toHaveJSProperty('selectionStart', 1)
+    await window.screenshot({ path: testInfo.outputPath('horizontal-text-arrival.png') })
+    await window.keyboard.type('99h')
+    await expect(first).toBeFocused()
+    await expect(first).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('h')
+    await expect(first).toHaveJSProperty('selectionStart', 0)
+  })
+
   // @requirement PRODUCT.md §20.2.9
   test('walks wrapped text before its image and returns from the next node through the final text line', async ({
     userDataDir,
@@ -543,12 +593,25 @@ test.describe('Vim editing: image caret', () => {
     await imageOnly.focus()
     await expect(imageOnly).toHaveClass(/node-input-image-caret/)
 
-    for (const key of ['h', 'l', '0', '$']) {
+    for (const key of ['0', '$']) {
       await imageOnly.press(key)
       await expect(imageOnly).toBeFocused()
       await expect(imageOnly).toHaveClass(/node-input-image-caret/)
       await expect(imageOnly).toHaveJSProperty('selectionStart', 0)
     }
+
+    await imageOnly.press('h')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 7)
+    await window.keyboard.press('l')
+    await expect(imageOnly).toBeFocused()
+    await expect(imageOnly).toHaveClass(/node-input-image-caret/)
+    await imageOnly.press('l')
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('h')
+    await expect(imageOnly).toBeFocused()
+    await expect(imageOnly).toHaveClass(/node-input-image-caret/)
 
     await imageOnly.press('j')
     await expect(node(window, 3)).toBeFocused()

@@ -57,6 +57,93 @@ const caretOffset = (field: ReturnType<typeof node>) =>
 test.describe('Vim editing: navigation and Visual modes', () => {
   test.use({ sharedApplicationReset: sharedApplicationAdopted() })
 
+  // @requirement PRODUCT.md §4.3
+  // @requirement PRODUCT.md §20.2.9
+  test('crosses rich text and unmounted rows with counted horizontal navigation', async ({ userDataDir }) => {
+    const url = 'https://example.com'
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'linked', text: url, links: [{ start: 0, end: url.length, url }], children: [] },
+          ...Array.from({ length: 300 }, (_, index) => ({ id: `row-${index}`, text: 'x', children: [] })),
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'linked' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const linked = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const second = window.getByRole('textbox', { name: 'Node 2', exact: true })
+    const last = window.getByRole('textbox', { name: 'Node 301', exact: true })
+    await linked.focus()
+    await window.keyboard.type('$l')
+    await expect(second).toBeFocused()
+    await expect(second).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('h')
+    await expect(linked).toBeFocused()
+    await expect.poll(() => caretOffset(linked)).toBe(url.length - 1)
+    await window.keyboard.type('300l')
+    await expect(last).toBeFocused()
+    await expect(last).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.type('300h')
+    await expect(linked).toBeFocused()
+    await expect.poll(() => caretOffset(linked)).toBe(url.length - 1)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  })
+
+  // @requirement PRODUCT.md §4.3
+  // @requirement PRODUCT.md §20.2.9
+  test('traverses visible outline boundaries with h and l while keeping Visual and operators local', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'branch', text: 'ab', children: [{ id: 'child', text: 'cd', children: [] }] },
+          { id: 'next', text: 'ef', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'branch' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await node(window, 1).focus()
+    await window.keyboard.type('$l')
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('h')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
+    await window.keyboard.type('za')
+    await window.keyboard.press('l')
+    await expect(node(window, 2)).toHaveValue('cd')
+    await expect(node(window, 2)).toBeFocused()
+    await window.keyboard.type('2l')
+    await expect(node(window, 3)).toBeFocused()
+    await window.keyboard.type('2h')
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.press('h')
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.type('gd')
+    await node(window, 1).focus()
+    await window.keyboard.press('0')
+    await window.keyboard.press('h')
+    await expect(parent(window)).toBeFocused()
+    await expect(parent(window)).toHaveJSProperty('selectionStart', 1)
+    await window.keyboard.press('l')
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+    await window.keyboard.type('$vl')
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('Escape')
+    await window.keyboard.type('dl')
+    await expect(node(window, 1)).toHaveValue('c')
+    await expect(parent(window)).toHaveValue('ab')
+    await window.keyboard.press('0')
+    await window.keyboard.type('dh')
+    await expect(node(window, 1)).toHaveValue('c')
+    await expect(node(window, 1)).toBeFocused()
+  })
+
   test.describe('wrapped Normal navigation', () => {
     test.use({ sharedApplicationReset: 'off' })
 

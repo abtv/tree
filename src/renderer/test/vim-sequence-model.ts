@@ -105,20 +105,28 @@ export function expectedStep(state: SequenceExpected, specs: readonly SequenceSp
     state.returned = undefined
     return
   }
-  if (key === 'h') {
-    if (state.image && length > 0) {
-      state.cursor = Math.max(0, (state.returned ?? length - 1) - count + 1)
-      state.image = false
-      state.returned = undefined
-    } else state.cursor = Math.max(0, state.cursor - count)
-    return
-  }
-  if (key === 'l') {
-    const old = state.cursor
-    state.cursor = Math.min(maximum(spec, text), old + count)
-    if (spec.image && !state.image && state.cursor === length && length > 0)
-      state.returned = Math.min(length - 1, old + count - 1)
-    state.image = spec.image && state.cursor === length
+  if (key === 'h' || key === 'l') {
+    for (let step = 0; step < count; step += 1) {
+      const current = specs[state.index]!
+      const currentLength = state.texts[state.index]!.length
+      if (key === 'h' && state.image && currentLength > 0) {
+        state.cursor = state.returned ?? currentLength - 1
+        state.image = false
+        state.returned = undefined
+      } else if (key === 'h' && state.cursor > 0) state.cursor -= 1
+      else if (key === 'l' && state.cursor < maximum(current, state.texts[state.index]!)) {
+        state.cursor += 1
+        state.image = current.image && state.cursor === currentLength
+        if (state.image) state.returned = currentLength - 1
+      } else {
+        const next = state.index + (key === 'l' ? 1 : -1)
+        if (next < 0 || next >= specs.length) break
+        state.index = next
+        state.cursor = key === 'l' ? 0 : maximum(specs[next]!, state.texts[next]!)
+        state.image = specs[next]!.image && state.cursor === state.texts[next]!.length
+        state.returned = undefined
+      }
+    }
     return
   }
   let navigationCursor = state.cursor

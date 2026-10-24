@@ -9,6 +9,99 @@ import type { VimTextCommandState } from './editor-input-handlers'
 import type { VimCaretState } from './vim-caret-transition'
 import { setCaret } from './editor-dom'
 import { dayNumberOf } from '../domain/calendar-date'
+import { requireNode } from '../domain/document'
+import { agendaRowLabel } from './agenda-labels'
+import type { RowCaret } from './agenda-row-caret'
+
+// @requirement PRODUCT.md §23.4
+it('matches flattened Agenda character positions across contextual, synthetic and repeated image occurrences', async () => {
+  await fc.assert(
+    fc.asyncProperty(fc.nat(100), fc.nat(150), fc.constantFrom<'h' | 'l'>('h', 'l'), async (origin, count, key) => {
+      const f = await createRealStoreHarness({
+        document: {
+          roots: [
+            {
+              id: 'context',
+              text: 'abc',
+              children: [
+                {
+                  id: 'shared',
+                  text: '2026-10-14 2026-10-15 X',
+                  children: [],
+                  attachment: { id: 'image', mimeType: 'image/png' },
+                },
+              ],
+            },
+            { id: 'far', text: '2026-12-01 Z', children: [] },
+          ],
+        },
+        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+      })
+      f.store.openAgenda()
+      const rows = f.store.getAgendaRows()
+      const textOf = (row: (typeof rows)[number]): string =>
+        row.kind === 'node'
+          ? requireNode(f.snapshot().document, row.nodeId).node.text
+          : agendaRowLabel(row, f.snapshot().agenda!.today)
+      const positions = rows.flatMap((row) => {
+        const text = textOf(row)
+        const image =
+          row.kind === 'node' &&
+          row.role === 'match' &&
+          requireNode(f.snapshot().document, row.nodeId).node.attachment !== undefined
+        return Array.from({ length: Math.max(1, text.length + Number(image)) }, (_, cursor) => ({
+          row,
+          cursor,
+          image: image && cursor === text.length,
+        }))
+      })
+      const start = origin % positions.length
+      const source = positions[start]!
+      const expected = positions[Math.max(0, Math.min(positions.length - 1, start + (key === 'l' ? count : -count)))]!
+      f.store.applyAgenda({ kind: 'select', key: source.row.key, cursor: source.cursor })
+      let rowCaret: RowCaret = { key: source.row.key, anchor: source.cursor, focus: source.cursor }
+      let caret: VimCaretState = { cursor: source.cursor, imageActive: source.image }
+      const vim: VimTextCommandState = {
+        mode: 'normal',
+        commandState: createVimCommandState(),
+        setMode: vi.fn(),
+        getCaretState: () => caret,
+        applyCaretState: (_id, next) => {
+          caret = next
+        },
+      }
+      const handler = createAgendaKeyDownHandler({
+        store: f.store,
+        vim,
+        rowText: {
+          textOf,
+          hasEditor: (row) => row.kind === 'node' && row.role === 'match',
+          caret: () => rowCaret,
+          setCaret: (next) => {
+            rowCaret = next
+          },
+          copy: vi.fn(),
+        },
+      })
+      const input = document.createElement('textarea')
+      input.className = source.row.kind === 'node' && source.row.role === 'match' ? 'node-input' : ''
+      input.value = textOf(source.row)
+      input.setSelectionRange(source.cursor, source.cursor)
+      const press = (key: string) =>
+        handler({ key, currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+      if (count > 0) {
+        for (const digit of String(count)) press(digit)
+        press(key)
+      }
+      expect(f.snapshot().agenda!.selectedKey).toBe(expected.row.key)
+      const actual = expected.row.kind === 'node' && expected.row.role === 'match' ? caret.cursor : rowCaret.focus
+      expect(actual).toBe(expected.cursor)
+      if (expected.row.kind === 'node' && expected.row.role === 'match') expect(caret.imageActive).toBe(expected.image)
+      expect(f.saves).toHaveLength(0)
+    }),
+    { numRuns: 100 },
+  )
+})
 
 // @requirement PRODUCT.md §23.4
 it('carries the original column through a short contextual row during counted navigation', async () => {

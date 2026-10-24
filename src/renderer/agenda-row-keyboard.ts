@@ -13,6 +13,8 @@ import { requireNode } from '../domain/document'
 import { agendaRowLabel } from './agenda-labels'
 import { firstNonWhitespace } from './vim-editing'
 import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
+import { horizontalNavigation } from './vim-horizontal-navigation'
+import { parseCount } from './vim-text-commands'
 import { APPLE_SHORTCUTS, isMappedPrimaryKey, isVimCtrlKey, type ShortcutProfile } from './shortcut-profile'
 
 /** The text and caret of the selected row when it has no editor, owned by the Agenda view. */
@@ -144,6 +146,50 @@ export function createAgendaKeyDownHandler({
         beforeSelect?.(false)
         store.applyAgenda({ kind: 'select', key: current.key, cursor: caret.cursor })
         if (current.kind === 'node' && current.role === 'match') vim.applyCaretState?.(current.nodeId, caret, true)
+      }
+    }
+    const horizontal = (direction: 'left' | 'right', count: number): void => {
+      let position = index
+      const item = (candidate: AgendaRow) => ({
+        row: candidate,
+        text: textOf(candidate),
+        attachment:
+          hasImage(candidate) && candidate.kind === 'node'
+            ? requireNode(state.document, candidate.nodeId).node.attachment
+            : undefined,
+      })
+      const cursor = sourceCursor()
+      const caret =
+        row.kind === 'node' && row.role === 'match'
+          ? vim?.getCaretState?.(
+              row.nodeId,
+              cursor,
+              event.currentTarget?.classList.contains('node-input-image-caret') ?? false,
+            )
+          : undefined
+      const next = horizontalNavigation({
+        node: item(row),
+        caret: caret ?? { cursor, imageActive: hasImage(row) && cursor === textOf(row).length },
+        direction,
+        count,
+        adjacent: () => {
+          position += direction === 'left' ? -1 : 1
+          const candidate = rows[position]
+          return candidate === undefined ? undefined : item(candidate)
+        },
+      })
+      const destination = next.node.row
+      const crossed = destination.key !== row.key
+      if (crossed) {
+        beforeSelect?.(false)
+        store.applyAgenda({ kind: 'select', key: destination.key, cursor: next.caret.cursor })
+      }
+      if (destination.kind === 'node' && destination.role === 'match') {
+        vim?.applyCaretState?.(destination.nodeId, next.caret, crossed)
+      } else {
+        if (row.kind === 'node' && row.role === 'match')
+          vim?.applyCaretState?.(row.nodeId, { cursor, imageActive: false }, false, 'preserve-selection')
+        rowText?.setCaret({ key: destination.key, anchor: next.caret.cursor, focus: next.caret.cursor })
       }
     }
     const viewportMotion = (motion: 'top' | 'middle' | 'bottom' | 'half-down' | 'half-up', count: number): void => {
@@ -334,6 +380,20 @@ export function createAgendaKeyDownHandler({
       beforeSelect?.(false)
       if (store.createAgendaDayNode(event.key === 'O' ? 'preceding' : 'selected') && vim !== undefined)
         vim.setMode('insert')
+      return
+    }
+    if (
+      normal &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      pending?.prefix === undefined &&
+      pending?.operator === undefined &&
+      pending?.awaiting === undefined &&
+      (event.key === 'h' || event.key === 'l') &&
+      (rowText === undefined || !rowText.hasEditor(row) || event.currentTarget?.classList.contains('node-input'))
+    ) {
+      clearPending(vim.commandState)
+      horizontal(event.key === 'h' ? 'left' : 'right', parseCount(pending?.count ?? ''))
       return
     }
     if (rowTextKey()) return

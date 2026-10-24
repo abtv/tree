@@ -1,5 +1,5 @@
 // @editing-modes: vim
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import type { TreeNode } from '../../src/domain/document'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,6 +26,113 @@ const dayKey = (month: number, day: number): string => `day:${dayNumber(month, d
 const nodeKey = (month: number, day: number, id: string): string => `node:${dayNumber(month, day)}:${id}`
 const gapKey = `gap:${dayNumber(10, 17)}:${dayNumber(11, 30)}`
 const row = (window: Page, key: string) => window.locator(`.agenda-row[data-agenda-key="${key}"]`)
+const caretOffset = (field: Locator): Promise<number> =>
+  field.evaluate((element) => {
+    if (element instanceof HTMLTextAreaElement) return element.selectionStart
+    const selection = document.getSelection()!
+    const prefix = document.createRange()
+    prefix.selectNodeContents(element)
+    prefix.setEnd(selection.anchorNode!, selection.anchorOffset)
+    return prefix.toString().length
+  })
+
+// @requirement PRODUCT.md §23.4
+test('keeps horizontal image carets separate across repeated Agenda occurrences and a focused-day heading', async ({
+  userDataDir,
+}, testInfo) => {
+  const text = '2026-10-14 2026-10-15 Shared'
+  seedDocument(userDataDir, {
+    document: { roots: [{ ...node('shared', text), attachment: { id: 'image', mimeType: 'image/png' } }] },
+    location: { currentParentId: null, selectedNodeId: 'shared' },
+  })
+  mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+  writeFileSync(
+    attachmentPath(userDataDir, 'image'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+  const { window } = await launchTree(userDataDir)
+  await openAndSelect(window, nodeKey(10, 14, 'shared'))
+  const firstRow = row(window, nodeKey(10, 14, 'shared'))
+  const secondRow = row(window, nodeKey(10, 15, 'shared'))
+  await window.keyboard.type('0l')
+  await window.keyboard.press('j')
+  await expect(firstRow.locator('.node-input')).toHaveClass(/node-input-image-caret/)
+  await window.keyboard.press('l')
+  const day = row(window, dayKey(10, 15))
+  await expect(day).toHaveAttribute('aria-selected', 'true')
+  await expect(firstRow.locator('.node-input-image-caret')).toHaveCount(0)
+  const headerLength = (await day.locator('.agenda-label').innerText()).length
+  await window.keyboard.type(`${headerLength}l`)
+  const second = secondRow.locator('.node-input')
+  await expect(second).toBeFocused()
+  await expect.poll(() => caretOffset(second)).toBe(0)
+  await window.keyboard.type('$l')
+  await expect(second).toHaveClass(/node-input-image-caret/)
+  await window.keyboard.press('h')
+  await expect.poll(() => caretOffset(second)).toBe(text.length - 1)
+  await window.keyboard.press('l')
+  await window.keyboard.press('l')
+  await expect(second).toHaveClass(/node-input-image-caret/)
+  await window.screenshot({ path: testInfo.outputPath('agenda-horizontal-mirror-image.png') })
+  await day.click()
+  await window.keyboard.press('Meta+.')
+  const heading = window.locator('.agenda-focused-heading')
+  await window.keyboard.type('$l')
+  await expect(second).toBeFocused()
+  await expect.poll(() => caretOffset(second)).toBe(0)
+  await window.keyboard.press('h')
+  await expect(heading.locator('.agenda-caret')).toHaveCount(1)
+  const label = await heading.innerText()
+  await expect(heading.locator('.agenda-caret')).toHaveText(label.at(-1)!)
+})
+
+// @requirement PRODUCT.md §23.4
+test('continues h and l through Agenda editors, contextual text, dates and gaps', async ({ userDataDir }, testInfo) => {
+  seedPending(userDataDir)
+  const { window } = await launchTree(userDataDir)
+  await openAndSelect(window, nodeKey(10, 14, 'plan'))
+  const plan = row(window, nodeKey(10, 14, 'plan')).locator('.node-input')
+  const other = row(window, nodeKey(10, 14, 'other')).locator('.node-input')
+  await window.keyboard.type('$l')
+  await expect(other).toBeFocused()
+  await expect.poll(() => caretOffset(other)).toBe(0)
+  await window.keyboard.press('h')
+  await expect(plan).toBeFocused()
+  await expect.poll(() => caretOffset(plan)).toBe('2026-10-14 Prepare'.length - 1)
+  await window.keyboard.type('0h')
+  const context = row(window, nodeKey(10, 14, 'context'))
+  await expect(context).toHaveAttribute('aria-selected', 'true')
+  await expect(context.locator('.agenda-caret')).toHaveText('t')
+  await window.keyboard.type('0h')
+  const day = row(window, dayKey(10, 14))
+  await expect(day).toHaveAttribute('aria-selected', 'true')
+  await window.keyboard.press('l')
+  await expect(context).toHaveAttribute('aria-selected', 'true')
+  await expect(context.locator('.agenda-caret')).toHaveText('C')
+  await window.keyboard.type('8l')
+  await expect(plan).toBeFocused()
+  await expect.poll(() => caretOffset(plan)).toBe(1)
+  await window.keyboard.type('2h')
+  await expect(context).toHaveAttribute('aria-selected', 'true')
+  await expect(context.locator('.agenda-caret')).toHaveText('t')
+  await window.screenshot({ path: testInfo.outputPath('agenda-horizontal-context.png') })
+  const gap = row(window, gapKey)
+  await gap.click()
+  await window.keyboard.type('$l')
+  await expect(row(window, dayKey(12, 1))).toHaveAttribute('aria-selected', 'true')
+  await window.keyboard.press('h')
+  await expect(gap).toHaveAttribute('aria-selected', 'true')
+  await expect(gap.locator('.agenda-caret')).toHaveCount(1)
+  await window.keyboard.type('$vl')
+  await expect(gap).toHaveAttribute('aria-selected', 'true')
+  await window.keyboard.press('Escape')
+  await window.keyboard.type('dl')
+  await expect(gap).toHaveAttribute('aria-selected', 'true')
+  await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+})
 
 // @requirement PRODUCT.md §23.4
 // @requirement PRODUCT.md §23.14
