@@ -13,7 +13,7 @@ export function installMenuFocus(menu: HTMLElement, trigger: HTMLElement): MenuF
   let outside = false
   let disposed = false
   const remember = (element: EventTarget | null) => {
-    if (!(element instanceof HTMLElement) || !element.matches('.node-input, .agenda-row, .agenda-loading')) return
+    if (!(element instanceof HTMLElement) || !element.matches('.node-input, .agenda-row')) return
     previous = element.matches('.node-input') ? { element, ...getSelectionEndpoints(element) } : { element }
   }
   const restore = () => {

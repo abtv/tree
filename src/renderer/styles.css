@@ -461,11 +461,6 @@ body:not(.node-drag-active) .location-link:hover {
   position: relative;
   --row-indent: 20px;
 }
-
-.agenda-loading {
-  min-height: 3rem;
-  color: var(--color-text-muted);
-}
 /* Retain the painted window while native scrolling waits for its range update. The inner offset
    and rows change together; the compositor never scrolls the old window into an empty spacer. */
 .agenda-list-windowed {

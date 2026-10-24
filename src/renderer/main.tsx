@@ -8,7 +8,6 @@ import {
   resumeNotesWrites,
 } from '../infrastructure/renderer/electron-services'
 import { App } from './App'
-import { AgendaView } from './AgendaView'
 import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import './styles.css'
@@ -51,12 +50,7 @@ void window.treeApi
     createRoot(rootElement).render(
       <StrictMode>
         <ErrorBoundary>
-          <App
-            initialVimEnabled={initialVimEnabled}
-            store={store}
-            dataOperations={dataOperations}
-            agendaView={AgendaView}
-          />
+          <App initialVimEnabled={initialVimEnabled} store={store} dataOperations={dataOperations} />
         </ErrorBoundary>
       </StrictMode>,
     )

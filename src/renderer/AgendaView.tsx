@@ -44,8 +44,19 @@ function isEditableOccurrence(
   )
 }
 
-export interface AgendaViewProps {
-  suppressInitialFocus?: boolean
+export function AgendaView({
+  store,
+  agenda,
+  document,
+  vim,
+  renderInput,
+  renderAttachment,
+  renderText,
+  dragFreeze,
+  locked = false,
+  visualNodeSelection,
+  shortcuts,
+}: {
   shortcuts?: ShortcutProfile
   store: EditorStore
   agenda: AgendaState
@@ -64,22 +75,7 @@ export interface AgendaViewProps {
         context: boolean,
       ) => ReactNode)
     | undefined
-}
-
-export function AgendaView({
-  store,
-  agenda,
-  document,
-  vim,
-  renderInput,
-  renderAttachment,
-  renderText,
-  dragFreeze,
-  locked = false,
-  visualNodeSelection,
-  shortcuts,
-  suppressInitialFocus = false,
-}: AgendaViewProps): React.JSX.Element {
+}): React.JSX.Element {
   const elements = useRef(new Map<string, HTMLDivElement>())
   // The caret of a row without an editor is renderer state: it changes on every motion key, so it
   // stays out of the store and the document. Navigation supplies the arrival offset.
@@ -333,10 +329,6 @@ export function AgendaView({
     [store, vim],
   )
   useLayoutEffect(() => {
-    if (suppressInitialFocus) {
-      viewportReveal.cancel()
-      return
-    }
     if (store.search.session.getSnapshot().draft !== undefined) return
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
@@ -361,7 +353,7 @@ export function AgendaView({
         return state.status === 'ready' && state.agenda?.selectedKey === agenda.selectedKey
       })
     else viewportReveal.cancel()
-  }, [agenda.selectedKey, agenda.focusedDay, focus, store, viewportReveal, suppressInitialFocus])
+  }, [agenda.selectedKey, agenda.focusedDay, focus, store, viewportReveal])
   const drag = useAgendaDrag({
     rows,
     locked,

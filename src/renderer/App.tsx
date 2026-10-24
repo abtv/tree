@@ -1,14 +1,4 @@
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ComponentType,
-} from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { CommandServices } from '../application/command-registry'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
@@ -21,7 +11,7 @@ import type { VimFoldCommand } from './vim-keyboard-types'
 import { AlwaysOnTopToggle } from './AlwaysOnTopToggle'
 import { LocationBar } from './LocationBar'
 import { AgendaLocationBar } from './AgendaLocationBar'
-import type { AgendaViewProps } from './AgendaView'
+import { AgendaView } from './AgendaView'
 import { AgendaSearchText } from './AgendaSearchText'
 import { CompletionPopup } from './CompletionPopup'
 import { CommandPanel } from './CommandPanel'
@@ -49,7 +39,6 @@ import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 
 interface AppProps {
-  agendaView: ComponentType<AgendaViewProps>
   registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
   menuCommands?: import('../application/menu-commands').MenuCommandSource
   store: EditorStore
@@ -69,18 +58,7 @@ interface AppProps {
   dataOperations?: DesktopDataOperations
 }
 
-function AgendaLoading(): React.JSX.Element {
-  const element = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => element.current?.focus({ preventScroll: true }), [])
-  return (
-    <div ref={element} className="agenda-loading" role="status" tabIndex={-1}>
-      Loading Agenda…
-    </div>
-  )
-}
-
 export function App({
-  agendaView: AgendaViewComponent,
   store,
   initialVimEnabled,
   vimAvailable = true,
@@ -530,21 +508,19 @@ export function App({
           }
         >
           {agenda !== undefined ? (
-            <Suspense fallback={<AgendaLoading />}>
-              <AgendaViewComponent
-                store={store}
-                agenda={agenda}
-                document={state.document}
-                dragFreeze={dragFreeze}
-                locked={persistenceLocked}
-                vim={vimEnabled ? vimTextCommandState : undefined}
-                shortcuts={shortcuts}
-                visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
-                renderInput={renderAgendaInput}
-                renderAttachment={renderAgendaAttachment}
-                renderText={renderAgendaText}
-              />
-            </Suspense>
+            <AgendaView
+              store={store}
+              agenda={agenda}
+              document={state.document}
+              dragFreeze={dragFreeze}
+              locked={persistenceLocked}
+              vim={vimEnabled ? vimTextCommandState : undefined}
+              shortcuts={shortcuts}
+              visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
+              renderInput={renderAgendaInput}
+              renderAttachment={renderAgendaAttachment}
+              renderText={renderAgendaText}
+            />
           ) : (
             <>
               {currentParent === undefined ? null : (
