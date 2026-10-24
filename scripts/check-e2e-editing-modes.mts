@@ -54,7 +54,7 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
       const path = join(directory, entry.name)
       if (entry.isDirectory()) walk(path)
       // `_*.spec.ts` files are temporary diagnostics (e2e/electron/AGENTS.md) and are not part of the suite.
-      else if (entry.isFile() && /\.spec\.(?:ts|mjs)$/.test(entry.name) && !entry.name.startsWith('_')) {
+      else if (entry.isFile() && /\.spec\.(?:ts|mts|mjs)$/.test(entry.name) && !entry.name.startsWith('_')) {
         files.push({ path: relative(rootDirectory, path).split('\\').join('/'), content: readFileSync(path, 'utf8') })
       }
     }

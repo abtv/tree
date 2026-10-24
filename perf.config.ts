@@ -13,7 +13,7 @@ export default defineConfig({
       // Browser scenarios run against the built static package (`npm run build:web`).
       name: 'web',
       testDir: './perf/web',
-      testMatch: '**/*.spec.mjs',
+      testMatch: '**/*.spec.mts',
       // Google Chrome has no Linux arm64 build; match the browser E2E configuration.
       use: { channel: process.platform === 'darwin' ? 'chrome' : 'chromium', headless: false },
     },

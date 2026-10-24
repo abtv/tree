@@ -1,21 +1,22 @@
 // @editing-modes: independent
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
+import type { Page } from '@playwright/test'
 
-const ready = (page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
-const saved = (page) =>
+const ready = (page: Page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+const saved = (page: Page) =>
   page.waitForFunction(
-    () => document.getElementById('prototype-save-status').textContent === 'Saved locally in this browser',
+    () => document.getElementById('prototype-save-status')!.textContent === 'Saved locally in this browser',
   )
-const input = (page) => page.locator('[data-node-id="welcome"] .node-input')
-const readHead = (page) =>
+const input = (page: Page) => page.locator('[data-node-id="welcome"] .node-input')
+const readHead = (page: Page) =>
   page.evaluate(async () => {
-    const db = await new Promise((resolve, reject) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const r = indexedDB.open('tree-browser-prototype')
       r.onsuccess = () => resolve(r.result)
       r.onerror = () => reject(r.error)
     })
     try {
-      return await new Promise((resolve, reject) => {
+      return await new Promise<import('../../src/domain/document.ts').PersistedEditorState>((resolve, reject) => {
         const tx = db.transaction('document')
         const r = tx.objectStore('document').get('head')
         tx.oncomplete = () => resolve(r.result)
@@ -30,22 +31,22 @@ test('preserves browser storage through restart and failure recovery', async ({
   baseURL,
 }) => {
   let context = await launch()
-  let page = context.pages()[0]
+  let page = context.pages()[0]!
   page.setDefaultTimeout(6000)
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
   await input(page).fill('Saved across a complete Chrome restart')
   await saved(page)
   await context.close()
   context = await launch()
-  page = context.pages()[0]
+  page = context.pages()[0]!
   page.setDefaultTimeout(6000)
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
   expect(await input(page).inputValue()).toBe('Saved across a complete Chrome restart')
 
   const blocked = await context.newPage()
-  await blocked.goto(baseURL)
+  await blocked.goto(baseURL!)
   await blocked.getByRole('alert').filter({ hasText: 'already open' }).waitFor()
   expect(await blocked.locator('.node-input').count()).toBe(0)
   await page.close()
@@ -78,7 +79,7 @@ test('preserves browser storage through restart and failure recovery', async ({
   })
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   await saved(page)
-  expect((await readHead(page)).document.roots[0].text).toBe('Unsaved work must remain in this tab')
+  expect((await readHead(page)).document.roots[0]!.text).toBe('Unsaved work must remain in this tab')
 
   // Real typing followed by immediate close must offer a browser-level warning.
   await input(page).press('End')
@@ -93,14 +94,14 @@ test('preserves browser storage through restart and failure recovery', async ({
 
   await page.locator('#tree-menu-button').click()
   await page.locator('#prototype-vim').click()
-  await page.waitForFunction(() => document.getElementById('prototype-vim').getAttribute('aria-pressed') === 'true')
+  await page.waitForFunction(() => document.getElementById('prototype-vim')!.getAttribute('aria-pressed') === 'true')
   await input(page).click()
   await input(page).press('Escape')
   await input(page).press('Home')
   await input(page).press('R')
   await input(page).press('Z')
   await page.waitForTimeout(800)
-  const durableText = (await readHead(page)).document.roots[0].text
+  const durableText = (await readHead(page)).document.roots[0]!.text
   const visibleText = await input(page).inputValue()
 
   expect(durableText).not.toBe(visibleText)
@@ -118,7 +119,7 @@ test('preserves browser storage through restart and failure recovery', async ({
   await (await replaceWarning).dismiss()
   expect(page.isClosed()).toBe(false)
   await saved(page)
-  expect((await readHead(page)).document.roots[0].text).toBe(visibleText)
+  expect((await readHead(page)).document.roots[0]!.text).toBe(visibleText)
 
   await page.keyboard.press('Escape')
 
@@ -158,7 +159,7 @@ test('preserves browser storage through restart and failure recovery', async ({
   expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
   await parent.press('Escape')
   await saved(page)
-  expect((await readHead(page)).document.roots.find((node) => node.id === 'project').text).toBe(
+  expect((await readHead(page)).document.roots.find((node) => node.id === 'project')!.text).toBe(
     await parent.inputValue(),
   )
   await page.evaluate(() => window.prototypeStore.navigateToAncestor(null))
@@ -186,7 +187,9 @@ test('preserves browser storage through restart and failure recovery', async ({
   await input(page).press('A')
   await input(page).pressSequentially(' retry me')
   await input(page).press('Escape')
-  await page.waitForFunction(() => window.prototypeStore.getSnapshot().persistenceLocked === true)
+  await page.waitForFunction(
+    () => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).persistenceLocked === true,
+  )
   expect(await page.evaluate(() => window.storageTest.writes)).toBe(3)
   await page.waitForTimeout(700)
   expect(await page.evaluate(() => window.storageTest.writes)).toBe(3)
@@ -199,22 +202,24 @@ test('preserves browser storage through restart and failure recovery', async ({
   await page.close({ runBeforeUnload: true })
   await (await retryWarning).dismiss()
   await saved(page)
-  expect((await readHead(page)).document.roots[0].text).toBe(unsavedText)
-  expect(await page.evaluate(() => window.prototypeStore.getSnapshot().persistenceLocked)).toBe(undefined)
+  expect((await readHead(page)).document.roots[0]!.text).toBe(unsavedText)
+  expect(
+    await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).persistenceLocked),
+  ).toBe(undefined)
 
   const writesBeforeIdle = await page.evaluate(() => window.storageTest.writes)
   await page.waitForTimeout(700)
   expect(await page.evaluate(() => window.storageTest.writes)).toBe(writesBeforeIdle)
 
   await page.evaluate(async () => {
-    const db = await new Promise((resolve) => {
+    const db = await new Promise<IDBDatabase>((resolve) => {
       const r = indexedDB.open('tree-browser-prototype')
       r.onsuccess = () => resolve(r.result)
     })
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('document', 'readwrite')
       tx.objectStore('document').put({ invalid: 'preserve this evidence' }, 'head')
-      tx.oncomplete = resolve
+      tx.oncomplete = () => resolve()
       tx.onabort = () => reject(tx.error)
     })
     db.close()

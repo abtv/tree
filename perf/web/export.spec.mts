@@ -11,7 +11,7 @@ import {
   ready,
   seedLargeProfile,
   watchMainThread,
-} from './large-profile.mjs'
+} from './large-profile.mts'
 
 // Measures "Export Notes…" in the built browser package (PRODUCT §24.3, §22.1): the worker writes
 // the archive while the main thread only appends transferred chunks to a Blob.
@@ -19,12 +19,14 @@ const server = createStaticServer()
 let origin = ''
 
 test.beforeAll(async () => {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  origin = `http://127.0.0.1:${server.address().port}/`
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('The test server did not bind a TCP port')
+  origin = `http://127.0.0.1:${address.port}/`
 })
 
 test.afterAll(async () => {
-  await new Promise((resolve) => server.close(resolve))
+  await new Promise<void>((resolve) => server.close(() => resolve()))
 })
 
 test('exports a large profile without blocking the main thread', async ({ browser }) => {
@@ -49,7 +51,7 @@ test('exports a large profile without blocking the main thread', async ({ browse
 
     const archive = new Uint8Array(await readFile(await download.path()))
     expect(listCentralEntries(archive)).toHaveLength(IMAGE_COUNT + 1)
-    expect(await page.evaluate(() => document.getElementById('data-activity-text').textContent)).toMatch(/^Exported/)
+    expect(await page.evaluate(() => document.getElementById('data-activity-text')!.textContent)).toMatch(/^Exported/)
     recordPerfResult({
       kind: 'web-export',
       scenario: `nodes-${NODE_COUNT}-images-${IMAGE_COUNT}`,

@@ -45,7 +45,7 @@ export default tseslint.config(
       'playwright*.config.ts',
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts,mts}',
-      'e2e/**/*.{ts,cjs,mjs}',
+      'e2e/**/*.{ts,mts,cjs,mjs}',
       'perf/**/*.{ts,mts,mjs}',
       'src/electron/main/**/*.ts',
       'src/electron/preload/**/*.ts',
@@ -62,7 +62,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['e2e/web/**/*.mjs'],
+    files: ['e2e/web/**/*.{mts,mjs}'],
     languageOptions: {
       globals: globals.browser,
     },

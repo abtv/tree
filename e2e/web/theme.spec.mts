@@ -1,13 +1,13 @@
 // @editing-modes: independent
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
 
 test('persists appearance and follows system changes', async ({ newContext, baseURL }) => {
   const context = await newContext({ colorScheme: 'light', viewport: { width: 1100, height: 760 } })
   const page = await context.newPage()
   page.setDefaultTimeout(5000)
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
-  const command = async (name) => {
+  const command = async (name: string) => {
     await page.keyboard.press(`${primaryKey}+Shift+p`)
     await page.getByRole('combobox', { name: 'Command', exact: true }).fill(name)
     await page.getByRole('combobox', { name: 'Command', exact: true }).press('Enter')
@@ -45,12 +45,14 @@ test('persists appearance and follows system changes', async ({ newContext, base
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#fbf8f1',
   )
   expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('system')
-  expect(await page.evaluate(() => window.prototypeStore.getSnapshot().operationError)).toBe(undefined)
+  expect(await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).operationError)).toBe(
+    undefined,
+  )
   const empty = page.locator('[data-node-id="welcome"] .node-input')
   await empty.fill('')
   await page.evaluate(() => window.treeApi.setVimEnabled(true))
   await empty.focus()
-  await page.waitForFunction(() => document.querySelector('.tree-app').classList.contains('vim-state-normal'))
+  await page.waitForFunction(() => document.querySelector('.tree-app')!.classList.contains('vim-state-normal'))
   const emptyBlock = () => empty.evaluate((element) => getComputedStyle(element).backgroundImage)
   expect(await emptyBlock()).not.toBe('none')
   expect(await empty.evaluate((element) => getComputedStyle(element).caretColor)).toBe('rgba(0, 0, 0, 0)')

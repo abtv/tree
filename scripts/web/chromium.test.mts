@@ -87,7 +87,7 @@ it('passes current source over stdin to the fixed container and propagates test 
       'playwright.web.config.ts',
       'scripts/web/build.mts',
       'src/web/index.html',
-      'e2e/web/fixtures.mjs',
+      'e2e/web/fixtures.mts',
     ]),
   )
   expect(args!.some((path) => /^(\.git|\.scratch|node_modules)(\/|$)/.test(path))).toBe(false)

@@ -8,7 +8,7 @@ const channel = process.platform === 'darwin' ? 'chrome' : 'chromium'
 
 export default defineConfig({
   testDir: './e2e/web',
-  testMatch: '**/*.spec.mjs',
+  testMatch: '**/*.spec.mts',
   outputDir: 'test-results/web',
   fullyParallel: false,
   // Restart and clipboard scenarios remain serial, matching the previous runner.

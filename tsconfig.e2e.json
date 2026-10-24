@@ -16,5 +16,13 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["playwright*.config.ts", "perf.config.ts", "e2e/**/*.ts", "perf/**/*.ts", "perf/**/*.mts"]
+  "include": [
+    "playwright*.config.ts",
+    "perf.config.ts",
+    "e2e/**/*.ts",
+    "e2e/**/*.mts",
+    "perf/**/*.ts",
+    "perf/**/*.mts",
+    "src/web/file-system-access.d.ts"
+  ]
 }

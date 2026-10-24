@@ -1,10 +1,10 @@
 // @editing-modes: vim
-import { test, expect, primaryKey } from './fixtures.mjs'
+import { test, expect, primaryKey } from './fixtures.mts'
 
 test('searches Agenda context and mirrors through native editing mode transitions', async ({ newContext, baseURL }) => {
   const context = await newContext()
   const page = await context.newPage()
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   await page.evaluate(async () => {
     await window.treeApi.save({
@@ -54,7 +54,7 @@ test('searches Agenda context and mirrors through native editing mode transition
 test('searches through noneditable Normal text and resumes native Insert editing', async ({ newContext, baseURL }) => {
   const context = await newContext()
   const page = await context.newPage()
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   await page.evaluate(async () => {
     await window.treeApi.save({

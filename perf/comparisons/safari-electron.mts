@@ -6,8 +6,6 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
-import type { EditorStore } from '../../src/application/editor-store.ts'
-import type { TreeApi } from '../../src/shared/ipc.ts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 
 type Scenario = 'typing' | 'agenda' | 'saving'
@@ -29,8 +27,6 @@ type Result = {
 }
 declare global {
   interface Window {
-    prototypeStore: EditorStore
-    treeApi: TreeApi
     perfProbe: { input: Sample[]; open: Sample[]; motion: Sample[]; saveState: Saves }
   }
   // The isolated Electron entry owns this measurement probe.

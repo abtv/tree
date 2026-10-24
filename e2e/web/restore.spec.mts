@@ -1,6 +1,7 @@
 // @editing-modes: independent
 // @requirement PRODUCT.md §24.6
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
+import type { Page } from '@playwright/test'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 import { serializeState } from '../../src/domain/document.ts'
 import {
@@ -15,11 +16,11 @@ import {
   seedImageNodes,
   writeFolder,
   writeStored,
-} from './data-helpers.mjs'
+} from './data-helpers.mts'
 
-const confirmation = (page) => page.getByRole('dialog', { name: 'Replace Current Notes?' })
-const activity = (page) => page.locator('#data-activity')
-const activityText = (page) => page.locator('#data-activity-text')
+const confirmation = (page: Page) => page.getByRole('dialog', { name: 'Replace Current Notes?' })
+const activity = (page: Page) => page.locator('#data-activity')
+const activityText = (page: Page) => page.locator('#data-activity-text')
 
 const folderHead = serializeState(
   {
@@ -47,7 +48,7 @@ test('restores a backup folder into a browser profile whose storage was cleared'
   await installBackupPicker(context)
   const page = await context.newPage()
   page.setDefaultTimeout(8000)
-  const errors = []
+  const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('/')
   await ready(page)
@@ -57,7 +58,7 @@ test('restores a backup folder into a browser profile whose storage was cleared'
   await chooseMenuItem(page, 'Back Up to Folder…')
   await expect(page.locator('#backup-status')).toHaveText('Backed up to “Tree Backup”.')
   const backup = JSON.parse((await readBackup(page))['document.json'])
-  expect(backup.document.roots[0].text).toMatch(/^Typed before backing up /)
+  expect(backup.document.roots[0]!.text).toMatch(/^Typed before backing up /)
 
   // Deleting the database closes this session, which reloads into a clean start.
   const cleared = page.waitForEvent('load')
@@ -113,7 +114,7 @@ test('a cancelled or failed restore leaves the notes unchanged', async ({ newCon
     expect(await readStored(page, 'document', 'head')).toEqual(head)
     await expect.poll(() => blobKeys(page)).toEqual(['kept'])
   }
-  const restoreFrom = async (name) => {
+  const restoreFrom = async (name: string) => {
     await page.evaluate((name) => {
       window.backupFolderName = name
     }, name)

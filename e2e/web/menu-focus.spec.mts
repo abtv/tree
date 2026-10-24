@@ -1,6 +1,6 @@
 // @editing-modes: independent
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
-import { ready, installBackupPicker, writeFolder } from './data-helpers.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
+import { ready, installBackupPicker, writeFolder } from './data-helpers.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
 // @requirement PRODUCT.md §1.4
@@ -12,17 +12,21 @@ test('Escape from the browser menu restores editing and backward selection witho
   await ready(page)
   const editor = page.locator('[data-node-id="welcome"] .node-input')
   await editor.fill('Menu focus sample')
-  await editor.evaluate((element) => element.setSelectionRange(2, 7, 'backward'))
+  await editor.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(2, 7, 'backward'))
   await page.locator('#tree-menu-button').click()
   await expect(page.locator('#tree-menu')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(editor).toBeFocused()
   expect(
-    await editor.evaluate((element) => [element.selectionStart, element.selectionEnd, element.selectionDirection]),
+    await editor.evaluate((element: HTMLTextAreaElement) => [
+      element.selectionStart,
+      element.selectionEnd,
+      element.selectionDirection,
+    ]),
   ).toEqual([2, 7, 'backward'])
   await page.keyboard.type('X')
   await expect(editor).toHaveValue('MeXcus sample')
-  await editor.evaluate((element) => element.setSelectionRange(2, 2))
+  await editor.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(2, 2))
   await page.locator('#tree-menu-button').click()
   await page.locator('#tree-menu-button').click()
   await expect(editor).toBeFocused()
@@ -31,7 +35,7 @@ test('Escape from the browser menu restores editing and backward selection witho
   await expect(page.locator('#tree-menu')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(editor).toBeFocused()
-  expect(await editor.evaluate((element) => element.selectionStart)).toBe(2)
+  expect(await editor.evaluate((element: HTMLTextAreaElement) => element.selectionStart)).toBe(2)
 })
 
 // @requirement PRODUCT.md §1.4
@@ -52,14 +56,14 @@ test('setting actions restore rich selections and preserve buffered Vim Replace 
   const editor = page.getByRole('textbox', { name: 'Node 2', exact: true })
   await editor.focus()
   await expect(editor).toHaveAttribute('contenteditable', 'true')
-  await editor.evaluate((element) => {
-    const text = element.firstChild
-    window.getSelection().setBaseAndExtent(text, 5, text, 1)
+  await editor.evaluate((element: HTMLElement) => {
+    const text = element.firstChild!
+    window.getSelection()!.setBaseAndExtent(text, 5, text, 1)
   })
   await page.locator('#tree-menu-button').click()
   await page.getByRole('button', { name: 'Dark', exact: true }).click()
   await expect(editor).toBeFocused()
-  expect(await editor.evaluate(() => [getSelection().anchorOffset, getSelection().focusOffset])).toEqual([5, 1])
+  expect(await editor.evaluate(() => [getSelection()!.anchorOffset, getSelection()!.focusOffset])).toEqual([5, 1])
   await page.keyboard.type('X')
   await expect(editor).toHaveText('aX https://example.com omega')
   await page.evaluate(() => window.treeApi.setVimEnabled(true))
@@ -112,14 +116,16 @@ test('backup confirmation owns focus and returns it with the saved caret on canc
   await writeFolder(page, 'Tree Backup', { 'document.json': '{}' })
   const editor = page.locator('[data-node-id="welcome"] .node-input')
   await editor.fill('dialog return')
-  await editor.evaluate((element) => element.setSelectionRange(3, 3))
+  await editor.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(3, 3))
   await page.locator('#tree-menu-button').click()
   await page.getByRole('button', { name: 'Back Up to Folder…', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'This Folder Already Contains Notes' })
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(editor).toBeFocused()
-  expect(await editor.evaluate((element) => [element.selectionStart, element.selectionEnd])).toEqual([3, 3])
+  expect(
+    await editor.evaluate((element: HTMLTextAreaElement) => [element.selectionStart, element.selectionEnd]),
+  ).toEqual([3, 3])
   await page.keyboard.type('X')
   await expect(editor).toHaveValue('diaXlog return')
   await page.keyboard.press(`${primaryKey}+Shift+p`)
@@ -190,7 +196,7 @@ test('menu cancellation preserves the image caret and its text return position',
   await expect(editor).toHaveClass(/node-input-image-caret/)
   await page.keyboard.press('h')
   await expect(editor).not.toHaveClass(/node-input-image-caret/)
-  expect(await editor.evaluate((element) => element.selectionStart)).toBe(2)
+  expect(await editor.evaluate((element: HTMLTextAreaElement) => element.selectionStart)).toBe(2)
 })
 
 // @requirement PRODUCT.md §1.4
@@ -203,7 +209,7 @@ test('dismissing a focused export failure returns to editing', async ({ newConte
   await ready(page)
   const editor = page.locator('[data-node-id="welcome"] .node-input')
   await editor.fill('activity return')
-  await editor.evaluate((element) => element.setSelectionRange(3, 3))
+  await editor.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(3, 3))
   await page.locator('#tree-menu-button').click()
   await page.getByRole('button', { name: 'Export Notes…', exact: true }).click()
   await expect(page.locator('#data-activity-text')).toContainText('Export failed.')
@@ -232,7 +238,9 @@ test('leaving the menu for another node commits the previous Replace buffer', as
   await expect(other).toBeFocused()
   await page.keyboard.type('Y')
   await page.keyboard.press('Escape')
-  expect(await page.evaluate(() => window.prototypeStore.getSnapshot().document.roots[0].text)).toBe('Xlpha beta')
+  expect(
+    await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots[0]!.text),
+  ).toBe('Xlpha beta')
   await expect(source).toHaveValue('Xlpha beta')
 })
 
@@ -256,7 +264,10 @@ test('Tab leaving the menu commits the borrowed editor before another editing de
   await expect(page.getByRole('button', { name: 'Top level', exact: true })).toBeFocused()
   expect(
     await page.evaluate(
-      () => window.prototypeStore.getSnapshot().document.roots.find((node) => node.id === 'project').text,
+      () =>
+        (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots.find(
+          (node) => node.id === 'project',
+        )!.text,
     ),
   ).toBe('Xlpha beta')
   await page.keyboard.press('Tab')
@@ -280,7 +291,7 @@ test('Tree and Agenda menu actions finish buffered Replace before switching view
   for (const [letter, view, text] of [
     ['X', 'Agenda', 'Xlpha #2026-10-24'],
     ['Y', 'Tree', 'Ylpha #2026-10-24'],
-  ]) {
+  ] as const) {
     await editor.click()
     await page.keyboard.press('Escape')
     await page.keyboard.press('0')
@@ -289,7 +300,9 @@ test('Tree and Agenda menu actions finish buffered Replace before switching view
     await page.locator('#tree-menu-button').click()
     await page.getByRole('button', { name: view, exact: true }).click()
     await expect(page.getByLabel('Vim mode')).toHaveText('NORMAL')
-    expect(await page.evaluate(() => window.prototypeStore.getSnapshot().document.roots[0].text)).toBe(text)
+    expect(
+      await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots[0]!.text),
+    ).toBe(text)
   }
   await expect(editor).toBeFocused()
 })

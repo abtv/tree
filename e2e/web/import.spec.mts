@@ -1,5 +1,6 @@
 // @editing-modes: independent
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
+import type { Page } from '@playwright/test'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 import { serializeState } from '../../src/domain/document.ts'
 import {
@@ -15,11 +16,11 @@ import {
   writeExportedArchive,
   writeStored,
   writeZip,
-} from './data-helpers.mjs'
+} from './data-helpers.mts'
 
-const confirmation = (page) => page.getByRole('dialog', { name: 'Replace Current Notes?' })
-const activity = (page) => page.locator('#data-activity')
-const activityText = (page) => page.locator('#data-activity-text')
+const confirmation = (page: Page) => page.getByRole('dialog', { name: 'Replace Current Notes?' })
+const activity = (page: Page) => page.locator('#data-activity')
+const activityText = (page: Page) => page.locator('#data-activity-text')
 const today = () => {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -36,13 +37,13 @@ const archiveHead = serializeState(
   { currentParentId: null, selectedNodeId: 'node-new-b' },
   { expandedIds: [] },
 )
-const json = (value) => new TextEncoder().encode(JSON.stringify(value))
+const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value))
 
 // @requirement PRODUCT.md §24.4
 test('imports an exported archive into another browser profile after confirmation', async ({ newContext, baseURL }) => {
   const source = await (await newContext()).newPage()
   source.setDefaultTimeout(8000)
-  await source.goto(baseURL)
+  await source.goto(baseURL!)
   await ready(source)
   const noise = await noisePng(source, 24)
   await seedImageNodes(source, [
@@ -56,13 +57,13 @@ test('imports an exported archive into another browser profile after confirmatio
   const archivePath = test.info().outputPath(`Tree Notes ${today()}.zip`)
   await (await downloading).saveAs(archivePath)
   const sourceHead = await readStored(source, 'document', 'head')
-  expect(sourceHead.document.roots[0].text).toContain('Typed before exporting')
+  expect(sourceHead.document.roots[0]!.text).toContain('Typed before exporting')
 
   const target = await (await newContext()).newPage()
   target.setDefaultTimeout(8000)
-  const errors = []
+  const errors: string[] = []
   target.on('pageerror', (error) => errors.push(error.message))
-  await target.goto(baseURL)
+  await target.goto(baseURL!)
   await ready(target)
   await saved(target)
   const targetHead = await readStored(target, 'document', 'head')
@@ -86,7 +87,7 @@ test('imports an exported archive into another browser profile after confirmatio
   expect(await blobKeys(target)).toEqual(['image-a', 'image-b'])
   await capture(target, 'data-import-confirm.png')
   await target.setViewportSize({ width: 390, height: 760 })
-  const narrow = await dialog.boundingBox()
+  const narrow = (await dialog.boundingBox())!
   expect(narrow.x >= 0 && narrow.x + narrow.width <= 390).toBe(true)
   await capture(target, 'data-import-confirm-narrow.png')
   await target.setViewportSize({ width: 1100, height: 760 })
@@ -107,7 +108,9 @@ test('imports an exported archive into another browser profile after confirmatio
   await reloaded
   await ready(target)
   expect(await readStored(target, 'document', 'head')).toEqual(sourceHead)
-  expect(await target.evaluate(() => window.prototypeStore.getSnapshot().document)).toEqual(sourceHead.document)
+  expect(await target.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document)).toEqual(
+    sourceHead.document,
+  )
   await expect(target.locator('[data-node-id="welcome"] .node-input')).toHaveValue(/^Typed before exporting /)
   expect(await readStored(target, 'blobs', 'image-a')).toEqual(noise)
   expect(await readStored(target, 'blobs', 'image-b')).toEqual([...onePixelPng])
@@ -121,9 +124,9 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
 }) => {
   const page = await (await newContext()).newPage()
   page.setDefaultTimeout(8000)
-  const errors = []
+  const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
   await seedImageNodes(page, [{ id: 'kept', bytes: [...onePixelPng] }])
   // Vim Normal mode, so the dialog check below can press a command key.
@@ -243,7 +246,7 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
   await editor.pressSequentially(' still editing')
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   await saved(page)
-  expect((await readStored(page, 'document', 'head')).document.roots[0].text).toMatch(/ still editing$/)
+  expect((await readStored(page, 'document', 'head')).document.roots[0]!.text).toMatch(/ still editing$/)
   expect(errors).toEqual([])
 })
 
@@ -251,7 +254,7 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
 test('replaces invalid stored notes with an imported archive', async ({ newContext, baseURL }) => {
   const page = await (await newContext()).newPage()
   page.setDefaultTimeout(8000)
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
   await writeStored(page, 'document', 'head', { invalid: 'stored before the import' })
   await page.reload()

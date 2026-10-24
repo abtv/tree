@@ -1,7 +1,7 @@
 // @editing-modes: independent
 // @requirement PRODUCT.md §24.5
 import { chromium } from '@playwright/test'
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
 import {
   chooseMenuItem,
   installBackupPicker,
@@ -12,7 +12,7 @@ import {
   ready,
   saved,
   seedImageNodes,
-} from './data-helpers.mjs'
+} from './data-helpers.mts'
 
 // Linux arm64 Playwright Chromium (1243) stops the browser process with SIGTRAP when a new
 // document reads a stored OPFS directory handle from IndexedDB. The picker stub returns OPFS
@@ -26,12 +26,12 @@ test('canary: Linux Chromium still crashes when a new document reads a stored OP
   // A separate browser keeps the expected crash away from the shared test browser.
   const browser = await chromium.launch({ channel: 'chromium', headless: true })
   try {
-    const page = await (await browser.newContext({ baseURL })).newPage()
+    const page = await (await browser.newContext({ baseURL: baseURL! })).newPage()
     await page.goto('/')
     await ready(page)
-    const readStoredHandle = (store) =>
+    const readStoredHandle = (store: boolean) =>
       page.evaluate(async (store) => {
-        const db = await new Promise((resolve, reject) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('stored-handle-canary', 1)
           request.onupgradeneeded = () => request.result.createObjectStore('handles')
           request.onsuccess = () => resolve(request.result)
@@ -40,7 +40,7 @@ test('canary: Linux Chromium still crashes when a new document reads a stored OP
         const folder = store
           ? await (await navigator.storage.getDirectory()).getDirectoryHandle('canary', { create: true })
           : undefined
-        const value = await new Promise((resolve, reject) => {
+        const value = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
           const tx = db.transaction('handles', 'readwrite')
           const request = store
             ? tx.objectStore('handles').put(folder, 'folder')
@@ -83,12 +83,12 @@ test('folder handles persist and a same-origin module worker can write through t
   await ready(page)
   const result = await page.evaluate(async () => {
     const folder = await (await navigator.storage.getDirectory()).getDirectoryHandle('probe', { create: true })
-    const db = await new Promise((resolve, reject) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('tree-browser-prototype')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
-    const loaded = await new Promise((resolve, reject) => {
+    const loaded = await new Promise<FileSystemDirectoryHandle>((resolve, reject) => {
       const tx = db.transaction('preferences', 'readwrite')
       const store = tx.objectStore('preferences')
       store.put(folder, 'probe-folder')
@@ -143,7 +143,9 @@ test('backs up saved notes and images, coalesces edits, resumes on reload, and s
   }
   expect((await readBackup(page))['document.json']).toBe(original)
   await expect
-    .poll(async () => JSON.parse((await readBackup(page))['document.json']).document.roots[0].text, { timeout: 15_000 })
+    .poll(async () => JSON.parse((await readBackup(page))['document.json']).document.roots[0]!.text, {
+      timeout: 15_000,
+    })
     .toBe('Saved version 4')
   // New images must be present by the time the new document names them.
   await seedImageNodes(page, [{ id: 'second-image', bytes: png }])
@@ -293,7 +295,7 @@ test('folder failure is visible and unsupported browsers hide the controls', asy
   await expect(page.locator('#prototype-problem')).toBeHidden()
   const unsupported = await newContext()
   await unsupported.addInitScript(() => {
-    window.showDirectoryPicker = undefined
+    delete window.showDirectoryPicker
   })
   const other = await unsupported.newPage()
   await other.goto('/')
@@ -309,7 +311,7 @@ test('backup menu fits light, dark and narrow viewports', async ({ newContext })
     ['light', 1100],
     ['dark', 1100],
     ['light', 390],
-  ]) {
+  ] as const) {
     const context = await newContext({ viewport: { width, height: 760 }, colorScheme: appearance })
     await installBackupPicker(context)
     const page = await context.newPage()
@@ -317,7 +319,7 @@ test('backup menu fits light, dark and narrow viewports', async ({ newContext })
     await ready(page)
     await openMenu(page)
     await expect(page.locator('#data-backup')).toBeVisible()
-    const bounds = await page.locator('#tree-menu').boundingBox()
+    const bounds = (await page.locator('#tree-menu').boundingBox())!
     expect(bounds.x).toBeGreaterThanOrEqual(0)
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width)
     await capture(page, `backup-menu-${appearance}-${width}.png`)

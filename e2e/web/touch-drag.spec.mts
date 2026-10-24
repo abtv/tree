@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture } from './fixtures.mts'
 
 // @requirement PRODUCT.md §11
 test('drags from empty row space while preserving touch editing and controls', async ({ newContext, baseURL }) => {
@@ -10,14 +10,17 @@ test('drags from empty row space while preserving touch editing and controls', a
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
   })
   const page = await context.newPage()
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   const session = await context.newCDPSession(page)
-  const row = (id) => page.locator(`.node-row[data-node-id="${id}"]`)
+  const row = (id: string) => page.locator(`.node-row[data-node-id="${id}"]`)
   await row('project').locator('.node-disclosure-triangle').tap()
-  const roots = () => page.evaluate(() => window.prototypeStore.getSnapshot().document.roots.map((node) => node.id))
+  const roots = () =>
+    page.evaluate(() =>
+      (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots.map((node) => node.id),
+    )
   const before = await roots()
-  const box = await row('welcome').boundingBox()
+  const box = (await row('welcome').boundingBox())!
   const point = { x: box.x + box.width + 12, y: box.y + box.height / 2, id: 1 }
   const start = (touch = point) =>
     session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touch] })
@@ -56,7 +59,7 @@ test('drags from empty row space while preserving touch editing and controls', a
   await row('welcome').dispatchEvent('pointercancel', { pointerId: 999, pointerType: 'touch' })
   await expect(page.locator('body')).toHaveClass(/node-drag-active/)
   await capture(page, 'touch-drag-active.png')
-  const target = await row('project').boundingBox()
+  const target = (await row('project').boundingBox())!
   await session.send('Input.dispatchTouchEvent', {
     type: 'touchMove',
     touchPoints: [{ ...point, y: target.y + target.height - 2 }],
@@ -68,7 +71,7 @@ test('drags from empty row space while preserving touch editing and controls', a
 
   const input = row('welcome').locator('.node-input')
   await expect(input).toHaveCSS('touch-action', 'auto')
-  const textBox = await input.boundingBox()
+  const textBox = (await input.boundingBox())!
   await start({ x: textBox.x + 35, y: textBox.y + 10, id: 1 })
   await page.waitForTimeout(300)
   await expect(page.locator('body')).not.toHaveClass(/node-drag-active/)
@@ -87,7 +90,7 @@ test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({
   })
   const page = await context.newPage()
   await page.clock.install({ time: new Date('2026-10-18T12:00:00') })
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   const [sourceId, targetId] = await page.evaluate(() => {
     window.prototypeStore.pasteSubtree('welcome', 'after', {
@@ -104,9 +107,8 @@ test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({
       ],
     })
     window.prototypeStore.openAgenda()
-    return window.prototypeStore
-      .getSnapshot()
-      .document.roots.find((node) => node.text === 'Touch fixture')
+    return (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots
+      .find((node) => node.text === 'Touch fixture')!
       .children.slice(0, 2)
       .map((node) => node.id)
   })
@@ -114,8 +116,8 @@ test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({
   const source = page.locator(`.agenda-row[data-node-id="${sourceId}"]`)
   await expect(source).toBeVisible()
   const destination = page.locator(`.agenda-row[data-node-id="${targetId}"]`)
-  const sourceBox = await source.boundingBox()
-  const targetBox = await destination.boundingBox()
+  const sourceBox = (await source.boundingBox())!
+  const targetBox = (await destination.boundingBox())!
   const session = await context.newCDPSession(page)
   const point = { x: sourceBox.x + sourceBox.width + 12, y: sourceBox.y + sourceBox.height / 2, id: 1 }
   await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
@@ -131,8 +133,9 @@ test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({
     .poll(() =>
       page.evaluate(
         () =>
-          window.prototypeStore.getSnapshot().document.roots.find((node) => node.text === 'Touch fixture').children[0]
-            .text,
+          (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots.find(
+            (node) => node.text === 'Touch fixture',
+          )!.children[0]!.text,
       ),
     )
     .toBe('First #2026-10-19')

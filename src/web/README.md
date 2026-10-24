@@ -222,12 +222,12 @@ the worker script through `page.route`) and replacing an invalid stored document
 
 `npm run test:perf -- --project=web` measures **Export Notes…** and
 **Import Notes…** on a large synthetic profile in the built package
-(`perf/web/export.spec.mjs`, `perf/web/import.spec.mjs`). The script rebuilds
+(`perf/web/export.spec.mts`, `perf/web/import.spec.mts`). The script rebuilds
 both targets first. It records main-thread long tasks, total blocking time,
 duration, main-thread heap growth and archive size through `perf/results.ts`. It runs locally in visible Chrome and is not part of the
 scheduled Performance workflow or the release gate.
 
-`npm run test:perf -- --project=web backup.spec.mjs` compares alternating
+`npm run test:perf -- --project=web backup.spec.mts` compares alternating
 backup-off/on typing with a large synthetic profile. It records input-to-paint
 latency, main-thread long tasks and heap, autosave transaction completion, backup
 lag and bytes written per minute. The relative comparison is the regression

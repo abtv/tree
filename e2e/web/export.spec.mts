@@ -1,5 +1,6 @@
 // @editing-modes: independent
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
+import type { Download, Page } from '@playwright/test'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 import {
   chooseMenuItem,
@@ -11,10 +12,10 @@ import {
   saved,
   seedImageNodes,
   writeStored,
-} from './data-helpers.mjs'
+} from './data-helpers.mts'
 
-const activity = (page) => page.locator('#data-activity')
-const activityText = (page) => page.locator('#data-activity-text')
+const activity = (page: Page) => page.locator('#data-activity')
+const activityText = (page: Page) => page.locator('#data-activity-text')
 const today = () => {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -25,11 +26,11 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   const context = await newContext()
   const page = await context.newPage()
   page.setDefaultTimeout(8000)
-  const errors = []
+  const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  const workers = []
+  const workers: string[] = []
   page.on('worker', (worker) => workers.push(worker.url()))
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
 
   const noise = await noisePng(page, 24)
@@ -48,7 +49,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   const menu = await openMenu(page)
   await expect(menu.getByText('Data', { exact: true })).toBeVisible()
   await expect(menu.locator('.folder-actions-separator')).toBeVisible()
-  // PRODUCT §24.1: the browser decides the storage line; installability.spec.mjs covers both texts.
+  // PRODUCT §24.1: the browser decides the storage line; installability.spec.mts covers both texts.
   const storage = page.locator('#storage-status')
   await expect(storage).toHaveText(/^Storage is (?:not )?protected from automatic clearing\.$/)
   const storageText = await storage.textContent()
@@ -75,7 +76,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   ])
   await capture(page, 'data-menu-light.png')
   await page.setViewportSize({ width: 390, height: 760 })
-  const narrow = await menu.boundingBox()
+  const narrow = (await menu.boundingBox())!
   expect(narrow.x >= 0 && narrow.x + narrow.width <= 390).toBe(true)
   await capture(page, 'data-menu-narrow.png')
   await page.setViewportSize({ width: 1100, height: 760 })
@@ -95,8 +96,8 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   await expect(activityText(page)).toHaveText(
     `Exported “Tree Notes ${today()}.zip”. 1 image could not be found and was not included.`,
   )
-  const panelBox = await activity(page).boundingBox()
-  const statusBarBox = await page.locator('.status-bar').boundingBox()
+  const panelBox = (await activity(page).boundingBox())!
+  const statusBarBox = (await page.locator('.status-bar').boundingBox())!
   expect(panelBox.y + panelBox.height, 'The panel must not cover the status bar').toBeLessThanOrEqual(statusBarBox.y)
   expect(panelBox.x + panelBox.width).toBeCloseTo(1100 - 16, 0)
   await capture(page, 'data-export-result.png')
@@ -106,12 +107,14 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   const archive = await readDownloadedArchive(download)
   expect(archive.names).toEqual(['document.json', 'attachments/image-a.png', 'attachments/image-b.png'])
   const head = await readStored(page, 'document', 'head')
-  expect(head.document.roots[0].text).toContain('Typed just before exporting')
-  expect(head.document).toEqual(await page.evaluate(() => window.prototypeStore.getSnapshot().document))
+  expect(head.document.roots[0]!.text).toContain('Typed just before exporting')
+  expect(head.document).toEqual(
+    await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document),
+  )
   const documentJson = new TextDecoder().decode(archive.entries.get('document.json'))
   expect(documentJson).toBe(JSON.stringify(head))
-  expect([...archive.entries.get('attachments/image-a.png')]).toEqual(await readStored(page, 'blobs', 'image-a'))
-  expect([...archive.entries.get('attachments/image-b.png')]).toEqual([...onePixelPng])
+  expect([...archive.entries.get('attachments/image-a.png')!]).toEqual(await readStored(page, 'blobs', 'image-a'))
+  expect([...archive.entries.get('attachments/image-b.png')!]).toEqual([...onePixelPng])
 
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   await expect(activity(page)).toBeHidden()
@@ -123,11 +126,11 @@ test('reports a stopped worker and cancels a worker that is sending the archive'
   const context = await newContext()
   const page = await context.newPage()
   page.setDefaultTimeout(8000)
-  const downloads = []
+  const downloads: Download[] = []
   page.on('download', (download) => downloads.push(download))
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
-  const replaceWorker = (body) =>
+  const replaceWorker = (body: string) =>
     page.route(/archive\.worker/, (route) => route.fulfill({ contentType: 'text/javascript', body }))
 
   await replaceWorker("throw new Error('Synthetic worker failure')")
@@ -162,11 +165,11 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   const context = await newContext()
   const page = await context.newPage()
   page.setDefaultTimeout(8000)
-  const errors = []
+  const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  const downloads = []
+  const downloads: Download[] = []
   page.on('download', (download) => downloads.push(download))
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await ready(page)
 
   // Typing stays responsive while a large archive is written.
@@ -190,11 +193,11 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   downloads.length = 0
 
   // Cancel while the worker script is still loading.
-  let release
-  const loading = new Promise((resolve) => {
+  let release!: () => void
+  const loading = new Promise<void>((resolve) => {
     release = resolve
   })
-  const requested = new Promise((resolve) =>
+  const requested = new Promise<void>((resolve) =>
     page.route(/archive\.worker/, async (route) => {
       resolve()
       await loading
@@ -240,8 +243,8 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   await expect(activityText(page)).toHaveText(/^Export failed\. Your latest changes could not be saved: /)
   const problem = page.locator('#prototype-problem')
   await expect(problem).toBeVisible()
-  const panelBox = await activity(page).boundingBox()
-  const problemBox = await problem.boundingBox()
+  const panelBox = (await activity(page).boundingBox())!
+  const problemBox = (await problem.boundingBox())!
   expect(
     panelBox.y + panelBox.height <= problemBox.y || problemBox.y + problemBox.height <= panelBox.y,
     'The problem banner must not cover the export panel',
@@ -249,9 +252,13 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   await capture(page, 'data-export-save-failed.png')
   expect(downloads).toEqual([])
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
-  await page.waitForFunction(() => window.prototypeStore.getSnapshot().persistenceLocked === true, undefined, {
-    timeout: 20_000,
-  })
+  await page.waitForFunction(
+    () => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).persistenceLocked === true,
+    undefined,
+    {
+      timeout: 20_000,
+    },
+  )
   const menu = await openMenu(page)
   await expect(menu.getByRole('button', { name: 'Export Notes…', exact: true })).toBeDisabled()
   // @requirement PRODUCT.md §24.4

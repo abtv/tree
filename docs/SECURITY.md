@@ -279,11 +279,11 @@ local tests do not establish those controls.
 
 | Control | Focused tests | Real-boundary tests |
 | --- | --- | --- |
-| Browser package and CSP presence | `scripts/web/build.mts` build policy | `e2e/web/package.spec.mjs` against the built package; this checks CSP presence and the worker directive, not every directive's enforcement |
-| Browser notes export | `src/application/notes-archive/export-notes.test.ts`, `src/infrastructure/archive/*.test.ts`, `src/web/archive/*.test.ts`, ESLint fflate import restrictions | `e2e/web/export.spec.mjs` against development and built packages |
-| Browser notes import of hostile archives | `src/application/notes-archive/zip-reader.test.ts` and `import-notes.test.ts` (malformed-archive corpus), `src/web/archive/import-job.test.ts` (real Deflate, Deflate bomb, seeded fuzzing), round-trip property | `e2e/web/import.spec.mjs` against development and built packages |
-| Browser storage ownership and failed writes | Shared document validation tests | `e2e/web/storage.spec.mjs` |
-| Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mjs`, `e2e/web/compatibility.spec.mjs` |
+| Browser package and CSP presence | `scripts/web/build.mts` build policy | `e2e/web/package.spec.mts` against the built package; this checks CSP presence and the worker directive, not every directive's enforcement |
+| Browser notes export | `src/application/notes-archive/export-notes.test.ts`, `src/infrastructure/archive/*.test.ts`, `src/web/archive/*.test.ts`, ESLint fflate import restrictions | `e2e/web/export.spec.mts` against development and built packages |
+| Browser notes import of hostile archives | `src/application/notes-archive/zip-reader.test.ts` and `import-notes.test.ts` (malformed-archive corpus), `src/web/archive/import-job.test.ts` (real Deflate, Deflate bomb, seeded fuzzing), round-trip property | `e2e/web/import.spec.mts` against development and built packages |
+| Browser storage ownership and failed writes | Shared document validation tests | `e2e/web/storage.spec.mts` |
+| Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mts`, `e2e/web/compatibility.spec.mts` |
 | Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |
 | Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
 | Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |

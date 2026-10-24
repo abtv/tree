@@ -12,6 +12,8 @@ describe('vitest configuration', () => {
 
     expect(isCollected('test-results/_layout-screenshots.spec.ts')).toBe(false)
     expect(isCollected('test-results/trace-unpacked/_probe.spec.ts')).toBe(false)
+    expect(isCollected('e2e/web/editor.spec.mts')).toBe(false)
+    expect(isCollected('perf/web/export.spec.mts')).toBe(false)
     expect(isCollected('src/domain/document.test.ts')).toBe(true)
   })
 })

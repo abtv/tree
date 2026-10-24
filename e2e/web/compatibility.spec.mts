@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect } from './fixtures.mjs'
+import { test, expect } from './fixtures.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
 // Clipboard checks use only headless Chrome's virtual clipboard.
@@ -8,9 +8,9 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const page = await context.newPage()
   page.setDefaultTimeout(8000)
-  const errors = []
+  const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   const input = page.locator('[data-node-id="welcome"] .node-input')
   await input.fill('A wrapping line '.repeat(150))
@@ -20,7 +20,7 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
   await page.locator('#tree-menu-button').click()
   await page.getByRole('dialog', { name: 'Tree menu' }).waitFor()
   await page.locator('#prototype-vim').click()
-  await page.waitForFunction(() => document.querySelector('.tree-app').classList.contains('vim-state-normal'))
+  await page.waitForFunction(() => document.querySelector('.tree-app')!.classList.contains('vim-state-normal'))
   await input.focus()
   await page.keyboard.press('Escape')
   await page.keyboard.press('0')
@@ -45,7 +45,7 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
     window.copiedBytes = ['previous clipboard']
     navigator.clipboard.write = async (items) => {
       if (!window.copyActivation) throw new DOMException('Copy lost user activation', 'NotAllowedError')
-      const blob = await items[0].getType('image/png')
+      const blob = await items[0]!.getType('image/png')
       window.copiedBytes = [...new Uint8Array(await blob.arrayBuffer())]
     }
     window.copyImage = (attachmentId) => {
@@ -76,18 +76,18 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
       navigator.clipboard.write = window.originalClipboardWrite
     })
     await page.evaluate(() =>
-      window.treeApi.writeClipboardContent({ kind: 'image', attachmentId: 'compatibility-image' }),
+      window.treeApi.writeClipboardContent!({ kind: 'image', attachmentId: 'compatibility-image' }),
     )
     const image = await page.evaluate(async () => {
       const [item] = await navigator.clipboard.read()
-      const bitmap = await createImageBitmap(await item.getType('image/png'))
+      const bitmap = await createImageBitmap(await item!.getType('image/png'))
       try {
         const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-        canvas.getContext('2d').drawImage(bitmap, 0, 0)
+        canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
         return {
           width: bitmap.width,
           height: bitmap.height,
-          pixels: [...canvas.getContext('2d').getImageData(0, 0, 1, 1).data],
+          pixels: [...canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data],
         }
       } finally {
         bitmap.close()
@@ -97,12 +97,12 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
     const failedCopy = await page.evaluate(async () => {
       const bytes = async () => {
         const [item] = await navigator.clipboard.read()
-        return [...new Uint8Array(await (await item.getType('image/png')).arrayBuffer())]
+        return [...new Uint8Array(await (await item!.getType('image/png')).arrayBuffer())]
       }
       const before = await bytes()
       let rejected = false
       try {
-        await window.treeApi.writeClipboardContent({ kind: 'image', attachmentId: 'missing-image' })
+        await window.treeApi.writeClipboardContent!({ kind: 'image', attachmentId: 'missing-image' })
       } catch {
         rejected = true
       }

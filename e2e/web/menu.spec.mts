@@ -1,24 +1,24 @@
 // @editing-modes: independent
-import { test, expect, capture } from './fixtures.mjs'
+import { test, expect, capture } from './fixtures.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
 test('uses the menu, previews and mobile editing policy', async ({ newContext, baseURL }) => {
   const context = await newContext({ viewport: { width: 1100, height: 760 }, colorScheme: 'light' })
   const page = await context.newPage()
   page.setDefaultTimeout(6000)
-  const errors = []
+  const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   expect(await page.title()).toBe('Tree')
   expect(await page.locator('#prototype-toolbar').count()).toBe(0)
-  expect(await page.evaluate(() => document.querySelector('.tree-app').getBoundingClientRect().height)).toBe(760)
+  expect(await page.evaluate(() => document.querySelector('.tree-app')!.getBoundingClientRect().height)).toBe(760)
   expect(await page.evaluate(() => window.treeApi.getVimEnabled())).toBe(false)
   const open = () => page.getByRole('button', { name: 'Tree menu', exact: true }).click()
-  const choose = async (name) => {
+  const choose = async (name: string) => {
     await open()
     await page.getByRole('dialog', { name: 'Tree menu' }).getByRole('button', { name, exact: true }).click()
-    await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))
+    await page.waitForFunction(() => !document.getElementById('tree-menu')!.matches(':popover-open'))
   }
   const checkPreviewMenu = async () => {
     await page.evaluate(
@@ -39,7 +39,7 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
       const close = page.getByRole('button', { name: 'Close image preview' })
       await close.waitFor()
       expect(await page.locator('#tree-menu-button').isVisible(), 'Preview must hide the Tree menu button').toBe(false)
-      const bounds = await close.boundingBox()
+      const bounds = (await close.boundingBox())!
       expect(bounds.y).toBe(16)
       expect(bounds.x + bounds.width).toBe(1100 - 16)
       await capture(page, `preview-${appearance.toLowerCase()}.png`)
@@ -55,7 +55,7 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   const iconLayout = await page.locator('#tree-menu').evaluate((menu) => {
     const ids = ['prototype-tree', 'prototype-agenda', 'data-export', 'data-import']
     return ids.map((id) => {
-      const button = menu.querySelector(`#${id}`)
+      const button = menu.querySelector(`#${id}`)!
       const icon = getComputedStyle(button, '::before')
       const range = document.createRange()
       range.selectNodeContents(button)
@@ -77,11 +77,11 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   }
   await capture(page, 'menu-open-light.png')
   await page.keyboard.press('Escape')
-  await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))
+  await page.waitForFunction(() => !document.getElementById('tree-menu')!.matches(':popover-open'))
   await choose('Agenda')
-  await page.waitForFunction(() => !!window.prototypeStore.getSnapshot().agenda)
+  await page.waitForFunction(() => !!(window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).agenda)
   await choose('Tree')
-  await page.waitForFunction(() => !window.prototypeStore.getSnapshot().agenda)
+  await page.waitForFunction(() => !(window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).agenda)
   await choose('Dark')
   await page.waitForFunction(
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#3f3f3f',
@@ -90,9 +90,9 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   expect(await page.getByRole('button', { name: 'Dark', exact: true }).getAttribute('aria-pressed')).toBe('true')
   await capture(page, 'menu-open-dark.png')
   await page.mouse.click(400, 400)
-  await page.waitForFunction(() => !document.getElementById('tree-menu').matches(':popover-open'))
+  await page.waitForFunction(() => !document.getElementById('tree-menu')!.matches(':popover-open'))
   await choose('Vim Editing')
-  await page.waitForFunction(() => document.getElementById('prototype-vim').getAttribute('aria-pressed') === 'true')
+  await page.waitForFunction(() => document.getElementById('prototype-vim')!.getAttribute('aria-pressed') === 'true')
   await open()
   const menu = page.getByRole('dialog', { name: 'Tree menu' })
   await expect(menu.getByRole('button', { name: 'Tree', exact: true })).toBeFocused()
@@ -104,31 +104,31 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   await expect(menu.getByRole('button', { name: 'Agenda', exact: true })).toBeFocused()
   await capture(page, 'vim-menu-agenda-focused.png')
   await page.keyboard.press('Enter')
-  await page.waitForFunction(() => !!window.prototypeStore.getSnapshot().agenda)
+  await page.waitForFunction(() => !!(window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).agenda)
   await open()
   await page.keyboard.press('Escape')
   await expect(page.locator('.agenda-row[tabindex="0"]')).toBeFocused()
   await choose('Tree')
   await choose('Vim Editing')
-  await page.waitForFunction(() => document.getElementById('prototype-vim').getAttribute('aria-pressed') === 'false')
+  await page.waitForFunction(() => document.getElementById('prototype-vim')!.getAttribute('aria-pressed') === 'false')
   await choose('Light')
   await page.waitForFunction(
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#fbf8f1',
   )
   await page.locator('[data-node-id="welcome"] .node-input').fill('Editing after using the menu')
   await page.waitForFunction(
-    () => document.getElementById('prototype-save-status').textContent === 'Saved locally in this browser',
+    () => document.getElementById('prototype-save-status')!.textContent === 'Saved locally in this browser',
   )
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   expect(await page.locator('[data-node-id="welcome"] .node-input').inputValue()).toBe('Editing after using the menu')
   const blocked = await context.newPage()
-  await blocked.goto(baseURL)
+  await blocked.goto(baseURL!)
   await blocked.getByRole('alert').filter({ hasText: 'already open' }).waitFor()
   await blocked.close()
   await page.setViewportSize({ width: 390, height: 760 })
   await open()
-  const bounds = await page.getByRole('dialog', { name: 'Tree menu' }).boundingBox()
+  const bounds = (await page.getByRole('dialog', { name: 'Tree menu' }).boundingBox())!
   expect(bounds.x >= 0 && bounds.x + bounds.width <= 390).toBeTruthy()
   await capture(page, 'menu-narrow.png')
   await page.keyboard.press('Escape')
@@ -140,7 +140,7 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     ['iphone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'iPhone', 5, 390],
     ['ipad-mobile', 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', 'iPad', 5, 820],
     ['ipad-desktop', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 'MacIntel', 5, 820],
-  ]) {
+  ] as const) {
     const mobile = await newContext({ userAgent, viewport: { width, height: 760 }, hasTouch: true })
     await mobile.addInitScript(
       ({ platform, maxTouchPoints }) => {
@@ -150,28 +150,28 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
       { platform, maxTouchPoints },
     )
     const device = await mobile.newPage()
-    const deviceErrors = []
+    const deviceErrors: string[] = []
     device.on('pageerror', (error) => deviceErrors.push(error.message))
-    await device.goto(baseURL)
+    await device.goto(baseURL!)
     await device.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
     // @requirement PRODUCT.md §20.4
     const enter = device.locator('[data-node-id="welcome"] .node-enter-control')
-    expect(await enter.evaluate((element) => getComputedStyle(element).webkitTapHighlightColor)).toBe(
-      'rgba(0, 0, 0, 0)',
-    )
+    expect(
+      await enter.evaluate((element) => getComputedStyle(element).getPropertyValue('-webkit-tap-highlight-color')),
+    ).toBe('rgba(0, 0, 0, 0)')
     await enter.tap()
     await expect(device.locator('[data-node-id="welcome"] .node-enter-control')).toHaveCount(0)
     await device.getByRole('button', { name: 'Top level', exact: true }).tap()
     await device.evaluate(async () => {
-      const db = await new Promise((resolve, reject) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('tree-browser-prototype', 1)
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
       })
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const tx = db.transaction('preferences', 'readwrite')
         tx.objectStore('preferences').put(true, 'vim')
-        tx.oncomplete = resolve
+        tx.oncomplete = () => resolve()
         tx.onabort = () => reject(tx.error)
       })
       db.close()
@@ -202,7 +202,7 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     expect(await device.locator('.command-panel [role="option"]').count()).toBe(0)
     await device.keyboard.press('Escape')
     await device.waitForFunction(
-      () => document.getElementById('prototype-save-status').textContent === 'Saved locally in this browser',
+      () => document.getElementById('prototype-save-status')!.textContent === 'Saved locally in this browser',
     )
     await device.reload()
     await device.locator('.tree-app').waitFor()
@@ -212,13 +212,13 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     expect(
       await device.evaluate(async () => {
         const request = indexedDB.open('tree-browser-prototype', 1)
-        const db = await new Promise((resolve) => {
+        const db = await new Promise<IDBDatabase>((resolve) => {
           request.onsuccess = () => resolve(request.result)
         })
         const tx = db.transaction('preferences')
         const value = tx.objectStore('preferences').get('vim')
-        await new Promise((resolve) => {
-          tx.oncomplete = resolve
+        await new Promise<void>((resolve) => {
+          tx.oncomplete = () => resolve()
         })
         db.close()
         return value.result

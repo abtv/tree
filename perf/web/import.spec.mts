@@ -10,7 +10,7 @@ import {
   ready,
   seedLargeProfile,
   watchMainThread,
-} from './large-profile.mjs'
+} from './large-profile.mts'
 
 // Measures "Import Notes…" in the built browser package (PRODUCT §24.4, §22.1): the worker reads,
 // validates and stages the archive while the main thread only shows progress and the confirmation.
@@ -18,12 +18,14 @@ const server = createStaticServer()
 let origin = ''
 
 test.beforeAll(async () => {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  origin = `http://127.0.0.1:${server.address().port}/`
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('The test server did not bind a TCP port')
+  origin = `http://127.0.0.1:${address.port}/`
 })
 
 test.afterAll(async () => {
-  await new Promise((resolve) => server.close(resolve))
+  await new Promise<void>((resolve) => server.close(() => resolve()))
 })
 
 test('imports a large archive without blocking the main thread', async ({ browser }, testInfo) => {
@@ -70,7 +72,9 @@ test('imports a large archive without blocking the main thread', async ({ browse
     await reloaded
     await ready(page)
     const replaceMs = Date.now() - replaced
-    expect(await page.evaluate(() => window.prototypeStore.getSnapshot().document.roots.length)).toBe(NODE_COUNT / 1000)
+    expect(
+      await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots.length),
+    ).toBe(NODE_COUNT / 1000)
 
     recordPerfResult({
       kind: 'web-import',

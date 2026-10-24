@@ -19,7 +19,7 @@ The Product Owner approved the dependency and its constraints on 2026-10-20: `ff
 
 ## Consequences
 
-- Editing stays responsive during export: the main thread does constant work per chunk. `perf/web/export.spec.mjs` records long tasks, blocking time and heap growth for a large synthetic profile.
+- Editing stays responsive during export: the main thread does constant work per chunk. `perf/web/export.spec.mts` records long tasks, blocking time and heap growth for a large synthetic profile.
 - An extracted archive opens in the desktop application without conversion (`src/infrastructure/main/notes-archive-compat.test.ts`).
 - ZIP32 bounds the number of images and the archive size; the limits in `docs/PRODUCT.md` §24.2 keep every offset below the signed 32-bit range. Very large libraries cannot be exported as one archive.
 - The page CSP no longer blocks same-origin workers. A meta CSP does not apply inside a worker, so the worker's behavior is bounded by its packaged code: it makes no network requests and evaluates no received code (`docs/SECURITY.md`).

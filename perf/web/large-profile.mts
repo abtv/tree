@@ -1,20 +1,21 @@
 /* global window, indexedDB, OffscreenCanvas */
+import type { BrowserContext, Page } from '@playwright/test'
 // The large synthetic browser profile shared by the notes archive scenarios (PRODUCT §24, §22.1).
 export const NODE_COUNT = 100_000
 export const IMAGE_COUNT = 300
 export const IMAGE_SIZE = 512
 export const LONG_TASK_CEILING_MS = 200
 
-export const ready = (page) =>
+export const ready = (page: Page) =>
   page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready', undefined, { timeout: 60_000 })
 
 // Writes a synthetic head of NODE_COUNT nodes and IMAGE_COUNT stored noise images straight into
 // IndexedDB; the page reloads afterwards so the editor opens the seeded notes.
-export function seedLargeProfile(page) {
+export function seedLargeProfile(page: Page) {
   return page.evaluate(
     async ({ nodeCount, imageCount, imageSize }) => {
       const canvas = new OffscreenCanvas(imageSize, imageSize)
-      const context = canvas.getContext('2d')
+      const context = canvas.getContext('2d')!
       const image = context.createImageData(imageSize, imageSize)
       for (let offset = 0; offset < image.data.length; offset += 65_536) {
         crypto.getRandomValues(image.data.subarray(offset, offset + 65_536))
@@ -44,16 +45,16 @@ export function seedLargeProfile(page) {
         location: { currentParentId: null, selectedNodeId: 'r0' },
         view: { expandedIds: [] },
       }
-      const db = await new Promise((resolve, reject) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('tree-browser-prototype')
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
       })
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(['document', 'blobs'], 'readwrite')
         tx.objectStore('document').put(head, 'head')
         for (let index = 1; index <= imageCount; index += 1) tx.objectStore('blobs').put(png.slice(), `image-${index}`)
-        tx.oncomplete = resolve
+        tx.oncomplete = () => resolve()
         tx.onabort = () => reject(tx.error)
       })
       db.close()
@@ -64,7 +65,7 @@ export function seedLargeProfile(page) {
 }
 
 /** Records long tasks in the page and samples the main-thread heap until `stop` is called. */
-export async function watchMainThread(context, page) {
+export async function watchMainThread(context: BrowserContext, page: Page) {
   await page.evaluate(() => {
     window.archivePerf = { longTasks: [] }
     new PerformanceObserver((list) => {
@@ -74,7 +75,7 @@ export async function watchMainThread(context, page) {
   const cdp = await context.newCDPSession(page)
   await cdp.send('Performance.enable')
   const heap = async () =>
-    (await cdp.send('Performance.getMetrics')).metrics.find((metric) => metric.name === 'JSHeapUsedSize').value
+    (await cdp.send('Performance.getMetrics')).metrics.find((metric) => metric.name === 'JSHeapUsedSize')!.value
   const heapBefore = await heap()
   let peakHeap = heapBefore
   let sampling = true

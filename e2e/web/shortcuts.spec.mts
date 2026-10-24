@@ -1,13 +1,14 @@
 // @editing-modes: independent
-import { test, expect, capture, pressPaste } from './fixtures.mjs'
+import { test, expect, capture, pressPaste } from './fixtures.mts'
+import type { Locator, Page } from '@playwright/test'
 
-const ready = (page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
-const rowInput = (page, id) => page.locator(`.node-row[data-node-id="${id}"] .node-input`)
-const text = (input) =>
+const ready = (page: Page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+const rowInput = (page: Page, id: string) => page.locator(`.node-row[data-node-id="${id}"] .node-input`)
+const text = (input: Locator) =>
   input.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : element.textContent))
 
-async function seed(page, baseURL) {
-  await page.goto(baseURL)
+async function seed(page: Page, baseURL: string | undefined) {
+  await page.goto(baseURL!)
   await ready(page)
   await page.evaluate(async () => {
     await window.treeApi.save({
@@ -59,16 +60,16 @@ async function seed(page, baseURL) {
 for (const [profile, modifier, otherModifier, label] of [
   ['apple', 'Meta', 'Control', '⌘Q'],
   ['other', 'Control', 'Meta', 'Ctrl+Q'],
-]) {
+] as const) {
   test(`${profile}: routes application shortcuts and formats the command panel`, async ({ newContext, baseURL }) => {
     const context = await newContext({ shortcutPlatform: profile })
     const page = await context.newPage()
     await seed(page, baseURL)
-    const press = (key) => page.keyboard.press(`${modifier}+${key}`)
+    const press = (key: string) => page.keyboard.press(`${modifier}+${key}`)
     const state = () =>
       page.evaluate(() => {
-        const s = window.prototypeStore.getSnapshot()
-        return { location: s.location, agenda: !!s.agenda, parent: s.document.roots[0] }
+        const s = window.prototypeStore.getSnapshot() as ReadyEditorSnapshot
+        return { location: s.location, agenda: !!s.agenda, parent: s.document.roots[0]! }
       })
     await rowInput(page, 'parent').focus()
     await page.keyboard.press(`${otherModifier}+p`)
@@ -128,7 +129,7 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     await expect(page.locator('#command-quit .command-shortcut')).toBeInViewport()
     await capture(page, `${profile}-shortcut-label-narrow.png`)
-    const geometry = await page.locator('#command-quit .command-shortcut').boundingBox()
+    const geometry = (await page.locator('#command-quit .command-shortcut').boundingBox())!
     expect(geometry.x).toBeGreaterThanOrEqual(0)
     expect(geometry.x + geometry.width).toBeLessThanOrEqual(390)
     await page.keyboard.press('Escape')
@@ -143,7 +144,7 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.keyboard.press('Enter')
     await expect(page.locator('.command-error')).toHaveText('Not a command: toggle-always-on-top')
     expect(await page.evaluate(() => window.treeApi.getCommandHistory())).toEqual(['toggle-always-on-top'])
-    for (const key of ['p', 'e', '.', ',', 'enter', 'z', '0', 'y', 'backspace']) {
+    for (const key of ['p', 'e', '.', ',', 'enter', 'z', '0', 'y', 'backspace'] as const) {
       await expect
         .poll(
           () =>
@@ -162,11 +163,11 @@ for (const [profile, modifier, otherModifier, label] of [
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await context.newPage()
     await seed(page, baseURL)
-    const press = (key) => page.keyboard.press(`${modifier}+${key}`)
+    const press = (key: string) => page.keyboard.press(`${modifier}+${key}`)
     const input = rowInput(page, 'parent')
     await input.fill('Clipboard text')
     await press('a')
-    expect(await page.evaluate(() => getSelection().toString())).toBe('Clipboard text')
+    expect(await page.evaluate(() => getSelection()!.toString())).toBe('Clipboard text')
     await press('c')
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('Clipboard text')
     await press('x')
@@ -178,7 +179,7 @@ for (const [profile, modifier, otherModifier, label] of [
     await pressPaste(page, modifier)
     await expect(input).toHaveText('Clipboard text')
     await expect.poll(() => page.evaluate(() => window.pastePrevented)).toBe(true)
-    for (const key of ['a', 'c', 'x', 'z']) {
+    for (const key of ['a', 'c', 'x', 'z'] as const) {
       expect(await page.evaluate((key) => window.shortcutEvents.some((e) => e.key === key && e.prevented), key)).toBe(
         true,
       )
@@ -187,7 +188,8 @@ for (const [profile, modifier, otherModifier, label] of [
     await input.focus()
     await page.keyboard.press('Escape')
     await expect(page.getByLabel('Vim mode')).toHaveText('NORMAL')
-    const selectedNode = () => page.evaluate(() => window.prototypeStore.getSnapshot().location.selectedNodeId)
+    const selectedNode = () =>
+      page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).location.selectedNodeId)
     await page.keyboard.press('Control+d')
     await expect.poll(selectedNode).not.toBe('parent')
     await page.keyboard.press('Control+u')
@@ -195,7 +197,9 @@ for (const [profile, modifier, otherModifier, label] of [
     await press('.')
     await page.keyboard.press('Control+o')
     await expect
-      .poll(() => page.evaluate(() => window.prototypeStore.getSnapshot().location.currentParentId))
+      .poll(() =>
+        page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).location.currentParentId),
+      )
       .toBe(null)
     await input.focus()
     await page.keyboard.type('0x')
@@ -205,7 +209,7 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.keyboard.press('Control+r')
     await expect(input).toHaveText('lipboard text')
     await page.evaluate(() => navigator.clipboard.writeText('PASTE'))
-    for (const mode of ['normal', 'visual']) {
+    for (const mode of ['normal', 'visual'] as const) {
       await page.keyboard.press('Escape')
       await page.keyboard.press('0')
       if (mode === 'visual') await page.keyboard.press('v')
@@ -221,6 +225,7 @@ for (const [profile, modifier, otherModifier, label] of [
       window.openedLinks = []
       window.open = (url) => {
         window.openedLinks.push(url)
+        return null
       }
     })
     const link = page.locator('.node-row[data-node-id="link"] a')
@@ -243,12 +248,12 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.keyboard.type('Friday')
     const popup = page.locator('.date-popup')
     await expect(popup.getByRole('option')).toHaveCount(2)
-    const initialSuggestion = await popup.locator('[aria-selected="true"]').textContent()
+    const initialSuggestion = (await popup.locator('[aria-selected="true"]').textContent())!
     await page.keyboard.press('Control+n')
     await expect(popup.locator('[aria-selected="true"]')).not.toHaveText(initialSuggestion)
     await page.keyboard.press('Control+p')
     await expect(popup.locator('[aria-selected="true"]')).toHaveText(initialSuggestion)
-    expect(await page.evaluate(() => !!window.prototypeStore.getSnapshot().agenda)).toBe(false)
+    expect(await page.evaluate(() => !!(window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).agenda)).toBe(false)
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
     await page.keyboard.type('0RZ')

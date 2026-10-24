@@ -135,11 +135,11 @@ npm run typecheck
 
 The node, renderer, end-to-end, and scripts projects compile with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `noUnusedLocals`, `noUnusedParameters`, and `noFallthroughCasesInSwitch`.
 
-Prefer `.mts` over `.mjs` for new Node scripts and their tests, and migrate an existing `.mjs` script when substantially changing its implementation. This also applies to temporary Node scripts. Keep `.mjs` when a tool requires JavaScript or an existing entry point must remain compatible; document the reason beside the exception. An unrelated edit does not require an extension migration. Existing tool configuration files and browser E2E JavaScript modules retain their extensions unless their migration is part of the task.
+Prefer `.mts` over `.mjs` for new Node scripts, browser E2E and performance specs, and their helpers and tests, and migrate an existing `.mjs` script when substantially changing its implementation. This also applies to temporary Node scripts. Keep `.mjs` when a tool requires JavaScript or an existing entry point must remain compatible; document the reason beside the exception. An unrelated edit does not require an extension migration. Existing tool configuration files retain their extensions unless their migration is part of the task.
 
 Maintained Node scripts and their tests use `.mts` to declare TypeScript ES modules explicitly. Node 24 runs them directly by stripping erasable types; no build step or extra runner is required. Use explicit extensions in relative imports and type-only imports for types. `tsconfig.scripts.json` enables `erasableSyntaxOnly` and checks the scripts through `npm run typecheck:scripts`, included in `npm run typecheck` and `npm run check`. It uses the repository's ESNext/Bundler resolution to include shared `.ts` helpers; Node execution still requires real import paths and does not read tsconfig settings. The imported JavaScript tool configuration and compatibility launchers are checked as well.
 
-The native Node comparison runner `perf/comparisons/safari-electron.mts` is checked by `tsconfig.e2e.json` alongside the performance suites. ESLint and Stryker configurations retain `.mjs` for their existing loaders and configuration discovery. The three `.mjs` launchers in `scripts/web-release/` preserve installed workflow entry points and delegate to `.mts` implementations.
+Browser specs and helpers in `e2e/web/` and `perf/web/` use `.mts` and are checked by `tsconfig.e2e.json` alongside the Electron suites and the native Node comparison runner `perf/comparisons/safari-electron.mts`. ESLint and Stryker configurations retain `.mjs` for their existing loaders and configuration discovery. The three `.mjs` launchers in `scripts/web-release/` preserve installed workflow entry points and delegate to `.mts` implementations.
 
 When type checking is required by §9, type errors must be fixed before the corresponding validation can pass.
 
@@ -193,7 +193,7 @@ Vitest uses the Node.js environment by default. Renderer tests opt into jsdom wh
 
 ### Choosing test coverage
 
-Browser E2E uses `primaryKey` from `e2e/web/fixtures.mjs` for the host's Cmd or
+Browser E2E uses `primaryKey` from `e2e/web/fixtures.mts` for the host's Cmd or
 Ctrl shortcuts. Dual-profile checks override the browser platform identity and
 press the corresponding modifier. `pressPaste(page, modifier)` supplies the CDP
 native paste command for either mapping. These synthetic events verify application
@@ -430,7 +430,7 @@ Preparation uses `scripts/web/chromium.Dockerfile` and installs locked dependenc
 
 In Codex, use host execution (`sandbox_permissions: "require_escalated"`) from the first invocation. `.codex/rules/chromium.rules` approves only this named npm workflow, not general Docker access. As with the existing npm permissions, the rule trusts mutable repository scripts and matches command arguments, not the working directory. Review runner, package script, Dockerfile, and rule changes together. It is not a security boundary against an agent that changes those files. Trust the project configuration and restart Codex after rule changes; native rule matching alone does not prove the current session loaded the rule.
 
-Linux arm64 Playwright Chromium 1243 stops the whole browser process with `SIGTRAP` when a new document reads a stored OPFS directory handle from IndexedDB; storing or using the handle within one document does not. The folder-backup picker stub returns OPFS handles, so `e2e/web/backup.spec.mjs` marks its three reload cases `test.fixme` on Linux, where both this container and the CI `Browser Chrome` job run, and keeps them on macOS Chrome. A Linux-only canary in the same spec expects the crash; when a Playwright update brings a fixed Chromium, the canary fails, and the marks and canary are removed together. Playwright reports such a browser exit only as `Target page, context or browser has been closed` with no exit status. To see the signal and stderr, launch the browser binary from a temporary spec with `--remote-debugging-port=0`, attach with `chromium.connectOverCDP`, and observe the child process.
+Linux arm64 Playwright Chromium 1243 stops the whole browser process with `SIGTRAP` when a new document reads a stored OPFS directory handle from IndexedDB; storing or using the handle within one document does not. The folder-backup picker stub returns OPFS handles, so `e2e/web/backup.spec.mts` marks its three reload cases `test.fixme` on Linux, where both this container and the CI `Browser Chrome` job run, and keeps them on macOS Chrome. A Linux-only canary in the same spec expects the crash; when a Playwright update brings a fixed Chromium, the canary fails, and the marks and canary are removed together. Playwright reports such a browser exit only as `Target page, context or browser has been closed` with no exit status. To see the signal and stderr, launch the browser binary from a temporary spec with `--remote-debugging-port=0`, attach with `chromium.connectOverCDP`, and observe the child process.
 
 The container's network restriction applies to test execution. It does not disable the coding agent's other network tools or revoke existing Docker permissions. Owner-only preparation is a workflow rule; enforcing it against an agent that can change the runner requires a separately protected launcher and host access controls.
 
@@ -681,7 +681,7 @@ Requirement traceability uses a standalone comment directly above a test or suit
 ```
 
 `npm run check:requirements` scans `src/**/*.test.*`, `scripts/**/*.test.*`,
-`e2e/**/*.{ts,mjs}` and `perf/**/*.ts`, including both Electron and Chrome specs.
+`e2e/**/*.{ts,mts,mjs}` and `perf/**/*.{ts,mts,mjs}`, including both Electron and Chrome specs.
 It requires a marker for every numbered leaf section of `docs/PRODUCT.md` and for
 parents with their own text; unnumbered subheadings belong to the nearest numbered
 section. Numbered headings at levels two through four are supported (for example,

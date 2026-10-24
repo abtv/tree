@@ -1,10 +1,10 @@
 // @editing-modes: independent
-import { test, expect, capture, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, primaryKey } from './fixtures.mts'
 
 test('flushes quit edits and recovers from failed or refused close', async ({ newContext, baseURL }) => {
   const context = await newContext()
   const opener = await context.newPage()
-  const dialogs = []
+  const dialogs: string[] = []
   context.on('page', (page) => {
     page.on('dialog', async (dialog) => {
       dialogs.push(dialog.message())
@@ -21,7 +21,7 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
   }
   let page = await open()
   const input = () => page.locator('[data-node-id="welcome"] .node-input')
-  const pressToClose = async (key) => {
+  const pressToClose = async (key: string) => {
     const closed = page.waitForEvent('close', { timeout: 6000 })
     // A successful close can destroy the keyboard dispatch's target before its
     // acknowledgement arrives. Only accept that error when the page did close.

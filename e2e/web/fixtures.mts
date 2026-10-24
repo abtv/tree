@@ -1,13 +1,19 @@
-import { test as base, expect } from '@playwright/test'
+import { test as base, expect, type BrowserContext, type BrowserContextOptions, type Page } from '@playwright/test'
 import { rm } from 'node:fs/promises'
 
 export { expect }
 export const primaryKey = process.platform === 'darwin' ? 'Meta' : 'Control'
 
-export const test = base.extend({
+type ContextOptions = BrowserContextOptions & { shortcutPlatform?: 'apple' | 'other' }
+type BrowserFixtures = {
+  newContext: (options?: ContextOptions) => Promise<BrowserContext>
+  persistentContext: () => Promise<BrowserContext>
+}
+
+export const test = base.extend<BrowserFixtures>({
   newContext: async ({ browser, headless }, use) => {
     expect(headless, 'Chrome checks require headless mode to keep clipboard tests off the machine clipboard').toBe(true)
-    const contexts = []
+    const contexts: BrowserContext[] = []
     try {
       await use(async (options = {}) => {
         const { shortcutPlatform, ...contextOptions } = options
@@ -33,11 +39,11 @@ export const test = base.extend({
   },
   persistentContext: async ({ playwright, channel }, use, testInfo) => {
     const profile = testInfo.outputPath('chrome-profile')
-    const contexts = []
+    const contexts: BrowserContext[] = []
     try {
       await use(async () => {
         const context = await playwright.chromium.launchPersistentContext(profile, {
-          channel,
+          ...(channel === undefined ? {} : { channel }),
           headless: true,
           viewport: { width: 1100, height: 760 },
         })
@@ -52,7 +58,7 @@ export const test = base.extend({
 })
 
 // Send the native paste command for either profile, independent of the host's keyboard mapping.
-export async function pressPaste(page, modifier = primaryKey) {
+export async function pressPaste(page: Page, modifier: 'Meta' | 'Control' = primaryKey) {
   const session = await page.context().newCDPSession(page)
   const key = { modifiers: modifier === 'Control' ? 2 : 4, key: 'v', code: 'KeyV', windowsVirtualKeyCode: 86 }
   try {
@@ -65,7 +71,7 @@ export async function pressPaste(page, modifier = primaryKey) {
   }
 }
 
-export async function capture(page, name) {
+export async function capture(page: Page, name: string) {
   const path = test.info().outputPath(name)
   await page.screenshot({ path })
   await test.info().attach(name, { path, contentType: 'image/png' })

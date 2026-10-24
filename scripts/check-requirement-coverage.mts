@@ -158,7 +158,7 @@ export function runChecks({
       if (entry.isDirectory()) walk(path, kind)
       else if (
         entry.isFile() &&
-        (kind === 'src' ? /\.test\.[cm]?[jt]sx?$/.test(entry.name) : /\.(?:ts|mjs)$/.test(entry.name))
+        (kind === 'src' ? /\.test\.[cm]?[jt]sx?$/.test(entry.name) : /\.(?:ts|mts|mjs)$/.test(entry.name))
       ) {
         files.push({ path: relative(rootDirectory, path).split('\\').join('/'), content: readFileSync(path, 'utf8') })
       }

@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { test, expect, capture, pressPaste, primaryKey } from './fixtures.mjs'
+import { test, expect, capture, pressPaste, primaryKey } from './fixtures.mts'
 
 for (const vimEnabled of [false, true]) {
   // @requirement PRODUCT.md §13
@@ -10,7 +10,7 @@ for (const vimEnabled of [false, true]) {
     const context = await newContext()
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await context.newPage()
-    await page.goto(baseURL)
+    await page.goto(baseURL!)
     await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
     await page.evaluate(async (enabled) => {
       await window.treeApi.setVimEnabled(enabled)
@@ -42,7 +42,7 @@ test('uses native text paste in every Vim mode and editor location', async ({ ne
   const context = await newContext()
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const page = await context.newPage()
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   await page.evaluate(async () => {
     await window.treeApi.save({
@@ -99,14 +99,14 @@ test('pastes an external image from the native event without requesting clipboar
   const context = await newContext()
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const page = await context.newPage()
-  await page.goto(baseURL)
+  await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 24
-    canvas.getContext('2d').fillRect(0, 0, 24, 24)
-    const image = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })])
+    canvas.getContext('2d')!.fillRect(0, 0, 24, 24)
+    const image = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': image! })])
     window.programmaticReads = 0
     navigator.clipboard.read = async () => {
       window.programmaticReads++
