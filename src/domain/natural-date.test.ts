@@ -188,7 +188,6 @@ describe('natural date expression table proposed in AG-22', () => {
     'last weekend',
     'mar',
     'may',
-    'Fri',
     'next',
     'Oct',
     'Oct 32',
@@ -404,6 +403,26 @@ describe('natural date expression table proposed in AG-22', () => {
     }
   })
 
+  it('completes bare weekdays from three letters with the same dates as their full names', () => {
+    for (const name of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']) {
+      for (let length = 3; length <= name.length; length++) {
+        const fragment = name.slice(0, length)
+        for (const prefix of ['', 'Plan ', 'beyond ', 'nearby ', 'on a ', 'by noon ', 'Plan on Monday then ']) {
+          const text = `${prefix}${fragment.toUpperCase()} at noon`
+          const match = suggestDates(text, prefix.length + fragment.length, today)!
+          expect(match, text).toBeDefined()
+          expect(match.start).toBe(prefix.length)
+          expect(match.end).toBe(prefix.length + fragment.length)
+          expect(match.suggestions).toEqual(suggestDates(name, name.length, today)!.suggestions)
+        }
+        expect(dates(fragment)).toEqual(dates(name))
+        expect(dates(`${fragment}suffix`)).toBeUndefined()
+        expect(dates(`prefix${fragment}`)).toBeUndefined()
+      }
+      expect(dates(name.slice(0, 2))).toBeUndefined()
+    }
+  })
+
   it('completes weekdays after on and by while preserving each preposition and surrounding text', () => {
     for (const name of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']) {
       for (const preposition of ['on', 'by']) {
@@ -472,15 +491,10 @@ describe('natural date expression table proposed in AG-22', () => {
     'by fr',
     'on fridays',
     'by fridayish',
-    'beyond fri',
-    'nearby fri',
     'se 15',
     'septembers 15',
     'septe 32',
     'febr 30',
-    'on a fri',
-    'by noon fri',
-    'Plan on Monday then fri',
     'next mondayundefined',
     'last septemberundefined',
   ])('rejects incomplete context and invalid continuations: %s', (text) => expect(dates(text)).toBeUndefined())
@@ -497,8 +511,6 @@ describe('natural date expression table proposed in AG-22', () => {
     'in the end of se',
     'sep',
     'sept',
-    'fri',
-    'sat',
     'in septs',
     'next fridayish',
   ])('keeps uncertain or unrelated fragments silent: %s', (text) => expect(dates(text)).toBeUndefined())

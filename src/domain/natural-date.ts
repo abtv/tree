@@ -265,14 +265,6 @@ export function suggestDates(text: string, caret: number, today: DayNumber): Nat
     const monthDay = /^([a-z]+) ([0-9]{1,2})$/.exec(normalized)
     const monthName = monthDay && months.find((name) => name.startsWith(monthDay[1]!))
     const expression = monthName ? `${monthName} ${monthDay![2]}` : (completedPrefixes.get(normalized) ?? normalized)
-    // Only on/by enables an otherwise bare weekday prefix. Keep the context
-    // outside the replacement span so accepting a deadline preserves meaning.
-    if (
-      expression !== normalized &&
-      weekdays.includes(expression) &&
-      !/(?:^|[^\p{L}\p{N}_])(?:on|by) +$/iu.test(text.slice(0, start))
-    )
-      continue
     const ambiguous = /^(next|last) mon$/.exec(normalized)
     const interpretations = ambiguous ? [`${ambiguous[1]} monday`, `${ambiguous[1]} month`] : [expression]
     const suggestions = interpretations.flatMap((expression) =>
