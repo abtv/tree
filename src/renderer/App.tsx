@@ -651,8 +651,11 @@ export function App({
       ) : null}
       {previewAttachmentId === undefined ? null : (
         <ImagePreview
+          key={previewAttachmentId}
           attachmentId={previewAttachmentId}
           images={attachmentImages}
+          vimEnabled={vimEnabled}
+          shortcuts={shortcuts}
           onClose={() => setPreviewAttachmentId(undefined)}
         />
       )}

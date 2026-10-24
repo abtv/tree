@@ -6,6 +6,7 @@ import { createAttachmentImageCache } from '../infrastructure/renderer/attachmen
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
+import { OTHER_SHORTCUTS } from './shortcut-profile'
 
 afterEach(cleanup)
 
@@ -243,6 +244,95 @@ describe('AttachmentImage', () => {
 })
 
 describe('ImagePreview', () => {
+  async function transformFixture(vimEnabled = false, otherPlatform = false) {
+    const onClose = vi.fn()
+    const rendered = render(
+      <ImagePreview
+        attachmentId="image"
+        onClose={onClose}
+        vimEnabled={vimEnabled}
+        {...(otherPlatform ? { shortcuts: OTHER_SHORTCUTS } : {})}
+      />,
+    )
+    const image = await screen.findByAltText('Attached image preview')
+    Object.defineProperties(image, {
+      naturalWidth: { value: 2000 },
+      offsetWidth: { value: window.innerWidth - 64 },
+      offsetHeight: { value: window.innerHeight - 64 },
+    })
+    const overlay = image.closest('.image-preview-overlay')!
+    return { image, overlay, onClose, ...rendered }
+  }
+
+  it.each([false, true])('zooms with the platform primary modifier and pans with arrows (other=%s)', async (other) => {
+    const { image, onClose } = await transformFixture(false, other)
+    const primary = other ? { ctrlKey: true } : { metaKey: true }
+    fireEvent.keyDown(document, { key: '=', ...primary })
+    expect(image.style.transform).toBe('translate(0px, 0px) scale(1.25)')
+    fireEvent.keyDown(document, { key: 'ArrowRight' })
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(image.style.transform).toBe('translate(-48px, -48px) scale(1.25)')
+    fireEvent.keyDown(document, { key: '-', ...primary })
+    expect(image.style.transform).toBe('translate(0px, 0px) scale(1)')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('uses Vim pan keys only when Vim is enabled (%s)', async (vim) => {
+    const { image } = await transformFixture(vim)
+    fireEvent.keyDown(document, { key: '+', metaKey: true, shiftKey: true })
+    fireEvent.keyDown(document, { key: 'l' })
+    fireEvent.keyDown(document, { key: 'j' })
+    expect(image.style.transform).toBe(`translate(${vim ? -48 : 0}px, ${vim ? -48 : 0}px) scale(1.25)`)
+    fireEvent.keyDown(document, { key: 'h', ctrlKey: true })
+    fireEvent.keyDown(document, { key: 'k', isComposing: true })
+    expect(image.style.transform).toBe(`translate(${vim ? -48 : 0}px, ${vim ? -48 : 0}px) scale(1.25)`)
+    fireEvent.keyDown(document, { key: 'h' })
+    fireEvent.keyDown(document, { key: 'k' })
+    expect(image.style.transform).toBe('translate(0px, 0px) scale(1.25)')
+  })
+
+  it('consumes pinch and scrolling without changing page zoom or dismissing the preview', async () => {
+    const { image, overlay, onClose } = await transformFixture()
+    const pinch = new WheelEvent('wheel', {
+      ctrlKey: true,
+      deltaY: -40,
+      clientX: window.innerWidth / 2,
+      clientY: window.innerHeight / 2,
+      bubbles: true,
+      cancelable: true,
+    })
+    fireEvent(overlay, pinch)
+    expect(pinch.defaultPrevented).toBe(true)
+    expect(image.style.transform).toContain(`scale(${Math.exp(0.4)})`)
+    fireEvent.wheel(overlay, { deltaX: 30, deltaY: 40 })
+    expect(image.style.transform).toContain('translate(-30px, -40px)')
+    expect(screen.getByRole('button', { name: 'Close image preview' })).toHaveFocus()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('supports cumulative Safari gesture scales and removes listeners on close', async () => {
+    const { image, overlay, unmount } = await transformFixture()
+    fireEvent(overlay, new Event('gesturestart', { cancelable: true }))
+    for (const scale of [1.5, 2]) {
+      const event = new Event('gesturechange', { cancelable: true })
+      Object.assign(event, { scale, clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 })
+      fireEvent(overlay, event)
+    }
+    expect(image.style.transform).toBe('translate(0px, 0px) scale(2)')
+    unmount()
+    const event = new KeyboardEvent('keydown', { key: '+', metaKey: true, cancelable: true })
+    document.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('keeps loading and failed images closable without applying zoom', async () => {
+    const { image } = await transformFixture()
+    fireEvent.error(image)
+    fireEvent.keyDown(document, { key: '+', metaKey: true })
+    expect(screen.getByText('Image could not be loaded.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close image preview' })).toHaveFocus()
+  })
+
   it('closes on Escape and restores focus to the previously focused element', async () => {
     const onClose = vi.fn()
     const trigger = document.createElement('button')

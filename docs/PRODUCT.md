@@ -1082,7 +1082,15 @@ Clicking an attached image opens an image preview.
 
 `Cmd+Y` opens the image preview for the selected node or the editable current parent when that node has an attached image, in every Vim mode and whether or not Vim mode is enabled. When neither the selected node nor the current parent has an image, `Cmd+Y` does nothing. `Cmd+Y` is not part of Apple's standard keyboard shortcuts, so it conflicts with none of them (§1.3).
 
-The image preview is a modal overlay within the application window. It displays the image fitted within the available window area while preserving its aspect ratio, and it does not enlarge the image beyond its natural size.
+The image preview is a modal overlay within the application window. It initially displays the image fitted within the available window area while preserving its aspect ratio, without enlarging it beyond its natural size.
+
+* A trackpad pinch or `Cmd++` / `Cmd+-` zooms the preview image. `Cmd+=` also zooms in without requiring Shift. Zoom ranges from the initial fitted size to 16 times that size, including enlargement beyond natural size.
+* Keyboard zoom uses the window center; pinch zoom keeps the point under the pointer in place until an image edge is reached.
+* Two-finger scrolling and unmodified arrow keys pan the enlarged image in the corresponding viewing direction, stopping at its edges; an axis that fits stays centered.
+* With Vim editing enabled, unmodified `h/j/k/l` pan like Left/Down/Up/Right, independently of the editor's Vim mode. These preview bindings take precedence over popup button navigation (§20.2.29).
+* Zoom and pan affect only the image, leave the close button fixed and available, and never edit notes or change the application's page zoom.
+* Reopening the preview restores the initial fit and centered position.
+* Resizing the window refits the base image and constrains its current zoom and position to the new bounds.
 
 Only one preview is open at a time. The preview has a visible close button and also closes on `Esc` and on a mouse click anywhere in the window, including on the image itself. When the preview opens, focus moves to the close button (§20.7 applies to how it was opened). Closing the preview returns focus to the element that was focused before the preview opened.
 
@@ -1582,7 +1590,7 @@ Every successfully run command except `quit` moves to the front of history, with
 
 #### 20.2.29 Popup Navigation
 
-While Vim editing is enabled, application-owned dialogs and activity messages support `h` and `l` to focus the previous and next visible, enabled button in their horizontal action row. Movement stops at either end without wrapping or activating a button. This applies independently of the editor's current Vim mode, only while focus is inside the popup. Import/restore confirmation, backup conflict/permission confirmation, quit confirmation, image preview and activity messages share this rule in desktop and browser versions where available.
+While Vim editing is enabled, application-owned dialogs and activity messages support `h` and `l` to focus the previous and next visible, enabled button in their horizontal action row. Movement stops at either end without wrapping or activating a button. This applies independently of the editor's current Vim mode, only while focus is inside the popup. Import/restore confirmation, backup conflict/permission confirmation, quit confirmation and activity messages share this rule in desktop and browser versions where available. Image preview instead uses `h/j/k/l` to pan its image (§17.1).
 
 `Enter` activates the focused button; `Escape` cancels or dismisses the popup through its existing action. Busy operations retain their existing cancellation restrictions. In a focused activity message, Escape invokes its Cancel or OK action. Existing initial focus, Tab/Shift+Tab navigation and focus restoration remain unchanged. Moving focus must not edit notes or execute an editor command.
 

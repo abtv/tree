@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { IMAGE_LOAD_ERROR } from '../domain/product-messages'
 import type { AttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
+import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
+import { useImagePreviewTransform } from './use-image-preview-transform'
 
 type AttachmentState =
   | { attachmentId: string; status: 'loading' }
@@ -140,12 +142,17 @@ export function ImagePreview({
   attachmentId,
   onClose,
   images = attachmentImageCache,
+  vimEnabled = false,
+  shortcuts = APPLE_SHORTCUTS,
 }: {
   attachmentId: string
   onClose: () => void
   images?: AttachmentImageCache
+  vimEnabled?: boolean
+  shortcuts?: ShortcutProfile
 }): React.JSX.Element {
   const { state, onImageError } = useAttachmentImage(images, attachmentId)
+  const { imageRef, overlayRef, transform } = useImagePreviewTransform(vimEnabled, shortcuts)
   const closeButton = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<Element | null>(null)
@@ -206,15 +213,8 @@ export function ImagePreview({
   }, [])
 
   return (
-    <div className="image-preview-overlay" onClick={onClose}>
-      <div
-        ref={dialog}
-        aria-label="Image preview"
-        aria-modal="true"
-        className="image-preview"
-        role="dialog"
-        data-popup-navigation="horizontal"
-      >
+    <div ref={overlayRef} className="image-preview-overlay" onClick={onClose}>
+      <div ref={dialog} aria-label="Image preview" aria-modal="true" className="image-preview" role="dialog">
         <button
           ref={closeButton}
           aria-label="Close image preview"
@@ -234,7 +234,14 @@ export function ImagePreview({
           </svg>
         </button>
         {state.status === 'ready' ? (
-          <img className="image-preview-image" src={state.url} alt="Attached image preview" onError={onImageError} />
+          <img
+            ref={imageRef}
+            className="image-preview-image"
+            style={{ transform }}
+            src={state.url}
+            alt="Attached image preview"
+            onError={onImageError}
+          />
         ) : null}
         {state.status === 'error' ? <ImageErrorMessage /> : null}
       </div>

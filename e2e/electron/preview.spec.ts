@@ -42,7 +42,48 @@ test.describe('inline image presentation (mode-independent)', () => {
   })
 })
 
-describeForEachEditingMode('image preview', () => {
+describeForEachEditingMode('image preview', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §17.1
+  test('zooms and pans only the image, keeps the close button available, and resets on reopening', async ({
+    userDataDir,
+  }, testInfo) => {
+    const { app, window } = await launchTree(userDataDir)
+    await writeClipboardImageSized(app, 1200, 900)
+    await firePaste(node(window, 1))
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+    const image = window.getByAltText('Attached image preview')
+    await expect(image).toBeVisible()
+    const initial = (await image.boundingBox())!
+    const close = window.getByRole('button', { name: 'Close image preview' })
+    const closeBounds = await close.boundingBox()
+    await window.keyboard.press('Meta+=')
+    await expect.poll(async () => (await image.boundingBox())!.width).toBeCloseTo(initial.width * 1.25, 0)
+    const zoomed = (await image.boundingBox())!
+    await window.keyboard.press('ArrowRight')
+    await window.keyboard.press('ArrowDown')
+    await expect.poll(async () => (await image.boundingBox())!.x).toBeCloseTo(zoomed.x - 48, 0)
+    await expect.poll(async () => (await image.boundingBox())!.y).toBeCloseTo(zoomed.y - 48, 0)
+    const panned = (await image.boundingBox())!
+    await window.keyboard.press('h')
+    await window.keyboard.press('k')
+    await expect.poll(async () => (await image.boundingBox())!.x).toBeCloseTo(mode === 'vim' ? zoomed.x : panned.x, 0)
+    await expect.poll(async () => (await image.boundingBox())!.y).toBeCloseTo(mode === 'vim' ? zoomed.y : panned.y, 0)
+    await expect(close).toBeFocused()
+    expect(await close.boundingBox()).toEqual(closeBounds)
+    expect(await window.evaluate(() => globalThis.visualViewport!.scale)).toBe(1)
+    await expect(window).toHaveScreenshot(screenshotName('image-preview-zoomed.png'))
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('image-preview-zoomed.png')) })
+    await window.keyboard.press('Meta+-')
+    await expect.poll(async () => (await image.boundingBox())!.width).toBeCloseTo(initial.width, 0)
+    await window.keyboard.press('Escape')
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('Meta+y')
+    await expect(image).toBeVisible()
+    expect(await image.boundingBox()).toEqual(initial)
+    await close.click()
+    await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeHidden()
+  })
+
   test('opens the preview by clicking the image and closes it with the button', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
@@ -136,6 +177,42 @@ describeForEachEditingMode('image preview', () => {
 })
 
 test.describe('image preview (mode-independent)', () => {
+  // @requirement PRODUCT.md §17.1
+  test('handles Chromium trackpad pinch and real wheel input without zooming or scrolling the page', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+    await writeClipboardImageSized(app, 1200, 900)
+    await firePaste(node(window, 1))
+    await window.getByRole('button', { name: 'Open image preview' }).click()
+    const image = window.getByAltText('Attached image preview')
+    await expect(image).toBeVisible()
+    const initial = (await image.boundingBox())!
+    const session = await window.context().newCDPSession(window)
+    try {
+      await session.send('Input.synthesizePinchGesture', {
+        x: initial.x + initial.width / 2,
+        y: initial.y + initial.height / 2,
+        scaleFactor: 2,
+        relativeSpeed: 800,
+        gestureSourceType: 'mouse',
+      })
+      await expect.poll(async () => (await image.boundingBox())!.width).toBeGreaterThan(initial.width * 1.5)
+      const enlarged = (await image.boundingBox())!
+      await window.mouse.move(initial.x + initial.width / 2, initial.y + initial.height / 2)
+      await window.mouse.wheel(40, 50)
+      await expect.poll(async () => (await image.boundingBox())!.x).toBeCloseTo(enlarged.x - 40, 0)
+      await expect.poll(async () => (await image.boundingBox())!.y).toBeCloseTo(enlarged.y - 50, 0)
+      expect(
+        await window.evaluate(() => [globalThis.visualViewport!.scale, globalThis.scrollX, globalThis.scrollY]),
+      ).toEqual([1, 0, 0])
+      await window.getByRole('button', { name: 'Close image preview' }).click()
+      await expect(node(window, 1)).toBeFocused()
+    } finally {
+      await session.detach()
+    }
+  })
+
   test('keeps keyboard focus inside the preview', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
