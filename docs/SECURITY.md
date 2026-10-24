@@ -304,5 +304,5 @@ The release gate and real deployment acceptance checks are described in
 `npm run check:full` runs the shared unit/contract checks and Electron end-to-end
 and performance suites, followed by `npm audit`. It does not include the browser
 suite. A registry connectivity failure must be reported rather than treated as a
-clean audit. Between runs, a daily workflow audits dependencies at high severity
+clean audit. Between runs, a workflow audits dependencies every eight hours at high severity
 or above and Dependabot proposes updates; `docs/DEVELOPMENT.md` describes both.

@@ -854,7 +854,7 @@ Direct dependencies are declared with exact versions and no range operators (`do
 
 `npm audit` runs as the final step of `npm run check:full`, not of `npm run check`, so known vulnerabilities are reported at the end of complete validation. It requires registry access and fails when offline.
 
-Between validation runs, `.github/dependabot.yml` opens weekly pull requests for npm and GitHub Actions updates (minor and patch updates are grouped, major updates arrive one per pull request), and Dependabot security updates open a pull request when an advisory is published. `.github/workflows/audit.yml` runs `npm audit --audit-level=high` on pushes to `main`, daily, and on manual dispatch, so a high or critical advisory fails a visible run even when no fix pull request exists. No update is merged automatically: review each pull request, keep the exact-version rule above, and apply the dependency validation scope above.
+Between validation runs, `.github/dependabot.yml` opens weekly pull requests for npm and GitHub Actions updates (minor and patch updates are grouped, major updates arrive one per pull request), and Dependabot security updates open a pull request when an advisory is published. `.github/workflows/audit.yml` runs `npm audit --audit-level=high` on pushes to `main`, every eight hours (00:00, 08:00 and 16:00 UTC), and on manual dispatch, so a high or critical advisory fails a visible run even when no fix pull request exists. No update is merged automatically: review each pull request, keep the exact-version rule above, and apply the dependency validation scope above.
 
 ## Formatting
 
