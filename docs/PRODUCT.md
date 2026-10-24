@@ -239,6 +239,8 @@ A thin toolbar at the top of the application displays the current location.
 
 At the root level, the toolbar displays only an outline-root glyph representing the implicit document container. The document container itself has no visible text label.
 
+Tree and Agenda use the same toolbar insets and vertically centered 18px location icons. The root glyph has a `Top level` tooltip; the calendar glyph has an `Agenda` tooltip and accessible name. Text path segments use the same `›` separator in both views.
+
 Below the root level, the toolbar displays a breadcrumb beginning with the outline-root glyph and continuing through every ancestor to the current parent. The current parent is the final breadcrumb segment.
 
 The location path represents the current parent/location, not the selected child. The outline-root glyph and each ancestor segment are clickable navigation controls. Clicking the outline-root glyph returns to the top-level root nodes. Clicking an ancestor segment displays that ancestor's immediate children.
@@ -1798,7 +1800,7 @@ Performance guards must exercise representative sequences in the running applica
 
 This deliberately assigns Apple's standard Print shortcut to Agenda, as approved by the Product Owner: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no menu item or global shortcut.
 
-The location toolbar reads `Agenda`, with no outline-root control. Agenda selection and scrolling do not change the persisted Tree view or create files; restarting opens Tree. Agenda uses the same document, without copying nodes.
+The location toolbar displays a calendar glyph, with no visible `Agenda` text or outline-root control. The glyph is a noninteractive location indicator. Agenda selection and scrolling do not change the persisted Tree view or create files; restarting opens Tree. Agenda uses the same document, without copying nodes.
 
 ### 23.2 Projection and Dates in Text
 
@@ -1969,7 +1971,7 @@ Whole-node Visual `d` marks exactly the selected occurrences for the pending mov
 
 ### 23.15 Focused Days
 
-`Cmd+.` on a day container opens that day's hierarchy. In Vim Normal, `gd` does the same. The location path reads `Agenda / Oct 14`; a non-editable heading such as `Wed Oct 14` occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports the existing day-container creation and folding commands, including `O` to create on the preceding day.
+`Cmd+.` on a day container opens that day's hierarchy. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Oct 14`; a non-editable heading such as `Wed Oct 14` occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports the existing day-container creation and folding commands, including `O` to create on the preceding day.
 
 `Cmd+,` returns to the timeline; Vim Normal also supports `Ctrl+o`. Returning restores the timeline's selection, scroll position, folds, and revealed days instead of selecting Today. If edits removed the saved row, selection falls back to the nearest visible day, choosing the earlier day on a tie. Focused folds are independent of that saved timeline state. Presentation changes cancel pending moves and obsolete whole-node selections. `Cmd+.` or `gd` on a real node still opens Tree at that node.
 

@@ -15,8 +15,9 @@ export function LocationBar({
     <header className="location-bar" aria-label="Current location">
       <button
         aria-label="Top level"
+        title="Top level"
         data-breadcrumb-id=""
-        className={`location-root${dropParentId === null ? ' location-drop-target' : ''}`}
+        className={`location-root location-icon${dropParentId === null ? ' location-drop-target' : ''}`}
         onClick={() => onNavigate(null)}
         type="button"
       >

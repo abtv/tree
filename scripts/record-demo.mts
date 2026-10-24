@@ -26,7 +26,7 @@ async function demonstrate(page: import('@playwright/test').Page) {
   await expect(page.getByRole('textbox', { name: 'Node 1', exact: true })).toBeFocused()
   await pause()
   await command('Meta+p')
-  await expect(page.locator('.agenda-location-bar')).toContainText('Agenda')
+  await expect(page.locator('.agenda-location-bar').getByRole('img', { name: 'Agenda' })).toBeVisible()
   await expect(page.locator('.agenda-row').filter({ hasText: 'Review the project proposal' })).toBeVisible()
   await expect(page.locator('.agenda-row').filter({ hasText: 'Ask the library about its meeting room' })).toBeVisible()
   await pause(1400)

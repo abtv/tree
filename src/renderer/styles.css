@@ -245,7 +245,7 @@ textarea {
   white-space: nowrap;
 }
 
-.location-root {
+.location-icon {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -256,16 +256,22 @@ textarea {
   border: 0;
   background: transparent;
   color: inherit;
+}
+
+.location-root {
   cursor: pointer;
 }
 
-.location-root svg {
+.location-icon svg {
   width: 18px;
   height: 18px;
-  fill: currentColor;
   stroke: currentColor;
   stroke-linejoin: round;
   stroke-width: 1.4;
+}
+
+.location-root svg {
+  fill: currentColor;
 }
 
 .location-segment {
@@ -573,10 +579,6 @@ body:not(.node-drag-active) .location-link:hover {
   border: 1.5px solid var(--color-gutter-mark);
   background: transparent;
 }
-.agenda-location-bar {
-  padding-left: 42px;
-}
-
 .node-row-image-only {
   min-height: 1px;
 }
