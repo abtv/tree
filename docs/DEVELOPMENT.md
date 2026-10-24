@@ -155,6 +155,8 @@ npm run lint
 
 New code must follow the project's linting rules.
 
+ESLint rejects `.mjs` modules outside the five explicit tool-configuration and release-compatibility exceptions in `eslint.config.mjs`. This applies to new files as well as tracked files in the linted source tree; generated output, dependencies and `.scratch/` retain their normal exclusions. Use `.mts` for temporary scripts too, as required by §6. A necessary new exception must have a documented reason and an explicit allowlist entry. `scripts/check-script-extensions.test.mts` checks both rejection and permitted paths. The lint step of `npm run check` enforces this rule locally and in CI.
+
 ESLint rejects static imports and re-exports of React, React DOM, Electron, and Node.js built-ins in `src/application/`, including nested modules and tests. Application services receive platform capabilities through interfaces instead.
 
 Do not disable lint rules locally merely to make a task pass unless there is a documented reason.

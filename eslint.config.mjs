@@ -38,6 +38,28 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ['**/*.mjs'],
+    ignores: [
+      // These tool configurations retain their existing JavaScript loaders/discovery.
+      'eslint.config.mjs',
+      'stryker.config.mjs',
+      // Installed release workflows still call these compatibility entry points.
+      'scripts/web-release/cli.mjs',
+      'scripts/web-release/publish.mjs',
+      'scripts/web-release/verify-target.mjs',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program',
+          message:
+            'Use .mts instead of .mjs. A necessary tool or compatibility exception must be documented and explicitly listed in eslint.config.mjs.',
+        },
+      ],
+    },
+  },
+  {
     files: [
       'electron.vite.config.ts',
       'eslint.config.mjs',
