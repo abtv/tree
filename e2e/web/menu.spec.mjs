@@ -83,7 +83,7 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   await page.waitForFunction(() => !!window.prototypeStore.getSnapshot().agenda)
   await open()
   await page.keyboard.press('Escape')
-  await expect(page.locator('#tree-menu-button')).toBeFocused()
+  await expect(page.locator('.agenda-row[tabindex="0"]')).toBeFocused()
   await choose('Tree')
   await choose('Vim Editing')
   await page.waitForFunction(() => document.getElementById('prototype-vim').getAttribute('aria-pressed') === 'false')

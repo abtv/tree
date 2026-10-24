@@ -40,6 +40,34 @@ async function run(page: Page, query: string): Promise<void> {
 
 test.describe('Normal command panel', () => {
   test.use({ editingMode: 'vim' })
+  // @requirement PRODUCT.md §1.4
+  test('a host menu can borrow focus without finishing a Replace session', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'one', text: 'alpha beta', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = node(window, 1)
+    await editor.focus()
+    await setCursor(editor, 2)
+    await window.keyboard.press('R')
+    await window.keyboard.type('X')
+    await window.evaluate(() => {
+      const button = document.createElement('button')
+      button.textContent = 'Synthetic host menu'
+      button.setAttribute('data-editor-focus-borrow', '')
+      button.style.cssText = 'position:fixed;right:16px;top:70px;z-index:100'
+      document.body.append(button)
+    })
+    await window.getByRole('button', { name: 'Synthetic host menu' }).click()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await editor.focus()
+    await window.keyboard.type('Y')
+    await window.keyboard.press('Escape')
+    await expect(editor).toHaveValue('alXYa beta')
+    await window.evaluate(() => document.querySelector('[data-editor-focus-borrow]')!.remove())
+    await window.screenshot({ path: '.scratch/browser-menu-focus/returned-replace.png' })
+  })
   // @requirement PRODUCT.md §20.2.28
   test('filters, wraps selection, cancels pending commands and restores native text focus and caret', async ({
     userDataDir,

@@ -74,8 +74,12 @@ export function createPointerHandlers(
   } = deps
   return {
     onBlur: (event?: FocusEvent<HTMLElement>) => {
-      // The command panel temporarily borrows focus without ending the editor's mode/session.
-      if (event?.relatedTarget instanceof Element && event.relatedTarget.closest('.command-input-line')) return
+      // Temporary command surfaces borrow focus without ending the editor's mode/session.
+      if (
+        event?.relatedTarget instanceof Element &&
+        event.relatedTarget.closest('.command-input-line, [data-editor-focus-borrow]')
+      )
+        return
       const input = getInput(node.id)
       setSelectAllNodeId(undefined)
       // A blur moves focus to a non-input control (a breadcrumb or enter-control click) or to

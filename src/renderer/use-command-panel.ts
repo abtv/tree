@@ -83,6 +83,18 @@ export function useCommandPanel(options: {
     restore.current()
   }, [])
 
+  const showAgenda = useCallback(async () => {
+    if (view === 'agenda') return
+    beforeViewChange()
+    const active = document.activeElement
+    store.openAgenda(active instanceof HTMLElement && active.matches('.node-input') ? getCaret(active) : undefined)
+  }, [view, beforeViewChange, store])
+  const showTree = useCallback(async () => {
+    if (view === 'tree') return
+    beforeViewChange()
+    store.closeAgenda()
+  }, [view, beforeViewChange, store])
+
   const run = useCallback(
     async (command: ApplicationCommand | undefined) => {
       if (running.current) return
@@ -103,19 +115,8 @@ export function useCommandPanel(options: {
           {
             quit: () => window.treeApi.quit(),
             setVimEnabled: applyVimEnabled,
-            showAgenda: async () => {
-              if (view === 'agenda') return
-              beforeViewChange()
-              const active = document.activeElement
-              store.openAgenda(
-                active instanceof HTMLElement && active.matches('.node-input') ? getCaret(active) : undefined,
-              )
-            },
-            showTree: async () => {
-              if (view === 'tree') return
-              beforeViewChange()
-              store.closeAgenda()
-            },
+            showAgenda,
+            showTree,
             setAlwaysOnTop: async (value) => {
               await window.treeApi.setAlwaysOnTop(value)
               setAlwaysOnTop(value)
@@ -149,7 +150,8 @@ export function useCommandPanel(options: {
       applyVimEnabled,
       vimEnabled,
       view,
-      beforeViewChange,
+      showAgenda,
+      showTree,
       menuCommands,
       menuEntries,
     ],
@@ -294,6 +296,8 @@ export function useCommandPanel(options: {
   }, [open, close])
 
   return {
+    showAgenda,
+    showTree,
     open,
     input,
     selected,

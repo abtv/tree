@@ -35,6 +35,8 @@ async function rememberFolder(folder: FileSystemDirectoryHandle | undefined): Pr
 }
 
 export interface BackupActions {
+  closeMenu(): void
+  restoreFocus(): void
   available(): boolean
   flush(): Promise<void>
   restore(folder: FileSystemDirectoryHandle): Promise<void>
@@ -184,7 +186,10 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
     }
   }
   const closeDialog = () => {
-    if (dialog.open) dialog.close()
+    if (!dialog.open) return
+    const focused = dialog.contains(document.activeElement)
+    dialog.close()
+    if (focused) actions.restoreFocus()
   }
   const showDialog = (next?: FileSystemDirectoryHandle) => {
     const occupied = next !== undefined
@@ -248,7 +253,7 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
   menu.addEventListener('beforetoggle', refresh)
   button.onclick = () => {
     if (busy || !actions.available()) return
-    menu.hidePopover()
+    actions.closeMenu()
     if (folder && paused) {
       showDialog()
       return

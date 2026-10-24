@@ -11,6 +11,7 @@ import {
 import type { DataSession } from './services'
 import type { ArchiveWorkerMessage, ArchiveWorkerRequest } from './workers/archive-protocol'
 import { installFolderBackup, supportsFolderBackup } from './backup/backup-controller'
+import type { MenuFocus } from './menu-focus'
 
 // Keep the object URL until the browser has taken the download.
 const DOWNLOAD_URL_LIFETIME_MILLISECONDS = 60_000
@@ -23,7 +24,7 @@ interface ActivityPanel {
   hide(): void
 }
 
-function activityPanel(): ActivityPanel {
+function activityPanel(restoreFocus: () => void): ActivityPanel {
   const panel = document.getElementById('data-activity')!
   const text = document.getElementById('data-activity-text')!
   const button = document.getElementById('data-activity-action') as HTMLButtonElement
@@ -35,9 +36,11 @@ function activityPanel(): ActivityPanel {
       panel.hidden = false
     },
     hide() {
+      const focused = panel.contains(document.activeElement)
       panel.hidden = true
       text.textContent = ''
       button.onclick = null
+      if (focused) restoreFocus()
     },
   }
 }
@@ -137,7 +140,7 @@ interface ImportDialog {
  * Wires the Data block of the browser menu (PRODUCT §24.3–§24.6). One export, import or restore
  * runs at a time, and none is available in the locked save-failure state.
  */
-export function installDataMenu(store: EditorStore, menu: HTMLElement, session: DataSession): void {
+export function installDataMenu(store: EditorStore, menu: HTMLElement, session: DataSession, focus: MenuFocus): void {
   const exportButton = document.getElementById('data-export') as HTMLButtonElement
   const importButton = document.getElementById('data-import') as HTMLButtonElement
   const restoreButton = document.getElementById('data-restore') as HTMLButtonElement
@@ -147,7 +150,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
   const dialogReplace = document.getElementById('import-confirm-replace') as HTMLButtonElement
   const dialogCancel = document.getElementById('import-confirm-cancel') as HTMLButtonElement
   const dialogStatus = document.getElementById('import-confirm-status')!
-  const panel = activityPanel()
+  const panel = activityPanel(focus.restore)
   let running = false
   let hideTimer: ReturnType<typeof setTimeout> | undefined
   const locked = () => {
@@ -155,6 +158,8 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     return state.status === 'ready' && state.persistenceLocked === true
   }
   const refreshBackup = installFolderBackup(session, menu, {
+    closeMenu: focus.close,
+    restoreFocus: focus.restore,
     available: () => !running && !locked(),
     restore: (folder) => startImport(folder),
     flush: () => store.flushPersistence(),
@@ -176,7 +181,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
   restoreButton.hidden = !supportsFolderBackup()
 
   exportButton.onclick = () => {
-    menu.hidePopover()
+    focus.close()
     if (running || locked()) return
     setRunning(true)
     clearTimeout(hideTimer)
@@ -200,7 +205,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
   }
 
   importButton.onclick = () => {
-    menu.hidePopover()
+    focus.close()
     if (running || locked()) return
     fileInput.click()
   }
@@ -211,7 +216,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
   }
 
   restoreButton.onclick = () => {
-    menu.hidePopover()
+    focus.close()
     if (running || locked()) return
     // Read access is enough; the picker must open from this click's user activation.
     void (async () => window.showDirectoryPicker!({ mode: 'read', id: 'tree-backup' }))().then(
@@ -244,7 +249,10 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
       dialogCancel.focus()
     },
     close() {
-      if (dialog.open) dialog.close()
+      if (!dialog.open) return
+      const focused = dialog.contains(document.activeElement)
+      dialog.close()
+      if (focused) focus.restore()
     },
   }
 

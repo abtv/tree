@@ -66,6 +66,20 @@ While an image preview is open, the browser's ellipsis menu button is hidden.
 Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
+The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
+its trigger, or a setting action returns focus to the previous connected Tree or
+Agenda editor/row, keeping the caret, selection direction and editing mode/session.
+View changes and Vim toggles apply their own documented result.
+
+An action that opens a dialog or file picker returns editing focus before opening it; the dialog then
+owns focus, and cancellation/dismissal returns to the editor. A focused activity
+message also returns editing focus when dismissed. No extra Tab is required.
+
+Tab and Shift+Tab keep native menu navigation; leaving the menu or clicking another
+control keeps that explicit destination. Without a connected previous editor, native
+control focus remains. Opening/cancelling the menu creates no document edit or extra
+save; buffered edits follow the existing commit rules when focus moves on.
+
 On iPhones and iPads, the browser version always uses standard editing and hides
 the Vim menu option, command-panel entry and mode indicator, even with an external
 keyboard attached. Detection uses the iPhone/iPad browser identity, including

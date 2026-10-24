@@ -284,6 +284,8 @@ Registry entries declare required capabilities. The command-panel owner derives 
 
 The renderer command-panel owner captures the application shortcut before editor handlers. It saves and restores native selection while borrowing focus; the input bindings forward the blur destination so that this temporary handoff preserves editing sessions. Named view actions resolve sessions through the existing input owner before dispatching the store's idempotent Agenda open/close methods. They add no document mutation or separate view state.
 
+The browser's `menu-focus.ts` owns the ellipsis menu's temporary focus transfer. It remembers one connected editing surface and directional selection, restores it synchronously before menu actions open dialogs, and defers native-dismissal restoration until the browser finishes restoring its trigger. Explicit pointer/Tab destinations and action-owned view changes retain focus. Menu surfaces declare `data-editor-focus-borrow`, which shares the input owner's temporary-blur exemption with the command panel. Data dialogs and activity messages return through the same focus owner on dismissal. The shared renderer registers its existing view commands with the browser menu so both menu and panel finish buffered edits before changing Tree/Agenda, without adding a save. Registration is released on unmount; menu view controls remain disabled until the renderer supplies its handlers. This adds bounded session-only DOM state, no document-scale work or writes beyond the existing edit-commit behavior.
+
 The application layer coordinates user intentions with domain operations and infrastructure.
 
 It is responsible for use cases such as:

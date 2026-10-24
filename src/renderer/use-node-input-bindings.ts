@@ -693,7 +693,12 @@ export function useNodeInputBindings({
       const row = target?.closest<HTMLElement>('.agenda-row')
       // A read-only row has no input blur handler. Leaving its row surface must still end
       // Replace, just as blur to an outside control does when an editor owns focus.
-      if (caretProjection.current.mode === 'replace' && document.activeElement?.matches('.agenda-row') && !row) {
+      if (
+        caretProjection.current.mode === 'replace' &&
+        document.activeElement?.matches('.agenda-row') &&
+        !row &&
+        !target?.closest('[data-editor-focus-borrow]')
+      ) {
         takeReplaceClick(vimSession.current)
         changeVimMode('normal')
       }

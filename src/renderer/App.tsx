@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import type { CommandServices } from '../application/command-registry'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../application/expansion-state'
@@ -38,6 +39,7 @@ import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 
 interface AppProps {
+  registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
   menuCommands?: import('../application/menu-commands').MenuCommandSource
   store: EditorStore
   /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
@@ -67,6 +69,7 @@ export function App({
   attachmentImages = attachmentImageCache,
   dataOperations,
   menuCommands,
+  registerViewCommands,
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
@@ -171,6 +174,19 @@ export function App({
     },
     [setVimEditing, store],
   )
+  const beforeViewChange = useCallback(() => {
+    const mode = vimTextCommandState.mode
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active.matches('.node-input')) {
+      vimTextCommandState.finishInsert?.(active)
+      if (mode === 'replace') vimTextCommandState.finishReplace?.(active, false)
+    }
+    clearCommandAssembly(vimTextCommandState.commandState)
+    if (mode === 'replace' || mode === 'visual-node') {
+      setNodeVisualSelection(undefined)
+      vimTextCommandState.setMode('normal')
+    }
+  }, [vimTextCommandState, setNodeVisualSelection])
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     menuCommands: menuCommands ?? dataOperations?.menuCommands,
     vimAvailable,
@@ -190,20 +206,13 @@ export function App({
         restoreSearchFocus()
       }
     },
-    beforeViewChange: () => {
-      const active = document.activeElement
-      if (active instanceof HTMLElement && active.matches('.node-input')) {
-        vimTextCommandState.finishInsert?.(active)
-        if (vimMode === 'replace') vimTextCommandState.finishReplace?.(active, false)
-      }
-      clearCommandAssembly(vimTextCommandState.commandState)
-      if (vimMode === 'replace' || vimMode === 'visual-node') {
-        setNodeVisualSelection(undefined)
-        vimTextCommandState.setMode('normal')
-      }
-    },
+    beforeViewChange,
   })
   // `p` and `Esc` of a pending Agenda move are Vim commands, so standard editing cannot keep one.
+  useLayoutEffect(
+    () => registerViewCommands?.({ showAgenda: commandPanel.showAgenda, showTree: commandPanel.showTree }),
+    [registerViewCommands, commandPanel.showAgenda, commandPanel.showTree],
+  )
   useEffect(() => {
     if (!vimEnabled) store.cancelAgendaMove()
   }, [vimEnabled, store])
