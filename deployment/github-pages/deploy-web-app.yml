@@ -1,4 +1,4 @@
-name: Publish Tree
+name: Deploy web app
 
 on:
   push:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Authenticate package
+    name: Verify web package authenticity
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -91,7 +91,7 @@ jobs:
           path: candidate/site/
 
   deploy:
-    name: Deploy authenticated package
+    name: Deploy web app to GitHub Pages
     needs: verify
     if: ${{ !inputs.rejection_probe }}
     runs-on: ubuntu-24.04
@@ -126,7 +126,7 @@ jobs:
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
 
   hosted:
-    name: Check hosted bytes
+    name: Verify deployed web files
     needs: [verify, deploy]
     runs-on: ubuntu-24.04
     timeout-minutes: 10

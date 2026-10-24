@@ -1,4 +1,4 @@
-name: CI and browser release
+name: Release web app
 
 on:
   push:
@@ -15,17 +15,17 @@ concurrency:
 jobs:
   check:
     needs: audit
-    name: Standard checks
-    uses: ./.github/workflows/ci.yml
+    name: Validate code
+    uses: ./.github/workflows/check-code-test-and-build.yml
   audit:
-    name: Dependency audit
-    uses: ./.github/workflows/audit.yml
+    name: Audit release dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
   chrome:
     needs: audit
-    name: Browser integration
-    uses: ./.github/workflows/browser.yml
+    name: Run web E2E tests
+    uses: ./.github/workflows/run-web-e2e-tests.yml
   gate:
-    name: Release gate
+    name: Approve web release
     if: always()
     needs: [check, audit, chrome]
     runs-on: ubuntu-24.04
@@ -43,7 +43,7 @@ jobs:
         run: node scripts/web-release/cli.mts gate
 
   sign:
-    name: Sign authenticated package
+    name: Sign web package manifest
     needs: [gate]
     if: ${{ !cancelled() && needs.gate.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
@@ -90,7 +90,7 @@ jobs:
           retention-days: 14
 
   publish:
-    name: Transfer verified browser package
+    name: Transfer web package to hosting repository
     needs: [sign]
     if: ${{ !cancelled() && needs.sign.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04

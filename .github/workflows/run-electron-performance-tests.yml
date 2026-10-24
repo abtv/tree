@@ -1,4 +1,4 @@
-name: Performance
+name: Run Electron performance tests
 
 on:
   schedule:
@@ -15,12 +15,13 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit Electron performance dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: performance
   performance:
     needs: audit
-    name: Performance
+    name: Run Electron performance tests
     runs-on: macos-15
     timeout-minutes: 5
 
@@ -44,7 +45,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          previous=$(gh run list --workflow performance.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          previous=$(gh run list --workflow run-electron-performance-tests.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
           if [ -n "$previous" ]; then
             gh run download "$previous" --name performance-results --dir perf-baseline
           fi

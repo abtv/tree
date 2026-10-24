@@ -44,7 +44,10 @@ export async function transferPackage(
   if (
     existing.truncated ||
     !existing.tree?.some(
-      (entry) => entry.path === '.github/workflows/pages.yml' && entry.type === 'blob' && entry.mode === '100644',
+      (entry) =>
+        ['.github/workflows/deploy-web-app.yml', '.github/workflows/pages.yml'].includes(entry.path) &&
+        entry.type === 'blob' &&
+        entry.mode === '100644',
     )
   ) {
     throw new Error('Trusted target workflow is missing')

@@ -1,4 +1,4 @@
-name: CI
+name: Check code, test and build
 
 on:
   pull_request:
@@ -13,12 +13,13 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit code dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: ci
   check:
     needs: audit
-    name: Check
+    name: Check code, test and build
     runs-on: ubuntu-24.04
     timeout-minutes: 4
 

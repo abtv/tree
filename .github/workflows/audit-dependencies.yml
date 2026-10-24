@@ -1,4 +1,4 @@
-name: Dependency audit
+name: Audit dependencies
 
 on:
   schedule:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   audit:
-    name: npm audit
+    name: Audit npm dependencies
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 

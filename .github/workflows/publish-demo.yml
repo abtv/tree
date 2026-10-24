@@ -1,4 +1,4 @@
-name: Generate demo
+name: Publish demo
 
 on:
   push:
@@ -14,10 +14,12 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit demo dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: demo
   generate:
+    name: Generate video and screenshots
     needs: audit
     runs-on: macos-15
     timeout-minutes: 8
@@ -65,6 +67,7 @@ jobs:
           path: reports/site/
 
   publish:
+    name: Publish demo to GitHub Pages
     if: github.ref == 'refs/heads/main'
     needs: generate
     runs-on: ubuntu-24.04

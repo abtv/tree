@@ -1,4 +1,4 @@
-name: Mutation testing
+name: Run mutation testing
 
 on:
   schedule:
@@ -14,12 +14,13 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit mutation testing dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: mutation
   mutation:
     needs: audit
-    name: Mutation testing (${{ matrix.shard }})
+    name: Run mutation testing (${{ matrix.shard }})
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 

@@ -1,4 +1,4 @@
-name: Property soak
+name: Run property tests
 
 on:
   schedule:
@@ -14,12 +14,13 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit property test dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: property-soak
   soak:
     needs: audit
-    name: Property soak
+    name: Run property tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 

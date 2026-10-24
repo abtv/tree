@@ -2,18 +2,18 @@
 
 The source is `abtv/tree`; the application destination is
 <https://tree-editor.github.io>, owned by the separate
-`tree-editor/tree-editor.github.io` repository. `release.yml` runs on a source
+`tree-editor/tree-editor.github.io` repository. `release-web-app.yml` runs on a source
 push to main. PRs check code but cannot publish or receive publishing secrets.
 
 ## Release checks
 
 The release workflow calls standard validation, the high-severity dependency
-audit, and the Chrome static-package check on Linux for the same source commit.
+audit, and the Chromium production-build tests on Linux for the same source commit.
 Failed, missing, skipped or canceled checks block publication.
 macOS workflows run weekly or manually: all six Electron E2E shards and their
 aggregate, memory measurements, performance checks and demo capture. They do not
 run on pull requests or source pushes and do not gate browser publication.
-Property soak and mutation runs also remain separate.
+Property tests and mutation testing also remain separate.
 Playwright's Chromium on Linux arm64 is the current browser gate; Google Chrome,
 Safari and full browser parity remain later work. The source demo workflow keeps
 publishing to its existing media site.
@@ -33,12 +33,25 @@ later transfer job receives the App key. Nothing rebuilds from a moving branch.
 ## One-time repository setup
 
 Configure GitHub through its UI. In the target repository, open Settings → Pages
-and select GitHub Actions before adding the workflow. Copy `pages.yml` from this
-directory to target `.github/workflows/pages.yml`. Copy `dependabot.yml` to target
+and select GitHub Actions before adding the workflow. Copy `deploy-web-app.yml` from this
+directory to target `.github/workflows/deploy-web-app.yml`. Copy `dependabot.yml` to target
 `.github/dependabot.yml`. The old four-file `.github/scripts/web-release/` copy
 from commit `1e5bd76` is obsolete; remove it in the same normal target commit.
 Do not amend or reset that earlier commit. Preserve README and application data.
 The workflow-only update does not publish a package.
+
+For an existing installation, replace `pages.yml` with `deploy-web-app.yml` in
+one target commit. Do not leave both files installed: both would deploy on the
+same package push. Source publication accepts either installed path during this
+migration; both obtain verifier tools from source main. The publisher cannot
+rename the protected target workflow itself.
+
+The source release now uses `release-web-app.yml` and the gate job
+`Approve web release`. Current package verification requires that exact source
+workflow and gate. Retention alone also accepts a valid signature from the former
+`release.yml`, with the same repository, main ref, source digest and hosted-runner
+constraints. This lets the first renamed release preserve authenticated assets
+without accepting the old signer for a new deployment.
 
 Release tools now use `.mts` and run directly on the pinned Node 24 runtime.
 The `cli.mjs`, `publish.mjs`, and `verify-target.mjs` entry points remain as small
@@ -119,8 +132,8 @@ a folder. Use one folder for one profile on one computer;
 sharing a writable backup through iCloud Drive can cause conflicting writers.
 
 After access setup, push the intended source commits to main. In source Actions,
-wait for **Browser release** and its **Release gate** and transfer job. In target
-Actions, wait for **Publish Tree**. Its read-only job independently authenticates
+wait for **Release web app** and its **Approve web release** and transfer job. In target
+Actions, wait for **Deploy web app**. Its read-only job independently authenticates
 the manifest with `gh attestation verify --bundle`, enforcing source repository,
 signer workflow, main ref, source digest and GitHub-hosted runner. It verifies every
 file, the source gate/run/attempt, and both current heads. A separate Pages/OIDC
@@ -201,7 +214,7 @@ trusted target workflow/scripts, copy and commit the reviewed files again. The
 setup commit itself does not publish a package; a later valid transfer does.
 
 Before calling activation secure, run a real signed source publication and hosted
-check. Then open target Actions → Publish Tree → Run workflow on main and enable
+check. Then open target Actions → Deploy web app → Run workflow on main and enable
 `rejection_probe`. This read-only run first authenticates the valid package, corrupts
 one file in its isolated checkout, confirms rejection, and restores the local copy.
 It uploads no deployable artifact and skips deployment, leaving the live site intact.

@@ -37,7 +37,7 @@ it('rejects an unknown shard rather than silently running a different scope', as
 })
 
 it('lets the scheduled workflow select the scope from the Stryker configuration', () => {
-  const workflow = readFileSync(new URL('../.github/workflows/mutation.yml', import.meta.url), 'utf8')
+  const workflow = readFileSync(new URL('../.github/workflows/run-mutation-testing.yml', import.meta.url), 'utf8')
   expect(workflow).toContain('shard: [domain, application, renderer]')
   expect(workflow).toContain('TREE_MUTATION_SHARD: ${{ matrix.shard }}')
   expect(workflow).not.toContain('--mutate')

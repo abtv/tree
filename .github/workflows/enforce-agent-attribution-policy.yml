@@ -1,4 +1,4 @@
-name: Attribution
+name: Enforce agent attribution policy
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   check:
-    name: Check
+    name: Enforce agent attribution policy
     runs-on: ubuntu-24.04
     timeout-minutes: 2
 

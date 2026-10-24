@@ -1,4 +1,4 @@
-name: Electron E2E
+name: Run Electron E2E tests
 
 on:
   schedule:
@@ -14,12 +14,13 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit Electron E2E dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: e2e
   shard:
     needs: audit
-    name: Electron E2E shard ${{ matrix.shard }}/6
+    name: Run Electron E2E tests (shard ${{ matrix.shard }}/6)
     runs-on: macos-15
     timeout-minutes: 12
     strategy:
@@ -60,7 +61,7 @@ jobs:
 
   # A single stable check name for every shard, so a required status check keeps working.
   e2e:
-    name: Electron E2E
+    name: Require all Electron E2E shards to pass
     if: always()
     needs: shard
     runs-on: ubuntu-24.04

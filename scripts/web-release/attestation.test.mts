@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { createManifest, verifyPackage } from './package.mts'
-import { verifyAttestation } from './attestation.mts'
+import { verifyAttestation, verifyRetainedAttestation } from './attestation.mts'
 import { preparePackage } from './prepare.mts'
 import { verifyTarget } from './verify-target.mts'
 
@@ -47,7 +47,7 @@ describe('independent manifest authentication', () => {
       '--repo',
       'abtv/tree',
       '--signer-workflow',
-      'abtv/tree/.github/workflows/release.yml',
+      'abtv/tree/.github/workflows/release-web-app.yml',
       '--source-ref',
       'refs/heads/main',
       '--source-digest',
@@ -61,6 +61,36 @@ describe('independent manifest authentication', () => {
         },
       }),
     ).rejects.toThrow('attestation verification failed')
+  })
+
+  it('accepts the historical signer only for retained assets and keeps all other trust constraints', async () => {
+    const f = await fixture()
+    const run = vi.fn<CommandRunner>((_command, args) => {
+      if (!args.includes('abtv/tree/.github/workflows/release.yml')) throw new Error('Signer mismatch')
+      return ''
+    })
+    await expect(verifyAttestation(f.manifestFile, f.bundleFile, { run })).rejects.toThrow('verification failed')
+    expect(run).toHaveBeenCalledOnce()
+    run.mockClear()
+    await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
+    expect(run).toHaveBeenCalledTimes(2)
+    const current = run.mock.calls[0]![1]
+    const historical = run.mock.calls[1]![1]
+    expect(historical).toEqual(current.map((arg) => arg.replace('release-web-app.yml', 'release.yml')))
+    run.mockImplementation(() => {
+      throw new Error('Invalid signature')
+    })
+    await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).rejects.toThrow(
+      'verification failed',
+    )
+  })
+
+  it('does not try the historical signer when the current signature verifies', async () => {
+    const f = await fixture()
+    const run = vi.fn<CommandRunner>()
+    await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
+    expect(run).toHaveBeenCalledOnce()
+    expect(run.mock.calls[0]![1]).toContain('abtv/tree/.github/workflows/release-web-app.yml')
   })
 
   it('rejects missing proof and symlink metadata before invoking the signature verifier', async () => {

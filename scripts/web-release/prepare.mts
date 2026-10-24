@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { api } from './github.mts'
-import { readMetadata, verifyAttestation, MAX_METADATA_BYTES } from './attestation.mts'
+import { readMetadata, verifyRetainedAttestation, MAX_METADATA_BYTES } from './attestation.mts'
 import { verifyPackage } from './package.mts'
 import { assetPaths, MAX_ASSET_GENERATIONS, MAX_FILE_BYTES, validateManifest } from './policy.mts'
 
@@ -28,7 +28,10 @@ function decodeBlob(blob: Blob, limit: number) {
 export async function preparePackage(
   directory: string,
   manifestFile: string,
-  { request = api, attest = verifyAttestation }: { request?: Request; attest?: typeof verifyAttestation } = {},
+  {
+    request = api,
+    attest = verifyRetainedAttestation,
+  }: { request?: Request; attest?: typeof verifyRetainedAttestation } = {},
 ): Promise<CurrentManifest> {
   const current = validateManifest(await readMetadata(manifestFile))
   if (current.schema !== 2 || current.assetGenerations.length !== 1) {

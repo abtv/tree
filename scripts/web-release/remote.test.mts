@@ -45,7 +45,7 @@ const goodRun: {
   conclusion: string | null
 } = {
   repository: { full_name: 'abtv/tree' },
-  path: '.github/workflows/release.yml',
+  path: '.github/workflows/release-web-app.yml',
   event: 'push',
   head_branch: 'main',
   head_sha: identity.sourceSha,
@@ -53,7 +53,7 @@ const goodRun: {
   status: 'in_progress',
   conclusion: null,
 }
-const goodGate = { name: 'Release gate', status: 'completed', conclusion: 'success' }
+const goodGate = { name: 'Approve web release', status: 'completed', conclusion: 'success' }
 function sourceRequest({
   run = goodRun,
   sha = identity.sourceSha,
@@ -126,6 +126,7 @@ describe('GitHub release trust', () => {
       { head_sha: 'b'.repeat(40) },
       { run_attempt: 3 },
       { path: '.github/workflows/evil.yml' },
+      { path: '.github/workflows/release.yml' },
       { conclusion: 'failure' },
       { status: 'completed', conclusion: null },
     ])
@@ -176,7 +177,11 @@ describe('atomic package transfer', () => {
     expect(unavailable).toHaveBeenCalledTimes(6)
     expect(waits).toHaveBeenCalledTimes(5)
   })
-  async function targetFixture({ conflict = false, workflow = true, source = sourceRequest() } = {}) {
+  async function targetFixture({
+    conflict = false,
+    workflow: workflowPath = '.github/workflows/deploy-web-app.yml',
+    source = sourceRequest(),
+  } = {}) {
     const f = await fixture()
     const request = vi.fn(async (path: string, options: ApiOptions = {}) => {
       if (path.startsWith('/repos/abtv/tree/')) return source(path, options)
@@ -186,7 +191,7 @@ describe('atomic package transfer', () => {
         return {
           truncated: false,
           tree: [
-            ...(workflow ? [{ path: '.github/workflows/pages.yml', mode: '100644', type: 'blob' }] : []),
+            ...(workflowPath ? [{ path: workflowPath, mode: '100644', type: 'blob' }] : []),
             { path: 'README.md' },
             { path: 'site/assets/old.js' },
           ],
@@ -208,6 +213,12 @@ describe('atomic package transfer', () => {
     })
     return { ...f, request }
   }
+  it('continues publication with the installed legacy hosting workflow during migration', async () => {
+    const { dir, manifest, request, ...auth } = await targetFixture({ workflow: '.github/workflows/pages.yml' })
+    await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).resolves.toBe(
+      'c'.repeat(40),
+    )
+  })
   it('preserves existing tree paths and appends one non-forced commit containing only allowlisted files', async () => {
     const { dir, manifest, request, ...auth } = await targetFixture()
     await transferPackage(dir, manifest, { ...auth, token: 'source', targetToken: 'target', request })
@@ -232,7 +243,7 @@ describe('atomic package transfer', () => {
     expect(request.mock.calls.at(-1)![1]!.body).toEqual({ sha: 'c'.repeat(40), force: false })
   })
   it('does not mutate target on rejected trust or missing setup and never retries a ref conflict', async () => {
-    for (const options of [{ workflow: false }, { source: sourceRequest({ sha: 'd'.repeat(40) }) }]) {
+    for (const options of [{ workflow: '' }, { source: sourceRequest({ sha: 'd'.repeat(40) }) }]) {
       const { dir, manifest, request, ...auth } = await targetFixture(options)
       await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).rejects.toThrow()
       expect(request.mock.calls.some(([, opts]) => ['POST', 'PATCH'].includes(opts?.method ?? ''))).toBe(false)

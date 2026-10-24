@@ -45,7 +45,7 @@ export async function verifySource(
   const run = (await request(`${root}/actions/runs/${manifest.sourceRunId}`, { token })) as WorkflowRun
   if (
     run.repository?.full_name !== 'abtv/tree' ||
-    run.path !== '.github/workflows/release.yml' ||
+    run.path !== '.github/workflows/release-web-app.yml' ||
     run.event !== 'push' ||
     run.head_branch !== 'main' ||
     run.head_sha !== manifest.sourceSha ||
@@ -69,7 +69,7 @@ export async function verifySource(
     if (jobs.length >= response.total_count) break
     if (response.jobs.length === 0 || page === 20) throw new Error('Incomplete source job list')
   }
-  const gates = jobs.filter((job) => job.name === 'Release gate')
+  const gates = jobs.filter((job) => job.name === 'Approve web release')
   if (gates.length !== 1 || gates[0]!.status !== 'completed' || gates[0]!.conclusion !== 'success') {
     throw new Error('Source release gate did not succeed')
   }

@@ -19,6 +19,29 @@ export async function verifyAttestation(
   bundleFile: string,
   { run = execFileSync }: { run?: CommandRunner } = {},
 ) {
+  return verifyWithSigner(manifestFile, bundleFile, 'release-web-app.yml', run)
+}
+
+// Only retention may authenticate historical packages signed before the rename.
+// Current transfer and deployment must use verifyAttestation's current identity.
+export async function verifyRetainedAttestation(
+  manifestFile: string,
+  bundleFile: string,
+  { run = execFileSync }: { run?: CommandRunner } = {},
+) {
+  try {
+    return await verifyAttestation(manifestFile, bundleFile, { run })
+  } catch {
+    return verifyWithSigner(manifestFile, bundleFile, 'release.yml', run)
+  }
+}
+
+async function verifyWithSigner(
+  manifestFile: string,
+  bundleFile: string,
+  workflow: 'release-web-app.yml' | 'release.yml',
+  run: CommandRunner,
+) {
   const manifest = validateManifest(await readMetadata(manifestFile))
   await readMetadata(bundleFile)
   // gh verifies Sigstore trust, the subject's exact bytes and certificate claims.
@@ -32,7 +55,7 @@ export async function verifyAttestation(
     '--repo',
     'abtv/tree',
     '--signer-workflow',
-    'abtv/tree/.github/workflows/release.yml',
+    `abtv/tree/.github/workflows/${workflow}`,
     '--source-ref',
     'refs/heads/main',
     '--source-digest',

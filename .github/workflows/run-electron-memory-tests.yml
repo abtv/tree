@@ -1,4 +1,4 @@
-name: Electron E2E memory
+name: Run Electron memory tests
 
 on:
   schedule:
@@ -14,12 +14,13 @@ concurrency:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit Electron memory dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: e2e-memory
   memory:
     needs: audit
-    name: Electron E2E memory
+    name: Run Electron memory tests
     runs-on: macos-15
     timeout-minutes: 20
     steps:

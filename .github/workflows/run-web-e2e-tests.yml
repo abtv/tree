@@ -1,4 +1,4 @@
-name: Browser Chrome
+name: Run web E2E tests
 
 on:
   pull_request:
@@ -9,12 +9,13 @@ permissions:
 
 jobs:
   audit:
-    uses: ./.github/workflows/audit.yml
+    name: Audit web dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: browser
   chrome:
     needs: audit
-    name: Chrome static package
+    name: Test production build (Chromium)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
@@ -31,7 +32,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify generated files in isolated Chromium
         run: npm run test:web:built
-      - name: Preserve Chrome test reports
+      - name: Preserve Chromium test reports
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
