@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
+import { happyPath } from '../../e2e/smoke/scenario.mts'
 
 export function validateArguments(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return 'help'
@@ -44,7 +45,7 @@ async function stopDriver(child: ChildProcess) {
   throw new Error('The owned SafariDriver process did not exit')
 }
 
-async function run() {
+export async function runSafari(smoke = false) {
   assert.equal(process.platform, 'darwin', 'Safari checks require macOS')
   const server = createStaticServer()
   const reservation = createServer()
@@ -52,7 +53,8 @@ async function run() {
   const interrupt = () => controller.abort(new Error('Safari checks interrupted'))
   process.on('SIGINT', interrupt)
   process.on('SIGTERM', interrupt)
-  const timeout = setTimeout(() => controller.abort(new Error('Safari checks exceeded two minutes')), 120_000)
+  const budget = smoke ? 20_000 : 120_000
+  const timeout = setTimeout(() => controller.abort(new Error(`Safari checks exceeded ${budget}ms`)), budget)
   let driver: ChildProcess | undefined
   let session: string | undefined
   let driverError: Error | undefined
@@ -118,6 +120,43 @@ async function run() {
     }).then((result) => assert.equal(result, true))
     await request(`/session/${session}/refresh`, {})
     await waitFor(ready)
+    if (smoke) {
+      async function elementId(selector: string) {
+        const element = await request(`/session/${session}/element`, { using: 'css selector', value: selector })
+        const id = element['element-6066-11e4-a52e-4f735466cecf']
+        assert(id, `Missing smoke editor: ${selector}`)
+        return id
+      }
+      await happyPath({
+        waitFor: async (script) => {
+          while (!controller.signal.aborted) {
+            const result = await request(`/session/${session}/execute/async`, {
+              script: `const done = arguments[arguments.length - 1];
+                (async () => { ${script} })().then(value => done({value}), error => done({error: String(error)}));`,
+              args: [],
+            })
+            assert(!result.error, result.error)
+            if (result.value) return
+            await delay(50, undefined, { signal: controller.signal })
+          }
+          controller.signal.throwIfAborted()
+        },
+        fill: async (selector, text) => {
+          const id = await elementId(selector)
+          await request(`/session/${session}/element/${id}/clear`, {})
+          await request(`/session/${session}/element/${id}/value`, { text })
+        },
+        press: async (selector, key) => {
+          const id = await elementId(selector)
+          await request(`/session/${session}/element/${id}/value`, { text: key === 'Enter' ? '\uE007' : '\uE004' })
+        },
+        reload: async () => {
+          await request(`/session/${session}/refresh`, {})
+        },
+      })
+      console.log(`Safari ${created.capabilities.browserVersion}: happy path passed`)
+      return
+    }
     const selector = '.node-row[data-node-id="welcome"] .node-input'
     const element = await request(`/session/${session}/element`, { using: 'css selector', value: selector })
     const id = element['element-6066-11e4-a52e-4f735466cecf']
@@ -182,6 +221,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log('npm run test:safari: isolated real-Safari typing, synthetic URL paste and reload checks')
     console.log('Requires macOS and Safari Remote Automation enabled by the owner. No arguments are accepted.')
   } else {
-    await run()
+    await runSafari()
   }
 }

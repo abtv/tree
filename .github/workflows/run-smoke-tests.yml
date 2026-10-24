@@ -1,0 +1,65 @@
+name: Run smoke tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit smoke dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
+    with:
+      caller: smoke
+  smoke:
+    needs: audit
+    name: Test happy paths (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+      - name: Enable Safari automation on the disposable runner
+        if: runner.os == 'macOS'
+        run: sudo safaridriver --enable
+      - name: Build Electron application
+        run: npm run build
+      - name: Build browser application
+        id: web-build
+        run: npm run build:web
+      - name: Check Linux Electron happy path
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:smoke:electron
+      - name: Check macOS Electron happy path
+        if: runner.os == 'macOS'
+        run: npm run test:smoke:electron
+      - name: Check Linux Chromium happy path
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.web-build.outcome == 'success' }}
+        run: npm run test:smoke:chromium
+      - name: Check macOS Safari happy path
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.web-build.outcome == 'success' }}
+        run: npm run test:smoke:safari
