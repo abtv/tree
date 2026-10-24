@@ -1,12 +1,41 @@
 /* global window, document, requestAnimationFrame, indexedDB */
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { _electron } from '@playwright/test'
+import { _electron, type ElectronApplication, type Page } from '@playwright/test'
+import type { EditorStore } from '../../src/application/editor-store.ts'
+import type { TreeApi } from '../../src/shared/ipc.ts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
+
+type Scenario = 'typing' | 'agenda' | 'saving'
+type Browser = 'safari' | 'electron'
+type Sample = { ms: number }
+type Saves = { started: number; completed: number }
+type Summary = { samples: number; medianMs: number; p95Ms: number; maxMs: number }
+type Metrics =
+  | Summary
+  | { scroll: Summary; mountedRows: number; open: Summary; motion: Summary }
+  | (Summary & { nextKeyPaintMs: number; artificialSaveDelayMs: number; savesCompleted?: number })
+type Result = {
+  browser: Browser
+  scenario: Scenario
+  repetition: number
+  userAgent: string
+  viewport: { width: number; height: number; scale: number }
+  metrics: Metrics
+}
+declare global {
+  interface Window {
+    prototypeStore: EditorStore
+    treeApi: TreeApi
+    perfProbe: { input: Sample[]; open: Sample[]; motion: Sample[]; saveState: Saves }
+  }
+  // The isolated Electron entry owns this measurement probe.
+  var __localSaves: Saves
+}
 
 // Local measurements only: no CI thresholds and no changes to the ordinary perf suite.
 const output = resolve('.scratch/safari-perf')
@@ -14,20 +43,22 @@ await mkdir(output, { recursive: true })
 await mkdir(resolve('test-results'), { recursive: true })
 const resultsPath = resolve('test-results/safari-perf-results.json')
 await writeFile(resultsPath, '[]')
-const results = []
+const results: Result[] = []
 const repetitions = Number(process.argv.find((arg) => arg.startsWith('--repetitions='))?.split('=')[1] ?? 3)
 assert(Number.isInteger(repetitions) && repetitions > 0 && repetitions <= 10, 'Use --repetitions=1..10')
 const server = createStaticServer()
-await new Promise((done) => server.listen(0, '127.0.0.1', done))
-const origin = `http://127.0.0.1:${server.address().port}`
-let driver
-let session
-let app
-let page
-let browser
-let profile
+await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+const address = server.address()
+assert(address && typeof address !== 'string')
+const origin = `http://127.0.0.1:${address.port}`
+let driver: ChildProcess | undefined
+let session: string | undefined
+let app: ElectronApplication | undefined
+let page: Page
+let browser: Browser
+let profile: string
 
-async function webdriver(path, body, method = 'POST') {
+async function webdriver(path: string, body?: unknown, method = 'POST') {
   const response = await fetch(`http://127.0.0.1:7056${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -39,8 +70,11 @@ async function webdriver(path, body, method = 'POST') {
   return value
 }
 
-async function evaluate(fn, arg = null) {
-  if (browser === 'electron') return page.evaluate(fn, arg)
+async function evaluate<Result, Arg = null>(
+  fn: (arg: Arg) => Result | Promise<Result>,
+  arg: Arg = null as Arg,
+): Promise<Result> {
+  if (browser === 'electron') return page.evaluate(fn as Parameters<typeof page.evaluate<Result, Arg>>[0], arg)
   const result = await webdriver(`/session/${session}/execute/async`, {
     script: `const done = arguments[arguments.length - 1];
       Promise.resolve().then(() => (${fn.toString()})(arguments[0]))
@@ -52,7 +86,7 @@ async function evaluate(fn, arg = null) {
   return result.value
 }
 
-async function waitFor(fn, arg = null) {
+async function waitFor<Arg = null>(fn: (arg: Arg) => unknown, arg: Arg = null as Arg) {
   const deadline = Date.now() + 20_000
   do {
     if (await evaluate(fn, arg)) return
@@ -61,7 +95,7 @@ async function waitFor(fn, arg = null) {
   throw new Error(`Timed out: ${fn.toString()}`)
 }
 
-async function key(text) {
+async function key(text: string) {
   if (browser === 'electron') await page.keyboard.type(text)
   else {
     await webdriver(`/session/${session}/actions`, {
@@ -79,12 +113,12 @@ async function key(text) {
   }
 }
 
-async function waitForExit(child, milliseconds) {
+async function waitForExit(child: ChildProcess, milliseconds: number) {
   if (child.exitCode !== null || child.signalCode !== null) return
   try {
     await once(child, 'exit', { signal: AbortSignal.timeout(milliseconds) })
   } catch (error) {
-    if (error.name !== 'AbortError') throw error
+    if (!(error instanceof Error) || error.name !== 'AbortError') throw error
   }
 }
 
@@ -108,7 +142,7 @@ async function close() {
   }
 }
 
-function seed(kind) {
+function seed(kind: Scenario) {
   const today = new Date()
   const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const count = kind === 'agenda' ? 3000 : 10000
@@ -131,7 +165,7 @@ function seed(kind) {
   }
 }
 
-async function launch(state, insert) {
+async function launch(state: ReturnType<typeof seed>, insert: boolean) {
   if (browser === 'safari') {
     const value = await webdriver('/session', { capabilities: { alwaysMatch: { browserName: 'safari' } } })
     session = value.sessionId
@@ -147,15 +181,15 @@ async function launch(state, insert) {
     await webdriver(`/session/${session}/window/rect`, { width: 1000 + frame.width, height: 700 + frame.height })
     await evaluate(async (state) => {
       const request = indexedDB.open('tree-browser-prototype', 1)
-      const db = await new Promise((done, fail) => {
+      const db = await new Promise<IDBDatabase>((done, fail) => {
         request.onsuccess = () => done(request.result)
         request.onerror = () => fail(request.error)
       })
-      await new Promise((done, fail) => {
+      await new Promise<void>((done, fail) => {
         const tx = db.transaction(['document', 'preferences'], 'readwrite')
         tx.objectStore('document').put(state, 'head')
         tx.objectStore('preferences').put(true, 'vim')
-        tx.oncomplete = done
+        tx.oncomplete = () => done()
         tx.onabort = () => fail(tx.error)
       })
       db.close()
@@ -171,7 +205,7 @@ async function launch(state, insert) {
       env: { ...process.env, TREE_E2E_HIDDEN: '0' },
     })
     page = await app.firstWindow()
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1000, 700))
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setContentSize(1000, 700))
   }
   await waitFor(() => !!document.querySelector('[aria-label="Node 1"]'))
   await evaluate(async () => {
@@ -179,7 +213,7 @@ async function launch(state, insert) {
     if (document.visibilityState !== 'visible') throw new Error('The measured window must be visible')
   })
   await evaluate(() => {
-    const input = document.querySelector('[aria-label="Node 1"]')
+    const input = document.querySelector<HTMLElement>('[aria-label="Node 1"]')!
     input.focus()
     if (document.activeElement !== input) throw new Error('Target editor is not focused')
   })
@@ -191,7 +225,7 @@ async function launch(state, insert) {
 
 async function probe() {
   return evaluate(() => {
-    window.perfProbe = { input: [], open: [], motion: [] }
+    window.perfProbe = { input: [], open: [], motion: [], saveState: { started: 0, completed: 0 } }
     document.addEventListener(
       'keydown',
       (event) => {
@@ -224,24 +258,25 @@ async function probe() {
   })
 }
 
-function summarize(samples) {
+function summarize(samples: Sample[]) {
   assert(samples.length > 0, 'No measured input events')
   const sorted = samples.map((sample) => sample.ms).sort((a, b) => a - b)
-  const at = (fraction) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))].toFixed(2)
+  const at = (fraction: number) =>
+    +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]!.toFixed(2)
   return { samples: sorted.length, medianMs: at(0.5), p95Ms: at(0.95), maxMs: at(1) }
 }
 
-async function typeMeasured(text) {
+async function typeMeasured(text: string) {
   for (const character of text) {
     await key(character)
     await delay(35)
   }
   await evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(null)))))
-  const input = await evaluate(() => document.querySelector('[aria-label="Node 1"]').value)
+  const input = await evaluate(() => document.querySelector<HTMLTextAreaElement>('[aria-label="Node 1"]')!.value)
   assert(input.includes(text), `Typed text did not reach the target editor: ${JSON.stringify(input)}`)
   assert.equal(
     await evaluate(() => {
-      const parent = document.querySelector('[aria-label="Current parent"]')
+      const parent = document.querySelector<HTMLTextAreaElement>('[aria-label="Current parent"]')!
       return parent.value ?? parent.textContent
     }),
     'Synthetic performance document',
@@ -251,14 +286,14 @@ async function typeMeasured(text) {
 
 async function saveState() {
   return browser === 'electron'
-    ? app.evaluate(() => globalThis.__localSaves)
+    ? app!.evaluate(() => globalThis.__localSaves)
     : evaluate(() => window.perfProbe.saveState)
 }
 
-async function run(kind) {
+async function run(kind: Scenario) {
   await launch(seed(kind), kind !== 'agenda')
   const viewport = await probe()
-  let metrics
+  let metrics: Metrics
   if (kind === 'typing') {
     metrics = await typeMeasured('abcdefghijklmnopqrstuvwxyz'.repeat(2))
   } else if (kind === 'agenda') {
@@ -293,10 +328,10 @@ async function run(kind) {
       document.querySelector('.agenda-row[aria-selected="true"]')?.getAttribute('data-agenda-key'),
     )
     assert(before && after && before !== after, 'Agenda navigation did not change selected node')
-    metrics = await evaluate(async () => {
+    const agenda = await evaluate(async () => {
       const frame = () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
       await frame()
-      const viewport = document.querySelector('.scroll-viewport')
+      const viewport = document.querySelector<HTMLElement>('.scroll-viewport')!
       const samples = []
       for (let index = 0; index < 20; index++) {
         const start = performance.now()
@@ -310,11 +345,11 @@ async function run(kind) {
         maxScroll: viewport.scrollHeight - viewport.clientHeight,
       }
     })
-    assert(metrics.maxScroll > 0, 'Agenda did not scroll')
-    assert(metrics.mountedRows < 100, 'Agenda rows are not windowed')
+    assert(agenda.maxScroll > 0, 'Agenda did not scroll')
+    assert(agenda.mountedRows < 100, 'Agenda rows are not windowed')
     metrics = {
-      scroll: summarize(metrics.scroll),
-      mountedRows: metrics.mountedRows,
+      scroll: summarize(agenda.scroll),
+      mountedRows: agenda.mountedRows,
       open: summarize(await evaluate(() => window.perfProbe.open)),
       motion: summarize(await evaluate(() => window.perfProbe.motion)),
     }
@@ -322,7 +357,7 @@ async function run(kind) {
     // Hold the save promise open in both adapters, as in perf/electron/save-responsiveness.spec.ts.
     // The real file/IndexedDB write still runs; this is a slow-save responsiveness proxy.
     if (browser === 'electron') {
-      await app.evaluate(() => {
+      await app!.evaluate(() => {
         globalThis.__localSaves = { started: 0, completed: 0 }
         globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
           globalThis.__localSaves.started++
@@ -336,7 +371,8 @@ async function run(kind) {
       await evaluate(() => {
         // The browser composition root already exposes this store. Instrument only
         // this isolated session's service object; do not add production test hooks.
-        const services = window.prototypeStore.services
+        const services = (window.prototypeStore as unknown as { services: { save: (state: unknown) => Promise<void> } })
+          .services
         const original = services.save.bind(services)
         window.perfProbe.saveState = { started: 0, completed: 0 }
         services.save = async (state) => {
@@ -359,11 +395,13 @@ async function run(kind) {
     assert.equal(afterKey.completed, pending.completed, 'The save finished before the next input was exercised')
     await evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(null)))))
     assert(
-      (await evaluate(() => document.querySelector('[aria-label="Node 1"]').value)).includes(`${prefix}zx`),
+      (await evaluate(() => document.querySelector<HTMLTextAreaElement>('[aria-label="Node 1"]')!.value)).includes(
+        `${prefix}zx`,
+      ),
       'Input was lost during the pending save',
     )
     const samples = await evaluate(() => window.perfProbe.input)
-    metrics = { ...summarize(samples), nextKeyPaintMs: samples.at(-1).ms, artificialSaveDelayMs: 750 }
+    metrics = { ...summarize(samples), nextKeyPaintMs: samples.at(-1)!.ms, artificialSaveDelayMs: 750 }
     while ((await saveState()).completed === pending.completed && Date.now() < deadline) {
       await delay(20)
     }
@@ -378,7 +416,7 @@ async function run(kind) {
       'Automatic save did not persist typed words',
     )
   }
-  const result = {
+  const result: Result = {
     browser,
     scenario: kind,
     repetition: results.filter((result) => result.browser === browser && result.scenario === kind).length + 1,
@@ -398,8 +436,8 @@ try {
   await delay(1000)
   assert(driver.exitCode === null, 'SafariDriver could not start on port 7056')
   for (let repetition = 0; repetition < repetitions; repetition++) {
-    for (browser of ['safari', 'electron']) {
-      for (const scenario of ['typing', 'agenda', 'saving']) await run(scenario)
+    for (browser of ['safari', 'electron'] as const) {
+      for (const scenario of ['typing', 'agenda', 'saving'] as const) await run(scenario)
     }
   }
 } finally {
@@ -415,6 +453,6 @@ try {
       }
       assert(driver.exitCode !== null || driver.signalCode !== null, 'The owned SafariDriver process did not exit')
     }
-    await new Promise((done) => server.close(done))
+    await new Promise<void>((done) => server.close(() => done()))
   }
 }

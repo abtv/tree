@@ -1,3 +1,4 @@
+// Keep JavaScript: ESLint's TypeScript config loader requires jiti or an unstable native-loading flag.
 import js from '@eslint/js'
 import { builtinModules } from 'node:module'
 import globals from 'globals'
@@ -45,7 +46,7 @@ export default tseslint.config(
       'perf.config.ts',
       'scripts/**/*.{js,mjs,ts,mts}',
       'e2e/**/*.{ts,cjs,mjs}',
-      'perf/**/*.{ts,mjs}',
+      'perf/**/*.{ts,mts,mjs}',
       'src/electron/main/**/*.ts',
       'src/electron/preload/**/*.ts',
       'src/infrastructure/main/**/*.ts',

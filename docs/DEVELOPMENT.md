@@ -139,6 +139,8 @@ Prefer `.mts` over `.mjs` for new Node scripts and their tests, and migrate an e
 
 Maintained Node scripts and their tests use `.mts` to declare TypeScript ES modules explicitly. Node 24 runs them directly by stripping erasable types; no build step or extra runner is required. Use explicit extensions in relative imports and type-only imports for types. `tsconfig.scripts.json` enables `erasableSyntaxOnly` and checks the scripts through `npm run typecheck:scripts`, included in `npm run typecheck` and `npm run check`. It uses the repository's ESNext/Bundler resolution to include shared `.ts` helpers; Node execution still requires real import paths and does not read tsconfig settings. The imported JavaScript tool configuration and compatibility launchers are checked as well.
 
+The native Node comparison runner `perf/comparisons/safari-electron.mts` is checked by `tsconfig.e2e.json` alongside the performance suites. ESLint and Stryker configurations retain `.mjs` for their existing loaders and configuration discovery. The three `.mjs` launchers in `scripts/web-release/` preserve installed workflow entry points and delegate to `.mts` implementations.
+
 When type checking is required by §9, type errors must be fixed before the corresponding validation can pass.
 
 ---

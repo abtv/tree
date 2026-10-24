@@ -1,3 +1,4 @@
+// Keep JavaScript: Stryker's default configuration discovery supports .mjs, not .mts.
 import process from 'node:process'
 
 // Mutation testing for the domain and application layers and the pure renderer modules. See docs/DEVELOPMENT.md §12.
