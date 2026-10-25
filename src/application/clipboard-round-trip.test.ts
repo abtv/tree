@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { clipboardSelectionTransition } from './editor-clipboard-transitions'
-import { extractClipboardLinks } from '../infrastructure/main/clipboard'
+import { extractClipboardLinks } from '../shared/clipboard-links'
 import { pasteText, requireNode, type Document, type LinkRange } from '../domain/document'
 
 function sourceDocument(text: string, links: readonly LinkRange[] = []): Document {

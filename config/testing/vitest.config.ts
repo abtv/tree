@@ -35,6 +35,12 @@ export default defineConfig({
           functions: 100,
           lines: 95,
         },
+        'src/shared/png-validation.ts': {
+          statements: 90,
+          branches: 85,
+          functions: 100,
+          lines: 95,
+        },
         'src/electron/main/ipc-handlers.ts': {
           statements: 95,
           branches: 80,

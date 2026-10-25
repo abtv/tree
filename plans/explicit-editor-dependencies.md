@@ -1,6 +1,6 @@
 # Explicit editor dependencies
 
-Status: In progress
+Status: Awaiting owner acceptance
 
 ## Authorization and scope
 
@@ -17,20 +17,20 @@ accepts the delivered result and confirms no further tasks remain in this batch.
 
 ## Tasks
 
-1. **Explicit save timing — Completed.** Add explicit idle and cleanup-retry intervals to
+1. **Explicit save timing — Completed (`4faf5bb`).** Add explicit idle and cleanup-retry intervals to
    the scheduler configuration and pass the browser values at composition. Remove
    the delay-equality Clock adapter. Files: `src/application/save-policy.ts`,
    `editor-save-scheduler.ts`, `editor-store.ts`, their focused tests,
    `src/web/services.ts`, `src/web/main.tsx`, and `docs/ARCHITECTURE.md`.
    Acceptance: default desktop timing and browser timing stay unchanged; an unrelated
    clock timer is unaffected; cleanup retry retains its own explicit interval.
-2. **Browser command source — Completed.** Replace label-based command discovery and
+2. **Browser command source — Completed (`8021794`).** Replace label-based command discovery and
    MutationObserver with explicit command IDs, enabled state and shared handlers.
    Files: `src/web/menu-commands.ts`, `data-menu.ts`, `backup/backup-controller.ts`,
    `main.tsx`, focused command tests and browser command-panel coverage.
    Acceptance: export/import/restore and backup start/stop/resume remain available
    in the same states; actions start synchronously and preserve existing focus handling.
-3. **Platform dependencies — Validated; awaiting commit.** Import the shared attachment limit directly,
+3. **Platform dependencies — Completed with this plan update.** Import the shared attachment limit directly,
    move pure clipboard link parsing into a platform-neutral module, and guard internal
    platform imports. Files: `src/web/services.ts`, `src/infrastructure/main/clipboard.ts`,
    the shared parser, clipboard tests, `eslint.config.mjs`, import-guard tests and
@@ -61,9 +61,24 @@ the fast guards in `npm run check` remain required.
 Execution is bounded to these three tasks, one focused commit each, and the existing
 two-attempt recovery rule for a repeated blocker. Closure needs only acceptance,
 plan retirement and documentation checks. Reserved decisions or behavior changes
-stop the dependent work. Temporary validation details live in `WORKING_PLAN.md`.
+stop the dependent work.
+
+## Acceptance evidence
+
+All three changes preserve existing behavior. `npm run check` passed, including
+4678 unit tests, coverage floors, five fast performance guards, static/governance
+checks and the production build. `npm run test:e2e` passed all 923 Electron cases.
+The affected built-browser storage, quit, compatibility, export, import, backup,
+restore, menu-focus and paste specs passed 35 cases; the Linux-only crash canary
+was correctly skipped on macOS. `npm run audit` found no vulnerabilities.
+Independent review reported `No meaningful issues found` and reused those results.
+No required verification remains blocked and no manual application check is required.
+
+Review the three commits and their architecture descriptions for acceptance. Confirm
+that items 1, 2 and limited 5 are accepted and this batch has no remaining tasks.
+Item 3 remains a separate proposal; item 4 remains deferred.
 
 ## Next task
 
-Validation and independent review passed for all three tasks. Commit task 3.
-Retain this plan for final owner acceptance and confirmation of the review batch scope.
+Wait for owner acceptance and confirmation that this batch has no remaining tasks.
+Then remove this plan and its index row, validate documentation and commit closure.

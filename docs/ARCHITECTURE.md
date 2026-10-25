@@ -313,6 +313,12 @@ The main process treats the preload API as an untrusted boundary: every IPC call
 
 Attachment writes are limited to validated IDs, PNG data, a bounded payload size, and a bounded decoded image size.
 
+`shared/png-validation.ts` owns the pure PNG byte, structure and decoded-size checks.
+Electron's IPC validators re-export these checks; the browser calls them directly
+before its own decoder. Both platforms use `shared/attachment-limits.ts` for the
+payload limit. Browser and shared source cannot import desktop implementation
+modules; lint guards cover static imports, re-exports and dynamic imports.
+
 Before application shutdown is allowed to complete, the main process asks the renderer to flush its queued persistence work. The renderer then acknowledges shutdown through the trusted IPC path. PNG attachment writes validate the PNG signature, chunk structure and CRCs, require image data, enforce a maximum of 32767 pixels per side and 64 megapixels in total before decoding, and decode the image through the platform image decoder before bytes are stored. The decoded-size bound prevents a small, highly compressible payload from forcing an unbounded synchronous native bitmap allocation. The decoder is injected into the IPC handler so the validation rule remains unit-testable while Electron's `nativeImage` decoding stays in the main process.
 
 The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit.
@@ -732,6 +738,10 @@ Moving a node must not require copying its attachment file.
 Clipboard access belongs to infrastructure.
 
 A dedicated clipboard service should translate the operating system clipboard into application-level input.
+
+Both clipboard adapters use `shared/clipboard-links.ts` for bounded pure HTML link
+extraction. The shared parser preserves its input limits and algorithm; platform
+adapters retain native/event clipboard access and their existing payload shapes.
 
 The rest of the application should not directly depend on browser clipboard APIs.
 

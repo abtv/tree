@@ -210,4 +210,43 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['src/web/**/*.{ts,tsx}', 'src/shared/**/*.{ts,tsx}'],
+    rules: {
+      // Keep the fflate import restrictions above; this rule also covers dynamic imports.
+      'no-restricted-syntax': [
+        'error',
+        ...[...nodeImports, 'electron'].map((source) => ({
+          selector: `:matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value='${source}']`,
+          message: 'Browser and shared modules must not depend on Node or Electron APIs.',
+        })),
+        {
+          selector:
+            ':matches(ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration, ImportExpression)[source.value=/^(electron\\/|.*\\/(electron|infrastructure\\/main)\\/)/]',
+          message: 'Browser and shared modules must not import desktop implementation modules.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/shared/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['react', 'react/**', 'react-dom', 'react-dom/**', 'fflate', 'fflate/**'],
+              message: 'Shared contracts and parsers must remain independent of UI and archive libraries.',
+            },
+            {
+              regex: '(^|/)(web|renderer|application|infrastructure)(/|$)',
+              allowTypeImports: true,
+              message: 'Shared contracts and parsers must not depend on runtime adapters or orchestration.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 )

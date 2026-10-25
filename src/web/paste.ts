@@ -1,6 +1,6 @@
 import type { ClipboardPayload } from '../shared/ipc'
-import { extractClipboardLinks } from '../infrastructure/main/clipboard'
-import { MAX_ATTACHMENT_BYTES } from '../electron/main/ipc-security'
+import { extractClipboardLinks } from '../shared/clipboard-links'
+import { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
 
 /** Capture event-owned data synchronously; the store may wait for an earlier clipboard operation. */
 export function capturePasteClipboard(data: DataTransfer): () => Promise<ClipboardPayload> {

@@ -2,7 +2,7 @@ import { EditorStore, type ClipboardValue, type Clock, type EditorServices } fro
 import { allIds, createServices, freshIds } from '../../application/test/editor-store-arbitraries'
 import { requireNode, serializeState, type Document, type Location } from '../../domain/document'
 import type { ClipboardContent, ClipboardWritePayload } from '../../shared/ipc'
-import { extractClipboardLinks } from '../../infrastructure/main/clipboard'
+import { extractClipboardLinks } from '../../shared/clipboard-links'
 
 export interface RealStoreOptions {
   document?: Document

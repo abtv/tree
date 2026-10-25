@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Explicit editor dependencies](explicit-editor-dependencies.md) | In progress | Explicit save timing, then browser command ownership and platform dependency cleanup |
+| [Explicit editor dependencies](explicit-editor-dependencies.md) | Awaiting owner acceptance | Accept items 1, 2 and limited 5; confirm the batch has no remaining tasks |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

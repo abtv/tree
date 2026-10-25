@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { capturePasteClipboard } from './paste'
-import { MAX_ATTACHMENT_BYTES } from '../electron/main/ipc-security'
+import { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
 
 function data(files: File[] = [], text = '', html = ''): DataTransfer {
   return { files, getData: (type: string) => (type === 'text/html' ? html : text) } as unknown as DataTransfer
