@@ -530,6 +530,7 @@ export function App({
                 <section
                   aria-label="Current parent"
                   className="current-parent"
+                  data-color-depth={path.length - 1}
                   data-has-attachment={currentParent.attachment !== undefined}
                   onClick={(event) => {
                     if (currentParent.text.length !== 0 || currentParent.attachment === undefined) return
@@ -567,6 +568,7 @@ export function App({
                 </section>
               )}
               <NodeList
+                colorDepthOffset={path.length}
                 breadcrumbTargets={breadcrumbTargets}
                 onBreadcrumbTarget={setBreadcrumbTarget}
                 dragFreeze={dragFreeze}

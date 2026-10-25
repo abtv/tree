@@ -1630,7 +1630,11 @@ The application must not show unintended flashes of a contrasting background dur
 
 The window's top strip, which holds the window controls (close, minimize, zoom) and the title `Tree`, has the same color as the document background in every appearance, light and dark. The system title bar is not shown, so the strip never differs in tone from the content below it. The strip drags the window, the window controls keep their standard behavior, and the title uses the secondary text color of the current appearance.
 
-The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors. In both appearances, ordinary node text uses the same text color at every depth, including in Agenda. Entering or leaving a focused parent does not change a node's text color. Semantic colors for links, dates, struck-through text, and selection highlights still apply.
+The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors.
+
+* In the dark appearance, Tree node text uses the existing eight-color depth palette based on its absolute depth in the document: root nodes use the first color, their children the second, and so on. Nodes deeper than the eighth level use the ordinary text color.
+* Entering or leaving a focused parent preserves each node's color, including when the node becomes the editable current-parent heading; indentation remains relative to the current parent.
+* Agenda retains its depth colors. The light appearance does not color text by depth. Semantic colors for links, dates, struck-through text, and selection highlights still apply.
 
 * The light appearance is an original palette, not adapted from a published color scheme. Its direction is a soft, paper-like notebook surface, set by a reference screenshot the Product Owner supplied (a note-taking application with a cream background and muted accents) and by the dotted-page look of a bullet journal. It uses a warm cream document surface, warm graphite text, warm gray-beige secondary text and rules, and a muted amber selection highlight with dark text.
 * The gutter dots of node rows are light warm gray, so they stay quiet beside the text.

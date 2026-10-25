@@ -7,6 +7,7 @@ interface NodeRowProps {
   node: TreeNode
   index: number
   depth?: number
+  colorDepth?: number
   renderInput: (node: TreeNode, label: string) => ReactNode
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
@@ -30,6 +31,7 @@ export const NodeRow = memo(function NodeRow({
   node,
   index,
   depth = 0,
+  colorDepth = depth,
   renderInput,
   onActivate,
   onEnter,
@@ -70,6 +72,7 @@ export const NodeRow = memo(function NodeRow({
     <div
       className={className}
       data-depth={depth}
+      data-color-depth={colorDepth}
       data-has-attachment={node.attachment !== undefined}
       data-node-id={node.id}
       data-node-index={index}

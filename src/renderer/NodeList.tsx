@@ -22,6 +22,7 @@ import { useNodeListDrag } from './use-node-list-drag'
 interface NodeListProps {
   nodes: readonly TreeNode[]
   visibleRows?: readonly VisibleRow[]
+  colorDepthOffset?: number
   renderInput: (node: TreeNode, label: string) => ReactNode
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
@@ -42,6 +43,7 @@ const NEVER_EXPANDED = (): boolean => false
 export function NodeList({
   nodes,
   visibleRows: suppliedVisibleRows,
+  colorDepthOffset = 0,
   renderInput,
   onActivate,
   onEnter,
@@ -236,6 +238,7 @@ export function NodeList({
   ): React.JSX.Element => (
     <NodeRow
       depth={depth}
+      colorDepth={depth + colorDepthOffset}
       dragging={freeze?.nodeId === node.id}
       dropAfter={dropMarker?.index === index && !dropMarker.before}
       dropBefore={dropMarker?.index === index && dropMarker.before}
